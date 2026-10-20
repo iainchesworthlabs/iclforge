@@ -44,6 +44,7 @@
 #include "display.hpp"
 #include "lyric_screen.hpp"
 #include "now_screen.hpp"
+#include "wall_clock.hpp"
 
 namespace player {
 namespace {
@@ -205,6 +206,8 @@ NowSettings read_now_settings() {
     return settings;
 }
 
+iclforge::wallclock::Reading read_wall_clock() { return wall_clock_read(); }
+
 void set_backlight(int percent) { display_set_backlight(percent); }
 
 void choose_now_view(iclforge::nowview::View view) {
@@ -212,6 +215,7 @@ void choose_now_view(iclforge::nowview::View view) {
     // was told until the next boot.
     (void)settings_set_now_view(view);
     g_now_view.store(static_cast<int>(view));
+    wall_clock_follow_view(view);
 }
 
 void choose_dim_after(int minutes) {
@@ -367,13 +371,15 @@ void run(void* /*arg*/) {
         }
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
-    char buffer[1280];
+    const panel::WallClockStats clock = panel::wall_clock_stats();
+    char buffer[1536];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
                   "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"dev_view\":%s,\"dev_refreshes\":%lu,"
-                  "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
+                  "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,"
+                  "\"clock_wanted\":%s,\"clock_asking\":%s,\"clock_synced\":%s,\"clock_syncs\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
                   "\"stack_free\":%lu}\n",
@@ -387,7 +393,9 @@ void run(void* /*arg*/) {
                   stats.dimmed ? "true" : "false", stats.dev_view ? "true" : "false",
                   static_cast<unsigned long>(stats.dev_refreshes),
                   static_cast<unsigned long>(stats.dev_refresh_us_last),
-                  static_cast<unsigned long>(stats.dev_refresh_us_max), panel::demo_mode(),
+                  static_cast<unsigned long>(stats.dev_refresh_us_max), clock.wanted ? "true" : "false",
+                  clock.running ? "true" : "false", clock.synced ? "true" : "false",
+                  static_cast<unsigned long>(clock.syncs), panel::demo_mode(),
                   static_cast<unsigned long>(stats.refreshes),
                   static_cast<unsigned long long>(stats.pixels),
                   static_cast<unsigned long>(stats.render_us_last),
@@ -578,9 +586,14 @@ bool panel_built() { return true; }
 
 bool panel_has_view(iclforge::nowview::View view) { return panel::now_view_drawn(view); }
 
-void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
+void panel_set_view(iclforge::nowview::View view) {
+    g_now_view.store(static_cast<int>(view));
+    panel::wall_clock_follow_view(view);
+}
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
+
+bool panel_set_time_zone(std::string_view zone) { return panel::wall_clock_set_zone(zone); }
 
 bool panel_start() {
     if (g_started.exchange(true)) {
@@ -592,6 +605,9 @@ bool panel_start() {
     }
     g_now_view.store(static_cast<int>(settings().now_view));
     g_dim_after_minutes.store(settings().dim_after_minutes);
+    // The clock view's zone, and its time server if that view is the stored one (it asks nobody otherwise).
+    panel::wall_clock_start(settings().time_zone.data());
+    panel::wall_clock_follow_view(settings().now_view);
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {

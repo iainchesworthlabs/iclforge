@@ -751,6 +751,20 @@ iclforge::ControlHandlers control_handlers() {
             player::panel_set_dim_after(minutes);
             return true;
         };
+        // The clock view's zone (stage 3): the board's C library must read it as the route did before it is
+        // kept, and a zone that cannot be stored is not left applied.
+        h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
+        h.set_time_zone = [](std::string_view zone) {
+            const std::string previous = player::settings().time_zone.data();
+            if (!player::panel_set_time_zone(zone)) {
+                return false;
+            }
+            if (!player::settings_set_time_zone(zone)) {
+                (void)player::panel_set_time_zone(previous);
+                return false;
+            }
+            return true;
+        };
     }
     h.slot_bits = []() { return player::sink_slot_bits(); };
     h.set_slot_bits = [](int bits) {

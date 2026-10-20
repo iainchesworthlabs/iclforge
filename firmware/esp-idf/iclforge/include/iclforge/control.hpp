@@ -276,6 +276,15 @@ struct ControlHandlers {
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
 
+    // GET and PUT /timezone: the time zone the clock view of a board with a screen shows, as a POSIX
+    // string (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3). A board with no screen leaves
+    // both empty, and the route answers that it has none. set_time_zone is handed a string the route has
+    // already read as a zone (wallclock::parse_time_zone), or an empty one for `none`; false means the board
+    // could not take it (its C library reads it differently, or it could not be stored). It acts at once,
+    // with no restart. time_zone answers with the words a PUT takes: the string, or `none`.
+    std::function<std::string()> time_zone;
+    std::function<bool(std::string_view zone)> set_time_zone;
+
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.
     std::function<PlayerStats()> stats;

@@ -23,6 +23,7 @@
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/wall_clock.hpp"
 
 // The web UI's two files. CMakeLists.txt embeds them (EMBED_FILES) and they stay
 // in flash. ESP-IDF names each symbol after the file's base name, which is why
@@ -476,6 +477,7 @@ struct Control::Impl {
                          "to change it\n"
                          "GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
+                         "GET  /timezone      the clock view's POSIX time zone, or none, on a board with a screen; PUT one\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
                          "(Sendspin pairing)\n"
@@ -893,6 +895,40 @@ struct Control::Impl {
         return send_text(req, "200 OK", "ok; takes effect at once\n");
     }
 
+    static esp_err_t on_time_zone_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.time_zone) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::string text = h.time_zone();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_time_zone_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        // A POSIX zone string or `none`, read here so that a refusal says what was wrong with it; the owner
+        // is handed the one that parsed.
+        const std::optional<std::string> zone = wallclock::parse_zone_setting(read_body(req));
+        if (!zone) {
+            return send_text(req, "400 Bad Request",
+                             "PUT /timezone wants a POSIX time zone with its daylight saving rules, such as "
+                             "AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n");
+        }
+        if (!h.set_time_zone) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_time_zone(*zone)) {
+            return send_text(req, "409 Conflict",
+                             "that zone could not be taken: this board's C library reads it differently, or it "
+                             "could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; the clock follows at once\n");
+    }
+
     // GET /pairing: see ControlPairings. Here, below on_play, for the reason
     // append_strings gives: contract.spec.js reads the keys GET /status
     // writes from the text between on_status and on_play.
@@ -1098,6 +1134,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
+        {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
+        {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},
         {.uri = "/pairing", .method = HTTP_GET, .handler = &Impl::on_pairing_get},
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},

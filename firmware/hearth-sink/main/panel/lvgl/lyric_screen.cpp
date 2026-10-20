@@ -32,6 +32,7 @@
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
 #include "now_screen.hpp"
+#include "wall_clock.hpp"
 
 namespace player::panel {
 
@@ -348,12 +349,19 @@ struct Screen {
     bool now_known = false;
     std::uint64_t now_read_us = 0;
     std::uint32_t now_key = 0;
-    // The speakers view is what the stage holds, and since when (the dim time counts from there).
+    // The time the clock view shows (wall_clock.hpp), read twice a second while that view is the one chosen.
+    iclforge::wallclock::Reading wall;
+    std::uint64_t wall_read_us = 0;
+    // A no-lyrics view (the speakers or the clock) is what the stage holds, and since when (the dim time counts
+    // from there); np_clock says it is the clock.
     bool np_active = false;
+    bool np_clock = false;
     bool np_was_showing = false;
     std::uint32_t np_since_ms = 0;
-    // Dimmed: a black cover over everything, the backlight at its floor.
+    // Dimmed: the backlight at its floor, and over everything a black cover with one line; but not over the
+    // clock, which is the thing to see in a dark room, so there the cover is clear and only catches the touch.
     bool dimmed = false;
+    bool dim_covered = false;
     lv_obj_t* dim_cover = nullptr;
     lv_obj_t* dim_text = nullptr;
     std::string dim_text_shown;
@@ -713,17 +721,26 @@ void build_dim_cover() {
 }
 
 void set_dimmed(bool dim) {
-    if (dim == g.dimmed) {
+    // The clock stays drawn through a dim: the backlight goes down and nothing is put over it.
+    const bool covered = dim && !g.np_clock;
+    if (dim == g.dimmed && covered == g.dim_covered) {
         return;
     }
     g.dimmed = dim;
+    g.dim_covered = covered;
     if (dim) {
-        const std::string line = g.now.heading.empty() ? std::string("Playing")
-                                                       : "Playing  -  " + std::string(g.now.heading.data(), g.now.heading.size());
-        if (line != g.dim_text_shown) {
-            g.dim_text_shown = line;
-            lv_label_set_text(g.dim_text, line.c_str());
+        if (covered) {
+            const std::string line = g.now.heading.empty() ? std::string("Playing")
+                                                           : "Playing  -  " + std::string(g.now.heading.data(), g.now.heading.size());
+            if (line != g.dim_text_shown) {
+                g.dim_text_shown = line;
+                lv_label_set_text(g.dim_text, line.c_str());
+            }
+            lv_obj_remove_flag(g.dim_text, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(g.dim_text, LV_OBJ_FLAG_HIDDEN);
         }
+        lv_obj_set_style_bg_opa(g.dim_cover, covered ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
         lv_obj_remove_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
         set_backlight(kBacklightDimPercent);
     } else {
@@ -798,6 +815,7 @@ void clear_stage() {
     lv_obj_clean(g.stage_box);
     now_forget();
     g.np_active = false;
+    g.np_clock = false;
     g.words.clear();
     g.dots.fill(nullptr);
     g.dot_count = 0;
@@ -1070,10 +1088,20 @@ void build_plain(int content_w) {
 // that cannot be drawn (the view is off, or the player has not said what room it plays in) the sentence
 // the screen has always had.
 void build_no_lyrics(int content_w) {
+    const NowStyle style{.text = kText, .accent = kAccent, .muted = kMuted, .faint = kFaint,
+                         .label = g.small.latin, .date = g.context.latin};
     if (g.now_set.view == iclforge::nowview::View::kSpeakers && g.now_known) {
-        const NowStyle style{.text = kText, .accent = kAccent, .muted = kMuted, .faint = kFaint, .label = g.small.latin};
         if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
             g.np_active = true;
+            return;
+        }
+    }
+    // The clock does not wait for the player to say what room it plays in: it is the time, which needs no
+    // stream, and until a time server has answered it draws nothing at all.
+    if (g.now_set.view == iclforge::nowview::View::kClock) {
+        if (now_build_clock(g.stage_box, g.width, lv_obj_get_height(g.stage_box), style)) {
+            g.np_active = true;
+            g.np_clock = true;
             return;
         }
     }
@@ -1357,16 +1385,33 @@ bool screen_update() {
     // while the speakers are what it shows, what the player says about the stream five times a second.
     g.now_set = read_now_settings();
     const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
-    if (no_lyrics && g.now_set.view == iclforge::nowview::View::kSpeakers) {
-        if (g.now_read_us == 0 || now_us - g.now_read_us >= 200'000) {
+    const bool speakers_chosen = no_lyrics && g.now_set.view == iclforge::nowview::View::kSpeakers;
+    const bool clock_chosen = no_lyrics && g.now_set.view == iclforge::nowview::View::kClock;
+    if (speakers_chosen || clock_chosen) {
+        // The speakers move with the sound, five times a second; the clock needs only the line over it, which
+        // changes with the stream, so once a second.
+        if (g.now_read_us == 0 || now_us - g.now_read_us >= (speakers_chosen ? 200'000U : 1'000'000U)) {
             g.now_read_us = now_us;
-            g.now_known = read_now_playing(g.now) && !g.now.spots.empty();
+            const bool read = read_now_playing(g.now);
+            if (!read) {
+                g.now.heading.clear();
+            }
+            g.now_known = speakers_chosen && read && !g.now.spots.empty();
             g.now_key = g.now_known ? now_room_key(g.now) : 0;
         }
     } else {
         g.now_read_us = 0;
         g.now_known = false;
         g.now_key = 0;
+    }
+    if (clock_chosen) {
+        if (g.wall_read_us == 0 || now_us - g.wall_read_us >= 500'000) {
+            g.wall_read_us = now_us;
+            g.wall = read_wall_clock();
+        }
+    } else {
+        g.wall_read_us = 0;
+        g.wall = {};
     }
 
     Signature sig;
@@ -1401,6 +1446,9 @@ bool screen_update() {
             update_words(stage);
         } else if (stage.mode == StageMode::kGap) {
             update_dots(stage);
+        } else if (g.np_clock) {
+            // Through a dim as well: the clock is what the dim leaves to see.
+            now_update_clock(g.wall);
         } else if (g.np_active && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }

@@ -115,7 +115,7 @@ if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
                             "panel/lvgl/dev_screen.cpp" "panel/lvgl/dev_info.cpp"
                             "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
-                            "panel/lvgl/lv_memory.cpp")
+                            "panel/lvgl/wall_clock.cpp" "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
         list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")
     else()
@@ -142,7 +142,7 @@ idf_component_register(
              esp_system esp_hw_support esp_hal_wdt
              esp_partition esp_psram app_update espcoredump heap
              esp_driver_sdmmc sdmmc fatfs wear_levelling
-             esp_wifi esp_eth esp_http_client esp_netif esp_event nvs_flash
+             esp_wifi esp_eth esp_http_client esp_netif esp_event lwip nvs_flash
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
 

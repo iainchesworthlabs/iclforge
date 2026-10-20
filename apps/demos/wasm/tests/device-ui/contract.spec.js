@@ -351,6 +351,92 @@ test('the stand-in answers /network-preference as the firmware does', async () =
     }
 });
 
+// Zones the firmware takes and refuses: the same lists as libs/device/tests/test_wall_clock.cpp, which holds
+// the grammar itself, so that the stand-in's copy of it cannot drift from the board's.
+const ZONES_TAKEN = [
+    'AEST-10AEDT,M10.1.0,M4.1.0/3',
+    'EST5EDT,M3.2.0,M11.1.0',
+    'JST-9',
+    'UTC0',
+    '<+0530>-5:30',
+    'ACST-9:30ACDT,M10.1.0,M4.1.0/3',
+    'LHST-10:30LHDT-11,M10.1.0,M4.1.0',
+    'IST-1GMT0,M10.5.0,M3.5.0/1',
+    '<-03>3',
+    'EST5EDT,J60,J300/2:30:00',
+    'EST5EDT,M3.2.0/-1,M11.1.0/25',
+];
+const ZONES_REFUSED = [
+    '',
+    'AEST',
+    '-10',
+    'None',
+    'Australia/Sydney',
+    'AE-10',
+    '<>-10',
+    'AEST-25',
+    'AEST-10:60',
+    'AEST-10AEDT',
+    'AEST-10AEDT,M10.1.0',
+    'AEST-10AEDT,M13.1.0,M4.1.0',
+    'AEST-10AEDT,M10.6.0,M4.1.0',
+    'AEST-10AEDT,M10.1.7,M4.1.0',
+    'AEST-10AEDT,J0,J300',
+    'AEST-10AEDT,366,300',
+    'AEST-10AEDT,M10.1.0,M4.1.0,M1.1.1',
+    'UTC0x',
+    'AEST -10',
+    'ABCDEFGHIJKLMNOPQ-10',
+    `AEST-10AEDT,M10.1.0/${'1'.repeat(63)},M4.1.0`,
+];
+
+test('the stand-in answers /timezone as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has no clock to set: a zone that parses is told so, and one that does not
+        // is refused first, as the route reads the body before it asks whether there is a screen.
+        let reply = await fetch(`${stub.url}timezone`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'JST-9' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Sydney' });
+        expect(reply.status).toBe(400);
+        expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+
+        // One with a screen starts with no zone, which it says, and takes a zone or `none`.
+        stub.device.screen = screenBoard();
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        for (const zone of ZONES_TAKEN) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: `${zone}\n` });
+            expect(reply.status, zone).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.timeZoneOk);
+            expect(await (await fetch(`${stub.url}timezone`)).text()).toBe(`${zone}\n`);
+        }
+        for (const zone of ZONES_REFUSED) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: zone });
+            expect(reply.status, JSON.stringify(zone)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+        }
+        // A refusal changes nothing: the last zone taken is still the one.
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('EST5EDT,M3.2.0/-1,M11.1.0/25\n');
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'none\n' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+
+        // A zone the grammar takes and the board's C library reads differently is refused with a 409 and kept
+        // out, and so is one that cannot be stored.
+        stub.device.screen.timeZoneRefused = true;
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'JST-9' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.timeZoneRefused);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in answers /now-playing and /dim-after as the firmware does', async () => {
     const stub = await startStub();
     try {
@@ -371,9 +457,13 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'Speakers' });
         expect(reply.status).toBe(400);
         expect(await reply.text()).toBe(REPLIES.nowPlayingBad);
-        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'clock' });
+        // The title card is not built yet, so a build refuses it; the clock is.
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'title' });
         expect(reply.status).toBe(409);
         expect(await reply.text()).toBe(REPLIES.nowPlayingRefused);
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'clock' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}now-playing`)).text()).toBe('clock\n');
         reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'off\n' });
         expect(reply.status).toBe(200);
         expect(await reply.text()).toBe(REPLIES.nowPlayingOk);

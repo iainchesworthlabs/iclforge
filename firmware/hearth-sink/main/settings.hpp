@@ -25,6 +25,7 @@
 #include <string_view>
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/wall_clock.hpp"
 
 namespace player {
 
@@ -78,6 +79,9 @@ struct Settings {
     // build and acted on by the one with a panel (panel/lvgl).
     iclforge::nowview::View now_view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    // The time zone the clock view shows, as a POSIX string (iclforge/wall_clock.hpp); empty when none is
+    // set, and the clock then says UTC. A board has no zone database, so this is the zone itself.
+    std::array<char, iclforge::wallclock::kTimeZoneMaxBytes + 1> time_zone{};
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -108,6 +112,9 @@ void settings_load();
 [[nodiscard]] bool settings_set_network_preference(NetworkPreference preference);
 [[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
 [[nodiscard]] bool settings_set_dim_after(int minutes);
+// A POSIX time zone, or an empty string to take the zone away. Refused when the string is not one
+// (iclforge::wallclock::parse_time_zone); the C library's own reading of it is the caller's to check.
+[[nodiscard]] bool settings_set_time_zone(std::string_view zone);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

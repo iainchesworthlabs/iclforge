@@ -50,6 +50,7 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        "GET  /timezone      the clock view's POSIX time zone, or none, on a board with a screen; PUT one",
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
@@ -97,6 +98,11 @@ const REPLIES = {
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
+    timeZoneBad:
+        'PUT /timezone wants a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
+    timeZoneRefused:
+        "that zone could not be taken: this board's C library reads it differently, or it could not be stored\n",
+    timeZoneOk: 'ok; the clock follows at once\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
@@ -162,6 +168,8 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /timezone',
+    'PUT /timezone',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
@@ -409,10 +417,125 @@ function cableNetwork(preference = 'auto') {
 }
 
 // The panel of a board with a screen (firmware/hearth-sink/main/panel/): what it shows while a song has
-// no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing
-// and GET /dim-after use.
+// no lyrics, which of the four views this build has, when it dims, and the time zone its clock view
+// shows, in the words GET /now-playing, GET /dim-after and GET /timezone use. The title card is not built
+// yet, so the build has three of the four views. `timeZoneRefused` is a board whose C library reads a zone
+// differently from the grammar, which the route says with a 409.
 function screenBoard() {
-    return { view: 'speakers', views: ['speakers', 'off'], dimAfter: '5' };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', timeZone: 'none', timeZoneRefused: false };
+}
+
+// Whether a string is a POSIX time zone the firmware takes: libs/device's wall_clock.hpp, rule for rule.
+// `std offset [dst [offset] ,start[/time],end[/time]]`; a zone with daylight saving MUST give its rules, and
+// nothing but printable ASCII is read.
+function validTimeZone(text) {
+    if (text.length === 0 || text.length > 63 || /[^!-~]/.test(text)) {
+        return false;
+    }
+    let at = 0;
+    const peek = () => (at < text.length ? text[at] : '');
+    const take = (c) => {
+        if (peek() === c) {
+            at += 1;
+            return true;
+        }
+        return false;
+    };
+    const digit = (c) => c >= '0' && c <= '9';
+    const alpha = (c) => /^[A-Za-z]$/.test(c);
+    const number = (least, most) => {
+        let value = 0;
+        let count = 0;
+        while (digit(peek()) && count < most) {
+            value = value * 10 + (peek().charCodeAt(0) - 48);
+            at += 1;
+            count += 1;
+        }
+        return count < least ? null : value;
+    };
+    const name = () => {
+        const start = at;
+        if (take('<')) {
+            while (at < text.length && peek() !== '>') {
+                if (!(alpha(peek()) || digit(peek()) || peek() === '+' || peek() === '-')) {
+                    return false;
+                }
+                at += 1;
+            }
+            if (!take('>')) {
+                return false;
+            }
+            const length = at - start - 2;
+            return length >= 3 && length <= 16;
+        }
+        while (alpha(peek())) {
+            at += 1;
+        }
+        const length = at - start;
+        return length >= 3 && length <= 16;
+    };
+    const hms = (maxHours) => {
+        if (!take('-')) {
+            take('+');
+        }
+        const hours = number(1, maxHours >= 100 ? 3 : 2);
+        if (hours === null || hours > maxHours) {
+            return false;
+        }
+        if (take(':')) {
+            const minutes = number(2, 2);
+            if (minutes === null || minutes > 59) {
+                return false;
+            }
+            if (take(':')) {
+                const seconds = number(2, 2);
+                if (seconds === null || seconds > 59) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    const rule = () => {
+        if (take('J')) {
+            const day = number(1, 3);
+            if (day === null || day < 1 || day > 365) {
+                return false;
+            }
+        } else if (take('M')) {
+            const month = number(1, 2);
+            if (month === null || month < 1 || month > 12 || !take('.')) {
+                return false;
+            }
+            const week = number(1, 1);
+            if (week === null || week < 1 || week > 5 || !take('.')) {
+                return false;
+            }
+            const weekday = number(1, 1);
+            if (weekday === null || weekday > 6) {
+                return false;
+            }
+        } else {
+            const day = number(1, 3);
+            if (day === null || day > 365) {
+                return false;
+            }
+        }
+        return take('/') ? hms(167) : true;
+    };
+    if (!name() || !hms(24)) {
+        return false;
+    }
+    if (at === text.length) {
+        return true;
+    }
+    if (!name()) {
+        return false;
+    }
+    if (peek() !== ',' && !hms(24)) {
+        return false;
+    }
+    return take(',') && rule() && take(',') && rule() && at === text.length;
 }
 
 // One of GET /pairing's servers, as on_pairing_get writes it
@@ -931,6 +1054,25 @@ async function startStub() {
                 }
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
+            }
+            case 'GET /timezone':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.timeZone + '\n');
+            case 'PUT /timezone': {
+                const word = body.trim();
+                if (word !== 'none' && !validTimeZone(word)) {
+                    return send(res, 400, REPLIES.timeZoneBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                if (device.screen.timeZoneRefused) {
+                    return send(res, 409, REPLIES.timeZoneRefused);
+                }
+                device.screen.timeZone = word;
+                return send(res, 200, REPLIES.timeZoneOk);
             }
             case 'GET /pairing':
                 if (!device.sendspin) {
