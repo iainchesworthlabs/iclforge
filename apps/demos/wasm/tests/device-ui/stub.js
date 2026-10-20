@@ -87,7 +87,7 @@ const REPLIES = {
     networkPreferenceNone: 'this player has one network, so no preference between networks\n',
     networkPreferenceRefused:
         'that preference could not be set: wifi needs a WiFi network stored, and the board may be busy joining one\n',
-    networkPreferenceOk: 'ok; takes effect at once, and is undone if the interface it names does not come up\n',
+    networkPreferenceOk: 'ok; takes effect in a moment, and is not kept if the interface it names does not come up\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',

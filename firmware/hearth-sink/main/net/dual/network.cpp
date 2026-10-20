@@ -15,10 +15,10 @@
 //
 // A preference for one interface leaves the board with that one and nothing to fall back to,
 // which is what pinning is. So a change made while the board runs is checked before it is kept:
-// the interface it names is brought up first, and the other is switched off only when the
-// named one holds an address. A change that cannot be verified is undone, and the preference is
-// what it was (apply()). A board that boots with a pin it cannot meet comes up with no network
-// and keeps trying: it was told to.
+// the interface it names is brought up first, and the preference is stored, and the other
+// interface switched off, only when the named one holds an address. A change that cannot be met is
+// not kept and the preference stays what it was (apply()). A board that boots with a pin it cannot
+// meet comes up with no network and keeps trying: it was told to.
 
 #include "network.hpp"
 
@@ -52,11 +52,11 @@ constexpr TickType_t kReplyGrace = pdMS_TO_TICKS(750);
 // either, and so for as long as a join takes.
 std::mutex g_mutex;
 
-// The preference before the last change a person made, which an unverified change goes back to.
-std::atomic<NetworkPreference> g_previous{NetworkPreference::automatic};
+// The preference a change over REST asks for and has not yet been kept: the task that applies it
+// brings the interface up, and stores the preference (settings.hpp) only once it has.
+std::atomic<NetworkPreference> g_target{NetworkPreference::automatic};
 std::atomic<bool> g_apply_pending{false};
 std::atomic<bool> g_applier_running{false};
-std::atomic<bool> g_verify{false};
 
 NetworkPreference preference() {
     return settings().network_preference;
@@ -102,22 +102,24 @@ void spawn(const char* name, TaskFunction_t body) {
     }
 }
 
-// Does what the stored preference asks. Called with g_mutex held.
-void reconcile(bool verify) {
-    const NetworkPreference want = preference();
-    const NetworkPreference before = g_previous.load();
-    const auto undo = [&](const char* why) {
-        std::printf("network: %s; keeping the %s preference\n", why,
-                    network_preference_name(before));
-        if (settings_set_network_preference(before)) {
-            g_apply_pending = true;
-            g_verify = false;
-        }
+// Makes `want` the board's preference. The interface it names is brought up first; the preference
+// is stored, and the other interface switched off, only once the named one holds an address, so
+// that a pin that cannot be met leaves the board as it was (the policy, above). Called with g_mutex
+// held.
+void apply(NetworkPreference want) {
+    const auto keep = [&] { return settings_set_network_preference(want); };
+    const auto refuse = [&](const char* why) {
+        std::printf("network: %s; the preference stays %s\n", why,
+                    network_preference_name(preference()));
     };
     switch (want) {
         case NetworkPreference::automatic:
-            // The station's interface before the cable's (station.hpp), then the cable, then
-            // the station's join: the cable's address is not held up by it.
+            // Kept first: nothing is switched off, so there is nothing to verify. The station's
+            // interface before the cable's (station.hpp), then the cable, then the station's
+            // join, so that the cable's address is not held up by it.
+            if (!keep()) {
+                return;
+            }
             if (net::station_configured()) {
                 net::station_prepare();
             }
@@ -128,21 +130,21 @@ void reconcile(bool verify) {
             return;
         case NetworkPreference::ethernet:
             if (!net::ethernet_start() || !net::ethernet_wait(kLinkWaitMs, kAddressWaitMs)) {
-                if (verify) {
-                    undo("no cable answered, so the WiFi station is not switched off");
-                }
+                refuse("no cable answered, so the WiFi station is not switched off");
                 return;
             }
-            net::station_stop();
+            if (keep()) {
+                net::station_stop();
+            }
             return;
         case NetworkPreference::wifi:
             if (!net::station_configured() || !net::station_up()) {
-                if (verify) {
-                    undo("the WiFi station did not join, so the cable is not switched off");
-                }
+                refuse("the WiFi station did not join, so the cable is not switched off");
                 return;
             }
-            net::ethernet_stop();
+            if (keep()) {
+                net::ethernet_stop();
+            }
             return;
     }
 }
@@ -151,9 +153,8 @@ void reconcile(bool verify) {
     vTaskDelay(kReplyGrace);
     for (;;) {
         while (g_apply_pending.exchange(false)) {
-            const bool verify = g_verify.exchange(false);
             const std::lock_guard lock(g_mutex);
-            reconcile(verify);
+            apply(g_target.load());
         }
         g_applier_running = false;
         // A request that arrived as the loop ended asks again, if no one else has started the task.
@@ -166,8 +167,8 @@ void reconcile(bool verify) {
     }
 }
 
-void request_apply(bool verify) {
-    g_verify = verify;
+void request_apply(NetworkPreference want) {
+    g_target = want;
     g_apply_pending = true;
     if (!g_applier_running.exchange(true)) {
         if (xTaskCreate(&apply_task, "net_apply", 4096, nullptr, 3, nullptr) != pdPASS) {
@@ -318,16 +319,12 @@ bool network_set_preference(NetworkPreference next) {
             "network: no WiFi network is stored, so the preference cannot be the station alone\n");
         return false;
     }
-    if (!settings_set_network_preference(next)) {
-        return false;
-    }
-    g_previous = before;
-    std::printf("network: preference %s, was %s\n", network_preference_name(next),
+    std::printf("network: preference %s asked for, is %s\n", network_preference_name(next),
                 network_preference_name(before));
-    // Done off this task, after a moment, with the change checked before it is kept (the policy,
-    // above): this is the control surface's, and the reply goes out over an interface that this may
-    // be about to switch off.
-    request_apply(next != NetworkPreference::automatic);
+    // Done off this task, after a moment, and kept only if it can be met (apply): this is the
+    // control surface's task, and its reply goes out over an interface that this may be about to
+    // switch off.
+    request_apply(next);
     return true;
 }
 

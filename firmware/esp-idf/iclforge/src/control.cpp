@@ -827,8 +827,8 @@ struct Control::Impl {
                              "and the board may be busy joining one\n");
         }
         return send_text(req, "200 OK",
-                         "ok; takes effect at once, and is undone if the interface it names does not "
-                         "come up\n");
+                         "ok; takes effect in a moment, and is not kept if the interface it names "
+                         "does not come up\n");
     }
 
     // GET /pairing: see ControlPairings. Here, below on_play, for the reason
