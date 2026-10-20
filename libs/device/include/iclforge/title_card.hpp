@@ -34,7 +34,7 @@ enum class Say : std::uint8_t { kLeave, kClear, kSet };
 struct TitleUpdate {
     struct Text {
         Say say = Say::kLeave;
-        std::string_view value;
+        std::string_view value = {};
     };
     struct Number {
         Say say = Say::kLeave;
