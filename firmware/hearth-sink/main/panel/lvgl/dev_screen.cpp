@@ -3,7 +3,7 @@
 // What it shows, and the words and numbers for it, are iclforge/dev_view.hpp's (libs/device, tested
 // on the host): this file lays the rows out, draws them, and handles the taps. The rows are labels
 // at fixed places in two columns, with the console's last lines under both; a row's text is set only
-// when it changed, so that a refresh twice a second draws the numbers that moved and nothing else.
+// when it changed, so that a refresh once a second (every two while a stream plays) draws the numbers that moved and nothing else.
 
 #include "dev_screen.hpp"
 
@@ -48,7 +48,9 @@ constexpr int kMeterWidth = 12;
 constexpr int kMeterGap = 4;
 constexpr int kMeterHeight = 34;
 
-constexpr std::uint32_t kRefreshMs = 500;
+constexpr std::uint32_t kRefreshMs = 1000;
+// While a stream plays the view asks half as often: its drawing shares the PSRAM with the decoder.
+constexpr std::uint32_t kRefreshPlayingMs = 2000;
 // A tap that closes the view comes after the three that opened it: ignored for this long, so a
 // fourth tap does not shut it again.
 constexpr std::uint32_t kCloseGuardMs = 500;
@@ -127,6 +129,9 @@ struct Dev {
     std::uint32_t opened_ms = 0;
     std::uint32_t refreshed_ms = 0;
     std::uint32_t touched_ms = 0;
+
+    // What the refreshes have cost the panel's task, for GET :8081/panel.
+    DevStats stats;
 };
 
 Dev g;
@@ -168,8 +173,12 @@ lv_obj_t* make_label(lv_obj_t* parent, const std::string& text, const lv_font_t*
     lv_label_set_text(label, text.c_str());
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, color(rgb), 0);
+    // One line, with dots where a value is too long for it: LVGL puts the dots only in a label whose
+    // height is fixed, and a label of automatic height wraps (a server's long name overlapped the row
+    // under it on the first run on the kit).
     lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_width(label, width);
+    lv_obj_set_height(label, lv_font_get_line_height(font));
     lv_obj_set_pos(label, x, y);
     return label;
 }
@@ -440,6 +449,7 @@ void rebuild_rows() {
         g.confirm_headline = make_label(g.confirm, "", g.semi24, g.c.text, 12, 12, kColumnWidth);
         g.confirm_detail = make_label(g.confirm, "", g.regular.latin, g.c.muted, 12, 46, kColumnWidth);
         lv_label_set_long_mode(g.confirm_detail, LV_LABEL_LONG_MODE_WRAP);
+        lv_obj_set_height(g.confirm_detail, LV_SIZE_CONTENT);
         lv_obj_t* const cancel = make_button(g.confirm, "Cancel", kConfirmButtonWidth, kSegmentHeight, g.c.surface_up,
                                              g.c.text, &on_cancel_clicked, nullptr, nullptr);
         lv_obj_set_pos(cancel, 12, kConfirmHeight - kSegmentHeight - 12);
@@ -631,6 +641,7 @@ void refresh_log() {
 }
 
 void refresh(std::uint32_t now) {
+    const std::int64_t started = time_us();
     g.refreshed_ms = now;
     g.facts = read_dev_facts();
     g.page = dv::describe(g.facts);
@@ -641,6 +652,10 @@ void refresh(std::uint32_t now) {
     }
     apply(now);
     refresh_log();
+    const auto took = static_cast<std::uint32_t>(time_us() - started);
+    ++g.stats.refreshes;
+    g.stats.refresh_us_last = took;
+    g.stats.refresh_us_max = std::max(g.stats.refresh_us_max, took);
 }
 
 }  // namespace
@@ -652,6 +667,8 @@ void dev_init(int width, int height, const DevColours& colours) {
 }
 
 void dev_open() { g.want_open = true; }
+
+DevStats dev_stats() { return g.stats; }
 
 bool dev_is_open() { return (g.open && !g.want_close) || g.want_open; }
 
@@ -682,7 +699,8 @@ void dev_update(std::uint32_t now) {
     if (g.confirming && now - g.confirm_since_ms > kConfirmIdleMs) {
         hide_confirm();
     }
-    if (now - g.refreshed_ms >= kRefreshMs || g.refreshed_ms == 0) {
+    const bool playing = g.facts.player && !g.facts.stream.empty() && g.facts.stream != "idle";
+    if (now - g.refreshed_ms >= (playing ? kRefreshPlayingMs : kRefreshMs) || g.refreshed_ms == 0) {
         refresh(now);
         // The words of a confirming step follow the facts: a cable plugged in while it is up changes them.
         if (g.confirming) {

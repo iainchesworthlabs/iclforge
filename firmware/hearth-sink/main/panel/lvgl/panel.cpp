@@ -231,6 +231,9 @@ void run(void* /*arg*/) {
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
+            g_stats.dev_refreshes = screen.dev_refreshes;
+            g_stats.dev_refresh_us_last = screen.dev_refresh_us_last;
+            g_stats.dev_refresh_us_max = screen.dev_refresh_us_max;
             g_stats.stack_free = static_cast<std::uint32_t>(uxTaskGetStackHighWaterMark(nullptr));
         }
         const auto cycle_us = static_cast<std::uint32_t>(esp_timer_get_time() - started);
@@ -286,12 +289,12 @@ void run(void* /*arg*/) {
         }
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
-    char buffer[1024];
+    char buffer[1280];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
-                  "\"screen\":\"%s\",\"dev_view\":%s,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
+                  "\"screen\":\"%s\",\"dev_view\":%s,\"dev_refreshes\":%lu,\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
                   "\"stack_free\":%lu}\n",
@@ -301,7 +304,9 @@ void run(void* /*arg*/) {
                   static_cast<unsigned long>(counters.failures.load()),
                   static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
-                  stats.dev_view ? "true" : "false", panel::demo_mode(),
+                  stats.dev_view ? "true" : "false", static_cast<unsigned long>(stats.dev_refreshes),
+                  static_cast<unsigned long>(stats.dev_refresh_us_last),
+                  static_cast<unsigned long>(stats.dev_refresh_us_max), panel::demo_mode(),
                   static_cast<unsigned long>(stats.refreshes),
                   static_cast<unsigned long long>(stats.pixels),
                   static_cast<unsigned long>(stats.render_us_last),

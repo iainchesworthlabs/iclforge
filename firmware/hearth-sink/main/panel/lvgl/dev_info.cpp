@@ -7,7 +7,7 @@
 // words are libs/device's and tested there. What it must never read is the Wi-Fi passphrase and the
 // Sendspin pairing token, and Facts has no field to put either in.
 //
-// Called from the panel's task with LVGL's lock held, about twice a second while the view is open
+// Called from the panel's task with LVGL's lock held, once a second while the view is open
 // and never otherwise. Nothing here waits for long, and the console is read a few hundred bytes at a
 // time from a cursor, so that a refresh does not ask the internal heap, which a decoder has little
 // of, for more than a kilobyte.
@@ -59,6 +59,18 @@ constexpr std::int64_t kApplyWaitUs = 45'000'000;
 // How often the core dump is looked for: it is a flash read, and it changes only when the board
 // crashes (and so restarts) or someone erases it.
 constexpr std::int64_t kCoreDumpEveryUs = 30'000'000;
+// How often the network is asked what it holds. On a board whose radio is a companion chip, the
+// station's signal is a call across SDIO to the C6 (about 40 ms), and the idle screen asks the same
+// of the network twice a second already: the view asks no more often than every two seconds, and at
+// once while a change of
+// the preference is under way.
+constexpr std::int64_t kNetworkEveryUs = 2'000'000;
+// And while a stream plays, when the board has its audio to keep and the Sendspin traffic shares that
+// bus: the view asks every ten seconds. The first run of plays on the kit with the view open (four,
+// refreshing twice a second and asking every half second) had one with three late chunks and an
+// underrun against none of four with it shut, which is within the one-in-four that start badly with
+// nothing open (planning/karaoke-p4x-panel.md) and not enough to say it is not the view.
+constexpr std::int64_t kNetworkWhilePlayingEveryUs = 10'000'000;
 // The console is read only while the internal heap has a block this big: a refresh that would make
 // a decoder's allocation fail is skipped, and the lines stay as they were.
 constexpr std::size_t kLogReadNeedsInternal = 4 * 1024;
@@ -126,7 +138,7 @@ dv::NetInterface convert(const InterfaceStatus& from) {
     return to;
 }
 
-void read_network(dv::Facts& facts) {
+void read_network_now(dv::Facts& facts) {
     const NetworkLink link = network_link();
     const std::string address = network_address();
     if (link.preference != nullptr) {
@@ -155,6 +167,26 @@ void read_network(dv::Facts& facts) {
     facts.mdns = discovery_host_name() + ".local";
     facts.web_address = address;
     facts.web_port = CONFIG_ICLFORGE_EXAMPLE_CONTROL_PORT;
+}
+
+void read_network(dv::Facts& facts, bool playing) {
+    static dv::Facts cache;
+    static std::int64_t at_us = -kNetworkEveryUs;
+    const std::int64_t now = esp_timer_get_time();
+    const std::int64_t every = playing ? kNetworkWhilePlayingEveryUs : kNetworkEveryUs;
+    if (now - at_us >= every || g_change == dv::NetChange::working) {
+        at_us = now;
+        cache = dv::Facts{};
+        read_network_now(cache);
+    }
+    facts.active = cache.active;
+    facts.preference = cache.preference;
+    facts.ethernet = cache.ethernet;
+    facts.wifi = cache.wifi;
+    facts.name = cache.name;
+    facts.mdns = cache.mdns;
+    facts.web_address = cache.web_address;
+    facts.web_port = cache.web_port;
 }
 
 void read_configuration(dv::Facts& facts, const BoardReport& report) {
@@ -259,9 +291,9 @@ std::uint64_t g_cursor = 0;
 dv::Facts gather_dev_facts(const PanelStats& panel, const TouchCounters& touch) {
     dv::Facts facts;
     const BoardReport report = board_report();
-    read_network(facts);
-    read_configuration(facts, report);
     read_stream(facts, report);
+    read_network(facts, facts.player && !facts.stream.empty() && facts.stream != "idle");
+    read_configuration(facts, report);
     read_performance(facts, panel, touch);
 
     // A change of the preference that was asked for is under way until the board says it has the

@@ -1226,6 +1226,10 @@ ScreenStats screen_stats() {
     stats.rebuilds = g.rebuilds;
     stats.rebuild_us_max = g.rebuild_us_max;
     stats.dev_view = dev_is_open();
+    const DevStats dev = dev_stats();
+    stats.dev_refreshes = dev.refreshes;
+    stats.dev_refresh_us_last = dev.refresh_us_last;
+    stats.dev_refresh_us_max = dev.refresh_us_max;
     return stats;
 }
 

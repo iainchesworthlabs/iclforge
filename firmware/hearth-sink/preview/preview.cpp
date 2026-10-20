@@ -452,6 +452,8 @@ int main(int argc, char** argv) {
     g_dev = healthy_board();
     g_dev.active = "wifi";
     g_dev.web_address = g_dev.wifi.address;
+    // A server whose name is longer than its row: Music Assistant gives its id with it.
+    g_dev.server = "Music Assistant (d5369777-music-assistant)";
     g_dev.ethernet.link = false;
     g_dev.ethernet.address.clear();
     g_dev.ethernet.speed_mbps.reset();

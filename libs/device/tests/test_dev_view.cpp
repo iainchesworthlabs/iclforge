@@ -293,10 +293,9 @@ TEST_CASE("a panic, a stored core dump and a profile that is not there are notic
 
 TEST_CASE("the streaming section reads clean when nothing has gone wrong", "[device][dev_view]") {
     const Section stream = describe(healthy()).streaming;
-    CHECK(find(stream, "Server")->value ==
-          "Hearth on STUDIO-PC \xC2\xB7 1 connection \xC2\xB7 2 paired");
+    CHECK(find(stream, "Server")->value == "Hearth on STUDIO-PC");
     CHECK(find(stream, "Clock")->value == "converged \xC2\xB7 error 120 us");
-    CHECK(find(stream, "Stream")->value == "bursts \xC2\xB7 6 outputs");
+    CHECK(find(stream, "Stream")->value == "bursts \xC2\xB7 6 outputs \xC2\xB7 1 conn \xC2\xB7 2 paired");
     CHECK(find(stream, "Bursts")->value == "1,234");
     for (const char* key : {"Underruns", "Late", "Dropped", "Resyncs", "Invalid"}) {
         REQUIRE(find(stream, key) != nullptr);
@@ -333,10 +332,10 @@ TEST_CASE("a clock that has not converged matters only while something plays", "
     f.stream = "idle";
     f.peak_db.clear();
     CHECK(find(describe(f).streaming, "Clock")->tone == Tone::muted);
-    CHECK(find(describe(f).streaming, "Stream")->value == "idle");
+    CHECK(find(describe(f).streaming, "Stream")->value == "idle \xC2\xB7 1 conn \xC2\xB7 2 paired");
     f.server.clear();
     f.connections = 0;
-    CHECK(find(describe(f).streaming, "Server")->value.starts_with("none"));
+    CHECK(find(describe(f).streaming, "Server")->value == "none");
     CHECK(find(describe(f).streaming, "Server")->tone == Tone::muted);
 }
 
@@ -384,7 +383,10 @@ TEST_CASE("the performance section watches the heap and the panel's own cost", "
     f.touch_failures = 2;
     perf = describe(f).performance;
     CHECK(find(perf, "Heap")->tone == Tone::attention);
-    CHECK(find(perf, "Panel")->tone == Tone::attention);
+    // The panel's own late cycles are not a fault: the task is the lowest, and the view's own
+    // refreshes make some.
+    CHECK(find(perf, "Panel")->value == "render 6.1 ms (max 20.0 ms) \xC2\xB7 4 late");
+    CHECK(find(perf, "Panel")->tone == Tone::text);
     CHECK(find(perf, "Touch")->tone == Tone::attention);
 }
 
@@ -424,25 +426,57 @@ TEST_CASE("the confirming step names what is about to be switched off", "[device
 }
 
 TEST_CASE("a change the board would refuse is blocked before it is asked", "[device][dev_view]") {
+    // The cable is on and has no link: nothing would answer a pin to it.
     Facts f = healthy();
+    f.ethernet.link = false;
     f.ethernet.address.clear();
     Confirm c = confirm_text(f, Preference::ethernet);
     CHECK(c.blocked);
     CHECK(c.tone == Tone::attention);
+    CHECK(c.detail.find("No cable is linked") != std::string::npos);
 
+    // No Wi-Fi network is stored: the board answers PUT with a refusal.
     f = healthy();
     f.wifi.configured = false;
     c = confirm_text(f, Preference::wifi);
     CHECK(c.blocked);
     CHECK(c.detail.find("No Wi-Fi network is stored") != std::string::npos);
 
-    f = healthy();
-    f.wifi.address.clear();
-    c = confirm_text(f, Preference::wifi);
-    CHECK(c.blocked);
-    CHECK(c.detail.find("holds no address") != std::string::npos);
     // Auto never cuts the board off.
     CHECK_FALSE(confirm_text(f, Preference::automatic).blocked);
+}
+
+TEST_CASE("an interface the current pin has switched off can be pinned to: the board brings it up first", "[device][dev_view]") {
+    // Pinned to the cable: the station is off, has no address, and is still the way back to Wi-Fi.
+    Facts f = healthy();
+    f.preference = "ethernet";
+    f.wifi.enabled = false;
+    f.wifi.link = false;
+    f.wifi.address.clear();
+    f.wifi.ssid.clear();
+    f.wifi.rssi_dbm.reset();
+    Confirm c = confirm_text(f, Preference::wifi);
+    CHECK_FALSE(c.blocked);
+    CHECK(c.detail.find("Wi-Fi is joined first") != std::string::npos);
+
+    // The same the other way round: the cable's MAC is stopped, so its link reads as down.
+    f = healthy();
+    f.active = "wifi";
+    f.preference = "wifi";
+    f.ethernet.enabled = false;
+    f.ethernet.link = false;
+    f.ethernet.address.clear();
+    c = confirm_text(f, Preference::ethernet);
+    CHECK_FALSE(c.blocked);
+    CHECK(c.detail.find("The cable is brought up first") != std::string::npos);
+
+    // A station that is on and has not joined yet: the board keeps the cable if it cannot.
+    f = healthy();
+    f.wifi.link = false;
+    f.wifi.address.clear();
+    c = confirm_text(f, Preference::wifi);
+    CHECK_FALSE(c.blocked);
+    CHECK(c.detail.find("keeps the cable") != std::string::npos);
 }
 
 TEST_CASE("a change in progress is described", "[device][dev_view]") {

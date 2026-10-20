@@ -23,7 +23,7 @@ struct TouchCounters;
 // panel's own counters, which panel.cpp holds, added to it.
 [[nodiscard]] iclforge::devview::Facts gather_dev_facts(const PanelStats& panel, const TouchCounters& touch);
 
-// Everything the view shows, about twice a second. Called from the panel's task with LVGL's lock
+// Everything the view shows, once a second. Called from the panel's task with LVGL's lock
 // held, so it takes no lock of the panel's and waits for nothing for long.
 [[nodiscard]] iclforge::devview::Facts read_dev_facts();
 

@@ -484,16 +484,16 @@ inline constexpr int kWeakSignalDbm = -75;
     } else {
         const bool playing = !facts.stream.empty() && facts.stream != "idle";
         std::string server = facts.server.empty() ? std::string("none") : facts.server;
-        stream.rows.push_back(one("Server",
-                                  join({server, std::to_string(facts.connections) + (facts.connections == 1 ? " connection" : " connections"),
-                                        std::to_string(facts.paired) + " paired"}),
-                                  facts.server.empty() ? Tone::muted : Tone::text));
+        // A server's name may be long (Music Assistant gives its id with it): it has the row to itself.
+        stream.rows.push_back(one("Server", server, facts.server.empty() ? Tone::muted : Tone::text));
         std::string clock = facts.clock_converged ? "converged \xC2\xB7 error " + micros_text(facts.clock_error_us)
                                                   : std::string("not converged");
         stream.rows.push_back(one("Clock", clock, facts.clock_converged ? Tone::text : (playing ? Tone::attention : Tone::muted)));
         stream.rows.push_back(one("Stream", join({facts.stream.empty() ? std::string("idle") : facts.stream,
                                                   facts.peak_db.empty() ? std::string()
-                                                                         : std::to_string(facts.peak_db.size()) + " outputs"}),
+                                                                         : std::to_string(facts.peak_db.size()) + " outputs",
+                                                  std::to_string(facts.connections) + " conn",
+                                                  std::to_string(facts.paired) + " paired"}),
                                   playing ? Tone::text : Tone::muted));
         stream.rows.push_back(two({"Bursts", grouped(facts.bursts), Tone::text}, detail::counter("Underruns", facts.underruns)));
         stream.rows.push_back(two(detail::counter("Late", facts.late), detail::counter("Dropped", facts.dropped)));
@@ -526,7 +526,7 @@ inline constexpr int kWeakSignalDbm = -75;
     perf.rows.push_back(one("Panel", join({"render " + micros_text(static_cast<long long>(facts.render_us_mean)) + " (max " +
                                                micros_text(static_cast<long long>(facts.render_us_max)) + ")",
                                            std::to_string(facts.late_cycles) + " late"}),
-                            facts.late_cycles > 0 ? Tone::attention : Tone::text));
+                            Tone::text));
     perf.rows.push_back(one("Touch", join({grouped(facts.touch_reads) + " reads", std::to_string(facts.touch_failures) + " failed",
                                            grouped(facts.touch_points) + " touches"}),
                             facts.touch_failures > 0 ? Tone::attention : Tone::text));
@@ -583,13 +583,18 @@ struct Confirm {
             confirm.headline = "Use auto?";
             confirm.detail = "The cable when it is linked, Wi-Fi when it is not. Both stay on.";
             return confirm;
+        // The board keeps a pin only once the interface it names holds an address, and brings it up
+        // itself if it is off now (a pin to the other one switches it off): so an interface that is
+        // off is not a reason to refuse, and a switched-on one with nothing to answer it is.
         case Preference::ethernet:
             confirm.headline = "Use the cable only?";
             confirm.detail = "Wi-Fi is switched off.";
-            if (facts.ethernet.address.empty()) {
+            if (facts.ethernet.enabled && !facts.ethernet.link) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
-                confirm.detail = "The cable holds no address now: the board would be cut off, so it refuses.";
+                confirm.detail = "No cable is linked, so the board would be cut off: it refuses.";
+            } else if (!facts.ethernet.enabled) {
+                confirm.detail += " The cable is brought up first, and Wi-Fi stays on until it holds an address.";
             } else if (facts.active != "ethernet") {
                 confirm.detail += where_now(facts.ethernet);
             }
@@ -600,11 +605,11 @@ struct Confirm {
             if (!facts.wifi.configured) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
-                confirm.detail = "No Wi-Fi network is stored, so the board would be cut off, so it refuses.";
+                confirm.detail = "No Wi-Fi network is stored, so the board would be cut off: it refuses.";
+            } else if (!facts.wifi.enabled) {
+                confirm.detail += " Wi-Fi is joined first, and the cable stays on until it holds an address.";
             } else if (facts.wifi.address.empty()) {
-                confirm.tone = Tone::attention;
-                confirm.blocked = true;
-                confirm.detail = "Wi-Fi holds no address now: the board would be cut off, so it refuses.";
+                confirm.detail += " Wi-Fi has no address yet: if it cannot join, the board keeps the cable.";
             } else if (facts.active != "wifi") {
                 confirm.detail += where_now(facts.wifi);
             }
