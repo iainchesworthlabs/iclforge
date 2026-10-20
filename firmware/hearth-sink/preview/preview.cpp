@@ -605,6 +605,8 @@ int main(int argc, char** argv) {
         write_bmp(out / "s16-title-cleared.bmp");
         say_no_title();
         g_settings.dim_after_minutes = 5;
+        // The sheet below shows the default choice, as a board out of the box does.
+        g_settings.view = iclforge::nowview::View::kSpeakers;
     }
 
     // S9: the sheet, over a line being sung.
