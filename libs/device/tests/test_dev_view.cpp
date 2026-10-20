@@ -19,10 +19,22 @@ Facts healthy() {
     Facts f;
     f.active = "ethernet";
     f.preference = "auto";
-    f.ethernet = {.present = true, .enabled = true, .link = true, .address = "192.168.1.163",
-                  .mac = "e8:f6:0a:e7:53:fb", .speed_mbps = 100, .full_duplex = true};
-    f.wifi = {.present = true, .enabled = true, .link = true, .address = "192.168.1.251",
-              .mac = "e8:f6:0a:e7:53:f9", .configured = true, .ssid = "HomeNet", .rssi_dbm = -52};
+    // Member by member: the CI's compilers refuse a designated initializer that leaves a member out.
+    f.ethernet.present = true;
+    f.ethernet.enabled = true;
+    f.ethernet.link = true;
+    f.ethernet.address = "192.168.1.163";
+    f.ethernet.mac = "e8:f6:0a:e7:53:fb";
+    f.ethernet.speed_mbps = 100;
+    f.ethernet.full_duplex = true;
+    f.wifi.present = true;
+    f.wifi.enabled = true;
+    f.wifi.link = true;
+    f.wifi.address = "192.168.1.251";
+    f.wifi.mac = "e8:f6:0a:e7:53:f9";
+    f.wifi.configured = true;
+    f.wifi.ssid = "HomeNet";
+    f.wifi.rssi_dbm = -52;
     f.name = "hearth-e753f9";
     f.mdns = "hearth-e753f9.local";
     f.web_address = "192.168.1.163";
