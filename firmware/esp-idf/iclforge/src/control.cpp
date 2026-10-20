@@ -474,7 +474,7 @@ struct Control::Impl {
                          "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
                          "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one "
                          "to change it\n"
-                         "GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it\n"
+                         "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
@@ -851,7 +851,7 @@ struct Control::Impl {
         auto& h = self(req)->handlers;
         const std::string body = read_body(req);
         if (!nowview::parse_view(body)) {
-            return send_text(req, "400 Bad Request", "PUT /now-playing wants speakers, title, clock or off\n");
+            return send_text(req, "400 Bad Request", "PUT /now-playing wants speakers, title, clock, off or dark\n");
         }
         if (!h.set_now_playing) {
             return send_text(req, "409 Conflict", "this board has no screen\n");
