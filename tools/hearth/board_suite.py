@@ -105,7 +105,7 @@ STATUS_FIELDS = (
 
 CHECKLIST = (
     "the suite cannot see another session. Before it runs, by hand:",
-    "  - read all five lock files (python tools/hearth/bench.py status)",
+    "  - read every lock file (python tools/hearth/bench.py status)",
     "  - ListAgents: is a peer building or testing near this board?",
     "  - no idf.py, esptool, ota.py or capture of this board is running",
     "  - the board's /status is stopped (the suite checks that one)",

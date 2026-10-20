@@ -137,7 +137,7 @@
       ]
     },
     "p4-rev3": {
-      "note": "No board of silicon revision v3.x is on the bench (the owner's kit has not arrived): the profile is held by its guard and its budgets and has no play list and no baseline. The first board that runs the image adds its rows, as the v1.x profiles' were.",
+      "note": "The owner's kit (P4X, chip v3.2) is on the bench since 2026-10-20 and runs this image, but the suite has not been played on it: the profile is held by its guard and its budgets and has no play list and no baseline yet. The first run adds its rows, as the v1.x profiles' were.",
       "plays": []
     }
   }

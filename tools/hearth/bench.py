@@ -11,7 +11,7 @@
 
 Everything here reads: nothing writes a board's flash (that is bench_flash.py, which holds the
 same rules). The rules are the owner's of 2026-10-11, planning/esp32-board-bench.md has them in
-full: a board nobody has booked is not one to use, the five lock files are read before one is
+full: a board nobody has booked is not one to use, every lock file is read before one is
 taken, and a lock that is not this session's is left alone however old it is.
 
 - **boards** and **status**: the table in bench.json, and for each board its lock (who, why, until

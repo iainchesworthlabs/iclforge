@@ -921,7 +921,9 @@
         "panel",
         "panel-dsi"
       ],
-      "boards": [],
+      "boards": [
+        "P4X"
+      ],
       "image": {
         "name": "hearth-sink-esp32p4-rev3",
         "flash_size": "16MB",
