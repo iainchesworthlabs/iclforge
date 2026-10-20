@@ -198,19 +198,30 @@ the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
 
-Which screen shows is the owner's: `speakers` (the default), `clock` ([below](#the-clock)) or `off`,
+Which screen shows is the owner's: `speakers` (the default), `clock` ([below](#the-clock)), `dark`, or `off`,
 which is the old sentence; `title` (title, artist and a progress line, once the sink asks the server
 for them) is planned and refused until then
 ([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
 
+**Dark** is for a listener who wants no light at all while music plays. With it chosen, the backlight
+is **off** from the moment a song with no lyrics begins, however long ago anything last touched the
+panel, and the screen says nothing. **A tap lights the speakers for 30 seconds from the last touch**
+(another tap moves that on), and then it is dark again. The tap that lights it does not also press what
+is under it; the developer view keeps the screen lit while it is open (the Adjust sheet puts itself
+away after eight seconds, inside the 30). The sheet's dim row, which has no meaning here, says "30
+seconds, then dark again" in place of its dim times. Only this screen goes dark: a lyric screen and
+the idle screen are lit as they always were.
+
+![The Adjust sheet with Dark chosen](screenshots/p4-panel-controls-dark.png)
+
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock` or `off` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
 
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
-404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` and the time's
-state.
+404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
+dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; and the [time of day](#the-time-of-day)'s state.
 
 #### The clock
 

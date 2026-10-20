@@ -31,11 +31,12 @@ struct NowStyle {
     const lv_font_t* date = nullptr;
 };
 
-// The views this build draws: the speakers, the clock, and "off" (the sentence the screen has always had).
-// The title card comes with what it needs (planning/p4x-now-playing.md); until then the sheet does not
-// offer it and PUT /now-playing refuses it.
+// The views this build draws: the speakers, the clock, "dark" (nothing lit until a touch lights the speakers)
+// and "off" (the sentence the screen has always had). The title card comes with what it needs
+// (planning/p4x-now-playing.md); until then the sheet does not offer it and PUT /now-playing refuses it.
 [[nodiscard]] constexpr bool now_view_drawn(iclforge::nowview::View view) {
     return view == iclforge::nowview::View::kSpeakers || view == iclforge::nowview::View::kClock ||
+           view == iclforge::nowview::View::kDark ||
            view == iclforge::nowview::View::kOff;
 }
 

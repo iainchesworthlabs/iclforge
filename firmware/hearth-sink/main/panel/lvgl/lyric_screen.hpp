@@ -25,8 +25,10 @@ struct ScreenStats {
     std::uint32_t dev_refreshes = 0;
     std::uint32_t dev_refresh_us_last = 0;
     std::uint32_t dev_refresh_us_max = 0;
-    // The no-lyrics screen has dimmed (planning/p4x-now-playing.md).
+    // The no-lyrics screen has dimmed or is dark (planning/p4x-now-playing.md): a black cover is up.
     bool dimmed = false;
+    // The backlight, percent: lit, the dimmed floor, or off in the dark view.
+    int backlight = 80;
 };
 
 // Builds the screen on `disp`. False, having said why, if the fonts did not come up.

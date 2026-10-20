@@ -139,6 +139,10 @@
     "55804346f": {
       "commit": "55804346f5dd9ca0961ee14e7ba555e50593522c",
       "what": "the tree panel_preview was built from: the commit that added the clock view (the clock, with a time zone and with none, and before a time server has answered; the Adjust sheet with its Clock button), 2026-10-21"
+    },
+    "fe6d347be": {
+      "commit": "fe6d347bea9b9c5ed823489dbbda2d888fff6f05",
+      "what": "the tree panel_preview was built from: the commit that added the dark view and its sheet, 2026-10-21"
     }
   },
   "pictures": [
@@ -1071,6 +1075,12 @@
       "program": "the Hearth for Android app's instrumented tests",
       "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "54fd33f78"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-controls-dark.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "fe6d347be"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-controls.png",

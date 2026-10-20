@@ -12,6 +12,7 @@
     | Stage | What | State |
     |---|---|---|
     | 1 | The setting (`GET` and `PUT /now-playing`, `/dim-after`, the Adjust sheet), the **speakers** view, dimming | Built; run on the kit: see [On the kit](#on-the-kit) |
+    | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built, the rule tested on the host and in the preview tool; see [The dark view](#the-dark-view) for what has run on the kit |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Not started; [what it needs](#stage-2-the-title-card) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
 
@@ -90,6 +91,12 @@ The owner, 2026-10-21, after seeing the pictures:
 What the decision leaves for the stages: the title card and the clock are in the sheet's list only
 once the board can draw them, and `PUT /now-playing title` and `clock` answer 409 until then.
 
+The owner, later on 2026-10-21, added one more choice to the same list: **a dark or off screen**, for
+people who do not want a bright screen while they listen to music. *"A tap would turn the screen on
+(just like when it's dimmed) and it would time out and go back to dark if not interacted with."* It is
+one more view beside the speakers, the title card and the clock, not a change to dimming: see [The dark
+view](#the-dark-view).
+
 ## Stage 1, as built
 
 **The setting.** Two stored values, in NVS beside the others (`np_view`, `np_dim`), read at boot and
@@ -97,7 +104,7 @@ followed at once when they change, with no restart:
 
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock` or `off` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or whole minutes from 1 to 240 | `5` |
 
 Both are in the control surface's route list (`GET /api`) on a board that has a panel and answer 404
@@ -137,6 +144,43 @@ layout text changes.
 ![The speakers in a 7.1.4 room](../docs/hearth/screenshots/p4-panel-speakers-7-1-4.png)
 ![The Adjust sheet with its third row](../docs/hearth/screenshots/p4-panel-controls.png)
 ![The dark screen](../docs/hearth/screenshots/p4-panel-dimmed.png)
+
+## The dark view
+
+**What it is for.** Dimming leaves the screen on at 4% with a line of text after five minutes, which is
+still a light in a dark room. The dark view is for a listener who wants none: the backlight is **off**
+and the screen says nothing, from the moment a song with no lyrics begins.
+
+**The rule**, one pure function in `libs/device/include/iclforge/now_view.hpp` (`dim_state`, 2 host test
+cases) that the screen and the preview tool share:
+
+- *Dark* from the moment the view begins to show, however long ago anything touched the panel: a touch
+  from before the song is not a touch of this song, so a song that begins on a panel nobody has touched
+  for an hour is dark at once.
+- *Lit* after a touch, for `kDarkAwakeMs` (**30 s**) from the **last** touch: a second touch moves it on
+  by as much. Then dark again. A touch lights the speakers view, which the dark view builds as well
+  (the sentence screen when the board does not yet know its layout).
+- The tap that wakes it lands on the black cover, which is the object a touch hits, so it does not also
+  press what is under it: the same mechanism as the dimmed screen.
+- The **dim time** (`/dim-after`, the sheet's *Dim after*) means nothing here and is not used, even
+  *never*; the sheet says so by showing "30 seconds, then dark again" where it would show the dim
+  times while Dark is chosen. The 30 s is a constant, not a setting; it is the one number the owner did
+  not give, and is the thing to change if a tap should light the screen for longer or shorter.
+- The **developer view keeps the screen lit while it is open** (it is read, not touched, and has no
+  idle time of its own). The sheet needs no such rule: it puts itself away after eight seconds, well
+  inside the 30.
+
+**What it does not do.** It is for the no-lyrics screen only. The lyric screens are lit, as they must be
+to be sung from, and the **idle screen is lit** (between two songs, or when a server has stopped, the
+panel can light up in a dark view: whether the idle screen should follow is the question
+[Open](#open) already asks about dimming, and the answer for one is the answer for the other).
+
+**What was run.** The rule on the host (13 test cases in `test_now_view.cpp`, the speakers view's own
+rule checked against `dimmed()` on every input it takes); the real screen code in the preview tool,
+which fails its run if the screen is not dark at the start, is not lit by a touch, is not lit at 28 s,
+is not dark at 32 s, or a second touch does not move it on (all pass); and a picture of the sheet:
+
+![The Adjust sheet with Dark chosen](../docs/hearth/screenshots/p4-panel-controls-dark.png)
 
 ## Stage 2: the title card
 
@@ -206,7 +250,10 @@ Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and 
 ## Open
 
 - **The idle screen is not dimmed.** It is on for hours too (Q7 of the panel's plan). The owner's
-  answer was about this screen; whether idle follows is a question for the owner.
+  answer was about this screen; whether idle follows is a question for the owner. It matters more now
+  that there is a dark view: a listener who chose it may see the idle screen light up between two
+  songs, if the server ends one stream before it starts the next. Whether it does has not been looked
+  at on the kit.
 - **Does a dark screen save the scan-out?** Stopping the DSI engine while the cover is up is the
   experiment; the kit's AC-4 5.1 glitches are the reason to try it.
 - **Brightness** is still not a setting (plan D6): the sheet has room for a fourth row only by being
