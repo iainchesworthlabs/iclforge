@@ -676,6 +676,11 @@ held, and nothing was restarted by HTTP. The PC served the four stream files it 
 folder of its own on one address for the length of the runs, and `hearth-testserver` dialled out to
 the kit; neither is left running.
 
+**Corrected the same day, [below](#the-third-session-on-the-kit).** The Sendspin rows of this
+section that say layout 2.0 ran at the kit's own layout, 9.1.6 (sixteen outputs), and the three things
+it left unexplained were the sixteen outputs (the slower burst), the TDM DMA queue (the internal
+heap) and a stall at the start of some plays (the glitches), and none of them was the glass.
+
 #### The karaoke play with the screen
 
 The programme is the repository's `examples/karaoke/auld-lang-syne`: an AC-3 3/2 stream of
@@ -775,14 +780,16 @@ good to about 6%):
 | AC-4 5.1 music onto `9.1.6`, 16 slots | | 597 | 614 | 669 |
 
 The whole burst over Sendspin (the product's path; the board's mean time for a burst less its wait
-in the sink, with its share of the frame in permille; 20 s of the three-frame AC-4 streams, looped):
+in the sink, with its share of the frame in permille; 20 s of the three-frame AC-4 streams, looped;
+the kit's rows at its own layout, **9.1.6, sixteen outputs**, which this section first called 2.0, and
+the v1.3 board's at 2.0, the two slots its sink has):
 
 | Row | v1.3, 360 MHz | Kit, no panel | Kit, `panel-null` | Kit, glass |
 |---|---|---|---|---|
 | AC-3 2.0 | 2,724 µs (85) | 4,871 µs (152) | 4,906 µs (153) | 5,071 µs (158) |
 | E-AC-3 2.0 | 2,141 µs (67) | 4,299 µs (134) | | 4,489 µs (140) |
 | AC-4 2.0 music | 8,075 µs (189) | 11,674 µs (274) | | 12,668 µs (297) |
-| AC-4 5.1 music (layout 2.0) | 25,176 µs (590) | 28,369 µs (665) | 28,719 µs (673) | 31,669 µs (742) |
+| AC-4 5.1 music (the kit at 9.1.6) | 25,176 µs (590) | 28,369 µs (665) | 28,719 µs (673) | 31,669 µs (742) |
 | Least internal heap, AC-4 5.1 | 27,687 bytes | 9,715 | 10,255 | 10,339 |
 | Plays that glitched, of 5 a row, in the order above | 0, 1, 1, 1 | 0, 0, 0, 0 | 0, 0 (two rows run) | 0, 0, 0, 0 |
 
@@ -805,7 +812,9 @@ filling where there is a screen:
   AC-3 2.0 (4.87 against 2.72 ms), with a decode that takes 1.75 ms against 1.95. **Not
   isolated, and not the panel's** (the no-panel image is as slow): the baseline is from 2026-10-12
   and this tree is some 400 commits on, so it may be the tree and not the silicon; the same tree on
-  the v1.3 board would say, and was not run (only the kit was flashed).
+  the v1.3 board would say, and was not run (only the kit was flashed). **Explained by the third
+  session: neither.** The kit's rows were at 9.1.6 and the baseline's at 2.0, and a burst costs about
+  176 µs for each output; at 2.0 the kit's bursts are 3 to 6% shorter than the baseline's.
 - **The glass costs the heavy stream a tenth, and the scan-out is nearly all of it.** `panel-null`
   against no panel is +0.35 ms a burst (+1.2%: LVGL's own presence); the glass against
   `panel-null` is +2.95 ms (+10.3%): the DSI engine's reads out of PSRAM and the touch polling,
@@ -822,7 +831,10 @@ filling where there is a screen:
   often as with the song filling (2 of 9 and 3 of 9), so the drawing is not what separates the
   images; the scan-out is, if the panel is the cause at all. The v1.3 baseline had the same kind of
   glitch once in five with no panel at layout 2.0, so this is a stream that runs close to its edge on
-  both, and the cause of any of them is not found.
+  both, and the cause of any of them is not found. **Explained by the third session: not the glass.**
+  The 13 clean plays were at 9.1.6 with no settings message; every glitch began with the stream's
+  first chunk reaching the board 300 to 600 ms late, with and without a scan-out, at about one play
+  in five.
 - **Internal RAM.** The AC-4 5.1 play leaves 9.7 to 10.4 KB at its least on all three images and
   the v1.3 board left 27.7 KB, so the kit is the tighter of the two; the panel changes that by
   nothing a play can see (Q3). Under AC-3 and E-AC-3 plays the panel (the screen task, its HTTP
@@ -830,7 +842,9 @@ filling where there is a screen:
   to 48.9 KB), against the plan's pass of 2 KB. At boot (the budget line, one boot of each) the
   three images read 295,779 to 300,675 bytes free, which is inside the boot-to-boot spread of the
   baselines, and the glass and `panel-null` a largest block 8,192 bytes smaller than the no-panel
-  image's (270,336 against 278,528).
+  image's (270,336 against 278,528). **The 10 KB and the difference from the v1.3 board are the TDM
+  DMA queue (196,608 bytes of internal RAM at every layout from three channels up, 24,576 at 2.0);
+  fixed in PR #1607, [below](#where-the-internal-ram-goes-the-tdm-dma-queue).**
 - **Is a `p4-rev3-ac4` profile worth adding?** As a bench-only profile with no published image (as
   `p4-rev1-ac4` is), **yes**: the rows play on the kit, the PCM matches, and its baseline would hold
   the figures above. Whether the kit should ship AC-4 is a different question and the numbers are
@@ -887,12 +901,164 @@ driver, its DMA buffers and its task take about 15 to 25 KB, and the headroom th
 
 A Sendspin play starts with a late burst or an underrun and a resync about one time in four, on
 either interface (cable 3 of 9 plays, Wi-Fi 1 of 5 in this session); the suite counts it as a
-glitched play, not a failure, and it is not the cable's.
+glitched play, not a failure, and it is not the cable's. The third session found it: lwIP's TCP receive
+mailbox refused the first segments ([below](#what-the-glitches-were-the-first-chunk-comes-late)), and it
+was worse over the cable (16 plays in 20) than over Wi-Fi (7 in 20).
 
 **Not tried:** a PoE splitter (the owner's next step: the USB cable stays in the drawer, but the
 update path above has been run with the cable alone); 10 Mbit/s or half duplex; a static address;
 IPv6; a long soak; a DHCP server that is slow (boot waits 15 s for the cable's address under `auto`
 and then joins the Wi-Fi, the cable going on asking).
+
+### The third session on the kit
+
+**2026-10-20, the same day.** The three findings the second session left unexplained, and what
+each was. Scratch images of `main` at `c7d2e126c` (built into their own directories, flashed to
+COM7 after the MAC check with the bench lock held; the PC's `hearth-testserver` dialled out to the
+kit, with the owner's yes, and was stopped after each series; nothing was restarted by HTTP):
+the AC-4 shape of the kit with the glass, with `panel-null`, and with the fix below, with a trace of
+how a stream starts (`sendspin.start:` in the console) added to the player. The v1.3 board P4a was
+**not** flashed: it was off the bench (no COM10, no answer on its address), and the first finding
+made the run unnecessary.
+
+#### The layout the Sendspin rows ran at (a correction)
+
+The second session's Sendspin rows say "layout 2.0". They were played with the server asking for no
+layout, and then the kit's player plays at the layout it has, which is **9.1.6: sixteen outputs**.
+The sink line says so (`16 channels: 16 slots (tdm)`), the report's `layout` is `null`, and the
+server logs `states ... layout 9.1.6`. The `POST /play` rows are at 2.0 as labelled, and the
+karaoke play 1 was at 2.0 (two levels in its report, two outputs on standard I2S). So "AC-4 5.1 clean at layout 2.0, glitched at 5.1" compared 9.1.6 with no settings message
+against 5.1 with a settings message each play, and "the heap a wider layout takes" compared 2.0
+(standard I2S) with 5.1 (TDM).
+
+#### Why the Sendspin burst was slower than the v1.3 board's: sixteen outputs
+
+A burst's decode is the same work at any layout; the rest of it (the renderer, the patch, the trims
+and delays, the level meter and the copy into the playout) is done for every output of the layout,
+and costs **about 176 µs a burst for each output** (29 µs a 256-sample block). The v1.3 board's
+sink has two slots and ran its rows at 2.0. The same rows on the kit at 2.0 are faster than the
+baseline's, in line with the decoder alone (microseconds a burst, the median of the plays in the
+row):
+
+| Row | v1.3, 360 MHz, 2 outputs | Kit, 2.0 (2 outputs) | Kit, 5.1 (6) | Kit, 9.1.6 (16) |
+|---|---|---|---|---|
+| AC-3 2.0 | 2,715 | 2,576 (-5%) | 3,282 | 5,034 to 5,135 |
+| E-AC-3 2.0 | 2,145 | 2,057 to 2,083 (-3%) | | 4,564 |
+| AC-4 2.0 music | 8,075 | 7,675 (-5%) | | |
+| AC-4 5.1 music, folded to 2.0 | 25,176 | 23,733 (-6%) | 27,652 (glass, after the fix below) | |
+
+Two to five plays a cell, 20 s each (the baseline's are its five plays). The gap was the layout, and neither the tree (400 commits on) nor
+the silicon: no flash of the v1.3 board was needed. Four outputs more than 2.0 add 0.70 ms to the
+AC-3 row (3,282 against 2,576) where 14 more add 2.46 ms (5,034): the cost is linear in outputs. A
+stream that fills 2 of 16 outputs still pays for 16: skipping outputs that carry nothing is the saving
+on offer, and not taken here.
+
+#### Where the internal RAM goes: the TDM DMA queue
+
+A TDM line on `sink/i2s_wide` clocks sixteen 32-bit slots whatever the layout, and its slot mask
+enabled all sixteen, so ESP-IDF sized the 64 ms DMA queue (96 descriptors of 32 frames) at 16 x 4
+bytes a frame in internal RAM: **196,608 bytes at every layout from three channels up**, 24,576 at 2.0
+(standard I2S). That is the whole of the 171,104-byte gap between the 2.0 and the 5.1 play (172,032 of
+queue), and of the AC-4 plays' 10 KB: the decoder (whose allocations below 16 KB try internal RAM
+first) takes whatever is left.
+The fix (PR #1607) enables the layout's channels in the mask and keeps `total_slot` at sixteen, so
+the frame on the wire is the same and the queue holds the channels it carries (4 bytes a frame each).
+Least free internal heap during a 20 s karaoke play (`sendspin.stream` line), the same programme:
+
+| Layout | Queue, before | Queue, after | Least free, before (same day) | Least free, after |
+|---|---|---|---|---|
+| 2.0 (standard I2S) | 24,576 | 24,576 | 218,671 | 219,955 |
+| 5.1 | 196,608 | 73,728 | 46,139 | **171,151** |
+| 9.1.6 | 196,608 | 196,608 | the same (the 2.0 stream: 68,831) | 44,655 (the 2.0 stream: 69,219) |
+
+An AC-4 5.1 play ends with 11 to 15 KB free on either image: the decoder takes what the queue gave
+back, which is faster memory than its PSRAM spill, and its Sendspin burst at 5.1 on the glass falls
+from 29.65 ms to **27.65 ms** (-6.7%; ten plays and thirty-two). The pacing is evidence, not proof,
+that the controller takes one sample per enabled slot: the plays whose first chunk was on time
+ran in real time with no underrun, as on the images before it.
+**The slots on the pins were not looked at** (no scope).
+
+#### What the glass costs the decoder, and what was tried
+
+AC-4 5.1 at layout 5.1, the burst's median, 20 s plays, the same image apart from the scan-out:
+
+| | Burst | Against `panel-null` |
+|---|---|---|
+| `panel-null`, after the fix (8 plays) | 25.27 ms | |
+| The glass at 60 Hz, after the fix (32 plays, idle and the song filling) | 27.65 ms | +2.38 ms, +9.4% |
+| The glass at 40 Hz: the pixel clock at 34.5 MHz instead of 52 (10 plays) | 26.91 ms | +1.64 ms, +6.5% |
+
+* **The cost is the scan-out's bytes**: 2.4 ms at 60 Hz and 1.6 at 40 (a linear 0.04 ms a hertz), and
+  the fix to the queue did not change it (the second session had +2.9 ms, +10.3%, on the other
+  image). The decoder's code and tables are in PSRAM behind the L2 cache, and the DSI engine reads
+  the frame buffer from it at 74 MB/s at 60 Hz.
+* **The AXI interconnect's arbitration priorities do nothing.** `axi_icm_ll` can raise the cache's,
+  the CPU port's (SDMMC, the AHB DMAs) or the DSI DMA's QoS; four settings (cache 8 and 15, CPU 8,
+  cache and CPU 15), two plays each, alternating with four blocks of the default, all gave 27.57 to
+  27.75 ms (the default 27.58 to 27.77). Nothing in the tree sets them and nothing was kept.
+* **A slower refresh buys a third of the cost back** and was run for the burst's sake only: **what it
+  does to the picture was not seen** (flicker, the panel's tolerance of a pixel clock under its
+  datasheet's, tearing on a moving fill). The 40 Hz image is a scratch build, `p4fx-hz40-dsi-ac4`, and
+  nothing in the tree sets the clock; it is the owner's to look at before it is a setting.
+
+#### What the glitches were: the first chunk comes late
+
+Every glitch of the second session's AC-4 5.1 series, and of the three series here, began in the
+first five seconds of a play, with the stream's first chunk reaching the player **300 to 600 ms after
+the stream's start message** (the server stamps it 360 to 390 ms after the start; the board states
+250 ms of lead). The player had nothing to do in that time: the settings that came with the start
+are applied in 0.5 to 3 ms, the sink and the stream are ready 1 ms after the start, the ring waits
+for the chunk, and the first burst's long "decode" in the trace is the player padding the sink with
+silence until the chunk's time. In a late play the silence is 256 to 4,000 frames where a normal one
+has 15,000 to 18,000, the chunks that follow find their time gone (`late`, then an underrun and a
+resynchronisation) and the first half second to second of the song is lost.
+
+It does not depend on the glass. Plays whose first chunk was late, of all the Sendspin plays of the
+session:
+
+| Image | Plays | First chunk late | Glitched |
+|---|---|---|---|
+| The glass, after the fix | 118 | 24 (20%) | 14 |
+| The glass, before it | 24 | 4 (17%) | 4 |
+| `panel-null`, after the fix | 38 | 6 (16%) | 3 |
+| The glass at 40 Hz | 10 | 1 | 1 |
+
+nor on the codec (AC-3, E-AC-3 and AC-4 plays), nor on whether the server sends a settings message
+(15 and 15 plays alternating: 4 and 4 late). The second session's "5 of 18 against 1 of 30" was
+different hours of a rate that moves from one hour to the next (6 of 12 plays in one 12-play series
+here, 1 of 12 in the next). 
+The trace puts the delay between the PC's server and the board's server task. The player's ring wait is
+0, the long handlers of the server task are the pairing steps (once, at connect), and the small
+WebSocket frames of the first second (126 to 1,862 bytes) show reads of 300 ms and more with the rest
+of the frame missing. It is no worse over Wi-Fi than on a wire: on the Ethernet image the same
+programme's 4 s plays were late 7 times in 20 over Wi-Fi and **16 times in 20 over the cable**.
+
+**The cause is lwIP's.** It posts each TCP segment it takes in to a per-socket mailbox and refuses the
+segment when the mailbox is full (the help of `CONFIG_LWIP_TCP_RECVMBOX_SIZE` says so). The default,
+6, is sized for full segments, the window over the segment size, 5,760 / 1,440, plus two. A sender that
+writes a WebSocket frame's header and its payload as separate segments puts small ones in it, and at
+the start of a play the chunks arrive faster than the server task reads them. The refused segment
+comes again 250 ms or more later, and the first chunk with it. PR #1610 sets the mailbox to 32 entries
+(128 bytes a socket) in `sdkconfig.p4`:
+
+| 20 pairs of 4 s plays, one programme, the Ethernet image | Late first chunk | Glitched |
+|---|---|---|
+| Before, over Wi-Fi | 7 | 5 |
+| Before, over the cable | 16 | 13 |
+| After, over Wi-Fi | **0** | 0 |
+| After, over the cable | **0** | 0 |
+
+**Not shown:** how the PC's server writes a frame (no packet capture: the session has no rights for
+one, and lwIP's statistics are off in the image), so the mechanism rests on lwIP's description and on
+the result; and the same default on the S3 and the C6, which were not played.
+
+#### What was not done
+
+* The v1.3 board (P4a) was not flashed: it was off (no COM10, no answer), and the burst's cost per
+  output made the run unnecessary.
+* The slots on the pins, and the I2S clocks, are not looked at: no scope.
+* The 40 Hz scan-out was run for its burst only; **what it does to the picture was not seen.**
+* Skipping the outputs a stream does not fill (176 µs a burst each) was not tried.
 
 ### The developer view on the kit (2026-10-21)
 
@@ -950,9 +1116,9 @@ are PSRAM's or a few hundred bytes.
 |---|---|---|
 | Q1 | The board's panel controller, touch controller and codec pins | **Mostly answered 2026-10-20.** The board is the ESP32-P4X-Function-EV-Board; its user guide gives the backlight and reset GPIOs and the J1 header, and does not name the display's driver IC (it links EK73217BCGA and EK79007AD), the lane count or the touch controller. The kit's own demo logs the `EK79007` driver, and the GT911 answers at **0x14** on GPIO7 and GPIO8 (not 0x5D). Two lanes at 900 Mbit/s initialise without error; whether the glass is right is not yet seen. The codec's GPIOs are still the older board's BSP values, not read from this kit. The board profile is a Kconfig choice |
 | Q2 | LVGL's right-to-left flex and `lv_label` bidi with Hebrew in a wrapping row | **Answered**: it works, with two things found (the default theme's 10 px gap between flex children, and LVGL mirroring an alignment under an RTL base, which put the fill on the wrong side until the alignment was left to LVGL); the Hebrew picture is the check |
-| Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was not measured on 2026-10-12. **Answered on the kit 2026-10-20**: under an AC-4 5.1 play the least-free internal heap is 9.7 to 10.4 KB with the glass, with `panel-null` and with no panel at all (the v1.3 board left 27.7 KB), so the panel takes nothing a play can see at the decoder's floor; under AC-3 and E-AC-3 plays it takes 14 to 17 KB (the pass was 2 KB); at boot the largest block is 8,192 bytes smaller with the panel ([AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz)) |
+| Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was not measured on 2026-10-12. **Answered on the kit 2026-10-20**: under an AC-4 5.1 play the least-free internal heap is 9.7 to 10.4 KB with the glass, with `panel-null` and with no panel at all (the v1.3 board left 27.7 KB: the TDM DMA queue, see the third session), so the panel takes nothing a play can see at the decoder's floor; under AC-3 and E-AC-3 plays it takes 14 to 17 KB (the pass was 2 KB); at boot the largest block is 8,192 bytes smaller with the panel ([AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz)) |
 | Q4 | Tearing with one frame buffer | The kit; two buffers cost 1.2 MB of PSRAM. **Looked at 2026-10-20**: the owner watched a karaoke play, with the Adjust sheet in use, and said it appeared and looked fine; no tearing was reported, and it was not filmed or measured. Not settled for a fast-moving fill |
-| Q5 | PSRAM bandwidth under the decoder's XIP fetches | **Answered on the kit 2026-10-20**: the glass costs the decoder a standing 1.3% (AC-3), 5.9% (E-AC-3) and about 10% (AC-4 5.1) against `panel-null`, and filling the screen adds drawing cost that is 5 to 12% on the light streams and 0.1 to 1% on AC-4 5.1 ([the second session](#the-second-session-on-the-kit)). At layout 5.1 the AC-4 stream glitched on 5 of 18 plays with the glass against 1 of 30 without a scan-out. Not tried: a slower refresh |
+| Q5 | PSRAM bandwidth under the decoder's XIP fetches | **Answered on the kit 2026-10-20**: the glass costs the decoder a standing 1.3% (AC-3), 5.9% (E-AC-3) and about 10% (AC-4 5.1) against `panel-null`, and filling the screen adds drawing cost that is 5 to 12% on the light streams and 0.1 to 1% on AC-4 5.1 ([the second session](#the-second-session-on-the-kit)). The glitches are not the glass's ([the third session](#the-third-session-on-the-kit)); after the DMA fix the glass costs the AC-4 5.1 burst 2.4 ms at 60 Hz (+9.4%) and 1.6 ms at 40 Hz (+6.5%) against `panel-null`, and no AXI priority setting changes it |
 | Q6 | A touch control for the vocals needs the role to carry a request back to the server | A protocol decision, its own PR |
 | Q7 | Auto-dim and a screensaver for a screen that is on for hours | Product, after the kit; the backlight PWM is there |
 | Q8 | CJK, Arabic and polytonic Greek | A font subset and shaping; not in this work (Greek and Cyrillic are in, 2026-10-12) |

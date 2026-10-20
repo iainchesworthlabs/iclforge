@@ -16,8 +16,12 @@ they are sung.
     following it on the glass, and the owner, who watched and used the Adjust sheet, said it appeared
     and looked fine. **The glass takes decode time:** its scan-out costs the decoder 1.3% (AC-3), 6%
     (E-AC-3) and about 10% (AC-4 5.1), and with the song filling the screen the light streams' decode
-    time moves by 5 to 12% (under 1% of a frame); AC-4 5.1 plays clean at layout 2.0 and glitched on
-    5 of 18 plays at layout 5.1 with the glass on, against 1 of 30 without a scan-out.
+    time moves by 5 to 12% (under 1% of a frame). **The glitches the first measurement put on the glass
+    are not its:** about one play in five reaches the kit with its first chunk 300 to 600 ms late, with
+    the glass, without it and at 40 Hz, over Wi-Fi and (more often) over the cable, and those plays
+    lose the start of their first second: lwIP's six-entry TCP receive mailbox refused the first
+    segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk
+    ([the trace](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#what-the-glitches-were-the-first-chunk-comes-late)).
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
     owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
     Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it,
@@ -119,8 +123,11 @@ the first slot, and its cause is not known.
 
 - **400 MHz**, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders do not scale
   with the clock: on the kit, with no panel, the decoder alone takes 10% less time than on the v1.3
-  board for AC-3 and 17% less for AC-4 (11% more clock), but a Sendspin burst takes 13% (AC-4 5.1) to
-  100% (E-AC-3) more (cause not isolated, and not the panel's). The kit's figures are in [Memory and
+  board for AC-3 and 17% less for AC-4 (11% more clock), and a Sendspin burst at the same layout (2.0)
+  takes 3 to 6% less. A burst costs about 176 µs for each output of the layout (the renderer, the
+  patch, the trims, the meters and the playout's copy), and the kit's player starts at 9.1.6,
+  sixteen outputs, where the v1.3 board's sink has two: the kit's first Sendspin figures were 13% to
+  100% above the v1.3 board's for that reason. The kit's figures are in [Memory and
   time](#memory-and-time).
 - **TDM opens**: the `i2s_wide` sink takes the 160 MHz PLL (`I2S_CLK_SRC_PLL_160M`) as the clock
   source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The source
@@ -406,7 +413,7 @@ kit on 2026-10-20:
 over `POST /play`, the median of six plays alternating the screen idle and the demo song filling;
 [the plan has the method and every figure](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-second-session-on-the-kit)):
 
-| | AC-3 2.0 | E-AC-3 2.0 | AC-4 5.1 (Sendspin burst, layout 2.0) |
+| | AC-3 2.0 | E-AC-3 2.0 | AC-4 5.1 (Sendspin burst, layout 9.1.6) |
 |---|---|---|---|
 | No scan-out: `panel-null`, idle | 1,746 µs | 1,132 µs | 28.72 ms |
 | The glass, idle | 1,768 µs (+1.3%) | 1,199 µs (+5.9%) | 31.7 to 32.0 ms (+10 to +11%) |
@@ -422,11 +429,17 @@ over `POST /play`, the median of six plays alternating the screen idle and the d
   already there with the screen idle. 5% was the plan's pass; the light streams exceed it while the
   song fills, by 0.3 to 0.65% of a frame, and AC-4 5.1 exceeds it all the time.
 - **AC-4 5.1 on the kit.** The decoder's PCM is the v1.3 board's, bit for bit. A Sendspin burst takes
-  74% of the 42.7 ms frame on the glass at layout 2.0 (66% with no panel) with no glitch in 13 plays,
-  but at layout 5.1 the glass glitched 5 of 18 plays (an underrun and a resynchronisation) against 1
-  of 30 without a scan-out, and the least free internal heap is 10 KB (the v1.3 board: 27.7 KB). A
-  bench-only `p4-rev3-ac4` profile is worth adding to hold these rows; whether the kit should ship
-  AC-4 is the owner's call and these numbers do not make it easy.
+  74% of the 42.7 ms frame on the glass at layout 9.1.6 (66% with no panel); at 5.1 it takes 65% on
+  the glass (27.65 ms, 25.27 ms with no scan-out, 26.91 ms with the glass at 40 Hz). The scan-out costs
+  2.4 ms a burst at 60 Hz, a linear 0.04 ms a hertz, and no AXI priority setting changes it. The
+  least free internal heap is 11 to 15 KB (the v1.3 board: 27.7 KB; the decoder takes whatever is
+  left, and the TDM DMA queue left 124 KB less at 5.1 before PR #1607). A bench-only `p4-rev3-ac4`
+  profile is worth adding to hold these rows; whether the kit should ship AC-4 is the owner's call.
+- **The TDM DMA queue holds the layout's channels.** The sink clocks sixteen slots whatever the
+  layout and, until PR #1607, enabled all of them, so its 64 ms queue was 196,608 bytes of internal RAM
+  at every layout from three channels up (24,576 at 2.0); it is now 4 bytes a frame for each channel,
+  73,728 at 5.1. A 5.1 karaoke play left 46,139 bytes of internal heap at its least and leaves
+  171,151.
 
 ## Developing the screen without a panel
 
