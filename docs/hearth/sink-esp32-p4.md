@@ -335,8 +335,9 @@ starts the question again at once if no server has answered yet.
 
 All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`) and take effect at once,
 with no restart. **They are on the board's own web page too**, in a Time section of Settings: the time
-the board keeps and how it got it, a checkbox for whether to ask a time server, and a field each for the
-zone and the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
+the board keeps and how it got it, a checkbox for whether to ask a time server, and a list of zones and cities
+(*UTC+10 Melbourne, Sydney, Hobart, Canberra*; 40 of them, each a POSIX string the board's C library is
+held to) with a field for any other, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
 object (`sync`, `asking`, `synced`, `local`, `zone`, `server`, `servers`, `answers`), and the console
 says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
 pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
