@@ -528,6 +528,10 @@ configurations set 80; the default is 0, none), the component's
 | `PUT /network` | body: an SSID, a newline, then the passphrase. Stored for the next boot; the station stays on the network it is already associated with. Improv over the serial port is the other way in, and the one a board with no network at all needs. |
 | `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a cable and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
 | `PUT /network-preference` | body: `auto`, `ethernet` or `wifi`. Stored, and acted on at once with no restart. `400` for any other word, `409` where there is nothing to choose between, or where `wifi` has no network stored to join. A change to one interface is undone if that interface does not come up |
+| `GET /now-playing` | `speakers`, `title`, `clock` or `off`, as text, on a board with a panel: what the screen shows while a song has no lyrics ([planning](../../planning/p4x-now-playing.md)); `404` on a board with none |
+| `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` and `clock` are refused until they are built) |
+| `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
+| `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
 | `GET /pairing` | the servers a Sendspin player is paired with, as JSON: each one's `server_id` and name, whether it is connected, and which played last. `404` on a board with no Sendspin player |
 | `POST /pairing` | body: `reset`, `cancel` or `forget`, for a Sendspin player's pairing ([Pairing](#pairing)), or `forget` and a space and a `server_id` from `GET /pairing`, for that server alone. `400` for any other body, `404` for a `server_id` the board has no pairing with, `409` on a board with no Sendspin player. |
 | `GET /slot-width` | the slot width in bits, 16 or 32 |
