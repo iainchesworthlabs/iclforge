@@ -3,8 +3,9 @@
 # and tests them: the planar-to-interleaved conversion with its slot conversion, the block ring and
 # the unit hold, the DAC queue model, the sink's mode and slot-count planner, the playout model, the
 # Wi-Fi provisioning protocol (Improv), the Sendspin player's pairing records, the console's log
-# ring, the TCP arrival log, the firmware image header, status and trial rules, and the hardware
-# report. Header-only and standard library only: none of them includes anything from ESP-IDF, which
+# ring, the TCP arrival log, the firmware image header, status and trial rules, the hardware
+# report, and the panel's no-lyrics screen (its setting, its dimming and its wording).
+# Header-only and standard library only: none of them includes anything from ESP-IDF, which
 # is what lets libs/device/tests run them on every host, and is worth keeping true.
 #
 # The headers keep the names the component's users include (iclforge/interleave.hpp and the rest).

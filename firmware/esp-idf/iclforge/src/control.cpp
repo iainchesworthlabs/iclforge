@@ -22,6 +22,7 @@
 #include "iclforge/firmware.hpp"
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/log.hpp"
+#include "iclforge/now_view.hpp"
 
 // The web UI's two files. CMakeLists.txt embeds them (EMBED_FILES) and they stay
 // in flash. ESP-IDF names each symbol after the file's base name, which is why
@@ -473,6 +474,8 @@ struct Control::Impl {
                          "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
                          "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one "
                          "to change it\n"
+                         "GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it\n"
+                         "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
                          "(Sendspin pairing)\n"
@@ -831,6 +834,65 @@ struct Control::Impl {
                          "does not come up\n");
     }
 
+    static esp_err_t on_now_playing_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.now_playing) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::string text = h.now_playing();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_now_playing_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::string body = read_body(req);
+        if (!nowview::parse_view(body)) {
+            return send_text(req, "400 Bad Request", "PUT /now-playing wants speakers, title, clock or off\n");
+        }
+        if (!h.set_now_playing) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        const std::string_view word = nowview::detail::trimmed(body);
+        if (!h.set_now_playing(word)) {
+            return send_text(req, "409 Conflict",
+                             "that view is not in this build, or the setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; the screen follows at once\n");
+    }
+
+    static esp_err_t on_dim_after_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.dim_after) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::string text = h.dim_after();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_dim_after_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<int> minutes = nowview::parse_dim_after(read_body(req));
+        if (!minutes) {
+            return send_text(req, "400 Bad Request",
+                             "PUT /dim-after wants never, or a number of minutes from 1 to 240\n");
+        }
+        if (!h.set_dim_after) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_dim_after(*minutes)) {
+            return send_text(req, "409 Conflict", "that time could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
     // GET /pairing: see ControlPairings. Here, below on_play, for the reason
     // append_strings gives: contract.spec.js reads the keys GET /status
     // writes from the text between on_status and on_play.
@@ -1032,6 +1094,10 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/network", .method = HTTP_PUT, .handler = &Impl::on_network_put},
         {.uri = "/network-preference", .method = HTTP_GET, .handler = &Impl::on_network_preference_get},
         {.uri = "/network-preference", .method = HTTP_PUT, .handler = &Impl::on_network_preference_put},
+        {.uri = "/now-playing", .method = HTTP_GET, .handler = &Impl::on_now_playing_get},
+        {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
+        {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
+        {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
         {.uri = "/pairing", .method = HTTP_GET, .handler = &Impl::on_pairing_get},
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},

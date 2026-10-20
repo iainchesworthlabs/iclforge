@@ -26,6 +26,8 @@ void sendspin_leave() {}
 
 std::optional<iclforge::ControlSendspin> sendspin_status() { return std::nullopt; }
 
+SendspinPlaying sendspin_now_playing() { return {}; }
+
 bool sendspin_pairing(std::string_view /*action*/) { return false; }
 
 std::optional<iclforge::ControlPairings> sendspin_pairings() { return std::nullopt; }

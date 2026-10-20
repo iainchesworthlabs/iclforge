@@ -24,6 +24,8 @@
 #include <span>
 #include <string_view>
 
+#include "iclforge/now_view.hpp"
+
 namespace player {
 
 // The longest a name may be, mDNS's own limit on an instance name's label
@@ -71,6 +73,11 @@ struct Settings {
     // Which network a board with a cable and a station uses. Read by every build and acted on by
     // the one with both (net/dual/network.cpp).
     NetworkPreference network_preference = NetworkPreference::automatic;
+    // What a board with a screen shows while a song with no lyrics plays, and the minutes of nothing
+    // touched after which that screen dims (0 is never): planning/p4x-now-playing.md. Read by every
+    // build and acted on by the one with a panel (panel/lvgl).
+    iclforge::nowview::View now_view = iclforge::nowview::kDefaultView;
+    int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -99,6 +106,8 @@ void settings_load();
 [[nodiscard]] bool settings_set_slot_bits(int bits);
 [[nodiscard]] bool settings_set_second_line(bool wired);
 [[nodiscard]] bool settings_set_network_preference(NetworkPreference preference);
+[[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
+[[nodiscard]] bool settings_set_dim_after(int minutes);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

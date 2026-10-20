@@ -50,7 +50,9 @@
 //                     pairing with, 409 with no player.
 //
 // And the board's own settings, which ControlHandlers lists: GET and PUT
-// /name, /slot-width and /wiring, and PUT /network.
+// /name, /slot-width and /wiring, PUT /network, GET and PUT /network-preference on
+// a board with a cable and a station, and GET and PUT /now-playing and
+// /dim-after on a board with a screen.
 //
 // And updates over the network, which Control hands to the owner's Firmware
 // (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
@@ -259,6 +261,20 @@ struct ControlHandlers {
     // interface the change switches off.
     std::function<std::string()> network_preference;
     std::function<bool(std::string_view preference)> set_network_preference;
+
+    // GET and PUT /now-playing and /dim-after: what a board with a screen shows
+    // while a song with no lyrics plays, and when that screen dims
+    // (iclforge/now_view.hpp, planning/p4x-now-playing.md). A board with no
+    // screen leaves all four empty, and the routes answer that it has none.
+    // set_now_playing is handed one of "speakers", "title", "clock" or "off";
+    // false means this build cannot show that view (or the setting could not
+    // be stored). set_dim_after is handed minutes, 1 to 240, or 0 for never.
+    // Both act at once, with no restart. now_playing and dim_after answer
+    // with the words a PUT takes: a view, and "never" or the minutes.
+    std::function<std::string()> now_playing;
+    std::function<bool(std::string_view view)> set_now_playing;
+    std::function<std::string()> dim_after;
+    std::function<bool(int minutes)> set_dim_after;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.
