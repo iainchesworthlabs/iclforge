@@ -38,12 +38,14 @@ struct NowStyle {
     int margin = 32;
 };
 
-// The views this build draws: the speakers, the title card, and "off" (the sentence the screen has always
-// had). The clock comes with what it needs (planning/p4x-now-playing.md); until then the sheet does not
-// offer it and PUT /now-playing refuses it. The title card is drawn only once a server has said a title:
-// until then the screen shows the speakers (or the sentence), never an empty card.
+// The views this build draws: the speakers, the title card, "dark" (nothing lit until a touch lights the
+// speakers) and "off" (the sentence the screen has always had). The clock comes with what it needs
+// (planning/p4x-now-playing.md); until then the sheet does not offer it and PUT /now-playing refuses it. The
+// title card is drawn only once a server has said a title: until then the screen shows the speakers (or the
+// sentence), never an empty card.
 [[nodiscard]] constexpr bool now_view_drawn(iclforge::nowview::View view) {
     return view == iclforge::nowview::View::kSpeakers || view == iclforge::nowview::View::kTitle ||
+           view == iclforge::nowview::View::kDark ||
            view == iclforge::nowview::View::kOff;
 }
 

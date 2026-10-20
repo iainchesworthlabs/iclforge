@@ -291,7 +291,7 @@ struct WordCell {
 enum class Button : int {
     kAdjust, kDelayLess, kDelayMore, kSmaller, kLarger, kClose,
     // The no-lyrics screen's view, one a view in the order of View, and when it dims.
-    kViewSpeakers, kViewTitle, kViewClock, kViewOff,
+    kViewSpeakers, kViewTitle, kViewClock, kViewOff, kViewDark,
     kDimNever, kDim5, kDim30
 };
 
@@ -301,10 +301,11 @@ struct ViewChoice {
     Button button;
     const char* label;
 };
-constexpr std::array<ViewChoice, 4> kViewChoices{{
+constexpr std::array<ViewChoice, 5> kViewChoices{{
     {iclforge::nowview::View::kSpeakers, Button::kViewSpeakers, "Speakers"},
     {iclforge::nowview::View::kTitle, Button::kViewTitle, "Title"},
     {iclforge::nowview::View::kClock, Button::kViewClock, "Clock"},
+    {iclforge::nowview::View::kDark, Button::kViewDark, "Dark"},
     {iclforge::nowview::View::kOff, Button::kViewOff, "Off"},
 }};
 struct DimChoice {
@@ -369,11 +370,17 @@ struct Screen {
     bool np_card = false;
     bool np_was_showing = false;
     std::uint32_t np_since_ms = 0;
-    // Dimmed: a black cover over everything, the backlight at its floor.
+    // Dimmed or dark: a black cover over everything, the backlight at its floor (dimmed) or off (dark: the
+    // dark view, which says nothing).
     bool dimmed = false;
+    bool dim_off = false;
+    int backlight = kBacklightNormalPercent;
     lv_obj_t* dim_cover = nullptr;
     lv_obj_t* dim_text = nullptr;
     std::string dim_text_shown;
+    // The sheet's dim row, which the dark view replaces with a sentence: it has no dim time.
+    lv_obj_t* dim_title = nullptr;
+    lv_obj_t* dim_note = nullptr;
 
     // The rows of the line on the stage.
     std::vector<WordCell> words;
@@ -578,6 +585,7 @@ void on_button(lv_event_t* event) {
         case Button::kViewTitle:
         case Button::kViewClock:
         case Button::kViewOff:
+        case Button::kViewDark:
             for (const ViewChoice& choice : kViewChoices) {
                 if (choice.button == which) {
                     choose_now_view(choice.view);
@@ -659,23 +667,38 @@ void build_sheet() {
     // The screen for a song with no lyrics: which view (only the views this build draws), and when it dims.
     lv_obj_t* const view_title = make_label(g.sheet, "Screen while a song has no lyrics", g.small, kMuted);
     lv_obj_set_pos(view_title, kMargin, 148);
+    // 128 px a button when they fit before the dim row (x = 600), narrower when more views are drawn.
+    int drawn = 0;
+    for (const ViewChoice& choice : kViewChoices) {
+        drawn += now_view_drawn(choice.view) ? 1 : 0;
+    }
+    drawn = std::max(drawn, 1);
+    const int view_w = std::min(128, (592 - kMargin - 8 * (drawn - 1)) / drawn);
     int x = kMargin;
     for (std::size_t i = 0; i < kViewChoices.size(); ++i) {
         if (!now_view_drawn(kViewChoices[i].view)) {
             continue;
         }
-        g.view_buttons[i] = make_button(g.sheet, kViewChoices[i].label, 128, 72, kViewChoices[i].button, false);
+        g.view_buttons[i] = make_button(g.sheet, kViewChoices[i].label, view_w, 72, kViewChoices[i].button, false);
         lv_obj_set_pos(g.view_buttons[i], x, 190);
-        x += 128 + 8;
+        x += view_w + 8;
     }
-    lv_obj_t* const dim_title = make_label(g.sheet, "Dim after", g.small, kMuted);
-    lv_obj_set_pos(dim_title, 600, 148);
+    g.dim_title = make_label(g.sheet, "Dim after", g.small, kMuted);
+    lv_obj_set_pos(g.dim_title, 600, 148);
     x = 600;
     for (std::size_t i = 0; i < kDimChoices.size(); ++i) {
         g.dim_buttons[i] = make_button(g.sheet, kDimChoices[i].label, 112, 72, kDimChoices[i].button, false);
         lv_obj_set_pos(g.dim_buttons[i], x, 190);
         x += 112 + 12;
     }
+    // The dark view has no dim time (it is dark already): its row says what a touch does instead, in
+    // the place of the buttons, which are hidden while it is the view.
+    char note[48];
+    std::snprintf(note, sizeof note, "%u seconds, then dark again",
+                  static_cast<unsigned>(iclforge::nowview::kDarkAwakeMs / 1000));
+    g.dim_note = make_label(g.sheet, note, g.small, kText);
+    lv_obj_set_pos(g.dim_note, 600, 214);
+    lv_obj_add_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
     g.shown_view = -1;
     g.shown_dim = -1;
 
@@ -698,6 +721,21 @@ void paint_sheet_choices() {
             const bool chosen = static_cast<int>(kViewChoices[i].view) == view;
             lv_obj_set_style_bg_color(button, color(chosen ? kAccent : kSurfaceUp), 0);
             lv_obj_set_style_text_color(lv_obj_get_child(button, 0), color(chosen ? kBg : kText), 0);
+        }
+        // The dim row: its buttons for the views that dim after a time, a sentence for the dark view.
+        const bool dark = view == static_cast<int>(iclforge::nowview::View::kDark);
+        lv_label_set_text(g.dim_title, dark ? "A touch lights the screen for" : "Dim after");
+        for (lv_obj_t* const button : g.dim_buttons) {
+            if (dark) {
+                lv_obj_add_flag(button, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_remove_flag(button, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        if (dark) {
+            lv_obj_remove_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
         }
     }
     if (g.now_set.dim_after_minutes != g.shown_dim) {
@@ -729,26 +767,35 @@ void build_dim_cover() {
     lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
 }
 
-void set_dimmed(bool dim) {
-    if (dim == g.dimmed) {
+// The cover and the backlight for what the no-lyrics screen is doing: lit, dimmed (the speakers view, left
+// alone: a black cover with one line, the backlight at its floor) or dark (the dark view: a black cover
+// that says nothing, the backlight off).
+void set_dimmed(iclforge::nowview::Dim dim) {
+    using iclforge::nowview::Dim;
+    const bool cover = dim != Dim::kNone;
+    const bool off = dim == Dim::kDark;
+    if (cover == g.dimmed && off == g.dim_off) {
         return;
     }
-    g.dimmed = dim;
-    if (dim) {
-        // The title card's dark screen names the song, the speakers' the stream and its room.
+    g.dimmed = cover;
+    g.dim_off = off;
+    if (cover) {
+        // The title card's dark screen names the song, the speakers' the stream and its room, and the dark
+        // view's says nothing.
         const std::string_view said = g.np_card ? std::string_view(g.np_header)
                                                 : std::string_view(g.now.heading.data(), g.now.heading.size());
-        const std::string line = said.empty() ? std::string("Playing") : "Playing  -  " + std::string(said);
+        const std::string line = off ? std::string() : said.empty() ? std::string("Playing") : "Playing  -  " + std::string(said);
         if (line != g.dim_text_shown) {
             g.dim_text_shown = line;
             lv_label_set_text(g.dim_text, line.c_str());
         }
         lv_obj_remove_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
-        set_backlight(kBacklightDimPercent);
+        g.backlight = off ? kBacklightOffPercent : kBacklightDimPercent;
     } else {
         lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
-        set_backlight(kBacklightNormalPercent);
+        g.backlight = kBacklightNormalPercent;
     }
+    set_backlight(g.backlight);
 }
 
 void build_frame() {
@@ -1099,7 +1146,7 @@ NoLyrics no_lyrics_shown() {
     if (chosen == View::kTitle && !g.card_title.empty()) {
         return NoLyrics::kTitle;
     }
-    if ((chosen == View::kSpeakers || chosen == View::kTitle) && g.now_known) {
+    if ((chosen == View::kSpeakers || chosen == View::kTitle || chosen == View::kDark) && g.now_known) {
         return NoLyrics::kSpeakers;
     }
     return NoLyrics::kSentence;
@@ -1127,6 +1174,7 @@ void build_no_lyrics(int content_w) {
             }
             break;
         case NoLyrics::kSpeakers:
+            // The dark view draws the speakers too: they are what a touch lights.
             if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
                 g.np_active = true;
                 return;
@@ -1447,9 +1495,11 @@ bool screen_update() {
     // while the speakers are what it shows, what the player says about the stream five times a second.
     g.now_set = read_now_settings();
     const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
-    // The speakers, and the title card (which stands on the speakers until a server has said a title).
+    // The speakers, the title card (which stands on the speakers until a server has said a title) and the
+    // dark view (whose speakers are what a touch lights).
+    const bool dark_view = no_lyrics && g.now_set.view == iclforge::nowview::View::kDark;
     const bool wants_now = g.now_set.view == iclforge::nowview::View::kSpeakers ||
-                           g.now_set.view == iclforge::nowview::View::kTitle;
+                           g.now_set.view == iclforge::nowview::View::kTitle || dark_view;
     if (no_lyrics && wants_now) {
         if (g.now_read_us == 0 || now_us - g.now_read_us >= 200'000) {
             g.now_read_us = now_us;
@@ -1550,14 +1600,22 @@ bool screen_update() {
     // Dimming: with the speakers showing and nothing touched for the time set, the screen goes dark, and
     // a touch brings it back. The time counts from when the speakers began to show as well as from the
     // last touch, so that a song started on a panel nobody has touched for hours does not start dark.
-    const bool showing = g.np_active;
+    // The dark view is dark from the moment a song with no lyrics begins, and a touch lights it for
+    // iclforge::nowview::kDarkAwakeMs: dim_state() is the whole rule, tested on the host. The developer
+    // view keeps the screen lit while it is open: it is read, not touched.
+    const bool showing = g.np_active || dark_view;
     if (showing && !g.np_was_showing) {
         g.np_since_ms = now;
     }
     g.np_was_showing = showing;
-    const std::uint32_t quiet =
-        showing ? std::min<std::uint32_t>(lv_display_get_inactive_time(g.disp), now - g.np_since_ms) : 0;
-    set_dimmed(iclforge::nowview::dimmed(showing, g.now_set.dim_after_minutes, quiet));
+    const std::uint32_t inactive = lv_display_get_inactive_time(g.disp);
+    const std::uint32_t showing_ms = showing ? now - g.np_since_ms : 0;
+    iclforge::nowview::Dim dim = iclforge::nowview::dim_state(g.now_set.view, showing,
+                                                              g.now_set.dim_after_minutes, inactive, showing_ms);
+    if (dev_is_open()) {
+        dim = iclforge::nowview::Dim::kNone;
+    }
+    set_dimmed(dim);
     // The developer view, when it is asked for, is on top of all this (a dimmed screen is dark under it
     // and a touch to open it has woken the screen).
     dev_update(now);
@@ -1575,6 +1633,7 @@ ScreenStats screen_stats() {
     stats.dev_refresh_us_last = dev.refresh_us_last;
     stats.dev_refresh_us_max = dev.refresh_us_max;
     stats.dimmed = g.dimmed;
+    stats.backlight = g.backlight;
     return stats;
 }
 

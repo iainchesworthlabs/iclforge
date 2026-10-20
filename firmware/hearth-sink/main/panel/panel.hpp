@@ -31,8 +31,10 @@ struct PanelStats {
     bool touch = false;
     // Which screen is showing: "idle", "lyrics", "gap", "waiting", "plain", "nolyrics".
     const char* screen = "";
-    // The no-lyrics screen has dimmed (planning/p4x-now-playing.md): the backlight is at its floor.
+    // The no-lyrics screen has dimmed, or is dark (planning/p4x-now-playing.md): a black cover is up.
     bool dimmed = false;
+    // The backlight, percent: lit, the dimmed floor (4), or off (0) in the dark view.
+    int backlight = 80;
     // Updates of the picture that LVGL made, and the pixels they covered.
     std::uint32_t refreshes = 0;
     std::uint64_t pixels = 0;

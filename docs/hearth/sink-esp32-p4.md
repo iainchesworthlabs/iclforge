@@ -198,7 +198,7 @@ the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
 
-Which screen shows is the owner's: `speakers` (the default), `title`, or `off`, which is the old
+Which screen shows is the owner's: `speakers` (the default), `title`, `dark`, or `off`, which is the old
 sentence; `clock` (once the board has the time) is planned and refused until then
 ([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
 
@@ -233,13 +233,25 @@ cleared given as `null`, so that a pause (a progress and nothing else) leaves th
 with no artist does not keep the last one's. A state stamped in the future (a scheduled change, which
 aiosendspin can send up to 20 s ahead and Music Assistant does not) takes effect when it arrives.
 
+**Dark** is for a listener who wants no light at all while music plays. With it chosen, the backlight
+is **off** from the moment a song with no lyrics begins, however long ago anything last touched the
+panel, and the screen says nothing. **A tap lights the speakers for 30 seconds from the last touch**
+(another tap moves that on), and then it is dark again. The tap that lights it does not also press what
+is under it; the developer view keeps the screen lit while it is open (the Adjust sheet puts itself
+away after eight seconds, inside the 30). The sheet's dim row, which has no meaning here, says "30
+seconds, then dark again" in place of its dim times. Only this screen goes dark: a lyric screen and
+the idle screen are lit as they always were.
+
+![The Adjust sheet with Dark chosen](screenshots/p4-panel-controls-dark.png)
+
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock` or `off` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
 
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
-404. `GET :8081/panel` says which `view` is chosen and whether the screen is `dimmed`.
+404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
+dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark.
 
 **On the kit, the title card** (2026-10-21): `hearth-testserver` said a song over Sendspin (`--title`, `--artist`, `--album`, `--year`, `--track-seconds`, and `--then-after` for a second song with no artist) and the panel's read-back was the card above, then the second song alone with nothing kept from the first, and the speakers again when the play ended; a play that said nothing, with the card chosen, showed the speakers; a 119-character title ended in three dots after two rows, and `0:08 / 24:45` fitted. A 5.1 E-AC-3 programme at layout 5.1 took 5,325 µs a burst with the view off, 5,341 with the speakers (their header the song) and 5,333 with the card (three plays each, none late, no underrun or resynchronisation); at 2.0 with a stereo programme 2,614, 2,628 and 2,633; at 7.1.4 6,475, 6,478 and 6,491. The role itself cost nothing that showed: the image without it took 5,364 µs for the same play. The panel redraws about 5.7 times a second for the song's time and line. The owner's Music Assistant had not reconnected to the kit by then, so what it sends this role is from aiosendspin's source (the whole state each time, as the specification has it) and not yet seen on the board.
 

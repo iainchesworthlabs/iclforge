@@ -12,12 +12,14 @@
 
 namespace nv = iclforge::nowview;
 
-TEST_CASE("now_view: the four views and their words", "[now_view]") {
+TEST_CASE("now_view: the five views and their words", "[now_view]") {
     CHECK(std::string(nv::view_name(nv::View::kSpeakers)) == "speakers");
     CHECK(std::string(nv::view_name(nv::View::kTitle)) == "title");
     CHECK(std::string(nv::view_name(nv::View::kClock)) == "clock");
     CHECK(std::string(nv::view_name(nv::View::kOff)) == "off");
-    for (const nv::View view : {nv::View::kSpeakers, nv::View::kTitle, nv::View::kClock, nv::View::kOff}) {
+    CHECK(std::string(nv::view_name(nv::View::kDark)) == "dark");
+    for (const nv::View view :
+         {nv::View::kSpeakers, nv::View::kTitle, nv::View::kClock, nv::View::kOff, nv::View::kDark}) {
         const auto parsed = nv::parse_view(nv::view_name(view));
         REQUIRE(parsed.has_value());
         CHECK(*parsed == view);
@@ -28,6 +30,9 @@ TEST_CASE("now_view: the four views and their words", "[now_view]") {
 TEST_CASE("now_view: a view is read with or without a line ending, and nothing else is a view", "[now_view]") {
     CHECK(nv::parse_view("speakers\n") == nv::View::kSpeakers);
     CHECK(nv::parse_view("  off\r\n") == nv::View::kOff);
+    CHECK(nv::parse_view("dark\n") == nv::View::kDark);
+    CHECK_FALSE(nv::parse_view("Dark").has_value());
+    CHECK_FALSE(nv::parse_view("dark screen").has_value());
     CHECK_FALSE(nv::parse_view("").has_value());
     CHECK_FALSE(nv::parse_view("Speakers").has_value());
     CHECK_FALSE(nv::parse_view("speaker").has_value());
@@ -41,10 +46,12 @@ TEST_CASE("now_view: the stored numbers are the ones written down, and a number 
     CHECK(static_cast<int>(nv::View::kTitle) == 1);
     CHECK(static_cast<int>(nv::View::kClock) == 2);
     CHECK(static_cast<int>(nv::View::kOff) == 3);
+    CHECK(static_cast<int>(nv::View::kDark) == 4);
     CHECK(nv::view_from_stored(0) == nv::View::kSpeakers);
     CHECK(nv::view_from_stored(3) == nv::View::kOff);
+    CHECK(nv::view_from_stored(4) == nv::View::kDark);
     CHECK_FALSE(nv::view_from_stored(-1).has_value());
-    CHECK_FALSE(nv::view_from_stored(4).has_value());
+    CHECK_FALSE(nv::view_from_stored(5).has_value());
 }
 
 TEST_CASE("now_view: dim-after is never or whole minutes up to four hours", "[now_view]") {
@@ -86,6 +93,55 @@ TEST_CASE("now_view: the screen dims after the time set with nothing touched, an
     // The ceiling does not overflow the arithmetic.
     CHECK_FALSE(nv::dimmed(true, nv::kDimMaxMinutes, 240 * kMinute - 1));
     CHECK(nv::dimmed(true, nv::kDimMaxMinutes, 240 * kMinute));
+}
+
+TEST_CASE("now_view: the dark view is dark from the moment it shows, and a touch lights it for a while", "[now_view]") {
+    using nv::Dim;
+    constexpr std::uint32_t kSecond = 1000;
+    constexpr nv::View kDark = nv::View::kDark;
+    // The song has shown for 10 s and nothing has touched the glass since before it began (it has been
+    // idle for an hour): dark, however long that was.
+    CHECK(nv::dim_state(kDark, true, 5, 3'600 * kSecond, 10 * kSecond) == Dim::kDark);
+    // At the first instant it shows, too.
+    CHECK(nv::dim_state(kDark, true, 5, 0, 0) == Dim::kDark);
+    // A touch 2 s ago, after the song began (it has shown for 10 s): lit.
+    CHECK(nv::dim_state(kDark, true, 5, 2 * kSecond, 10 * kSecond) == Dim::kNone);
+    // Lit for exactly kDarkAwakeMs from the last touch, and not a millisecond longer.
+    CHECK(nv::dim_state(kDark, true, 5, nv::kDarkAwakeMs - 1, 600 * kSecond) == Dim::kNone);
+    CHECK(nv::dim_state(kDark, true, 5, nv::kDarkAwakeMs, 600 * kSecond) == Dim::kDark);
+    CHECK(nv::kDarkAwakeMs == 30 * kSecond);
+    // Another touch lights it for another 30 s: the time counts from the last.
+    CHECK(nv::dim_state(kDark, true, 5, 1 * kSecond, 600 * kSecond) == Dim::kNone);
+    // A touch just before the song began is not a touch of this song: the screen goes dark with it.
+    CHECK(nv::dim_state(kDark, true, 5, 4 * kSecond, 2 * kSecond) == Dim::kDark);
+    // The dim time of the speakers view means nothing here, even "never".
+    CHECK(nv::dim_state(kDark, true, nv::kDimNever, 3'600 * kSecond, 10 * kSecond) == Dim::kDark);
+    // Not on the no-lyrics view (a lyric screen, the idle screen): lit.
+    CHECK(nv::dim_state(kDark, false, 5, 3'600 * kSecond, 3'600 * kSecond) == Dim::kNone);
+}
+
+TEST_CASE("now_view: the speakers view dims as it always did, and the dark view does not change it", "[now_view]") {
+    using nv::Dim;
+    constexpr std::uint32_t kMinute = 60'000;
+    // Five minutes set, the song has shown for ten: the glass untouched for five minutes dims it, a
+    // millisecond short does not, and a touch lights it.
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 5 * kMinute - 1, 10 * kMinute) == Dim::kNone);
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 5 * kMinute, 10 * kMinute) == Dim::kDimmed);
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 100, 10 * kMinute) == Dim::kNone);
+    // The time counts from the song as well: it began a minute ago on a panel nobody touched for hours.
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 600 * kMinute, 1 * kMinute) == Dim::kNone);
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 600 * kMinute, 5 * kMinute) == Dim::kDimmed);
+    // Never is never; and a view that is not showing is not dimmed.
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, nv::kDimNever, 600 * kMinute, 600 * kMinute) == Dim::kNone);
+    CHECK(nv::dim_state(nv::View::kSpeakers, false, 5, 600 * kMinute, 600 * kMinute) == Dim::kNone);
+    // It agrees with dimmed() on every input it takes, for the speakers view.
+    for (const std::uint32_t inactive : {0U, 1U, 4 * kMinute, 5 * kMinute, 600 * kMinute}) {
+        for (const std::uint32_t showing_ms : {0U, 3 * kMinute, 5 * kMinute, 600 * kMinute}) {
+            const std::uint32_t quiet = inactive < showing_ms ? inactive : showing_ms;
+            CHECK((nv::dim_state(nv::View::kSpeakers, true, 5, inactive, showing_ms) == Dim::kDimmed) ==
+                  nv::dimmed(true, 5, quiet));
+        }
+    }
 }
 
 TEST_CASE("now_view: a stream is named for its codec and the layout it was coded in", "[now_view]") {
