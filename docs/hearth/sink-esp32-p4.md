@@ -19,7 +19,10 @@ they are sung.
     time moves by 5 to 12% (under 1% of a frame); AC-4 5.1 plays clean at layout 2.0 and glitched on
     5 of 18 plays at layout 5.1 with the glass on, against 1 of 30 without a scan-out.
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
-    owner's look.** The board suite is played on it, with a baseline.
+    owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
+    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it and
+    takes an update over it, so the kit can run on a PoE splitter; **pulling the cable out and in
+    again while it plays is not yet tried.**
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
 
@@ -269,15 +272,45 @@ base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A dia
 control for the preference reads `GET /status` and `GET` and `PUT /network-preference` and nothing
 else.
 
-!!! warning "Moving a kit to PoE: it is safe once the checklist below is true"
-    Wired up, the kit has no USB console and no USB flashing, so a bad image can only be rescued by
-    the update's own rollback (an image that does not reach the network, the HTTP server and the
-    Sendspin player inside five minutes goes back to the one before it, and so does a panic on its
-    first boot) or by putting the USB cable back. See [What was tested](#what-was-tested-on-the-cable).
+!!! warning "Moving a kit to PoE"
+    On a PoE splitter the kit has no USB console and no USB flashing, so a bad image can only be
+    rescued by the update's own rollback (an image that does not reach the network, the HTTP server
+    and the Sendspin player inside five minutes goes back to the one before it, and so does one that
+    panics on its first boot; both were tried on the kit) or by putting the USB cable back. Keep the
+    Wi-Fi network stored, so the board has a way out if the cable goes. See
+    [What was tested](#what-was-tested-on-the-cable) for what was and was not tried.
 
 #### What was tested on the cable
 
-(Results are filled in below as the tests are run on the kit.)
+On the v3.2 kit, 2026-10-20, with the owner's cable to their router (100 Mbit/s, full duplex), the
+Wi-Fi and the USB cable on as well. Details and the numbers:
+[the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20).
+
+- **The update path, before the cable:** ten `ota.py push` runs (eight accepted, an image that never
+  becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
+  bootloader in about 25 s), a `PUT` rollback, eight `POST /restart` and four rounds of a USB flash
+  followed 20 s later by an update: the C6 link was back each time, 7 to 10 s after the restart.
+- **The PHY** answers on the default pins at SMI address 1 with the IP101's ID, and negotiates 100
+  Mbit/s full duplex.
+- **Boot:** with the cable in, it answers on the cable 10 s after reset and the Wi-Fi joins behind it
+  at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
+  **no Wi-Fi network stored** it comes up on the cable alone, with the page, mDNS and the Sendspin
+  player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.
+- **A cable put in while the board runs** is in use within about 6 s, with no restart.
+- **Everything that answers on Wi-Fi answers on the cable:** the page, `/api`, `/hardware`, `GET /log`,
+  `PUT /firmware` (an update over the cable restarted the board, which answered on the cable 10 s
+  later and passed its trial), mDNS (`hearth-<mac tail>.local` has an A record for each address) and
+  Sendspin, which played four 30 s AC-3 streams through the cable, 938 of 938 bursts each with no
+  underrun (one with a late burst and a resync at its start).
+- **The preference** set to each of the three words with the cable in did what the table says, and
+  survived a restart; `ethernet` with no cable in was not kept and left the Wi-Fi on throughout.
+- **Cost:** the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
+  smaller (about 281 KB free, largest block about 256 KB).
+
+**Not tested:** pulling the cable out and putting it back while the board plays (the owner was
+remote), a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. **Until
+the pull test is run, a kit on PoE should have its Wi-Fi network stored, so that it can fall back to
+it, and the first move to PoE should be done with the USB cable at hand.**
 
 ### Memory and time
 

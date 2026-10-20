@@ -772,6 +772,54 @@ filling where there is a screen:
   in five or six with the glass on and the heap is 10 KB. **No profile was added**; it is the
   owner's call.
 
+### The cable on the kit (2026-10-20)
+
+D9 built and run on the kit: the owner's cable to their router (100 Mbit/s full duplex), the Wi-Fi
+and the USB cable on as well, image `v0.10.0-beta.1-5131-gbb6d603fd` (profile hash `ff9b27a6c4fd`).
+The order was the owner's: the update path first, over Wi-Fi with the USB attached, then the cable.
+
+**Before the cable: does the kit restart and update?** (`bench.json` said "not tried"; on the
+v1.x boards a restart once left the C6 link dead, #1434.)
+
+| Tried | Result |
+|---|---|
+| `ota.py push` of p4-rev3 images, ten times: eight accepted (the baseline image, a second one, the Ethernet image six times) and two that were meant to fail (below) | each accepted one restarted, came back on Wi-Fi 7 s after the restart, ran its 30 s trial and was accepted |
+| `ota.py rollback` | restarted into the image before, on trial, accepted |
+| An image that never reports healthy (`ICLFORGE_FIRMWARE_TEST=unhealthy`) | rolled back at the 300 s deadline, Wi-Fi up |
+| An image that panics on its trial (`=panic`) | the bootloader rolled it back in about 25 s, Wi-Fi up, the core dump readable |
+| `POST /restart`, eight times | the C6 link was back 10.3 s after each (reset reason `wdt`: the system reset of #1434) |
+| A USB flash, 20 s, an OTA push (the sequence that failed 8 times in 16 on the v1.x boards), four times | all four accepted |
+
+So the kit's restart and update are as good as the old boards' with #1434, and `bench.json` no longer
+marks it as unknown.
+
+**The cable.**
+
+| Tried | Result |
+|---|---|
+| The PHY on the chosen pins | answers at SMI address 1 with ID `0243 0c54` (the IP101's); the pins are ESP-IDF's example defaults for the P4 and Zephyr's for this board |
+| A cable put in while the board runs (auto) | the link seen, DHCP done and the board using the cable within about 6 s of each other, no restart; the Wi-Fi stays joined |
+| Boot with the cable in and a Wi-Fi network stored | the cable up and answering 9.9 s after reset, the Wi-Fi joined behind it at 14 s |
+| Boot with the cable out | waits 4 s for a link, then the Wi-Fi as before: network at about 16 s |
+| Boot with the cable in and **no Wi-Fi network stored** (NVS erased, an image with none built in) | up on the cable alone, address at 8.9 s (the router's DHCP took 4.4 s of that), the player and mDNS started, `network: "wired"` in `GET /firmware`; Improv said *ready*, and a network handed over USB joined while the cable stayed in use (Improv answered with the cable's page address) |
+| The page, `/api`, `/hardware`, `GET /log` | answer on the cable's address and the Wi-Fi's |
+| mDNS | `hearth-e753f9.local` has an A record for each address |
+| A Sendspin play (`hearth-testserver` dialling the board, the suite's way, its 30 s AC-3 2.0 stream) | four plays on the cable (three with the Wi-Fi joined as well, one with no Wi-Fi stored), 938 of 938 bursts and no underrun each, one of them with 1 late burst and 1 resync at its start; one on the Wi-Fi address, 938 of 938, clean |
+| `ota.py push` to the cable's address | the same image with `--force`: the board restarted, answered on the cable 9.9 s after reset, the trial was accepted |
+| `PUT /network-preference` wifi / ethernet / auto with the cable in | each took effect in a few seconds: `wifi` left only the Wi-Fi (the cable's address stopped answering), `ethernet` only the cable (the Wi-Fi off), `auto` both again; the setting survived a restart |
+| `PUT /network-preference ethernet` with no cable | not kept: the preference stayed `auto` and `wifi` stayed on throughout (the first design stored it first and undid it, and `/status` read "no address" for five seconds; the order was changed) |
+
+What it costs: the image is 2,518,416 bytes against 2,466,880 (the budget is 2,600,000); at boot the
+internal heap reads 279,103 to 284,487 bytes free with a largest block of 253,952 to 258,048,
+against 295,779 to 307,147 and 270,336 to 278,528 for the image without it, so the cable's
+driver, its DMA buffers and its task take about 15 to 25 KB, and the headroom the budget line prints
+(the largest block less the biggest single ask) is 221 to 225 KB against 245 KB.
+
+**Not tried:** pulling the cable out and putting it back while the board plays or serves (the owner
+was not at the kit; the code's path for it is the link event, the loss of the address and ESP-IDF's
+choice of the default route, and the first is what the hot-plug row above exercised in one
+direction); a PoE splitter; 10 Mbit/s or half duplex; a static address; IPv6; a long soak.
+
 ## Risks and open questions
 
 | # | Item | What decides it |
