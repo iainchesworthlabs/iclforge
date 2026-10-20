@@ -27,7 +27,7 @@
 // its name with a Forget, and the one dialog asking before forgetting one
 // server or every server. Decision 22's re-derivation has the images.
 //
-// 61,440 since the Time section (a board's time zone, time server and whether it asks one: planning/p4x-now-playing.md,
+// 65,536 since the zone list of the Time section (61,440 with the section alone) (a board's time zone, time server and whether it asks one: planning/p4x-now-playing.md,
 // stage 3), which every board that has a network has; 57,344 since the firmware section (decision 29): both slots, a trial, an
 // upload and the last update; an upload from a file with the bytes sent
 // shown; Restart and Roll back behind the dialog, which now asks before
@@ -39,7 +39,7 @@ const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { UI_DIR } = require('./stub');
 
-const BUDGET = 61440;
+const BUDGET = 65536;
 
 test('the page and its script fit the flash budget', () => {
     const files = ['iclforge_ui.html', 'iclforge_ui.js'].map((name) => fs.readFileSync(path.join(UI_DIR, name)));

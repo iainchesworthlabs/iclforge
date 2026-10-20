@@ -147,7 +147,10 @@ test('every request the page makes is to a route the firmware registers', () => 
         'PUT /layout',
         'PUT /name',
         'PUT /network',
+        'PUT /ntp-server',
         'PUT /slot-width',
+        'PUT /time-sync',
+        'PUT /timezone',
         'PUT /wiring',
     ]);
     for (const route of made) {
@@ -410,6 +413,23 @@ const SERVERS_REFUSED = [
     'ntp.123',
     `${'a'.repeat(64)}`,
 ];
+
+test("every zone the page offers is one the firmware takes", async () => {
+    const listed = SCRIPT.match(/const ZONES = \(([\s\S]*?)\)\s*\.split/);
+    expect(listed, 'the page has its list of zones').not.toBeNull();
+    const zones = [...listed[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]).join('').split(';').map((z) => z.split('|'));
+    expect(zones.length).toBeGreaterThan(30);
+    const stub = await startStub();
+    try {
+        for (const [label, zone] of zones) {
+            const reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: zone });
+            expect(reply.status, `${label}: ${zone}`).toBe(200);
+        }
+        expect(new Set(zones.map((z) => z[1])).size, 'a zone listed twice').toBe(zones.length);
+    } finally {
+        await stub.close();
+    }
+});
 
 test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware does', async () => {
     const stub = await startStub();
