@@ -76,6 +76,7 @@
 #include "sendspin.hpp"
 #include "settings.hpp"
 #include "system_reset.hpp"
+#include "wall_clock.hpp"
 
 // The example's half of the stage timers. main/CMakeLists.txt links the
 // bare-metal probe's backend (firmware/baremetal/stage_timers.cpp) when the
@@ -751,19 +752,55 @@ iclforge::ControlHandlers control_handlers() {
             player::panel_set_dim_after(minutes);
             return true;
         };
-        // The clock view's zone (stage 3): the board's C library must read it as the route did before it is
-        // kept, and a zone that cannot be stored is not left applied.
+    }
+    // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
+    // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
+    // at once. A zone is applied first, because the board's C library must read it as the route did, and is
+    // not left applied if it cannot be stored.
+    if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
         h.set_time_zone = [](std::string_view zone) {
             const std::string previous = player::settings().time_zone.data();
-            if (!player::panel_set_time_zone(zone)) {
+            if (!player::wall_clock_set_zone(zone)) {
                 return false;
             }
             if (!player::settings_set_time_zone(zone)) {
-                (void)player::panel_set_time_zone(previous);
+                (void)player::wall_clock_set_zone(previous);
                 return false;
             }
             return true;
+        };
+        h.ntp_server = []() { return iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data()); };
+        h.set_ntp_server = [](std::string_view server) {
+            if (!player::settings_set_ntp_server(server)) {
+                return false;
+            }
+            player::wall_clock_set_server(server);
+            return true;
+        };
+        h.time_sync = []() { return std::string(iclforge::wallclock::time_sync_text(player::settings().time_sync)); };
+        h.set_time_sync = [](bool on) {
+            if (!player::settings_set_time_sync(on)) {
+                return false;
+            }
+            player::wall_clock_set_sync(on);
+            return true;
+        };
+        h.time = []() -> std::optional<iclforge::ControlTime> {
+            const player::WallClockStats stats = player::wall_clock_stats();
+            iclforge::ControlTime time;
+            time.sync = stats.enabled;
+            time.asking = stats.asking;
+            time.synced = stats.synced;
+            const iclforge::wallclock::Reading reading = player::wall_clock_read();
+            if (reading.known) {
+                time.local = iclforge::wallclock::local_text(reading.local);
+            }
+            time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
+            time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
+            time.servers = player::wall_clock_servers();
+            time.answers = stats.syncs;
+            return time;
         };
     }
     h.slot_bits = []() { return player::sink_slot_bits(); };
@@ -1018,6 +1055,10 @@ extern "C" void app_main() {
     // build with no network says so and carries on; so does a board with
     // nothing stored to join, which is what Improv is then there to fix.
     (void)player::network_up();
+
+    // The time of day, from the settings: it asks a time server as soon as the board holds an address, and a
+    // network that comes up later (Improv) is followed by an event it listens for (main/wall_clock.hpp).
+    player::wall_clock_start();
 
     // Found by name once it is on one (discovery.hpp), and told what to join
     // when it is not: a browser over the same USB port this console is on

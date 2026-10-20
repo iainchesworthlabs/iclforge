@@ -23,10 +23,3 @@ CONFIG_LV_USE_BIDI=y
 # keeps the control surface's, the Sendspin host's and mDNS's: the default of ten sockets is what
 # they used, so this is room and not a measured need.
 CONFIG_LWIP_MAX_SOCKETS=16
-
-# The clock view's time servers (planning/p4x-now-playing.md, stage 3; main/panel/lvgl/wall_clock.cpp): the
-# ones the router gives over DHCP (option 42, kept by lwIP when a lease is bound; net/stack.cpp turns that
-# on) and pool.ntp.org behind them, so two. Nothing asks either until the clock is the view chosen.
-CONFIG_LWIP_DHCP_GET_NTP_SRV=y
-CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=1
-CONFIG_LWIP_SNTP_MAX_SERVERS=2

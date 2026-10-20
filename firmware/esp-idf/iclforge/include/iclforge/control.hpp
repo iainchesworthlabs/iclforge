@@ -152,6 +152,24 @@ struct ControlPairings {
     std::vector<ControlPairing> servers;
 };
 
+// GET /status's "time" object: what a board that keeps the time says about it, for a page that offers to set the
+// zone and the server and for someone asking why a clock shows nothing.
+struct ControlTime {
+    // The board keeps its time with a time server (PUT /time-sync).
+    bool sync = false;
+    // The SNTP client is started, and a time server has answered since it was.
+    bool asking = false;
+    bool synced = false;
+    // The time to the second in the board's zone ("2026-10-21 08:09:44"); empty until a server has answered.
+    std::string local;
+    // The zone as set, or "none" (the time is UTC), and the server a person named, or "none".
+    std::string zone;
+    std::string server;
+    // The servers lwIP is set to ask, as text, and how many answers there have been since boot.
+    std::string servers;
+    unsigned answers = 0;
+};
+
 // GET /status's "network" object: what the board is joined to, for a page
 // that offers to move it to another network and for someone asking why its
 // stream stutters. Plain values, which the owner fills in.
@@ -276,14 +294,21 @@ struct ControlHandlers {
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
 
-    // GET and PUT /timezone: the time zone the clock view of a board with a screen shows, as a POSIX
-    // string (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3). A board with no screen leaves
-    // both empty, and the route answers that it has none. set_time_zone is handed a string the route has
-    // already read as a zone (wallclock::parse_time_zone), or an empty one for `none`; false means the board
-    // could not take it (its C library reads it differently, or it could not be stored). It acts at once,
-    // with no restart. time_zone answers with the words a PUT takes: the string, or `none`.
+    // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
+    // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps
+    // no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each setter
+    // is handed what the route has already read as the setting (wallclock::parse_zone_setting and the like: an
+    // empty string is `none`); false means the board could not take it (its C library reads a zone differently,
+    // or it could not be stored). They act at once, with no restart. The getters answer with the words a PUT
+    // takes: a zone or a server or `none`, and `on` or `off`.
     std::function<std::string()> time_zone;
     std::function<bool(std::string_view zone)> set_time_zone;
+    std::function<std::string()> ntp_server;
+    std::function<bool(std::string_view server)> set_ntp_server;
+    std::function<std::string()> time_sync;
+    std::function<bool(bool on)> set_time_sync;
+    // GET /status's "time": see ControlTime.
+    std::function<std::optional<ControlTime>()> time;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.

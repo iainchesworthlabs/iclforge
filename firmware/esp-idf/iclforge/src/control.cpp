@@ -477,7 +477,9 @@ struct Control::Impl {
                          "to change it\n"
                          "GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
-                         "GET  /timezone      the clock view's POSIX time zone, or none, on a board with a screen; PUT one\n"
+                         "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one\n"
+                         "GET  /ntp-server    the time server a person named, or none (the router's, then the pool); PUT one\n"
+                         "GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
                          "(Sendspin pairing)\n"
@@ -631,6 +633,29 @@ struct Control::Impl {
                 } else {
                     out += "null";
                 }
+                out += '}';
+            } else {
+                out += "null";
+            }
+        }
+        // What the board says the time is, on a board that keeps one: see ControlTime.
+        if (h.time) {
+            append_key(out, "time");
+            if (const std::optional<ControlTime> time = h.time()) {
+                out += '{';
+                append_bool(out, "sync", time->sync);
+                append_bool(out, "asking", time->asking);
+                append_bool(out, "synced", time->synced);
+                append_key(out, "local");
+                if (time->local.empty()) {
+                    out += "null";
+                } else {
+                    append_json_string(out, time->local);
+                }
+                append_string(out, "zone", time->zone);
+                append_string(out, "server", time->server);
+                append_string(out, "servers", time->servers);
+                append_number(out, "answers", time->answers);
                 out += '}';
             } else {
                 out += "null";
@@ -898,7 +923,7 @@ struct Control::Impl {
     static esp_err_t on_time_zone_get(httpd_req_t* req) {
         auto& h = self(req)->handlers;
         if (!h.time_zone) {
-            return send_text(req, "404 Not Found", "this board has no screen\n");
+            return send_text(req, "404 Not Found", "this board keeps no time\n");
         }
         std::string text = h.time_zone();
         text += '\n';
@@ -919,7 +944,7 @@ struct Control::Impl {
                              "AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n");
         }
         if (!h.set_time_zone) {
-            return send_text(req, "409 Conflict", "this board has no screen\n");
+            return send_text(req, "409 Conflict", "this board keeps no time\n");
         }
         if (!h.set_time_zone(*zone)) {
             return send_text(req, "409 Conflict",
@@ -927,6 +952,64 @@ struct Control::Impl {
                              "could not be stored\n");
         }
         return send_text(req, "200 OK", "ok; the clock follows at once\n");
+    }
+
+    static esp_err_t on_ntp_server_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.ntp_server) {
+            return send_text(req, "404 Not Found", "this board keeps no time\n");
+        }
+        std::string text = h.ntp_server();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_ntp_server_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<std::string> server = wallclock::parse_ntp_server_setting(read_body(req));
+        if (!server) {
+            return send_text(req, "400 Bad Request",
+                             "PUT /ntp-server wants a host name or an IPv4 address, such as pool.ntp.org or "
+                             "192.168.1.5, or none\n");
+        }
+        if (!h.set_ntp_server) {
+            return send_text(req, "409 Conflict", "this board keeps no time\n");
+        }
+        if (!h.set_ntp_server(*server)) {
+            return send_text(req, "409 Conflict", "that server could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; the board asks it at once\n");
+    }
+
+    static esp_err_t on_time_sync_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.time_sync) {
+            return send_text(req, "404 Not Found", "this board keeps no time\n");
+        }
+        std::string text = h.time_sync();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_time_sync_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<bool> on = wallclock::parse_time_sync(read_body(req));
+        if (!on) {
+            return send_text(req, "400 Bad Request", "PUT /time-sync wants on or off\n");
+        }
+        if (!h.set_time_sync) {
+            return send_text(req, "409 Conflict", "this board keeps no time\n");
+        }
+        if (!h.set_time_sync(*on)) {
+            return send_text(req, "409 Conflict", "that setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
     }
 
     // GET /pairing: see ControlPairings. Here, below on_play, for the reason
@@ -1136,6 +1219,10 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
         {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},
+        {.uri = "/ntp-server", .method = HTTP_GET, .handler = &Impl::on_ntp_server_get},
+        {.uri = "/ntp-server", .method = HTTP_PUT, .handler = &Impl::on_ntp_server_put},
+        {.uri = "/time-sync", .method = HTTP_GET, .handler = &Impl::on_time_sync_get},
+        {.uri = "/time-sync", .method = HTTP_PUT, .handler = &Impl::on_time_sync_put},
         {.uri = "/pairing", .method = HTTP_GET, .handler = &Impl::on_pairing_get},
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},

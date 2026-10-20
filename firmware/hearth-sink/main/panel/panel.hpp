@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string_view>
 
 #include "iclforge/now_view.hpp"
 
@@ -68,11 +67,6 @@ struct PanelStats {
 [[nodiscard]] bool panel_has_view(iclforge::nowview::View view);
 void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
-
-// The time zone the clock view shows, as a POSIX string, or "" for none (iclforge/wall_clock.hpp): read
-// the way the board's C library reads it, and refused (false, nothing changed) where that differs from
-// the grammar. Not stored: the board's settings are the caller's to keep. Without a panel does nothing.
-[[nodiscard]] bool panel_set_time_zone(std::string_view zone);
 
 // Starts the panel's task: once, from app_main, after the network and the Sendspin player. True when
 // a panel is running; false (having said why) when there is none or it did not come up.

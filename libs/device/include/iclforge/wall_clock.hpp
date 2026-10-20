@@ -255,6 +255,111 @@ class Zone {
     return fits(january_east_s) && fits(july_east_s);
 }
 
+// --- the time server --------------------------------------------------------------------------------------
+
+// The longest a time server's name may be (NVS holds it in a field of this many bytes and a NUL).
+inline constexpr std::size_t kNtpServerMaxBytes = 63;
+
+namespace detail {
+
+[[nodiscard]] constexpr bool is_digit(char c) { return c >= '0' && c <= '9'; }
+
+// a.b.c.d, each part 0 to 255 and written without a leading zero (lwIP, like most resolvers, reads "010" as
+// octal, and a three-part "10.0.1" as 10.0.0.1: neither is what anyone typed).
+[[nodiscard]] constexpr bool is_ipv4(std::string_view text) {
+    int parts = 0;
+    std::size_t at = 0;
+    while (at <= text.size()) {
+        const std::size_t start = at;
+        int value = 0;
+        while (at < text.size() && is_digit(text[at])) {
+            value = value * 10 + (text[at] - '0');
+            if (value > 255) {
+                return false;
+            }
+            ++at;
+        }
+        const std::size_t digits = at - start;
+        if (digits == 0 || digits > 3 || (digits > 1 && text[start] == '0')) {
+            return false;
+        }
+        ++parts;
+        if (at == text.size()) {
+            break;
+        }
+        if (text[at] != '.') {
+            return false;
+        }
+        ++at;
+    }
+    return parts == 4;
+}
+
+}  // namespace detail
+
+// A host name (RFC 1123 labels of letters, digits and hyphens, none starting or ending with a hyphen, the last
+// not all digits) or an IPv4 address, of at most kNtpServerMaxBytes. What PUT /ntp-server takes for a server of
+// the owner's own, in place of the pool: a time server on the network the board is on.
+[[nodiscard]] constexpr bool valid_ntp_server(std::string_view text) {
+    if (text.empty() || text.size() > kNtpServerMaxBytes) {
+        return false;
+    }
+    bool numeric = true;
+    for (const char c : text) {
+        numeric = numeric && (detail::is_digit(c) || c == '.');
+    }
+    if (numeric) {
+        return detail::is_ipv4(text);
+    }
+    std::size_t label = 0;
+    bool last_all_digits = true;
+    for (std::size_t i = 0; i <= text.size(); ++i) {
+        const bool end = i == text.size() || text[i] == '.';
+        if (end) {
+            if (label == 0 || label > 63 || text[i - 1] == '-') {
+                return false;
+            }
+            if (i == text.size()) {
+                break;
+            }
+            label = 0;
+            last_all_digits = true;
+            continue;
+        }
+        const char c = text[i];
+        const bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+        if (!(letter || detail::is_digit(c) || c == '-') || (label == 0 && c == '-')) {
+            return false;
+        }
+        last_all_digits = last_all_digits && detail::is_digit(c);
+        ++label;
+    }
+    return !last_all_digits;
+}
+
+// What PUT /ntp-server takes: a server, or `none`, with or without a line ending. nullopt is a body that is
+// neither; an empty string is `none` (the board's own choice of servers again: the router's, then the pool).
+[[nodiscard]] inline std::optional<std::string> parse_ntp_server_setting(std::string_view body) {
+    body = detail::trimmed(body);
+    if (body == kNoZone) {
+        return std::string();
+    }
+    // "None" is a host name as far as the grammar goes, and a typo for the word as far as a person goes.
+    if (body.size() == 4 && (body[0] | 0x20) == 'n' && (body[1] | 0x20) == 'o' && (body[2] | 0x20) == 'n' &&
+        (body[3] | 0x20) == 'e') {
+        return std::nullopt;
+    }
+    if (!valid_ntp_server(body)) {
+        return std::nullopt;
+    }
+    return std::string(body);
+}
+
+// What GET /ntp-server says: the server, or `none` while there is not one.
+[[nodiscard]] inline std::string ntp_server_setting_text(std::string_view stored) {
+    return stored.empty() ? std::string(kNoZone) : std::string(stored);
+}
+
 // --- the time -------------------------------------------------------------------------------------------
 
 // A date and a time on a wall: what the clock shows, which a zone and a count of seconds make.
@@ -326,6 +431,23 @@ inline constexpr std::int64_t kProbeJuly = 1784116800;     // 2026-07-15 12:00:0
 // before it says one that cannot be.
 inline constexpr std::int64_t kNotBefore = 1767225600;
 
+// --- whether to ask --------------------------------------------------------------------------------------
+
+// What PUT /time-sync takes: `on` or `off`, with or without a line ending. A board keeps its time with a time
+// server by default (planning/p4x-now-playing.md, stage 3); `off` is for a board that must contact none.
+[[nodiscard]] constexpr std::optional<bool> parse_time_sync(std::string_view body) {
+    body = detail::trimmed(body);
+    if (body == "on") {
+        return true;
+    }
+    if (body == "off") {
+        return false;
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] constexpr const char* time_sync_text(bool on) { return on ? "on" : "off"; }
+
 // --- the words ---------------------------------------------------------------------------------------------
 
 // What the seam gives the screen: no time until a time server has answered, and never one the board made up.
@@ -374,6 +496,20 @@ inline constexpr const char* kUtcNote = "UTC. No time zone is set.";
         out.note = kUtcNote;
     }
     return out;
+}
+
+// "2026-10-21 08:09:44": the time as GET /status and the board's page write it, to the second.
+[[nodiscard]] inline std::string local_text(const LocalTime& at) {
+    const auto digits = [](int value, int width) {
+        std::string text(static_cast<std::size_t>(width), '0');
+        for (int i = width - 1; i >= 0; --i) {
+            text[static_cast<std::size_t>(i)] = static_cast<char>('0' + value % 10);
+            value /= 10;
+        }
+        return text;
+    };
+    return digits(at.year, 4) + "-" + digits(at.month, 2) + "-" + digits(at.day, 2) + " " + digits(at.hour, 2) +
+           ":" + digits(at.minute, 2) + ":" + digits(at.second, 2);
 }
 
 }  // namespace iclforge::wallclock

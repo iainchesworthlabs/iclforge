@@ -32,7 +32,6 @@
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
 #include "now_screen.hpp"
-#include "wall_clock.hpp"
 
 namespace player::panel {
 

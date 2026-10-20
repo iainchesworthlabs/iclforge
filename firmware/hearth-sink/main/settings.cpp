@@ -28,7 +28,9 @@ constexpr const char* kKeySecondLine = "second_line";
 constexpr const char* kKeyNetworkPreference = "net_pref";
 constexpr const char* kKeyNowView = "np_view";
 constexpr const char* kKeyDimAfter = "np_dim";
-constexpr const char* kKeyTimeZone = "np_tz";
+constexpr const char* kKeyTimeZone = "time_zone";
+constexpr const char* kKeyNtpServer = "ntp_server";
+constexpr const char* kKeyTimeSync = "time_sync";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -138,6 +140,9 @@ void settings_load() {
     g_settings.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     g_settings.now_view = iclforge::nowview::kDefaultView;
     g_settings.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    g_settings.time_zone = {};
+    g_settings.ntp_server = {};
+    g_settings.time_sync = true;
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -204,19 +209,30 @@ void settings_load() {
                     g_settings.time_zone.data());
         g_settings.time_zone[0] = '\0';
     }
+    read_string(handle, kKeyNtpServer, g_settings.ntp_server);
+    if (g_settings.ntp_server[0] != '\0' && !iclforge::wallclock::valid_ntp_server(g_settings.ntp_server.data())) {
+        std::printf("settings: stored time server '%s' is not one this build reads; the router's and the pool\n",
+                    g_settings.ntp_server.data());
+        g_settings.ntp_server[0] = '\0';
+    }
+    if (nvs_get_i32(handle, kKeyTimeSync, &stored) == ESP_OK) {
+        g_settings.time_sync = stored != 0;
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, time zone %s\n",
+                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
-                iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str());
+                iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
+                iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
+                iclforge::wallclock::time_sync_text(g_settings.time_sync));
 }
 
 const Settings& settings() { return g_settings; }
@@ -310,6 +326,23 @@ bool settings_set_time_zone(std::string_view zone) {
     }
     // An empty string is stored as such, and read back as no zone: NVS keeps the key, the clock says UTC.
     return write_string(kKeyTimeZone, zone, g_settings.time_zone);
+}
+
+bool settings_set_ntp_server(std::string_view server) {
+    if (!server.empty() && !iclforge::wallclock::valid_ntp_server(server)) {
+        std::printf("settings: '%.*s' is not a time server this board reads\n", static_cast<int>(server.size()),
+                    server.data());
+        return false;
+    }
+    return write_string(kKeyNtpServer, server, g_settings.ntp_server);
+}
+
+bool settings_set_time_sync(bool on) {
+    if (!write_int(kKeyTimeSync, on ? 1 : 0)) {
+        return false;
+    }
+    g_settings.time_sync = on;
+    return true;
 }
 
 bool settings_forget() {

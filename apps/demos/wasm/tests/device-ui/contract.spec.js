@@ -24,6 +24,7 @@ const {
     firmwareTrial,
     cableNetwork,
     screenBoard,
+    timeBoard,
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
@@ -197,7 +198,7 @@ test("the stand-in writes GET /status's keys in the firmware's order", async () 
             stub.device.sendspin = sendspin;
             const body = JSON.parse(await (await fetch(`${stub.url}status`)).text());
             const keys = Object.keys(body).flatMap((key) =>
-                ['stream', 'sendspin', 'network'].includes(key) ? [key, ...Object.keys(body[key])] : [key],
+                ['stream', 'sendspin', 'network', 'time'].includes(key) ? [key, ...Object.keys(body[key])] : [key],
             );
             expect(keys).toEqual(firmware);
         }
@@ -390,24 +391,55 @@ const ZONES_REFUSED = [
     `AEST-10AEDT,M10.1.0/${'1'.repeat(63)},M4.1.0`,
 ];
 
-test('the stand-in answers /timezone as the firmware does', async () => {
+const SERVERS_TAKEN = ['pool.ntp.org', '192.168.1.5', 'ntp', 'my-router.lan', 'NTP1.Example.COM', '0.au.pool.ntp.org', '255.255.255.255'];
+const SERVERS_REFUSED = [
+    '',
+    'None',
+    'NONE',
+    '256.1.1.1',
+    '1.2.3',
+    '192.168.01.5',
+    '-pool.ntp.org',
+    'pool-.ntp.org',
+    'pool..ntp.org',
+    'pool.ntp.org.',
+    'pool.ntp.org:123',
+    'http://pool.ntp.org',
+    'pool_ntp.org',
+    '[::1]',
+    'ntp.123',
+    `${'a'.repeat(64)}`,
+];
+
+test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware does', async () => {
     const stub = await startStub();
     try {
-        // A board with no screen has no clock to set: a zone that parses is told so, and one that does not
-        // is refused first, as the route reads the body before it asks whether there is a screen.
-        let reply = await fetch(`${stub.url}timezone`);
-        expect(reply.status).toBe(404);
-        expect(await reply.text()).toBe(REPLIES.noScreen);
-        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'JST-9' });
-        expect(reply.status).toBe(409);
-        expect(await reply.text()).toBe(REPLIES.noScreen);
-        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Sydney' });
-        expect(reply.status).toBe(400);
-        expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+        // A board that keeps no time (no network, or QEMU's) has nothing to set: what parses is told so, and
+        // what does not is refused first, as the routes read the body before they ask whether there is a clock.
+        stub.device.time = undefined;
+        for (const [route, good, bad] of [
+            ['timezone', 'JST-9', 'Sydney'],
+            ['ntp-server', 'pool.ntp.org', 'pool.ntp.org:123'],
+            ['time-sync', 'off', 'maybe'],
+        ]) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noClock);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noClock);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+        }
 
-        // One with a screen starts with no zone, which it says, and takes a zone or `none`.
-        stub.device.screen = screenBoard();
+        // One that keeps it starts as a board should: asking, on, no zone, no server of its own.
+        stub.device.time = timeBoard();
         expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
+        expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('on\n');
+
+        // The zone: a POSIX string or `none`.
+        let reply;
         for (const zone of ZONES_TAKEN) {
             reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: `${zone}\n` });
             expect(reply.status, zone).toBe(200);
@@ -424,14 +456,48 @@ test('the stand-in answers /timezone as the firmware does', async () => {
         reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'none\n' });
         expect(reply.status).toBe(200);
         expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
-
         // A zone the grammar takes and the board's C library reads differently is refused with a 409 and kept
-        // out, and so is one that cannot be stored.
-        stub.device.screen.timeZoneRefused = true;
+        // out.
+        stub.device.time.zoneRefused = true;
         reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'JST-9' });
         expect(reply.status).toBe(409);
         expect(await reply.text()).toBe(REPLIES.timeZoneRefused);
         expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        stub.device.time.zoneRefused = false;
+
+        // The server: a host name or an IPv4 address, or `none` for the router's and then the pool.
+        for (const server of SERVERS_TAKEN) {
+            reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: `${server}\r\n` });
+            expect(reply.status, server).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.ntpServerOk);
+            expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe(`${server}\n`);
+        }
+        for (const server of SERVERS_REFUSED) {
+            reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: server });
+            expect(reply.status, JSON.stringify(server)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.ntpServerBad);
+        }
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('255.255.255.255\n');
+        reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: 'none' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
+
+        // Whether to ask at all: on or off.
+        for (const bad of ['', 'On', '1', 'true', 'off now']) {
+            reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeSyncBad);
+        }
+        reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: 'off\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.timeSyncOk);
+        expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('off\n');
+        const off = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(off.sync).toBe(false);
+        expect(off.asking).toBe(false);
+        expect(off.local).toBe(null);
+        reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: 'on' });
+        expect(reply.status).toBe(200);
     } finally {
         await stub.close();
     }

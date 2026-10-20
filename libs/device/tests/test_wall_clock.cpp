@@ -296,3 +296,88 @@ TEST_CASE("wall_clock: every weekday and month has its name", "[wall_clock]") {
     reading.local = wc::LocalTime{2026, 13, 15, 9, 0, 0, 9};
     CHECK_FALSE(wc::face(reading).date.empty());
 }
+
+TEST_CASE("wall_clock: a time server is a host name or an IPv4 address", "[wall_clock]") {
+    CHECK(wc::valid_ntp_server("pool.ntp.org"));
+    CHECK(wc::valid_ntp_server("time.cloudflare.com"));
+    CHECK(wc::valid_ntp_server("0.au.pool.ntp.org"));
+    CHECK(wc::valid_ntp_server("ntp"));
+    CHECK(wc::valid_ntp_server("my-router.lan"));
+    CHECK(wc::valid_ntp_server("NTP1.Example.COM"));
+    CHECK(wc::valid_ntp_server("192.168.1.5"));
+    CHECK(wc::valid_ntp_server("10.0.0.0"));
+    CHECK(wc::valid_ntp_server("255.255.255.255"));
+    CHECK(wc::valid_ntp_server("a1.b2"));
+    // Nothing, or too much of it.
+    CHECK_FALSE(wc::valid_ntp_server(""));
+    CHECK_FALSE(wc::valid_ntp_server(std::string(wc::kNtpServerMaxBytes + 1, 'a')));
+    CHECK(wc::valid_ntp_server(std::string(wc::kNtpServerMaxBytes, 'a')));
+    CHECK_FALSE(wc::valid_ntp_server("a." + std::string(64, 'b')));
+    // An address that is not one: a part out of range, the wrong number of parts, a leading zero (which a
+    // resolver reads as octal), a part with a sign or a space in it.
+    CHECK_FALSE(wc::valid_ntp_server("256.1.1.1"));
+    CHECK_FALSE(wc::valid_ntp_server("1.2.3"));
+    CHECK_FALSE(wc::valid_ntp_server("1.2.3.4.5"));
+    CHECK_FALSE(wc::valid_ntp_server("192.168.01.5"));
+    CHECK_FALSE(wc::valid_ntp_server("192.168.1."));
+    CHECK_FALSE(wc::valid_ntp_server(".192.168.1.5"));
+    CHECK_FALSE(wc::valid_ntp_server("1..2.3"));
+    CHECK_FALSE(wc::valid_ntp_server("1000.1.1.1"));
+    CHECK_FALSE(wc::valid_ntp_server("192.168.1.-5"));
+    // A name that is not one.
+    CHECK_FALSE(wc::valid_ntp_server("-pool.ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool-.ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool..ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool.ntp.org."));
+    CHECK_FALSE(wc::valid_ntp_server("pool.ntp.org/x"));
+    CHECK_FALSE(wc::valid_ntp_server("pool ntp org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool_ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("http://pool.ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool.ntp.org:123"));
+    CHECK_FALSE(wc::valid_ntp_server("[::1]"));
+    CHECK_FALSE(wc::valid_ntp_server("ntp.123"));
+    CHECK_FALSE(wc::valid_ntp_server("p\xC3\xB6ol.ntp.org"));
+    CHECK_FALSE(wc::valid_ntp_server("pool.ntp.org\n"));
+}
+
+TEST_CASE("wall_clock: PUT /ntp-server takes a server or `none`, and GET reads it back", "[wall_clock]") {
+    CHECK(wc::parse_ntp_server_setting("192.168.1.5") == std::string("192.168.1.5"));
+    CHECK(wc::parse_ntp_server_setting("  pool.ntp.org\r\n") == std::string("pool.ntp.org"));
+    const auto none = wc::parse_ntp_server_setting("none\n");
+    REQUIRE(none.has_value());
+    CHECK(none->empty());
+    CHECK_FALSE(wc::parse_ntp_server_setting("").has_value());
+    CHECK_FALSE(wc::parse_ntp_server_setting("None").has_value());
+    CHECK_FALSE(wc::parse_ntp_server_setting("NONE").has_value());
+    CHECK(wc::valid_ntp_server("nonesuch"));
+    CHECK_FALSE(wc::parse_ntp_server_setting("pool.ntp.org:123").has_value());
+    CHECK(wc::ntp_server_setting_text("") == "none");
+    CHECK(wc::ntp_server_setting_text("192.168.1.5") == "192.168.1.5");
+    for (const char* server : {"", "pool.ntp.org", "192.168.1.5"}) {
+        const auto parsed = wc::parse_ntp_server_setting(wc::ntp_server_setting_text(server));
+        REQUIRE(parsed.has_value());
+        CHECK(*parsed == std::string(server));
+    }
+}
+
+TEST_CASE("wall_clock: PUT /time-sync takes on or off", "[wall_clock]") {
+    CHECK(wc::parse_time_sync("on") == true);
+    CHECK(wc::parse_time_sync("off\n") == false);
+    CHECK(wc::parse_time_sync(" on \r\n") == true);
+    CHECK_FALSE(wc::parse_time_sync("").has_value());
+    CHECK_FALSE(wc::parse_time_sync("On").has_value());
+    CHECK_FALSE(wc::parse_time_sync("1").has_value());
+    CHECK_FALSE(wc::parse_time_sync("true").has_value());
+    CHECK(std::string(wc::time_sync_text(true)) == "on");
+    CHECK(std::string(wc::time_sync_text(false)) == "off");
+    for (const bool on : {true, false}) {
+        CHECK(wc::parse_time_sync(wc::time_sync_text(on)) == on);
+    }
+}
+
+TEST_CASE("wall_clock: the time as GET /status writes it is to the second, with the zeros a date has", "[wall_clock]") {
+    CHECK(wc::local_text(wc::LocalTime{2026, 10, 21, 8, 9, 44, 3}) == "2026-10-21 08:09:44");
+    CHECK(wc::local_text(wc::LocalTime{2026, 1, 5, 0, 0, 0, 1}) == "2026-01-05 00:00:00");
+    CHECK(wc::local_text(wc::LocalTime{2027, 12, 31, 23, 59, 59, 5}) == "2027-12-31 23:59:59");
+    CHECK(wc::local_text(wc::local_from_unix(wc::kProbeJanuary, 11 * 3600)) == "2026-01-15 23:00:00");
+}

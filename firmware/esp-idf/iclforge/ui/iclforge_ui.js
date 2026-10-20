@@ -455,6 +455,27 @@
   // this page last sent: a choice whose request is out, or that a read begun
   // before its answer would undo, keeps what the user chose, and a field is
   // never changed under someone typing in it.
+  // A field is set to what the board says unless someone is typing in it or has typed in it since.
+  function field(input, value) {
+    if (document.activeElement === input) return;
+    if (input.value === (input.dataset.board ?? '')) input.value = value;
+    input.dataset.board = value;
+  }
+
+  // What the board says about its time: the zone and the server it was given and whether it asks at all.
+  function time(t, fresh) {
+    $('time-group').hidden = !t || typeof t !== 'object';
+    if ($('time-group').hidden) return;
+    $('time-now').textContent = str(t.local)
+      ? t.local + (t.zone === 'none' ? ' UTC' : '')
+      : t.sync ? 'Waiting for a time server.' : 'Not kept: no time server is asked.';
+    if (fresh('timesync')) $('time-sync').checked = t.sync === true;
+    field($('zone-input'), t.zone === 'none' ? '' : str(t.zone));
+    field($('ntp-input'), t.server === 'none' ? '' : str(t.server));
+    $('ntp-help').textContent = 'A host name or an IPv4 address. Empty is the router\'s, then pool.ntp.org.' +
+      (str(t.servers) ? ' Asking ' + t.servers + '.' : '');
+  }
+
   function settings(s, read) {
     const fresh = (key) => read > (settled[key] ?? 0);
     // A setting the board does not report is one it has no choice about.
@@ -463,6 +484,7 @@
     $('slot-row').hidden = !num(s.slot_bits);
     $('layout-row').hidden = !str(s.layout);
     row('network', network(s.network));
+    time(s.time, fresh);
     if (str(s.name)) {
       $('title').textContent = s.name;
       document.title = s.name + ' - Hearth sink';
@@ -603,6 +625,26 @@
       reveal(false);
       say('Stored ' + ssid + ' for the next restart.');
     });
+  });
+
+  $('time-sync').addEventListener('change', () => {
+    const on = $('time-sync').checked;
+    act(on ? 'Time sync on' : 'Time sync off', 'PUT', 'time-sync', on ? 'on' : 'off',
+      () => say(on ? 'The board keeps its time with a time server.' : 'The board asks no time server.'), { key: 'timesync' });
+  });
+
+  $('zone-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const zone = $('zone-input').value.trim();
+    act('Time zone', 'PUT', 'timezone', zone || 'none', () => say(zone ? 'Time zone ' + zone + '.' : 'No time zone: UTC.'),
+      { why: 'this board reads that zone differently.' });
+  });
+
+  $('ntp-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const server = $('ntp-input').value.trim();
+    act('Time server', 'PUT', 'ntp-server', server || 'none',
+      () => say(server ? 'Asking ' + server + ' for the time.' : 'Asking the router\'s time server, then pool.ntp.org.'));
   });
 
   $('ss-cancel').addEventListener('click', () => pairing('Cancel pairing', 'cancel', 'Pairing cancelled.'));

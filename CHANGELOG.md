@@ -51,10 +51,19 @@ The sections below contain the complete change list and fixes.
   named), the glow following the board's own peak and RMS over the last 100 ms in a few slow steps, a speaker with nothing on
   it hollow, and a line saying what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*). After five minutes
   with nothing touched the backlight goes to 4% under a black screen with one line, and any tap wakes it. `GET` and `PUT
-  /now-playing` (`speakers`, `off`; `title` and `clock` are planned) and `GET` and `PUT /dim-after` (`never`, or minutes)
+  /now-playing` (`speakers`, `clock`, `off`; `title` is planned) and `GET` and `PUT /dim-after` (`never`, or minutes)
   set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
-  `planning/p4x-now-playing.md`; the title card and the clock need the sink to ask the server for metadata and the board to
-  be given the time, and are not built.
+  `planning/p4x-now-playing.md`; the title card needs the sink to ask the server for metadata, and is not built.
+- **The clock view.** The time in 24 hours at 200 px in the muted tone, the date under it, and no seconds, so that the
+  screen redraws one rectangle a minute. Until a time server has first answered the view shows only the stream's heading,
+  never a time it made up. A dim lowers the backlight and leaves the clock on the glass.
+- **Every ESP board that has a network now keeps its time with a time server.** On by default, from the moment the board
+  holds an address and every hour after: lwIP's SNTP client asks the server a person named, else the one the router gives
+  over DHCP (option 42), and `pool.ntp.org` behind them when nobody named one. `GET` and `PUT /ntp-server` (a host name or
+  an IPv4 address, or `none`), `GET` and `PUT /timezone` (a POSIX string, such as `AEST-10AEDT,M10.1.0,M4.1.0/3`, stored
+  on the board; with none the time is UTC, and the clock says so) and `GET` and `PUT /time-sync` (`on` or `off`) set it,
+  `GET /status` has a `time` object, and the board's own web page has a Time section with the same three settings and the
+  time it keeps. QEMU's network and a build with no network keep no time, and those routes answer 404.
 
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
