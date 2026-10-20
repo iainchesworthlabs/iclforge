@@ -147,7 +147,7 @@ reaches `PlayerListener::on_server_state()`); the host now forwards it (`Sendspi
 and `on_metadata_gone()`, `firmware/esp-idf/iclforge`), and `kSinkMaxJsonTokens` (512) covers the largest
 message a server sends.
 
-**The store** (`libs/device/include/iclforge/title_card.hpp`, 19 host cases): title (256 bytes), artist
+**The store** (`libs/device/include/iclforge/title_card.hpp`, 8 host cases): title (256 bytes), artist
 and album (160 each) and year, cut at a character and not in the middle of one, in strings reserved when
 the store is made (in PSRAM where the part has it, `PsramScope`), so that an update and the panel's reads
 allocate nothing from the internal heap; and the progress with the time it was told at. The song's
