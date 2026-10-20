@@ -589,6 +589,8 @@ stack 18 KB free:
 | E-AC-3 2.0, 30 s | 38 | 41 |
 | AC-3 5.1 on 16 slots, 2.5 s | 138 | not playable |
 
+(Recorded again with the Ethernet image: 57, 40 and 142 permille, see [the cable](#the-cable-on-the-kit-2026-10-20).)
+
 The kit takes 7 to 8% less time to decode where the clock is 11% higher. Why is not isolated: the
 decoders run their code from PSRAM, which is 200 MHz hex here and does not scale with the clock. The
 Sendspin rows and the AC-4 profile were not played in the first session on the kit; the second
@@ -808,6 +810,10 @@ marks it as unknown.
 | `ota.py push` to the cable's address | the same image with `--force`: the board restarted, answered on the cable 9.9 s after reset, the trial was accepted |
 | `PUT /network-preference` wifi / ethernet / auto with the cable in | each took effect in a few seconds: `wifi` left only the Wi-Fi (the cable's address stopped answering), `ethernet` only the cable (the Wi-Fi off), `auto` both again; the setting survived a restart |
 | `PUT /network-preference ethernet` with no cable | not kept: the preference stayed `auto` and `wifi` stayed on throughout (the first design stored it first and undid it, and `/status` read "no address" for five seconds; the order was changed) |
+| **The cable pulled and put back**, four times by the owner (the board idle, three times; playing, once) | the Wi-Fi was reported as the interface in use at the first poll after each pull (half a second apart), with no restart (uptime ran on unbroken); each return to the cable took 4.1 to 4.9 s from the link to the address, same address. A Sendspin play over the Wi-Fi with the cable out: 938 of 938, clean. `PUT ethernet` with the cable out: not kept, the Wi-Fi stayed on. A play over the cable pulled out from under it: 926 bursts and no underrun until the pull; the board was `idle` with no connection afterwards, and the next play (cable) was 938 of 938 (one underrun and a resync at its start) |
+| A bad **Ethernet** image pushed to the cable's address: one that panics on its trial and one that never reports healthy | the first was rolled back by the bootloader (about 25 s), the second at the 300 s deadline; the board was back on the cable each time. (The earlier bad-image rows used the images without the cable) |
+| **A kit on the cable alone**: `PUT ethernet`, then an update to the cable's address | the Wi-Fi off (its address stopped answering), the update restarted the board, which answered on the cable alone and passed its trial with the preference still `ethernet`; `PUT auto` brought the Wi-Fi back in a few seconds |
+| The board suite, `p4-rev3`, three plays a row, the HTTP source fetched over the cable | AC-3 2.0 57 permille (56 before the cable), E-AC-3 2.0 40 (38), AC-3 5.1 on sixteen slots 142 (138): no underrun, no resynchronised byte, the decode stack 18.4 KB free; boot: 278,659 bytes free, largest block 253,952 (worst of three boots). The baseline is recorded again |
 
 What it costs: the image is 2,518,416 bytes against 2,466,880 (the budget is 2,600,000); at boot the
 internal heap reads 279,103 to 284,487 bytes free with a largest block of 253,952 to 258,048,
@@ -815,10 +821,14 @@ against 295,779 to 307,147 and 270,336 to 278,528 for the image without it, so t
 driver, its DMA buffers and its task take about 15 to 25 KB, and the headroom the budget line prints
 (the largest block less the biggest single ask) is 221 to 225 KB against 245 KB.
 
-**Not tried:** pulling the cable out and putting it back while the board plays or serves (the owner
-was not at the kit; the code's path for it is the link event, the loss of the address and ESP-IDF's
-choice of the default route, and the first is what the hot-plug row above exercised in one
-direction); a PoE splitter; 10 Mbit/s or half duplex; a static address; IPv6; a long soak.
+A Sendspin play starts with a late burst or an underrun and a resync about one time in four, on
+either interface (cable 3 of 9 plays, Wi-Fi 1 of 5 in this session); the suite counts it as a
+glitched play, not a failure, and it is not the cable's.
+
+**Not tried:** a PoE splitter (the owner's next step: the USB cable stays in the drawer, but the
+update path above has been run with the cable alone); 10 Mbit/s or half duplex; a static address;
+IPv6; a long soak; a DHCP server that is slow (boot waits 15 s for the cable's address under `auto`
+and then joins the Wi-Fi, the cable going on asking).
 
 ## Risks and open questions
 

@@ -20,9 +20,9 @@ they are sung.
     5 of 18 plays at layout 5.1 with the glass on, against 1 of 30 without a scan-out.
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
     owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
-    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it and
-    takes an update over it, so the kit can run on a PoE splitter; **pulling the cable out and in
-    again while it plays is not yet tried.**
+    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it,
+    takes an update over it, falls back to Wi-Fi when the cable is pulled and returns to the cable
+    when it is put back, so the kit can run on a PoE splitter; **the splitter itself is not yet tried.**
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
 
@@ -296,7 +296,11 @@ Wi-Fi and the USB cable on as well. Details and the numbers:
   at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
   **no Wi-Fi network stored** it comes up on the cable alone, with the page, mDNS and the Sendspin
   player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.
-- **A cable put in while the board runs** is in use within about 6 s, with no restart.
+- **A cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
+  pulled** (four times, by the owner, three with the board idle and one in the middle of a play)
+  made the Wi-Fi the interface in use within half a second, with no restart, and the cable returned
+  4 to 5 s after it was put back. A play cut by the pull ended there (926 bursts, no underrun until
+  it) and the board was idle and answering; the next play ran in full.
 - **Everything that answers on Wi-Fi answers on the cable:** the page, `/api`, `/hardware`, `GET /log`,
   `PUT /firmware` (an update over the cable restarted the board, which answered on the cable 10 s
   later and passed its trial), mDNS (`hearth-<mac tail>.local` has an A record for each address) and
@@ -304,13 +308,18 @@ Wi-Fi and the USB cable on as well. Details and the numbers:
   underrun (one with a late burst and a resync at its start).
 - **The preference** set to each of the three words with the cable in did what the table says, and
   survived a restart; `ethernet` with no cable in was not kept and left the Wi-Fi on throughout.
+  With `ethernet` set (the Wi-Fi radio off), an update sent to the cable's address restarted the
+  board, which came back on the cable alone and passed its trial: the PoE case with the radio off.
+- **Bad images on the cable:** an image that panics on its trial and one that never reports healthy,
+  both built with the cable, pushed to the cable's address, were rolled back (about 25 s, and at the
+  300 s deadline) and the board returned on the cable.
 - **Cost:** the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
   smaller (about 281 KB free, largest block about 256 KB).
 
-**Not tested:** pulling the cable out and putting it back while the board plays (the owner was
-remote), a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. **Until
-the pull test is run, a kit on PoE should have its Wi-Fi network stored, so that it can fall back to
-it, and the first move to PoE should be done with the USB cable at hand.**
+**Not tested:** a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. A
+board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is joined as well
+(the cable goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
+out if the cable goes, and the first move to PoE should be done with the USB cable at hand.**
 
 ### Memory and time
 

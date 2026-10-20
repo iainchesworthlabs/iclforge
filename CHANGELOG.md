@@ -54,10 +54,12 @@ The sections below contain the complete change list and fixes.
   the Sendspin player and its pairing, and the idle screen, which names the interface in use. So the
   kit can sit on a PoE splitter with no USB cable: a board with the cable in and no Wi-Fi network
   stored comes up on the cable alone, and an image is updated over it like any other (`ota.py push`
-  to the cable's address; the update, its rollback and a bad image's rollback were tried on the kit).
-  By default the cable is used while it holds an address (its route priority is 200 against the
-  station's 100; ESP-IDF's own number for Ethernet, 50, would have chosen Wi-Fi) and the Wi-Fi when
-  only that does, switching back and forth with no restart.
+  to the cable's address; the update, its rollback and the rollback of a bad image were tried on the
+  kit, over the cable as well). By default the cable is used while it holds an address (its route
+  priority is 200 against the station's 100; ESP-IDF's own number for Ethernet, 50, would have
+  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: a
+  cable pulled and put back four times moved the board to Wi-Fi within half a second and back to the
+  cable in 4 to 5 s. A PoE splitter itself is not yet tried.
 - **A stored network preference: `auto`, `ethernet` or `wifi`**, `GET` and `PUT /network-preference`
   (text, like `/name`) and `network.preference` in `GET /status`. `ethernet` and `wifi` pin the board to
   one interface and switch the other off, and a change is kept only once the interface it names holds
