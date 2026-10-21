@@ -343,6 +343,12 @@ class Playout {
     static constexpr std::size_t kBlockFrames = 256;
     static constexpr std::size_t kMaxOutputs = 16;
 
+    // What the sink is handed for an output that was silent for a whole block it writes, in place of
+    // a staging buffer of zeros: one constant block (in flash, not RAM), the same for every such
+    // output. A sink may tell it by its address, from zero_block(), and skip converting it.
+    static constexpr std::array<float, kBlockFrames> kZeroBlock{};
+    [[nodiscard]] static std::span<const float> zero_block() { return std::span<const float>(kZeroBlock); }
+
     using Tuning = PlayoutTuning;
     using Stats = PlayoutStats;
 
@@ -407,8 +413,14 @@ class Playout {
     // `count` decoded frames, one span per output each at least that long,
     // the first of which is frame `first_frame` of the stream and should play
     // at `target_us`; `now_us` is when they are handed over.
+    //
+    // `silent` names outputs (bit n for output n) whose `count` frames are all zeros: their spans
+    // are not read, and nothing is copied for them. What the sink sees is the same, sample for
+    // sample, as if the zeros had been passed: an output silent for a whole block is handed to it
+    // as zero_block(), and one that had audio earlier in the block gets zeros for the rest of it.
     void push(std::span<const std::span<const float>> frames, std::size_t count, std::int64_t target_us,
-              std::uint64_t first_frame, std::int64_t now_us, PlayoutSink& sink) {
+              std::uint64_t first_frame, std::int64_t now_us, PlayoutSink& sink, std::uint32_t silent = 0) {
+        begin_push(silent);
         std::size_t k = 0;
         while (k < count) {
             if (aligned_ && behind(now_us)) {
@@ -438,19 +450,29 @@ class Playout {
                 }
                 continue;
             }
+            // The frames up to the end of the block or of the push are staged together, output by output,
+            // unless a correction is due among them: that frame is dealt with alone, and the run ends
+            // before it.
             bool repeat = false;
-            if (slew_ != 0 && ++since_slew_ >= tuning_.slew_interval) {
-                since_slew_ = 0;
-                if (slew_ > 0) {
-                    // Late: this frame is left out, and the rest play one
-                    // frame sooner.
-                    ++k;
-                    ++stats_.dropped_frames;
-                    continue;
+            std::size_t run = std::min(count - k, kBlockFrames - staged_);
+            if (slew_ != 0) {
+                if (since_slew_ + 1 >= tuning_.slew_interval) {
+                    since_slew_ = 0;
+                    if (slew_ > 0) {
+                        // Late: this frame is left out, and the rest play one
+                        // frame sooner.
+                        ++k;
+                        ++stats_.dropped_frames;
+                        continue;
+                    }
+                    // Early: this frame goes out twice.
+                    repeat = true;
+                    run = 1;
+                    ++stats_.repeated_frames;
+                } else {
+                    run = std::min<std::size_t>(run, tuning_.slew_interval - 1 - since_slew_);
+                    since_slew_ += static_cast<std::uint32_t>(run);
                 }
-                // Early: this frame goes out twice.
-                repeat = true;
-                ++stats_.repeated_frames;
             }
             if (!block_has_target_) {
                 block_has_target_ = true;
@@ -458,9 +480,9 @@ class Playout {
                 block_target_at_ = staged_;
                 block_frame_ = first_frame + k;
             }
-            stage_frame(frames, k);
+            stage_run(frames, k, run);
             if (!repeat) {
-                ++k;
+                k += run;
             }
             if (staged_ == kBlockFrames) {
                 write_block(sink);
@@ -501,17 +523,68 @@ class Playout {
     // The block the sink would take next has started to play already.
     [[nodiscard]] bool behind(std::int64_t now_us) const { return have_next_ && next_block_play_ <= now_us; }
 
-    void stage_frame(std::span<const std::span<const float>> frames, std::size_t k) {
+    // The outputs this push carries audio on: every output but `silent`, as a list for the per-frame
+    // loop to walk, so that the work of a frame is the audio's and not the sink's width.
+    void begin_push(std::uint32_t silent) {
+        live_ = all_outputs() & ~silent;
+        live_count_ = 0;
         for (std::size_t o = 0; o < outputs_; ++o) {
-            staging_[o][staged_] = o < frames.size() && k < frames[o].size() ? frames[o][k] : 0.0F;
+            if (((live_ >> o) & 1U) != 0) {
+                live_list_[live_count_++] = static_cast<std::uint8_t>(o);
+            }
         }
-        ++staged_;
-        ++staged_stream_;
     }
 
+    [[nodiscard]] std::uint32_t all_outputs() const {
+        return outputs_ >= 32 ? ~std::uint32_t{0} : (std::uint32_t{1} << outputs_) - 1U;
+    }
+
+    // An output with audio in this push that had none in the block so far: what it holds before this
+    // frame is silence, and the staging buffer, which has not been written this block, is made to say so.
+    void start_live(std::uint32_t fresh) {
+        for (std::size_t o = 0; o < outputs_; ++o) {
+            if (((fresh >> o) & 1U) != 0) {
+                std::fill_n(staging_[o].begin(), staged_, 0.0F);
+            }
+        }
+        in_block_ |= fresh;
+    }
+
+    // `run` frames from frame `k` of each output into the staging, which must have room for them. An
+    // output that has fewer frames, or none, than `run` takes zeros for the rest.
+    void stage_run(std::span<const std::span<const float>> frames, std::size_t k, std::size_t run) {
+        if (const std::uint32_t fresh = live_ & ~in_block_; fresh != 0) {
+            start_live(fresh);
+        }
+        for (std::size_t i = 0; i < live_count_; ++i) {
+            const std::size_t o = live_list_[i];
+            float* const into = staging_[o].data() + staged_;
+            std::size_t have = 0;
+            if (o < frames.size() && k < frames[o].size()) {
+                have = std::min(run, frames[o].size() - k);
+                std::copy_n(frames[o].data() + k, have, into);
+            }
+            std::fill_n(into + have, run - have, 0.0F);
+        }
+        // An output with audio earlier in this block and none now: zeros for the rest of the block.
+        if (const std::uint32_t stale = in_block_ & ~live_; stale != 0) {
+            for (std::size_t o = 0; o < outputs_; ++o) {
+                if (((stale >> o) & 1U) != 0) {
+                    std::fill_n(staging_[o].data() + staged_, run, 0.0F);
+                }
+            }
+        }
+        staged_ += run;
+        staged_stream_ += run;
+    }
+
+    // Only the outputs that hold audio in this block need zeros written: the rest are handed to the
+    // sink as zero_block() whatever their staging buffers hold.
     void stage_silence(std::size_t n) {
         for (std::size_t o = 0; o < outputs_; ++o) {
-            std::fill_n(staging_[o].begin() + static_cast<std::ptrdiff_t>(staged_), n, 0.0F);
+            if (((in_block_ >> o) & 1U) != 0) {
+                std::fill_n(staging_[o].begin() + static_cast<std::ptrdiff_t>(staged_), n, 0.0F);
+            }
         }
         staged_ += n;
     }
@@ -522,6 +595,7 @@ class Playout {
         staged_ = 0;
         staged_stream_ = 0;
         block_has_target_ = false;
+        in_block_ = 0;
     }
 
     // Where the stream's next frame goes: after silence until its target, or
@@ -560,6 +634,9 @@ class Playout {
     }
 
     void write_block(PlayoutSink& sink) {
+        for (std::size_t o = 0; o < outputs_; ++o) {
+            views_[o] = ((in_block_ >> o) & 1U) != 0 ? std::span<const float>(staging_[o]) : zero_block();
+        }
         const std::optional<PlayoutWrite> written =
             sink.write(std::span<const std::span<const float>>(views_.data(), outputs_));
         ++stats_.blocks;
@@ -587,6 +664,7 @@ class Playout {
         staged_ = 0;
         staged_stream_ = 0;
         block_has_target_ = false;
+        in_block_ = 0;
     }
 
     void measure(std::int64_t error, std::int64_t play_us, bool broken) {
@@ -630,6 +708,13 @@ class Playout {
     std::array<std::span<const float>, kMaxOutputs> views_{};
     std::size_t staged_ = 0;
     std::size_t staged_stream_ = 0;
+    // The outputs whose staging buffer holds this block's frames so far (bit n for output n); the
+    // others were silent for all of it, and the sink is handed zero_block() for them. And the
+    // outputs the push under way has audio on, and the same as a list.
+    std::uint32_t in_block_ = 0;
+    std::uint32_t live_ = 0;
+    std::size_t live_count_ = 0;
+    std::array<std::uint8_t, kMaxOutputs> live_list_{};
 
     bool block_has_target_ = false;
     std::int64_t block_target_ = 0;

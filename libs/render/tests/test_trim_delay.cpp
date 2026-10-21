@@ -203,3 +203,45 @@ TEST_CASE("trim applies after the delay, and outputs stay independent", "[render
     REQUIRE(only[0] == Approx(0.5F).epsilon(1e-4));  // output 0's line: the last block's ones
     REQUIRE(only[2] == Approx(1.0F).epsilon(1e-4));  // then this block's twos, trimmed
 }
+
+TEST_CASE("process for some outputs trims those as process does and leaves the rest alone", "[render][trim-delay]") {
+    std::vector<float> storage(TrimDelay::storage_floats(4, 10), 0.0F);
+    TrimDelay stage;
+    REQUIRE(stage.configure(storage, 4, 10));
+    REQUIRE(stage.set_trim_db(0, -6.0));
+    REQUIRE(stage.set_trim_db(2, 6.0));
+    REQUIRE(stage.set_trim_db(3, -12.0));
+    CHECK_FALSE(stage.delayed());
+
+    const auto filled = [](std::size_t outputs) {
+        std::vector<std::vector<float>> planes(outputs, std::vector<float>(8));
+        for (std::size_t o = 0; o < outputs; ++o) {
+            for (std::size_t k = 0; k < 8; ++k) {
+                planes[o][k] = static_cast<float>((o + 1) * 10 + k);
+            }
+        }
+        return planes;
+    };
+    auto everything = filled(4);
+    std::vector<std::span<float>> all_spans(everything.begin(), everything.end());
+    stage.process(all_spans);
+
+    for (const std::uint32_t only : {0U, 0b0001U, 0b0110U, 0b1111U, 0xFFFFFFF0U}) {
+        CAPTURE(only);
+        auto some = filled(4);
+        std::vector<std::span<float>> spans(some.begin(), some.end());
+        stage.process(spans, only);
+        const auto untouched = filled(4);
+        for (std::size_t o = 0; o < 4; ++o) {
+            CAPTURE(o);
+            REQUIRE(some[o] == (((only >> o) & 1U) != 0 ? everything[o] : untouched[o]));
+        }
+    }
+
+    // A delay is a line that moves with every block, which is why a caller asks delayed().
+    REQUIRE(stage.set_delay(1, 3));
+    CHECK(stage.delayed());
+    REQUIRE(stage.set_delay(1, 0));
+    CHECK_FALSE(stage.delayed());
+    CHECK_FALSE(TrimDelay{}.delayed());
+}

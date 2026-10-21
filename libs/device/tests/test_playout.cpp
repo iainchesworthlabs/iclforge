@@ -11,12 +11,14 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <deque>
+#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
@@ -815,4 +817,192 @@ TEST_CASE("the playout skips every frame of a stream whose chunks stay later tha
     CHECK(stats.stream_frames < kSecond);
     CHECK(stats.skipped_frames > 15 * kSecond);
     CHECK(stats.underruns >= 1);
+}
+
+// --- Outputs a stream does not fill ------------------------------------------------------------------
+
+namespace {
+
+// A sink that keeps every block it is written, output by output as the bits of its floats, and which
+// outputs it was handed the playout's shared zero block for. Its answers are ScriptedSink's: the blocks
+// play one after another from `first_play_us`, and the writes named in `late_at` come back late.
+class RecordingSink final : public PlayoutSink {
+   public:
+    std::optional<std::int64_t> first_play_us = 1'000'000;
+    std::vector<std::uint64_t> late_at;
+    std::vector<std::vector<std::uint32_t>> blocks;
+    std::vector<std::uint32_t> zero_views;
+
+    [[nodiscard]] std::optional<PlayoutWrite> write(std::span<const std::span<const float>> outputs) override {
+        const std::uint64_t written = blocks.size();
+        std::vector<std::uint32_t>& bits = blocks.emplace_back();
+        std::uint32_t zero = 0;
+        for (std::size_t o = 0; o < outputs.size(); ++o) {
+            REQUIRE(outputs[o].size() == kBlock);
+            if (outputs[o].data() == Playout::zero_block().data()) {
+                zero |= 1U << o;
+            }
+            for (const float x : outputs[o]) {
+                bits.push_back(std::bit_cast<std::uint32_t>(x));
+            }
+        }
+        zero_views.push_back(zero);
+        if (!first_play_us) {
+            return std::nullopt;
+        }
+        const bool late = std::find(late_at.begin(), late_at.end(), written) != late_at.end();
+        return PlayoutWrite{.play_us = *first_play_us + frames_us(written * kBlock), .late = late, .gap = false};
+    }
+};
+
+struct SilentRun {
+    RecordingSink sink;
+    Playout::Stats stats;
+};
+
+constexpr std::size_t kWide = 6;
+
+// A stream pushed in chunks of odd sizes, each with its own set of silent outputs, to a playout of kWide
+// outputs. A live output's frame f carries f * 8 + o + 1 (exact in a float, and never zero). With
+// `masked` the silent outputs' spans hold NaN and are named in the mask; without it they are explicit
+// zeros and the mask is 0, which is how a caller that does not know passes them. The stream's times
+// drift 300 ppm and jump 30 ms, so the playout drops frames to catch up and places the stream again,
+// and the sink answers some writes late.
+void play_silent_mix(bool masked, SilentRun& run) {
+    run.sink.late_at = {60, 61};
+    std::vector<float> storage(kWide * kBlock, 7.0F);
+    Playout playout(storage, kWide);
+    const std::array<std::size_t, 8> sizes = {256, 100, 777, 1, 384, 1536, 33, 512};
+    const std::array<std::uint32_t, 7> masks = {0b111100, 0b000000, 0b111111, 0b101010, 0b011110, 0b111100, 0b110011};
+    std::array<std::vector<float>, kWide> planes;
+    std::array<std::span<const float>, kWide> views;
+    std::uint64_t frame = 0;
+    for (std::size_t step = 0; frame < 3 * kSecond; ++step) {
+        const std::size_t count = sizes[step % sizes.size()];
+        const std::uint32_t silent = masks[step % masks.size()];
+        for (std::size_t o = 0; o < kWide; ++o) {
+            planes[o].assign(count, 0.0F);
+            const bool is_silent = ((silent >> o) & 1U) != 0;
+            for (std::size_t k = 0; k < count; ++k) {
+                planes[o][k] = is_silent ? (masked ? std::numeric_limits<float>::quiet_NaN() : 0.0F)
+                                         : static_cast<float>(((frame + k) * 8) + o + 1);
+            }
+            views[o] = std::span<const float>(planes[o]);
+        }
+        // 300 ppm early (so the frames play late and are dropped to catch up), and from step 25 a 30 ms
+        // step, which is past what is corrected frame by frame and is placed again.
+        const std::int64_t bump = step >= 25 ? 30'000 : 0;
+        const std::int64_t target =
+            1'100'000 + frames_us(frame) - static_cast<std::int64_t>(frame * 25 / 4000) - bump;
+        playout.push(views, count, target, frame, 0, run.sink, masked ? silent : 0U);
+        frame += count;
+    }
+    playout.flush(0, run.sink);
+    run.stats = playout.stats();
+}
+
+}  // namespace
+
+TEST_CASE("outputs a stream does not fill reach the sink as the same samples, however they are named", "[io][playout]") {
+    SilentRun plain;
+    SilentRun named;
+    play_silent_mix(false, plain);
+    play_silent_mix(true, named);
+
+    // The run is not vacuous: it padded, dropped frames to catch up, skipped some after the step and
+    // placed the stream again, and handed the sink the shared zero block for outputs that stayed
+    // silent a whole block but not for every one.
+    CHECK(plain.stats.silence_frames > 0);
+    CHECK(plain.stats.dropped_frames > 0);
+    CHECK(plain.stats.skipped_frames > 0);
+    CHECK(plain.stats.resyncs > 0);
+    CHECK(std::any_of(named.sink.zero_views.begin(), named.sink.zero_views.end(), [](std::uint32_t z) { return z != 0; }));
+    CHECK(std::any_of(named.sink.zero_views.begin(), named.sink.zero_views.end(), [](std::uint32_t z) { return z == 0; }));
+    // The blocks of silence the playout writes to find out where the sink is share it too, named or not.
+    CHECK(std::any_of(plain.sink.zero_views.begin(), plain.sink.zero_views.end(), [](std::uint32_t z) { return z != 0; }));
+
+    REQUIRE(plain.sink.blocks.size() == named.sink.blocks.size());
+    for (std::size_t b = 0; b < plain.sink.blocks.size(); ++b) {
+        CAPTURE(b);
+        REQUIRE(plain.sink.blocks[b] == named.sink.blocks[b]);
+    }
+    CHECK(plain.stats.blocks == named.stats.blocks);
+    CHECK(plain.stats.stream_frames == named.stats.stream_frames);
+    CHECK(plain.stats.silence_frames == named.stats.silence_frames);
+    CHECK(plain.stats.skipped_frames == named.stats.skipped_frames);
+    CHECK(plain.stats.dropped_frames == named.stats.dropped_frames);
+    CHECK(plain.stats.repeated_frames == named.stats.repeated_frames);
+    CHECK(plain.stats.resyncs == named.stats.resyncs);
+    CHECK(plain.stats.late_blocks == named.stats.late_blocks);
+    CHECK(plain.stats.underruns == named.stats.underruns);
+    CHECK(plain.stats.worst_error_us == named.stats.worst_error_us);
+}
+
+TEST_CASE("an output silent for a whole block is the shared zero block, and one with audio is not", "[io][playout]") {
+    std::vector<float> storage(3 * kBlock, 7.0F);
+    Playout playout(storage, 3);
+    RecordingSink sink;
+    std::vector<float> audio(kBlock, 0.5F);
+    const std::array<std::span<const float>, 3> views{std::span<const float>(audio), std::span<const float>(audio),
+                                                      std::span<const float>(audio)};
+    // Due right when the first block would play: no padding, so the first block written after the one
+    // that finds out where the sink is holds frames, and holds them on outputs 0 and 2 only.
+    playout.push(views, kBlock, 1'000'000 + frames_us(kBlock), 0, 0, sink, 0b010);
+    REQUIRE(sink.blocks.size() >= 2);
+    const std::uint32_t last = sink.zero_views.back();
+    CHECK(last == 0b010);  // output 1 was silent for the block; 0 and 2 were not
+    const std::vector<std::uint32_t>& block = sink.blocks.back();
+    for (std::size_t k = 0; k < kBlock; ++k) {
+        REQUIRE(block[k] == std::bit_cast<std::uint32_t>(0.5F));
+        REQUIRE(block[kBlock + k] == 0U);
+        REQUIRE(block[(2 * kBlock) + k] == std::bit_cast<std::uint32_t>(0.5F));
+    }
+    // The zero block is what it says it is.
+    CHECK(Playout::zero_block().size() == kBlock);
+    CHECK(std::all_of(Playout::zero_block().begin(), Playout::zero_block().end(), [](float x) { return x == 0.0F; }));
+}
+
+TEST_CASE("an output that has audio and then falls silent inside a block is zeros for the rest of it", "[io][playout]") {
+    // Staging that starts full of something else, so a sample that was not zeroed shows.
+    std::vector<float> storage(2 * kBlock, 7.0F);
+    Playout playout(storage, 2);
+    RecordingSink sink;
+    std::vector<float> audio(kBlock, 0.25F);
+    const std::array<std::span<const float>, 2> views{std::span<const float>(audio), std::span<const float>(audio)};
+    // 100 frames with both outputs, then 156 with output 1 named silent (its span holds audio, which must
+    // not be read), then 100 with both again in the next block.
+    const std::int64_t due = 1'000'000 + frames_us(kBlock);
+    playout.push(views, 100, due, 0, 0, sink, 0);
+    playout.push(views, 156, due + frames_us(100), 100, 0, sink, 0b10);
+    playout.push(views, 100, due + frames_us(256), 256, 0, sink, 0);
+    playout.flush(0, sink);
+    REQUIRE(sink.blocks.size() >= 3);
+    const std::size_t first = sink.blocks.size() - 2;
+    const std::vector<std::uint32_t>& a = sink.blocks[first];
+    for (std::size_t k = 0; k < kBlock; ++k) {
+        CAPTURE(k);
+        REQUIRE(a[k] == std::bit_cast<std::uint32_t>(0.25F));
+        REQUIRE(a[kBlock + k] == (k < 100 ? std::bit_cast<std::uint32_t>(0.25F) : 0U));
+    }
+    // The next block's output 1 has audio again from its first frame: nothing of the zeros before it.
+    const std::vector<std::uint32_t>& b = sink.blocks[first + 1];
+    for (std::size_t k = 0; k < 100; ++k) {
+        REQUIRE(b[kBlock + k] == std::bit_cast<std::uint32_t>(0.25F));
+    }
+    for (std::size_t k = 100; k < kBlock; ++k) {
+        REQUIRE(b[kBlock + k] == 0U);  // padded by the flush
+    }
+}
+
+TEST_CASE("a silent output named beyond the sink's outputs is ignored", "[io][playout]") {
+    std::vector<float> storage(2 * kBlock);
+    Playout playout(storage, 2);
+    RecordingSink sink;
+    std::vector<float> audio(kBlock, 0.75F);
+    const std::array<std::span<const float>, 2> views{std::span<const float>(audio), std::span<const float>(audio)};
+    playout.push(views, kBlock, 1'000'000 + frames_us(kBlock), 0, 0, sink, 0xFFFFFF00U);
+    REQUIRE(sink.blocks.size() >= 2);
+    CHECK(sink.zero_views.back() == 0);
+    CHECK(sink.blocks.back()[0] == std::bit_cast<std::uint32_t>(0.75F));
+    CHECK(sink.blocks.back()[kBlock] == std::bit_cast<std::uint32_t>(0.75F));
 }

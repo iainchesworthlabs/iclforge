@@ -224,3 +224,64 @@ TEST_CASE("apply_interleaved lays the outputs out frame by frame", "[render][rou
 
     REQUIRE(Routing{}.apply_interleaved(rendered.spans, roomy, 10) == 0);
 }
+
+TEST_CASE("the outputs a set of channels is patched to", "[render][routing]") {
+    // Channel 0 to output 2, channel 1 to none, channel 2 to output 0, channel 3 to output 5.
+    const std::array<int, 4> map = {2, Routing::kUnassigned, 0, 5};
+    const auto patch = *Routing::from_outputs(map, 8);
+    CHECK(patch.outputs_fed_by(0) == 0);
+    CHECK(patch.outputs_fed_by(0b0001) == 0b000100);
+    CHECK(patch.outputs_fed_by(0b0010) == 0);  // patched to nothing
+    CHECK(patch.outputs_fed_by(0b0100) == 0b000001);
+    CHECK(patch.outputs_fed_by(0b1111) == 0b100101);
+    CHECK(patch.outputs_fed_by(0xFFFFFFFFU) == patch.patched_outputs());
+    CHECK(patch.outputs_fed_by(1U << 9) == 0);  // a channel the patch does not have
+    CHECK(Routing{}.outputs_fed_by(0xFFFFFFFFU) == 0);
+}
+
+TEST_CASE("apply for some outputs writes those as apply does and leaves the rest as they were", "[render][routing]") {
+    // Four channels onto eight outputs, swapped and with holes: outputs 1, 3, 4 and 6 have no channel.
+    const std::array<int, 4> map = {2, 7, 0, 5};
+    const auto patch = *Routing::from_outputs(map, 8);
+    const Rendered rendered(4, 6);
+    Outputs everything(8, 6);
+    patch.apply(rendered.spans, everything.spans);
+
+    for (const std::uint32_t only : {0U, 0b00000001U, 0b01011010U, 0b10100101U, 0xFFU, 0xFFFFFF00U}) {
+        CAPTURE(only);
+        Outputs some(8, 6);
+        patch.apply(rendered.spans, some.spans, only);
+        for (std::size_t o = 0; o < 8; ++o) {
+            CAPTURE(o);
+            if (((only >> o) & 1U) != 0) {
+                REQUIRE(some.storage[o] == everything.storage[o]);  // an output with no channel gets zeros
+            } else {
+                REQUIRE(some.storage[o] == std::vector<float>(6, 99.0F));
+            }
+        }
+    }
+
+    // The shortest of the chosen outputs' spans and their channels' blocks decides how much is written:
+    // a short block on a channel nobody chose does not shorten it.
+    const std::vector<float> channel0(6, 1.0F);
+    const std::vector<float> channel1(6, 2.0F);
+    const std::vector<float> channel2(6, 3.0F);
+    const std::vector<float> channel3(6, 4.0F);
+    const std::array<std::span<const float>, 4> uneven = {
+        std::span<const float>(channel0), std::span<const float>(channel1.data(), 2),  // channel 1 -> output 7
+        std::span<const float>(channel2), std::span<const float>(channel3)};
+    Outputs picked(8, 6);
+    patch.apply(uneven, picked.spans, 0b00000100U);  // output 2, fed by channel 0
+    CHECK(picked.storage[2] == std::vector<float>(6, 1.0F));
+    Outputs short_one(8, 6);
+    patch.apply(uneven, short_one.spans, 0b10000100U);  // outputs 2 and 7
+    CHECK(short_one.storage[2] == (std::vector<float>{1.0F, 1.0F, 99.0F, 99.0F, 99.0F, 99.0F}));
+    CHECK(short_one.storage[7] == (std::vector<float>{2.0F, 2.0F, 99.0F, 99.0F, 99.0F, 99.0F}));
+
+    // Nothing chosen that the patch has: nothing written.
+    Outputs none(8, 6);
+    patch.apply(rendered.spans, none.spans, 0xFFFFFF00U);
+    for (std::size_t o = 0; o < 8; ++o) {
+        REQUIRE(none.storage[o] == std::vector<float>(6, 99.0F));
+    }
+}

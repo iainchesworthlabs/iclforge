@@ -841,19 +841,34 @@ struct BurstPlayer::Impl {
                 renderer_bed = bed;
             }
         }
+        std::uint32_t reached = renderer.all_slots();
         if (serving.fold) {
             renderer.render_folded(block, 1.0F, out);
         } else {
             if (serving.reconstruct && block.index == 0) {
                 renderer.set_objects(block.object_metadata, block.objects.size());
             }
-            renderer.render(block, serving.reconstruct, 1.0F, out);
+            reached = renderer.render_reached(block, serving.reconstruct, 1.0F, out);
         }
-        emit(n);
+        emit(n, reached);
     }
 
-    // The rendered slots from here on: `n` frames of them.
-    void emit(std::size_t n) {
+    // The outputs that can carry audio in a block that reached the slots in `reached`
+    // (LayoutRenderer::render_reached()), bit n for output n: the ones the patch feeds from them. Every
+    // other output is silence, and costs nothing from here to the sink: it is not routed, trimmed,
+    // scaled or metered, and the playout hands the sink the same block of zeros for all of them. An
+    // output with a delay keeps a line that holds audio past the block that gave it, and the identify
+    // tone writes every output, so with either all of them are live.
+    [[nodiscard]] std::uint32_t live_outputs(std::uint32_t reached) const {
+        const std::uint32_t open = outputs_open >= 32 ? ~std::uint32_t{0} : (std::uint32_t{1} << outputs_open) - 1U;
+        if (identifying || trim_delay.delayed()) {
+            return open;
+        }
+        return routing.outputs_fed_by(reached) & open;
+    }
+
+    // The rendered slots from here on: `n` frames of them, `reached` the slots that hold any.
+    void emit(std::size_t n, std::uint32_t reached) {
         const std::size_t slots = layout.slots();
         for (std::size_t s = 0; s < slots; ++s) {
             rendered_views[s] = std::span<const float>(rendered[s].data(), n);
@@ -864,12 +879,15 @@ struct BurstPlayer::Impl {
             output_views[o] = view[o];
         }
         const std::span<const std::span<float>> out(view.data(), outputs_open);
-        routing.apply(std::span<const std::span<const float>>(rendered_views.data(), slots), out);
+        const std::uint32_t live = live_outputs(reached);
+        routing.apply(std::span<const std::span<const float>>(rendered_views.data(), slots), out, live);
         // Outputs past the patch's own, which only the identify tone opens.
         for (std::size_t o = routing.outputs(); o < outputs_open; ++o) {
-            std::fill(view[o].begin(), view[o].end(), 0.0F);
+            if (((live >> o) & 1U) != 0) {
+                std::fill(view[o].begin(), view[o].end(), 0.0F);
+            }
         }
-        trim_delay.process(out);
+        trim_delay.process(out, live);
         if (identifying) {
             // Every output carries the tone or silence; the stream goes on
             // underneath, decoded and discarded, and keeps its timeline.
@@ -877,9 +895,9 @@ struct BurstPlayer::Impl {
                                                                 : outputs_open;
             tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
         }
-        const bool scaled = apply_gain(out, n);
+        const bool scaled = apply_gain(out, n, live);
         if (scaled || !meter_from_source(n)) {
-            meter(out, n);
+            meter(out, n, live);
         }
 
         const std::uint64_t first = decoded_frame;
@@ -890,7 +908,7 @@ struct BurstPlayer::Impl {
             return;  // frames from before any burst this decode knows of
         }
         playout->push(std::span<const std::span<const float>>(output_views.data(), outputs_open), n, *target, first,
-                      esp_timer_get_time(), timed);
+                      esp_timer_get_time(), timed, ~live);
     }
 
     [[nodiscard]] bool carries_lfe(std::size_t output) const {
@@ -901,15 +919,20 @@ struct BurstPlayer::Impl {
         return layout.slot(static_cast<std::size_t>(channel)).kind == iclforge::render::Speaker::Kind::kLfe;
     }
 
-    // True when the block was scaled: a block at unity is left as it is, and costs nothing.
-    bool apply_gain(std::span<const std::span<float>> out, std::size_t n) {
+    // True when the block was scaled: a block at unity is left as it is, and costs nothing. Only the
+    // outputs in `live` are scaled: the others are silence, which scaling does not change.
+    bool apply_gain(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live = ~std::uint32_t{0}) {
         const float target = target_gain.load();
         if (target == 1.0F && gain == 1.0F) {
             return false;
         }
         const float start = gain;
         const float step = (target - start) / static_cast<float>(n);
-        for (const std::span<float>& samples : out) {
+        for (std::size_t o = 0; o < out.size(); ++o) {
+            if (((live >> o) & 1U) == 0) {
+                continue;
+            }
+            const std::span<float>& samples = out[o];
             float g = start;
             for (std::size_t k = 0; k < n; ++k) {
                 g += step;
@@ -920,8 +943,14 @@ struct BurstPlayer::Impl {
         return true;
     }
 
-    void meter(std::span<const std::span<float>> out, std::size_t n) {
+    // The outputs in `live` measured over `n` frames. The others are silence: a peak of 0 and a sum of
+    // 0 change nothing the window or the stream has, so they are not read, and the report says them
+    // all the same (publish_levels() has every open output).
+    void meter(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live = ~std::uint32_t{0}) {
         for (std::size_t o = 0; o < out.size(); ++o) {
+            if (((live >> o) & 1U) == 0) {
+                continue;
+            }
             const std::span<float> samples = out[o];
             float peak = window_peak[o];
             double sum = 0.0;
@@ -1141,12 +1170,13 @@ struct BurstPlayer::Impl {
                                           .object_indices = {},
                                           .object_metadata = nullptr};
         const std::span<const std::span<float>> out(rendered.data(), layout.slots());
+        std::uint32_t reached = renderer.all_slots();
         if (serving.fold) {
             renderer.render_folded(pcm, 1.0F, out);
         } else {
-            renderer.render(pcm, false, 1.0F, out);
+            reached = renderer.render_reached(pcm, false, 1.0F, out);
         }
-        emit(block.samples);
+        emit(block.samples, reached);
     }
 
     // The AC-4 decoder made, when it is not: false, with the stream refused for good and its chunk
@@ -1464,10 +1494,11 @@ struct BurstPlayer::Impl {
                                       .object_indices = {},
                                       .object_metadata = nullptr};
             const std::span<const std::span<float>> out(rendered.data(), layout.slots());
+            std::uint32_t reached = renderer.all_slots();
             if (serving.fold) {
                 renderer.render_folded(block, 1.0F, out);
             } else {
-                renderer.render(block, false, 1.0F, out);
+                reached = renderer.render_reached(block, false, 1.0F, out);
             }
             // The levels stand for the outputs only while the channels are the source's own: not
             // for a two-channel stream folded to one speaker, or a mono one given to two.
@@ -1476,7 +1507,7 @@ struct BurstPlayer::Impl {
                 source_channels = channels;
                 source_bits = width == 2 ? 16U : 24U;
             }
-            emit(n);
+            emit(n, reached);
             source_levels = nullptr;
             done += n;
         }

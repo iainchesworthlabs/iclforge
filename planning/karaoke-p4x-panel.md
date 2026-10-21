@@ -950,8 +950,8 @@ row):
 Two to five plays a cell, 20 s each (the baseline's are its five plays). The gap was the layout, and neither the tree (400 commits on) nor
 the silicon: no flash of the v1.3 board was needed. Four outputs more than 2.0 add 0.70 ms to the
 AC-3 row (3,282 against 2,576) where 14 more add 2.46 ms (5,034): the cost is linear in outputs. A
-stream that fills 2 of 16 outputs still pays for 16: skipping outputs that carry nothing is the saving
-on offer, and not taken here.
+stream that fills 2 of 16 outputs still pays for 16: skipping outputs that carry nothing was the saving
+on offer, and is taken in [The outputs a stream does not fill](#the-outputs-a-stream-does-not-fill-2026-10-21).
 
 #### Where the internal RAM goes: the TDM DMA queue
 
@@ -1058,7 +1058,101 @@ the result; and the same default on the S3 and the C6, which were not played.
   output made the run unnecessary.
 * The slots on the pins, and the I2S clocks, are not looked at: no scope.
 * The 40 Hz scan-out was run for its burst only; **what it does to the picture was not seen.**
-* Skipping the outputs a stream does not fill (176 µs a burst each) was not tried.
+* Skipping the outputs a stream does not fill (176 µs a burst each) was not tried in this session; it
+  was done the next day ([below](#the-outputs-a-stream-does-not-fill-2026-10-21)).
+
+### The outputs a stream does not fill (2026-10-21)
+
+The third session found that a Sendspin burst costs about 176 µs for each output of the layout
+whether or not the stream fills it, and left the saving undone. This takes it. The change is in the
+board's player and the libraries it draws on; the decoder, the layout default and every profile value
+are as they were.
+
+#### Where the 176 µs went
+
+A scratch image of `main` with cycle counters round each stage of a block (summed over a burst,
+shown in µs at 400 MHz; the playout's figure has the sink's blocking write taken out), one play a
+row, an AC-3 2.0 stream (six blocks a burst) at three layouts:
+
+| Layout (outputs) | Burst | Renderer | Patch | Trim, gain | Level meter | Playout's copy | Decode and the rest |
+|---|---|---|---|---|---|---|---|
+| 2.0 (2) | 2,616 | 68 | 34 | 9 | 186 | 340 | 1,979 |
+| 5.1 (6) | 3,321 | 182 | 90 | 11 | 475 | 648 | 1,915 |
+| 9.1.6 (16) | 5,210 | 388 | 270 | 17 | 1,191 | 1,368 | 1,976 |
+
+The decode is the same at every layout. The 14 outputs more add 2,594 µs, 185 a burst each: **the meter
+72 and the playout's copy 73** (one frame at a time across every output, a strided store for each
+sample), the renderer's zeroing of each slot 23, the patch's copy 17, and the trim and the gain next
+to nothing (a trim of 0 dB and no delay is skipped already). For an AC-4 5.1 stream (eight blocks a
+burst) the same four stages take 760, 194, 713 and 927 µs at 5.1 and 1,111, 504, 1,691 and 1,847 at
+9.1.6.
+
+#### What it does
+
+* `LayoutRenderer::reached_slots()` says which slots a block can put anything but zeros in: the slots
+  the coded channels have a gain into, the objects' when they are placed, and always the small
+  slots and the LFE feed that bass management works on (a filter rings on after its input stops).
+  It is worked out when the bed or the objects are set, not per block. `render_reached()` writes
+  those slots exactly as `render()` does and leaves the rest alone.
+* `Routing::outputs_fed_by()` turns that into the outputs that can carry audio, and `Routing::apply()`,
+  `TrimDelay::process()`, the player's gain and its meter take the same set. With the identify tone,
+  or a delay on any output (its line holds audio past the block that gave it), every output is live
+  as before.
+* `Playout::push()` takes the outputs that are silent. It copies nothing for them, and hands the
+  sink one shared block of zeros (`Playout::zero_block()`, in flash) for an output that was silent
+  for a whole block: the sink still gets zeros for every output, and the level report still has all
+  of them, at the silence floor. An output that has audio and then falls silent inside a block gets
+  zeros for the rest of it.
+* The playout now copies a run of frames output by output, in place of one frame across every output,
+  and stops short of the frame a drift correction acts on, so the frames that are dropped or repeated
+  are the same ones. A first version that kept the frame-by-frame copy and added the checks per frame
+  took 2% more at 2.0 (2,659 µs against 2,603), where nothing is skipped. The run copy made 2.0 faster
+  than before as well.
+
+#### On the kit
+
+The `p4-rev3` profile with the AC-4 fragment added (`sdkconfig.ac4`, as the earlier sessions' AC-4
+images were built), one image from `main` and one with the change, flashed over USB in turn; the
+test server asking for each layout, plays of 20 s (the AC-3 file plays through, 938 bursts), two
+plays a cell with the order of the cells reversed in the second, the same screen state.
+Microseconds a burst, the mean of the two:
+
+| Stream, layout | Before | After | |
+|---|---|---|---|
+| AC-3 2.0, 2.0 | 2,609 | 2,371 | -9% |
+| AC-3 2.0, 5.1 (2 of 6 outputs) | 3,331 | 2,336 | -30% |
+| AC-3 2.0, 9.1.6 (2 of 16) | 5,240 | 2,379 | -55% |
+| AC-4 5.1, 2.0 (folded) | 24,499 | 24,256 | -1% |
+| AC-4 5.1, 5.1 | 28,420 | 27,831 | -2% |
+| AC-4 5.1, 9.1.6 (6 of 16) | 33,398 | 29,927 | -10% |
+
+None of the 24 plays had a late burst, an underrun or a resynchronisation, and every output's
+stream RMS is the same number before and after (for 2 of 16: `81651` and `83523` on the two coded
+outputs, `0` on the rest). The AC-3 stream now costs the same at every layout (2,336 to 2,379 µs); the
+AC-4 stream at 9.1.6 is still 2.1 ms above 5.1 with the same six outputs, which is not the player's
+work on outputs. The third session found the 16-slot TDM queue takes 120 KiB more of the internal RAM
+than 5.1's (196,608 bytes against 73,728, #1607), which the AC-4 decoder then lacks; that is the
+likely cause, and it was not measured again (the least free heap of these plays, 13 to 15 KB, does
+not tell the two apart).
+
+**Bit for bit.** The host tests (`libs/render/tests` and `libs/device/tests/test_playout.cpp`) render
+the same blocks both ways and compare every sample, and pass for the bed and the objects, for a
+bed that changes mid-stream and for a small speaker's filter tail; a scratch comparison of the new
+playout with `main`'s, 120 runs with drift both ways, late writes and short inputs (31,113 frames
+dropped, 35,380 repeated, 246,300 skipped), writes the same samples to the sink and counts the
+same. On the kit, scratch images of both hash every decoded frame as it is handed to the playout (the
+sink's own input is not the same from play to play, since the playout skips the first few frames and
+drops a few more to follow the clock): AC-3 2.0 at 9.1.6, 1,440,768 frames of 16 outputs,
+`431d3e7c8c8cf2d9` on both, and AC-4 5.1 at 9.1.6, 964,608 frames, `3ab9d362de7dd871` on both; and
+the sink was handed no sample but zero on any of the 14 outputs the AC-3 stream does not fill, nor
+the 10 the AC-4 stream does not. The session played 49 times in all (the 24 above, the breakdown,
+the hash runs, and some first runs of images that had no AC-4 decoder).
+
+**Not done.** The sink's interleave still converts the shared zero block for each silent output:
+its time is inside the sink's wait for the DMA queue (27 to 30 ms a burst), so it is not in the
+burst and a faster interleave would not shorten the burst; a sink that knew `zero_block()` could
+skip it. The S3 and the C6 run the same player and playout code and were not played. A stream with
+objects was tested on the host only.
 
 ### The developer view on the kit (2026-10-21)
 
