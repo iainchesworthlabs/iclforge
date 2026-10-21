@@ -1,18 +1,28 @@
 # Name,     Type, SubType,  Offset,   Size,     Flags
 # partitions.csv's shape for an ESP32-C6 module with 4 MB of flash, the least
 # any C6 module has (sdkconfig.c6). partitions.csv's two 4 MiB slots do not fit
-# in 4 MB; these are 1.75 MiB each, and the C6's Sendspin image (1.58 MB with
-# sdkconfig.sendspin-c6 in September 2026) fills one to 86%. A C6 with 16 MB of
-# flash takes partitions.csv instead (sdkconfig.flash16mb). See partitions.csv
-# for what each partition is for.
+# in 4 MB; these are 1.875 MiB each. A C6 with 16 MB of flash takes
+# partitions.csv instead (sdkconfig.flash16mb). See partitions.csv for what each
+# partition is for.
 #
-# `audio` is 64 KB here where partitions.csv has 256: the sample is 10,752
-# bytes, and the room went to the slots.
+# There is no `audio` and no `storage` here. They are the sample the QEMU shapes
+# and the bare-metal demos play from flash and the FAT volume the file source is
+# run on (partitions.csv), and the C6's Sendspin player takes its audio from the
+# network and reads neither. They took 320 KB of this 4 MB, which is why the
+# slots were 1.75 MiB. The C6's image was 86% of one in September 2026 and
+# 99.9% on 2026-10-20, and the next change that added code to every board (the
+# Ethernet seam) passed it; the time a board keeps and the title card followed
+# on main, to 1.87 MB. The slots took the room, and the 64 KB after `coredump`
+# is left over because an application partition starts on a 64 KB boundary.
+# planning/esp32-ota.md named this as the step for when the image outgrew the
+# slot.
+#
+# This table changes only over USB, like every other: a C6 on the 1.75 MiB
+# table moves to this one with one `write-flash @flash_args` that keeps its
+# NVS, as the move to that table did.
 nvs,        data, nvs,      0x9000,   0x6000,
 phy_init,   data, phy,      0xf000,   0x1000,
 otadata,    data, ota,      0x10000,  0x2000,
-ota_0,      app,  ota_0,    0x20000,  0x1c0000,
-ota_1,      app,  ota_1,    0x1e0000, 0x1c0000,
-coredump,   data, coredump, 0x3a0000, 0x10000,
-audio,      data, 0x40,     0x3b0000, 0x10000,
-storage,    data, fat,      0x3c0000, 0x40000,
+ota_0,      app,  ota_0,    0x20000,  0x1e0000,
+ota_1,      app,  ota_1,    0x200000, 0x1e0000,
+coredump,   data, coredump, 0x3e0000, 0x10000,

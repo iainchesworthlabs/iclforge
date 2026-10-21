@@ -1366,11 +1366,9 @@ C6_TABLE_4MB = (
     ("nvs", 1, 0x02, 0x9000, 0x6000),
     ("phy_init", 1, 0x01, 0xF000, 0x1000),
     ("otadata", 1, 0x00, 0x10000, 0x2000),
-    ("ota_0", 0, 0x10, 0x20000, 0x1C0000),
-    ("ota_1", 0, 0x11, 0x1E0000, 0x1C0000),
-    ("coredump", 1, 0x03, 0x3A0000, 0x10000),
-    ("audio", 1, 0x40, 0x3B0000, 0x10000),
-    ("storage", 1, 0x81, 0x3C0000, 0x40000),
+    ("ota_0", 0, 0x10, 0x20000, 0x1E0000),
+    ("ota_1", 0, 0x11, 0x200000, 0x1E0000),
+    ("coredump", 1, 0x03, 0x3E0000, 0x10000),
 )
 
 
@@ -1409,7 +1407,7 @@ class PublishedImages(Case):
         c6 = {"target": "esp32c6", "chip": "ESP32-C6", "revision": "0.2", "psram_bytes": 0}
         p4 = {"target": "esp32p4", "chip": "ESP32-P4", "revision": "1.3", "psram_bytes": 32 << 20}
         c6_4mb = firmware(
-            flash_bytes=4 << 20, slot_bytes=0x1C0000, partitions=table_json(C6_TABLE_4MB)
+            flash_bytes=4 << 20, slot_bytes=0x1E0000, partitions=table_json(C6_TABLE_4MB)
         )
         self.assertEqual(self.chosen(s3, firmware()), "hearth-sink-esp32s3")
         self.assertEqual(self.chosen(c6, firmware()), "hearth-sink-esp32c6-16mb")

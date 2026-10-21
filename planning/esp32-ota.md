@@ -173,6 +173,13 @@ code in it ([Diagnostics](#diagnostics-without-a-cable-o4)). When it outgrows th
 modules need something else: a smaller image, or no `audio`/`storage` partitions in the C6's
 Sendspin build. The limit is written here so that it does not arrive as a surprise.
 
+**Taken 2026-10-21: no `audio` and no `storage` in `partitions_c6.csv`.** The image reached 99.9% of
+the slot on 2026-10-20 and the next three changes to code every board carries put it 38,784 bytes
+over. The slots are now `0x1E0000` (1.875 MiB) at `0x20000` and `0x200000`, `coredump` follows at
+`0x3E0000`, and the 64 KiB after it is unused (an application partition starts on a 64 KiB
+boundary, so the slots cannot take it). The project's CMake flashes `audio` and `storage` only on a
+table that has them. A board moves to this table over USB, as it did to the one before.
+
 **Moving a board to the new layout** is one USB flash of the usual `write-flash @flash_args`. The
 build's `flash_args` then writes:
 

@@ -190,7 +190,8 @@ the flash size setting and the bootloader change only over USB.
 
 An ESP32-C6 with 16 MB of flash takes `partitions.csv` and its 4 MiB slots:
 add `sdkconfig.flash16mb` after the C6's own overlays. `partitions_c6.csv`'s
-slots are 1.75 MiB, for any C6 module. The ESP32-P4 uses `partitions.csv`, as
+slots are 1.875 MiB, for any C6 module, and it has no `audio` and no `storage`
+partition: the player takes its audio from the network. The ESP32-P4 uses `partitions.csv`, as
 the S3 does.
 
 ### Updating over the network

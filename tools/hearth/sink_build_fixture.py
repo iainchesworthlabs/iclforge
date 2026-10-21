@@ -41,11 +41,9 @@ TABLE_4MB = [
     ("nvs", 1, 0x02, 0x9000, 0x6000),
     ("phy_init", 1, 0x01, 0xF000, 0x1000),
     ("otadata", 1, 0x00, 0x10000, 0x2000),
-    ("ota_0", 0, 0x10, 0x20000, 0x1C0000),
-    ("ota_1", 0, 0x11, 0x1E0000, 0x1C0000),
-    ("coredump", 1, 0x03, 0x3A0000, 0x10000),
-    ("audio", 1, 0x40, 0x3B0000, 0x10000),
-    ("storage", 1, 0x81, 0x3C0000, 0x40000),
+    ("ota_0", 0, 0x10, 0x20000, 0x1E0000),
+    ("ota_1", 0, 0x11, 0x200000, 0x1E0000),
+    ("coredump", 1, 0x03, 0x3E0000, 0x10000),
 ]
 
 
@@ -130,16 +128,20 @@ def make_build(
     (build / "iclforge_hearth_sink.elf").write_bytes(b"\x7fELF" + bytes(2000))
     (build / "storage.bin").write_bytes(b"\xeb\x3c\x90" + bytes(4093))
     (root / "stream" / "sample.ac3").write_bytes(b"\x0b\x77" + bytes(1022))
-    audio_at = next(offset for label, _, _, offset, _ in table if label == "audio")
-    storage_at = next(offset for label, _, _, offset, _ in table if label == "storage")
+    # The 4 MB table has neither partition (firmware/hearth-sink/CMakeLists.txt flashes
+    # each only where the table has it), so its flash_args has neither region.
+    offsets = {label: offset for label, _, _, offset, _ in table}
+    regions = ""
+    if "audio" in offsets:
+        regions += f"{offsets['audio']:#x} ../stream/sample.ac3\n"
+    if "storage" in offsets:
+        regions += f"{offsets['storage']:#x} storage.bin\n"
     (build / "flash_args").write_text(
         f"--flash-mode dio --flash-freq 80m --flash-size {flash_size}\n"
         f"{bootloader_at:#x} bootloader/bootloader.bin\n"
         "0x8000 partition_table/partition-table.bin\n"
         "0x10000 ota_data_initial.bin\n"
-        "0x20000 iclforge_hearth_sink.bin\n"
-        f"{audio_at:#x} ../stream/sample.ac3\n"
-        f"{storage_at:#x} storage.bin\n",
+        "0x20000 iclforge_hearth_sink.bin\n" + regions,
         "utf-8",
     )
     (build / "sdkconfig").write_text(

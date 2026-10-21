@@ -4832,6 +4832,19 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**The ESP32-C6 on a 4 MB module has room for its player again**
+
+- **The 4 MB table (`partitions_c6.csv`) has two 1.875 MiB application slots, not 1.75, and no
+  `audio` or `storage` partition.** The C6's Sendspin image had grown from 86% of a slot in
+  September to 99.9% by 2026-10-20, and the changes after that (the cable, the time a board keeps
+  and its page, the title card, the burst player) took it 38,784 bytes past it: the build stopped at
+  its size check. `audio` and `storage` are the sample and the FAT volume the QEMU shapes and the
+  bare-metal demos play from flash, which the C6's player never reads, and they were 320 KB of the
+  4 MB. The project's CMake flashes each of them only when the table has it. The `c6-4mb` profile's
+  budget is the new slot, 1,966,080 bytes. A board moves to the table over USB, with one
+  `write-flash @flash_args` that keeps its NVS; none is known to be on this table (the C6 on the
+  bench has 16 MB), and a C6 with 16 MB of flash is not touched.
+
 **The Forge GUI's players play out what they queued**
 
 - **An object's audition, a stream played in the stream player and the motion preview were cut off

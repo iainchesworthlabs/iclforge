@@ -488,7 +488,7 @@
     },
     "c6-4mb": {
       "target": "esp32c6",
-      "board": "any ESP32-C6 module: 4 MB of flash, the 1.75 MiB application slots of partitions_c6.csv",
+      "board": "any ESP32-C6 module: 4 MB of flash, the 1.875 MiB application slots of partitions_c6.csv",
       "fragments": [
         "hw",
         "sendspin",
@@ -505,7 +505,7 @@
         "refuse_above": null
       },
       "budget": {
-        "app_bytes_max": 1835008,
+        "app_bytes_max": 1966080,
         "bootloader_bytes_max": 32768,
         "internal_static_bytes_max": 117000
       },
