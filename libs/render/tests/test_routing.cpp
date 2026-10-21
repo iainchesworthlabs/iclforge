@@ -263,13 +263,18 @@ TEST_CASE("apply for some outputs writes those as apply does and leaves the rest
 
     // The shortest of the chosen outputs' spans and their channels' blocks decides how much is written:
     // a short block on a channel nobody chose does not shorten it.
-    Rendered uneven(4, 6);
-    uneven.spans[1] = std::span<const float>(uneven.storage[1].data(), 2);  // channel 1 -> output 7
+    const std::vector<float> channel0(6, 1.0F);
+    const std::vector<float> channel1(6, 2.0F);
+    const std::vector<float> channel2(6, 3.0F);
+    const std::vector<float> channel3(6, 4.0F);
+    const std::array<std::span<const float>, 4> uneven = {
+        std::span<const float>(channel0), std::span<const float>(channel1.data(), 2),  // channel 1 -> output 7
+        std::span<const float>(channel2), std::span<const float>(channel3)};
     Outputs picked(8, 6);
-    patch.apply(uneven.spans, picked.spans, 0b00000100U);  // output 2, fed by channel 0
+    patch.apply(uneven, picked.spans, 0b00000100U);  // output 2, fed by channel 0
     CHECK(picked.storage[2] == std::vector<float>(6, 1.0F));
     Outputs short_one(8, 6);
-    patch.apply(uneven.spans, short_one.spans, 0b10000100U);  // outputs 2 and 7
+    patch.apply(uneven, short_one.spans, 0b10000100U);  // outputs 2 and 7
     CHECK(short_one.storage[2] == (std::vector<float>{1.0F, 1.0F, 99.0F, 99.0F, 99.0F, 99.0F}));
     CHECK(short_one.storage[7] == (std::vector<float>{2.0F, 2.0F, 99.0F, 99.0F, 99.0F, 99.0F}));
 
