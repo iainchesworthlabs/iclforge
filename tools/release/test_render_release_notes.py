@@ -24,7 +24,10 @@ import render_release_notes as notes
 GITHUB_RELEASE_BODY_LIMIT = 125_000
 REPO = "iainchesworthlabs/iclforge"
 
-INTRO = "This release adds:\n\n- one thing;\n- another.\n\nThe sections below contain the complete change list and fixes.\n"
+INTRO = (
+    "This release adds:\n\n- one thing;\n- another.\n\n"
+    "The sections below contain the complete change list and fixes.\n"
+)
 
 
 def section(version: str, date: str, intro: str, detail: str) -> str:
@@ -86,7 +89,9 @@ class Render(unittest.TestCase):
         self.assertIn("- another.", out)
         self.assertNotIn("### Added", out)
         self.assertNotIn("a change that is long enough", out)
-        self.assertIn("https://github.com/iainchesworthlabs/iclforge/blob/v0.2.0-beta.1/CHANGELOG.md", out)
+        self.assertIn(
+            "https://github.com/iainchesworthlabs/iclforge/blob/v0.2.0-beta.1/CHANGELOG.md", out
+        )
         self.assertIn("`## [0.2.0-beta.1]`", out)
         self.assertTrue(out.rstrip().endswith("v0.1.0-beta.1...v0.2.0-beta.1"))
 
@@ -131,7 +136,10 @@ class Check(unittest.TestCase):
         self.assertTrue(any("no date" in p for p in notes.check(text, "0.2.0-beta.1")))
 
     def test_an_empty_section_fails(self):
-        text = "# Changelog\n\n## [0.2.0-beta.1] - 2026-02-01\n\n## [0.1.0-beta.1] - 2026-01-01\n\nFirst.\n"
+        text = (
+            "# Changelog\n\n## [0.2.0-beta.1] - 2026-02-01\n\n"
+            "## [0.1.0-beta.1] - 2026-01-01\n\nFirst.\n"
+        )
         self.assertTrue(any("empty" in p for p in notes.check(text, "0.2.0-beta.1")))
 
     def test_main_exit_codes(self):
@@ -139,13 +147,18 @@ class Check(unittest.TestCase):
         bad = changelog(section("0.2.0-beta.1", "YYYY-MM-DD", "Second.\n", "- b\n"))
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "CHANGELOG.md"
-            argv = ["--changelog", str(path), "--version", "0.2.0-beta.1", "--tag", "v0.2.0-beta.1", "--repo", REPO]
+            argv = [
+                *("--changelog", str(path)),
+                *("--version", "0.2.0-beta.1"),
+                *("--tag", "v0.2.0-beta.1"),
+                *("--repo", REPO),
+            ]
             path.write_text(good, encoding="utf-8")
-            code, out, _ = run_main(argv + ["--check"])
+            code, out, _ = run_main([*argv, "--check"])
             self.assertEqual(code, 0)
             self.assertIn("is dated", out)
             path.write_text(bad, encoding="utf-8")
-            code, _, err = run_main(argv + ["--check"])
+            code, _, err = run_main([*argv, "--check"])
             self.assertEqual(code, 1)
             self.assertIn("no date", err)
             # Without --check a placeholder date still renders: the notes step needs no date.
@@ -162,9 +175,13 @@ class RealChangelog(unittest.TestCase):
         version = versions[0]
         self.assertRegex(version, r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$")
         body, previous = notes.find_section(text, version)
-        out = notes.render(body, repo=REPO, tag=f"v{version}", previous_version=previous, version=version)
-        self.assertLessEqual(len(out), GITHUB_RELEASE_BODY_LIMIT, f"[{version}] does not fit a release page")
-        # Every section the file has, not only the newest, must be findable by the workflow's own rule.
+        out = notes.render(
+            body, repo=REPO, tag=f"v{version}", previous_version=previous, version=version
+        )
+        self.assertLessEqual(
+            len(out), GITHUB_RELEASE_BODY_LIMIT, f"[{version}] does not fit a release page"
+        )
+        # Every section the file has, not only the newest, is found by the workflow's own rule.
         for v in versions:
             self.assertTrue(re.search(rf"^## \[{re.escape(v)}\]", text, re.MULTILINE))
 

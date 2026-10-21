@@ -164,11 +164,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="only check that the section can be released (present, dated, not empty); write nothing",
+        help="only check that the section can be released (present, dated, not empty)",
     )
     args = parser.parse_args(argv)
 
-    # The notes carry arrows and accented letters; a Windows console's own code page cannot print them.
+    # The notes carry arrows and accented letters that a Windows console's code page cannot print.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     changelog_text = args.changelog.read_text(encoding="utf-8")
@@ -179,7 +179,11 @@ def main(argv: list[str] | None = None) -> int:
         if not problems:
             body, previous_version = find_section(changelog_text, args.version)
             notes = render(
-                body, repo=args.repo, tag=args.tag, previous_version=previous_version, version=args.version
+                body,
+                repo=args.repo,
+                tag=args.tag,
+                previous_version=previous_version,
+                version=args.version,
             )
             kind = "in full" if body in notes else "cut to its introduction"
             print(
@@ -195,7 +199,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     notes = render(
-        section_body, repo=args.repo, tag=args.tag, previous_version=previous_version, version=args.version
+        section_body,
+        repo=args.repo,
+        tag=args.tag,
+        previous_version=previous_version,
+        version=args.version,
     )
     if args.output is not None:
         args.output.write_text(notes, encoding="utf-8", newline="\n")
