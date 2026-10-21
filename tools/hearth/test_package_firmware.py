@@ -99,19 +99,30 @@ class Package(unittest.TestCase):
 
     def test_the_factory_image_is_every_region_at_its_offset_over_erased_flash(self) -> None:
         build = fixture.make_build(
+            self.root / "c6", target="esp32c6", flash_size="16MB", psram=False
+        )
+        packager.package(build, "hearth-sink-esp32c6-16mb", self.out)
+        factory = (self.out / "hearth-sink-esp32c6-16mb-v0.11.0-factory.bin").read_bytes()
+        app = (build / "iclforge_hearth_sink.bin").read_bytes()
+        storage = (build / "storage.bin").read_bytes()
+        self.assertEqual(len(factory), 0x870000 + len(storage))
+        self.assertEqual(factory[0x20000 : 0x20000 + len(app)], app)
+        self.assertEqual(factory[0x870000:], storage)
+        # Between the bootloader and the partition table, and after the app:
+        # erased flash, not zeros.
+        self.assertEqual(set(factory[0x2000:0x8000]), {0xFF})
+        self.assertEqual(set(factory[0x20000 + len(app) : 0x30000]), {0xFF})
+
+    def test_a_table_with_no_audio_or_storage_ends_its_factory_image_with_the_app(self) -> None:
+        # The 4 MB C6's table (partitions_c6.csv) has neither, so its flash_args writes neither.
+        build = fixture.make_build(
             self.root / "c6", target="esp32c6", flash_size="4MB", psram=False
         )
         packager.package(build, "hearth-sink-esp32c6", self.out)
         factory = (self.out / "hearth-sink-esp32c6-v0.11.0-factory.bin").read_bytes()
         app = (build / "iclforge_hearth_sink.bin").read_bytes()
-        storage = (build / "storage.bin").read_bytes()
-        self.assertEqual(len(factory), 0x3C0000 + len(storage))
-        self.assertEqual(factory[0x20000 : 0x20000 + len(app)], app)
-        self.assertEqual(factory[0x3C0000:], storage)
-        # Between the bootloader and the partition table, and after the app:
-        # erased flash, not zeros.
-        self.assertEqual(set(factory[0x2000:0x8000]), {0xFF})
-        self.assertEqual(set(factory[0x20000 + len(app) : 0x30000]), {0xFF})
+        self.assertEqual(len(factory), 0x20000 + len(app))
+        self.assertEqual(factory[0x20000:], app)
 
     def test_packaging_one_build_twice_gives_the_same_bytes(self) -> None:
         build = fixture.make_build(self.root / "s3")

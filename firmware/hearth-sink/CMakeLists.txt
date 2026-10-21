@@ -51,7 +51,14 @@ target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"icl
 # through a separate esptool invocation so `idf.py flash` puts everything the
 # application needs on the part in one step - a demo whose second half has to be
 # flashed by hand is a demo that gets reported as broken.
-esptool_py_flash_to_partition(flash "audio" "${CMAKE_CURRENT_SOURCE_DIR}/stream/sample.ac3")
+#
+# Only on a table that has the partition: the 4 MB C6's (partitions_c6.csv) has neither this nor
+# `storage` below, its player takes its audio from the network, and esptool_py_flash_to_partition()
+# stops the configure for a label the table does not have.
+partition_table_get_partition_info(audio_offset "--partition-name audio" "offset")
+if(audio_offset)
+    esptool_py_flash_to_partition(flash "audio" "${CMAKE_CURRENT_SOURCE_DIR}/stream/sample.ac3")
+endif()
 
 # And the same bytes again as a FAT filesystem, for source/fatfs/.
 #
@@ -64,4 +71,7 @@ esptool_py_flash_to_partition(flash "audio" "${CMAKE_CURRENT_SOURCE_DIR}/stream/
 # read_only, because nothing writes to it and a read-only image needs no wear
 # levelling - which keeps the mount to esp_vfs_fat_spiflash_mount_ro and the
 # partition to its nominal size.
-fatfs_create_rawflash_image(storage "${CMAKE_CURRENT_SOURCE_DIR}/stream" FLASH_IN_PROJECT)
+partition_table_get_partition_info(storage_offset "--partition-name storage" "offset")
+if(storage_offset)
+    fatfs_create_rawflash_image(storage "${CMAKE_CURRENT_SOURCE_DIR}/stream" FLASH_IN_PROJECT)
+endif()

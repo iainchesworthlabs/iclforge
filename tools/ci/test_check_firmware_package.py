@@ -167,13 +167,13 @@ class Gate(unittest.TestCase):
 
     def test_an_app_too_big_for_its_smallest_slot_is_refused(self) -> None:
         app = fixture.app_image(
-            fixture.CHIP_IDS["esp32c6"], "v0.11.0", flash_code=2, segment_bytes=0x1C0000
+            fixture.CHIP_IDS["esp32c6"], "v0.11.0", flash_code=2, segment_bytes=0x1E0000
         )
         self.release(**{"hearth-sink-esp32c6": {"app": app}})
         code, output = self.run_gate()
         self.assertEqual(code, 1)
         self.assertIn(
-            "hearth-sink-esp32c6: its app is 1,835,088 bytes, and the smallest slot", output
+            "hearth-sink-esp32c6: its app is 1,966,160 bytes, and the smallest slot", output
         )
 
     def test_a_network_built_in_is_refused(self) -> None:
