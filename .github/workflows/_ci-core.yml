@@ -542,14 +542,14 @@ jobs:
       # (planning/hearth-sendspin-extension.md, Decisions): a host pairs with a scripted
       # aiosendspin 9.1.1 player over loopback and plays it PCM, FLAC and Opus, which the script
       # checks against the programme. The SDK, PyAV, numpy and Pillow come from
-      # tools/sendspin/requirements.txt.
+      # tools/sendspin/requirements.txt, a pip-compile lock with hashes (requirements.in beside it).
       - name: aiosendspin 9.1.1 player
         shell: bash
         run: |
           set -eu
           python3 -m venv /tmp/aiosendspin-venv
           /tmp/aiosendspin-venv/bin/pip install --no-cache-dir --only-binary=:all: \
-            -r tools/sendspin/requirements.txt
+            --require-hashes -r tools/sendspin/requirements.txt
           /tmp/aiosendspin-venv/bin/python tools/sendspin/aiosendspin_exit.py \
             --iclforge-tests ./build/config-linux-gcc/bin/iclforge-hearth-tests
 
