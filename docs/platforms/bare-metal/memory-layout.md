@@ -57,7 +57,7 @@ board with no panel.
 | Internal RAM | 512 KB | 512 KB, shared with the radio | 768 KB, and 32 KB of low-power SRAM that the profiles keep out of the heap |
 | PSRAM | 8 MB, octal, 80 MHz | none | 32 MB, hex, 200 MHz |
 | Flash | 16 MB, QIO | 4 MB or 16 MB, QIO | 16 MB, QIO at 80 MHz |
-| Partition table and application slots | `partitions.csv`, two of 4 MiB | `partitions_c6.csv`, two of 1.75 MiB (4 MB); `partitions.csv` (16 MB) | `partitions.csv`, two of 4 MiB |
+| Partition table and application slots | `partitions.csv`, two of 4 MiB | `partitions_c6.csv`, two of 1.8125 MiB (4 MB); `partitions.csv` (16 MB) | `partitions.csv`, two of 4 MiB |
 | Bootloader's window | 32,768 bytes from 0x0 | 32,768 bytes from 0x0 | 24,576 bytes from 0x2000 |
 | Where the code runs | PSRAM, copied there at start: 2.3 MB of the 8 | flash, through the cache | PSRAM, copied there at start |
 | Caches | instruction 32 KB; data 32 KB in 64-byte lines, 64 KB with the AC-4 decoder | 16 KB for code and data together, in 32-byte lines | 16 KB instruction cache and a 128 KB L2 cache in 64-byte lines |
@@ -101,11 +101,11 @@ partitions_c6.csv: 4 MB of flash (any C6 module)
 nvs       data  0x009000  0x006000    24 KiB
 phy_init  data  0x00F000  0x001000     4 KiB
 otadata   data  0x010000  0x002000     8 KiB
-ota_0     app   0x020000  0x1C0000  1.75 MiB
-ota_1     app   0x1E0000  0x1C0000  1.75 MiB
-coredump  data  0x3A0000  0x010000    64 KiB
-audio     data  0x3B0000  0x010000    64 KiB
-storage   fat   0x3C0000  0x040000   256 KiB   the table ends at 0x400000
+ota_0     app   0x020000  0x1D0000  1.8125 MiB
+ota_1     app   0x1F0000  0x1D0000  1.8125 MiB
+coredump  data  0x3C0000  0x010000    64 KiB
+audio     data  0x3D0000  0x003000    12 KiB
+storage   fat   0x3E0000  0x020000   128 KiB   the table ends at 0x400000
 ```
 
 The two files are
@@ -211,7 +211,7 @@ up to two coded channels ([An ESP32-C6 sink](../../hearth/sink-esp32-c6.md)).
 
 | | Figure | Build and date |
 |---|---|---|
-| Flash | QIO mode (`sdkconfig.c6`). `c6-4mb`: `partitions_c6.csv`, 1.75 MiB slots, application budget 1,835,008 bytes, which is the slot. `c6-16mb`: `partitions.csv` through `sdkconfig.flash16mb`, 4 MiB slots, application budget 1,880,000. Bootloader budget 32,768 | `profiles.json`. The image was 1,665,856 bytes on 2026-09-25, 91% of a 1.75 MiB slot ([the OTA plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)). QIO left about 8% of the part idle where DIO left 1%: AC-3 2.0 over Wi-Fi, 2026-09-17 (`sdkconfig.c6`) |
+| Flash | QIO mode (`sdkconfig.c6`). `c6-4mb`: `partitions_c6.csv`, 1.8125 MiB slots (1.75 MiB until 2026-10-21), application budget 1,900,544 bytes, which is the slot. `c6-16mb`: `partitions.csv` through `sdkconfig.flash16mb`, 4 MiB slots, application budget 1,880,000. Bootloader budget 32,768 | `profiles.json`. The image was 1,665,856 bytes on 2026-09-25, 91% of a 1.75 MiB slot ([the OTA plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)). QIO left about 8% of the part idle where DIO left 1%: AC-3 2.0 over Wi-Fi, 2026-09-17 (`sdkconfig.c6`) |
 | Cache | 16 KB for code and data together, in 32-byte lines. The fixed-point transform's tables are initialised data (`.data`) for that reason: as constants in flash they cost 15 thousandths of a burst (AC-3 656 to 671, E-AC-3 751 to 766) | The cache: ESP-IDF's ROM header for the part. The timing: the C6 board, `c6-16mb` ([#1511](https://github.com/iainchesworthlabs/iclforge/pull/1511), merged 2026-10-13) |
 | Wi-Fi's code | In flash: `CONFIG_ESP_WIFI_IRAM_OPT`, `_EXTRA_IRAM_OPT`, `_RX_IRAM_OPT`, `_SLP_IRAM_OPT` and `CONFIG_ESP_PHY_IRAM_OPT` are off (`sdkconfig.sendspin-c6`). In the probe's Wi-Fi build that took the code in RAM from 93,190 to 44,804 bytes and the heap free at boot from 295,104 to 343,968, and AC-3 5.1 from 0.82 to 1.09 of real time | The probe, 2026-09-15 ([WiFi's code kept in flash](esp32-c6.md#wifis-code-kept-in-flash)) |
 | Static internal RAM | 111,823 bytes for both images, budget 117,000: `.bss` 43,664, `.data` 21,655, and the rest code placed in RAM. It was 144,139 (`.bss` 81,736) before 27,776 bytes of the decoder's tables came out, and 116,307 (`.bss` 53,904) after | `idf.py size`, 2026-10-12 and 2026-10-13 ([#1474](https://github.com/iainchesworthlabs/iclforge/pull/1474), [#1511](https://github.com/iainchesworthlabs/iclforge/pull/1511), [the profiles plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md#the-c6s-static-ram-budget-was-wrong-pr-14)) |

@@ -243,7 +243,10 @@ clock view reads it.
 
 **What the owner did not say, and was decided:** with a server named the pool is not asked (a person who
 names a server is saying where the time comes from; the router's, a local server too, is still second); a
-board that is turned `off` shows no time at all rather than an old one; the page budget went from 57,344 to
+board that is turned `off` shows no time at all rather than an old one; the C6 with 4 MB of flash had no room for the time (its image was 6,128 bytes over its 1.75 MiB slot on main
+already and this adds 26 KB), so its table gives the slots 64 KB each from `audio` (12 KB, from 64) and `storage`
+(128 KB, from 256), which no C6 image uses: 1.8125 MiB slots, a C6 with the old table taking one USB flash to move
+to it, and the image 31,920 bytes (2%) under its slot; the page budget went from 57,344 to
 65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 42 zones and cities (*UTC+10 Melbourne,
 Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and the 400 says why.
 

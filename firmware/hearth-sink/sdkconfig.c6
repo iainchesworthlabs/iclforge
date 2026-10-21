@@ -20,8 +20,8 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
 
 # The C6's own table, for a module with 4 MB of flash, the least any C6 module has:
 # partitions.csv's two 4 MiB application slots do not fit in 4 MB, and partitions_c6.csv's
-# are 1.75 MiB each. The Sendspin player image (1.58 MB with sdkconfig.sendspin-c6 in
-# September 2026) fills one to 86%. A C6 with 16 MB of flash takes partitions.csv instead,
+# are 1.8125 MiB each (1.75 MiB until 2026-10-21). The Sendspin player image (1.87 MB with
+# sdkconfig.sendspin-c6 and the time of day in October 2026) fills one to 98%. A C6 with 16 MB of flash takes partitions.csv instead,
 # through sdkconfig.flash16mb after this file.
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6.csv"

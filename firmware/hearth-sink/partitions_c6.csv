@@ -1,18 +1,30 @@
 # Name,     Type, SubType,  Offset,   Size,     Flags
 # partitions.csv's shape for an ESP32-C6 module with 4 MB of flash, the least
 # any C6 module has (sdkconfig.c6). partitions.csv's two 4 MiB slots do not fit
-# in 4 MB; these are 1.75 MiB each, and the C6's Sendspin image (1.58 MB with
-# sdkconfig.sendspin-c6 in September 2026) fills one to 86%. A C6 with 16 MB of
-# flash takes partitions.csv instead (sdkconfig.flash16mb). See partitions.csv
-# for what each partition is for.
+# in 4 MB; these are 1.8125 MiB each (1,900,544 bytes), and the C6's Sendspin
+# image (1.87 MB with sdkconfig.sendspin-c6 and the time of day in October
+# 2026) fills one to 98%. A C6 with 16 MB of flash takes partitions.csv instead
+# (sdkconfig.flash16mb). See partitions.csv for what each partition is for.
 #
-# `audio` is 64 KB here where partitions.csv has 256: the sample is 10,752
-# bytes, and the room went to the slots.
+# The slots were 1.75 MiB until 2026-10-21, when the image outgrew them (main
+# was already 6,128 bytes over, and keeping the time with a time server added
+# 26 KB). What gave the room is what no C6 image uses: `audio` is 12 KB here
+# where partitions.csv has 256 (the sample is 10,752 bytes; it is read by the
+# build that plays from flash, not by the Sendspin sink), and `storage`, the FAT
+# volume that only the QEMU file source mounts, is 128 KB where partitions.csv
+# has 256 (it holds the two 10,752-byte files of stream/). That is 180 KB, of
+# which the slots took 128 KB, 64 KB each, the most their 64 KB alignment
+# allows; the rest is the gap between `audio` and `storage`.
+#
+# A change to this table is not an update over the network (planning/esp32-ota.md,
+# tools/hearth/ota.py refuse it): a C6 with 4 MB that has the old table takes one
+# USB flash to move to this one, and keeps its name, its network and its pairings
+# (nvs is where it was).
 nvs,        data, nvs,      0x9000,   0x6000,
 phy_init,   data, phy,      0xf000,   0x1000,
 otadata,    data, ota,      0x10000,  0x2000,
-ota_0,      app,  ota_0,    0x20000,  0x1c0000,
-ota_1,      app,  ota_1,    0x1e0000, 0x1c0000,
-coredump,   data, coredump, 0x3a0000, 0x10000,
-audio,      data, 0x40,     0x3b0000, 0x10000,
-storage,    data, fat,      0x3c0000, 0x40000,
+ota_0,      app,  ota_0,    0x20000,  0x1d0000,
+ota_1,      app,  ota_1,    0x1f0000, 0x1d0000,
+coredump,   data, coredump, 0x3c0000, 0x10000,
+audio,      data, 0x40,     0x3d0000, 0x3000,
+storage,    data, fat,      0x3e0000, 0x20000,

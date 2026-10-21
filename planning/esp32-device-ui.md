@@ -1137,7 +1137,9 @@ run as root, so Playwright can install Chromium's system libraries).
     time server, its zone from a list of zones and cities, and its server: [p4x-now-playing.md](p4x-now-playing.md), stage 3; every board with a
     network has it) took the page to 61,830 (22,708 + 39,122): three settings, a readout, and the script that
     sends them and fills them from `GET /status`'s `time`. The tightest slot is the C6's on the 4 MB
-    table, which was already 6,128 bytes over on main (1,840,112 bytes in a 1,835,008-byte slot) before this.
+    table, which was already 6,128 bytes over on main (1,840,112 bytes in a 1,835,008-byte slot): the
+    table moved `audio` and `storage` into less room and the slots grew to 1.8125 MiB (`partitions_c6.csv`),
+    with this change's image 31,920 bytes (2%) under it.
 
 23. **The output layout's control.** (a) **the named layouts as a segmented control, those wider
     than the sink disabled, above the field**; (b) the field with its suggestion list, as before;
