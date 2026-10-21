@@ -124,10 +124,13 @@ the first slot, and its cause is not known.
 - **400 MHz**, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders do not scale
   with the clock: on the kit, with no panel, the decoder alone takes 10% less time than on the v1.3
   board for AC-3 and 17% less for AC-4 (11% more clock), and a Sendspin burst at the same layout (2.0)
-  takes 3 to 6% less. A burst costs about 176 µs for each output of the layout (the renderer, the
-  patch, the trims, the meters and the playout's copy), and the kit's player starts at 9.1.6,
-  sixteen outputs, where the v1.3 board's sink has two: the kit's first Sendspin figures were 13% to
-  100% above the v1.3 board's for that reason. The kit's figures are in [Memory and
+  takes 3 to 6% less. A burst used to cost about 176 µs for each output of the layout (the renderer,
+  the patch, the trims, the meters and the playout's copy) whether or not the stream filled it, and
+  the kit's player starts at 9.1.6, sixteen outputs, where the v1.3 board's sink has two: the kit's
+  first Sendspin figures were 13% to 100% above the v1.3 board's for that reason. The player now
+  does that work for the outputs that carry audio only, and hands the DAC zeros for the rest: an
+  AC-3 2.0 stream takes 2.4 ms a burst at 2.0, 5.1 and 9.1.6 alike (2.6, 3.3 and 5.2 ms before),
+  and an AC-4 5.1 stream 29.9 ms at 9.1.6 (33.4 before). The kit's figures are in [Memory and
   time](#memory-and-time).
 - **TDM opens**: the `i2s_wide` sink takes the 160 MHz PLL (`I2S_CLK_SRC_PLL_160M`) as the clock
   source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The source

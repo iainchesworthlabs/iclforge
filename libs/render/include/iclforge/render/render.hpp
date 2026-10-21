@@ -163,6 +163,13 @@ class LayoutRenderer {
             crossover_hp_.resize(small_slots_.size());
             crossover_lp_.resize(small_slots_.size());
             configure_crossover();
+            // Bass management works on these whatever is fed (reached_slots()).
+            for (const std::size_t slot : small_slots_) {
+                always_reach_ |= std::uint32_t{1} << slot;
+            }
+            if (lfe_slot_ >= 0) {
+                always_reach_ |= std::uint32_t{1} << static_cast<unsigned>(lfe_slot_);
+            }
         }
     }
 
@@ -282,6 +289,14 @@ class LayoutRenderer {
         if (lfe_topology_changed) {
             size_lfe_delay();
         }
+        bed_reach_ = 0;
+        for (std::size_t c = 0; c < bed_channels_; ++c) {
+            for (std::size_t slot = 0; slot < layout_.slots(); ++slot) {
+                if (bed_gains_[c][slot] != 0.0F) {
+                    bed_reach_ |= std::uint32_t{1} << slot;
+                }
+            }
+        }
     }
 
     // The objects of the unit about to be rendered, as describe_objects sees
@@ -306,6 +321,14 @@ class LayoutRenderer {
         if (object_count_ > 0 && !lfe_delay_taken_) {
             lfe_delay_taken_ = true;
             size_lfe_delay();
+        }
+        object_reach_ = 0;
+        for (std::size_t i = 0; i < object_count_; ++i) {
+            for (std::size_t slot = 0; slot < layout_.slots(); ++slot) {
+                if (object_gains_[i][slot] > 0.0F) {
+                    object_reach_ |= std::uint32_t{1} << slot;
+                }
+            }
         }
     }
 
@@ -382,61 +405,38 @@ class LayoutRenderer {
     // plays is the bed's of object_lag() samples before.
     void render(const iclforge::render::PcmBlock& block, bool objects, float gain,
                 std::span<const std::span<float>> out) {
-        const std::size_t slots = std::min(out.size(), layout_.slots());
-        const std::size_t n = block_length(block, out);
-        for (std::size_t slot = 0; slot < slots; ++slot) {
-            std::fill_n(out[slot].data(), n, 0.0F);
+        render_slots(block, objects, gain, out, all_slots());
+    }
+
+    // The slots the layout has, bit n for slot n.
+    [[nodiscard]] std::uint32_t all_slots() const {
+        return layout_.slots() >= 32 ? ~std::uint32_t{0} : (std::uint32_t{1} << layout_.slots()) - 1U;
+    }
+
+    // The slots a render() with these settings can put anything but zeros in, bit n for slot n:
+    // every slot a coded channel has a gain into (and, with `objects`, a placed object does), the
+    // slots bass management works on (every small slot and the LFE feed they redirect to, whatever
+    // the bed feeds, since a filter keeps ringing after its input stops), and nothing else. The
+    // rest of a block is silence, so a caller that knows this need not zero it, route it, meter it
+    // or copy it: render_reached() skips it. Worked out when the bed and the objects are set, not
+    // per block.
+    [[nodiscard]] std::uint32_t reached_slots(bool objects) const {
+        std::uint32_t mask = bed_reach_ | always_reach_;
+        if (objects && object_count_ > 0) {
+            mask |= object_reach_;
         }
-        const bool place_objects = objects && object_count_ > 0 && !block.objects.empty();
-        if (place_objects) {
-            const std::size_t count = std::min(object_count_, block.objects.size());
-            for (std::size_t i = 0; i < count; ++i) {
-                const std::span<const float> audio = block.objects[i];
-                if (audio.size() < n) {
-                    continue;
-                }
-                for (std::size_t t = 0; t < targets_; ++t) {
-                    const std::size_t slot = target_slots_[t];
-                    if (slot >= slots) {
-                        continue;
-                    }
-                    const float g = object_gains_[i][slot];
-                    if (g <= 0.0F) {
-                        continue;
-                    }
-                    float* const dst = out[slot].data();
-                    for (std::size_t k = 0; k < n; ++k) {
-                        dst[k] += g * audio[k];
-                    }
-                }
-            }
-        } else {
-            for (std::size_t c = 0; c < bed_channels_ && c < block.channels.size(); ++c) {
-                // Once there is a delay line, the LFE goes by way of it below.
-                if (!lfe_delay_taken_ || !coded_is_lfe(c)) {
-                    add_channel(block.channels[c], c, n, slots, out);
-                }
-            }
-        }
-        // The bed's LFE through its own gains: delayed beside the objects, as
-        // it arrives beside the rest of the bed, and into the line either way,
-        // so that objects placed after a unit without them still find the LFE
-        // they go with. set_objects() takes the line before object_count_ can
-        // be anything but zero, so it is there whenever objects are placed.
-        if (lfe_delay_taken_) {
-            add_lfe(block, n, slots, out, place_objects);
-        }
-        if (has_small_) {
-            apply_crossover(n, slots, out);
-        }
-        if (gain != 1.0F) {
-            for (std::size_t slot = 0; slot < slots; ++slot) {
-                float* const dst = out[slot].data();
-                for (std::size_t k = 0; k < n; ++k) {
-                    dst[k] *= gain;
-                }
-            }
-        }
+        return mask;
+    }
+
+    // render(), for the slots reached_slots(objects) names alone: they are written, zeros and sums,
+    // exactly as render() writes them, and every other slot of `out` is LEFT AS IT WAS, not zeroed.
+    // Returns the mask, which is what the caller may read: a slot outside it holds whatever it held
+    // before, and is silence for this block all the same.
+    std::uint32_t render_reached(const iclforge::render::PcmBlock& block, bool objects, float gain,
+                                 std::span<const std::span<float>> out) {
+        const std::uint32_t reached = reached_slots(objects);
+        render_slots(block, objects, gain, out, reached);
+        return reached;
     }
 
     // Drops the crossover filters' delay-line state (not their
@@ -574,6 +574,73 @@ class LayoutRenderer {
         }
     }
 
+    // render() for the slots in `write`, which must hold every slot reached_slots() names (or be
+    // every slot): the others are not touched at all. The writes below only ever land in reached
+    // slots, so that is all `write` gates: the zeroing and the gain.
+    void render_slots(const iclforge::render::PcmBlock& block, bool objects, float gain,
+                      std::span<const std::span<float>> out, std::uint32_t write) {
+        const std::size_t slots = std::min(out.size(), layout_.slots());
+        const std::size_t n = block_length(block, out);
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            if ((write >> slot) & 1U) {
+                std::fill_n(out[slot].data(), n, 0.0F);
+            }
+        }
+        const bool place_objects = objects && object_count_ > 0 && !block.objects.empty();
+        if (place_objects) {
+            const std::size_t count = std::min(object_count_, block.objects.size());
+            for (std::size_t i = 0; i < count; ++i) {
+                const std::span<const float> audio = block.objects[i];
+                if (audio.size() < n) {
+                    continue;
+                }
+                for (std::size_t t = 0; t < targets_; ++t) {
+                    const std::size_t slot = target_slots_[t];
+                    if (slot >= slots) {
+                        continue;
+                    }
+                    const float g = object_gains_[i][slot];
+                    if (g <= 0.0F) {
+                        continue;
+                    }
+                    float* const dst = out[slot].data();
+                    for (std::size_t k = 0; k < n; ++k) {
+                        dst[k] += g * audio[k];
+                    }
+                }
+            }
+        } else {
+            for (std::size_t c = 0; c < bed_channels_ && c < block.channels.size(); ++c) {
+                // Once there is a delay line, the LFE goes by way of it below.
+                if (!lfe_delay_taken_ || !coded_is_lfe(c)) {
+                    add_channel(block.channels[c], c, n, slots, out);
+                }
+            }
+        }
+        // The bed's LFE through its own gains: delayed beside the objects, as
+        // it arrives beside the rest of the bed, and into the line either way,
+        // so that objects placed after a unit without them still find the LFE
+        // they go with. set_objects() takes the line before object_count_ can
+        // be anything but zero, so it is there whenever objects are placed.
+        if (lfe_delay_taken_) {
+            add_lfe(block, n, slots, out, place_objects);
+        }
+        if (has_small_) {
+            apply_crossover(n, slots, out);
+        }
+        if (gain != 1.0F) {
+            for (std::size_t slot = 0; slot < slots; ++slot) {
+                if (!((write >> slot) & 1U)) {
+                    continue;
+                }
+                float* const dst = out[slot].data();
+                for (std::size_t k = 0; k < n; ++k) {
+                    dst[k] *= gain;
+                }
+            }
+        }
+    }
+
     static std::size_t block_length(const iclforge::render::PcmBlock& block,
                                     std::span<const std::span<float>> out) {
         std::size_t n = block.channels.empty() ? 0 : block.channels.front().size();
@@ -684,6 +751,11 @@ class LayoutRenderer {
     std::array<std::array<float, kMaxSlots>, kMaxCoded> bed_gains_{};
     std::array<std::array<float, kMaxSlots>, kMaxObjects> object_gains_{};
     std::size_t object_count_ = 0;
+    // The slots the bed's gains and the objects' gains reach, and the ones bass management always
+    // works on, bit n for slot n (reached_slots()): kept beside the gains they come from.
+    std::uint32_t bed_reach_ = 0;
+    std::uint32_t object_reach_ = 0;
+    std::uint32_t always_reach_ = 0;
     // Bass management: which slots are small, the LFE slot their bass is
     // redirected to, and each small slot's own filter pair - small_slots_[i]
     // owns crossover_hp_[i]/crossover_lp_[i]. All three stay empty, and

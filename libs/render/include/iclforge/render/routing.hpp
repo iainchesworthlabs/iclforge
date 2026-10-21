@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -213,6 +214,19 @@ class Routing {
         return mask;
     }
 
+    // The outputs the channels in `channels` are patched to, bit n for channel n in and bit n for
+    // output n out: with the slots a block reaches (LayoutRenderer::reached_slots()) the outputs
+    // that can carry audio, and every other output of the patch is silence.
+    [[nodiscard]] std::uint32_t outputs_fed_by(std::uint32_t channels) const {
+        std::uint32_t mask = 0;
+        for (std::size_t c = 0; c < channels_; ++c) {
+            if (output_of_[c] != kUnassigned && ((channels >> c) & 1U) != 0) {
+                mask |= std::uint32_t{1} << static_cast<unsigned>(output_of_[c]);
+            }
+        }
+        return mask;
+    }
+
     // The channels patched to nothing, bit n for channel n: rendered audio
     // that will not be heard, which a settings page should say.
     [[nodiscard]] std::uint16_t unpatched_channels() const {
@@ -240,6 +254,39 @@ class Routing {
             }
         }
         for (std::size_t o = 0; o < outputs; ++o) {
+            const int c = channel_of(o);
+            if (c == kUnassigned || static_cast<std::size_t>(c) >= rendered.size()) {
+                std::fill_n(out[o].data(), n, 0.0F);
+            } else {
+                std::copy_n(rendered[static_cast<std::size_t>(c)].data(), n, out[o].data());
+            }
+        }
+    }
+
+    // apply() for the outputs in `only` (bit n for output n) and no others, which are left as they
+    // were: n is the shortest of THEIR spans and of the rendered channels patched to them. For the
+    // outputs in `only` the samples written are the ones apply() writes, bit for bit.
+    void apply(std::span<const std::span<const float>> rendered, std::span<const std::span<float>> out,
+               std::uint32_t only) const {
+        const std::size_t outputs = std::min<std::size_t>(out.size(), outputs_);
+        std::size_t n = std::numeric_limits<std::size_t>::max();
+        for (std::size_t o = 0; o < outputs; ++o) {
+            if (((only >> o) & 1U) == 0) {
+                continue;
+            }
+            n = std::min(n, out[o].size());
+            const int c = channel_of(o);
+            if (c != kUnassigned && static_cast<std::size_t>(c) < rendered.size()) {
+                n = std::min(n, rendered[static_cast<std::size_t>(c)].size());
+            }
+        }
+        if (n == std::numeric_limits<std::size_t>::max()) {
+            return;
+        }
+        for (std::size_t o = 0; o < outputs; ++o) {
+            if (((only >> o) & 1U) == 0) {
+                continue;
+            }
             const int c = channel_of(o);
             if (c == kUnassigned || static_cast<std::size_t>(c) >= rendered.size()) {
                 std::fill_n(out[o].data(), n, 0.0F);

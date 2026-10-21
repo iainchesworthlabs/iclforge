@@ -8,7 +8,9 @@
 // slots, where a swapped subscript puts the centre channel in the subwoofer
 // and nothing complains.
 
+#include <algorithm>
 #include <array>
+#include <bit>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
@@ -834,4 +836,201 @@ TEST_CASE("moving the crossover moves a small speaker's bass", "[render][layout]
     const auto high_corner = measure(250.0);
     REQUIRE(low_corner[0] > 2.0 * low_corner[1]);
     REQUIRE(high_corner[1] > 2.0 * high_corner[0]);
+}
+
+// --- the slots a block reaches, and rendering only those -----------------------------------------
+
+namespace {
+
+constexpr float kUntouched = 99.0F;
+
+[[nodiscard]] bool same_bits(const std::vector<float>& a, const std::vector<float>& b) {
+    return a.size() == b.size() &&
+           std::equal(a.begin(), a.end(), b.begin(), [](float x, float y) {
+               return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
+           });
+}
+
+[[nodiscard]] bool all_of_value(const std::vector<float>& plane, float value) {
+    return std::all_of(plane.begin(), plane.end(), [value](float x) { return x == value; });
+}
+
+[[nodiscard]] bool any_nonzero(const std::vector<float>& plane) {
+    return std::any_of(plane.begin(), plane.end(), [](float x) { return x != 0.0F; });
+}
+
+// One block through render() on `full` and through render_reached() on `part`, two renderers that
+// have been set the same way and fed the same blocks: every slot render_reached() says it wrote is
+// render()'s, bit for bit, and every other slot is silence in render()'s and untouched in
+// render_reached()'s. Returns the mask.
+std::uint32_t render_both(LayoutRenderer& full, LayoutRenderer& part, Out& a, Out& b,
+                          const iclforge::ac3::PcmBlock& block, bool objects, float gain = 1.0F) {
+    // `b` starts every block full of something no render writes, so a slot render_reached() did not
+    // write shows (a caller's buffer holds the last block's audio there).
+    for (std::vector<float>& plane : b.storage) {
+        std::fill(plane.begin(), plane.end(), kUntouched);
+    }
+    full.render(block, objects, gain, a.spans);
+    const std::uint32_t reached = part.render_reached(block, objects, gain, b.spans);
+    REQUIRE(reached == part.reached_slots(objects));
+    for (std::size_t slot = 0; slot < a.storage.size(); ++slot) {
+        CAPTURE(slot);
+        if (((reached >> slot) & 1U) != 0) {
+            REQUIRE(same_bits(a.storage[slot], b.storage[slot]));
+        } else {
+            REQUIRE(all_of_value(a.storage[slot], 0.0F));
+            REQUIRE(all_of_value(b.storage[slot], kUntouched));
+        }
+    }
+    return reached;
+}
+
+}  // namespace
+
+TEST_CASE("a 2.0 stream on 9.1.6 reaches two of sixteen slots, and renders only those", "[io][layout][render]") {
+    const auto layout = *OutputLayout::parse("9.1.6");
+    REQUIRE(layout.slots() == 16);
+    const auto slot_of = [&](Location where) { return static_cast<unsigned>(layout.index_of(where)); };
+
+    const std::uint16_t stereo = iclforge::ac3::eac3::chanmap::acmod_map(iclforge::ac3::Acmod::k2_0, false);
+    LayoutRenderer full{layout};
+    LayoutRenderer part{layout};
+    full.set_bed(coded(stereo));
+    part.set_bed(coded(stereo));
+    CHECK(part.reached_slots(false) == ((1U << slot_of(Location::kLeft)) | (1U << slot_of(Location::kRight))));
+    CHECK(part.reached_slots(true) == part.reached_slots(false));  // no objects set
+
+    Out a(16, 256, 0.0F);
+    Out b(16, 256, kUntouched);
+    for (int block = 0; block < 4; ++block) {
+        const float level = 0.1F * static_cast<float>(block + 1);
+        const Block source({level, -level / 2}, {}, 256);
+        const std::uint32_t reached = render_both(full, part, a, b, source.block(), false);
+        CHECK(std::popcount(reached) == 2);
+        CHECK(any_nonzero(a.storage[slot_of(Location::kLeft)]));
+        CHECK(any_nonzero(b.storage[slot_of(Location::kRight)]));
+    }
+
+    // 5.1: six slots, the LFE feed one of them.
+    full.set_bed(coded(k51));
+    part.set_bed(coded(k51));
+    CHECK(std::popcount(part.reached_slots(false)) == 6);
+    CHECK(part.reached_slots(false) == part.bed_slots());
+    CHECK((part.reached_slots(false) & (1U << slot_of(Location::kLfe))) != 0);
+    Out c(16, 256, 0.0F);
+    Out d(16, 256, kUntouched);
+    for (int block = 0; block < 3; ++block) {
+        const float level = 0.05F * static_cast<float>(block + 1);
+        const Block source({level, level * 2, level * 3, level * 4, level * 5, level * 6}, {}, 256);
+        render_both(full, part, c, d, source.block(), false);
+    }
+    // The gain is applied to the slots written and to no others.
+    const Block gained({0.2F, 0.2F, 0.2F, 0.2F, 0.2F, 0.2F}, {}, 256);
+    render_both(full, part, c, d, gained.block(), false, 0.5F);
+}
+
+TEST_CASE("a bed that changes mid-stream hands the slots it leaves back to silence", "[io][layout][render]") {
+    // 5.1 and then 2.0 on 5.1.4: a slot that stops being reached is silence from the next block, and
+    // is no longer in the mask, whatever the caller's buffer still holds there.
+    const auto layout = *OutputLayout::parse("5.1.4");
+    LayoutRenderer full{layout};
+    LayoutRenderer part{layout};
+    full.set_bed(coded(k51));
+    part.set_bed(coded(k51));
+    Out a(10, 256, 0.0F);
+    Out b(10, 256, kUntouched);
+    const Block loud({0.3F, 0.3F, 0.3F, 0.3F, 0.3F, 0.3F}, {}, 256);
+    const std::uint32_t before = render_both(full, part, a, b, loud.block(), false);
+    CHECK(std::popcount(before) == 6);
+
+    const std::uint16_t stereo = iclforge::ac3::eac3::chanmap::acmod_map(iclforge::ac3::Acmod::k2_0, false);
+    full.set_bed(coded(stereo));
+    part.set_bed(coded(stereo));
+    // The slots the old bed filled are silence in render()'s block now, and not in the mask.
+    const Block quiet({0.1F, 0.2F}, {}, 256);
+    const std::uint32_t after = render_both(full, part, a, b, quiet.block(), false);
+    CHECK(std::popcount(after) == 2);
+}
+
+TEST_CASE("render_reached with objects writes what render writes, the bed's LFE included", "[io][layout][render]") {
+    const auto layout = *OutputLayout::parse("5.1.4");
+    LayoutRenderer full{layout};
+    LayoutRenderer part{layout};
+    for (LayoutRenderer* renderer : {&full, &part}) {
+        renderer->set_bed(coded(k51));
+        const std::array<iclforge::objects::oba::DisplayObject, 2> objects = {
+            object_at(0.5, 0.0, 0.0),  // C
+            object_at(0.5, 0.5, 1.0),  // Vhl and Vhr
+        };
+        renderer->set_objects(objects);
+    }
+    // Slots: L C R Ls Rs Vhl Vhr Lts Rts LFE. The objects reach C and the heights; the bed alone, the
+    // five and the LFE; with objects, the union (the bed's own channels are not added while objects
+    // are placed, but the mask need not be exact, only complete).
+    CHECK(part.reached_slots(false) == part.bed_slots());
+    CHECK(part.reached_slots(true) == (part.bed_slots() | part.object_slots()));
+    CHECK(std::popcount(part.reached_slots(true)) > std::popcount(part.reached_slots(false)));
+
+    constexpr std::size_t kLong = 1024;
+    Out a(10, kLong, 0.0F);
+    Out b(10, kLong, kUntouched);
+    for (int block = 0; block < 3; ++block) {
+        const float level = 0.1F * static_cast<float>(block + 1);
+        const Block source({level, level, level, level, level, 0.1F}, {0.5F, 0.2F}, kLong);
+        render_both(full, part, a, b, source.block(), true);
+        render_both(full, part, a, b, source.block(), false);
+    }
+    // Objects are on offer and the unit has none: the bed.
+    const Block no_objects({0.3F, 0.3F, 0.3F, 0.3F, 0.3F, 0.1F}, {}, kLong);
+    render_both(full, part, a, b, no_objects.block(), true);
+    // Objects set and then taken away (no metadata): the bed's reach alone.
+    full.set_objects(nullptr, 0);
+    part.set_objects(nullptr, 0);
+    CHECK(part.reached_slots(true) == part.reached_slots(false));
+    render_both(full, part, a, b, no_objects.block(), true);
+}
+
+TEST_CASE("bass management always reaches the small slots and the LFE feed, so a filter's tail is rendered",
+          "[io][layout][render]") {
+    // C is small. A loud centre goes through the crossover, and then the bed changes to 2.0, which
+    // feeds neither C nor the LFE: their filters ring on for a few blocks.
+    const auto layout = *OutputLayout::parse("L,R,C:small,LFE");
+    LayoutRenderer full{layout};
+    LayoutRenderer part{layout};
+    full.set_bed(coded(k51));
+    part.set_bed(coded(k51));
+    Out a(4, 256, 0.0F);
+    Out b(4, 256, kUntouched);
+    const Block centre({0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, {}, 256);
+    for (int block = 0; block < 5; ++block) {
+        render_both(full, part, a, b, centre.block(), false);
+    }
+
+    const std::uint16_t stereo = iclforge::ac3::eac3::chanmap::acmod_map(iclforge::ac3::Acmod::k2_0, false);
+    full.set_bed(coded(stereo));
+    part.set_bed(coded(stereo));
+    const Block silence({0.0F, 0.0F}, {}, 256);
+    for (int block = 0; block < 4; ++block) {
+        const std::uint32_t reached = render_both(full, part, a, b, silence.block(), false);
+        CAPTURE(block);
+        CHECK((reached & 0b1100U) == 0b1100U);  // C and the LFE: reached, whatever the bed feeds
+        if (block == 0) {
+            CHECK(any_nonzero(a.storage[2]));  // the high-pass's tail
+            CHECK(any_nonzero(a.storage[3]));  // the low-pass's, in the LFE feed
+        }
+    }
+    // A layout with nothing small reaches what the bed feeds, and nothing more.
+    LayoutRenderer plain{*OutputLayout::parse("L,R,C,LFE")};
+    plain.set_bed(coded(stereo));
+    CHECK(std::popcount(plain.reached_slots(false)) == 2);
+}
+
+TEST_CASE("a renderer with no bed set reaches nothing, and a smaller bed clears the reach of a larger one",
+          "[io][layout][render]") {
+    LayoutRenderer renderer{*OutputLayout::parse("5.1")};
+    CHECK(renderer.reached_slots(false) == 0);
+    renderer.set_bed(coded(k51));
+    CHECK(renderer.reached_slots(false) == renderer.all_slots());
+    renderer.set_bed(coded(iclforge::ac3::eac3::chanmap::acmod_map(iclforge::ac3::Acmod::k1_0, false)));
+    CHECK(std::popcount(renderer.reached_slots(false)) == 1);
 }

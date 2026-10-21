@@ -124,33 +124,31 @@ class TrimDelay {
     void process(std::span<const std::span<float>> out) {
         const std::size_t count = std::min(out.size(), outputs_);
         for (std::size_t o = 0; o < count; ++o) {
-            float* const samples = out[o].data();
-            const std::size_t n = out[o].size();
-            const std::size_t d = delay_[o];
-            if (d != 0) {
-                // The line holds the last d samples in arrival order from
-                // position_; swapping a run in takes the oldest out.
-                float* const ring = line(o);
-                std::size_t p = position_[o];
-                std::size_t k = 0;
-                while (k < n) {
-                    const std::size_t run = std::min(n - k, d - p);
-                    std::swap_ranges(samples + k, samples + k + run, ring + p);
-                    k += run;
-                    p += run;
-                    if (p == d) {
-                        p = 0;
-                    }
-                }
-                position_[o] = static_cast<std::uint32_t>(p);
-            }
-            const float g = gain_[o];
-            if (g != 1.0F) {
-                for (std::size_t k = 0; k < n; ++k) {
-                    samples[k] *= g;
-                }
+            process_output(out[o], o);
+        }
+    }
+
+    // process() for the outputs in `only` (bit n for output n) and no others, which are not
+    // touched: nothing is delayed, trimmed or advanced for them. An output with a delay keeps a
+    // line that moves with the blocks, so a caller leaves such an output out of `only` only when
+    // it has none (delay() is 0); a trim alone cannot make a block of zeros anything else.
+    void process(std::span<const std::span<float>> out, std::uint32_t only) {
+        const std::size_t count = std::min(out.size(), outputs_);
+        for (std::size_t o = 0; o < count; ++o) {
+            if (((only >> o) & 1U) != 0) {
+                process_output(out[o], o);
             }
         }
+    }
+
+    // Whether any output has a delay: its line carries audio past the block that gave it.
+    [[nodiscard]] bool delayed() const {
+        for (std::size_t o = 0; o < outputs_; ++o) {
+            if (delay_[o] != 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Silence in every delay line, for a new stream; the settings stay.
@@ -169,6 +167,36 @@ class TrimDelay {
     }
 
     float* line(std::size_t output) { return storage_.data() + (output * max_delay_); }
+
+    // One output's block, in place: delayed, then trimmed.
+    void process_output(std::span<float> block, std::size_t o) {
+        float* const samples = block.data();
+        const std::size_t n = block.size();
+        const std::size_t d = delay_[o];
+        if (d != 0) {
+            // The line holds the last d samples in arrival order from
+            // position_; swapping a run in takes the oldest out.
+            float* const ring = line(o);
+            std::size_t p = position_[o];
+            std::size_t k = 0;
+            while (k < n) {
+                const std::size_t run = std::min(n - k, d - p);
+                std::swap_ranges(samples + k, samples + k + run, ring + p);
+                k += run;
+                p += run;
+                if (p == d) {
+                    p = 0;
+                }
+            }
+            position_[o] = static_cast<std::uint32_t>(p);
+        }
+        const float g = gain_[o];
+        if (g != 1.0F) {
+            for (std::size_t k = 0; k < n; ++k) {
+                samples[k] *= g;
+            }
+        }
+    }
 
     std::span<float> storage_;
     std::size_t outputs_ = 0;
