@@ -354,9 +354,10 @@ cmake --build --preset build-windows-llvm-debug
 ctest --preset test-windows-llvm-debug
 ```
 
-`VCPKG_ROOT` must point at a vcpkg checkout (it supplies Catch2 and {fmt}, mbedTLS, cpp-httplib,
+A vcpkg checkout is needed (`ICL_VCPKG_STORE` makes one on the first configure, or `VCPKG_ROOT`
+names yours; see [building.md](../building.md#which-vcpkg-a-configure-uses)). It supplies Catch2 and {fmt}, mbedTLS, cpp-httplib,
 libFLAC, Opus and mdns through the `hearth` feature the desktop presets select, and Boost and
-Tracy only if you opt into the `adm`/`profiling` features; see [building.md](../building.md)). See
+Tracy only if you opt into the `adm`/`profiling` features; see [building.md](../building.md). See
 [Presets](../building.md#presets) for the full preset table and the `ci-windows-msvc` /
 `ci-windows-llvm` workflow presets that chain all three steps.
 

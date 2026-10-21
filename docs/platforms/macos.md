@@ -289,7 +289,7 @@ run-loop question above are all still unobserved.
 ## Building
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
+export ICL_VCPKG_STORE=$HOME/.cache/icl/vcpkg   # once; or VCPKG_ROOT=/path/to/vcpkg
 cmake --preset config-macos-llvm-debug
 cmake --build --preset build-macos-llvm-debug
 ctest --preset test-macos-llvm-debug
@@ -298,7 +298,8 @@ ctest --preset test-macos-llvm-debug
 Swap `macos-llvm` for `macos-llvm-x64` throughout on Intel; drop `-debug` from all three preset
 names for a Release build either way. The `ci-macos-llvm`/`ci-macos-llvm-x64` workflow presets
 each chain the same three steps in one command. Homebrew's `llvm` formula must be installed (CI
-runs `brew install llvm`), and `VCPKG_ROOT` must point at a vcpkg checkout — it supplies Catch2
+runs `brew install llvm`), and a vcpkg checkout is needed (`ICL_VCPKG_STORE` makes one on the first configure, or
+`VCPKG_ROOT` names yours; see [building.md](../building.md#which-vcpkg-a-configure-uses)) — it supplies Catch2
 and {fmt}, mbedTLS, cpp-httplib, libFLAC, Opus and mdns through the `hearth` feature the desktop
 presets select, and Boost and Tracy only if you opt into the `adm`/`profiling` features (see
 [building.md](../building.md)). `ICLFORGE_BUILD_GUI` defaults **OFF** on both presets, as on Linux

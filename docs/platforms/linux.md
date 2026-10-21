@@ -225,7 +225,7 @@ distro-packaged Qt6 is built, not a missing dependency).
 ## Building
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
+export ICL_VCPKG_STORE=$HOME/.cache/icl/vcpkg   # once; or VCPKG_ROOT=/path/to/vcpkg
 cmake --preset config-linux-gcc-debug
 cmake --build --preset build-linux-gcc-debug
 ctest --preset test-linux-gcc-debug
@@ -233,11 +233,13 @@ ctest --preset test-linux-gcc-debug
 
 Substitute `linux-llvm` for `linux-gcc` to build with Clang instead. Add
 `-DICLFORGE_BUILD_GUI=ON` to either configure line to build `forge-gui` too, once Qt is installed
-(see [GUI](#gui-opt-in-not-on-by-default) above). `VCPKG_ROOT` must point at a vcpkg checkout —
+(see [GUI](#gui-opt-in-not-on-by-default) above). A vcpkg checkout is needed (`ICL_VCPKG_STORE` makes one on the first
+configure, or `VCPKG_ROOT` names yours; see
+[building.md](../building.md#which-vcpkg-a-configure-uses)) —
 it supplies Catch2 and {fmt}, mbedTLS, cpp-httplib, libFLAC, Opus and mdns through the `hearth`
 feature the desktop presets select, and Boost and Tracy only if you opt into the
-`adm`/`profiling` features (see [building.md](../building.md)), same as on Windows; this
-project's own convention keeps it at `/opt/vcpkg`, but any path works.
+`adm`/`profiling` features (see [building.md](../building.md)), same as on Windows. Any path
+works for a `VCPKG_ROOT` (CI's runners use a clone under `RUNNER_TEMP`).
 
 ## Packaging
 

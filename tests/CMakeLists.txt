@@ -9,6 +9,17 @@ add_subdirectory(support)
 include(IclforgeTests)
 
 # ---------------------------------------------------------------------------
+# Which vcpkg checkout a configure uses (cmake/VcpkgRoot.cmake): the shared per-commit store, a
+# root you name, VCPKG_ROOT as CI sets it, a toolchain you pass, and what is said when there is
+# none or one is dead. Script mode against a fake upstream repository: no network, and no real
+# vcpkg is touched.
+# ---------------------------------------------------------------------------
+add_test(NAME vcpkg_root_selection
+    COMMAND "${CMAKE_COMMAND}" "-DREPO_ROOT=${PROJECT_SOURCE_DIR}"
+        "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/vcpkg_root_selection"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_vcpkg_root.cmake")
+
+# ---------------------------------------------------------------------------
 # iclforge-perf - real-time throughput regression guards, deliberately a SEPARATE
 # binary/target from the test binaries rather than a couple more source files added to
 # one. A throughput assertion is a different kind of check from the rest of

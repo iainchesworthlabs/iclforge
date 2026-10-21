@@ -10,7 +10,7 @@ Every command here has been run on the configuration described under
 | A compiler | MSVC (VS 2026, toolset 14.5x), clang-cl 22, GCC 16, Clang 22, or Homebrew LLVM on macOS | C++23, including `std::expected` and deducing `this`. CI pins GCC 16 (`.github/toolchain/02-gcc-toolchain.sh`), LLVM 22 (`03-llvm-toolchain.sh`) and the MSVC toolset prefix 14.5 (`.github/toolchain-versions.json`); the Linux toolchain files fall back to older GCC versions so a machine one release behind still configures. See [Verified configuration](#verified-configuration) for the CI matrix. |
 | CMake | ≥ 3.28 | `cmake_minimum_required(VERSION 3.28...4.3)`. |
 | Ninja | any recent | The presets hard-code the Ninja generator. |
-| vcpkg | a checkout that contains the commit in `vcpkg.json`'s `builtin-baseline` | Supplies fmt, Catch2, fast-float (decimal text) and nlohmann-json (the Forge programs' project file and the object scene file), and the `hearth` feature's cpp-httplib, mbedTLS, libFLAC, Opus and mdns (selected by every hosted preset), plus the opt-in `adm` (Boost) and `profiling` (Tracy) features. A shallow or old checkout that lacks the baseline commit cannot resolve it. fmt, Catch2 and nlohmann-json can use `FetchContent` when vcpkg is unavailable. See [Options](#options). |
+| vcpkg | a checkout that contains the commit in `vcpkg.json`'s `builtin-baseline` | Supplies fmt, Catch2, fast-float (decimal text) and nlohmann-json (the Forge programs' project file and the object scene file), and the `hearth` feature's cpp-httplib, mbedTLS, libFLAC, Opus and mdns (selected by every hosted preset), plus the opt-in `adm` (Boost) and `profiling` (Tracy) features. A shallow or old checkout that lacks the baseline commit cannot resolve it, which is why a shared store keeps one checkout per baseline: see [Which vcpkg a configure uses](#which-vcpkg-a-configure-uses). fmt, Catch2 and nlohmann-json can use `FetchContent` when vcpkg is unavailable. See [Options](#options). |
 | Qt | 6.5+ prebuilt for `forge-gui`, 6.8+ for `hearth` and Crucible | GUI applications only. CI pins 6.12.0, the LTS (`.github/toolchain-versions.json`). **Never from vcpkg** — see [Qt](#qt). |
 | ALSA (`libasound2-dev`) | any recent | Optional Linux audio backend. See [Linux audio](#linux-audio). |
 | PipeWire (`libpipewire-0.3-dev`) | any recent | Optional Linux audio backend; required by Crucible. See [Linux audio](#linux-audio). |
@@ -21,8 +21,10 @@ Every command here has been run on the configuration described under
 
 ## The short version
 
-With `VCPKG_ROOT` set to a vcpkg checkout, from any shell — a Developer PowerShell is not
-required; see [The compiler is pinned, not PATH-found](#the-compiler-is-pinned-not-path-found):
+With a vcpkg set up (set `ICL_VCPKG_STORE` once and the first configure does it; see
+[Which vcpkg a configure uses](#which-vcpkg-a-configure-uses)), from any shell — a Developer
+PowerShell is not required; see
+[The compiler is pinned, not PATH-found](#the-compiler-is-pinned-not-path-found):
 
 ```bash
 cmake --preset config-windows-msvc-debug
@@ -68,12 +70,72 @@ or a matching VS install) rather than picking something else and failing later. 
 Visual Studio Build Tools (or Community/Professional/Enterprise) with the "Desktop development
 with C++" workload if you hit that.
 
+## Which vcpkg a configure uses
+
+`cmake/VcpkgRoot.cmake` decides this before `project()` and sets `CMAKE_TOOLCHAIN_FILE`; the
+presets do not. The first match wins:
+
+1. A `CMAKE_TOOLCHAIN_FILE` you pass (`-D`, or an IDE that sets it) is used as it is. A
+   `vcpkg.cmake` that does not exist is named in the error; a toolchain that is not vcpkg's (the
+   WebAssembly and bare-metal presets, the vcpkg port) is left alone.
+2. `ICLFORGE_VCPKG_ROOT` names one vcpkg checkout you manage yourself (a CMake variable or an
+   environment variable). A commit other than `vcpkg.json`'s `builtin-baseline` is a warning, not
+   an error. There is no organisation-wide equivalent on purpose: one directory cannot be at the
+   commit every repository pins.
+3. A shared **store**, `ICLFORGE_VCPKG_STORE`, else `ICL_VCPKG_STORE`. This is the one to set.
+4. `VCPKG_ROOT` in the environment, which is what CI does (`.github/actions/setup-vcpkg` checks
+   out the baseline and exports it). A store beats it, so a stale `VCPKG_ROOT` left in your
+   environment does no harm once a store is set.
+
+With none of them, a configure that asks for vcpkg (any preset that inherits `core` sets a
+`VCPKG_TARGET_TRIPLET`) stops and lists the options. One that does not ask, such as a plain
+`cmake -S . -B build`, carries on without it.
+
+### The shared store
+
+One vcpkg checkout shared by every worktree broke whenever something else moved it: another
+branch checked out in it, a shallow fetch, a clone that never had the baseline. Each of those
+shows up as `no version database entry` or `failed to git show versions/baseline.json`. A store
+keeps a directory per baseline commit instead, and nothing that exists is ever moved. Set it once
+per machine, in your environment:
+
+```sh
+# Windows (new terminals and Visual Studio pick it up after a restart)
+setx ICL_VCPKG_STORE C:\Repos\common\vcpkg
+# Linux/macOS: put this in your shell profile
+export ICL_VCPKG_STORE=$HOME/.cache/icl/vcpkg
+```
+
+`ICL_VCPKG_STORE` is read by every Iain Chesworth Labs repository that carries the same
+`cmake/VcpkgRoot.cmake`, so they all share the one directory. `ICLFORGE_VCPKG_STORE` overrides it
+for this repository alone.
+
+The first configure clones the labs' vcpkg fork (`https://github.com/iainchesworthlabs/vcpkg.git`,
+the one CI clones) into `<store>/mirror`, and checks out the commit `builtin-baseline` names into
+`<store>/<first 12 characters of the commit>` with `git worktree add`. Every checkout or
+repository that pins the same commit uses that directory. When the baseline moves (a vcpkg bump),
+the new commit gets a directory of its own. A repository whose pin is in a different fork has the
+commit fetched into the same mirror from `ICLFORGE_VCPKG_URL`. Directories of old commits can be
+deleted when you no longer need them (`git -C <store>/mirror worktree remove <dir>`).
+
+Already have a full clone of the fork somewhere? Set `ICL_VCPKG_MIRROR` (or
+`ICLFORGE_VCPKG_MIRROR`) to it and the store makes its checkouts from that instead of cloning
+again.
+
+A build directory remembers the vcpkg it was first configured with, so after the baseline moves
+(or you switch between a store, `ICLFORGE_VCPKG_ROOT` and `VCPKG_ROOT`), configure it again with
+`cmake --fresh --preset <name>`; CMake says so. A build directory made before this existed keeps
+the toolchain file its preset gave it. Build artifacts are separate from all this: share the
+downloads, binary cache and installed tree with `VCPKG_DOWNLOADS`, `VCPKG_BINARY_SOURCES` and
+`VCPKG_INSTALLED_DIR`, as vcpkg documents (the `CMakeUserPresets.json` example below does).
+
 ## Presets
 
 `CMakePresets.json` is checked in and holds only what is machine-independent. It is built from
 hidden fragments composed together, not a flat list:
 
-- `core` — the Ninja generator, the vcpkg toolchain file from `$env{VCPKG_ROOT}`,
+- `core` — the Ninja generator, no toolchain file (`cmake/VcpkgRoot.cmake` picks the vcpkg and
+  sets it; see [Which vcpkg a configure uses](#which-vcpkg-a-configure-uses)),
   `ICLFORGE_BUILD_CLI`/`ICLFORGE_BUILD_TESTS` pinned `ON`, `VCPKG_MANIFEST_FEATURES=hearth`, the
   vcpkg overlay triplets under `cmake/vcpkg/triplets/` and the overlay ports under
   `cmake/vcpkg/ports/`. (`CMAKE_EXPORT_COMPILE_COMMANDS` comes from the top-level
@@ -274,9 +336,8 @@ is a hidden `local` preset carrying the paths, inherited alongside the checked-i
       "name": "local",
       "hidden": true,
       "environment": {
-        "VCPKG_ROOT": "D:/vcpkg",
         "VCPKG_DOWNLOADS": "D:/vcpkg-downloads",
-        "VCPKG_DEFAULT_BINARY_CACHE": "D:/vcpkg-cache"
+        "VCPKG_BINARY_SOURCES": "clear;files,D:/vcpkg-cache,readwrite"
       },
       "cacheVariables": {
         "VCPKG_INSTALL_OPTIONS": "--x-buildtrees-root=D:/vcpkg-buildtrees;--x-packages-root=D:/vcpkg-packages"
@@ -302,7 +363,9 @@ all four.
 
 That keeps vcpkg's working directories off the system drive, which matters because they run to
 several gigabytes. Substitute your own paths, and swap `windows-msvc` for whichever
-platform/compiler fragment matches your machine.
+platform/compiler fragment matches your machine. Which vcpkg checkout to use is not set here: it
+comes from `ICL_VCPKG_STORE` in your environment (below), so a worktree needs no user presets of
+its own for it.
 
 ## Running the tests
 
@@ -389,11 +452,13 @@ Building the library and CLI alone, with neither Qt nor vcpkg's extra features i
 cmake --preset config-windows-msvc-debug -DICLFORGE_BUILD_GUI=OFF -DICLFORGE_BUILD_TESTS=OFF -DICLFORGE_BUILD_HEARTH=OFF
 ```
 
-The vcpkg toolchain file is still referenced by the preset, so `VCPKG_ROOT` must still point
-at a checkout — it simply has nothing to install once `ICLFORGE_BUILD_HEARTH` is also off (the
-preset's own `VCPKG_MANIFEST_FEATURES=hearth` default otherwise still asks vcpkg to build
-Hearth's network/FLAC/Opus dependencies even with the library and CLI alone). To build with no
-vcpkg at all, configure without the preset and pass the generator and build type by hand.
+The preset still configures with a vcpkg (the configure stops and lists the options when it has
+none), which has little to install once `ICLFORGE_BUILD_HEARTH` is also off (the preset's own
+`VCPKG_MANIFEST_FEATURES=hearth` default otherwise still asks vcpkg to build Hearth's
+network/FLAC/Opus dependencies even with the library and CLI alone). To build with no vcpkg at
+all, configure without the preset and pass the generator and build type by hand: with no vcpkg
+named anywhere and no `VCPKG_TARGET_TRIPLET`, the configure carries on and takes fmt, Catch2,
+fast-float and nlohmann-json through `FetchContent`.
 
 ## Minimum-footprint decoder profile
 
@@ -810,16 +875,15 @@ names used elsewhere in this document — there is no `cmake --preset debug` on 
 [Presets](#presets) above.
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
+export ICL_VCPKG_STORE=$HOME/.cache/icl/vcpkg   # once; see "Which vcpkg a configure uses"
 cmake --preset config-linux-gcc-debug
 cmake --build --preset build-linux-gcc-debug
 ctest --preset test-linux-gcc-debug
 ```
 
-Substitute `linux-llvm` for `linux-gcc` to build with Clang instead. `VCPKG_ROOT` works the same
-way as on Windows: it must point at a vcpkg checkout for the toolchain file the preset
-references, even though (as on Windows) it supplies nothing but fmt and Catch2. Any path
-works — there is nothing Linux-specific about vcpkg here.
+Substitute `linux-llvm` for `linux-gcc` to build with Clang instead. The vcpkg is chosen the same
+way as on Windows (the preset needs one, even though it supplies nothing but fmt and Catch2 on
+this platform). Any path works — there is nothing Linux-specific about vcpkg here.
 
 ### GUI on Linux
 
@@ -1013,7 +1077,8 @@ always produced; NSIS (Windows), TGZ and DEB/RPM (Linux) and DragNDrop (macOS) a
 when the packaging tool for that format is found on `PATH`, so `cpack` degrades gracefully instead
 of failing outright on a machine that does not have e.g. `makensis` installed.
 
-From a Developer PowerShell, with `VCPKG_ROOT` set:
+From a Developer PowerShell, with a vcpkg set up as in
+[Which vcpkg a configure uses](#which-vcpkg-a-configure-uses):
 
 ```bash
 cmake --preset config-windows-msvc

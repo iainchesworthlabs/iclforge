@@ -13,7 +13,6 @@
       "description": "Shared configuration for every platform/compiler preset. NOTE: VCPKG_CHAINLOAD_TOOLCHAIN_FILE is the single source of truth for the chainloaded compiler toolchain and is set per concrete preset; the vcpkg overlay triplets must NOT also set it. VCPKG_MANIFEST_FEATURES defaults to Hearth's \"hearth\" feature (vcpkg.json) so ICLFORGE_BUILD_HEARTH's own ON default (root CMakeLists.txt) resolves everywhere without a hand-passed -D; a preset that cannot or should not build Hearth sets ICLFORGE_BUILD_HEARTH back to OFF itself - minimal-decoder and minimal-encoder also clear this string back to empty (turning ICLFORGE_BUILD_HEARTH off alone leaves vcpkg still installing cpp-httplib/mbedTLS/mdns/libFLAC/Opus for nothing, since vcpkg's own feature resolution runs independently of which CMake option ends up consuming the result), wasm-emscripten does not inherit core at all so the question does not arise, and config-windows-llvm-coverage already clears it for its own Crucible-only reason. config-linux-gcc-coverage instead overrides this string to add its own \"adm\" feature alongside \"hearth\".",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "ICLFORGE_BUILD_CLI": "ON",
         "ICLFORGE_BUILD_TESTS": "ON",

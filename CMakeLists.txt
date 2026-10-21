@@ -5,6 +5,13 @@ cmake_minimum_required(VERSION 3.28...4.3)
 # single source of truth: nothing in this tree needs bumping by hand anymore.
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/GitVersionDerivation.cmake")
 
+# Which vcpkg checkout this configure uses, and so CMAKE_TOOLCHAIN_FILE: the
+# presets do not set it. The vcpkg toolchain is loaded at project(), so this has
+# to come first. The choices (a shared per-commit store, a root of your own,
+# VCPKG_ROOT as CI sets it) are in cmake/VcpkgRoot.cmake and docs/building.md.
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/VcpkgRoot.cmake")
+iclforge_resolve_vcpkg("${CMAKE_CURRENT_SOURCE_DIR}")
+
 project(iclforge
     VERSION ${DERIVED_VERSION_SEMVER}
     DESCRIPTION "Clean-room AC-3 (ATSC A/52), E-AC-3 and AC-4 encoder and decoder with a spatial object layer"
