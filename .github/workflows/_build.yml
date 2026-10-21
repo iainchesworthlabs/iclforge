@@ -905,10 +905,12 @@ jobs:
       # copies go to /usr/local, which sits ahead of /usr/lib/python3 on this
       # python3's path, so they are the ones the build environment finds, and
       # --ignore-installed leaves apt's own copies alone rather than trying to
-      # uninstall files it does not own.
+      # uninstall files it does not own. The three are pinned by hash in
+      # requirements/requirements-build-bootstrap.txt (a pip-compile lock like the
+      # others there, so Dependabot bumps it), which is why there is no --upgrade.
       - name: Upgrade pip and setuptools
         shell: bash
-        run: python3 -m pip install --ignore-installed --upgrade pip 'setuptools>=70' wheel
+        run: python3 -m pip install --ignore-installed --require-hashes -r requirements/requirements-build-bootstrap.txt
 
       # Decouples the Qt version entirely from the base image's age (the
       # same tool, same pinned commit and same version input the Windows leg

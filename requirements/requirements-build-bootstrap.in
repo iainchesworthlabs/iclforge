@@ -1,0 +1,12 @@
+# pip, setuptools and wheel for _build.yml's AppImage job (ubuntu:22.04 container, where apt's pip 22.0
+# and setuptools 59.6 cannot build the git-pinned aqtinstall - see that job's "Upgrade pip and
+# setuptools" step). Installed with --require-hashes so the step is pinned by hash like every other
+# pip install in CI (OSSF Scorecard Pinned-Dependencies). pip matches requirements-pip-bootstrap.txt,
+# setuptools keeps the old >=70 floor, and wheel is left unpinned so the lock takes the newest.
+# --allow-unsafe is needed because pip-compile otherwise leaves pip, setuptools and wheel out of a
+# lock. Regenerate with:
+#   python -m piptools compile --generate-hashes --strip-extras --allow-unsafe \
+#     --output-file=requirements-build-bootstrap.txt requirements-build-bootstrap.in
+pip==26.2.1
+setuptools>=70
+wheel
