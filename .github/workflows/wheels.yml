@@ -249,8 +249,29 @@ jobs:
           # only ever pick from wheelhouse/ - with the index reachable, pip
           # would be free to prefer a released iclforge from PyPI over the
           # locally built wheel this job exists to measure.
-          .pyvenv/bin/python -m pip install --quiet --no-index \
-            --find-links wheelhouse iclforge
+          #
+          # --require-hashes, from a one-line requirements file written here: the
+          # version and the sha256 of every iclforge wheel the build job uploaded
+          # (one per interpreter). There is no committed lock for a file this very
+          # run built, so this is not a supply-chain pin; it makes pip install
+          # exactly the artifact that was downloaded above and nothing else, and it
+          # is the form OSSF Scorecard's Pinned-Dependencies check accepts.
+          # --no-deps because hash mode would otherwise want every dependency of the
+          # wheel listed with a hash too: numpy is already installed from the
+          # hashed requirements-pytest.txt above, and `pip check` below fails the
+          # step if that ever stops satisfying the wheel's own requirement.
+          wheels=(wheelhouse/iclforge-*.whl)
+          version="$(basename "${wheels[0]}" | cut -d- -f2)"
+          {
+            printf 'iclforge==%s' "$version"
+            for wheel in wheelhouse/iclforge-"$version"-*.whl; do
+              printf ' --hash=sha256:%s' "$(sha256sum "$wheel" | cut -d' ' -f1)"
+            done
+            printf '\n'
+          } > wheelhouse-requirements.txt
+          .pyvenv/bin/python -m pip install --quiet --no-index --no-deps --require-hashes \
+            --find-links wheelhouse -r wheelhouse-requirements.txt
+          .pyvenv/bin/python -m pip check
           .pyvenv/bin/python -c "import iclforge; print(iclforge.__version__)"
 
       # --cov-fail-under is the gate. The floor is deliberately well under the
