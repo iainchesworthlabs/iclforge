@@ -2,10 +2,11 @@
 # --require-hashes. Regenerate the lock after any change here with:
 #   python -m piptools compile --generate-hashes --strip-extras \
 #     --output-file=requirements.txt requirements.in
-# The lock is compiled under Python 3.14 and installed by CI under whatever python3 ubuntu-latest
-# ships (3.12). The two resolve to the same set today: aiohttp and aiosignal want typing-extensions
-# below 3.13, and mashumaro already brings it in. If a bump adds a python_version-gated
-# dependency, compile under 3.12 (--require-hashes fails on a package the lock leaves out).
+# The lock is compiled under Python 3.14, which is the python3 of the ubuntu:26.04 container that
+# _ci-core.yml's Hearth Sendspin job installs it in. The scripts also run on 3.12, and the set is the
+# same there today: aiohttp and aiosignal want typing-extensions below 3.13, and mashumaro already
+# brings it in. If a bump adds a python_version-gated dependency, compile under the oldest Python
+# you support (--require-hashes fails on a package the lock leaves out).
 #
 # The scripts in tools/sendspin, on Python 3.12 or later: aiosendspin 9.1.1, PyAV for its FLAC
 # and Opus codecs, and numpy and Pillow, which its server half imports (aiosendspin_server.py).
