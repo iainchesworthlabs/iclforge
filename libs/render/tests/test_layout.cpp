@@ -915,7 +915,7 @@ TEST_CASE("a 2.0 stream on 9.1.6 reaches two of sixteen slots, and renders only 
     full.set_bed(coded(k51));
     part.set_bed(coded(k51));
     CHECK(std::popcount(part.reached_slots(false)) == 6);
-    CHECK(part.reached_slots(false) == part.bed_slots());
+    CHECK(part.reached_slots(false) == static_cast<std::uint32_t>(part.bed_slots()));
     CHECK((part.reached_slots(false) & (1U << slot_of(Location::kLfe))) != 0);
     Out c(16, 256, 0.0F);
     Out d(16, 256, kUntouched);
@@ -967,8 +967,8 @@ TEST_CASE("render_reached with objects writes what render writes, the bed's LFE 
     // Slots: L C R Ls Rs Vhl Vhr Lts Rts LFE. The objects reach C and the heights; the bed alone, the
     // five and the LFE; with objects, the union (the bed's own channels are not added while objects
     // are placed, but the mask need not be exact, only complete).
-    CHECK(part.reached_slots(false) == part.bed_slots());
-    CHECK(part.reached_slots(true) == (part.bed_slots() | part.object_slots()));
+    CHECK(part.reached_slots(false) == static_cast<std::uint32_t>(part.bed_slots()));
+    CHECK(part.reached_slots(true) == static_cast<std::uint32_t>(part.bed_slots() | part.object_slots()));
     CHECK(std::popcount(part.reached_slots(true)) > std::popcount(part.reached_slots(false)));
 
     constexpr std::size_t kLong = 1024;
