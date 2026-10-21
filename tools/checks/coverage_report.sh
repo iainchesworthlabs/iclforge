@@ -222,6 +222,17 @@ html="$build_dir/coverage.html"
 # is its own flag (gcovr's --gcov-ignore-parse-errors appends per occurrence
 # rather than replacing) so a genuinely new problem in either category still
 # shows up rather than both going quiet under one blanket `all`.
+# --merge-lines (gcovr 8.4; the CI pin is 8.6) on every gcovr below: a header template is
+# instantiated once for every caller and every lambda passed to it, gcov reports each
+# instantiation's lines on their own, and gcovr counted each as a line of the file. A case
+# that reaches one branch of a function covers one copy of it and leaves the same branch
+# in all the others "missed". sink_wait.hpp's wait_until_played_out, a 100-line template
+# over a sink and a keep-waiting lambda that a test case passes a lambda of its own to,
+# went from 144 lines at 44% to 1,472 at 21% when it came (2026-10-14) and took
+# apps/shared/media/src from 87% to 63% line and 51% branch against floors of 78 and 66; the
+# nightly's coverage gate has failed on it every night since. Merged, a line is covered when
+# any instantiation ran it, which is what a line of source means.
+#
 # -fprofile-update=atomic would remove the threaded-code form of the race,
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
@@ -233,6 +244,7 @@ gcovr --root . \
     --filter 'apps/crucible/engine/src/.*' \
     --filter 'apps/hearth/(engine|testsink)/src/.*' \
     --gcov-executable "$gcov_exe" \
+    --merge-lines \
     --exclude-throw-branches --exclude-unreachable-branches \
     --gcov-ignore-errors=no_working_dir_found \
     --gcov-ignore-parse-errors=suspicious_hits.warn \
@@ -261,7 +273,7 @@ while read -r comp line_min branch_min; do
     echo
     echo "== $comp (gate: line >= $line_min%, branch >= $branch_min%) =="
     if ! gcovr --root . --add-tracefile "$json" --filter "$comp/.*" --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
-        --print-summary \
+        --merge-lines --print-summary \
         --fail-under-line "$line_min" --fail-under-branch "$branch_min"; then
         echo "::error::coverage gate missed for $comp (need line >= $line_min%, branch >= $branch_min%)"
         fail=1
@@ -286,7 +298,7 @@ for src in apps/forge/cli/src/*.cpp apps/forge/cli/src/commands/*.cpp; do
     # whole report is captured and those two picked out of it. Redirecting the
     # table away with --txt /dev/null takes the summary with it.
     summary="$(gcovr --root . --add-tracefile "$json" --filter "${src}" \
-        --print-summary 2>/dev/null || true)"
+        --merge-lines --print-summary 2>/dev/null || true)"
     line_pct="$(echo "$summary" | awk '/^lines:/ {print $2}')"
     branch_pct="$(echo "$summary" | awk '/^branches:/ {print $2}')"
     printf '%-26s %8s %8s\n' "${src#apps/forge/cli/src/}" "${line_pct:-n/a}" "${branch_pct:-n/a}"
