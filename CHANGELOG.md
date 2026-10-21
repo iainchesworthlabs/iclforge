@@ -4145,6 +4145,22 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**One vcpkg route, shared between checkouts**
+
+- **`cmake/VcpkgRoot.cmake` chooses the vcpkg checkout, and the presets no longer set the toolchain
+  file.** First match wins: a `CMAKE_TOOLCHAIN_FILE` you pass, `ICLFORGE_VCPKG_ROOT`, a shared
+  store (`ICLFORGE_VCPKG_STORE`, else `ICL_VCPKG_STORE`), then `VCPKG_ROOT` as CI sets it. The
+  store keeps one `git worktree` checkout per `builtin-baseline` commit, made once from a shared
+  clone of the labs' vcpkg fork, so a checkout on another branch, a shallow fetch or a clone that
+  never had the baseline cannot break a configure with `no version database entry`, and a stale
+  `VCPKG_ROOT` in the environment is ignored once a store is set. It is the same module and the
+  same `ICL_VCPKG_STORE` as Cubeulator and ARINC Data Loader. A build directory whose vcpkg moved
+  is told to configure again with `--fresh`; a configure that asks for vcpkg and has none lists
+  the options; one that does not (the Python wheel, the Conan recipe, a plain `cmake -S . -B
+  build`) is unchanged. CI is unchanged. `tests/cmake/check_vcpkg_root.cmake` covers each case
+  against a fake upstream with no network. See
+  [Building](docs/building.md#which-vcpkg-a-configure-uses).
+
 **The label on a primary button reaches 4.5:1 in every palette and both modes**
 
 - **A filled accent control has its own fill, `Theme.accentFill`, and the label that goes on it,

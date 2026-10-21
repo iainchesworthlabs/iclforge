@@ -21,7 +21,7 @@ This path builds the library, CLI, and tests on Windows or Linux. See
 | A compiler | MSVC (VS 2026), clang-cl 22, GCC 16, or Clang 22 | C++23. One preset per compiler. |
 | CMake | ≥ 3.28 | |
 | Ninja | any recent | The presets hard-code the Ninja generator. |
-| [vcpkg](https://github.com/microsoft/vcpkg) | any recent, with `VCPKG_ROOT` set | The presets read it. Supplies fmt, Catch2 and the libraries of the default Hearth build (plus Boost/Tracy only for the opt-in `adm`/`profiling` features — see [building.md](building.md)). |
+| [vcpkg](https://github.com/microsoft/vcpkg) | any recent; set `ICL_VCPKG_STORE` and the first configure makes one, or set `VCPKG_ROOT` | The presets use it (see [building.md](building.md#which-vcpkg-a-configure-uses)). Supplies fmt, Catch2 and the libraries of the default Hearth build (plus Boost/Tracy only for the opt-in `adm`/`profiling` features — see [building.md](building.md)). |
 | Qt | 6.5+ prebuilt for the GUI; 6.8+ for Hearth's window and Crucible, which are skipped without it | Not needed for the library and CLI. The Windows x64 presets build the GUI, so they need it or `-DICLFORGE_BUILD_GUI=OFF`. Never from vcpkg — see [building.md](building.md). |
 
 ### Configure, build, and test
@@ -42,7 +42,7 @@ This path builds the library, CLI, and tests on Windows or Linux. See
 === "Linux"
 
     ```bash
-    export VCPKG_ROOT=/path/to/vcpkg
+    export ICL_VCPKG_STORE=$HOME/.cache/icl/vcpkg   # once; or VCPKG_ROOT=/path/to/vcpkg
     cmake --preset config-linux-gcc-debug
     cmake --build --preset build-linux-gcc-debug
     ctest --preset test-linux-gcc-debug
