@@ -342,3 +342,13 @@ port and one unbound-peer UDP socket on an ephemeral port; no listening TCP sock
 **Not checked on the kit.** A finger's tap on the glass in place of an injected one; the dim with the clock
 chosen (the preview checks it: backlight at its floor, the clock still lit, a touch wakes it); the S3, C6 and
 P4 boards of the bench were built (S3 and QEMU's shape fit and hold to their profiles) and not flashed.
+
+**The C6 (the bench's, `192.168.1.117`, base MAC `ac:eb:e6:db:4c:40`, 16 MB of flash), 2026-10-21.** The `c6-16mb`
+image of this branch went over the network (accepted on its trial): the one-core 160 MHz part asked a time server
+from boot (`192.168.1.5 (from DHCP), pool.ntp.org`), synced, kept a zone, stopped and restarted on `PUT /time-sync`,
+and has the Time section on its page. Then the **`c6-4mb` image with the new `partitions_c6.csv` was flashed over
+USB** (the first 128 KB backed up first; no button held, the auto-reset worked): it booted from the new table
+(`ota_0` and `ota_1` of 0x1D0000 at 0x20000 and 0x1F0000, `audio` 12 KB, `storage` 128 KB), kept its name and
+Wi-Fi network (nvs is where it was), synced, and a second push of the image went into `ota_1` over the network and was
+accepted, so an update into the larger slots works. The board was then put back on the 16 MB table with the `c6-16mb`
+image. A 16 MB module boots a 4 MB-layout image, so this proves the table, not a 4 MB module's flash.
