@@ -1419,4 +1419,5 @@ module.exports = {
     slotsOf,
     speakersOf,
     served,
+    validTimeZone,
 };
