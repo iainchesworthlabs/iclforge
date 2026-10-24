@@ -4842,6 +4842,13 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**The Sendspin player sends `client/pair-init` on the Pairing PSK**
+
+- **A player now sends `client/pair-init` and then `client/pair-finalize`, as pairing.md requires.** It
+  sent the finalize alone, which aiosendspin 10.2.1 accepts and logs as non-compliant, and a strict
+  server would reject. The 9.1.1 dialect still sends the finalize alone, and Hearth's server already
+  accepts the init. A board takes the change when it is reflashed.
+
 **The ESP32-C6 on a 4 MB module has room for its player again**
 
 - **The 4 MB table (`partitions_c6.csv`) has two 1.875 MiB application slots, not 1.75, and no
