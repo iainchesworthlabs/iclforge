@@ -190,3 +190,11 @@ on 2026-11-06), a set of about 1,100 streams kept on a local disk with a
 manifest, each rebuildable from the committed programme fixtures.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
 writes the short streams under `testdata/external-baseline/` that CI reads.
+
+`gen_atmos_demo_track.py` writes a 72 s Dolby Atmos demo piece (E-AC-3 JOC, 768 kb/s,
+48 kHz, nine objects) as a raw `.ec3` and a tagged `.m4a` with a generated cover, for
+trying object audio end to end through a media server. The music is synthesised from
+numpy with a fixed seed, so the files are free to share and the output is reproducible.
+`python tools/generators/gen_atmos_demo_track.py --forge <a host build's forge> --out <dir>`;
+it needs numpy, scipy, `ffmpeg` on PATH and a built `forge`. Nothing it writes is committed.
+See `planning/atmos-demo-track.md`.
