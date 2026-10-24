@@ -66,6 +66,14 @@ The sections below contain the complete change list and fixes.
   screen redraws one rectangle a minute. Until a time server has first answered the view shows only the stream's heading,
   never a time it made up. A dim lowers the backlight and leaves the clock on the glass.
 
+**Hearth Player for Windows**
+
+- **`hearth-player` is a Sendspin player that plays through the computer's speakers.** It lists `_iclforge_player@v1`
+  (AC-3 and E-AC-3, decoded here with the objects rendered and folded to stereo) and `player@v1` (PCM, FLAC, Opus),
+  advertises as `hearth-pc-<computer name>`, keeps its identity and pairing key in `%LOCALAPPDATA%\hearth-player`,
+  and plays each burst at the time the server gave it, measuring the sync error against the device's own queue.
+  `--list-devices`, `--device ID` and `--device null` choose the output. See `docs/hearth/player.md`.
+
 **Every ESP board keeps its time with a time server**
 
 - **Every ESP board that has a network now keeps its time with a time server.** On by default, from the moment the board
