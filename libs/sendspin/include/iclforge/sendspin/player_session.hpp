@@ -363,6 +363,9 @@ class PlayerSession {
     bool reported_attempt_ = false;
     // Set once paired, until the server's re-handshake arrives or the wait times out.
     std::optional<std::int64_t> rehandshake_due_;
+    // A re-handshake has completed on this connection: the server's next message may be its
+    // server/activate, since the specification re-sends neither hello (connection.md, Re-handshake).
+    bool rehandshaken_ = false;
 
     ClockSync clock_;
     bool reported_available_ = false;
