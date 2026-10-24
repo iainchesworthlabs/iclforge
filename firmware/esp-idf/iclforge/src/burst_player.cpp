@@ -327,6 +327,8 @@ struct BurstPlayer::Impl {
 
     std::uint64_t late_chunks = 0;
     std::uint64_t bursts_played = 0;
+    // The coded bytes of the chunks played, for the screen's bitrate.
+    std::uint64_t coded_bytes = 0;
     bool have_decoder_report = false;
     ac::DecoderReport decoder_report;
     // Whether this stream has already printed why it refused a syncframe
@@ -629,6 +631,7 @@ struct BurstPlayer::Impl {
         have_origin = false;
         have_decoder_report = false;
         bursts_played = 0;
+        coded_bytes = 0;
         late_chunks = 0;
         late_kept_chunks = 0;
         lost_frames = 0;
@@ -1366,6 +1369,7 @@ struct BurstPlayer::Impl {
         }
         mark(frame, local_us);
         ++bursts_played;
+        coded_bytes += payload.size();
         const std::int64_t started = esp_timer_get_time();
         // An AC-4 chunk is one sync frame, whole: it is not cut into units as AC-3's and E-AC-3's
         // bursts are.
@@ -1541,6 +1545,7 @@ struct BurstPlayer::Impl {
                                   .late_chunks = late_chunks,
                                   .dropped_chunks = dropped_chunks.load(),
                                   .invalid_chunks = invalid_chunks.load()};
+        s.coded_bytes = coded_bytes;
         s.playout = playout->stats();
         if (s.playout.have_last) {
             s.have_play = true;

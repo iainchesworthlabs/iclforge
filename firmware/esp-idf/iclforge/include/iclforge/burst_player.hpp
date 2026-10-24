@@ -175,6 +175,8 @@ struct BurstPlayerStatus {
     std::uint32_t levels_serial = 0;
 
     iclforge::sendspin::player::Counters counters;
+    // The coded bytes of the chunks played so far in this stream (0 for PCM): the screen's bitrate.
+    std::uint64_t coded_bytes = 0;
     Playout::Stats playout;
 
     // The newest stream frame with a known play time: its position from the

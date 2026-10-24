@@ -549,7 +549,13 @@ bool accept_layout(std::string_view text) {
         return false;
     }
     std::memcpy(c.text, text.data(), text.size());
-    return xQueueSend(g_commands, &c, 0) == pdTRUE;
+    if (xQueueSend(g_commands, &c, 0) != pdTRUE) {
+        return false;
+    }
+    // Kept over a restart, so that a board a server never sends a layout to (Music Assistant sends none)
+    // starts in the room it was set to. Too long a speaker list to store still applies until the restart.
+    (void)player::settings_set_layout(text);
+    return true;
 }
 
 // The verdict. stream.audio_ms against stream.wall_ms is the whole-pipeline
@@ -1075,6 +1081,17 @@ extern "C" void app_main() {
         return;
     }
     g_layout = *layout;
+    // A layout set on the board (PUT /layout) outlives a restart and stands over the image's, when this
+    // sink can carry it.
+    if (player::settings().layout[0] != '\0') {
+        const auto stored = iclforge::render::OutputLayout::parse(player::settings().layout.data());
+        if (stored.has_value() && stored->slots() <= static_cast<std::size_t>(player::sink_slots())) {
+            g_layout = *stored;
+        } else {
+            std::printf("settings: stored layout '%s' is not one this sink carries; keeping %s\n",
+                        player::settings().layout.data(), g_layout.text().data());
+        }
+    }
 #if CONFIG_ICLFORGE_AC4
     std::printf("iclforge hearth_sink: AC-3, E-AC-3 or AC-4 onto %s\n", g_layout.text().data());
 #else

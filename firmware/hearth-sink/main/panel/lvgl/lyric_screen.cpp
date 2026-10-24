@@ -336,6 +336,11 @@ struct Screen {
     lv_obj_t* chip_name = nullptr;
     lv_obj_t* chip_line = nullptr;
     lv_obj_t* chip_delay = nullptr;
+    // The footer's line about the stream (decoded on this board, bitrate, who sends it) while a view with no
+    // lyrics shows, in the room the lyric chips leave.
+    lv_obj_t* chip_stream = nullptr;
+    std::string stream_text;
+    int stream_room = 0;
     lv_obj_t* sheet = nullptr;
     lv_obj_t* sheet_delay = nullptr;
     lv_obj_t* sheet_size = nullptr;
@@ -847,7 +852,8 @@ void build_frame() {
     lv_obj_set_style_bg_opa(footer, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(footer, color(kSurface), 0);
     g.chip_name = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_name, 300);
+    lv_obj_set_width(g.chip_name, 220);
+    lv_label_set_long_mode(g.chip_name, LV_LABEL_LONG_MODE_CLIP);
     lv_obj_set_pos(g.chip_name, kMargin, 18);
     // The target of the three taps: the footer's whole height (64 px, a finger's, where the label is
     // 28), from the edge to the next thing, drawing nothing and moving nothing.
@@ -862,6 +868,12 @@ void build_frame() {
     g.chip_delay = make_label(footer, delay_string(g.delay_ms), g.small, kMuted);
     lv_obj_set_width(g.chip_delay, 220);
     lv_obj_set_pos(g.chip_delay, 620, 18);
+    // From the lyric chips' column to the button, less a gap each side.
+    g.stream_room = g.width - kMargin - 160 - 24 - 250;
+    g.chip_stream = make_label(footer, "", g.small, kMuted);
+    lv_obj_set_width(g.chip_stream, g.stream_room);
+    lv_label_set_long_mode(g.chip_stream, LV_LABEL_LONG_MODE_CLIP);
+    lv_obj_set_pos(g.chip_stream, 250, 18);
     make_button(footer, "Adjust", 160, 48, Button::kAdjust, false);
     lv_obj_set_pos(lv_obj_get_child(footer, -1), g.width - kMargin - 160, 8);
 
@@ -1442,6 +1454,25 @@ void update_header_and_footer(const Stage& stage) {
     if (progress != g.progress_width) {
         g.progress_width = progress;
         lv_obj_set_width(g.progress, progress);
+    }
+
+    // What the stream is: the most the footer has room for of "Decoded on this board - 768 kb/s - from Music
+    // Assistant" (or "PCM from ..." where the server decoded it). The clock view says nothing of it.
+    std::string stream_line;
+    if (g.np_active && !g.np_clock) {
+        const std::string server = drawable_title(g.info.server);
+        const auto options = iclforge::nowview::stream_info_options(g.now.facts, g.now.kbps, server);
+        stream_line = options.back();
+        for (const std::string& option : options) {
+            if (text_width(option, g.small) <= g.stream_room) {
+                stream_line = option;
+                break;
+            }
+        }
+    }
+    if (stream_line != g.stream_text) {
+        g.stream_text = stream_line;
+        lv_label_set_text(g.chip_stream, stream_line.c_str());
     }
 
     std::string line;

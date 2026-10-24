@@ -217,6 +217,31 @@ lyric screens have them, where the server gave a progress and the board's clock 
 ![The title card](screenshots/p4-panel-title-card.png)
 ![A long title, cut at two rows](screenshots/p4-panel-title-card-long.png)
 
+**The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
+and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
+*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone.
+A coded stream (E-AC-3, AC-3, AC-4) is sent undecoded and decoded on the board, which the wording says; a
+PCM one was decoded by the server, and the footer says *PCM from Music Assistant*. The bitrate is what was
+played: the coded bytes of the chunks played over the time they took, over windows of a second and
+smoothed, not a figure from a header (it is absent until the first second has played). The server is the
+name in `/status` `server` without the id in brackets (`Music Assistant (d5369777-music-assistant)` is
+*Music Assistant*); the developer view keeps the whole string.
+
+![A 7.1.4 Atmos stream from Music Assistant](screenshots/p4-panel-stream-details.png)
+![A PCM stream from Music Assistant](screenshots/p4-panel-stream-pcm.png)
+
+**A layout for a server that sends none.** A board's layout is the image's (`CONFIG_ICLFORGE_EXAMPLE_LAYOUT`,
+`2.0` on the kit) until a server's settings replace it for the stream: Hearth sends one, Music Assistant
+does not, so a 5.1 or 7.1.4 stream to a 2.0 board shows two speakers. `PUT /layout` now keeps what it is
+given in NVS, so it survives a restart, and the board starts with it (a stored layout this sink cannot
+carry is said on the console and the image's stands):
+
+```
+curl -X PUT -d 7.1.4 http://<board address>/layout
+```
+
+The role's own settings message still wins for the stream and is not stored.
+
 **Until a title has come, there is no card.** With `title` chosen and nothing said (a server that
 does not send the role, or has not yet), or with a title in a script the fonts cannot draw, the
 speakers show in its place, and nothing but a title makes a card. Once a title is known the speakers'
