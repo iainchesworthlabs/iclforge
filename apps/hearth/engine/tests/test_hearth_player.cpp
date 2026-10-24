@@ -85,11 +85,16 @@ struct Rig {
     }
     // The device plays what it holds until now, as a clock would.
     void advance(std::int64_t to_us) {
-        const std::uint64_t elapsed = static_cast<std::uint64_t>(to_us - now_us) * kRate / 1'000'000;
-        device->played = std::min(device->frames, device->played + elapsed);
+        owed += static_cast<double>(to_us - now_us) * skew * kRate / 1'000'000.0;
+        const auto whole = static_cast<std::uint64_t>(owed);
+        owed -= static_cast<double>(whole);
+        device->played = std::min(device->frames, device->played + whole);
         now_us = to_us;
     }
 
+    // The device's clock against the sink's: below 1 it is slow, as a sound card's crystal can be.
+    double skew = 1.0;
+    double owed = 0.0;
     std::int64_t now_us = 1'000'000;
     ModelDevice* device = nullptr;
     std::unique_ptr<hp::ScheduledPcmSink> sink;
@@ -231,4 +236,26 @@ TEST_CASE("hearth player: a stream that ended lets the device go once it has pla
     rig.advance(rig.now_us + 200'000);
     rig.sink->pump();
     CHECK_FALSE(rig.device->is_open);
+}
+
+TEST_CASE("hearth player: a device clock that runs slow is followed, not left to drift", "[hearth][player]") {
+    // 300 ppm slow: over two minutes the queue grows by 36 ms, more than the coarse correction's
+    // tolerance, and the drift must be taken up in small steps well before that.
+    Rig rig;
+    rig.skew = 1.0 - 300e-6;
+    const std::int64_t first = rig.now_us + 20'000;
+    const std::int64_t end = first + 120'000'000;
+    std::uint64_t next = 0;
+    while (rig.now_us < end) {
+        while (first + static_cast<std::int64_t>(next) * 32'000 - rig.now_us < 500'000) {
+            rig.burst(first + static_cast<std::int64_t>(next) * 32'000, next * 1536);
+            ++next;
+        }
+        rig.advance(rig.now_us + 4'000);
+        rig.sink->pump();
+    }
+    const hp::PlayStats stats = rig.sink->stats();
+    CHECK(stats.measured > 3000);
+    CHECK(std::llabs(stats.worst_sync_error_us) < 8'000);
+    CHECK(stats.trimmed_frames > 0);
 }
