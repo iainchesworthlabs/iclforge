@@ -10,6 +10,8 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+## [0.11.0-beta.1] - YYYY-MM-DD
+
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
