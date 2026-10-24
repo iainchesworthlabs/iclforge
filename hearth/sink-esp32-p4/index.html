@@ -1,0 +1,6377 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library in C++23, the Forge CLI and GUI over it, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks">
+      
+      
+      
+        <link rel="canonical" href="https://iainchesworthlabs.github.io/iclforge/hearth/sink-esp32-p4/">
+      
+      
+        <link rel="prev" href="../sink-esp32-c6/">
+      
+      
+        <link rel="next" href="../sink-firmware/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>An ESP32-P4 sink - ICL Forge</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"IBM Plex Sans";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/new.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#an-esp32-p4-sink" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ICL Forge" class="md-header__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ICL Forge
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              An ESP32-P4 sink
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+  
+
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../quickstart/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../library/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Library
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../karaoke/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Karaoke
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../verification/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Validation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../performance-quality/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Performance & quality
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../forge/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Forge
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../crucible/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Crucible
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hearth
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../platforms/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Platforms
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ICL Forge" class="md-nav__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ICL Forge
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/ac3-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-3 & E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/atmos-joc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atmos & JOC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/object-signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building from source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../library/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Library
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The projects of the tree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/development-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/application-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the library
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example programs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/encoding-ac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/encoding-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/spatial-and-atmos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial & Atmos objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/station-broadcast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example — station broadcast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/channel-plans-and-routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel plans & routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/muxing-and-sinks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Muxing & sinks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/file-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/iab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAB (SMPTE ST 2098-2) reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/adm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM / BW64 reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/adm-bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM → Atmos bridging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/iamf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAMF reading and writing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4 decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measuring quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/header-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Header map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/api-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bindings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/c-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../library/rust-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../karaoke/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Karaoke
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../karaoke/forced-alignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing with a forced aligner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How output is checked
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../conformance-vectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformance vectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance & quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance & quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tool-comparison-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool comparison trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../object-quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../landscape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Landscape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../forge/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forge
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forge
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../forge/cli/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/cli/commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/cli/metadata-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options & grammars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../forge/gui/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GUI guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/loading-a-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading a source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/format-and-channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format & channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/objects-and-motion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects & motion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/live-session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live capture & session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/source-assignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-source & assignment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/karaoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/coding-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QC a stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/inspect-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/open-stream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Localisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forge/gui/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & text size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../crucible/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crucible
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Crucible
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & first run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/room/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The room
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/signal-path/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The signal path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & screen readers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Languages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design record
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crucible/design/promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Promotion plan and record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/windows-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Windows demo it grew from
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hearth
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../desktop-player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the desktop player
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth Player for Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth for Android
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sink-esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-S3 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sink-esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-C6 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-P4 sink
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-P4 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-chips-two-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two chips, two images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-flash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and flash
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-v1x-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the v1.x board
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="On the v1.x board">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#karaoke-on-the-v1x-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Karaoke on the v1.x board
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-v3x-kit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the v3.x kit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="On the v3.x kit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-changes-for-the-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What changes for the audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The screen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-song-with-no-lyrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A song with no lyrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clock
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-developer-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The developer view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-time-of-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The time of day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-cable-and-wi-fi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The cable, and Wi-Fi
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The cable, and Wi-Fi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-tested-on-the-cable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was tested on the cable
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-and-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developing-the-screen-without-a-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developing the screen without a panel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sink-firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sink firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sink-installer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install from the browser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/player-appliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../platforms/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platforms
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platforms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/raspberry-pi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raspberry Pi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android (Shield demo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_10_7" id="__nav_10_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    WebAssembly
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/wasm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../wasm-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../wasm-encode-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../platforms/bare-metal/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bare metal
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10_8" id="__nav_10_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bare metal
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/cortex-m3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cortex-M3 (QEMU reference)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-P4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/esp32-c3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/esphome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESPHome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/memory-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 memory layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 build profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/bare-metal/board-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing and benchmarking the boards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/windows-driver-acx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows null-sink driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../renamed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renamed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ci-self-hosted-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-hosted CI runners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ci-lanes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI lane partitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ci-agentic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI for many agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-chips-two-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two chips, two images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-flash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and flash
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-v1x-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the v1.x board
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="On the v1.x board">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#karaoke-on-the-v1x-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Karaoke on the v1.x board
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-v3x-kit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the v3.x kit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="On the v3.x kit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-changes-for-the-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What changes for the audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The screen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-song-with-no-lyrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A song with no lyrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clock
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-developer-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The developer view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-time-of-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The time of day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-cable-and-wi-fi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The cable, and Wi-Fi
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The cable, and Wi-Fi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-tested-on-the-cable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was tested on the cable
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-and-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developing-the-screen-without-a-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developing the screen without a panel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="an-esp32-p4-sink">An ESP32-P4 sink<a class="headerlink" href="#an-esp32-p4-sink" title="Permanent link">&para;</a></h1>
+<p><code>hearth_sink</code> runs on the ESP32-P4 as the <strong>best</strong> of the sink family: the part with the room to
+decode E-AC-3 7.1.4 with its tools on, and AC-4 to 5.1, in real time. It has one I2S controller
+whose TDM frame holds 512 bits, which reaches sixteen 32-bit channels into both DACs of the
+planned pair from one line, and, on a board with a panel, it draws the words of a karaoke song as
+they are sung.</p>
+<div class="admonition note">
+<p class="admonition-title">Status as of 2026-10-20: the v1.x board plays; the v3.x kit shows the screen, takes a tap, plays through 16 TDM slots, plays a karaoke song with its words and decodes AC-4 5.1; the clocks on the pins are not measured, and the glass costs the heaviest stream a tenth</p>
+<p>The sink runs on a DFRobot FireBeetle 2 (chip revision v1.3), stereo, over Wi-Fi hosted on its
+onboard ESP32-C6. The v3.x kit arrived on 2026-10-20 and the v3.x image ran on it the same day:
+it boots on a v3.2 chip at 400 MHz, joins Wi-Fi, is found by Music Assistant, draws the idle and
+the lyric screens on the panel, answers a tap on every button of the controls sheet, and plays a
+5.1 stream through the full sixteen 32-bit TDM slots in real time with no underrun. A karaoke
+song with word-timed lyrics then played for 99 s with no underrun or late chunk, the words
+following it on the glass, and the owner, who watched and used the Adjust sheet, said it appeared
+and looked fine. <strong>The glass takes decode time:</strong> its scan-out costs the decoder 1.3% (AC-3), 6%
+(E-AC-3) and about 10% (AC-4 5.1), and with the song filling the screen the light streams' decode
+time moves by 5 to 12% (under 1% of a frame). <strong>The glitches the first measurement put on the glass
+are not its:</strong> about one play in five reaches the kit with its first chunk 300 to 600 ms late, with
+the glass, without it and at 40 Hz, over Wi-Fi and (more often) over the cable, and those plays
+lose the start of their first second: lwIP's six-entry TCP receive mailbox refused the first
+segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk
+(<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#what-the-glitches-were-the-first-chunk-comes-late">the trace</a>).
+<strong>Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
+owner's look.</strong> The board suite is played on it, with a baseline. Its RJ45 port works beside the
+Wi-Fi (<a href="#the-cable-and-wi-fi">the cable</a>): the sink answers on it, plays Sendspin through it,
+takes an update over it, falls back to Wi-Fi when the cable is pulled and returns to the cable
+when it is put back, so the kit can run on a PoE splitter; <strong>the splitter itself is not yet tried.</strong>
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md">planning/karaoke-p4x-panel.md</a>
+has the plan, the first run and the list of what it runs next.</p>
+</div>
+<p>Pairing, groups and firmware updates work the same as on the S3; see
+<a href="../sink-esp32-s3/">An ESP32-S3 sink</a> and <a href="../sink-firmware/">Sink firmware</a>. This page covers what
+differs on the P4.</p>
+<h2 id="two-chips-two-images">Two chips, two images<a class="headerlink" href="#two-chips-two-images" title="Permanent link">&para;</a></h2>
+<p>The P4 has had two silicon generations, and <strong>their firmware images are not interchangeable</strong>
+(Espressif's v3.x user guide, section 1.1): an image for one refuses to start on the other. A
+release carries one for each.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Chip revision v1.x</th>
+<th>Chip revision v3.x ("P4X", v3.1 and newer)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Image</td>
+<td><code>hearth-sink-esp32p4-rev1</code></td>
+<td><code>hearth-sink-esp32p4-rev3</code></td>
+</tr>
+<tr>
+<td>Example board</td>
+<td>DFRobot FireBeetle 2 (v1.3)</td>
+<td>ESP32-P4X-Function-EV-Board, 7-inch panel</td>
+</tr>
+<tr>
+<td>CPU</td>
+<td>360 MHz (400 MHz asserts in its boot)</td>
+<td>400 MHz</td>
+</tr>
+<tr>
+<td>I2S clock source</td>
+<td>APLL, 125 MHz at most: <strong>no TDM above two channels</strong></td>
+<td>the 160 MHz PLL: TDM at the full 16 × 32 bits</td>
+</tr>
+<tr>
+<td>Screen</td>
+<td>none</td>
+<td>the 7-inch 1024 by 600 panel, with touch</td>
+</tr>
+<tr>
+<td>Verified</td>
+<td>on a board</td>
+<td>on a board (a v3.2 kit, 2026-10-20): screen, touch, 16-slot TDM in real time, a karaoke play with lyrics, AC-4 5.1 (scratch build); <strong>the clocks on the TDM pins not yet measured</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>GET /hardware</code> tells which a board is, and <code>ota.py</code> chooses the image from it, so a board updated
+over its network gets the right one (<a href="../sink-firmware/#which-image">Sink firmware</a>).</p>
+<h2 id="build-and-flash">Build and flash<a class="headerlink" href="#build-and-flash" title="Permanent link">&para;</a></h2>
+<p>From <code>firmware/hearth-sink</code>, in an ESP-IDF v6.1 terminal. A P4 is not built with <code>set-target</code>
+and plain defaults: say the target and the overlays.</p>
+<p><strong>Chip revision v1.x</strong> (the FireBeetle 2, stereo, no screen):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>idf.py<span class="w"> </span>-DIDF_TARGET<span class="o">=</span>esp32p4<span class="w"> </span><span class="s2">&quot;-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin&quot;</span><span class="w"> </span>build
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>idf.py<span class="w"> </span>-p<span class="w"> </span>PORT<span class="w"> </span>flash<span class="w"> </span>monitor
+</code></pre></div>
+<p><strong>Chip revision v3.x with the 7-inch panel</strong> (the image CI publishes as <code>hearth-sink-esp32p4-rev3</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>idf.py<span class="w"> </span>-DIDF_TARGET<span class="o">=</span>esp32p4<span class="w"> </span><span class="s2">&quot;-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi&quot;</span><span class="w"> </span>build
+</code></pre></div>
+<p><strong>A board with no panel, to see the screen</strong> (any P4; the picture is read back over HTTP,
+<a href="#developing-the-screen-without-a-panel">below</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>idf.py<span class="w"> </span>-DIDF_TARGET<span class="o">=</span>esp32p4<span class="w"> </span><span class="s2">&quot;-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null&quot;</span><span class="w"> </span>build
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it sets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sdkconfig.p4</code></td>
+<td>The P4 itself: the wide I2S sink, PSRAM, the code run from PSRAM, the Wi-Fi buffers and the DMA queue, with the reasons for each. Written for v1.x silicon</td>
+</tr>
+<tr>
+<td><code>sdkconfig.p4-rev3</code></td>
+<td>After <code>sdkconfig.p4</code>: chip revisions v3.1 to v3.99, 400 MHz, and the bootloader at the Warn log level (a v3.x bootloader is 25,152 bytes at Info against the 24,576-byte window; 22,448 at Warn)</td>
+</tr>
+<tr>
+<td><code>sdkconfig.panel</code></td>
+<td>LVGL's heap in PSRAM, TrueType fonts, right-to-left text</td>
+</tr>
+<tr>
+<td><code>sdkconfig.panel-null</code> / <code>sdkconfig.panel-dsi</code></td>
+<td>The frame buffer with no panel, or the 7-inch MIPI DSI panel</td>
+</tr>
+</tbody>
+</table>
+<p>AC-4 is <code>sdkconfig.ac4</code> after those (<a href="../../platforms/bare-metal/esp32-p4/#ac-4">ESP32-P4 platform page</a>).</p>
+<h2 id="on-the-v1x-board">On the v1.x board<a class="headerlink" href="#on-the-v1x-board" title="Permanent link">&para;</a></h2>
+<p>It plays AC-3 and E-AC-3 onto 2.0 in a paired Sendspin session, and decodes AC-4 to 5.1 in real
+time (<a href="../../platforms/bare-metal/esp32-p4/">ESP32-P4</a>). <strong>TDM does not open above two channels on
+this silicon</strong>: the controller has no PLL clock source before v3, and the audio PLL it falls back to
+tops out at 125 MHz, short of the ~147 MHz a 512-bit frame needs at 48 kHz. That is a limit of the
+chip, and <code>GET /hardware</code> says so on such a board.</p>
+<h3 id="karaoke-on-the-v1x-board">Karaoke on the v1.x board<a class="headerlink" href="#karaoke-on-the-v1x-board" title="Permanent link">&para;</a></h3>
+<p>The board reproduces AC-3 and E-AC-3 karaoke itself at its 2.0 layout, which is the only one it
+can open. Hearth's live karaoke cases at <code>ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT=2.0</code>, on a v1.3 board
+booted from its first slot on 2026-10-13, found the board's output levels within 0.2 dB of the
+host's decode for AC-3 and within 0.7 dB for E-AC-3, for as coded, aware, and capable with a
+vocal, with none, and with the melody and a vocal moved, with the layout, routing, trim, delay
+and crossover settings pushed as well. At 2.0 the aware reproduction is the Lo/Ro fold as coded
+already is, so the two read alike. The 3.0 layout the case uses by default needs three slots
+and cannot open here; it is not measured on a v3.x chip.</p>
+<p>One earlier run on the same image, started from the board's second slot straight after an update
+restart, played nothing and logged <code>burst player: a stream control message did not fit the ring</code>
+(the player's ring was not draining). It did not repeat in eight runs after a clean start from
+the first slot, and its cause is not known.</p>
+<h2 id="on-the-v3x-kit">On the v3.x kit<a class="headerlink" href="#on-the-v3x-kit" title="Permanent link">&para;</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Run on a v3.2 chip and a panel; the pins' clocks are not measured</p>
+<p>What follows was built from ESP-IDF's headers, the v3.x user guide and the vendor drivers' own
+values, and the first run on the kit (2026-10-20) corrected it in four places: a crash in the DSI
+code, the touch controller's address (0x14), its axes (turned half a turn from the display's)
+and how often it must be read, all fixed. A line below that says what the kit did was seen on it;
+one that says what the chip should do was not.</p>
+</div>
+<h3 id="what-changes-for-the-audio">What changes for the audio<a class="headerlink" href="#what-changes-for-the-audio" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>400 MHz</strong>, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders do not scale
+  with the clock: on the kit, with no panel, the decoder alone takes 10% less time than on the v1.3
+  board for AC-3 and 17% less for AC-4 (11% more clock), and a Sendspin burst at the same layout (2.0)
+  takes 3 to 6% less. A burst used to cost about 176 µs for each output of the layout (the renderer,
+  the patch, the trims, the meters and the playout's copy) whether or not the stream filled it, and
+  the kit's player starts at 9.1.6, sixteen outputs, where the v1.3 board's sink has two: the kit's
+  first Sendspin figures were 13% to 100% above the v1.3 board's for that reason. The player now
+  does that work for the outputs that carry audio only, and hands the DAC zeros for the rest: an
+  AC-3 2.0 stream takes 2.4 ms a burst at 2.0, 5.1 and 9.1.6 alike (2.6, 3.3 and 5.2 ms before),
+  and an AC-4 5.1 stream 29.9 ms at 9.1.6 (33.4 before). The kit's figures are in <a href="#memory-and-time">Memory and
+  time</a>.</li>
+<li><strong>TDM opens</strong>: the <code>i2s_wide</code> sink takes the 160 MHz PLL (<code>I2S_CLK_SRC_PLL_160M</code>) as the clock
+  source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The source
+  is chosen when the image is built, because the two revisions are two images. On the kit, a 5.1
+  stream rendered onto the layout <code>9.1.6</code> opened sixteen 32-bit slots and played for 30 s in real
+  time with no underrun, 30,336 ms of audio in 30,185 ms of wall clock, the six coded channels in
+  their slots and the other ten at zero. <strong>Whether the clocks leave the pins at 24.576 MHz (BCLK) and
+  48 kHz (WS) is not measured:</strong> it needs a scope or a logic analyser.</li>
+<li><strong>The DACs</strong> are not wired and no firmware programs an ES9080 over I2C: the board plays to a
+  frame whose unused slots are zero, which is what the ES9080 contract is
+  (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md#shared-es9080-contract-all-tiers">sink tiers</a>).</li>
+</ul>
+<h3 id="the-screen">The screen<a class="headerlink" href="#the-screen" title="Permanent link">&para;</a></h3>
+<p><img alt="The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics with the screen off, plain text, the controls, and the speakers while a song has no lyrics, dimmed, and the clock" src="../screenshots/p4-panel-sheet.png" /></p>
+<p>The board shows the lyrics of the item playing, against the sound <strong>the board</strong> is playing: the
+server sends the document and where in it the sound is, and the board follows on its own clock, which
+knows its own output delay. The same lyric file and the same karaoke stream Hearth plays on a desktop
+(<a href="../../karaoke/">Karaoke</a>).</p>
+<p><img alt="The line being sung: words before it sung in the accent colour, the word being sung filled from the left as it is sung and underlined, the rest muted, and the lines before and after it" src="../screenshots/p4-panel-singing.png" /></p>
+<p>One colour for a word sung, one fill for the word being sung, and one for a word not yet sung, as on
+the desktop, with one cue that is not colour (the underline), so that no one has to tell the colours
+apart. The picture above and the others on this page are drawn by the firmware's own screen code
+(<code>firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp</code>) and rendered by a tool on a computer
+(<a href="#developing-the-screen-without-a-panel">below</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Screen</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="Idle" src="../screenshots/p4-panel-idle-pairing.png" /></td>
+<td><strong>Nothing is playing.</strong> The board's name, its address and network, and what it waits for; the pairing code while an attempt shows one</td>
+</tr>
+<tr>
+<td><img alt="Waiting" src="../screenshots/p4-panel-waiting.png" /></td>
+<td><strong>The song is held and has not started.</strong> The first lines, so a singer sees what is coming</td>
+</tr>
+<tr>
+<td><img alt="Duet" src="../screenshots/p4-panel-duet.png" /></td>
+<td><strong>A duet.</strong> The first singer's lines at the left, the second's indented, each tagged with its name from the file</td>
+</tr>
+<tr>
+<td><img alt="Instrumental break" src="../screenshots/p4-panel-gap.png" /></td>
+<td><strong>An instrumental break</strong> of four seconds or more: four dots that go out one a second, so the line's start is seen coming</td>
+</tr>
+<tr>
+<td><img alt="A file timed by line" src="../screenshots/p4-panel-line-timed.png" /></td>
+<td><strong>A file with line times only.</strong> The whole line, emphasised; no word is invented</td>
+</tr>
+<tr>
+<td><img alt="Right to left" src="../screenshots/p4-panel-right-to-left.png" /></td>
+<td><strong>Hebrew or Yiddish.</strong> Right-aligned, the words flow right to left and the fill runs from a word's right edge</td>
+</tr>
+<tr>
+<td><img alt="Russian and Greek" src="../screenshots/p4-panel-cyrillic-greek.png" /></td>
+<td><strong>Cyrillic or Greek.</strong> Drawn as Latin is, in Noto Sans behind Archivo, with the same fill</td>
+</tr>
+<tr>
+<td><img alt="A script the fonts lack" src="../screenshots/p4-panel-script.png" /></td>
+<td><strong>A script the fonts cannot draw</strong> (Arabic here). One sentence in the line's place; the title in it is left out; a music note is dropped</td>
+</tr>
+<tr>
+<td><img alt="Plain text" src="../screenshots/p4-panel-plain.png" /></td>
+<td><strong>A file with no times.</strong> The text, scrolled by touch, not followed</td>
+</tr>
+<tr>
+<td><img alt="The speakers" src="../screenshots/p4-panel-speakers-5-1.png" /></td>
+<td><strong>Playing, and no lyrics are held</strong> (<a href="#a-song-with-no-lyrics">below</a>). The speakers of the layout in force, each glowing with its own level</td>
+</tr>
+<tr>
+<td><img alt="The title card" src="../screenshots/p4-panel-title-card.png" /></td>
+<td><strong>Playing, no lyrics, and the server has said what is playing</strong> (the title card, <a href="#a-song-with-no-lyrics">below</a>). The title, the artist, the album and year, and the song's time with a progress line</td>
+</tr>
+<tr>
+<td><img alt="The clock" src="../screenshots/p4-panel-clock.png" /></td>
+<td><strong>Playing, no lyrics, and the clock chosen</strong> (<a href="#the-clock">below</a>). The time, the date and the line over them; nothing until a time server has answered</td>
+</tr>
+<tr>
+<td><img alt="No lyrics" src="../screenshots/p4-panel-no-lyrics.png" /></td>
+<td><strong>The same with that screen turned off.</strong> The sentence this screen had before</td>
+</tr>
+<tr>
+<td><img alt="The controls" src="../screenshots/p4-panel-controls.png" /></td>
+<td><strong>Adjust.</strong> The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Controls.</strong> Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size
+(Smaller, Normal or Larger, which the sheet says beside its buttons), what its screen shows while a
+song has no lyrics, when that dims, and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
+shown, not changed, until the role has a way to carry a request back.</p>
+<h4 id="a-song-with-no-lyrics">A song with no lyrics<a class="headerlink" href="#a-song-with-no-lyrics" title="Permanent link">&para;</a></h4>
+<p>Most of what is played has none. While a stream plays and the board holds no lyrics, the panel shows
+the <strong>speakers</strong>: the room the layout in force describes, seen from above with the front at the top.
+Ear-level speakers are circles, height speakers rounded squares, the LFE a wide box along the bottom,
+and each speaker glows with its own level, from the board's own measure of the last 100 ms. A
+speaker with nothing on it is a hollow outline, so a dead output can be seen. The line above says
+what arrives and what it is played on (<em>Dolby Digital Plus 5.1 to 7.1.4</em>, <em>PCM to 2.0</em>).</p>
+<p><img alt="The speakers in a 7.1.4 room" src="../screenshots/p4-panel-speakers-7-1-4.png" /></p>
+<p>It is meant to be left on for hours in a dim room: the glow moves in a few steps, slowly (it rises
+at once and falls at 14 dB a second), and is never brighter than the accent at 55%. <strong>After five
+minutes with nothing touched</strong> (the time is Adjust's, or <code>PUT /dim-after</code>: <code>never</code>, or whole minutes
+from 1 to 240) the backlight goes to 4% and a black screen with one line is over everything; any tap
+brings the speakers back, and the tap does not also press what is under it. Only this screen dims:
+the lyric screens and the idle screen do not.</p>
+<p><img alt="The dimmed screen" src="../screenshots/p4-panel-dimmed.png" /></p>
+<p>Which screen shows is the owner's: <code>speakers</code> (the default), <code>title</code>, <code>clock</code> (<a href="#the-clock">below</a>),
+<code>dark</code>, or <code>off</code>, which is the old sentence. The plan, with how each was chosen and built, is
+(<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md">planning/p4x-now-playing.md</a>).</p>
+<p><strong>The title card.</strong> The board lists <code>metadata@v1</code> in its hello, which a board with a screen does and
+one without does not, so a server that has the role tells it what is playing: the title, the artist,
+the album and its year, and where in the song it is. The card is those, and nothing the server did
+not say: the title in 72 down to 34 px by its length (the lyric line's rule, and the same Smaller and
+Larger steps), in two rows at most with three dots after them; the artist under it in 36 px, the album
+and year in 24 px muted; the song's time at the top right and a progress line under the header, as the
+lyric screens have them, where the server gave a progress and the board's clock has converged.</p>
+<p><img alt="The title card" src="../screenshots/p4-panel-title-card.png" />
+<img alt="A long title, cut at two rows" src="../screenshots/p4-panel-title-card-long.png" /></p>
+<p><strong>Until a title has come, there is no card.</strong> With <code>title</code> chosen and nothing said (a server that
+does not send the role, or has not yet), or with a title in a script the fonts cannot draw, the
+speakers show in its place, and nothing but a title makes a card. Once a title is known the speakers'
+own header says it too: <em>Title - Artist</em> at the left, the time at the right and the progress line under
+it, in place of what arrives and what it is played on (which the dark screen still says).</p>
+<p><img alt="The speakers with a title in the header" src="../screenshots/p4-panel-speakers-title.png" /></p>
+<p>The card dims as the speakers do, and its dark screen names the song (<em>Playing - Blue in Green - Miles
+Davis</em>). What the store keeps is small and fixed (a title of 256 bytes, an artist or an album of 160,
+cut at a character and not in the middle of one), in strings that keep their capacity, so a server's
+update and the panel's five reads a second allocate nothing from the internal heap an AC-4 decoder
+leaves little of. Two servers say it differently, and the board reads each as it means it
+(<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-sendspin-extension.md">planning/hearth-sendspin-extension.md</a>,
+C36): the specification's object is the whole state, so what it leaves out is gone (and aiosendspin 10,
+which Music Assistant runs now, sends it so); aiosendspin 9.1.1's carried only what changed, a field it
+cleared given as <code>null</code>, so that a pause (a progress and nothing else) leaves the title alone and a track
+with no artist does not keep the last one's. A state stamped in the future (a scheduled change, which
+aiosendspin can send up to 20 s ahead and Music Assistant does not) takes effect when it arrives.</p>
+<p><strong>Dark</strong> is for a listener who wants no light at all while music plays. With it chosen, the backlight
+is <strong>off</strong> from the moment a song with no lyrics begins, however long ago anything last touched the
+panel, and the screen says nothing. <strong>A tap lights the speakers for 30 seconds from the last touch</strong>
+(another tap moves that on), and then it is dark again. The tap that lights it does not also press what
+is under it; the developer view keeps the screen lit while it is open (the Adjust sheet puts itself
+away after eight seconds, inside the 30). The sheet's dim row, which has no meaning here, says "30
+seconds, then dark again" in place of its dim times. Only this screen goes dark: a lyric screen and
+the idle screen are lit as they always were.</p>
+<p><img alt="The Adjust sheet with Dark chosen" src="../screenshots/p4-panel-controls-dark.png" /></p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Takes</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code> and <code>PUT /now-playing</code></td>
+<td><code>speakers</code>, <code>title</code>, <code>clock</code>, <code>off</code> or <code>dark</code></td>
+<td><code>speakers</code></td>
+</tr>
+<tr>
+<td><code>GET</code> and <code>PUT /dim-after</code></td>
+<td><code>never</code>, or minutes from 1 to 240</td>
+<td><code>5</code></td>
+</tr>
+</tbody>
+</table>
+<p>Both are stored on the board and take effect at once, with no restart; a board with no panel answers
+404. <code>GET :8081/panel</code> says which <code>view</code> is chosen, whether the screen is <code>dimmed</code> (a black cover is up,
+dimmed or dark) and the <code>backlight</code> in percent: 80 lit, 4 dimmed, 0 dark; and the <a href="#the-time-of-day">time of day</a>'s state.</p>
+<h4 id="the-clock">The clock<a class="headerlink" href="#the-clock" title="Permanent link">&para;</a></h4>
+<p>The time of day, for a room where the sound is the thing and the panel is a glance: <strong>the time in 24
+hours at 200 px, the date under it, and nothing else</strong>, in the muted tone (the time at about 80% of
+it and the date at about 60%, so that neither is the brightest thing in a dim room). It shows no
+seconds, so what the screen redraws is the time's rectangle once a minute (the preview counts 224,000
+pixels, against none for a second that passes), and the line over it still says what the stream is
+(<em>Dolby Digital Plus 5.1 to 5.1</em>).</p>
+<p><img alt="The clock: 21:47 and Tuesday 20 October" src="../screenshots/p4-panel-clock.png" /></p>
+<p>The time is <a href="#the-time-of-day">the board's own</a>, kept with a time server, which every board does.
+<strong>Until the first answer the view draws the heading and nothing else, never a time it made up</strong> (and an
+answer from before 2026 is a server with a wrong clock, and is not taken for the time either).</p>
+<p><img alt="Before a time server has answered: the line over the screen and nothing in it" src="../screenshots/p4-panel-clock-waiting.png" /></p>
+<p><strong>With no time zone set the clock says UTC, and says so:</strong></p>
+<p><img alt="The clock with no time zone set: UTC, and a sentence that says so" src="../screenshots/p4-panel-clock-utc.png" /></p>
+<p><strong>A dim leaves the clock on the glass.</strong> Dimming lowers the backlight to its floor, as for the speakers,
+but the clock is what a dark room has the screen for, so no black cover goes over it: a clear one
+catches the tap that wakes the screen, and the time goes on changing under it.</p>
+<p><strong>On the kit, the title card</strong> (2026-10-21): <code>hearth-testserver</code> said a song over Sendspin (<code>--title</code>, <code>--artist</code>, <code>--album</code>, <code>--year</code>, <code>--track-seconds</code>, and <code>--then-after</code> for a second song with no artist) and the panel's read-back was the card above, then the second song alone with nothing kept from the first, and the speakers again when the play ended; a play that said nothing, with the card chosen, showed the speakers; a 119-character title ended in three dots after two rows, and <code>0:08 / 24:45</code> fitted. A 5.1 E-AC-3 programme at layout 5.1 took 5,325 µs a burst with the view off, 5,341 with the speakers (their header the song) and 5,333 with the card (three plays each, none late, no underrun or resynchronisation); at 2.0 with a stereo programme 2,614, 2,628 and 2,633; at 7.1.4 6,475, 6,478 and 6,491. The role itself cost nothing that showed: the image without it took 5,364 µs for the same play. The panel redraws about 5.7 times a second for the song's time and line. The owner's Music Assistant had not reconnected to the kit by then, so what it sends this role is from aiosendspin's source (the whole state each time, as the specification has it) and not yet seen on the board.</p>
+<p><strong>On the kit, the speakers</strong> (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With <code>dim-after</code> at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone. The <strong>dark view</strong>, run the same way (the same programme for 190 s, injected taps, the read-back sampled twice a second): dark as soon as the song showed, on a panel nobody had touched; a tap on <em>Adjust</em> lit it within 0.8 s and did not open the sheet; dark again 30.1 s after that tap; two taps 20 s apart kept it lit and it was dark 30.2 s after the second. A real finger, and the glass with its backlight off, were not looked at.</p>
+<p><strong>The time and the clock</strong> (2026-10-21, with the time on every board): the clock view drew <code>09:06 Wednesday 21
+October</code> against the PC's local <code>09:06</code>, and a 5.1 Sendspin play with it chosen took a burst 4,566 µs against
+4,564 µs with the view off (three 60 s plays each, no late burst or underrun). The board asked a time server
+from boot, answered within seconds, stopped asking at once on <code>PUT /time-sync off</code> (no request in the next 30 s),
+kept its zone, server and sync through <code>POST /restart</code>, and read all 42 zones of the page's list and 15 others as
+written.</p>
+<p><strong>Fonts.</strong> Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
+the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
+Greek (modern, with its tonos) and Cyrillic (with its supplement), and Noto Sans Hebrew behind that;
+all three under the SIL Open Font License, in the image (473 KB of flash, two weights of each). <strong>Not
+in this build:</strong> polytonic Greek and the Cyrillic Extended blocks, CJK (a usable face is 5 to 16 MB,
+which the 4 MB application slots have no room for), Arabic (its shaping is not done by LVGL), and the
+Indic and Thai scripts. <strong>A line in a script the screen cannot draw is replaced by one sentence</strong>,
+"This line is in a script this screen cannot show.", not by the font's missing-glyph boxes; a title
+in one is left out, and a music note (which none of the fonts has) is dropped from a line.</p>
+<h3 id="the-developer-view">The developer view<a class="headerlink" href="#the-developer-view" title="Permanent link">&para;</a></h3>
+<p><strong>Three taps on the board's name</strong> (<code>hearth-e753f9</code>, at the left of the footer) put a screen of
+developer information over the lyrics; <strong>a tap anywhere else puts it away</strong>. It is on the panel
+image only (it needs the touch screen), the lyric and idle screens are as they were with it shut,
+and it puts itself away after five minutes untouched, so that a panel left on a stand is a lyric
+screen again.</p>
+<p><img alt="The developer view: the network, the configuration, the stream and the board's performance in two columns, the network preference as three buttons, and the console's last five lines" src="../screenshots/p4-panel-dev-view.png" /></p>
+<p>Two columns of 18 px type and the console's last five lines under them, brought up to date once a
+second (every two while a stream plays, so that its drawing and its questions of the radio
+leave the audio alone). This is a page for someone at arm's length, not the two-metre type of the lyrics.</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>What it says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Network</strong></td>
+<td>The interface <strong>in use</strong>; for the cable and for the radio its link (the cable's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page</td>
+</tr>
+<tr>
+<td><strong>Configuration</strong></td>
+<td>The profile and its hash (<code>/hardware</code>), the firmware version and the slot it runs from, the chip and its revision, the ESP-IDF, the cores and the CPU and PSRAM clocks, the output layout, the slots and their width and the sink, how long the board has been up and why it last reset, and whether a core dump is stored</td>
+</tr>
+<tr>
+<td><strong>Streaming</strong></td>
+<td>The server and the connections; whether the clock has converged and its error; the stream; bursts played, underruns, late, dropped, resyncs and invalid chunks; the playout's offset and the burst time, each with its worst; a meter for each output; and the figures of a play from <code>POST /play</code> (<code>us_per_frame</code>, <code>worst_frame_us</code>, <code>sink_us_per_frame</code>, <code>render_us_per_frame</code>), which are dashes until one has run</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td>The internal heap and the PSRAM, free and at their lowest; the panel's own render time and late cycles; the touch controller's reads, failures and touches</td>
+</tr>
+<tr>
+<td><strong>Console</strong></td>
+<td>The last five lines of the 16 KB ring <code>GET /log</code> serves, without their colour codes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The accent colour means look here</strong>: a counter that is not zero, a radio signal below -75 dBm, a
+clock that has not converged while something plays, a reset by a panic, a watchdog or a brownout
+(<code>wdt</code> is not one: it is how this board restarts), a stored core dump, an internal heap that has
+fallen below 16 KB.</p>
+<p><img alt="The same view of a board in trouble: no cable, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour" src="../screenshots/p4-panel-dev-trouble.png" /></p>
+<p><strong>The network preference.</strong> The row of three buttons, Auto, Ethernet and Wi-Fi, is the board's
+<a href="#the-cable-and-wi-fi">network preference</a>, the chosen one in the accent colour. A tap on another one
+<strong>asks first</strong>, so that a stray tap cannot cut the board off the network it is being used over:</p>
+<p><img alt="Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch" src="../screenshots/p4-panel-dev-confirm.png" /></p>
+<p>Cancel, a tap anywhere else or eight seconds of nothing changes nothing. A change the board is sure
+to refuse (the interface it names holds no address, or no Wi-Fi network is stored) is said so in the
+accent colour and Switch is dimmed. <strong>Switch</strong> asks for the change as <code>PUT /network-preference</code> does
+(the same call; it returns at once and the work is done on a task of its own, verified as the cable
+section says), and the view says "Switching..." until the board keeps the preference, then "Done.",
+or "The board refused the change." if it has not after 45 seconds.</p>
+<p><strong>What it never shows</strong> is the Wi-Fi passphrase or the Sendspin pairing token: the view reads one
+struct of facts that has no field for either, and a console line that names a passphrase, a
+password or a pairing token is replaced by a sentence. <strong>What it does not show</strong> is a ring fill: the
+burst player keeps no such figure (the HTTP source's <code>ring_low</code> is in <code>GET /status</code> after a
+<code>POST /play</code>).</p>
+<p>The view's rows are <code>libs/device/include/iclforge/dev_view.hpp</code>, which the host tests hold to the
+letter (the triple tap, the numbers, the colours, the confirming step's words, the log's lines),
+and its pictures are drawn by the same code as the board's, by the
+<a href="#developing-the-screen-without-a-panel">preview</a>.</p>
+<h3 id="the-time-of-day">The time of day<a class="headerlink" href="#the-time-of-day" title="Permanent link">&para;</a></h3>
+<p><strong>Every ESP board that has a network keeps its time with a time server</strong>, by default, from the
+moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its cable), where QEMU's
+network has nothing to ask and a build with no network has nothing to ask over, so those keep no
+time (the routes below answer 404). It is lwIP's SNTP client (<code>firmware/hearth-sink/main/clock/sntp/</code>).
+The panel's <a href="#the-clock">clock view</a> draws what it keeps; a board with no screen has it for its page,
+<code>GET /status</code> and the console. Nothing listens: SNTP is a request the board sends and the answer comes
+back to it.</p>
+<p><strong>Which server is asked</strong>, in this order:</p>
+<ol>
+<li><strong>The one a person named</strong> (<code>PUT /ntp-server</code>: a host name or an IPv4 address). Naming a server says
+   where the time comes from, so with one named the board asks it and then the router's, and not the pool.</li>
+<li><strong>The one the router gave over DHCP</strong> (option 42), which is the default: lwIP keeps it when a lease is
+   bound (<code>net/stack.cpp</code> turns that on at boot), so it is there from the first lease, and a lease
+   renewed with another replaces it.</li>
+<li><strong><code>pool.ntp.org</code></strong>, when nobody named a server.</li>
+</ol>
+<p>A lease rewrites lwIP's table of servers when it is bound (the router's takes the first slot and the rest
+are emptied), so the board looks at the table once a second and puts it back as it should be; the
+router's server is remembered from the first slot. The first request goes out after a random delay of up to
+five seconds (RFC 4330 asks it of a device that has just started), and then once an hour. A new address
+starts the question again at once if no server has answered yet.</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Takes</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code> and <code>PUT /time-sync</code></td>
+<td><code>on</code> or <code>off</code></td>
+<td><code>on</code></td>
+</tr>
+<tr>
+<td><code>GET</code> and <code>PUT /ntp-server</code></td>
+<td>a host name or an IPv4 address, or <code>none</code></td>
+<td><code>none</code>: the router's, then the pool</td>
+</tr>
+<tr>
+<td><code>GET</code> and <code>PUT /timezone</code></td>
+<td>a POSIX time zone, or <code>none</code></td>
+<td><code>none</code>: UTC</td>
+</tr>
+</tbody>
+</table>
+<p>All three are stored on the board (NVS <code>time_sync</code>, <code>ntp_server</code>, <code>time_zone</code>) and take effect at once,
+with no restart. <strong>They are on the board's own web page too</strong>, in a Time section of Settings: the time
+the board keeps and how it got it, a checkbox for whether to ask a time server, and a list of zones and cities
+(<em>UTC+10 Melbourne, Sydney, Hobart, Canberra</em>; 42 of them, each a POSIX string the board's C library is
+held to) with a field for any other, and a field for the server (which says, under it, the servers lwIP is set to ask). <code>GET /status</code> has a <code>time</code>
+object (<code>sync</code>, <code>asking</code>, <code>synced</code>, <code>local</code>, <code>zone</code>, <code>server</code>, <code>servers</code>, <code>answers</code>), and the console
+says when the board started asking (<em>wall clock: asking for the time: 192.168.1.5 (from DHCP),
+pool.ntp.org</em>), each answer, and when it stopped. <strong><code>off</code> is for a board that must contact no time server:</strong>
+it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
+made up), and a clock view then shows only its heading.</p>
+<p><strong>The time zone is a POSIX string</strong>, because the firmware has no zone database and a list of names
+would be a table to keep: <code>PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3</code> is Sydney, Melbourne and
+Hobart. Its offset is the hours <em>west</em> of UTC, so an Australian zone has a minus sign; <code>none</code> takes
+the zone away. A string that is not a zone, or one with daylight saving and no rules (which the
+board's C library would give its own for, differently from the next one's), is refused with a 400
+that says so; one the grammar accepts is then read by the board's own C library, on a day in January
+and a day in July, and refused with a 409 if the library did not read it as written (a library that
+cannot parse a string falls back to UTC without saying so). With none set the time is UTC.</p>
+<p>The grammar and the words (<code>libs/device/include/iclforge/wall_clock.hpp</code>) are held to the letter by
+the host tests (<code>test_wall_clock.cpp</code>: the zones and the servers taken and the ones refused, the offsets,
+the dates and the words), and the device page's stand-in is held to the same lists
+(<code>apps/demos/wasm/tests/device-ui/contract.spec.js</code>).</p>
+<h3 id="wiring">Wiring<a class="headerlink" href="#wiring" title="Permanent link">&para;</a></h3>
+<p>All of these are Kconfig (<code>ICLFORGE_EXAMPLE_PANEL_*</code>), and the defaults are the
+<a href="https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4x-function-ev-board/user_guide.html">ESP32-P4X-Function-EV-Board's</a>,
+from its user guide and the older board's support header; <strong>check them against the schematic of
+the board the image is for.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Default</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Panel</td>
+<td>EK79007, 1024 by 600, two DSI lanes at 900 Mbit/s</td>
+<td>from Espressif's driver</td>
+</tr>
+<tr>
+<td>DSI PHY supply</td>
+<td>LDO channel 3 at 2.5 V</td>
+<td>from Espressif's driver</td>
+</tr>
+<tr>
+<td>Backlight (PWM), panel reset</td>
+<td>GPIO26, GPIO27</td>
+<td>the user guide: J1 pins 31 and 38, to the LCD adapter</td>
+</tr>
+<tr>
+<td>Touch (GT911)</td>
+<td>I2C SDA GPIO7, SCL GPIO8; address 0x5D, then 0x14; polled</td>
+<td>board header</td>
+</tr>
+<tr>
+<td>TDM BCLK, WS, DOUT</td>
+<td>GPIO20, 21, 22, the FireBeetle defaults</td>
+<td>on J1 (pins 13, 11, 12), free in the user guide's table; <strong>not yet checked on the bench</strong></td>
+</tr>
+<tr>
+<td>Ethernet (<code>ICLFORGE_EXAMPLE_ETH_*</code>)</td>
+<td>IP101GR on RMII: SMI MDC 31 and MDIO 52, PHY reset 51, PHY address 1, the 50 MHz reference clock in on 50, TX_EN 49, TXD0 34, TXD1 35, CRS_DV 28, RXD0 29, RXD1 30</td>
+<td>ESP-IDF v6.1's <code>examples/ethernet/basic</code> for the P4, and Zephyr's devicetree for this board; <strong>read on the kit: the PHY answers at address 1 with ID 0243 0c54</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Two things the user guide does not settle, and the first power-on checks: <strong>which driver IC the
+screen has</strong> (it links both an EK73217BCGA and an EK79007AD datasheet; this image has the EK79007's
+driver) and which touch controller (the older board's has a GT911). <strong>Secure Download is not
+supported on a v3.1 chip, and the image never enables it.</strong></p>
+<h3 id="the-cable-and-wi-fi">The cable, and Wi-Fi<a class="headerlink" href="#the-cable-and-wi-fi" title="Permanent link">&para;</a></h3>
+<p>The kit's RJ45 port (the chip's own Ethernet MAC and an IP101GR PHY on RMII, 10/100 Mbit/s) is a
+network of the sink as the Wi-Fi is, so the kit can sit on a PoE splitter with no USB cable: the
+splitter's Ethernet leg into the RJ45, its USB-C leg into the kit's <strong>power</strong> input (not the
+connector marked JTAG, which is the console and the flashing port). The image is updated over the
+same network, the way <a href="../sink-firmware/">Sink firmware</a> describes, and everything that answers on
+Wi-Fi answers on the cable: the control surface and the page on port 80, <code>GET /log</code>, <code>PUT /firmware</code>,
+mDNS (<code>_sendspin._tcp</code> on 8928 and <code>hearth-&lt;mac tail&gt;.local</code>), the Sendspin player and its pairing,
+and the idle screen, which shows the address and then <code>Ethernet</code> or <code>Wi-Fi &lt;network&gt;</code>.</p>
+<p><strong>Which one it uses.</strong> The board takes an address on whichever has a link, by DHCP, under the name
+it is called (<code>hearth-&lt;mac tail&gt;</code>). With <strong>auto</strong>, the default, it uses the cable while the cable
+holds an address and the Wi-Fi when only that does, and goes back to the cable when it returns, with
+no restart. Both are up when the cable is in and a Wi-Fi network is stored, the cable's interface
+with the higher route priority (200 against the Wi-Fi's 100; ESP-IDF's own number for Ethernet, 50,
+would have put a board with both on Wi-Fi). A board with the cable in and <strong>no Wi-Fi network
+stored</strong> comes up on the cable alone and needs nothing else. The setting, <code>network preference</code>,
+chooses what the board does:</p>
+<table>
+<thead>
+<tr>
+<th>Preference</th>
+<th>The cable</th>
+<th>The Wi-Fi station</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto</code></td>
+<td>used while it holds an address</td>
+<td>joined as the way out if the cable goes; used when only it holds an address</td>
+</tr>
+<tr>
+<td><code>ethernet</code></td>
+<td>the only network</td>
+<td>switched off: no radio, nothing joined</td>
+</tr>
+<tr>
+<td><code>wifi</code></td>
+<td>switched off</td>
+<td>the only network</td>
+</tr>
+</tbody>
+</table>
+<p>It is stored in the board's NVS like its name and its Wi-Fi network, so it survives a restart and an
+update, and it is changed over REST, in the style of <code>PUT /name</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>http://192.168.1.251/network-preference<span class="w">                     </span><span class="c1"># auto</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-d<span class="w"> </span>ethernet<span class="w"> </span>http://192.168.1.251/network-preference<span class="w">  </span><span class="c1"># ok; takes effect in a moment, ...</span>
+</code></pre></div>
+<p>A pinned preference leaves the board with one network and nothing to fall back to, so a change made
+while the board runs is checked before it is kept. <code>ethernet</code> brings the cable up first (it waits
+for a link and an address) and only then stores the preference and switches the Wi-Fi off; <code>wifi</code>
+joins the stored network first and only then stores it and stops the cable. A change whose interface
+does not come up is <strong>not kept</strong>: the preference stays what it was, the other interface stays on, and
+the console says so (<code>network: no cable answered, so the WiFi station is not switched off</code>). The
+reply (<code>200</code>) is sent before any of this, so it comes back over the interface the change may switch
+off; read <code>GET /network-preference</code> a few seconds later to see what was kept.
+<code>PUT /network-preference wifi</code> with no Wi-Fi network stored is refused (<code>409</code>). Improv over USB and
+<code>PUT /network</code> still store a Wi-Fi network, and a board on the cable alone reports Improv's <em>ready</em>
+state (it has no Wi-Fi), so a client still offers its Wi-Fi form; the Wi-Fi it is given joins while
+the cable stays in use.</p>
+<p><strong>What <code>GET /status</code> says.</strong> The <code>network</code> object keeps its four fields (<code>kind</code>, <code>ssid</code>,
+<code>rssi_dbm</code>, <code>address</code>), which now describe the interface <strong>in use</strong> (<code>kind</code> is <code>"ethernet"</code> or
+<code>"wifi"</code>, and while none holds an address it is the one the board is waiting on), and adds
+<code>preference</code> and <code>interfaces</code>: how each interface stands, and never the passphrase. On a board with
+one network <code>preference</code> and <code>interfaces</code> are <code>null</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ethernet&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ssid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;rssi_dbm&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;192.168.1.163&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">&quot;preference&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">&quot;interfaces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">&quot;ethernet&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;link&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;192.168.1.163&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">                 </span><span class="nt">&quot;mac&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;e8:f6:0a:e7:53:f9&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;speed_mbps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;full_duplex&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">&quot;wifi&quot;</span><span class="p">:</span><span class="w">     </span><span class="p">{</span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;link&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;192.168.1.251&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">                 </span><span class="nt">&quot;mac&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;98:88:e0:72:59:b0&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;configured&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ssid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;rssi_dbm&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-40</span><span class="p">}</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>enabled</code> is "not switched off by the preference", <code>link</code> is a cable with a partner on it
+(Ethernet) or an association with the access point (Wi-Fi), <code>configured</code> says a Wi-Fi network is
+stored, and <code>mac</code> is the interface's own address, for a DHCP reservation (the cable's is the chip's
+base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A diagnostics view or a
+control for the preference reads <code>GET /status</code> and <code>GET</code> and <code>PUT /network-preference</code> and nothing
+else.</p>
+<div class="admonition warning">
+<p class="admonition-title">Moving a kit to PoE</p>
+<p>On a PoE splitter the kit has no USB console and no USB flashing, so a bad image can only be
+rescued by the update's own rollback (an image that does not reach the network, the HTTP server
+and the Sendspin player inside five minutes goes back to the one before it, and so does one that
+panics on its first boot; both were tried on the kit) or by putting the USB cable back. Keep the
+Wi-Fi network stored, so the board has a way out if the cable goes. See
+<a href="#what-was-tested-on-the-cable">What was tested</a> for what was and was not tried.</p>
+</div>
+<h4 id="what-was-tested-on-the-cable">What was tested on the cable<a class="headerlink" href="#what-was-tested-on-the-cable" title="Permanent link">&para;</a></h4>
+<p>On the v3.2 kit, 2026-10-20, with the owner's cable to their router (100 Mbit/s, full duplex), the
+Wi-Fi and the USB cable on as well. Details and the numbers:
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20">the plan</a>.</p>
+<ul>
+<li><strong>The update path, before the cable:</strong> ten <code>ota.py push</code> runs (eight accepted, an image that never
+  becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
+  bootloader in about 25 s), a <code>PUT</code> rollback, eight <code>POST /restart</code> and four rounds of a USB flash
+  followed 20 s later by an update: the C6 link was back each time, 7 to 10 s after the restart.</li>
+<li><strong>The PHY</strong> answers on the default pins at SMI address 1 with the IP101's ID, and negotiates 100
+  Mbit/s full duplex.</li>
+<li><strong>Boot:</strong> with the cable in, it answers on the cable 10 s after reset and the Wi-Fi joins behind it
+  at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
+  <strong>no Wi-Fi network stored</strong> it comes up on the cable alone, with the page, mDNS and the Sendspin
+  player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.</li>
+<li><strong>A cable put in while the board runs</strong> is in use within about 6 s, with no restart. <strong>A cable
+  pulled</strong> (four times, by the owner, three with the board idle and one in the middle of a play)
+  made the Wi-Fi the interface in use within half a second, with no restart, and the cable returned
+  4 to 5 s after it was put back. A play cut by the pull ended there (926 bursts, no underrun until
+  it) and the board was idle and answering; the next play ran in full.</li>
+<li><strong>Everything that answers on Wi-Fi answers on the cable:</strong> the page, <code>/api</code>, <code>/hardware</code>, <code>GET /log</code>,
+  <code>PUT /firmware</code> (an update over the cable restarted the board, which answered on the cable 10 s
+  later and passed its trial), mDNS (<code>hearth-&lt;mac tail&gt;.local</code> has an A record for each address) and
+  Sendspin, which played four 30 s AC-3 streams through the cable, 938 of 938 bursts each with no
+  underrun (one with a late burst and a resync at its start).</li>
+<li><strong>The preference</strong> set to each of the three words with the cable in did what the table says, and
+  survived a restart; <code>ethernet</code> with no cable in was not kept and left the Wi-Fi on throughout.
+  With <code>ethernet</code> set (the Wi-Fi radio off), an update sent to the cable's address restarted the
+  board, which came back on the cable alone and passed its trial: the PoE case with the radio off.</li>
+<li><strong>Bad images on the cable:</strong> an image that panics on its trial and one that never reports healthy,
+  both built with the cable, pushed to the cable's address, were rolled back (about 25 s, and at the
+  300 s deadline) and the board returned on the cable.</li>
+<li><strong>Cost:</strong> the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
+  smaller (about 281 KB free, largest block about 256 KB).</li>
+</ul>
+<p><strong>Not tested:</strong> a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. A
+board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is joined as well
+(the cable goes on asking). <strong>A kit on PoE should keep its Wi-Fi network stored, so that it has a way
+out if the cable goes, and the first move to PoE should be done with the USB cable at hand.</strong></p>
+<h3 id="memory-and-time">Memory and time<a class="headerlink" href="#memory-and-time" title="Permanent link">&para;</a></h3>
+<p>The screen's own memory is in PSRAM, none in the internal RAM the AC-4 decoder leaves 1 to 11 KB
+of: the frame buffer (1.2 MB at 16 bits), two render buffers (80 KB each), LVGL's heap and glyph
+caches, the copies of the lines it shows (the rows, a file's plain text and the title are held in
+LVGL's heap, not ESP-IDF's, which would try internal RAM first for anything up to 16 KB), and the
+task's stack. The task runs at priority 2, below the decoder and the I2S writer.</p>
+<p><strong>Measured on the v1.3 board with no panel</strong> (a FireBeetle 2 at 360 MHz, a synthetic karaoke AC-3
+programme decoded to 2.0 over Wi-Fi for 60 s, the screen filling a looping song at 30 fps):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Screen idle</th>
+<th>Screen filling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Underruns, late, dropped chunks</td>
+<td>0, 0, 0</td>
+<td>0, 0, 0</td>
+</tr>
+<tr>
+<td>A burst's decode and render, mean</td>
+<td>4.50 ms</td>
+<td>4.58 ms (+1.6 %)</td>
+</tr>
+<tr>
+<td>A burst, worst</td>
+<td>5.7 to 6.0 ms</td>
+<td>5.8 to 6.2 ms</td>
+</tr>
+<tr>
+<td>Refreshes a minute</td>
+<td>60</td>
+<td>about 960, 1.7 ms each (2.7 % of one core)</td>
+</tr>
+<tr>
+<td>A line's rows rebuilt</td>
+<td></td>
+<td>28 to 48 ms, once a line</td>
+</tr>
+</tbody>
+</table>
+<p>One of five runs with the screen filling broke some 15 to 20 seconds in (underruns and resyncs, then
+every chunk late until the stream ended); the three that followed it on the same image did not, and
+a run with the screen idle had a smaller disturbance of the same kind. The cause was not found, and
+the screen is neither shown to be it nor shown not to be
+(<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#measured">the plan's Measured section</a>).
+<strong>Not in these numbers:</strong> the DSI engine's own reads of PSRAM (74 MB/s at 60 Hz, on the bus the
+decoder fetches its code from), and the AC-4 5.1 streams that fill a frame. Both were measured on the
+kit on 2026-10-20:</p>
+<p><strong>Measured on the v3.2 kit</strong> (400 MHz, the glass; images of one tree, the decoder's time a frame
+over <code>POST /play</code>, the median of six plays alternating the screen idle and the demo song filling;
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-second-session-on-the-kit">the plan has the method and every figure</a>):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>AC-3 2.0</th>
+<th>E-AC-3 2.0</th>
+<th>AC-4 5.1 (Sendspin burst, layout 9.1.6)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No scan-out: <code>panel-null</code>, idle</td>
+<td>1,746 µs</td>
+<td>1,132 µs</td>
+<td>28.72 ms</td>
+</tr>
+<tr>
+<td>The glass, idle</td>
+<td>1,768 µs (+1.3%)</td>
+<td>1,199 µs (+5.9%)</td>
+<td>31.7 to 32.0 ms (+10 to +11%)</td>
+</tr>
+<tr>
+<td>The glass, the song filling</td>
+<td>1,862 µs (+6.6%)</td>
+<td>1,339 µs (+18.3%)</td>
+<td>32.03 ms (+11.5%)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>No underrun or resynchronised byte</strong> in any of the 52 AC-3 and E-AC-3 plays, and no late chunk in a
+  99 s karaoke play with the screen filling and the owner touching the Adjust sheet. The screen
+  task's refresh took 2.3 ms on average over that play (1.6 ms for the demo song alone), a line
+  rebuild up to 48.9 ms (the plan's 30 ms is not met), and the audio had no late chunk beside it.</li>
+<li><strong>The scan-out and the drawing split differently by stream.</strong> On the light streams most of the
+  move while the song fills is the drawing (4.6% and 11.7% on <code>panel-null</code>, which draws and does
+  not scan out), and on AC-4 5.1 the song filling adds almost nothing (0.1%) to a 10% that is
+  already there with the screen idle. 5% was the plan's pass; the light streams exceed it while the
+  song fills, by 0.3 to 0.65% of a frame, and AC-4 5.1 exceeds it all the time.</li>
+<li><strong>AC-4 5.1 on the kit.</strong> The decoder's PCM is the v1.3 board's, bit for bit. A Sendspin burst takes
+  74% of the 42.7 ms frame on the glass at layout 9.1.6 (66% with no panel); at 5.1 it takes 65% on
+  the glass (27.65 ms, 25.27 ms with no scan-out, 26.91 ms with the glass at 40 Hz). The scan-out costs
+  2.4 ms a burst at 60 Hz, a linear 0.04 ms a hertz, and no AXI priority setting changes it. The
+  least free internal heap is 11 to 15 KB (the v1.3 board: 27.7 KB; the decoder takes whatever is
+  left, and the TDM DMA queue left 124 KB less at 5.1 before PR #1607). A bench-only <code>p4-rev3-ac4</code>
+  profile is worth adding to hold these rows; whether the kit should ship AC-4 is the owner's call.</li>
+<li><strong>The TDM DMA queue holds the layout's channels.</strong> The sink clocks sixteen slots whatever the
+  layout and, until PR #1607, enabled all of them, so its 64 ms queue was 196,608 bytes of internal RAM
+  at every layout from three channels up (24,576 at 2.0); it is now 4 bytes a frame for each channel,
+  73,728 at 5.1. A 5.1 karaoke play left 46,139 bytes of internal heap at its least and leaves
+  171,151.</li>
+</ul>
+<h2 id="developing-the-screen-without-a-panel">Developing the screen without a panel<a class="headerlink" href="#developing-the-screen-without-a-panel" title="Permanent link">&para;</a></h2>
+<p>Two tools, neither needing the kit.</p>
+<p><strong>On a computer.</strong> <code>firmware/hearth-sink/preview</code> builds the firmware's lyric screen against LVGL's
+software renderer and writes one picture per screen above, and the <a href="#the-developer-view">developer view</a>'s
+(opened with three taps on the name, on fixture data), in seconds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>cmake<span class="w"> </span>-S<span class="w"> </span>firmware/hearth-sink/preview<span class="w"> </span>-B<span class="w"> </span>build-preview<span class="w"> </span>-DLVGL_DIR<span class="o">=</span>&lt;firmware/hearth-sink/managed_components/lvgl__lvgl&gt;
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>cmake<span class="w"> </span>--build<span class="w"> </span>build-preview
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>build-preview/panel_preview<span class="w"> </span>&lt;output<span class="w"> </span>directory&gt;
+</code></pre></div>
+<p><code>managed_components/lvgl__lvgl</code> appears after any P4 build of <code>firmware/hearth-sink</code>. It reads the
+example songs in <code>examples/karaoke</code> and writes 24-bit BMP files.</p>
+<p><strong>On a P4 with no panel</strong> (<code>sdkconfig.panel-null</code>): LVGL draws into a frame buffer in PSRAM, and a
+second small HTTP server (port 8081, <code>ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT</code>, 0 for none) serves it:</p>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /panel.bmp</code></td>
+<td>the picture, as a 24-bit BMP</td>
+</tr>
+<tr>
+<td><code>GET /panel</code></td>
+<td>what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics <code>view</code> is chosen and whether the screen is <code>dimmed</code>; the <a href="#the-time-of-day">time of day</a>'s state (<code>clock_enabled</code>, <code>clock_asking</code>, <code>clock_synced</code> and <code>clock_syncs</code>); and whether the <a href="#the-developer-view">developer view</a> is open (<code>dev_view</code>) and what its refreshes cost</td>
+</tr>
+<tr>
+<td><code>POST /panel/tap?x=..&amp;y=..</code></td>
+<td>a tap, for a board with no touch controller (or to try one: three of them within 600 ms at <code>x=100&amp;y=568</code> open the developer view, and a tap on it half a second later closes it)</td>
+</tr>
+</tbody>
+</table>
+<p>The same screen code runs on both and on the glass; what the computer and the board with no panel
+leave out is the glass itself.</p>
+<h2 id="licences">Licences<a class="headerlink" href="#licences" title="Permanent link">&para;</a></h2>
+<p>The image with a screen carries <strong>LVGL</strong> (MIT licence, from the component registry, version
+9.5), and three typefaces under the SIL Open Font License 1.1: <strong>Archivo</strong> and <strong>Noto Sans Hebrew</strong>,
+which the apps bundle, and <strong>Noto Sans Greek and Cyrillic</strong>, which only this image has (the texts
+are in <code>firmware/hearth-sink/main/panel/fonts/</code>: <code>OFL.txt</code>, <code>NotoSansHebrew-OFL.txt</code> and
+<code>NotoSansGreekCyrillic-OFL.txt</code>). The Hebrew and the Greek and Cyrillic files are static instances
+cut from a variable font, which the licence allows for a font with no reserved name.</p>
+<p><strong>Where a person reads them:</strong> Hearth's <strong>About, Licences</strong> window, which shows the generated
+<code>NOTICES.txt</code> that also ships in each package, names LVGL (<code>notices/fragments/hearth-lvgl.txt</code>) and
+all three typefaces (<code>notices/fragments/hearth-fonts.txt</code>) with their copyright lines and the text
+of each licence, and, in a section of its own (<code>notices/fragments/hearth-firmware.txt</code>), ESP-IDF and
+the third-party components the ESP32 images link (FreeRTOS, lwIP, Mbed TLS, picolibc, HTTP Parser,
+argtable3, TLSF, wpa_supplicant, the Xtensa headers, and what LVGL carries: stb_truetype and the
+Montserrat font with Font Awesome's symbols), each with its text as its own files state it.
+Those texts are <code>notices/licences/ESP-IDF-components.txt</code>, made from an ESP-IDF checkout by
+<code>tools/generators/gen_esp_idf_notices.py</code> (a new ESP-IDF means running it again; a test fails
+until it is). <code>tools/ci/check_hearth_package.py</code> fails a package whose notices lack any of them.
+Forge and Crucible do not ship this firmware or these faces and their licence windows are
+unchanged. The firmware images themselves carry no notices file: the notices travel with Hearth.</p>
+<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../platforms/bare-metal/esp32-p4/">ESP32-P4 platform</a> — the chip revision, decode timing and
+  memory, AC-4</li>
+<li><a href="../../karaoke/">Karaoke</a> — the stream and the lyrics files the screen shows</li>
+<li><a href="../sink-firmware/">Sink firmware</a> — which image, and updating over the network</li>
+<li><a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md">planning/karaoke-p4x-panel.md</a>
+  — the plan, the decisions and the bring-up list</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/enhancements.js"></script>
+      
+        <script src="../../javascripts/hero-stats.js"></script>
+      
+    
+  </body>
+</html>
