@@ -575,6 +575,25 @@ jobs:
               --testsink ./build/config-linux-gcc/bin/hearth-testsink --pair "$pair"
           done
 
+      # The Music Assistant fork's side (planning/ma-atmos-e2e.md): aiosendspin 10.2.1, the release the
+      # fork runs, in a venv of its own from tools/sendspin/requirements-as10.txt (the 9.1.1 lock above
+      # stays until aiosendspin_exit.py and aiosendspin_group_exit.py pass on 10.2.1). The server
+      # script pairs with the test sink by token and by code; the ma_role package's pytest cases
+      # run; and ma_role_harness.py plays an E-AC-3 stream through `_iclforge_player@v1` to the
+      # sink. A bump of aiosendspin that breaks the sink fails here, not in the owner's Music Assistant.
+      - name: aiosendspin 10.2.1 server and ma_role
+        shell: bash
+        run: |
+          set -eu
+          python3 -m venv /tmp/aiosendspin-as10-venv
+          /tmp/aiosendspin-as10-venv/bin/pip install --no-cache-dir --only-binary=:all:             --require-hashes -r tools/sendspin/requirements-as10.txt
+          py=/tmp/aiosendspin-as10-venv/bin/python
+          for pair in token code; do
+            "$py" tools/sendspin/aiosendspin_server.py               --testsink ./build/config-linux-gcc/bin/hearth-testsink --pair "$pair"
+          done
+          "$py" -m pytest -q tools/sendspin/ma_role/tests
+          "$py" tools/sendspin/ma_role_harness.py             --testsink ./build/config-linux-gcc/bin/hearth-testsink
+
       # planning/ac4.md, phase I2: AC-4's output level, downmixes and dialogue enhancement held to
       # Part 1's formulas through Hearth's engine - the player, session and stream decoder the
       # window plays with (apps/hearth/render) - with each of forge's options as the Decoder

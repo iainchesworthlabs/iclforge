@@ -291,6 +291,21 @@ plays an E-AC-3 stream to the sink through the `_iclforge_player@v1` role.
 | C44 | One role for each family | A server negotiates one role for each family, so a sink that lists `_iclforge_player@v1` and `player@v1` is given both | A sink was told to expect at most one stream | `tools/sendspin/ma_role` gives such a connection one of them by a policy (`select_roles`, `set_mode`) that patches `SendspinConnection._roles_to_activate`, since 10.2.1 has no hook. Its stream/end and re-activation on a switch were run against the sink |
 | C45 | send_ahead for ID 192 | 10.2.1 stamps `send_ahead` at transmit for ID 4 only (`pack_player_audio_frame`) | | `ma_role` writes the 17-byte header and stamps `send_ahead` at enqueue, which is earlier by the queue's delay; sinks never schedule by it ([R5](#playerv1)). The library change that makes it generic is a message type argument to `pack_player_audio_frame` and `_send_binary_data` |
 
+### Open specification pull requests (read 2026-10-25)
+
+Four open pull requests on Sendspin/spec, read from their text and diffs only. None is merged, so
+nothing here is built; this is what each would change when it lands.
+
+| PR | Change | Rows and code it touches |
+|---|---|---|
+| #314 | Admission by activities: at most one admitted connection has `playback` and at most one has `pairing` (one may have both); empty `activities` only alone. Every `server/activate` is arbitrated, not the first only. `playback` gates the `player` and `visualizer` streams and the source role's `start`: the client ignores them (and player commands, while another connection has `playback`) without it, and the server must not send them | C11 and C12 unchanged. `arbiter.hpp` and the sink: its rank model (playback above pairing above none, later activations change rank without arbitration) is replaced by the two-slot rule and re-arbitration on every activation; the held-pairing-beside-playback exception becomes the general rule. `PlayerSession` must drop `stream/start` player objects and audio chunks on a connection without `playback`. A pairing connection that adds `playback` displaces the playback holder. aiosendspin 10.x behaviour on the server side follows the text, so the role's activations (`['playback']`) are already the right shape |
+| #315 | The same gating, but keeping the rank model and patching each gap: pairing is held only beside a connection whose activities are exactly `['playback']`; a pairing connection that adds `playback`, a new `pairing` connection and a playback connection that drops `playback` or adds `pairing` are all arbitrated | Same gating work as #314; the arbiter keeps its shape and gains the extra arbitration cases. #314 and #315 are alternatives: only one will merge |
+| #316 | `client/leave` ends no stream by itself; each stream continues or ends as for any client in the new solo group | C12 (Hearth sends `client/state` `available: false` rather than `client/leave`, a 9.1.1 workaround). Nothing to change for the sink; the server must stop ending streams on a leave, which matters to Hearth's server only if it ever handles a leave from a 10.x peer |
+| #323 | Servers must produce `flac` at 16 and 24 bit, 1 and 2 channels, 44.1 and 48 kHz, and `pcm` at 16 bit at the same rates and channels; other formats optional (Opus no longer a MAY-support only, PCM no longer required at 24 bit) | C32. The sink lists its formats in preference order: it must keep one of the mandated combinations so every server can serve it. Hearth's server must offer 16-bit PCM and the eight FLAC combinations. `_iclforge_player@v1` is outside the player role, so its burst format is untouched |
+
+Sink rules that stay as they are under all four: the pairing and the Noise rules (C2 to C10,
+C20 to C27), the 13-byte audio header and the burst chunk (IDs 4 and 192).
+
 ## The role `_ac3forge_player@v1`
 
 A Hearth sink offers two playback roles in `client/hello`, in this order:
