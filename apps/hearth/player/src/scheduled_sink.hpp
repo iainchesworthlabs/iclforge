@@ -40,6 +40,9 @@ struct PlayStats {
     // Frames dropped for being late, and frames of silence played for being early.
     std::uint64_t dropped_frames = 0;
     std::uint64_t silence_frames = 0;
+    // Frames dropped or silence played a few at a time to follow the device's clock, which is
+    // not the sink's: the drift, taken up before it is an error.
+    std::uint64_t trimmed_frames = 0;
     std::uint64_t underruns = 0;
     // Frames waiting for their time.
     std::uint64_t pending_frames = 0;
@@ -114,6 +117,9 @@ class ScheduledPcmSink final : public sink::PcmSink {
     // The stream has had its first burst, which sets its alignment.
     bool aligned_ = false;
     std::uint64_t stream_bursts_ = 0;
+    // The sync error, smoothed over some bursts so that the device's period does not move it, in
+    // microseconds; what the small steps follow.
+    double smoothed_error_us_ = 0.0;
     PlayStats stats_;
     // Underruns of the streams that are over, and whether this one's have been taken: they are
     // counted until its last frame is queued, and the silence after it is not a gap.

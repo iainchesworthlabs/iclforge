@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -17,6 +18,10 @@ namespace {
 
 // Frames handed to the device at a time.
 constexpr std::size_t kChunkFrames = 1024;
+// Bursts the error is smoothed over, and the smoothed error (in frames, about a millisecond) from
+// which the clock is followed.
+constexpr double kSmoothing = 16.0;
+constexpr double kTrimThresholdFrames = 48.0;
 
 }  // namespace
 
@@ -57,6 +62,7 @@ bool ScheduledPcmSink::open(std::uint32_t sample_rate, std::uint16_t channels) {
     ended_ = false;
     finalized_ = false;
     stream_bursts_ = 0;
+    smoothed_error_us_ = 0.0;
     rate_ = sample_rate;
     channels_ = channels;
     pending_.clear();
@@ -97,6 +103,7 @@ void ScheduledPcmSink::clear(std::uint64_t /*frames*/) {
     anchors_.clear();
     aligned_ = false;
     stream_bursts_ = 0;
+    smoothed_error_us_ = 0.0;
     if (device_open_) {
         device_->flush();
     }
@@ -199,6 +206,32 @@ bool ScheduledPcmSink::pump_locked() {
                     }
                     stats_.silence_frames += early;
                     worked = true;
+                }
+            }
+            if (!counted || std::llabs(error) > tolerance) {
+                smoothed_error_us_ = 0.0;
+            } else {
+                // Within the tolerance: follow the device's clock a frame or two at a time, from
+                // the error smoothed over some bursts, so that its period does not move it.
+                smoothed_error_us_ += (static_cast<double>(error) - smoothed_error_us_) / kSmoothing;
+                const double off_frames = smoothed_error_us_ * rate_ / 1e6;
+                if (std::fabs(off_frames) >= kTrimThresholdFrames) {
+                    const auto step = static_cast<std::size_t>(std::min(4.0, std::ceil(std::fabs(off_frames) / 24.0)));
+                    const double step_us = static_cast<double>(step) * 1e6 / rate_;
+                    if (off_frames > 0) {
+                        const std::size_t drop = std::min(step, available);
+                        pending_offset_ += drop * channels;
+                        next_frame_ += drop;
+                        stats_.trimmed_frames += drop;
+                        smoothed_error_us_ -= step_us;
+                    } else {
+                        const std::vector<float> silence(step * channels, 0.0F);
+                        if (submit_locked(silence)) {
+                            stats_.trimmed_frames += step;
+                            smoothed_error_us_ += step_us;
+                            worked = true;
+                        }
+                    }
                 }
             }
             anchors_.pop_front();

@@ -44,8 +44,13 @@ Every burst carries the time, on the player's clock, it is due. The player holds
 until they are within 150 ms of that time, then queues them on the device. When a burst is due it
 asks the device when the frame would be heard (the device's queue and the delay the platform adds)
 and compares: the difference is the **sync error**. The first burst of a stream sets its alignment,
-with silence if it is early. After that an error beyond 10 ms is corrected, by dropping frames if it
-is late and by playing silence if it is early, and counted. `stream/clear` drops what is waiting and
+with silence if it is early. After that the device's clock, which is not the player's, is followed a frame
+or a few at a time: the error is smoothed over about sixteen bursts, and when the smoothed error is
+above a millisecond, bursts drop or gain frames (`trimmed`), so a sound card that runs 300 ppm slow
+stays within a few milliseconds, not drifting for minutes. An error beyond 25 ms, which is a period
+and a half of WASAPI's shared mode and so more than the platform's own position can be trusted to,
+is corrected at once, by dropping frames if it is late and by playing silence if it is early, and
+counted (`corrected`). `stream/clear` drops what is waiting and
 flushes the device.
 
 The console status line, printed every two seconds while a stream plays and when the state changes,
