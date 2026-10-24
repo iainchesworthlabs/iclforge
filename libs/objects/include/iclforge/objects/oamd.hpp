@@ -419,8 +419,12 @@ struct TrimConfig {
 // value anywhere in TS 103 420. Six is what a real stream proves: a DD+ JOC
 // trim_element from the Dolby Encoding Engine parses to exactly its declared
 // oa_element_size with six configurations and to a byte-count mismatch with
-// any other number.
+// any other number. A 15-object music mix (a real Dolby Atmos release, 768
+// kb/s) carries nine, the count TS 103 190 6.3.9.10.4 gives AC-4's trim(), so
+// parse_payload tries six, then kNumTrimConfigsFull, and keeps the one that
+// fills the declared element size exactly.
 inline constexpr int kNumTrimConfigs = 6;
+inline constexpr int kNumTrimConfigsFull = 9;
 
 struct TrimElement {
     int warp_mode = 0;         // Table 32
