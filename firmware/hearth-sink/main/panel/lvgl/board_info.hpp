@@ -52,6 +52,10 @@ struct BoardInfo {
 struct NowPlaying {
     // "Dolby Digital Plus 5.1 to 7.1.4": what arrives and what it is played on.
     LvString heading;
+    // What the decoder found, and the coded stream's bitrate in kb/s (0 until it is known): the footer says
+    // them (iclforge::nowview::stream_info_options).
+    iclforge::nowview::StreamFacts facts;
+    int kbps = 0;
     // One per output slot, in slot order; empty while the board does not know its layout.
     LvVector<iclforge::render::PlanSpot> spots;
     // Per slot, in dB of full scale (-120 is silence); empty before the first 100 ms window has closed.

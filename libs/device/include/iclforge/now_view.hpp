@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace iclforge::nowview {
 
@@ -227,6 +228,106 @@ struct StreamFacts {
     const std::string stream = stream_name(facts);
     const std::string room = room_name(layout, outputs);
     return room.empty() ? stream : stream + " to " + room;
+}
+
+// --- who sends it, how fast, and where it is decoded -----------------------------------------------------
+
+// The bitrate of the coded stream being played, in kb/s: the bytes of coded audio the player has played
+// (a total that only grows within a stream) over the time they took, smoothed. Not the figure in a header:
+// what actually arrived. Fed a few times a second; it measures over windows of at least kWindowMs and
+// moves a third of the way to each one, so a variable-rate stream settles and a burst of network does not
+// show. A total that goes down is a new stream and starts the meter again.
+class BitrateMeter {
+   public:
+    static constexpr std::uint32_t kWindowMs = 1000;
+
+    void observe(std::uint64_t total_bytes, std::uint32_t now_ms) {
+        if (!started_ || total_bytes < last_bytes_ || now_ms < last_ms_) {
+            started_ = true;
+            last_bytes_ = total_bytes;
+            last_ms_ = now_ms;
+            kbps_ = 0.0;
+            have_ = false;
+            return;
+        }
+        const std::uint32_t elapsed = now_ms - last_ms_;
+        if (elapsed < kWindowMs) {
+            return;
+        }
+        const std::uint64_t bytes = total_bytes - last_bytes_;
+        last_bytes_ = total_bytes;
+        last_ms_ = now_ms;
+        if (bytes == 0) {
+            // Nothing played in the window (paused, or between songs): the figure is not kept, it is unknown.
+            kbps_ = 0.0;
+            have_ = false;
+            return;
+        }
+        // bits per millisecond is kb/s.
+        const double window = static_cast<double>(bytes) * 8.0 / static_cast<double>(elapsed);
+        kbps_ = have_ ? kbps_ + (window - kbps_) / 3.0 : window;
+        have_ = true;
+    }
+
+    // 0 until a window has closed with audio in it.
+    [[nodiscard]] int kbps() const { return have_ ? static_cast<int>(kbps_ + 0.5) : 0; }
+
+    void reset() { *this = BitrateMeter(); }
+
+   private:
+    bool started_ = false;
+    bool have_ = false;
+    std::uint64_t last_bytes_ = 0;
+    std::uint32_t last_ms_ = 0;
+    double kbps_ = 0.0;
+};
+
+// What a server calls itself in /status is "Music Assistant (d5369777-music-assistant)": the name, and the
+// id it connects with in brackets. The screen says the name; the developer view keeps the whole string.
+[[nodiscard]] inline std::string server_label(std::string_view server) {
+    server = detail::trimmed(server);
+    if (!server.empty() && server.back() == ')') {
+        const std::size_t open = server.rfind(" (");
+        if (open != std::string_view::npos && open > 0) {
+            return std::string(detail::trimmed(server.substr(0, open)));
+        }
+    }
+    return std::string(server);
+}
+
+// The line the footer says about a stream, from the most to the least it can say; the screen takes the
+// first that fits its width. A coded stream is decoded on this board (the server sent it undecoded), and a
+// PCM one was decoded by the server.
+//   "Decoded on this board - 768 kb/s - from Music Assistant", "Decoded on this board - 768 kb/s",
+//   "Decoded here - 768 kb/s - from Music Assistant", "Decoded here - 768 kb/s", "768 kb/s"; "PCM from Music
+//   Assistant", "PCM".
+[[nodiscard]] inline std::vector<std::string> stream_info_options(const StreamFacts& facts, int kbps,
+                                                                  std::string_view server) {
+    const std::string who = server_label(server);
+    std::vector<std::string> out;
+    if (facts.codec == Codec::kPcm) {
+        out.push_back(who.empty() ? std::string("PCM") : "PCM from " + who);
+        out.push_back("PCM");
+        return out;
+    }
+    const std::string rate = kbps > 0 ? std::to_string(kbps) + " kb/s" : std::string();
+    const auto join = [&](const char* head) {
+        std::string line = head;
+        if (!rate.empty()) {
+            line += " - " + rate;
+        }
+        return line;
+    };
+    if (!who.empty()) {
+        out.push_back(join("Decoded on this board") + " - from " + who);
+        out.push_back(join("Decoded here") + " - from " + who);
+    }
+    out.push_back(join("Decoded on this board"));
+    out.push_back(join("Decoded here"));
+    if (!rate.empty()) {
+        out.push_back(rate);
+    }
+    return out;
 }
 
 }  // namespace iclforge::nowview

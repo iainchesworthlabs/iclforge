@@ -4153,6 +4153,8 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+- The ESP32-P4 kit screen now says, in its footer, that a coded stream is decoded on the board, its bitrate and which server sends it (`PCM from <server>` for PCM); `PUT /layout` is kept over a restart, so a board a server sends no layout to (Music Assistant) can show 5.1 or 7.1.4.
+
 **One vcpkg route, shared between checkouts**
 
 - **`cmake/VcpkgRoot.cmake` chooses the vcpkg checkout, and the presets no longer set the toolchain

@@ -181,7 +181,8 @@ struct Level {
 };
 
 // A stream playing to the room `layout` names, with the decoder's findings and a level for every slot.
-void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, const std::vector<Level>& levels) {
+void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, const std::vector<Level>& levels,
+               int kbps = 0, const char* server = "") {
     const auto parsed = iclforge::render::OutputLayout::parse(layout);
     if (!parsed) {
         std::fprintf(stderr, "scenario layout %s\n", layout);
@@ -192,6 +193,9 @@ void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, 
     g_now.spots.assign(spots.begin(), spots.end());
     const std::string heading = iclforge::nowview::heading(facts, layout, spots.size());
     g_now.heading.assign(heading.data(), heading.size());
+    g_now.facts = facts;
+    g_now.kbps = kbps;
+    g_board.server = server;
     for (const Level& level : levels) {
         g_now.peak_db.push_back(level.peak);
         g_now.rms_db.push_back(level.rms);
@@ -490,6 +494,30 @@ int main(int argc, char** argv) {
                        kSevenOneFour);
          }, 10'000'000},
         {"s13-speakers-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix); }, 10'000'000},
+        // Stream details (a server that is not Hearth: Music Assistant): decoded on this board, the bitrate and
+        // who sends it, in the footer; and PCM, which the server decoded.
+        {"s17-ma-atmos-7-1-4", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true,
+                                 .objects = 15},
+                       kSevenOneFour, 768, "Music Assistant (d5369777-music-assistant)");
+         }, 10'000'000},
+        {"s17-ma-title-card", [&] {
+             g_settings.view = iclforge::nowview::View::kTitle;
+             play_room("5.1", kDolbyFiveOne, kFiveOne, 448, "Music Assistant (d5369777-music-assistant)");
+             say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+         }},
+        {"s17-ma-pcm", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo, 0,
+                       "Music Assistant (d5369777-music-assistant)");
+             say_no_title();
+         }, 10'000'000},
+        {"s17-long-server-name", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("5.1", kDolbyFiveOne, kFiveOne, 640, "Living room Hearth server on a very long host name (id)");
+             say_no_title();
+         }, 10'000'000},
         // Stage 2: the title card, once a server has said a title. A song of a record's length, partway.
         {"s16-title-card", [&] {
              g_settings.view = iclforge::nowview::View::kTitle;
