@@ -217,6 +217,37 @@ TEST_CASE("pairing flow: a server takes the specification's client/pair-init bef
     }
 }
 
+TEST_CASE("pairing flow: a client sends client/pair-init before the Pairing PSK's finalize",
+          "[sendspin][pairing_flow]") {
+    const m::PairingActivation activation{
+        .method = m::PairMethod::kPairingPsk, .format = std::nullopt, .pin_length = 0, .languages = {}};
+    SECTION("the specification: init for this activation, then finalize") {
+        Pairing pairing(Dialect::kSpecification, hs::PskCategory::kPairing, {kPskDescriptor});
+        const flow::Step step = pairing.client->start(activation, 7, 0);
+        CHECK(step.after == flow::After::kContinue);
+        REQUIRE(step.messages.size() == 2);
+        const Parsed init(step.messages[0]);
+        CHECK(init.envelope->type == "client/pair-init");
+        const auto read = iclforge::sendspin::pairing_messages::read_client_pair_init(init.envelope->payload);
+        REQUIRE(read.has_value());
+        CHECK(read->pairing_index == 7);
+        CHECK_FALSE(read->commit_b.has_value());
+        CHECK(Parsed(step.messages[1]).envelope->type == "client/pair-finalize");
+    }
+    SECTION("the 9.1.1 dialect: the finalize alone, which that server requires") {
+        Pairing pairing(Dialect::kAiosendspin911, hs::PskCategory::kPairing, {kPskDescriptor});
+        const flow::Step step = pairing.client->start(activation, 1, 0);
+        REQUIRE(step.messages.size() == 1);
+        CHECK(Parsed(step.messages[0]).envelope->type == "client/pair-finalize");
+    }
+    SECTION("both halves pair with the init in the stream") {
+        Pairing pairing(Dialect::kSpecification, hs::PskCategory::kPairing, {kPskDescriptor});
+        pairing.start(activation);
+        CHECK(pairing.server_after == flow::After::kPaired);
+        CHECK(pairing.client_after == flow::After::kPaired);
+    }
+}
+
 TEST_CASE("pairing flow: pairing_psk needs the pairing PSK to have matched", "[sendspin][pairing_flow]") {
     Pairing pairing(Dialect::kSpecification, hs::PskCategory::kSentinel, {kPskDescriptor, kDynamicDescriptor});
     const flow::Step step = pairing.client->start(
