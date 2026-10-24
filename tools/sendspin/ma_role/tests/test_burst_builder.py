@@ -131,7 +131,9 @@ def test_the_chunk_header_is_seventeen_big_endian_bytes() -> None:
 def test_send_ahead_saturates_and_never_wraps() -> None:
     burst = eac3.Burst(payload=bytes(16))
     assert eac3.parse_burst_chunk(eac3.pack_burst_chunk(1, -5, burst)).send_ahead_us == 0
-    assert eac3.parse_burst_chunk(eac3.pack_burst_chunk(1, 1 << 40, burst)).send_ahead_us == 0xFFFFFFFF
+    assert (
+        eac3.parse_burst_chunk(eac3.pack_burst_chunk(1, 1 << 40, burst)).send_ahead_us == 0xFFFFFFFF
+    )
 
 
 def test_a_chunk_that_contradicts_itself_is_refused() -> None:

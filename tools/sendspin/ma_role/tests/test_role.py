@@ -1,6 +1,6 @@
 """The role's parsing, stream messages and send path, against a stand-in client.
 
-Needs aiosendspin 10.2.1; skipped without it. The sink-side check is tools/sendspin/ma_role_harness.py.
+Needs aiosendspin 10.2.1; skipped without it. The sink-side check is ../../ma_role_harness.py.
 """
 
 from __future__ import annotations
@@ -13,7 +13,9 @@ import pytest
 
 pytest.importorskip("aiosendspin")
 
-from ma_role import eac3, role  # noqa: E402
+from aiosendspin.server.roles import registry
+from aiosendspin.server.roles.negotiation import negotiate_roles
+from ma_role import eac3, role
 
 SUPPORT = {
     "data_types": ["eac3"],
@@ -184,7 +186,12 @@ def test_a_burst_is_sent_with_its_header_and_send_ahead_stamped() -> None:
     assert sent["buffer_end_time_us"] == stamp + 32_000
     assert sent["buffer_byte_count"] == len(sent["data"]) == 17 + 16
     parsed = eac3.parse_burst_chunk(sent["data"])
-    assert (parsed.timestamp_us, parsed.send_ahead_us, parsed.pc, parsed.pd) == (stamp, 600_000, 0x15, 16)
+    assert (parsed.timestamp_us, parsed.send_ahead_us, parsed.pc, parsed.pd) == (
+        stamp,
+        600_000,
+        0x15,
+        16,
+    )
     assert parsed.payload == burst().payload
 
 
@@ -222,7 +229,10 @@ def test_a_programme_waits_for_the_sink_state_and_starts_after_its_lead_time() -
         await sending
 
     asyncio.run(scenario())
-    assert client.binary[0]["timestamp_us"] == client._server.clock.now + 1_000_000 + role.START_MARGIN_US
+    assert (
+        client.binary[0]["timestamp_us"]
+        == client._server.clock.now + 1_000_000 + role.START_MARGIN_US
+    )
 
 
 def test_role_selection_gives_a_board_with_both_roles_one_of_them() -> None:
@@ -240,9 +250,6 @@ def test_role_selection_gives_a_board_with_both_roles_one_of_them() -> None:
 
 
 def test_register_adds_the_role_requiring_pairing_and_is_repeatable() -> None:
-    from aiosendspin.server.roles import registry
-    from aiosendspin.server.roles.negotiation import negotiate_roles
-
     role.register()
     role.register()
     assert registry.ROLE_FACTORIES[role.ROLE_ID] is role.IclforgePlayerRole

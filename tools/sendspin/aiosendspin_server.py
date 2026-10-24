@@ -1,4 +1,4 @@
-"""Music Assistant's Sendspin server, scripted on aiosendspin 9.1.1 or 10.2.1, playing to hearth-testsink.
+"""Music Assistant's Sendspin server, scripted on aiosendspin 9.1.1 or 10.2.1, to hearth-testsink.
 
 A rehearsal of A4's exit with Music Assistant (planning/hearth-reference-player.md, A4's exit):
 Music Assistant's Sendspin provider runs aiosendspin 9.1.1's SendspinServer, and this script drives
@@ -33,6 +33,11 @@ from typing import Any
 import numpy as np
 from aiosendspin.audio.format import AudioFormat
 from aiosendspin.models.types import MediaCommand, PairMethod
+
+try:
+    from aiosendspin.models.types import PairingCodeFormat
+except ImportError:  # 9.1.1 has no code formats
+    PairingCodeFormat = None
 from aiosendspin.noise.keys import Identity
 from aiosendspin.noise.pairing import PairingAttempt
 from aiosendspin.noise.trust_store import InMemoryServerPairingStore
@@ -219,8 +224,6 @@ async def play(sink: TestSink, pair: str, samples: array) -> None:
             if hasattr(PairMethod, "DYNAMIC_PIN"):  # 9.1.1
                 attempt = PairingAttempt(PairMethod.DYNAMIC_PIN, pin_provider=entered_code)
             else:
-                from aiosendspin.models.types import PairingCodeFormat
-
                 attempt = PairingAttempt(
                     PairMethod.DYNAMIC_PAIRING_CODE,
                     pairing_code_provider=entered_code,

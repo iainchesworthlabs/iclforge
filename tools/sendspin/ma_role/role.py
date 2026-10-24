@@ -1,10 +1,11 @@
 """`_iclforge_player@v1` as a plug-in role of an aiosendspin 10.2.1 server.
 
 The role the sinks list ahead of `player@v1` (planning/hearth-sendspin-extension.md, The role
-`_ac3forge_player@v1`, the name the page was written with; the wire name is `_iclforge_player@v1`), written the way aiosendspin 10.2.1's own roles are, so that a server which
-imports this package and calls `register()` negotiates it, reads its support and state objects,
-starts and ends its stream, and sends it burst chunks (binary id 192). Nothing here edits aiosendspin;
-two places where the library has no hook are patched from here and marked PATCH.
+`_ac3forge_player@v1`, the name the page was written with; the wire name is `_iclforge_player@v1`),
+written the way aiosendspin 10.2.1's own roles are, so that a server which imports this package
+and calls `register()` negotiates it, reads its support and state objects, starts and ends its
+stream, and sends it burst chunks (binary id 192). Nothing here edits aiosendspin; two places
+where the library has no hook are patched from here and marked PATCH.
 
 What a server does with it (tools/sendspin/ma_role_harness.py is the worked example):
 
@@ -117,7 +118,9 @@ def parse_support(raw: dict[str, Any]) -> IclforgePlayerSupport:
     ):
         raise ValueError(f"{SUPPORT_KEY}.data_types must be a non-empty list of strings")
     sample_rates = raw.get("sample_rates")
-    if not isinstance(sample_rates, list) or not all(isinstance(item, int) for item in sample_rates):
+    if not isinstance(sample_rates, list) or not all(
+        isinstance(item, int) for item in sample_rates
+    ):
         raise ValueError(f"{SUPPORT_KEY}.sample_rates must be a list of integers")
     capacity = raw.get("buffer_capacity")
     if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity < 1:
@@ -157,7 +160,7 @@ class IclforgePlayerState:
         self.raw |= obj
         for name in ("required_lead_time_ms", "min_buffer_ms", "output_delay_ms"):
             value = obj.get(name)
-            if isinstance(value, int) and not isinstance(value, bool) and 0 <= value:
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
                 setattr(self, name, min(value, MAXIMUM_TIMING_MS))
         if isinstance(obj.get("counters"), dict):
             self.counters = {k: v for k, v in obj["counters"].items() if isinstance(v, int)}
@@ -215,7 +218,7 @@ class IclforgePlayerRole(Role):
         return 1.0
 
     def requires_initial_state(self) -> bool:
-        """The sink's first client/state carries this role's object, as `player@v1`'s carries its."""
+        """The sink's first client/state carries this role's object, as `player@v1`'s does."""
         return True
 
     def requires_activation_state(self) -> bool:
@@ -266,7 +269,7 @@ class IclforgePlayerRole(Role):
         capacity = self.support.buffer_capacity if self.support else 1
         if self._buffer_tracker is None:
             self._buffer_tracker = BufferTracker(
-                clock=self._client._server.clock,  # noqa: SLF001
+                clock=self._client._server.clock,
                 client_id=self._client.client_id,
                 capacity_bytes=capacity,
             )
@@ -297,7 +300,9 @@ class IclforgePlayerRole(Role):
         self.send_message(
             StreamStartMessage(
                 payload=StreamStartPayload(
-                    application_objects={FAMILY: {"data_type": data_type, "sample_rate": sample_rate}}
+                    application_objects={
+                        FAMILY: {"data_type": data_type, "sample_rate": sample_rate}
+                    }
                 )
             )
         )
@@ -307,7 +312,7 @@ class IclforgePlayerRole(Role):
         self.reset_binary_timing()
 
     def clear_stream(self) -> None:
-        """stream/clear for this role: the sink drops what it holds and plays on from what follows."""
+        """stream/clear for this role: the sink drops what it holds and plays on after it."""
         if not self.has_connection():
             return
         # What is queued here goes first, or it would reach the sink after the clear.
@@ -341,11 +346,11 @@ class IclforgePlayerRole(Role):
     # The send path (B3, B4).
 
     def send_burst(self, burst: Burst, timestamp_us: int) -> None:
-        """Enqueue one burst chunk, to play its first decoded sample at `timestamp_us` (server clock).
+        """Enqueue one burst chunk, its first decoded sample due at `timestamp_us` (server clock).
 
         PATCH note (B4): aiosendspin stamps send_ahead at transmit time only for binary id 4, in
         `pack_player_audio_frame`. For id 192 the role writes the 17-byte header itself and stamps
-        send_ahead now, at enqueue, which is earlier than the transmit by the queue's delay. The sinks
+        send_ahead now, at enqueue, earlier than the transmit by the queue's delay. The sinks
         never schedule by it, so this is a stopgap; README.md says what the library change is.
         """
         if not self._stream_started:
@@ -357,7 +362,7 @@ class IclforgePlayerRole(Role):
                 raise RoleError(f"a {frame_bytes}-byte chunk is over the sink's max_chunk_bytes")
             if frame_bytes > support.buffer_capacity:
                 raise RoleError(f"a {frame_bytes}-byte chunk is over the sink's buffer_capacity")
-        now_us = self._client._server.clock.now_us()  # noqa: SLF001
+        now_us = self._client._server.clock.now_us()
         frame = pack_burst_chunk(timestamp_us, compute_send_ahead(timestamp_us, now_us), burst)
         duration_us = burst.samples * 1_000_000 // self._sample_rate
         self._client.send_binary(
@@ -380,7 +385,7 @@ class IclforgePlayerRole(Role):
 
     def default_start_us(self) -> int:
         """Where a stream begun now starts: the sink's lead time, with a margin, after now."""
-        now_us = self._client._server.clock.now_us()  # noqa: SLF001
+        now_us = self._client._server.clock.now_us()
         return now_us + self.get_required_lead_time_us() + START_MARGIN_US
 
     async def send_programme(
@@ -404,7 +409,7 @@ class IclforgePlayerRole(Role):
         stamps = timeline(start_us, self._sample_rate, (burst.samples for burst in burst_list))
         end_us = start_us
         for burst, stamp in zip(burst_list, stamps, strict=True):
-            while (wait_us := stamp - self._client._server.clock.now_us() - ahead_us) > 0:  # noqa: SLF001
+            while (wait_us := stamp - self._client._server.clock.now_us() - ahead_us) > 0:
                 await asyncio.sleep(min(wait_us / 1_000_000, 0.25))
             self.send_burst(burst, stamp)
             end_us = stamp + burst.samples * 1_000_000 // self._sample_rate
@@ -446,17 +451,17 @@ def _patch_role_selection() -> None:
     global _patched  # noqa: PLW0603
     if _patched:
         return
-    original = SendspinConnection._roles_to_activate  # noqa: SLF001
+    original = SendspinConnection._roles_to_activate
 
     def roles_to_activate(self: SendspinConnection) -> list[str]:
-        return select_roles(self._client_id, original.fget(self))  # type: ignore[union-attr]  # noqa: SLF001
+        return select_roles(self._client_id, original.fget(self))  # type: ignore[union-attr]
 
-    SendspinConnection._roles_to_activate = property(roles_to_activate)  # type: ignore[method-assign]  # noqa: SLF001
+    SendspinConnection._roles_to_activate = property(roles_to_activate)  # type: ignore[method-assign]
     _patched = True
 
 
 def mode_of(client: SendspinClient) -> str:
-    """"coded" or "pcm": which playback role the connection is to have."""
+    """ "coded" or "pcm": which playback role the connection is to have."""
     return _MODES.get(client.client_id, "pcm")
 
 
@@ -476,9 +481,12 @@ async def set_mode(client: SendspinClient, mode: str, timeout: float = 10.0) -> 
     wanted = ROLE_ID if mode == "coded" else PLAYER_ROLE_ID
     if client.role(wanted) is not None:
         return
-    if ROLE_ID not in connection._negotiated_roles or PLAYER_ROLE_ID not in connection._negotiated_roles:  # noqa: SLF001
+    if (
+        ROLE_ID not in connection._negotiated_roles
+        or PLAYER_ROLE_ID not in connection._negotiated_roles
+    ):
         raise RoleError("the client does not list both playback roles")
-    connection._send_activation(connection._roles_to_activate)  # noqa: SLF001
+    connection._send_activation(connection._roles_to_activate)
     async with asyncio.timeout(timeout):
         while client.role(wanted) is None:
             await asyncio.sleep(0.02)

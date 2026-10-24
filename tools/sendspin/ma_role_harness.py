@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import itertools
 import logging
 import sys
 import tempfile
@@ -111,11 +112,13 @@ async def pair(server: SendspinServer, sink: TestSink) -> object:
 
 async def play_out(player: role.IclforgePlayerRole, end_us: int, client: object) -> None:
     """Waits until the sink has played to `end_us` on the server clock, and a little more."""
-    clock = client._server.clock  # noqa: SLF001
+    clock = client._server.clock
     await asyncio.sleep(max(0.0, (end_us - clock.now_us()) / 1_000_000) + 0.5)
 
 
-async def coded_item(client: object, stream: bytes, limit: int, tap: WireTap, sink: TestSink) -> list[str]:
+async def coded_item(
+    client: object, stream: bytes, limit: int, tap: WireTap, sink: TestSink
+) -> list[str]:
     problems: list[str] = []
     bursts = eac3.build_bursts(stream)[:limit]
     assert len(bursts) >= 4, "the stream is too short for the clear test"
@@ -160,7 +163,9 @@ async def coded_item(client: object, stream: bytes, limit: int, tap: WireTap, si
         if (chunk.pc, chunk.payload) != (burst.pc, burst.payload):
             problems.append("a chunk's bytes are not its burst's")
             break
-    expected = golden_digests(Path(sys.argv[sys.argv.index("--stream") + 1]) if "--stream" in sys.argv else DEFAULT_STREAM)
+    expected = golden_digests(
+        Path(sys.argv[sys.argv.index("--stream") + 1]) if "--stream" in sys.argv else DEFAULT_STREAM
+    )
     if expected is not None:
         wire_rows = [(c.pc, c.pd, fnv1a(c.payload)) for c in sent]
         if wire_rows != expected[: len(wire_rows)]:
@@ -168,7 +173,7 @@ async def coded_item(client: object, stream: bytes, limit: int, tap: WireTap, si
         else:
             print(f"coded item: {len(wire_rows)} chunk payloads equal the C++ packer's")
     stamps = [chunk.timestamp_us for chunk in sent[:first]]
-    steps = {b - a for a, b in zip(stamps, stamps[1:], strict=False)}
+    steps = {b - a for a, b in itertools.pairwise(stamps)}
     if not steps <= {32_000}:
         problems.append(f"the first half's timestamps step by {sorted(steps)} us, not 32,000")
     return problems
@@ -250,9 +255,13 @@ def main() -> int:
     arguments = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if arguments.verbose else logging.WARNING)
     if arguments.out is not None:
-        return asyncio.run(run(arguments.testsink, arguments.stream, arguments.bursts, arguments.out))
+        return asyncio.run(
+            run(arguments.testsink, arguments.stream, arguments.bursts, arguments.out)
+        )
     with tempfile.TemporaryDirectory(prefix="ma-role-harness-") as scratch:
-        return asyncio.run(run(arguments.testsink, arguments.stream, arguments.bursts, Path(scratch)))
+        return asyncio.run(
+            run(arguments.testsink, arguments.stream, arguments.bursts, Path(scratch))
+        )
 
 
 if __name__ == "__main__":
