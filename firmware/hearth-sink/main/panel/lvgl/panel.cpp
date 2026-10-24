@@ -189,6 +189,21 @@ bool read_now_playing(NowPlaying& out) {
         out.heading.assign(heading.data(), heading.size());
     }
     first = false;
+    // The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure).
+    static iclforge::nowview::BitrateMeter meter;
+    static bool metered = false;
+    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
+        meter.reset();
+        metered = false;
+    } else {
+        if (!metered) {
+            meter.reset();
+            metered = true;
+        }
+        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
+    }
+    out.facts = playing.facts;
+    out.kbps = meter.kbps();
     if (playing.have_levels) {
         out.peak_db.assign(playing.peak_db.begin(), playing.peak_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
         out.rms_db.assign(playing.rms_db.begin(), playing.rms_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));

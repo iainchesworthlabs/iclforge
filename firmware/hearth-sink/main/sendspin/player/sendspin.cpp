@@ -1053,6 +1053,7 @@ SendspinPlaying sendspin_now_playing() {
     out.layout = play.layout;
     out.outputs = std::min(play.outputs, out.peak_db.size());
     out.have_levels = play.have_levels;
+    out.coded_bytes = play.coded_bytes;
     for (std::size_t o = 0; o < out.outputs; ++o) {
         out.peak_db[o] = play.peak_db[o];
         out.rms_db[o] = play.rms_db[o];

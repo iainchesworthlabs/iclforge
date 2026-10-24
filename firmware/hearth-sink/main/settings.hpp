@@ -88,6 +88,11 @@ struct Settings {
     std::array<char, iclforge::wallclock::kNtpServerMaxBytes + 1> ntp_server{};
     // Whether the board keeps its time with a time server at all. On unless someone turned it off.
     bool time_sync = true;
+    // The output layout the board starts with ("5.1", "7.1.4", or a short speaker list), set by PUT /layout
+    // and kept over a restart; empty when nobody has set one, and the image's own
+    // (CONFIG_ICLFORGE_EXAMPLE_LAYOUT) stands. A server that sends a layout of its own (Hearth does, a
+    // Music Assistant does not) replaces it for the stream.
+    std::array<char, kMaxPasswordBytes + 1> layout{};
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -125,6 +130,8 @@ void settings_load();
 // pool; and whether to ask one at all.
 [[nodiscard]] bool settings_set_ntp_server(std::string_view server);
 [[nodiscard]] bool settings_set_time_sync(bool on);
+// The stored layout text (already checked as a layout by the caller); an empty string takes it away.
+[[nodiscard]] bool settings_set_layout(std::string_view layout);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

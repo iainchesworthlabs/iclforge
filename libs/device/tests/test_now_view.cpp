@@ -202,3 +202,73 @@ TEST_CASE("now_view: the heading says what arrives and what it is played on", "[
     // No room known: the stream alone.
     CHECK(nv::heading({.codec = Codec::kPcm}, "", 0) == "PCM");
 }
+
+TEST_CASE("now_view: a server's name is shortened to what a person reads", "[now_view]") {
+    CHECK(nv::server_label("Music Assistant (d5369777-music-assistant)") == "Music Assistant");
+    CHECK(nv::server_label("  Hearth on STUDIO-PC ") == "Hearth on STUDIO-PC");
+    CHECK(nv::server_label("") == "");
+    // Nothing before the brackets: the whole string stays.
+    CHECK(nv::server_label("(id)") == "(id)");
+    CHECK(nv::server_label("Plain (not closed") == "Plain (not closed");
+}
+
+TEST_CASE("now_view: the bitrate settles on the rate of the bytes played", "[now_view]") {
+    nv::BitrateMeter meter;
+    CHECK(meter.kbps() == 0);
+    // 768 kb/s is 96,000 bytes a second.
+    meter.observe(0, 10'000);
+    CHECK(meter.kbps() == 0);
+    meter.observe(48'000, 10'500);  // under a window: not measured yet
+    CHECK(meter.kbps() == 0);
+    meter.observe(96'000, 11'000);
+    CHECK(meter.kbps() == 768);
+    // A burst of network does not show: the next window is twice as fast and the figure moves a third of the way.
+    meter.observe(96'000 + 192'000, 12'000);
+    CHECK(meter.kbps() == 1024);
+    meter.observe(96'000 + 192'000 + 96'000, 13'000);
+    CHECK(meter.kbps() == 939);
+}
+
+TEST_CASE("now_view: the bitrate starts again with a stream and is unknown while nothing plays", "[now_view]") {
+    nv::BitrateMeter meter;
+    meter.observe(0, 0);
+    meter.observe(56'000, 1'000);
+    CHECK(meter.kbps() == 448);
+    // Nothing played in a window: no figure rather than the last one.
+    meter.observe(56'000, 2'000);
+    CHECK(meter.kbps() == 0);
+    // A smaller total is a new stream.
+    meter.observe(12'000, 3'000);
+    CHECK(meter.kbps() == 0);
+    meter.observe(12'000 + 96'000, 4'000);
+    CHECK(meter.kbps() == 768);
+    meter.reset();
+    CHECK(meter.kbps() == 0);
+}
+
+TEST_CASE("now_view: a coded stream says it is decoded on this board, most to least", "[now_view]") {
+    using Codec = nv::Codec;
+    const nv::StreamFacts atmos{.codec = Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true, .objects = 15};
+    const auto full = nv::stream_info_options(atmos, 768, "Music Assistant (d5369777-music-assistant)");
+    REQUIRE(full.size() == 5);
+    CHECK(full[0] == "Decoded on this board - 768 kb/s - from Music Assistant");
+    CHECK(full[1] == "Decoded here - 768 kb/s - from Music Assistant");
+    CHECK(full[2] == "Decoded on this board - 768 kb/s");
+    CHECK(full[3] == "Decoded here - 768 kb/s");
+    CHECK(full[4] == "768 kb/s");
+    // No figure yet, no server: nothing is made up.
+    const auto bare = nv::stream_info_options(atmos, 0, "");
+    REQUIRE(bare.size() == 2);
+    CHECK(bare[0] == "Decoded on this board");
+    CHECK(bare[1] == "Decoded here");
+    // Before the first unit has decoded it is still the board that will decode it.
+    CHECK(nv::stream_info_options({.codec = Codec::kUnknown}, 0, "Hearth")[0] == "Decoded on this board - from Hearth");
+}
+
+TEST_CASE("now_view: a PCM stream says the server decoded it", "[now_view]") {
+    const auto pcm = nv::stream_info_options({.codec = nv::Codec::kPcm}, 0, "Music Assistant (d5369777-music-assistant)");
+    REQUIRE(pcm.size() == 2);
+    CHECK(pcm[0] == "PCM from Music Assistant");
+    CHECK(pcm[1] == "PCM");
+    CHECK(nv::stream_info_options({.codec = nv::Codec::kPcm}, 0, "")[0] == "PCM");
+}

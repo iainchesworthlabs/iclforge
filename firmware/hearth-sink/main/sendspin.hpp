@@ -93,6 +93,8 @@ struct SendspinPlaying {
     std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
     // The codec, and once a unit has decoded the coded layout and the objects.
     iclforge::nowview::StreamFacts facts;
+    // The coded bytes played so far in this stream, for the bitrate (iclforge::nowview::BitrateMeter).
+    std::uint64_t coded_bytes = 0;
 };
 [[nodiscard]] SendspinPlaying sendspin_now_playing();
 

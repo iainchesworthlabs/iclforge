@@ -31,6 +31,7 @@ constexpr const char* kKeyDimAfter = "np_dim";
 constexpr const char* kKeyTimeZone = "time_zone";
 constexpr const char* kKeyNtpServer = "ntp_server";
 constexpr const char* kKeyTimeSync = "time_sync";
+constexpr const char* kKeyLayout = "layout";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -143,6 +144,7 @@ void settings_load() {
     g_settings.time_zone = {};
     g_settings.ntp_server = {};
     g_settings.time_sync = true;
+    g_settings.layout = {};
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -218,6 +220,7 @@ void settings_load() {
     if (nvs_get_i32(handle, kKeyTimeSync, &stored) == ESP_OK) {
         g_settings.time_sync = stored != 0;
     }
+    read_string(handle, kKeyLayout, g_settings.layout);
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
@@ -316,6 +319,10 @@ bool settings_set_dim_after(int minutes) {
     }
     g_settings.dim_after_minutes = minutes;
     return true;
+}
+
+bool settings_set_layout(std::string_view layout) {
+    return write_string(kKeyLayout, layout, g_settings.layout);
 }
 
 bool settings_set_time_zone(std::string_view zone) {
