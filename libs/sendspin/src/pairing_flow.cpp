@@ -477,6 +477,15 @@ Step ServerPairing::receive(std::string_view type, json::Value payload) {
                 return {};
             }
             if (method_ == m::PairMethod::kPairingPsk) {
+                if (type == "client/pair-init" && dialect == Dialect::kSpecification) {
+                    // The specification has the client send client/pair-init, then client/pair-finalize
+                    // (pairing.md); a player of the 9.1.1 era or Hearth's own sends the finalize alone.
+                    const auto init = pm::read_client_pair_init(payload);
+                    if (!init || init->pairing_index != pairing_index_ || init->commit_b) {
+                        return protocol_error();
+                    }
+                    return {};
+                }
                 if (type != "client/pair-finalize") {
                     return protocol_error();
                 }

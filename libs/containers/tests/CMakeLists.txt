@@ -21,7 +21,9 @@ if(ICLFORGE_BUILD_IAMF)
 endif()
 
 # iec61937/test_iec61937_ac4.cpp reads std::getenv, for the census directory it packs - the C4996
-# reasoning of libs/ac3/tests' cpu_features.cpp.
+# reasoning of libs/ac3/tests' cpu_features.cpp. iec61937/test_iec61937_parts.cpp reads it for the
+# file its hidden vector-writing case names.
 if(ICLFORGE_IS_MSVC_LIKE)
-    set_source_files_properties(iec61937/test_iec61937_ac4.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+    set_source_files_properties(iec61937/test_iec61937_ac4.cpp iec61937/test_iec61937_parts.cpp
+                                PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()

@@ -280,10 +280,10 @@ TEST_CASE("pairing flow errors: the client refuses a message its stage does not 
 }
 
 TEST_CASE("pairing flow errors: the server refuses a message its stage does not expect", "[sendspin][pairing_flow]") {
-    SECTION("the Pairing PSK Flow: anything but client/pair-finalize, or one without the PSK") {
+    SECTION("the Pairing PSK Flow: anything but client/pair-init and client/pair-finalize, or one without the PSK") {
         Duo duo(Dialect::kSpecification, hs::PskCategory::kPairing, {kPsk});
         duo.server->activated(pairing_psk(), 1);
-        CHECK(duo.server_gets(made("client/pair-init", R"({"pairing_index":1})")).after == flow::After::kClose);
+        CHECK(duo.server_gets(made("client/pair-auth")).after == flow::After::kClose);
         Duo again(Dialect::kSpecification, hs::PskCategory::kPairing, {kPsk});
         again.server->activated(pairing_psk(), 1);
         CHECK(again.server_gets(made("client/pair-finalize")).after == flow::After::kClose);

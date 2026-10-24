@@ -1,4 +1,4 @@
-"""Music Assistant's Sendspin server, scripted on aiosendspin 9.1.1, playing to hearth-testsink.
+"""Music Assistant's Sendspin server, scripted on aiosendspin 9.1.1 or 10.2.1, to hearth-testsink.
 
 A rehearsal of A4's exit with Music Assistant (planning/hearth-reference-player.md, A4's exit):
 Music Assistant's Sendspin provider runs aiosendspin 9.1.1's SendspinServer, and this script drives
@@ -33,19 +33,29 @@ from typing import Any
 import numpy as np
 from aiosendspin.audio.format import AudioFormat
 from aiosendspin.models.types import MediaCommand, PairMethod
+
+try:
+    from aiosendspin.models.types import PairingCodeFormat
+except ImportError:  # 9.1.1 has no code formats
+    PairingCodeFormat = None
 from aiosendspin.noise.keys import Identity
 from aiosendspin.noise.pairing import PairingAttempt
-from aiosendspin.noise.pairing_token import decode_token
 from aiosendspin.noise.trust_store import InMemoryServerPairingStore
 from aiosendspin.server.roles.color.state import Color
 from aiosendspin.server.roles.metadata.state import Metadata
 from aiosendspin.server.server import SendspinServer
+
+try:
+    from aiosendspin.noise.pairing_token import decode_psk_token
+except ImportError:  # 9.1.1 names it decode_token
+    from aiosendspin.noise.pairing_token import decode_token as decode_psk_token
 
 SAMPLE_RATE = 48000
 CHANNELS = 2
 FRAMES = 3 * SAMPLE_RATE
 BLOCK_FRAMES = SAMPLE_RATE // 50
 MINIMUM_OPUS_SNR_DB = 20.0
+CONVERGENCE_SECONDS = 3.0
 EDGE_FRAMES = 4800
 MAXIMUM_HEAD_LOSS = SAMPLE_RATE // 4
 MAXIMUM_TAIL_LOSS = SAMPLE_RATE // 10
@@ -196,22 +206,41 @@ async def play(sink: TestSink, pair: str, samples: array) -> None:
         await server.connect_to_client_and_wait(url)
         client = await wait_until(lambda: server.get_client(client_id), "the sink's hello")
         if pair == "token":
-            attempt = PairingAttempt(
-                PairMethod.PAIRING_PSK, pairing_psk=decode_token(token).pairing_psk
-            )
+            parsed = decode_psk_token(token)
+            if hasattr(PairMethod, "DYNAMIC_PIN"):  # 9.1.1
+                attempt = PairingAttempt(PairMethod.PAIRING_PSK, pairing_psk=parsed.pairing_psk)
+            else:  # 10.x: the attempt runs on the connection of the token's client_id only
+                attempt = PairingAttempt(
+                    PairMethod.PAIRING_PSK,
+                    pairing_psk=parsed.pairing_psk,
+                    client_id=parsed.client_id,
+                )
         else:
 
             async def entered_code() -> str:
                 code = await sink.wait_for(r"PAIRING CODE (\d+)-?(\d*)")
                 return code.group(1) + code.group(2)
 
-            attempt = PairingAttempt(PairMethod.DYNAMIC_PIN, pin_provider=entered_code)
+            if hasattr(PairMethod, "DYNAMIC_PIN"):  # 9.1.1
+                attempt = PairingAttempt(PairMethod.DYNAMIC_PIN, pin_provider=entered_code)
+            else:
+                attempt = PairingAttempt(
+                    PairMethod.DYNAMIC_PAIRING_CODE,
+                    pairing_code_provider=entered_code,
+                    pairing_format=PairingCodeFormat.DIGITS,
+                )
         await server.initiate_pairing(client_id, attempt)
         await wait_until(lambda: client.is_connected, "the sink on its long-term PSK")
         # Starting the stream activates playback, as pressing play in Music Assistant does, so
         # the first chunks race the sink's first client/state and its first clock exchange.
 
         stream = client.group.start_stream()
+        # 10.2.1 joins a player to a stream once it reports itself available, which the sink does
+        # when its clock has converged (C14), and replays only about a second of history to a
+        # player that joins late; sleep_to_limit_buffer paces nothing before one has joined. So
+        # wait out the convergence before the first commit.
+        await sink.wait_for(r"activated for playback", timeout=10.0)
+        await asyncio.sleep(CONVERGENCE_SECONDS)
         source = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
         if sys.byteorder == "big":
             samples = array("h", samples)
@@ -223,7 +252,9 @@ async def play(sink: TestSink, pair: str, samples: array) -> None:
             if first == 0:
                 await show_roles(client, sink)
             await stream.sleep_to_limit_buffer(1_500_000)
-        await asyncio.sleep(1.0)
+        # 10.2.1 sends each chunk as it falls due, so the programme's last second and a half is
+        # still to be sent when the loop ends.
+        await asyncio.sleep(2.5)
         await client.group.stop()
         await asyncio.sleep(1.0)
     finally:
