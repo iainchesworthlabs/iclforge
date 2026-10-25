@@ -175,12 +175,101 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![The title card](screenshots/p4-panel-title-card.png) | **Playing, no lyrics, and the server has said what is playing** (the title card, [below](#a-song-with-no-lyrics)). The title, the artist, the album and year, and the song's time with a progress line |
 | ![The clock](screenshots/p4-panel-clock.png) | **Playing, no lyrics, and the clock chosen** ([below](#the-clock)). The time, the date and the line over them; nothing until a time server has answered |
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **The same with that screen turned off.** The sentence this screen had before |
-| ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched |
+| ![Adjust](screenshots/p4-panel-adjust.png) | **Adjust.** The lyric delay in 50 ms steps and the text size, and nothing else; put away after eight seconds untouched |
+| ![Preferences](screenshots/p4-panel-prefs.png) | **Preferences.** What is chosen once and left, grouped and scrollable ([below](#adjust-and-preferences)): the screen for a song with no lyrics and when it dims; a choice the board cannot make is greyed, with the reason |
 
-**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size
-(Smaller, Normal or Larger, which the sheet says beside its buttons), what its screen shows while a
-song has no lyrics, when that dims, and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
+**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms) and its text size
+(Smaller, Normal or Larger, which the sheet says beside its buttons) in **Adjust**, and what it shows
+while a song has no lyrics, when that dims and the rest of what is chosen once in **Preferences**
+([below](#adjust-and-preferences)). Which vocals sound and the reproduction are the server's settings and are
 shown, not changed, until the role has a way to carry a request back.
+
+#### Adjust and Preferences
+
+The footer has two buttons, **Preferences** and **Adjust** (Adjust is where it always was, at the right). One is for
+what a person does while a song is on, the other for what they choose once and leave.
+
+**Adjust** keeps the two tweaks of the lyric screen: the lyric delay (50 ms steps, up to 1,000 ms either way) and the
+text size (Smaller, Normal or Larger). It is 250 px tall on the kit's panel (it was 352 when it also held the screen for
+a song with no lyrics and its dim time) and puts itself away after eight seconds untouched.
+
+![Adjust: the lyric delay and the text size](screenshots/p4-panel-adjust.png)
+
+**Preferences** is a full-screen, scrollable list of everything that is chosen once and left, grouped Display, Sound,
+Network, Time, Updates and System (a group with nothing in it is not drawn), with *Close* at the top right. It keeps the
+screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
+closes, so the lyric screen is as it was with it shut. Today it holds the two settings that were in Adjust: what the
+screen shows while a song has no lyrics, and when it dims. The technical settings (slot width, the second I2S line, the
+time server) stay in the [developer view](#the-developer-view) and the routes.
+
+![Preferences on the kit](screenshots/p4-panel-prefs.png)
+
+**One product base, many boards.** What a board can do is data, not an `#ifdef` and not "is this the P4X".
+`iclforge::BoardCaps` (`libs/device/include/iclforge/board_caps.hpp`) describes it: the display (how it is attached, its
+size, whether it has touch and a backlight), the sink (the bits in a TDM frame, whether a second line is possible,
+whether the chip can open a TDM frame at all, and the slot width and second line in force), the networks, whether the
+board keeps the time, the object cap, and the chip's own facts (`HardwareFacts`, which `GET /hardware` reports). The
+firmware fills it from the build and the hardware (`main/board_caps.cpp`), and `board_variants.hpp` has every board the
+product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an ESP32-C3 with a panel that has no
+touch) for the host tests to walk.
+
+The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text or action),
+whether a change applies live, at the next play or after a restart, the route that sets the same value, its choices,
+and **`availability(caps)`**, once for the entry and once for each choice: whether this board can do it and, if not,
+why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
+functions (`main/preferences.cpp`), so the screen, the routes and the host tests go through the same code.
+
+**A preference the board cannot support is shown, greyed, with the reason, and never hidden.** On a board whose screen
+has no touch, the Dark view (which a touch lights) and the dim time (which a touch wakes) are greyed, and the sheet says
+why:
+
+![Preferences on a board whose screen has no touch: Dark and Dim after greyed, with the reason under each](screenshots/p4-panel-prefs-greyed.png)
+
+A tap on a greyed control does nothing, and `prefs::set_value()` refuses it before the board is asked. The host tests
+(`libs/device/tests/test_preferences.cpp`) check every entry against every known board: a reason wherever something is
+greyed, and a default that is never a choice the board cannot make.
+
+| Preference | Id | Route | Available when |
+|---|---|---|---|
+| Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
+| Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+
+**`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
+entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
+value, whether it is available and why not, and each choice the same way. It is read-only; a change goes through the
+entry's own route.
+
+```json
+{"profile":"p4-rev3","display":"dsi","preferences":[{"id":"now-view","group":"Display","label":"Screen without lyrics","kind":"choice","apply":"live","route":"/now-playing","value":"speakers","available":true,"reason":"","choices":[{"id":"speakers","label":"Speakers","available":true,"reason":""}]}]}
+```
+
+**Any size of screen.** The sizes are the display's, not 1024 by 600's. `libs/device/include/iclforge/screen_metrics.hpp`
+derives the margins, the gaps, the type and the height of a button from the display's shorter side (host tested for every
+size), and the footer and both sheets are laid out from them, so the kit's own sizes are as they were:
+
+| Display | Margin | Type | Button (Adjust / list) | Adjust sheet |
+|---|---|---|---|---|
+| 1024 by 600 | 32 | 24 | 72 / 64 | 250 px |
+| 800 by 480 | 24 | 22 | 64 / 56 | 222 px |
+| 480 by 320 | 16 | 18 | 56 / 52 | 194 px |
+| 320 by 240 | 10 | 16 | 48 / 48 | 170 px |
+
+![Preferences on a 320 by 240 screen](screenshots/p4-panel-prefs-small.png)
+
+**The fingertip.** A control that is touched is at least **48 px** on both sides, with at least 6 px to the next one:
+48 px is 7.2 mm on the kit's 7-inch 1024 by 600 panel (about 6.7 px a millimetre) and 7.4 mm on a 2.4-inch 320 by 240
+module, over the 7 mm that Apple and Google give as the least a finger hits reliably (44 pt, 48 dp). The preview tool
+([below](#developing-the-screen-without-a-panel)) draws Adjust and Preferences at the four sizes above and **fails the
+run** if text is cut off, a control sticks out of what holds it or off the screen, a touch target is under 48 px or
+closer than 6 px to another, a tap does not do what it says, a greyed choice answers a tap, or a list longer than the
+glass does not scroll. A display backend for a chip other than the P4 is not written (no such panel is on the bench):
+`panel/lvgl/display.hpp` is the seam one would fill, and everything above it takes its size from the display.
+
+**Adding a preference** is a registry entry (id, group, label, choices and their availability rules), a getter and a
+setter in `Backend` (a pure virtual, so a firmware that forgot the setter does not build), the same pair in the host
+tests' fake, and the firmware's implementation; only a control that is not one of the five kinds (a layout list, a
+time-zone picker) needs an editor in `panel/lvgl/prefs_screen.cpp`. There are no bespoke buttons in `lyric_screen.cpp`.
 
 #### A song with no lyrics
 
@@ -195,7 +284,7 @@ what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*, *PCM t
 
 It is meant to be left on for hours in a dim room: the glow moves in a few steps, slowly (it rises
 at once and falls at 14 dB a second), and is never brighter than the accent at 55%. **After five
-minutes with nothing touched** (the time is Adjust's, or `PUT /dim-after`: `never`, or whole minutes
+minutes with nothing touched** (the time is a Preference, or `PUT /dim-after`: `never`, or whole minutes
 from 1 to 240) the backlight goes to 4% and a black screen with one line is over everything; any tap
 brings the speakers back, and the tap does not also press what is under it. Only this screen dims:
 the lyric screens and the idle screen do not.
@@ -219,7 +308,9 @@ lyric screens have them, where the server gave a progress and the board's clock 
 
 **The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
 and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
-*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone.
+*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With
+**Preferences** and **Adjust** both in the footer there are 386 px for it on the kit's panel (it was 558 with Adjust
+alone), which holds *Decoded on this board - 768 kb/s* and not the server's name: the developer view has that.
 A coded stream (E-AC-3, AC-3, AC-4) is sent undecoded and decoded on the board, which the wording says; a
 PCM one was decoded by the server, and the footer says *PCM from Music Assistant*. The bitrate is what was
 played: the coded bytes of the chunks played over the time they took, over windows of a second and
@@ -266,12 +357,12 @@ aiosendspin can send up to 20 s ahead and Music Assistant does not) takes effect
 is **off** from the moment a song with no lyrics begins, however long ago anything last touched the
 panel, and the screen says nothing. **A tap lights the speakers for 30 seconds from the last touch**
 (another tap moves that on), and then it is dark again. The tap that lights it does not also press what
-is under it; the developer view keeps the screen lit while it is open (the Adjust sheet puts itself
-away after eight seconds, inside the 30). The sheet's dim row, which has no meaning here, says "30
-seconds, then dark again" in place of its dim times. Only this screen goes dark: a lyric screen and
-the idle screen are lit as they always were.
+is under it; the developer view and Preferences keep the screen lit while they are open (the Adjust sheet
+puts itself away after eight seconds, inside the 30). Preferences' dim row, which has no meaning here, is
+greyed and says "Not used by the Dark view: a touch lights it for 30 seconds, then it is dark again." Only this
+screen goes dark: a lyric screen and the idle screen are lit as they always were.
 
-![The Adjust sheet with Dark chosen](screenshots/p4-panel-controls-dark.png)
+![Preferences with Dark chosen](screenshots/p4-panel-prefs-dark.png)
 
 | Route | Takes | Default |
 |---|---|---|
@@ -280,7 +371,9 @@ the idle screen are lit as they always were.
 
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
 404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
-dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; and the [time of day](#the-time-of-day)'s state.
+dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; whether Preferences is open (`prefs_view`),
+how many times it was built and the longest a build took (`prefs_builds`, `prefs_build_us_max`); and the
+[time of day](#the-time-of-day)'s state.
 
 #### The clock
 
@@ -678,7 +771,11 @@ build-preview/panel_preview <output directory>
 ```
 
 `managed_components/lvgl__lvgl` appears after any P4 build of `firmware/hearth-sink`. It reads the
-example songs in `examples/karaoke` and writes 24-bit BMP files.
+example songs in `examples/karaoke` and writes 24-bit BMP files. After the screens above it draws
+[Adjust and Preferences](#adjust-and-preferences) at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240, for the kit
+and for a board whose screen has no touch (`iclforge/board_variants.hpp`), and checks them: it exits 3 when text is
+clipped, a control is smaller than a fingertip or sticks out of its sheet, a tap does nothing, or a greyed choice
+answers one.
 
 **On a P4 with no panel** (`sdkconfig.panel-null`): LVGL draws into a frame buffer in PSRAM, and a
 second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 for none) serves it:

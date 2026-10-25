@@ -8,7 +8,9 @@
 #include <string_view>
 #include <vector>
 
+#include "iclforge/hardware_info.hpp"
 #include "iclforge/player.hpp"
+#include "iclforge/preferences.hpp"
 
 // The control surface: a few HTTP verbs over the player, for the ESP-IDF
 // integrator whose controller is not Home Assistant. planning/esp32-player.md
@@ -354,6 +356,11 @@ struct ControlHandlers {
     // empty. Called for every GET /status, on the server's task.
     std::function<std::optional<ControlNetwork>()> network;
 
+    // GET /preferences: every preference the board has (iclforge/preferences.hpp), as this board sees it - its value,
+    // whether it can use it and, if not, why. Read-only: a change goes through the entry's own route. The owner
+    // keeps the backend alive for as long as Control runs; null leaves the route answering that there are none.
+    iclforge::prefs::Backend* preferences = nullptr;
+
     // POST /reset-preferences: the choices a person made once (what the screen shows, when it dims, the
     // time zone, ...) go back to the image's defaults, at once; the name, the network, the wiring and
     // the pairings stay (iclforge/settings_keys.hpp says which is which). Nothing, when it is done;
@@ -369,6 +376,10 @@ struct ControlHandlers {
     // keeps it alive for as long as Control runs.
     Firmware* firmware = nullptr;
 };
+
+// What this board is - chip, revision, cores, FPU, PSRAM, and the sink ceiling the caller states - gathered from
+// the SDK (GET /hardware reports the same; the board's capability description, iclforge/board_caps.hpp, builds on it).
+[[nodiscard]] HardwareFacts hardware_facts(int sink_max_slots, int sink_max_slots_bits);
 
 class Control {
    public:

@@ -23,6 +23,8 @@ struct Display {
     const std::uint16_t* frame = nullptr;
     // A touch controller is reading.
     bool touch = false;
+    // The backlight can be set to a level (display_set_backlight does something).
+    bool backlight = false;
     // "null" or "dsi".
     const char* kind = "";
 };
