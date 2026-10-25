@@ -489,6 +489,8 @@ struct Control::Impl {
             "one to change it\n"
             "GET  /dim-after     never, or minutes until that screen dims, on a board with a "
             "screen; PUT one\n"
+            "GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; "
+            "PUT one\n"
             "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, "
             "on a board with a screen; PUT one\n"
             "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a "
@@ -1031,6 +1033,34 @@ struct Control::Impl {
             return send_text(req, "409 Conflict", "that time could not be stored\n");
         }
         return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
+    static esp_err_t on_speakers_style_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.speakers_style) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::string text = h.speakers_style();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_speakers_style_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::string body = read_body(req);
+        if (!nowview::parse_speakers_style(body)) {
+            return send_text(req, "400 Bad Request", "PUT /speakers-style wants glow or pulse\n");
+        }
+        if (!h.set_speakers_style) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_speakers_style(nowview::detail::trimmed(body))) {
+            return send_text(req, "409 Conflict", "that style could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; the screen follows at once\n");
     }
 
     // A refusal a handler gave, said the way its kind says no.
@@ -1618,6 +1648,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
+        {.uri = "/speakers-style", .method = HTTP_GET, .handler = &Impl::on_speakers_style_get},
+        {.uri = "/speakers-style", .method = HTTP_PUT, .handler = &Impl::on_speakers_style_put},
         {.uri = "/brightness", .method = HTTP_GET, .handler = &Impl::on_brightness_get},
         {.uri = "/brightness", .method = HTTP_PUT, .handler = &Impl::on_brightness_put},
         {.uri = "/clock-format", .method = HTTP_GET, .handler = &Impl::on_clock_format_get},

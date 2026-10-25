@@ -93,7 +93,7 @@ it, and the other stacks this page spells are held to it too. The list, generate
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
 | `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
-| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
 | `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
 
 <!-- sink-profiles:end -->
@@ -559,6 +559,8 @@ configurations set 80; the default is 0, none), the component's
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
 | `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
 | `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
+| `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it; [planning](../../planning/p4x-speakers-options.md)); `404` on a board with none |
+| `PUT /speakers-style` | body: `glow` or `pulse`. Stored (`np_style`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
 | `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants ([planning](../../planning/hearth-late-night.md)); `404` on a board with none |
 | `PUT /dynamic-range` | body: `standard` or `late-night`. Stored (NVS key `dyn_range`, kept over a restart; `CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE` is a board's first answer), and followed from the next stream's start. `late-night` is line mode's level with the stream's `compr` words (AC-3, E-AC-3) or speaker DRC mode (AC-4) on top, and wins over a server's decoder mode; it changes nothing in a stream that carries neither. `400` for any other word, `409` where there is no player. `POST /play` plays as the build says |
 | `GET /preferences` | every preference this board has, as JSON, on every board: its id, group, label, kind, how a change applies, the route that sets it, its value, whether the board can use it and why not, and each choice the same way. Read-only: a change goes through the entry's own route. The board's capability description decides what is available ([the Preferences sheet](../../docs/hearth/sink-esp32-p4.md#adjust-and-preferences)) |
@@ -653,7 +655,7 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 ```
 
 `sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,

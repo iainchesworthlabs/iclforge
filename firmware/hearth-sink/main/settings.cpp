@@ -123,6 +123,7 @@ Settings image_defaults() {
     defaults.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     defaults.now_view = iclforge::nowview::kDefaultView;
     defaults.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    defaults.speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
     defaults.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
     defaults.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
                                 .value_or(iclforge::wallclock::ClockFormat{});
@@ -209,6 +210,14 @@ void load_all() {
                         g_settings.dim_after_minutes);
         }
     }
+    if (nvs_get_i32(handle, sk::kSpeakersStyle, &stored) == ESP_OK) {
+        if (const auto style = iclforge::nowview::speakers_style_from_stored(stored)) {
+            g_settings.speakers_style = *style;
+        } else {
+            std::printf("settings: stored speakers style %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::speakers_style_name(g_settings.speakers_style));
+        }
+    }
     if (nvs_get_i32(handle, sk::kBrightness, &stored) == ESP_OK) {
         if (const auto percent = iclforge::nowview::brightness_from_stored(stored)) {
             g_settings.brightness_percent = *percent;
@@ -289,13 +298,14 @@ void load_all() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
+                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
                 "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
+                iclforge::nowview::speakers_style_name(g_settings.speakers_style),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
                 g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
                 iclforge::nowview::night_schedule_text(g_settings.night).c_str(),
@@ -405,6 +415,14 @@ bool settings_set_now_view(iclforge::nowview::View view) {
         return false;
     }
     g_settings.now_view = view;
+    return true;
+}
+
+bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style) {
+    if (!write_int(sk::kSpeakersStyle, static_cast<std::int32_t>(style))) {
+        return false;
+    }
+    g_settings.speakers_style = style;
     return true;
 }
 

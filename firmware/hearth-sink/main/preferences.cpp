@@ -41,6 +41,16 @@ class Board final : public iclforge::prefs::Backend {
         return true;
     }
 
+    [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return settings().speakers_style; }
+
+    [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
+        if (!settings_set_speakers_style(style)) {
+            return false;
+        }
+        panel_set_speakers_style(style);
+        return true;
+    }
+
     // Network. Only a board with both a cable and Wi-Fi has a choice; the call returns at once and the work is done on
     // a task of its own (network_set_preference), which the board keeps only once the interface holds an address.
     [[nodiscard]] std::string network_preference() const override {

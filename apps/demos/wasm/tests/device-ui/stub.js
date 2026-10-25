@@ -51,6 +51,7 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
         'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
         'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
         "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off",
@@ -119,6 +120,8 @@ const REPLIES = {
     nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
     nowPlayingOk: 'ok; the screen follows at once\n',
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
+    speakersStyleBad: 'PUT /speakers-style wants glow or pulse\n',
+    speakersStyleRefused: 'that style could not be stored\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
     noDynamicRange: 'this board decodes no Dolby stream, so it has no dynamic range to choose\n',
@@ -228,6 +231,8 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /speakers-style',
+    'PUT /speakers-style',
     'GET /brightness',
     'PUT /brightness',
     'GET /clock-format',
@@ -560,7 +565,7 @@ function parseNight(body, current) {
 
 function screenBoard() {
     // `dimmable` is a glass whose backlight can be dimmed; a frame buffer with no panel behind it has none.
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', speakersStyle: 'glow', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
 }
 
 // The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
@@ -609,6 +614,19 @@ const PREFERENCES = [
             ['120', '2 hours'],
             ['240', '4 hours'],
             ['never', 'Never'],
+        ],
+    },
+    {
+        id: 'speakers-style',
+        group: 'Display',
+        label: 'Speakers style',
+        kind: 'choice',
+        apply: 'live',
+        route: '/speakers-style',
+        needs: 'screen',
+        choices: [
+            ['glow', 'Glow'],
+            ['pulse', 'Pulse'],
         ],
     },
     {
@@ -750,6 +768,8 @@ function preferenceValue(p, device) {
             return screen ? screen.view : '';
         case 'dim-after':
             return screen ? screen.dimAfter : '';
+        case 'speakers-style':
+            return screen ? screen.speakersStyle : '';
         case 'brightness':
             return screen ? String(screen.brightness) : '';
         case 'clock-hours':
@@ -1768,6 +1788,22 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /speakers-style':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.speakersStyle + '\n');
+            case 'PUT /speakers-style': {
+                const word = body.trim();
+                if (!['glow', 'pulse'].includes(word)) {
+                    return send(res, 400, REPLIES.speakersStyleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.speakersStyle = word;
+                return send(res, 200, REPLIES.nowPlayingOk);
+            }
             case 'GET /brightness':
                 if (!device.screen) {
                     return send(res, 404, REPLIES.noScreen);
@@ -2071,7 +2107,7 @@ async function startStub() {
             // pairings and the time zone stay (libs/device's settings_keys.hpp). At once.
             case 'POST /reset-preferences':
                 if (device.screen) {
-                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                 }
                 return send(res, 200, REPLIES.resetPreferencesOk);
             // The factory reset: only by the board's own address or name, and only for the words; then
@@ -2091,7 +2127,7 @@ async function startStub() {
                         device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
                     }
                     if (device.screen) {
-                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                     }
                     if (device.time) {
                         Object.assign(device.time, { zone: 'none', zoneName: 'none', server: 'none', sync: 'on' });

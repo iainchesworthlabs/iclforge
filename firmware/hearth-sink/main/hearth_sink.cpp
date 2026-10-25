@@ -774,6 +774,15 @@ iclforge::ControlHandlers control_handlers() {
             const auto view = iclforge::nowview::parse_view(word);
             return view.has_value() && player::preferences().set_now_view(*view);
         };
+        h.speakers_style = []() { return std::string(iclforge::nowview::speakers_style_name(player::settings().speakers_style)); };
+        h.set_speakers_style = [](std::string_view word) {
+            const auto style = iclforge::nowview::parse_speakers_style(word);
+            if (!style || !player::settings_set_speakers_style(*style)) {
+                return false;
+            }
+            player::panel_set_speakers_style(*style);
+            return true;
+        };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
         // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no

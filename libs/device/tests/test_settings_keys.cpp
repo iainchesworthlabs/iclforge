@@ -85,7 +85,7 @@ TEST_CASE("Reset preferences erases the choices a person made once", "[settingsk
     // adding one does not break it. The time zone is not: it is where the room is, and the per-speaker trims and delays
     // are the room's calibration (the owner's call, 2026-10-25), both kept.
     const std::set<std::string> erased = preferences();
-    for (const char* name : {"np_view", "np_dim"}) {
+    for (const char* name : {"np_view", "np_dim", "np_style"}) {
         INFO("erased " << name);
         CHECK(erased.contains(name));
         CHECK(sk::reset_of(name) == sk::Reset::erase);
@@ -106,6 +106,7 @@ TEST_CASE("the sentences name what a reset changes and what it keeps, each thing
     const std::string reset = sk::reset_words();
     CHECK(reset.find("what the screen shows without lyrics") != std::string::npos);
     CHECK(reset.find("when the screen dims") != std::string::npos);
+    CHECK(reset.find("speakers style") != std::string::npos);
     // None of what it keeps is in what it changes.
     CHECK(reset.find("time zone") == std::string::npos);
     CHECK(reset.find("name") == std::string::npos);

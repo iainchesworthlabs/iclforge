@@ -163,6 +163,9 @@ class Backend {
     [[nodiscard]] virtual bool set_now_view(nowview::View view) = 0;
     [[nodiscard]] virtual int dim_after_minutes() const = 0;
     [[nodiscard]] virtual bool set_dim_after_minutes(int minutes) = 0;
+    // How the speakers view shows a level: a glow, or a glow that also makes each speaker's circle grow and shrink a little.
+    [[nodiscard]] virtual nowview::SpeakersStyle speakers_style() const = 0;
+    [[nodiscard]] virtual bool set_speakers_style(nowview::SpeakersStyle style) = 0;
 
     // Display: the backlight's lit level in percent (nowview::kBrightnessMin to kBrightnessMax), how the clock view
     // writes the time, and the night schedule (when the screen goes dark by the board's own time).
@@ -367,6 +370,11 @@ inline constexpr std::array<ChoiceDef, 5> kNowViewChoices{{
     {.id = "off", .label = "Off"},
 }};
 
+inline constexpr std::array<ChoiceDef, 2> kSpeakersStyleChoices{{
+    {.id = "glow", .label = "Glow"},
+    {.id = "pulse", .label = "Pulse"},
+}};
+
 // A stepper walks its stops in order: from a little to a lot, and "never" at the end, where the effect has gone.
 inline constexpr std::array<ChoiceDef, 8> kDimAfterChoices{{
     {.id = "1", .label = "1 min"},
@@ -557,6 +565,26 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
 [[nodiscard]] inline bool set_dim_after(Backend& backend, std::string_view word) {
     const std::optional<int> minutes = nowview::parse_dim_after(word);
     return minutes.has_value() && backend.set_dim_after_minutes(*minutes);
+}
+
+[[nodiscard]] inline std::string get_speakers_style(const Backend& backend) {
+    return nowview::speakers_style_name(backend.speakers_style());
+}
+
+[[nodiscard]] inline bool set_speakers_style(Backend& backend, std::string_view word) {
+    const std::optional<nowview::SpeakersStyle> style = nowview::parse_speakers_style(word);
+    return style.has_value() && backend.set_speakers_style(*style);
+}
+
+// The speakers are what the Speakers, Title and Dark views show (the Title view stands on them until a server says a
+// title); the Clock view and the old sentence draw none.
+[[nodiscard]] inline std::string speakers_style_inert(const Backend& backend) {
+    const nowview::View view = backend.now_view();
+    if (view == nowview::View::kClock || view == nowview::View::kOff) {
+        return std::string("Not used by the ") + (view == nowview::View::kClock ? "Clock" : "Off") +
+               " view: it draws no speakers.";
+    }
+    return {};
 }
 
 // The Dark view is dark from the moment a song with no lyrics begins: it has no time to dim after.
@@ -807,6 +835,20 @@ inline constexpr std::array<Pref, 20> kRegistry{{
      .inert = &detail::dim_after_inert,
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after,
+     .on_reset = OnReset::kReset},
+    {.id = "speakers-style",
+     .group = Group::kDisplay,
+     .label = "Speakers style",
+     .note = "How the speakers show the sound: a glow, or a glow with the circle growing and shrinking too.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/speakers-style",
+     .default_word = "glow",
+     .choices = detail::kSpeakersStyleChoices,
+     .availability = &detail::needs_screen,
+     .inert = &detail::speakers_style_inert,
+     .get = &detail::get_speakers_style,
+     .set = &detail::set_speakers_style,
      .on_reset = OnReset::kReset},
     {.id = "brightness",
      .group = Group::kDisplay,

@@ -77,6 +77,46 @@ namespace detail {
     return std::nullopt;
 }
 
+// --- the speakers' style --------------------------------------------------------------------------------
+
+// How the speakers view shows a level (planning/p4x-speakers-options.md). The stored values are these
+// numbers: never renumbered, never reused.
+enum class SpeakersStyle : std::uint8_t {
+    kGlow = 0,   // each speaker glows with its level: the fill and a halo in steps
+    kPulse = 1,  // the same, and the filled circle grows and shrinks a little with the level
+};
+
+inline constexpr SpeakersStyle kDefaultSpeakersStyle = SpeakersStyle::kGlow;
+
+[[nodiscard]] constexpr const char* speakers_style_name(SpeakersStyle style) {
+    switch (style) {
+        case SpeakersStyle::kPulse:
+            return "pulse";
+        case SpeakersStyle::kGlow:
+            break;
+    }
+    return "glow";
+}
+
+// One of the two words, with or without a line ending after it.
+[[nodiscard]] constexpr std::optional<SpeakersStyle> parse_speakers_style(std::string_view text) {
+    text = detail::trimmed(text);
+    for (const SpeakersStyle style : {SpeakersStyle::kGlow, SpeakersStyle::kPulse}) {
+        if (text == speakers_style_name(style)) {
+            return style;
+        }
+    }
+    return std::nullopt;
+}
+
+// A stored number, or nothing for one this build does not know (a partition written by another build).
+[[nodiscard]] constexpr std::optional<SpeakersStyle> speakers_style_from_stored(std::int32_t value) {
+    if (value >= static_cast<std::int32_t>(SpeakersStyle::kGlow) && value <= static_cast<std::int32_t>(SpeakersStyle::kPulse)) {
+        return static_cast<SpeakersStyle>(value);
+    }
+    return std::nullopt;
+}
+
 // --- dimming ----------------------------------------------------------------------------------------
 
 inline constexpr int kDimNever = 0;
