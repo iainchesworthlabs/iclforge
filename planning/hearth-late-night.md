@@ -96,6 +96,14 @@ page in Hearth are a follow-up in `libs/sendspin` and the app.
 | AC-4 cost | host: within measurement noise of the decode of DEE's 5.1 stream (x0.93 to x1.11 over three runs of the hidden `[cost]` case, two of them with a firmware build running beside it). The level detector accumulates in `double`, which an ESP32-S3 does in software, so the board's figure is the one that matters and is owed |
 | Cannot offer it | PCM (no metadata); AC-4 on an ESP32-C6 (it decodes none: it is sent PCM); AC-4 on an ESP32-S3 until its decode time with late night on is measured (it already keeps up to 2 channels at 25 frames a second) |
 
+## Builds (2026-10-25, `0e45f23a7` plus this change)
+
+| Profile | App image | Against |
+|---|---|---|
+| `p4-rev3` (the P4X kit) | 2,607,392 B | main's 2,604,624 B built the same way, so +2,768 B. Both are over the profile's 2,600,000 B budget: main was already over it, so the budget gate's verdict does not come from this change. |
+| `s3-n16r8` | 1,593,232 B | budget 1,600,000 B |
+| `s3-n16r8-ac4`, `p4-rev1-ac4` | link | the two profiles that compile `ac4_stream.cpp`, where the AC-4 half of this change lives (the published profiles have the AC-4 decoder off) |
+
 ## Preferences entry (after prefs-core merges)
 
 A `choice` entry, group Sound, label *Late night*, choices *Standard* and *Late night*, applies at the next stream
