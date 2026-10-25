@@ -278,7 +278,7 @@ HardwareFacts gather_hardware_facts(int sink_max_slots, int sink_max_slots_bits)
     // revision_notice_at above: a chip this old can only ever be running a
     // build lenient enough to accept it, so there is no build-flag case
     // where the limit does not apply.
-    facts.revision_hard_limit_below = 300;  // v3.0
+    facts.revision_hard_limit_below = kEsp32p4TdmClockRevision;  // v3.0, which the wide sink reads too
     facts.revision_hard_limit_cost =
         "This chip has no PLL clock source for I2S (hal/i2s_ll.h), and the APLL fallback's own "
         "125 MHz ceiling falls short of what a full-width TDM frame needs: TDM output cannot "
@@ -424,9 +424,6 @@ struct Control::Impl {
     // it changes while the board runs, so on_hardware has nothing to compute
     // and no player to read.
     std::string hardware_json;
-    // Why the chip cannot open a multi-channel output, or empty (tdm_blocked_clause): the same
-    // gathering, kept for GET /layout-options.
-    std::string tdm_blocked;
 
     static Impl* self(httpd_req_t* req) { return static_cast<Impl*>(req->user_ctx); }
 
@@ -741,69 +738,43 @@ struct Control::Impl {
         if (!h.set_layout) {
             return send_text(req, "409 Conflict", "this player's layout is fixed\n");
         }
-        if (!h.set_layout(body)) {
-            return send_text(req, "409 Conflict",
-                             "not a layout this player can play: check the name or the list, and "
-                             "that it has no more slots than the sink\n");
+        const ControlLayoutAnswer answer = h.set_layout(body);
+        if (!answer.accepted) {
+            // The reason the board cannot carry it, from the verdict GET /layout-options and the Preferences list
+            // give; the route's own words when the owner has none (text that is not a layout).
+            if (answer.message.empty()) {
+                return send_text(req, "409 Conflict",
+                                 "not a layout this player can play: check the name or the list, and "
+                                 "that it has no more slots than the sink\n");
+            }
+            return send_text(req, "409 Conflict", (answer.message + '\n').c_str());
         }
-        return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        if (answer.message.empty()) {
+            return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        }
+        // Taken, with a limit on it: said, so that a person is not told "ok" about a layout that plays narrower.
+        return send_text(req, "200 OK",
+                         ("ok; takes effect at the next play. Note: " + answer.message + '\n').c_str());
     }
 
-    // The board's own facts for iclforge/layout_options.hpp, read from the handlers /status reads.
-    static LayoutFacts layout_facts(const Impl& impl) {
-        const ControlHandlers& h = impl.handlers;
-        LayoutFacts facts;
-        facts.profile = h.profile;
-        facts.slots_now = h.sink_slots ? h.sink_slots() : 0;
-        facts.slot_bits = h.slot_bits ? h.slot_bits() : 0;
-        facts.slots_max = h.sink_max_slots ? h.sink_max_slots() : 0;
-        facts.slots_max_bits = h.sink_max_slots_bits ? h.sink_max_slots_bits() : 0;
-        facts.second_line_possible = static_cast<bool>(h.second_line);
-        facts.second_line_wired = h.second_line && h.second_line();
-        facts.coded_channels_max = h.max_coded_channels ? h.max_coded_channels() : 0;
-        facts.tdm_blocked = impl.tdm_blocked;
-        return facts;
-    }
-
-    // GET /layout-options: every layout the chooser lists, each judged against what this sink has now
-    // (layout_options.hpp). Read-only; PUT /layout stays the one way to set one. Sent one option at a
-    // time: the whole list is some 3 KB, and the server's task has 6 KB of stack and no heap to spare
-    // on a small part.
+    // GET /layout-options: every layout the chooser lists, each judged against this board's capabilities
+    // (iclforge/layout_options.hpp, the verdict PUT /layout and the Preferences list ask too). Read-only. Sent
+    // one option at a time: the whole list is some 3 KB, and the server's task has 6 KB of stack and no heap to
+    // spare on a small part.
     static esp_err_t on_layout_options_get(httpd_req_t* req) {
-        const Impl& impl = *self(req);
-        const ControlHandlers& h = impl.handlers;
-        if (!h.sink_slots || !h.layout) {
+        const ControlHandlers& h = self(req)->handlers;
+        if (h.preferences == nullptr || !h.layout) {
             return send_text(req, "404 Not Found", "this player has no layout to choose\n");
         }
-        const LayoutFacts facts = layout_facts(impl);
-        std::string head = "{";
-        append_string(head, "layout", h.layout());
-        append_number(head, "slots", static_cast<unsigned long long>(std::max(facts.slots_now, 0)));
-        if (facts.slot_bits > 0) {
-            append_number(head, "slot_bits", static_cast<unsigned long long>(facts.slot_bits));
-        }
-        if (facts.second_line_possible) {
-            append_bool(head, "second_line", facts.second_line_wired);
-        }
-        append_string(head, "profile", facts.profile);
-        head += ",\"options\":[";
+        const BoardCaps caps = h.preferences->caps();
+        const std::string head = layout_options_head_json(caps, h.layout());
         httpd_resp_set_type(req, "application/json");
         if (httpd_resp_send_chunk(req, head.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
             return ESP_FAIL;
         }
         bool first = true;
         for (const CatalogLayout& entry : kLayoutCatalog) {
-            const LayoutOption option = evaluate_layout(facts, entry.name, entry.slots);
-            std::string item = first ? "{" : ",{";
-            append_string(item, "layout", option.name);
-            append_number(item, "slots", option.slots);
-            append_string(item, "verdict", word(option.verdict));
-            append_string(item, "fix", word(option.fix));
-            append_bool(item, "verified", option.verified);
-            if (!option.reason.empty()) {
-                append_string(item, "reason", option.reason);
-            }
-            item += '}';
+            const std::string item = layout_option_json(evaluate_layout(caps, entry.name, entry.slots), first);
             if (httpd_resp_send_chunk(req, item.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
                 return ESP_FAIL;
             }
@@ -1270,7 +1241,6 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
     impl_ = new Impl{};
     impl_->handlers = handlers;
     impl_->hardware_json = build_hardware_json(handlers);
-    impl_->tdm_blocked = tdm_blocked_clause(gather_hardware_facts(handlers));
 
     // Copied into value-initialised httpd_uri_t below: the SDK's struct has
     // WebSocket members when a project turns WebSocket support on, as the

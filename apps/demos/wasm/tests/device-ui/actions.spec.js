@@ -186,7 +186,7 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Output layout').fill('5.1');
         await page.getByRole('button', { name: 'Apply' }).click();
         await expect.poll(() => stub.sent('PUT /layout').map((r) => r.body)).toEqual(['5.1']);
-        await expect(page.getByRole('status')).toHaveText('Output layout 5.1 refused (409): it needs 6 slots and this sink has 2.');
+        await expect(page.getByRole('status')).toHaveText("Output layout 5.1 refused (409): 5.1 needs 6 slots; this board's output carries 2.");
         await expect(page.locator('#next')).toHaveText('2.0');
     });
 

@@ -74,6 +74,8 @@
 #include "network.hpp"
 #include "provision.hpp"
 #include "panel/panel.hpp"
+#include "board_caps.hpp"
+#include "layout_control.hpp"
 #include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
@@ -536,30 +538,37 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
 
 // A layout for the next play, from the control surface: parsed here, on the
 // server's task, so a refusal is answered at once; applied by app_main.
-// What GET /layout-options offers is held to this rule (iclforge/layout_options.hpp,
-// layout_fits_sink): a layout it calls available is one this takes.
-bool accept_layout(std::string_view text) {
+// The verdict is the one GET /layout-options and the Preferences list give (iclforge/layout_options.hpp, over
+// board_caps()): a layout they call available is one this takes, and one they refuse is refused here with the
+// same sentence. A layout with a limit on it is taken with the limit as the note. A refusal with no message is
+// text that is not a layout, or a layout the board could not queue.
+iclforge::ControlLayoutAnswer accept_layout(std::string_view text) {
     const auto layout = iclforge::render::OutputLayout::parse(text);
-    if (!layout.has_value() || !iclforge::layout_fits_sink(layout->slots(), player::sink_slots())) {
-        return false;
+    if (!layout.has_value()) {
+        return {};
+    }
+    const iclforge::LayoutOption verdict =
+        iclforge::evaluate_layout(player::board_caps(), layout->text(), layout->slots());
+    if (!verdict.accepted()) {
+        return {false, verdict.reason};
     }
     // The Sendspin player's too, for streams whose server sets no layout.
     if (!player::sendspin_set_layout(*layout)) {
-        return false;
+        return {};
     }
     Command c;
     c.kind = CommandKind::kLayout;
     if (text.size() >= sizeof(c.text)) {
-        return false;
+        return {};
     }
     std::memcpy(c.text, text.data(), text.size());
     if (xQueueSend(g_commands, &c, 0) != pdTRUE) {
-        return false;
+        return {};
     }
     // Kept over a restart, so that a board a server never sends a layout to (Music Assistant sends none)
     // starts in the room it was set to. Too long a speaker list to store still applies until the restart.
     (void)player::settings_set_layout(text);
-    return true;
+    return {true, verdict.reason};
 }
 
 // The verdict. stream.audio_ms against stream.wall_ms is the whole-pipeline
@@ -655,12 +664,7 @@ iclforge::ControlHandlers control_handlers() {
         return xQueueSend(g_commands, &c, 0) == pdTRUE;
     };
     h.volume = []() { return g_volume.load(); };
-    h.layout = []() {
-        xSemaphoreTake(g_player_mutex, portMAX_DELAY);
-        std::string text{g_layout.text()};
-        xSemaphoreGive(g_player_mutex);
-        return text;
-    };
+    h.layout = []() { return player::layout_text(); };
     h.set_layout = accept_layout;
     h.name = []() { return std::string(player::settings().name.data()); };
     h.set_name = [](std::string_view text) {
@@ -847,10 +851,6 @@ iclforge::ControlHandlers control_handlers() {
     h.sink_max_slots = []() { return player::sink_max_slots(); };
     h.sink_max_slots_bits = []() { return player::sink_max_slots_bit_width(); };
     h.state = []() { return g_state.load(); };
-    // The widest stream the Sendspin player decodes, which GET /layout-options sets a wider layout against.
-    if (player::sendspin_built()) {
-        h.max_coded_channels = []() { return static_cast<int>(CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS); };
-    }
     // A build with the player reports on it, as null until it runs; a build
     // without leaves the object out of /status.
     if (player::sendspin_built()) {
@@ -916,6 +916,15 @@ iclforge::FirmwareConfig firmware_config() {
 }  // namespace
 
 namespace player {
+
+std::string layout_text() {
+    xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+    std::string text{g_layout.text()};
+    xSemaphoreGive(g_player_mutex);
+    return text;
+}
+
+iclforge::ControlLayoutAnswer layout_set(std::string_view text) { return accept_layout(text); }
 
 // The panel's developer view reads these (board_report.hpp). The figures are the ones GET /status
 // reports from the same stats: the player's own, or those of the last play when it has ended.

@@ -385,21 +385,16 @@ old can only be running a build lenient enough to accept it):
 
 ```json
 {"target":"esp32p4","chip":"ESP32-P4","revision":"1.3","cores":2,"fpu":true,"cpu_freq_mhz":360,
- "psram_bytes":33554432,"sink_max_slots":32,"sink_max_slots_bits":16,
+ "psram_bytes":33554432,"sink_max_slots":2,"sink_max_slots_bits":16,
  "capabilities":["2 cores, a hardware floating-point unit","Running at 360 MHz",
- "32 MiB of PSRAM","This sink's bus reaches up to 32 slots at 16-bit"],
+ "32 MiB of PSRAM","This sink's bus reaches up to 2 slots at 16-bit"],
  "notices":["The detected chip is v1.3, below v3.0. This chip has no PLL clock source for I2S
  (hal/i2s_ll.h), and the APLL fallback's own 125 MHz ceiling falls short of what a full-width TDM
  frame needs: TDM output cannot open at any channel count above 2 on this board, regardless of
  layout - only standard 1-2 channel I2S is reachable."]}
 ```
 
-Note `sink_max_slots` (32) on this exact board: true of the sink's wiring at 16-bit slots, and
-still the right thing to report there (a build-time frame-width fact, unconditional on chip
-revision) - the notice above is what tells a reader that on THIS chip, nothing past 2 slots can
-actually open regardless of what the ceiling says. The two facts do not contradict each other; a
-board's own real ceiling is the lower of what its wiring allows and what its silicon allows, and
-this report gives both rather than silently picking the smaller one.
+Note `sink_max_slots` (2) on this exact board: **since 2026-10-25 the sink reports what the chip reaches** ([decision 31](#decisions)), so a chip below v3.0 says 2, not the 32 its 512-bit frame would hold at 16-bit slots; the notice above still says why. Before that date this report said 32 and relied on the notice to explain the gap ([decision 21](#decisions), taken (b)).
 
 The page's own **Hardware** section reads `chip`, `revision`, `cores`, `cpu_freq_mhz`, `fpu` and
 `psram_bytes` as its own rows (`hw-chip`, `hw-cores`, `hw-clock`, `hw-arithmetic`, `hw-psram`) and
@@ -1241,3 +1236,29 @@ run as root, so Playwright can install Chromium's system libraries).
 
     Cost: one more request when the sink's slots, slot width or wiring change, and 1.7 KB of the
     page's budget (63,843 of 65,536 bytes).
+
+31. **The sink reports what the chip reaches** (revises decision 21; [Which layouts the board can take](#which-layouts-the-board-can-take)).
+    Decision 21 kept `sink_max_slots` a pure wiring fact (32 on an ESP32-P4 below v3.0) with a notice
+    beside it, and the output layout then accepted a `5.1` the chip could not open. The owner, 2026-10-25:
+    "platform capabilities are a core piece here", so the mismatch is a bug and not a note. (a) **the wide
+    sink reads the chip revision and reports two slots when it cannot clock a TDM frame
+    (`sink_tdm_usable()`, `sink_slots()`, `sink_max_slots()`); the capability description
+    (`BoardCaps::sink.tdm_usable`) takes it from the sink, and `PUT /layout`, `GET /layout-options`, the
+    Preferences list and the page all ask one verdict over those capabilities**; (b) keep decision 21's
+    report and let the listing be stricter than the route; (c) have `accept_layout` read the revision
+    itself. **Taken, (a).**
+    - **The reason (b) was taken is gone.** Decision 21 kept the number free of chip-revision logic because
+      `sendspin.cpp` sizes its buffers from `sink_max_slots()`. Sized for two instead of thirty-two on a
+      chip that can never open more, they are smaller, which is the right size.
+    - **One revision constant** (`kEsp32p4TdmClockRevision`, `hardware_info.hpp`) for the sink and for
+      `GET /hardware`'s `revision_hard_limit_below`.
+    - **What changes on such a board:** `sink_slots` in `/status` and the Sendspin hello's `outputs.count`
+      are 2; `PUT /layout 5.1` is refused with "This chip (v1.3) has no clock for multi-channel output, so
+      only 1.0 and 2.0 can play."; a 5.1 stream plays folded to the 2.0 layout, as the board suite's fold
+      row already expected.
+    - **A refused layout says why in the 409's body**, and a layout with a limit is taken with the limit as
+      a note after the `ok`.
+
+    Cost: the board suite's row that set `5.1` on a P4 below v3.0 to test the fold can no longer do that
+    (it plays a 5.1 stream on the 2.0 layout, which tests the fold itself), and the suite learns what each
+    row needs (`planning/p4x-layout-options.md`).

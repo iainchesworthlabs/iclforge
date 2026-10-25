@@ -61,11 +61,13 @@ namespace variants {
     BoardCaps caps;
     caps.hardware = chip("esp32c6", "ESP32-C6", 0, 1, 1, false, 160, 0, 8);
     caps.profile = "c6-16mb";
-    caps.sink = {.frame_bit_max = 128, .second_line_possible = false, .slot_bits = 32};
+    // 16-bit slots (sdkconfig.sendspin-c6), and a build that decodes two coded channels at most.
+    caps.sink = {.frame_bit_max = 128, .second_line_possible = false, .slot_bits = 16};
     caps.network = {.wifi = true};
     caps.wall_clock = true;
     caps.sendspin = true;
     caps.max_objects = 0;
+    caps.coded_channels_max = 2;
     caps.firmware_slots = true;
     return caps;
 }
@@ -74,7 +76,8 @@ namespace variants {
 // the C6 beside it, no cable and no screen.
 [[nodiscard]] inline BoardCaps p4_rev1() {
     BoardCaps caps;
-    caps.hardware = chip("esp32p4", "ESP32-P4", 1, 3, 2, true, 360, 32U * 1024 * 1024, 32);
+    // The sink reports what the chip reaches (SinkCaps::slots_most): two, not the frame's thirty-two.
+    caps.hardware = chip("esp32p4", "ESP32-P4", 1, 3, 2, true, 360, 32U * 1024 * 1024, 2);
     caps.hardware.revision_hard_limit_below = 300;
     caps.hardware.revision_hard_limit_cost = "TDM output cannot open above 2 channels on this silicon.";
     caps.profile = "p4-rev1";

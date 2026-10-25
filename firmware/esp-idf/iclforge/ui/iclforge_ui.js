@@ -627,14 +627,13 @@
     if (ok && after) done();
   }
 
-  // A preset and the field both end here: the page sends every layout and
-  // lets the firmware decide, counting slots only to explain a refusal.
+  // A preset and the field both end here: the page sends every layout and lets the firmware decide, which
+  // answers a refusal with its reason (the page counts slots only to grey presets on a firmware without
+  // GET /layout-options).
   function setLayout(layout) {
-    const n = need(layout);
-    const room = status.sink_slots;
     $('layout-input').value = layout;
     act('Output layout ' + layout, 'PUT', 'layout', layout, () => say('Output layout ' + layout + ' from the next play.'),
-      { why: num(room) && n > room ? 'it needs ' + n + ' slots and this sink has ' + room + '.' : '', after: true, key: 'layout' });
+      { after: true, key: 'layout' });
   }
 
   // POST /pairing's bodies: reset, cancel, forget, and forget with a server_id.

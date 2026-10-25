@@ -104,17 +104,15 @@ TEST_CASE("an unknown slot width has no slots", "[board_caps]") {
     REQUIRE(variants::s3_n16r8().sink.slots_at(24, false) == 0);
 }
 
-TEST_CASE("the sink's most slots is the figure GET /hardware reports, except where a chip cannot clock a wide frame",
-          "[board_caps]") {
-    // One truth: HardwareFacts::sink_max_slots comes from the sink's own arithmetic, and so does this.
+TEST_CASE("the sink's most slots is the figure GET /hardware reports, on every board", "[board_caps]") {
+    // One truth: HardwareFacts::sink_max_slots comes from the sink, and so does this. A chip that cannot clock a wide
+    // frame reports the two it reaches, not the thirty-two the frame holds (the sink knows the revision).
     for (const auto& variant : known_variants()) {
         INFO(variant.name);
         const BoardCaps& caps = variant.caps;
         REQUIRE(caps.hardware.sink_max_slots_bits == 16);
-        if (caps.sink.tdm_usable) {
-            REQUIRE(caps.sink.slots_most() == caps.hardware.sink_max_slots);
-        } else {
-            // GET /hardware says 32 and explains in a notice that the chip reaches 2.
+        REQUIRE(caps.sink.slots_most() == caps.hardware.sink_max_slots);
+        if (!caps.sink.tdm_usable) {
             REQUIRE(caps.hardware.revision_hard_limit_below > caps.hardware.revision_major * 100 + caps.hardware.revision_minor);
             REQUIRE(caps.sink.slots_most() == 2);
         }

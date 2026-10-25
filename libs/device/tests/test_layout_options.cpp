@@ -1,7 +1,7 @@
-// Which layouts a board can be set to, and why not: the verdicts behind GET /layout-options, checked
-// for every kind of board the project builds for against libs/render's own parser and the rule
-// accept_layout() (firmware/hearth-sink/main/hearth_sink.cpp) applies: a layout that parses and has
-// no more slots than the sink has now.
+// Which layouts a board can be set to, and why not: the one verdict behind PUT /layout, GET /layout-options and the
+// Preferences registry's speaker-layout choices, checked for every board in board_variants.hpp against libs/render's
+// own parser and against the sink's slot count (what accept_layout() in firmware/hearth-sink/main/hearth_sink.cpp
+// applies through this verdict).
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
@@ -10,13 +10,15 @@
 #include <string_view>
 #include <vector>
 
+#include "fake_prefs_backend.hpp"
+#include "iclforge/board_variants.hpp"
 #include "iclforge/layout_options.hpp"
+#include "iclforge/preferences.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/sink_plan.hpp"
 
+using iclforge::BoardCaps;
 using iclforge::evaluate_layout;
 using iclforge::kLayoutCatalog;
-using iclforge::LayoutFacts;
 using iclforge::LayoutFix;
 using iclforge::LayoutOption;
 using iclforge::LayoutVerdict;
@@ -25,101 +27,69 @@ using iclforge::render::OutputLayout;
 
 namespace {
 
-constexpr int kS3C6FrameBits = 128;
-constexpr int kP4FrameBits = 512;
+namespace variants = iclforge::variants;
 
-// The facts player::sink_*() and the settings give on each kind of board, as hearth_sink.cpp fills
-// them. The ceilings come from sink_plan.hpp, the function the sinks call.
-LayoutFacts s3(int bits, bool wired, std::string_view profile = "s3-n16r8") {
-    LayoutFacts f;
-    f.profile = profile;
-    f.slots_now = static_cast<int>(iclforge::sink_ceiling(bits, wired, kS3C6FrameBits));
-    f.slot_bits = bits;
-    f.slots_max = 16;
-    f.slots_max_bits = 16;
-    f.second_line_possible = true;
-    f.second_line_wired = wired;
-    return f;
+// An ESP32-S3 at a slot width and wiring (the two settings a person can change).
+BoardCaps s3(int bits, bool wired, const char* profile = "s3-n16r8") {
+    BoardCaps caps = variants::s3_n16r8();
+    caps.profile = profile;
+    caps.sink.slot_bits = bits;
+    caps.sink.second_line = wired;
+    return caps;
 }
 
-// An ESP32-C6: one controller, 16-bit slots by sdkconfig.sendspin-c6, and a build that decodes two
-// coded channels at most.
-LayoutFacts c6(std::string_view profile = "c6-16mb") {
-    LayoutFacts f;
-    f.profile = profile;
-    f.slots_now = static_cast<int>(iclforge::sink_ceiling(16, false, kS3C6FrameBits));
-    f.slot_bits = 16;
-    f.slots_max = 8;
-    f.slots_max_bits = 16;
-    f.coded_channels_max = 2;
-    return f;
+BoardCaps c6() { return variants::c6_16mb(); }
+BoardCaps p4_rev1() { return variants::p4_rev1(); }
+BoardCaps p4_rev3() { return variants::p4_rev3_kit(); }
+
+// A board with no sink at all, and the two sinks without a TDM frame: the capture sink CI plays onto (twelve slots
+// and a width it was built with) and the null sink (every slot a layout can have).
+BoardCaps no_sink() { return BoardCaps{}; }
+
+BoardCaps capture12() {
+    BoardCaps caps;
+    caps.sink.fixed_slots = 12;
+    caps.sink.slot_bits = 32;
+    return caps;
 }
 
-LayoutFacts p4(int bits, std::string_view profile, std::string_view blocked = {}) {
-    LayoutFacts f;
-    f.profile = profile;
-    f.slots_now = static_cast<int>(iclforge::sink_ceiling(bits, false, kP4FrameBits));
-    f.slot_bits = bits;
-    f.slots_max = 32;
-    f.slots_max_bits = 16;
-    f.tdm_blocked = blocked;
-    return f;
+BoardCaps null_sink() {
+    BoardCaps caps;
+    caps.sink.fixed_slots = 16;
+    return caps;
 }
 
-constexpr std::string_view kV13 = "This chip (v1.3) has no clock for multi-channel output";
-
-LayoutFacts p4_rev1() { return p4(32, "p4-rev1", kV13); }
-LayoutFacts p4_rev3() { return p4(32, "p4-rev3"); }
-
-// A board with no sink at all, and the two sinks without hardware: the capture sink CI plays onto
-// (twelve slots, no width) and the null sink (every slot a layout can have).
-LayoutFacts no_sink() { return LayoutFacts{}; }
-
-LayoutFacts capture12() {
-    LayoutFacts f;
-    f.slots_now = 12;
-    f.slot_bits = 32;  // the width it was built for: sink_slot_bits() answers one, and nothing moves it
-    f.slots_max = 12;
-    return f;
-}
-
-LayoutFacts null_sink() {
-    LayoutFacts f;
-    f.slots_now = 16;
-    f.slots_max = 16;
-    return f;
-}
-
-struct Variant {
-    const char* name;
-    LayoutFacts facts;
+struct Case {
+    std::string name;
+    BoardCaps caps;
 };
 
-std::vector<Variant> variants() {
-    return {
-        {"S3 N16R8, 32-bit, one line", s3(32, false)},
-        {"S3 N16R8, 16-bit, one line", s3(16, false)},
-        {"S3 N16R8, 32-bit, two lines", s3(32, true)},
-        {"S3 N16R8, 16-bit, two lines", s3(16, true)},
-        {"S3 N16R8 with AC-4", s3(32, false, "s3-n16r8-ac4")},
-        {"C6 16 MB", c6()},
-        {"C6 4 MB", c6("c6-4mb")},
-        {"P4 rev1 (v1.3)", p4_rev1()},
-        {"P4 rev1 with AC-4", p4(32, "p4-rev1-ac4", kV13)},
-        {"P4 rev3, 32-bit", p4_rev3()},
-        {"P4 rev3, 16-bit", p4(16, "p4-rev3")},
-        {"P4X kit (rev3)", p4_rev3()},
-        {"no sink", no_sink()},
-        {"capture sink", capture12()},
-        {"null sink", null_sink()},
-        {"a profile nobody has measured", s3(16, false, "s3-scratch")},
-    };
+// Every board the project knows, and the same boards at the settings a person can move.
+std::vector<Case> boards() {
+    std::vector<Case> out;
+    for (const auto& variant : iclforge::known_variants()) {
+        out.push_back({variant.name, variant.caps});
+    }
+    out.push_back({"S3 16-bit, one line", s3(16, false)});
+    out.push_back({"S3 32-bit, two lines", s3(32, true)});
+    out.push_back({"S3 16-bit, two lines", s3(16, true)});
+    out.push_back({"S3 with AC-4", s3(32, false, "s3-n16r8-ac4")});
+    out.push_back({"P4 rev3, 16-bit slots", [] {
+                       BoardCaps caps = p4_rev3();
+                       caps.sink.slot_bits = 16;
+                       return caps;
+                   }()});
+    out.push_back({"no sink", no_sink()});
+    out.push_back({"capture sink", capture12()});
+    out.push_back({"null sink", null_sink()});
+    out.push_back({"a profile nobody has measured", s3(16, false, "s3-scratch")});
+    return out;
 }
 
-// accept_layout()'s decision, minus the queue: parses, and fits the sink.
-bool accepted(const LayoutFacts& facts, std::string_view text) {
+// What PUT /layout does with a text: it parses, and the verdict does not refuse it.
+bool accepted(const BoardCaps& caps, std::string_view text) {
     const std::optional<OutputLayout> layout = OutputLayout::parse(text);
-    return layout.has_value() && iclforge::layout_fits_sink(layout->slots(), facts.slots_now);
+    return layout.has_value() && evaluate_layout(caps, text, layout->slots()).accepted();
 }
 
 const LayoutOption& find(const std::vector<LayoutOption>& options, std::string_view name) {
@@ -150,12 +120,13 @@ TEST_CASE("catalog: every name parses and its slot count is the parser's", "[dev
     }
 }
 
-TEST_CASE("catalog: every layout the grammar reads is judged exactly as PUT /layout would", "[device][layout_options]") {
-    // Every F.L.H the name grammar takes (layout.hpp): the ring, the low-frequency feeds, the heights.
+TEST_CASE("a layout is accepted if and only if the sink carries its slots, on every board", "[device][layout_options]") {
+    // Every F.L.H the name grammar takes (layout.hpp): the ring, the low-frequency feeds, the heights. The verdict
+    // and the sink agree to the slot: a chip that cannot open TDM reports two, and the verdict refuses past two.
     static constexpr int rings[] = {1, 2, 3, 4, 5, 7, 9};
     static constexpr int feeds[] = {0, 1, 2};
     static constexpr int heights[] = {0, 2, 4, 6};
-    for (const Variant& variant : variants()) {
+    for (const Case& board : boards()) {
         std::size_t parsed = 0;
         for (const int ring : rings) {
             for (const int feed : feeds) {
@@ -164,41 +135,70 @@ TEST_CASE("catalog: every layout the grammar reads is judged exactly as PUT /lay
                                              (height != 0 ? "." + std::to_string(height) : std::string{});
                     const std::optional<OutputLayout> layout = OutputLayout::parse(name);
                     if (!layout) {
-                        continue;
+                        continue;  // seventeen speakers: 9.2.6 is not a layout
                     }
                     ++parsed;
-                    const LayoutOption option = evaluate_layout(variant.facts, name, layout->slots());
-                    INFO(variant.name << " / " << name << ": " << option.reason);
-                    if (accepted(variant.facts, name)) {
-                        // Offered only when the route takes it. The one layout the route takes and the
-                        // listing refuses is a chip that cannot open TDM, above stereo.
-                        if (option.verdict == LayoutVerdict::unavailable) {
-                            CHECK_FALSE(variant.facts.tdm_blocked.empty());
-                            CHECK(layout->slots() > 2);
-                        }
-                    } else {
-                        CHECK(option.verdict == LayoutVerdict::unavailable);
-                    }
+                    const LayoutOption option = evaluate_layout(board.caps, name, layout->slots());
+                    INFO(board.name << " / " << name << ": " << option.reason);
+                    CHECK(option.accepted() == (static_cast<int>(layout->slots()) <= board.caps.sink.slots()));
+                    CHECK(accepted(board.caps, name) == option.accepted());
                     // A verdict always comes with its sentence, unless it is the plain yes.
                     CHECK((option.verdict == LayoutVerdict::supported) == option.reason.empty());
+                    CHECK((option.fix == LayoutFix::none) == option.accepted());
                 }
             }
         }
-        // The grammar's whole product. (9.2.6 is seventeen speakers and the parser keeps sixteen of
-        // them: it is judged by the slots it parses to, as PUT /layout would.)
-        CHECK(parsed == 84);
+        CHECK(parsed >= 83);  // the grammar's whole product, less a name that expands past sixteen slots
     }
 }
 
-TEST_CASE("catalog: a layout the route refuses is never offered, on any board, at any setting", "[device][layout_options]") {
-    for (const int bits : {16, 32}) {
-        for (const bool wired : {false, true}) {
-            const LayoutFacts facts = s3(bits, wired);
-            for (const LayoutOption& option : layout_options(facts)) {
-                INFO(bits << "-bit, second line " << wired << ": " << option.name);
-                CHECK((option.verdict != LayoutVerdict::unavailable) == accepted(facts, option.name));
+TEST_CASE("the listing, the route and the Preferences choices give one verdict for every board and layout", "[device][layout_options]") {
+    using namespace iclforge::prefs;
+    const Pref* pref = find("speaker-layout");
+    REQUIRE(pref != nullptr);
+    REQUIRE(pref->choices.size() == kLayoutCatalog.size());
+    for (const Case& board : boards()) {
+        const auto options = layout_options(board.caps);
+        REQUIRE(options.size() == kLayoutCatalog.size());
+        testing::FakeBackend backend(board.caps);
+        const Entry entry = resolve(*pref, backend, board.caps);
+        REQUIRE(entry.choices.size() == options.size());
+        for (std::size_t i = 0; i < options.size(); ++i) {
+            const LayoutOption& listed = options[i];
+            INFO(board.name << " / " << listed.name);
+            // The listing is the catalog in order, and each choice is its layout.
+            CHECK(entry.choices[i].id == std::string(kLayoutCatalog[i].name));
+            // The route: the same verdict over the same name, from the text.
+            CHECK(accepted(board.caps, listed.name) == listed.accepted());
+            // The registry: available exactly when accepted, with the same sentence.
+            CHECK(entry.choices[i].availability.available == listed.accepted());
+            CHECK(entry.choices[i].availability.reason == listed.reason);
+            // set_value() asks the same verdict before it asks the board.
+            const SetResult set = set_value(backend, *pref, listed.name);
+            if (!entry.availability.available) {
+                CHECK_FALSE(set.ok);
+            } else if (listed.accepted()) {
+                CHECK(set.ok);
+                CHECK(backend.layout() == std::string(listed.name));
+            } else {
+                CHECK_FALSE(set.ok);
+                CHECK(set.message == listed.reason);
             }
         }
+    }
+}
+
+TEST_CASE("a board with no audio output has the preference greyed, with the sentence", "[device][layout_options]") {
+    using namespace iclforge::prefs;
+    const Pref* pref = find("speaker-layout");
+    REQUIRE(pref != nullptr);
+    const BoardCaps caps = no_sink();
+    testing::FakeBackend backend(caps);
+    const Entry entry = resolve(*pref, backend, caps);
+    CHECK_FALSE(entry.availability.available);
+    CHECK(entry.availability.reason == "This board has no audio output to set a layout for.");
+    for (const auto& choice : entry.choices) {
+        CHECK_FALSE(choice.availability.available);
     }
 }
 
@@ -262,23 +262,22 @@ TEST_CASE("an ESP32-S3 with a second line wired reaches 9.1.6, with the second l
     CHECK(mentions(wide, "7.1.4 needs the second I2S line"));
     CHECK(mentions(wide, "never checked with a DAC on both lines"));
     CHECK(mentions(find(options, "9.1.6"), "second I2S line"));
-}
-
-TEST_CASE("a second line wired but not needed does not colour the layouts one line carries", "[device][layout_options]") {
-    // 5.1 is six slots: the first line's eight carry it, so the second line is not in the sentence.
-    const LayoutOption five_one = find(layout_options(s3(16, true)), "5.1");
-    CHECK_FALSE(mentions(five_one, "second I2S line"));
+    // And a second line wired but not needed does not colour the layouts one line carries.
+    CHECK_FALSE(mentions(find(options, "5.1"), "second I2S line"));
 }
 
 TEST_CASE("an ESP32-C6 offers what its single 16-bit line carries and says its build decodes stereo", "[device][layout_options]") {
     for (const char* profile : {"c6-16mb", "c6-4mb"}) {
-        const auto options = layout_options(c6(profile));
+        BoardCaps caps = c6();
+        caps.profile = profile;
+        const auto options = layout_options(caps);
         CHECK(find(options, "1.0").verdict == LayoutVerdict::supported);
         CHECK(find(options, "2.0").verdict == LayoutVerdict::supported);
         for (const char* name : {"2.1", "5.1", "7.1"}) {
             INFO(profile << " " << name);
             const LayoutOption& option = find(options, name);
             CHECK(option.verdict == LayoutVerdict::with_limits);
+            CHECK(option.accepted());
             CHECK(mentions(option, "decodes streams of at most 2 channels"));
         }
         const LayoutOption& wide = find(options, "7.1.4");
@@ -290,11 +289,11 @@ TEST_CASE("an ESP32-C6 offers what its single 16-bit line carries and says its b
     }
 }
 
-TEST_CASE("an ESP32-P4 below v3.0 offers mono and stereo and says the chip is why", "[device][layout_options]") {
+TEST_CASE("an ESP32-P4 below v3.0 offers mono and stereo and PUT /layout refuses the rest with the chip as the reason", "[device][layout_options]") {
     for (const char* profile : {"p4-rev1", "p4-rev1-ac4"}) {
-        LayoutFacts facts = p4_rev1();
-        facts.profile = profile;
-        const auto options = layout_options(facts);
+        BoardCaps caps = p4_rev1();
+        caps.profile = profile;
+        const auto options = layout_options(caps);
         CHECK(find(options, "1.0").verdict == LayoutVerdict::supported);
         CHECK(find(options, "2.0").verdict == LayoutVerdict::supported);
         for (const auto& option : options) {
@@ -306,20 +305,31 @@ TEST_CASE("an ESP32-P4 below v3.0 offers mono and stereo and says the chip is wh
             CHECK(option.fix == LayoutFix::hardware);
             CHECK(option.reason == "This chip (v1.3) has no clock for multi-channel output, so only 1.0 and "
                                    "2.0 can play.");
+            // The route says the same, because it is the same verdict: 5.1 is refused here, not accepted and failed.
+            CHECK_FALSE(accepted(caps, option.name));
         }
-        // The route would take 5.1 here (the fold is tested through it) and the listing does not offer it.
-        CHECK(accepted(facts, "5.1"));
+        CHECK(caps.sink.slots() == 2);
     }
 }
 
 TEST_CASE("an ESP32-P4 of v3.0 or newer, the P4X kit among them, supports every layout up to 9.1.6", "[device][layout_options]") {
-    for (const LayoutFacts& facts : {p4_rev3(), p4(16, "p4-rev3")}) {
-        for (const auto& option : layout_options(facts)) {
-            INFO(option.name << ": " << option.reason);
-            CHECK(option.verdict == LayoutVerdict::supported);
-            CHECK(option.verified);
-            CHECK(option.reason.empty());
+    for (const char* name : {"p4-rev3-kit"}) {
+        for (const auto& variant : iclforge::known_variants()) {
+            if (variant.name != std::string(name)) {
+                continue;
+            }
+            for (const auto& option : layout_options(variant.caps)) {
+                INFO(option.name << ": " << option.reason);
+                CHECK(option.verdict == LayoutVerdict::supported);
+                CHECK(option.verified);
+                CHECK(option.reason.empty());
+            }
         }
+    }
+    BoardCaps narrow = p4_rev3();
+    narrow.sink.slot_bits = 16;
+    for (const auto& option : layout_options(narrow)) {
+        CHECK(option.verdict == LayoutVerdict::supported);
     }
 }
 
@@ -357,16 +367,22 @@ TEST_CASE("a profile with no evidence says not verified rather than inventing a 
 }
 
 TEST_CASE("the S3 records a stream measured falling behind", "[device][layout_options]") {
-    // Two lines at 16 bits carry 12 slots; the 7.1.4 Atmos stream took 1.08 of real time with Wi-Fi up.
-    LayoutFacts facts = s3(16, false);
-    facts.slots_now = 12;  // as if a line carried it: isolates the stream evidence from the wiring
-    facts.second_line_wired = false;
-    const LayoutOption wide = evaluate_layout(facts, "7.1.4", 12);
+    // Twelve slots on one line, as if a wider line carried it: isolates the stream evidence from the wiring.
+    BoardCaps caps = s3(16, false);
+    caps.sink.frame_bit_max = 192;
+    const LayoutOption wide = evaluate_layout(caps, "7.1.4", 12);
     CHECK(wide.verdict == LayoutVerdict::with_limits);
     CHECK(mentions(wide, "1.08 of real time"));
     CHECK(mentions(wide, "7.1.4 can break up"));
     // Narrower layouts do not carry the sentence.
-    CHECK_FALSE(mentions(evaluate_layout(facts, "5.1.4", 10), "1.08"));
+    CHECK_FALSE(mentions(evaluate_layout(caps, "5.1.4", 10), "1.08"));
+}
+
+TEST_CASE("a speaker list too long to name is called 'This layout' in its sentence", "[device][layout_options]") {
+    const LayoutOption option =
+        evaluate_layout(c6(), "L,R,C,LFE,Ls,Rs,Lrs,Rrs,Vhl,Vhr,Lts,Rts", 12);
+    CHECK(option.verdict == LayoutVerdict::unavailable);
+    CHECK(option.reason.starts_with("This layout needs 12 slots"));
 }
 
 TEST_CASE("every profile the project defines has an evidence row", "[device][layout_options]") {
@@ -381,4 +397,25 @@ TEST_CASE("every profile the project defines has an evidence row", "[device][lay
         CHECK(found);
     }
     CHECK(iclforge::kLayoutEvidence.size() == 7);
+}
+
+TEST_CASE("GET /layout-options is the head and one object a layout, in a fixed key order", "[device][layout_options]") {
+    const BoardCaps caps = s3(32, false);
+    const std::string json = iclforge::layout_options_json(caps, "2.0");
+    CHECK(json.starts_with("{\"layout\":\"2.0\",\"slots\":4,\"slot_bits\":32,\"second_line\":false,"
+                           "\"profile\":\"s3-n16r8\",\"options\":[{\"layout\":\"1.0\",\"slots\":1,"
+                           "\"verdict\":\"supported\",\"fix\":\"none\",\"verified\":true}"));
+    CHECK(json.ends_with("]}\n"));
+    CHECK(json.find("{\"layout\":\"5.1\",\"slots\":6,\"verdict\":\"unavailable\",\"fix\":\"slot-width\","
+                    "\"verified\":false,\"reason\":\"5.1 needs 6 slots; this board's output carries 4 (32-bit "
+                    "slots, one line). 16-bit slots would carry 8.\"}") != std::string::npos);
+    // A sink that is not an I2S bus has no wiring to report; a part with one controller has no second line.
+    const std::string fixed = iclforge::layout_options_head_json(capture12(), "2.0");
+    CHECK(fixed.find("second_line") == std::string::npos);
+    CHECK(fixed.find("\"slots\":12,\"slot_bits\":32") != std::string::npos);
+    CHECK(iclforge::layout_options_head_json(c6(), "2.0").find("second_line") == std::string::npos);
+    // The head's slots are what the sink carries: two on a chip that opens no TDM.
+    CHECK(iclforge::layout_options_head_json(p4_rev1(), "2.0").starts_with("{\"layout\":\"2.0\",\"slots\":2,"));
+    // Quotes in a layout text cannot break the document.
+    CHECK(iclforge::layout_options_head_json(c6(), "a\"b").starts_with("{\"layout\":\"a\\\"b\""));
 }

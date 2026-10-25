@@ -80,6 +80,7 @@ const REPLIES = {
     layoutRefused:
         'not a layout this player can play: check the name or the list, and that it has no more slots than the sink\n',
     layoutOk: 'ok; takes effect at the next play\n',
+    layoutNote: 'ok; takes effect at the next play. Note: ',
     layoutOptionsNone: 'this player has no layout to choose\n',
     nameEmpty: 'PUT /name wants a name\n',
     nameRefused: 'not a name this player can hold: it is too long, or it could not be stored\n',
@@ -253,6 +254,8 @@ function slotsOf(text) {
 // scripts device.layoutOptions.
 const LAYOUT_CATALOG = ['1.0', '2.0', '2.1', '5.0', '5.1', '5.1.2', '7.1', '5.1.4', '7.1.2', '7.1.4', '9.1.2', '9.1.4', '9.1.6'];
 
+const tooWide = (name, slots, carries) => `${name} needs ${slots} slots; this board's output carries ${carries}.`;
+
 function layoutOptions(device) {
     return {
         layout: device.layout,
@@ -267,7 +270,7 @@ function layoutOptions(device) {
             }
             return {
                 layout: name, slots, verdict: 'unavailable', fix: 'hardware', verified: false,
-                reason: `${name} needs ${slots} slots; this board's output carries ${device.sinkSlots}.`,
+                reason: tooWide(name, slots, device.sinkSlots),
             };
         }),
     };
@@ -1335,11 +1338,18 @@ async function startStub() {
                     return send(res, 400, REPLIES.layoutEmpty);
                 }
                 const slots = slotsOf(body);
-                if (!slots || slots > device.sinkSlots) {
+                if (!slots) {
                     return send(res, 409, REPLIES.layoutRefused);
                 }
+                // The verdict GET /layout-options gives, which this route answers with (the board has one): a layout
+                // past the sink is refused with its sentence, and one with a limit on it is taken with the note.
+                const listed = device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: device.sinkSlots });
+                const judged = (listed.options ?? []).find((o) => o.layout === body);
+                if (slots > device.sinkSlots || judged?.verdict === 'unavailable') {
+                    return send(res, 409, `${judged?.reason ?? tooWide(body, slots, device.sinkSlots)}\n`);
+                }
                 device.layout = body;
-                return send(res, 200, REPLIES.layoutOk);
+                return send(res, 200, judged?.verdict === 'limits' && judged.reason ? `${REPLIES.layoutNote}${judged.reason}\n` : REPLIES.layoutOk);
             }
             // Updates over the network (planning/esp32-ota.md). A firmware
             // without them answers every one of these routes 404.

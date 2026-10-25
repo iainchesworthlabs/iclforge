@@ -305,22 +305,31 @@ test("the stand-in writes GET /hardware's keys in the firmware's order", async (
 });
 
 test("the stand-in writes GET /layout-options' keys in the firmware's order", async () => {
-    // on_layout_options_get writes the board's line (head) and then each layout's (item); a layout the
-    // sink cannot carry has a reason, which a supported one leaves out.
+    // layout_options.hpp writes the board's line (layout_options_head_json) and then each layout's
+    // (layout_option_json), and control.cpp sends them; a layout the sink cannot carry has a reason, which a
+    // supported one leaves out. The keys in the order the source writes them, a key written twice (a true and a
+    // false) once.
+    const LAYOUT_OPTIONS = fs.readFileSync(path.join(LIBS_DEVICE, 'layout_options.hpp'), 'utf8');
+    const keys = (from, to) => {
+        const found = [...LAYOUT_OPTIONS.slice(LAYOUT_OPTIONS.indexOf(from), LAYOUT_OPTIONS.indexOf(to)).matchAll(/\\"([a-z_]+)\\":/g)].map(
+            (m) => m[1],
+        );
+        return found.filter((key, at) => found.indexOf(key) === at);
+    };
     const firmware = [
-        ...CONTROL.slice(
-            CONTROL.indexOf('static esp_err_t on_layout_options_get'),
-            CONTROL.indexOf('static esp_err_t on_name_get'),
-        ).matchAll(/append_\w+\((?:head|item), "([a-z_]+)"/g),
-    ].map((m) => m[1]);
+        ...keys('layout_options_head_json(const BoardCaps', 'layout_option_json(const LayoutOption'),
+        ...keys('layout_option_json(const LayoutOption', 'layout_options_json(const BoardCaps'),
+    ];
+    // The head's last key opens the list; the stand-in's options array is that key.
     expect(firmware.length).toBeGreaterThan(8);
+    expect(CONTROL).toContain('layout_options_head_json(caps, h.layout())');
     const stub = await startStub();
     try {
         const body = JSON.parse(await (await fetch(`${stub.url}layout-options`)).text());
         const { options, ...head } = body;
         const refused = options.find((o) => o.reason);
         expect(refused, 'the stand-in lists a layout the sink cannot carry').toBeDefined();
-        expect([...Object.keys(head), ...Object.keys(refused)]).toEqual(firmware);
+        expect([...Object.keys(head), 'options', ...Object.keys(refused)]).toEqual(firmware);
         expect(options.find((o) => !o.reason)).not.toHaveProperty('reason');
     } finally {
         await stub.close();
