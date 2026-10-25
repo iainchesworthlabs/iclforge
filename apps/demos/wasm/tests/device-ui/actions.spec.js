@@ -47,7 +47,7 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Name').fill('Kitchen');
         await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
         await expect(page.getByRole('status')).toHaveText(
-            'Name Kitchen refused (409): not a name this player can hold: it is too long, or it could not be stored',
+            'Name Kitchen refused (409): not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored',
         );
         await expect(page.getByRole('status')).toHaveClass(/error/);
     });

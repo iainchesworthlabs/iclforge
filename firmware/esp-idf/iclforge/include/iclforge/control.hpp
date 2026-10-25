@@ -356,6 +356,11 @@ struct ControlHandlers {
     // empty. Called for every GET /status, on the server's task.
     std::function<std::optional<ControlNetwork>()> network;
 
+    // GET /preferences: every preference the board has (iclforge/preferences.hpp), as this board sees it - its value,
+    // whether it can use it and, if not, why. Read-only: a change goes through the entry's own route. The owner
+    // keeps the backend alive for as long as Control runs; null leaves the route answering that there are none.
+    iclforge::prefs::Backend* preferences = nullptr;
+
     // POST /reset-preferences: the choices a person made once (what the screen shows, when it dims, the
     // time zone, ...) go back to the image's defaults, at once; the name, the network, the wiring and
     // the pairings stay (iclforge/settings_keys.hpp says which is which). Nothing, when it is done;
@@ -365,10 +370,6 @@ struct ControlHandlers {
     // are erased, and the board restarts as a new one. Called only for a request that named this board by
     // its own address or name. Nothing once it has erased and the restart is under way; otherwise why not.
     std::function<std::optional<std::string>()> factory_reset;
-    // GET /preferences: every preference the board has (iclforge/preferences.hpp), as this board sees it - its value,
-    // whether it can use it and, if not, why. Read-only: a change goes through the entry's own route. The owner
-    // keeps the backend alive for as long as Control runs; null leaves the route answering that there are none.
-    iclforge::prefs::Backend* preferences = nullptr;
 
     // The firmware routes (firmware.hpp), and flash mode's refusals. Null
     // leaves the routes answering that the board takes no updates. The owner

@@ -320,6 +320,8 @@ struct Screen {
     lv_obj_t* footer = nullptr;
     // The footer's chips beyond the name (the line and the delay) show only where they leave the buttons room.
     bool chips = false;
+    // The Adjust sheet's delay says "+50 ms" and not "Delay +50 ms" where the longer would not fit between its buttons.
+    bool short_delay = false;
     // What the no-lyrics screen follows (settings, read every frame), and what the player says is playing
     // (read five times a second while the speakers show).
     NowSettings now_set;
@@ -433,6 +435,13 @@ Screen g;
     char buffer[32];
     std::snprintf(buffer, sizeof buffer, "Delay %+d ms", static_cast<int>(ms));
     return buffer;
+}
+
+// The delay as the Adjust sheet says it between its buttons: the footer's words, or just the figure where the sheet
+// is too narrow for "Delay -1000 ms" and two buttons (a 240 pixel screen).
+[[nodiscard]] std::string sheet_delay_string(std::int32_t ms) {
+    const std::string full = delay_string(ms);
+    return g.short_delay ? full.substr(sizeof "Delay " - 1) : full;
 }
 
 // The text size step as the sheet says it. The idle screen draws no lyrics to resize, so without
@@ -651,7 +660,9 @@ void build_sheet() {
 
     lv_obj_t* controls = sheet_row(g.sheet, "Lyric delay", content_w);
     make_button(controls, "-", m.target, m.target, Button::kDelayLess, false);
-    g.sheet_delay = sheet_value(controls, delay_string(g.delay_ms), text_width(delay_string(-kDelayMaxMs), g.small) + 4);
+    g.short_delay = text_width(delay_string(-kDelayMaxMs), g.small) + 4 + 2 * (m.target + m.gap) > content_w;
+    g.sheet_delay =
+        sheet_value(controls, sheet_delay_string(g.delay_ms), text_width(sheet_delay_string(-kDelayMaxMs), g.small) + 4);
     make_button(controls, "+", m.target, m.target, Button::kDelayMore, false);
 
     controls = sheet_row(g.sheet, "Text size", content_w);
@@ -798,12 +809,14 @@ void build_frame() {
     lv_obj_set_size(name_target, std::min(340, std::max(room, 1)), m.footer);
     lv_obj_set_pos(name_target, 0, 0);
     lv_obj_add_event_cb(name_target, &on_name_tap, LV_EVENT_CLICKED, nullptr);
-    const int line_x = 300;
-    const int delay_x = 470;
+    // The lyric chips: "Line 12 of 40" (up to "Line 100 of 100") from x = 290, "Delay -1000 ms" from x = 458, which end
+    // before the Preferences button at the kit's 1024 by 600 (the chips are not shown where they would not).
+    const int line_x = 290;
+    const int delay_x = 458;
     const int delay_w = text_width(delay_string(-kDelayMaxMs), g.small);
     g.chips = wide && delay_x + delay_w <= room;
     g.chip_line = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_line, delay_x - line_x - m.gap);
+    lv_obj_set_width(g.chip_line, delay_x - line_x - 4);
     lv_obj_set_pos(g.chip_line, line_x, label_y);
     g.chip_delay = make_label(footer, delay_string(g.delay_ms), g.small, kMuted);
     lv_obj_set_width(g.chip_delay, delay_w + 4);
@@ -1436,7 +1449,7 @@ void update_header_and_footer(const Stage& stage) {
         g.delay_text = delay;
         lv_label_set_text(g.chip_delay, delay.c_str());
         if (g.sheet_delay != nullptr) {
-            lv_label_set_text(g.sheet_delay, delay.c_str());
+            lv_label_set_text(g.sheet_delay, sheet_delay_string(g.delay_ms).c_str());
         }
     }
     const char* const size = size_string(g.scale);

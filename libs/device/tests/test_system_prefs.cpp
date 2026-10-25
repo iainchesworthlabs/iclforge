@@ -88,8 +88,11 @@ TEST_CASE("the cable-or-Wi-Fi choice is there only on a board that has both", "[
         const prefs::Entry entry = resolved(backend, "network-preference");
         REQUIRE(entry.availability.available == variant.caps.network.choice());
         if (!entry.availability.available) {
-            REQUIRE(contains(entry.availability.reason, "Wi-Fi only"));
-            REQUIRE(contains(entry.availability.reason, "nothing to choose"));
+            // The one interface a board has is named: the radio, the cable, or neither.
+            const char* which = variant.caps.network.wifi       ? "Wi-Fi only"
+                                : variant.caps.network.ethernet ? "cable only"
+                                                                : "no network";
+            REQUIRE(contains(entry.availability.reason, which));
         }
     }
     BoardCaps cable_only = iclforge::variants::p4_rev3_kit();

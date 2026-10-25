@@ -308,7 +308,9 @@ lyric screens have them, where the server gave a progress and the board's clock 
 
 **The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
 and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
-*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone.
+*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With
+**Preferences** and **Adjust** both in the footer there are 386 px for it on the kit's panel (it was 558 with Adjust
+alone), which holds *Decoded on this board - 768 kb/s* and not the server's name: the developer view has that.
 A coded stream (E-AC-3, AC-3, AC-4) is sent undecoded and decoded on the board, which the wording says; a
 PCM one was decoded by the server, and the footer says *PCM from Music Assistant*. The bitrate is what was
 played: the coded bytes of the chunks played over the time they took, over windows of a second and

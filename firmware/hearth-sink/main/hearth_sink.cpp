@@ -851,9 +851,9 @@ iclforge::ControlHandlers control_handlers() {
         h.pairings = []() { return player::sendspin_pairings(); };
         h.forget_server = [](std::string_view server_id) { return player::sendspin_forget_server(server_id); };
     }
+    h.preferences = &player::preferences();
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
-    h.preferences = &player::preferences();
     h.firmware = &g_firmware;
     return h;
 }
