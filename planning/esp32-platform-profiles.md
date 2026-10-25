@@ -472,7 +472,25 @@ the line; and a Sendspin play list for the C6 needs a server on the bench.
 
 A row may name a `layout`, set with `PUT /layout` for its play and put back after it, and the `slots`
 the sink must open for: `p4-rev3`'s 5.1 stream on `9.1.6` is the one, and fails when the sink opens
-for fewer than sixteen. `--fixtures-url` plays the streams from a server that is already running
+for fewer than sixteen.
+
+**A row declares what it needs, and the board says what it carries (2026-10-25).** A row that names a
+`layout` needs the board to carry it, and the suite does not guess that from the profile: it reads
+`GET /layout-options`, the firmware's one verdict over its capabilities (the same one `PUT /layout`, the
+Preferences list and the device page ask: [`p4x-layout-options.md`](p4x-layout-options.md)), once per run,
+and prints what the board carries, carries with a limit and does not. A layout the board carries is played
+as before; one it carries with a limit is played and the limit is noted. One it cannot carry is what the
+row's `if_unavailable` says: `refuse` (the default) sends `PUT /layout` and holds the board to answering
+409 with the reason the listing gives for it, which is the row's pass, since a board told a layout it
+cannot carry is meant to say no (state `refused-layout`, the reason in `why`); `skip` leaves the row out
+and says why (state `skipped`). A board that takes a layout it lists as unavailable, or refuses it in other
+words than it lists, is a finding. A firmware with no `GET /layout-options` plays the row as written. The
+old rule that only a v3.x profile could have a layout row is gone: a P4 below v3.0 reports two slots
+(`sink_slots()`) and says so, and the fold is tested where it always was, by a 5.1 stream on the board's own
+2.0. No row was added to another profile in this change: a new row is a new baseline, and a baseline is
+recorded on a board.
+
+`--fixtures-url` plays the streams from a server that is already running
 and serves the repository's paths, where the suite would otherwise start one over the whole
 repository on the LAN.
 
