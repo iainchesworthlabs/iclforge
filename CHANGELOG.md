@@ -72,6 +72,12 @@ The sections below contain the complete change list and fixes.
   /now-playing` (`speakers`, `title`, `clock`, `off`) and `GET` and `PUT /dim-after` (`never`, or minutes)
   set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
   `planning/p4x-now-playing.md`.
+- **Late night.** A sink decodes AC-3, E-AC-3 (with Atmos objects) and AC-4 for a listener who can choose how much
+  of their dynamic range is kept: `GET` and `PUT /dynamic-range`, `standard` (the default, and what a sink always
+  did) or `late-night`, which applies the stream's own heavy compression (`compr`, or an AC-4 speaker DRC mode) at the
+  level dialogue was already heard at, not RF mode's 11 dB higher. It is stored on the board, followed from the next
+  stream, and wins over a server's decoder mode while it is on. The plan and the measurements are
+  `planning/hearth-late-night.md`.
 - **The title card.** The sink lists `metadata@v1` in its hello (a board with a screen only), so a server tells it what is
   playing, and the panel can show the title, the artist, and the album and year, with the song's time and a progress line
   as the lyric screens have. The card is the third choice in Adjust (`PUT /now-playing title`); until a server has said a

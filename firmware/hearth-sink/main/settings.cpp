@@ -134,6 +134,8 @@ Settings image_defaults() {
     defaults.ntp_server = {};
     defaults.time_sync = true;
     defaults.layout = {};
+    defaults.dynamic_range = iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
+                                 .value_or(iclforge::ac3::kDefaultDynamicRange);
     return defaults;
 }
 
@@ -255,13 +257,21 @@ void load_all() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, sk::kLayout, g_settings.layout);
+    if (nvs_get_i32(handle, sk::kDynamicRange, &stored) == ESP_OK) {
+        if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
+            g_settings.dynamic_range = *range;
+        } else {
+            std::printf("settings: stored dynamic range %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
                 "no-lyrics screen %s, dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
-                "time server %s, time sync %s\n",
+                "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
@@ -274,7 +284,8 @@ void load_all() {
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
                 g_settings.time_zone_name[0] != '\0' ? " = " : "", g_settings.time_zone_name.data(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
-                iclforge::wallclock::time_sync_text(g_settings.time_sync));
+                iclforge::wallclock::time_sync_text(g_settings.time_sync),
+                iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
 }
 
 }  // namespace
@@ -475,6 +486,14 @@ bool settings_set_time_sync(bool on) {
     return true;
 }
 
+bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range) {
+    if (!write_int(sk::kDynamicRange, static_cast<std::int32_t>(range))) {
+        return false;
+    }
+    g_settings.dynamic_range = range;
+    return true;
+}
+
 bool settings_forget() {
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
@@ -513,6 +532,8 @@ void reset_in_memory(std::string_view key, const Settings& defaults) {
         g_settings.clock_format = defaults.clock_format;
     } else if (key == sk::kNight) {
         g_settings.night = defaults.night;
+    } else if (key == sk::kDynamicRange) {
+        g_settings.dynamic_range = defaults.dynamic_range;
     } else {
         std::printf("settings: '%.*s' is erased; the board follows at its next start\n", static_cast<int>(key.size()),
                     key.data());

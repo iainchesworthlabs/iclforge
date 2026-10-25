@@ -55,6 +55,7 @@ const REPLIES = {
         'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
         "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off",
         'GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; PUT one',
+        "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is kept; PUT one to change it (from the next stream)",
         'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
         'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one, or a name from /time-zones',
         'GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)',
@@ -112,6 +113,10 @@ const REPLIES = {
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
+    noDynamicRange: 'this board decodes no Dolby stream, so it has no dynamic range to choose\n',
+    dynamicRangeBad: 'PUT /dynamic-range wants standard or late-night\n',
+    dynamicRangeRefused: 'that setting could not be stored\n',
+    dynamicRangeOk: 'ok; takes effect from the next stream\n',
     noClock: 'this board keeps no time\n',
     brightnessBad: 'PUT /brightness wants a number of percent from 10 to 100\n',
     brightnessRefused:
@@ -219,6 +224,8 @@ const ROUTES = [
     'GET /night-idle',
     'PUT /night-idle',
     'GET /time-zones',
+    'GET /dynamic-range',
+    'PUT /dynamic-range',
     'GET /preferences',
     'GET /timezone',
     'PUT /timezone',
@@ -1082,6 +1089,10 @@ async function startStub() {
         // A board with a screen (a test sets screenBoard()): the view it shows while a song has no
         // lyrics, the views this build has, and when it dims. Null for a board with none.
         screen: null,
+        // How much of a Dolby stream's dynamic range the listener wants: 'standard' or 'late-night' on a board
+        // with a Sendspin player, which decodes for a listener; null for one that decodes none, whose routes
+        // answer 404.
+        dynamicRange: 'standard',
         // What the board says about its time (timeBoard); undefined for a firmware that keeps none (no
         // network, or QEMU's), whose /status has no "time" key and whose time routes answer 404.
         time: timeBoard(),
@@ -1529,6 +1540,22 @@ async function startStub() {
                     return send(res, 404, REPLIES.noClock);
                 }
                 return send(res, 200, ZONE_TABLE.map((z) => z[0] + '\n').join(''));
+            case 'GET /dynamic-range':
+                if (!device.dynamicRange) {
+                    return send(res, 404, REPLIES.noDynamicRange);
+                }
+                return send(res, 200, device.dynamicRange + '\n');
+            case 'PUT /dynamic-range': {
+                const word = body.trim();
+                if (!['standard', 'late-night'].includes(word)) {
+                    return send(res, 400, REPLIES.dynamicRangeBad);
+                }
+                if (!device.dynamicRange) {
+                    return send(res, 409, REPLIES.noDynamicRange);
+                }
+                device.dynamicRange = word;
+                return send(res, 200, REPLIES.dynamicRangeOk);
+            }
             case 'GET /preferences':
                 return send(res, 200, preferencesJson(device), 'application/json');
             case 'GET /timezone':
