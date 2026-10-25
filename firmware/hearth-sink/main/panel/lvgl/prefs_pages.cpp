@@ -822,6 +822,8 @@ void pages_open(const prefs::Pref& pref, const std::string& word) {
                 open_dialog(pref, word, pref.confirm_step(preferences_backend(), word), State::Then::kSet);
             }
             break;
+        case prefs::Kind::kSheet:
+            break;  // the Speakers sheet is opened by sound_sheet_open(), not by a page of this file
     }
 }
 
