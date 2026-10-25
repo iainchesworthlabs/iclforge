@@ -77,6 +77,27 @@ test.describe('a board with a Sendspin player', () => {
         await expect(rows(page).first()).toContainText('0.0 ms');
     });
 
+    test('a span of distances the delay lines cannot hold is refused, and a smaller one is not', async ({ page, stub }) => {
+        await set(field(page, 'Front left distance'), '1');
+        await expect.poll(() => stub.sent('PUT /trim').length).toBe(1);
+        await set(field(page, 'Front right distance'), '9');
+        await expect(page.getByRole('status')).toHaveText(
+            'Front right distance refused (409): the nearest and the farthest speaker can be at most 6.86 m apart on this board (its delay lines hold 20 ms)',
+        );
+        expect(stub.device.sound.speakers[2].distance).toBe(0);
+        // Nearer is a smaller span, and is taken.
+        await set(field(page, 'Front right distance'), '7');
+        await expect.poll(() => stub.sent('PUT /trim').map((r) => r.body).pop()).toBe('R distance=7');
+        expect(stub.device.sound.speakers[2].distance).toBe(7);
+        // A table stored past the span (by a build with longer lines) still takes a level, and can be made smaller.
+        stub.device.sound.speakers[2].distance = 9;
+        await page.reload();
+        await set(field(page, 'Front left level'), '1');
+        await expect.poll(() => stub.sent('PUT /trim').map((r) => r.body).pop()).toBe('L level=1');
+        await set(field(page, 'Front right distance'), '8');
+        await expect.poll(() => stub.sent('PUT /trim').map((r) => r.body).pop()).toBe('R distance=8');
+    });
+
     test('a distance past the range is refused in the device words', async ({ page }) => {
         await set(field(page, 'Front left distance'), '11');
         await expect(page.getByRole('status')).toHaveText(

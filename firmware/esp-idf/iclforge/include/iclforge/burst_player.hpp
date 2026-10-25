@@ -222,19 +222,25 @@ struct BurstPlayerStatus {
     std::uint8_t identify_role = iclforge::render::speaker_trim::kNoRole;
     std::uint32_t identify_remaining_ms = 0;
 
-    // The level and delay in force at each output, and the speaker role there (kNoRole: none). A server's
-    // settings can put these away from the listener's table (trim_server_*).
-    std::array<std::uint8_t, Playout::kMaxOutputs> trim_role = no_trim_roles();
-    std::array<float, Playout::kMaxOutputs> trim_level_db{};
-    std::array<std::uint32_t, Playout::kMaxOutputs> trim_delay_samples{};
+};
+
+// The level and delay in force at each output, and the speaker role there (kNoRole: none), as the decode task last
+// published them: a read of its own (BurstPlayer::trim_status()), since the status above is copied ten times a
+// second on a stack that has little to spare. A server's settings can put these away from the listener's table.
+struct BurstPlayerTrim {
+    // The layout in force, as text.
+    std::array<char, iclforge::render::OutputLayout::kTextBytes> layout{};
+    std::array<std::uint8_t, Playout::kMaxOutputs> role = no_trim_roles();
+    std::array<float, Playout::kMaxOutputs> level_db{};
+    std::array<std::uint32_t, Playout::kMaxOutputs> delay_samples{};
     // The outputs whose delay is cut to what the build holds, or was not given for want of delay lines.
-    std::uint32_t trim_clamped = 0;
-    bool trim_server_level = false;
-    bool trim_server_delay = false;
+    std::uint32_t clamped = 0;
+    bool server_level = false;
+    bool server_delay = false;
     // The most delay a speaker can be given here, in samples (0: this build has no delay lines), and the
     // distance the delays are counted from, in centimetres.
-    std::uint32_t trim_max_delay_samples = 0;
-    std::uint16_t trim_farthest_cm = 0;
+    std::uint32_t max_delay_samples = 0;
+    std::uint16_t farthest_cm = 0;
 };
 
 // The board's own identify request (iclforge/render/identify_request.hpp): one speaker once, one speaker over and
@@ -300,6 +306,7 @@ class BurstPlayer {
 
     // Safe from any task.
     [[nodiscard]] BurstPlayerStatus status() const;
+    [[nodiscard]] BurstPlayerTrim trim_status() const;
     // Whether a stream is running.
     [[nodiscard]] bool active() const;
     // Whether this build decodes Opus (CONFIG_ICLFORGE_SENDSPIN_OPUS): a firmware lists the format

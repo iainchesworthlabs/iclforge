@@ -10,11 +10,14 @@
 #include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include "iclforge/render/layout.hpp"
@@ -427,4 +430,57 @@ TEST_CASE("a player with fewer outputs than the stage's most holds the delay it 
     // More outputs open than storage was given for are not set up.
     trim.configure(layout_of("9.1.6"), identity_for(layout_of("9.1.6")), 16);
     REQUIRE(trim.outputs() == 8);
+}
+
+// What the stage costs, per output and block of 256 frames, on the machine the test runs on. Hidden: run it by
+// name ("[output-trim-bench]") for the figures planning/hearth-speaker-trim-identify.md quotes. The boards' own
+// are the kit's to measure (the burst player's sink_us and decode figures); this gives the proportions between
+// the cases, which the boards share.
+TEST_CASE("the cost of the stage per output", "[.][output-trim-bench]") {
+    struct Case {
+        const char* name;
+        const char* table;
+    };
+    const std::array<Case, 4> cases = {Case{"neutral", ""},
+                                       Case{"level", "L level=-1.5; R level=-1.5; C level=-1.5"},
+                                       Case{"delay", "L distance=2; R distance=2; C distance=3"},
+                                       Case{"level and delay", "L level=-1.5 distance=2; R level=-1.5 distance=2; C level=-1.5 distance=3"}};
+    for (const std::size_t outputs : {2U, 6U, 16U}) {
+        const char* const layout_text = outputs == 2 ? "2.0" : outputs == 6 ? "5.1" : "9.1.6";
+        const OutputLayout layout = layout_of(layout_text);
+        for (const Case& c : cases) {
+            Stage stage;
+            if (c.table[0] != '\0') {
+                SpeakerTrimTable table = table_of(c.table);
+                // Every speaker of the layout, with a distance when the case has any: the cost is per output.
+                for (std::size_t o = 0; o < outputs && c.table[0] != '\0'; ++o) {
+                    const st::RoleCode role = st::role_of_slot(layout, o);
+                    if (std::string(c.name).find("delay") != std::string::npos) {
+                        (void)table.set_distance_m(role, 2.0 + (0.5 * static_cast<double>(o % 3)));
+                    }
+                    if (std::string(c.name).find("level") != std::string::npos) {
+                        (void)table.set_level_db(role, -1.5);
+                    }
+                }
+                stage.trim.set_table(table);
+            }
+            stage.trim.configure(layout, identity_for(layout), outputs);
+            std::vector<std::vector<float>> planes(outputs, std::vector<float>(kBlock, 0.25F));
+            std::vector<std::span<float>> spans(outputs);
+            for (std::size_t o = 0; o < outputs; ++o) {
+                spans[o] = planes[o];
+            }
+            const std::uint32_t live = (std::uint32_t{1} << outputs) - 1U;
+            constexpr int kBlocks = 20000;
+            const auto start = std::chrono::steady_clock::now();
+            for (int b = 0; b < kBlocks; ++b) {
+                stage.trim.process(spans, live);
+            }
+            const auto elapsed = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - start).count();
+            std::printf("%2zu outputs, %-16s %8.1f ns a block of 256 frames per output, %7.2f us a block in all, delay lines %zu KB\n",
+                        outputs, c.name, elapsed / kBlocks / static_cast<double>(outputs), elapsed / kBlocks / 1000.0,
+                        (outputs * stage.trim.max_delay_samples() * sizeof(float)) / 1024);
+            REQUIRE(planes[0][0] == planes[0][0]);  // the work is not removed
+        }
+    }
 }

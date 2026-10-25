@@ -322,10 +322,31 @@ TEST_CASE("a delay past what the build holds is cut to it, and said so; without 
     const auto caps = st::trim_caps(1440, 48000);
     REQUIRE(caps.delay);
     REQUIRE(caps.max_span_m == Approx(10.29).margin(0.01));
+    REQUIRE(caps.max_span_cm == 1029);
+    REQUIRE(st::trim_caps(960, 48000).max_span_cm == 686);
+    REQUIRE(st::trim_caps(960, 44100).max_span_cm == 746);
+    REQUIRE(st::trim_caps(0, 48000).max_span_cm == 0);
     const auto no_caps = st::trim_caps(0, 48000);
     REQUIRE_FALSE(no_caps.delay);
     REQUIRE(no_caps.level);
     REQUIRE(std::string(no_caps.delay_reason).size() > 0);
+}
+
+TEST_CASE("the span is how far apart the nearest and the farthest set distances are", "[render][speaker-trim]") {
+    SpeakerTrimTable table;
+    REQUIRE(table.span_cm() == 0);
+    REQUIRE(table.apply_text("L distance=3.0").ok);
+    REQUIRE(table.span_cm() == 0);  // one distance is no span
+    REQUIRE(table.apply_text("Ls distance=1.85; Vhl distance=4.2").ok);
+    REQUIRE(table.span_cm() == 235);
+    // Whether or not a layout has the speaker: the span is over every role.
+    REQUIRE(table.apply_text("S9 distance=10").ok);
+    REQUIRE(table.span_cm() == 815);
+    REQUIRE(table.apply_text("S9 distance=none").ok);
+    REQUIRE(table.span_cm() == 235);
+    // Levels are not distances.
+    REQUIRE(table.apply_text("C level=3").ok);
+    REQUIRE(table.span_cm() == 235);
 }
 
 TEST_CASE("a trim follows its speaker when the layout changes", "[render][speaker-trim]") {

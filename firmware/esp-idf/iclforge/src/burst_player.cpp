@@ -357,6 +357,7 @@ struct BurstPlayer::Impl {
 
     mutable std::mutex status_mutex;
     BurstPlayerStatus status;
+    BurstPlayerTrim trim_report;
 
     // ---------------------------------------------------------------------------
 
@@ -1656,16 +1657,18 @@ struct BurstPlayer::Impl {
         s.identify_output = static_cast<std::int8_t>(tone_output);
         s.identify_role = tone_output >= 0 ? trim.role(static_cast<std::size_t>(tone_output)) : speaker_trim::kNoRole;
         s.identify_remaining_ms = local_identify.remaining_ms();
+        BurstPlayerTrim& t = trim_report;
+        t.layout = s.layout;
         for (std::size_t o = 0; o < Playout::kMaxOutputs; ++o) {
-            s.trim_role[o] = trim.role(o);
-            s.trim_level_db[o] = static_cast<float>(trim.level_db(o));
-            s.trim_delay_samples[o] = trim.delay_samples(o);
+            t.role[o] = trim.role(o);
+            t.level_db[o] = static_cast<float>(trim.level_db(o));
+            t.delay_samples[o] = trim.delay_samples(o);
         }
-        s.trim_clamped = trim.clamped();
-        s.trim_server_level = trim.server_level();
-        s.trim_server_delay = trim.server_delay();
-        s.trim_max_delay_samples = static_cast<std::uint32_t>(trim.max_delay_samples());
-        s.trim_farthest_cm = trim.farthest_cm();
+        t.clamped = trim.clamped();
+        t.server_level = trim.server_level();
+        t.server_delay = trim.server_delay();
+        t.max_delay_samples = static_cast<std::uint32_t>(trim.max_delay_samples());
+        t.farthest_cm = trim.farthest_cm();
         if (stream == Stream::kIdle) {
             s.have_levels = false;
         }
@@ -2063,17 +2066,17 @@ IdentifyOutcome BurstPlayer::identify_local(const IdentifyRequest& request) {
     if (im.active.load()) {
         return IdentifyOutcome::kPlaying;
     }
-    const BurstPlayerStatus now = status();
-    if (now.identifying) {
+    if (status().identifying) {
         return IdentifyOutcome::kServer;
     }
-    // The speakers the layout in force has at an output, as the last status said.
+    // The speakers the layout in force has at an output, as the last report said.
+    const BurstPlayerTrim now = trim_status();
     bool any = false;
     bool found = false;
     for (std::size_t o = 0; o < Playout::kMaxOutputs; ++o) {
-        if (now.trim_role[o] != speaker_trim::kNoRole) {
+        if (now.role[o] != speaker_trim::kNoRole) {
             any = true;
-            found = found || now.trim_role[o] == request.role;
+            found = found || now.role[o] == request.role;
         }
     }
     if (!any || (request.shape != IdentifyRequest::Shape::kEach && !found)) {
@@ -2107,6 +2110,11 @@ bool BurstPlayer::hold(bool held) {
 BurstPlayerStatus BurstPlayer::status() const {
     const std::lock_guard lock(impl_->status_mutex);
     return impl_->status;
+}
+
+BurstPlayerTrim BurstPlayer::trim_status() const {
+    const std::lock_guard lock(impl_->status_mutex);
+    return impl_->trim_report;
 }
 
 bool BurstPlayer::active() const { return impl_->active.load(); }

@@ -580,6 +580,8 @@ the build, the pairing, the screens and what has been run.
 - [An ESP32-C6 sink](sink-esp32-c6.md) — the stereo player on a part with no PSRAM.
 - [An ESP32-P4 sink](sink-esp32-p4.md) — the best tier, its two silicon generations and two images,
   and the lyric screen for a board with a panel.
+- [Speaker levels, distances and the test tone](sink-speakers.md) — what a sink does to each speaker
+  between the decoder and the DAC, and how to hear which speaker an output reaches.
 - [Sink firmware](sink-firmware.md) — install a published image, update over the network, and go
   back; or [install from the browser](sink-installer.md).
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md) — decoder timing and memory measurements.

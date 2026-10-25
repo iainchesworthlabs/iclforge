@@ -66,7 +66,7 @@ constexpr bool kDecodeStackInPsram = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STA
 constexpr std::size_t kServerStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES;
 constexpr int kMaxDelayMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS;
 // The delay lines are one buffer per output of this length, in PSRAM. A part without any has no room for them in
-// the internal RAM the network and the decoder leave (sixteen outputs of 30 ms is 92 KB), so it has none, whatever
+// the internal RAM the network and the decoder leave (sixteen outputs of 20 ms is 61 KB), so it has none, whatever
 // the build asks: the support object says 0, and a trim of distance is unavailable with that as the reason.
 [[nodiscard]] bool delay_lines_possible() {
     return kMaxDelayMs > 0 && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
@@ -1016,21 +1016,21 @@ std::optional<SpeakerTrimStatus> sendspin_speaker_trim_status() {
     if (r == nullptr) {
         return std::nullopt;
     }
-    const iclforge::BurstPlayerStatus play = r->player->status();
+    const iclforge::BurstPlayerTrim play = r->player->trim_status();
     SpeakerTrimStatus out;
     out.layout = play.layout;
-    out.server_level = play.trim_server_level;
-    out.server_delay = play.trim_server_delay;
-    out.farthest_cm = play.trim_farthest_cm;
+    out.server_level = play.server_level;
+    out.server_delay = play.server_delay;
+    out.farthest_cm = play.farthest_cm;
     for (std::size_t o = 0; o < out.rows.size(); ++o) {
-        if (play.trim_role[o] == iclforge::render::speaker_trim::kNoRole) {
+        if (play.role[o] == iclforge::render::speaker_trim::kNoRole) {
             continue;
         }
-        out.rows[out.count++] = SpeakerTrimStatus::Row{.role = play.trim_role[o],
+        out.rows[out.count++] = SpeakerTrimStatus::Row{.role = play.role[o],
                                                        .output = static_cast<std::uint8_t>(o),
-                                                       .applied_level_db = play.trim_level_db[o],
-                                                       .applied_delay_samples = play.trim_delay_samples[o],
-                                                       .delay_clamped = ((play.trim_clamped >> o) & 1U) != 0};
+                                                       .applied_level_db = play.level_db[o],
+                                                       .applied_delay_samples = play.delay_samples[o],
+                                                       .delay_clamped = ((play.clamped >> o) & 1U) != 0};
     }
     return out;
 }

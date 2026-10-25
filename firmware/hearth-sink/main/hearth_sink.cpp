@@ -685,6 +685,18 @@ std::optional<iclforge::ControlRefusal> set_speaker_trim(std::string_view body) 
             }
         }
     }
+    // And the delay lines hold only so much: the nearest and the farthest speaker can be no further apart than
+    // sound travels in them. A span that is already past it (a table stored by a build with longer lines) can
+    // still be made smaller, or left alone while a level is set.
+    if (next.span_cm() > caps.trim.max_span_cm && next.span_cm() > player::settings().speaker_trim.span_cm()) {
+        std::array<char, 16> apart{};
+        std::snprintf(apart.data(), apart.size(), "%u.%02u", static_cast<unsigned>(caps.trim.max_span_cm / 100),
+                      static_cast<unsigned>(caps.trim.max_span_cm % 100));
+        return iclforge::ControlRefusal{
+            Kind::kConflict, std::string("the nearest and the farthest speaker can be at most ") + apart.data() +
+                                 " m apart on this board (its delay lines hold " +
+                                 std::to_string((caps.trim.max_delay_samples * 1000U) / kSampleRate) + " ms)"};
+    }
     if (!player::settings_set_speaker_trim(next)) {
         return iclforge::ControlRefusal{Kind::kConflict, "the trim could not be stored"};
     }

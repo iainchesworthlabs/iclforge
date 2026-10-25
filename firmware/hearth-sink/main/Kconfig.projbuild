@@ -776,15 +776,16 @@ config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
 
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
     int "Longest per-output delay, milliseconds (0 = none)"
-    default 30
+    default 20
     range 0 100
     help
         The most one speaker can be delayed against another, by a server's settings
         or by the listener's own distances (Preferences, PUT /trim). The delay lines
-        are one buffer per output of this length: sixteen outputs of 30 ms is about
-        92 KB, in PSRAM when the part has it. 30 ms is 10.3 m of sound's travel, the
-        farthest a speaker distance can be set; a build with less holds a shorter
-        span and says so (GET /trim), and a build with 0 has levels only.
+        are one buffer per output of this length: sixteen outputs of 20 ms is about
+        61 KB, in PSRAM when the part has it. 20 ms is 6.86 m of sound's travel, the
+        most the nearest and the farthest speaker can be apart; 30 ms would be 10.3 m.
+        A build with less holds a shorter span and says so (GET /trim), and a build
+        with 0 has levels only.
 
 config ICLFORGE_EXAMPLE_SPEAKER_TRIM
     string "The listener's level and distance for each speaker, as a build starts with them"

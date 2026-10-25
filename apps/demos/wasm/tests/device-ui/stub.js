@@ -485,7 +485,7 @@ function soundBoard(fields) {
     return {
         layout: '5.1',
         speakers: roles.map((role, output) => ({ role, output, level: 0, distance: 0 })),
-        delay: { available: true, reason: '', maxSpan: 10.29, samples: 1440 },
+        delay: { available: true, reason: '', maxSpan: 6.86, samples: 960 },
         serverLevel: false,
         serverDelay: false,
         identify: { active: false, output: -1, role: '', remaining: 0, refuse: '' },
@@ -581,6 +581,18 @@ function applyTrim(sound, body) {
     }
     if (!sound.delay.available && next.some((x, i) => x.distance !== sound.speakers[i].distance)) {
         return { code: 409, why: `a distance is a delay, and ${sound.delay.reason}` };
+    }
+    // The delay lines hold only so much: the span of the set distances may not grow past it.
+    const span = (speakers) => {
+        const cm = speakers.map((x) => Math.round(x.distance * 100)).filter((c) => c > 0);
+        return cm.length > 1 ? Math.max(...cm) - Math.min(...cm) : 0;
+    };
+    const most = Math.round(sound.delay.maxSpan * 100);
+    if (span(next) > most && span(next) > span(sound.speakers)) {
+        return {
+            code: 409,
+            why: `the nearest and the farthest speaker can be at most ${sound.delay.maxSpan.toFixed(2)} m apart on this board (its delay lines hold ${Math.round((sound.delay.samples * 1000) / 48000)} ms)`,
+        };
     }
     sound.speakers = next;
     return null;

@@ -152,15 +152,15 @@ TEST_CASE("a burst fades in and out, so no speaker is clicked", "[render][identi
     const Recording r = record(sequence, 1, 256, 100'000);
     const std::vector<float>& out = r.output[0];
 
-    // The same noise, undressed: the burst is that noise times a raised cosine over the first and last 20 ms
+    // The same noise, undressed: the burst is that noise times a smoothstep over the first and last 20 ms
     // (960 samples) and 1 between.
     IdentifyTone raw(kRate);
     REQUIRE(raw.set_level_db(-24.0));
     std::vector<float> plain(72'000);
     raw.generate(plain, IdentifyTone::Band::kFull);
-    constexpr double kPi = 3.14159265358979323846;
     const auto fade = [&](std::size_t from_edge) {
-        return 0.5 - (0.5 * std::cos(kPi * (static_cast<double>(from_edge) + 0.5) / 960.0));
+        const double x = (static_cast<double>(from_edge) + 0.5) / 960.0;
+        return x * x * (3.0 - (2.0 * x));
     };
     for (std::size_t k = 0; k < 72'000; ++k) {
         double gain = 1.0;

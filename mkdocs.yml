@@ -168,6 +168,7 @@ nav:
       - An ESP32-S3 sink: hearth/sink-esp32-s3.md
       - An ESP32-C6 sink: hearth/sink-esp32-c6.md
       - An ESP32-P4 sink: hearth/sink-esp32-p4.md
+      - Speaker levels and the test tone: hearth/sink-speakers.md
       - Sink firmware: hearth/sink-firmware.md
       - Install from the browser: hearth/sink-installer.md
       - Design record: hearth/design/player-appliance.md

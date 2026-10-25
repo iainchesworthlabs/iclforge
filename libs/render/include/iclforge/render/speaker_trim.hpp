@@ -305,6 +305,21 @@ class SpeakerTrimTable {
     }
     void clear_all() { trims_.fill(SpeakerTrim{}); }
 
+    // How far apart the nearest and the farthest speaker that has a distance are, in centimetres; 0 when fewer
+    // than two have. Over every role, whether or not the layout in force has it: a layout that comes back finds
+    // the span it was left with.
+    [[nodiscard]] std::uint16_t span_cm() const {
+        std::uint16_t nearest = 0xFFFF;
+        std::uint16_t farthest = 0;
+        for (const SpeakerTrim& t : trims_) {
+            if (t.cm != 0) {
+                nearest = std::min(nearest, t.cm);
+                farthest = std::max(farthest, t.cm);
+            }
+        }
+        return farthest > nearest ? static_cast<std::uint16_t>(farthest - nearest) : std::uint16_t{0};
+    }
+
     // Every role at the default.
     [[nodiscard]] bool neutral() const {
         return std::all_of(trims_.begin(), trims_.end(), [](const SpeakerTrim& t) { return t.neutral(); });
@@ -468,9 +483,11 @@ class SpeakerTrimTable {
 struct TrimCaps {
     bool level = true;
     bool delay = false;
-    // Samples of delay a build holds for each output, and the extra distance that is at the sample rate.
+    // Samples of delay a build holds for each output, and the extra distance that is at the sample rate: how far
+    // apart the nearest and the farthest speaker can be.
     std::size_t max_delay_samples = 0;
     double max_span_m = 0.0;
+    std::uint16_t max_span_cm = 0;
     // Why there is no delay, when there is none.
     const char* delay_reason = "this board has no memory for delay lines";
 };
@@ -482,6 +499,8 @@ struct TrimCaps {
     caps.max_span_m = caps.delay ? static_cast<double>(max_delay_samples) * kSpeedOfSoundMps / static_cast<double>(std::max<std::uint32_t>(sample_rate_hz, 1)) : 0.0;
     if (caps.delay) {
         caps.delay_reason = "";
+        caps.max_span_cm = static_cast<std::uint16_t>(std::min<std::uint64_t>(
+            (static_cast<std::uint64_t>(max_delay_samples) * 34300U) / std::max<std::uint32_t>(sample_rate_hz, 1), 0xFFFFU));
     }
     return caps;
 }

@@ -18,7 +18,7 @@
 //
 //   level   at most kMaxLevelDb (-24 dB of full scale, RMS; pink noise peaks about 12 dB over its RMS), whatever
 //           a caller asks for, and kDefaultLevelDb (-30) when it asks for nothing in particular;
-//   burst   kToneMs for each speaker, with a kFadeMs raised-cosine fade in and out, so no speaker is clicked;
+//   burst   kToneMs for each speaker, with a kFadeMs smoothstep fade in and out, so no speaker is clicked;
 //   total   kMaxTotalMs from start() to the end, however the sequence is arranged. A sequence that loops ends
 //           there, and one that is started again begins its count again - only a caller that asks, for it.
 //
@@ -218,27 +218,29 @@ class IdentifySequence {
         }
     }
 
-    // The fades: a raised cosine up over the first kFadeMs of the burst and down over the last, or down from a
-    // stop() over the kFadeMs that follow it.
+    // The fades: a smoothstep (3x^2 - 2x^3, flat at both ends) up over the first kFadeMs of the burst and down
+    // over the last, or down from a stop() over the kFadeMs that follow it. Single precision and no library call:
+    // a board's double arithmetic is software.
+    static float smoothstep(float x) { return x * x * (3.0F - (2.0F * x)); }
+
     void envelope(std::span<float> part) const {
-        constexpr double kPi = 3.14159265358979323846;
-        const std::uint64_t fade = std::max<std::uint64_t>(fade_samples_, 1);
+        const auto fade = static_cast<float>(std::max<std::uint64_t>(fade_samples_, 1));
         for (std::size_t i = 0; i < part.size(); ++i) {
             const std::uint64_t at = position_ + i;
-            double gain = 1.0;
-            if (at < fade) {
-                gain = 0.5 - (0.5 * std::cos(kPi * (static_cast<double>(at) + 0.5) / static_cast<double>(fade)));
+            float gain = 1.0F;
+            if (at < fade_samples_) {
+                gain = smoothstep((static_cast<float>(at) + 0.5F) / fade);
             }
             const std::uint64_t to_end = tone_samples_ - 1 - at;
-            if (to_end < fade) {
-                gain = std::min(gain, 0.5 - (0.5 * std::cos(kPi * (static_cast<double>(to_end) + 0.5) / static_cast<double>(fade))));
+            if (to_end < fade_samples_) {
+                gain = std::min(gain, smoothstep((static_cast<float>(to_end) + 0.5F) / fade));
             }
             if (fade_out_ > 0) {
                 const std::uint64_t done = fade_out_done_ + i;
                 const std::uint64_t left = done < fade_out_total_ ? fade_out_total_ - done : 0;
-                gain = std::min(gain, 0.5 - (0.5 * std::cos(kPi * (static_cast<double>(left)) / static_cast<double>(fade_out_total_))));
+                gain = std::min(gain, smoothstep(static_cast<float>(left) / static_cast<float>(fade_out_total_)));
             }
-            part[i] *= static_cast<float>(gain);
+            part[i] *= gain;
         }
     }
 
