@@ -798,12 +798,14 @@ void build_frame() {
     lv_obj_set_size(name_target, std::min(340, std::max(room, 1)), m.footer);
     lv_obj_set_pos(name_target, 0, 0);
     lv_obj_add_event_cb(name_target, &on_name_tap, LV_EVENT_CLICKED, nullptr);
-    const int line_x = 300;
-    const int delay_x = 470;
+    // The lyric chips: "Line 12 of 40" (up to "Line 100 of 100") from x = 290, "Delay -1000 ms" from x = 458, which end
+    // before the Preferences button at the kit's 1024 by 600 (the chips are not shown where they would not).
+    const int line_x = 290;
+    const int delay_x = 458;
     const int delay_w = text_width(delay_string(-kDelayMaxMs), g.small);
     g.chips = wide && delay_x + delay_w <= room;
     g.chip_line = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_line, delay_x - line_x - m.gap);
+    lv_obj_set_width(g.chip_line, delay_x - line_x - 4);
     lv_obj_set_pos(g.chip_line, line_x, label_y);
     g.chip_delay = make_label(footer, delay_string(g.delay_ms), g.small, kMuted);
     lv_obj_set_width(g.chip_delay, delay_w + 4);

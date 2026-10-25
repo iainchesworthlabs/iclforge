@@ -584,6 +584,11 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
     pump(6);
     write_bmp(out / ("footer-" + size + ".bmp"));
     failures += audit(player::panel::screen_footer_object(), "footer " + size);
+    // A screen wide enough for the kit's columns still says where in the song it is and the delay, beside the buttons.
+    if (width >= 960) {
+        expect(shows_text(player::panel::screen_footer_object(), "Line ", true), "the footer says which line is being sung");
+        expect(shows_text(player::panel::screen_footer_object(), "Delay +0 ms"), "and the lyric delay");
+    }
 
     // Adjust: the lyric delay and the text size, and nothing else.
     expect(tap_button("Adjust"), "the footer has an Adjust button");
