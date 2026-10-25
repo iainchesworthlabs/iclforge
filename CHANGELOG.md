@@ -108,6 +108,22 @@ The sections below contain the complete change list and fixes.
   `GET /status` has a `time` object, and the board's own web page has a Time section with the same three settings and the
   time it keeps. QEMU's network and a build with no network keep no time, and those routes answer 404.
 
+**Display and time preferences: brightness, the clock's format, and 420 time zones by name**
+
+- **Brightness is a setting.** `GET` and `PUT /brightness` (10 to 100 percent, 80 by default) set the level of a board
+  screen's backlight while it is lit, at once and kept over a restart; the dimmed screen stays under it (the floor is
+  4 percent, and never above the brightness) and the dark view is off. A glass with no backlight to dim refuses it.
+- **The clock view can be in 12 hours and can show the seconds.** `GET` and `PUT /clock-format` take `24`, `12`,
+  `24 seconds` and `12 seconds`. The seconds and the AM or PM are small beside the digits, so a second redraws about
+  9,600 pixels and not the digits'.
+- **The time zone can be chosen by name.** The board carries 420 zones by region and city (IANA tzdata 2026e, Australia
+  complete, 11,578 bytes of flash), written by `tools/hearth/gen_time_zones.py`, which holds every one to tzdata's own
+  offsets to 2036. `PUT /timezone Australia/Melbourne` stores the zone and the name (`GET /time-zones` lists the names,
+  `GET /status`'s `time` object has `zone_name`), and the board's web page offers a region and a city. A POSIX string is
+  taken as before. The night schedule's rule (`dim_state()` with a window of times and the board's local minute, held to
+  Melbourne's daylight saving changeovers) is built and host-tested; its setting and its use on the screen follow with
+  the Preferences screen.
+
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
 - **The `p4-rev3` Hearth sink uses the kit's RJ45 port as well as its Wi-Fi.** The chip's EMAC and the

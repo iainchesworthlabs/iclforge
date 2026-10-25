@@ -15,6 +15,10 @@
 # (bindings/rust/, roadmap AP9) expects in CI.
 *.rs text eol=lf
 
+# The firmware update trust anchor (firmware/keys/) is a public certificate that is embedded in the
+# image and checked against what CI signs: LF in every checkout, whatever core.autocrlf says.
+firmware/keys/*.pem text eol=lf
+
 # The three products' notice fragments, licence texts and platform files (notices/) are read at
 # configure time and concatenated into each package's NOTICES.txt (cmake/Notices.cmake); the
 # generator normalises line endings, and pinning the blobs to LF keeps the checked-in bytes the same

@@ -26,8 +26,9 @@
 // key: at most 15 characters.
 //
 // ADDING A SETTING: add its name below, add a row to kKeys with its class and the words the screen
-// uses for it (`what`), and, if it is a preference, a case in settings_reset_preferences() so the
-// running board follows. Never rename or renumber a key that has been stored: a board in the field has
+// uses for it (`what`), and, if it is a preference, a registry entry (preferences.hpp) that says
+// `on_reset = kReset`, so Reset preferences puts it back through its own setter and the running board
+// follows. Never rename or renumber a key that has been stored: a board in the field has
 // it under that name.
 
 namespace iclforge::settingskeys {
@@ -42,6 +43,9 @@ inline constexpr const char* kNetworkPreference = "net_pref";
 inline constexpr const char* kNowView = "np_view";
 inline constexpr const char* kDimAfter = "np_dim";
 inline constexpr const char* kTimeZone = "time_zone";
+inline constexpr const char* kTimeZoneName = "tz_name";
+inline constexpr const char* kBrightness = "bright";
+inline constexpr const char* kClockFormat = "clock_fmt";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
@@ -85,6 +89,11 @@ inline constexpr std::array kKeys = {
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
+    // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
+    // Reset preferences keeps the time zone).
+    Key{kTimeZoneName, Kind::setup, "time zone"},
+    Key{kBrightness, Kind::preference, "brightness"},
+    Key{kClockFormat, Kind::preference, "clock format"},
     Key{kDynamicRange, Kind::preference, "late-night mode"},
 };
 
