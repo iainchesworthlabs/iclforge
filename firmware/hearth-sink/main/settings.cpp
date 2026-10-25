@@ -32,6 +32,7 @@ constexpr const char* kKeyTimeZone = "time_zone";
 constexpr const char* kKeyNtpServer = "ntp_server";
 constexpr const char* kKeyTimeSync = "time_sync";
 constexpr const char* kKeyLayout = "layout";
+constexpr const char* kKeySpeakerTrim = "speaker_trim";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -145,6 +146,16 @@ void settings_load() {
     g_settings.ntp_server = {};
     g_settings.time_sync = true;
     g_settings.layout = {};
+    g_settings.speaker_trim = {};
+    // What the build starts with, when it says (a CI shape, a product's own room): the same statements PUT /trim
+    // takes. A string that is wrong is said and leaves every speaker at the default.
+    if (const std::string_view built_in = CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM; !built_in.empty()) {
+        if (const auto result = g_settings.speaker_trim.apply_text(built_in); !result.ok) {
+            std::printf("settings: the build's speaker trim is not one this board reads (%s); every speaker at the default\n",
+                        result.error);
+            g_settings.speaker_trim = {};
+        }
+    }
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -221,6 +232,16 @@ void settings_load() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, kKeyLayout, g_settings.layout);
+    // A stored trim that is not one this build reads (a partition written by a later image, or damaged) is
+    // said, and the build's own stands: a speaker at the wrong level is worse than one at none.
+    {
+        std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+        std::size_t blob_length = blob.size();
+        if (nvs_get_blob(handle, kKeySpeakerTrim, blob.data(), &blob_length) == ESP_OK &&
+            !g_settings.speaker_trim.from_blob(std::span<const std::uint8_t>(blob.data(), blob_length))) {
+            std::printf("settings: the stored speaker trim is not one this build reads; keeping the build's own\n");
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
@@ -323,6 +344,25 @@ bool settings_set_dim_after(int minutes) {
 
 bool settings_set_layout(std::string_view layout) {
     return write_string(kKeyLayout, layout, g_settings.layout);
+}
+
+bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table) {
+    std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+    const std::size_t length = table.to_blob(blob);
+    nvs_handle_t handle = 0;
+    if (length == 0 || nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
+        std::printf("settings: could not open NVS to write %s\n", kKeySpeakerTrim);
+        return false;
+    }
+    const esp_err_t err = nvs_set_blob(handle, kKeySpeakerTrim, blob.data(), length);
+    if (err == ESP_OK) {
+        (void)nvs_commit(handle);
+        g_settings.speaker_trim = table;
+    } else {
+        std::printf("settings: NVS refused %s (%s)\n", kKeySpeakerTrim, esp_err_to_name(err));
+    }
+    nvs_close(handle);
+    return err == ESP_OK;
 }
 
 bool settings_set_time_zone(std::string_view zone) {

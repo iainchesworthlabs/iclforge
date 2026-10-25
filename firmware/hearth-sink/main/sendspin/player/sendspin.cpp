@@ -65,6 +65,13 @@ constexpr std::uint32_t kDecodeStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DEC
 constexpr bool kDecodeStackInPsram = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM != 0;
 constexpr std::size_t kServerStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES;
 constexpr int kMaxDelayMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS;
+// The delay lines are one buffer per output of this length, in PSRAM. A part without any has no room for them in
+// the internal RAM the network and the decoder leave (sixteen outputs of 30 ms is 92 KB), so it has none, whatever
+// the build asks: the support object says 0, and a trim of distance is unavailable with that as the reason.
+[[nodiscard]] bool delay_lines_possible() {
+    return kMaxDelayMs > 0 && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+}
+[[nodiscard]] double max_delay_ms() { return delay_lines_possible() ? static_cast<double>(kMaxDelayMs) : 0.0; }
 constexpr std::size_t kMaxCodedChannels = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS;
 // Whether the board lists AC-4 (where it decodes it, which needs CONFIG_ICLFORGE_AC4), and the most
 // channels of it a frame may decode to.
@@ -230,7 +237,7 @@ bool g_board_changed = false;
     s.management.routing = true;
     s.management.trim_db = {iclforge::render::TrimDelay::kMinTrimDb,
                             iclforge::render::TrimDelay::kMaxTrimDb};
-    s.management.max_delay_ms = static_cast<double>(kMaxDelayMs);
+    s.management.max_delay_ms = max_delay_ms();
     s.management.crossover_hz = {iclforge::render::LayoutRenderer::kMinCrossoverHz,
                                  iclforge::render::LayoutRenderer::kMaxCrossoverHz};
     s.management.identify = true;
@@ -824,7 +831,10 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     // it keeps the slots it was built with.
     config.max_outputs = std::min<std::size_t>(iclforge::Playout::kMaxOutputs,
                                                static_cast<std::size_t>(std::max(sink_max_slots(), 1)));
-    config.max_delay_ms = static_cast<double>(kMaxDelayMs);
+    config.max_delay_ms = max_delay_ms();
+    // The listener's own level and distance for each speaker; a change before the player is up is taken
+    // again below, once it can be handed over.
+    config.speaker_trim = settings().speaker_trim;
     config.max_coded_channels = kMaxCodedChannels;
     config.max_ac4_channels = kAc4MaxCodedChannels;
     config.max_ac4_frame_rate = kAc4MaxFrameRate;
@@ -892,6 +902,8 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     while (true) {
         {
             const std::lock_guard lock(g_mutex);
+            // A trim the control surface stored while the player was starting.
+            g_started.player->set_speaker_trim(settings().speaker_trim);
             if (g_pending_layout) {
                 if (!g_started.player->set_layout(*g_pending_layout)) {
                     std::printf("sendspin: the player cannot take layout %s\n", g_pending_layout->text().data());
@@ -975,6 +987,78 @@ void sendspin_board_changed() {
         }
     }
     r->host->set_player_config(player_config(*r->player));
+}
+
+SoundCaps sendspin_sound_caps() {
+    SoundCaps caps;
+    caps.player = true;
+    caps.identify_reason = "";
+    caps.trim = iclforge::render::speaker_trim::trim_caps(
+        delay_lines_possible() ? iclforge::render::TrimDelay::samples_for_ms(static_cast<double>(kMaxDelayMs), kSampleRate) : 0,
+        kSampleRate);
+    if (!caps.trim.delay) {
+        caps.trim.delay_reason = kMaxDelayMs == 0 ? "this build has no delay lines"
+                                                  : "this board has no PSRAM to hold delay lines";
+    }
+    return caps;
+}
+
+void sendspin_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table) {
+    const std::lock_guard lock(g_mutex);
+    if (const Running* const r = running()) {
+        r->player->set_speaker_trim(table);
+    }
+    // A player that has yet to start takes settings().speaker_trim as it starts.
+}
+
+std::optional<SpeakerTrimStatus> sendspin_speaker_trim_status() {
+    const Running* const r = running();
+    if (r == nullptr) {
+        return std::nullopt;
+    }
+    const iclforge::BurstPlayerStatus play = r->player->status();
+    SpeakerTrimStatus out;
+    out.layout = play.layout;
+    out.server_level = play.trim_server_level;
+    out.server_delay = play.trim_server_delay;
+    out.farthest_cm = play.trim_farthest_cm;
+    for (std::size_t o = 0; o < out.rows.size(); ++o) {
+        if (play.trim_role[o] == iclforge::render::speaker_trim::kNoRole) {
+            continue;
+        }
+        out.rows[out.count++] = SpeakerTrimStatus::Row{.role = play.trim_role[o],
+                                                       .output = static_cast<std::uint8_t>(o),
+                                                       .applied_level_db = play.trim_level_db[o],
+                                                       .applied_delay_samples = play.trim_delay_samples[o],
+                                                       .delay_clamped = ((play.trim_clamped >> o) & 1U) != 0};
+    }
+    return out;
+}
+
+iclforge::render::IdentifyOutcome sendspin_identify(const iclforge::render::IdentifyRequest& request) {
+    const Running* const r = running();
+    if (r == nullptr) {
+        return iclforge::render::IdentifyOutcome::kNoPlayer;
+    }
+    // A play from the control surface holds the player: it is not available for a tone.
+    if (g_external.load() && request.shape != iclforge::render::IdentifyRequest::Shape::kOff) {
+        return iclforge::render::IdentifyOutcome::kBusy;
+    }
+    return r->player->identify_local(request);
+}
+
+IdentifyStatus sendspin_identify_status() {
+    IdentifyStatus out;
+    const Running* const r = running();
+    if (r == nullptr) {
+        return out;
+    }
+    const iclforge::BurstPlayerStatus play = r->player->status();
+    out.active = play.identify_local;
+    out.output = play.identify_output;
+    out.role = play.identify_role;
+    out.remaining_ms = play.identify_remaining_ms;
+    return out;
 }
 
 std::optional<iclforge::ControlSendspin> sendspin_status() {

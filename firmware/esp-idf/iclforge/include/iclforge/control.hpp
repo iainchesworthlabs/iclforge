@@ -52,7 +52,8 @@
 // And the board's own settings, which ControlHandlers lists: GET and PUT
 // /name, /slot-width and /wiring, PUT /network, GET and PUT /network-preference on
 // a board with a cable and a station, and GET and PUT /now-playing and
-// /dim-after on a board with a screen.
+// /dim-after on a board with a screen, and GET and PUT /trim and GET and POST /identify on a board with a Sendspin
+// player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
 //
 // And updates over the network, which Control hands to the owner's Firmware
 // (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
@@ -216,6 +217,14 @@ struct ControlNetwork {
     std::optional<Interface> ethernet;
 };
 
+// Why a handler refused a request that a route can only pass on: the words to say, and which of the three
+// ways to say no it is (400 the request is wrong, 409 the board cannot now, 404 there is nothing here).
+struct ControlRefusal {
+    enum class Kind : std::uint8_t { kBadRequest, kConflict, kMissing };
+    Kind kind = Kind::kConflict;
+    std::string why;
+};
+
 struct ControlHandlers {
     // GET /hardware's "profile" and "profile_hash": which locked build configuration this image
     // was built as, and a hash of what that configuration locks (firmware/hearth-sink/
@@ -309,6 +318,20 @@ struct ControlHandlers {
     std::function<bool(bool on)> set_time_sync;
     // GET /status's "time": see ControlTime.
     std::function<std::optional<ControlTime>()> time;
+
+    // GET and PUT /trim: the listener's level (+-12 dB) and distance (0.1 to 10 m) for each speaker of the layout
+    // in force (iclforge/render/speaker_trim.hpp), as JSON, and a body of statements that changes them
+    // ("L level=-1.5 distance=2.4; reset"). `trim` is nothing, and the route answers 404, on a board with no
+    // player to apply it. set_trim answers nothing when the table was taken, stored and put in force at once,
+    // and why not otherwise. A board whose build holds no delay lines takes levels and says distance is
+    // unavailable (the JSON's "delay" object).
+    std::function<std::optional<std::string>()> trim;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_trim;
+    // GET and POST /identify: what the board's own test tone is doing, as JSON, and a request for it: off, all,
+    // a speaker's name, or a name and "loop" (iclforge/render/identify_request.hpp). Refused while a stream
+    // plays; stops at once when one begins; ends by its own limits in any case.
+    std::function<std::optional<std::string>()> identify;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_identify;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.

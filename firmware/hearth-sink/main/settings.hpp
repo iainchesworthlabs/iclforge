@@ -25,6 +25,7 @@
 #include <string_view>
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/wall_clock.hpp"
 
 namespace player {
@@ -93,6 +94,12 @@ struct Settings {
     // (CONFIG_ICLFORGE_EXAMPLE_LAYOUT) stands. A server that sends a layout of its own (Hearth does, a
     // Music Assistant does not) replaces it for the stream.
     std::array<char, kMaxPasswordBytes + 1> layout{};
+    // The listener's own level and distance for each speaker, by the speaker's role in the layout
+    // (iclforge/render/speaker_trim.hpp), so that a trim follows its speaker when the layout changes. Every
+    // speaker at 0 dB with no distance unless CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM or a person says otherwise;
+    // the player applies it to every stream, after the decode and before the DAC. Read by every build, acted
+    // on by the one with a Sendspin player.
+    iclforge::render::speaker_trim::SpeakerTrimTable speaker_trim;
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -132,6 +139,9 @@ void settings_load();
 [[nodiscard]] bool settings_set_time_sync(bool on);
 // The stored layout text (already checked as a layout by the caller); an empty string takes it away.
 [[nodiscard]] bool settings_set_layout(std::string_view layout);
+// The speaker trim, whole. Stored as the table's own compact form (SpeakerTrimTable::to_blob), so a role that is
+// not set costs nothing and the stored role numbers are never renumbered.
+[[nodiscard]] bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

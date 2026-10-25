@@ -516,31 +516,42 @@ struct TrimResolved {
     }
 };
 
-// The trims and delays of the table for each output `routing` patches a slot of `layout` to. Slots that are not
-// connected, channels the patch leaves out and outputs past kOutputs have none; an output no slot reaches has the
-// neutral trim. `max_delay_samples` is what the build's delay lines hold (0 for none: no delay at all).
-[[nodiscard]] inline TrimResolved resolve_trim(const OutputLayout& layout, const Routing& routing, const SpeakerTrimTable& table,
-                                               std::uint32_t sample_rate_hz, std::size_t max_delay_samples) {
-    TrimResolved out;
-    std::array<int, kOutputs> cm{};
-    std::uint16_t farthest = 0;
+// The role at each output `routing` patches a slot of `layout` to. Slots that are not connected, channels the
+// patch leaves out and outputs past kOutputs have none.
+[[nodiscard]] inline std::array<RoleCode, kOutputs> roles_of_outputs(const OutputLayout& layout, const Routing& routing) {
+    std::array<RoleCode, kOutputs> roles{};
+    roles.fill(kNoRole);
     const std::size_t channels = std::min(layout.slots(), routing.channels());
     for (std::size_t c = 0; c < channels; ++c) {
         const int output = routing.output_of(c);
         const RoleCode role = role_of_slot(layout, c);
-        if (output < 0 || static_cast<std::size_t>(output) >= kOutputs || role == kNoRole) {
+        if (output >= 0 && static_cast<std::size_t>(output) < kOutputs && role != kNoRole) {
+            roles[static_cast<std::size_t>(output)] = role;
+        }
+    }
+    return roles;
+}
+
+// The trims and delays of the table for the speakers at `roles`; an output with no role has the neutral trim.
+// `max_delay_samples` is what the build's delay lines hold (0 for none: no delay at all).
+[[nodiscard]] inline TrimResolved resolve_trim(const std::array<RoleCode, kOutputs>& roles, const SpeakerTrimTable& table,
+                                               std::uint32_t sample_rate_hz, std::size_t max_delay_samples) {
+    TrimResolved out;
+    out.role = roles;
+    std::array<int, kOutputs> cm{};
+    std::uint16_t farthest = 0;
+    for (std::size_t o = 0; o < kOutputs; ++o) {
+        if (roles[o] == kNoRole) {
             continue;
         }
-        const SpeakerTrim trim = table.get(role);
-        const auto o = static_cast<std::size_t>(output);
-        out.role[o] = role;
+        const SpeakerTrim trim = table.get(roles[o]);
         out.level_db[o] = trim.level_db();
         cm[o] = trim.cm;
         farthest = std::max(farthest, trim.cm);
     }
     out.farthest_cm = farthest;
     for (std::size_t o = 0; o < kOutputs; ++o) {
-        if (out.role[o] == kNoRole || cm[o] == 0) {
+        if (roles[o] == kNoRole || cm[o] == 0) {
             continue;
         }
         const std::uint32_t wanted = delay_samples_for(static_cast<std::uint32_t>(farthest - cm[o]), sample_rate_hz);
@@ -553,6 +564,12 @@ struct TrimResolved {
         }
     }
     return out;
+}
+
+// resolve_trim() for the patch of `routing` from `layout`.
+[[nodiscard]] inline TrimResolved resolve_trim(const OutputLayout& layout, const Routing& routing, const SpeakerTrimTable& table,
+                                               std::uint32_t sample_rate_hz, std::size_t max_delay_samples) {
+    return resolve_trim(roles_of_outputs(layout, routing), table, sample_rate_hz, max_delay_samples);
 }
 
 // --- GET /trim -----------------------------------------------------------------------------------------
