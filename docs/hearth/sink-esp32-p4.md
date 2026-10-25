@@ -234,6 +234,7 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Speakers style: glow, pulse | `speakers-style` | `/speakers-style` | the board has a screen (it is greyed, with the reason, while the screen is set to the clock or off, which draw no speakers) |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
@@ -314,7 +315,7 @@ grow and shrink with its level, a little: eight sizes between 88% and 112% of th
 three in a window, held until the level is a quarter size past an edge, and a speaker 18 dB or more under the
 room's loudest (or silent) stays at its smallest and does not move. The halo is not resized, so a size change
 redraws the circle's rectangle and nothing else. It needs no meter and no seam the glow does not have. It is
-set with `PUT /speakers-style` (and, once Preferences is on the board, from there); the value is kept on the
+set in Preferences (Display) or with `PUT /speakers-style`; the value is kept on the
 board as `np_style` (0 glow, 1 pulse; never renumbered).
 
 ![The speakers in the pulse style, 5.1: the louder a speaker, the larger its circle](screenshots/p4-panel-speakers-pulse-5-1.png)
