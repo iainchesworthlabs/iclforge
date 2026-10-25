@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -39,7 +40,9 @@
 //   that order - ring, heights, LFE - which for a name is Table E2.5's own
 //   order with the LFE-type locations last: "5.1" is L C R Ls Rs LFE, the
 //   AC-3 order, NOT the L R C LFE Ls Rs a WAV file uses. A DAC is wired to
-//   slots, so a board that wants the other order writes a list.
+//   slots, so a board that wants the other order writes a list. A name that
+//   expands to more than kMaxSlots (16) locations is refused, never trimmed:
+//   "9.1.6" is exactly sixteen, "9.2.6" is seventeen and parses to nothing.
 //
 //   A LIST, comma-separated, one token per slot in slot order:
 //     a Table E2.5 location name    L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd
@@ -184,6 +187,8 @@ class OutputLayout {
     // A name or a list, as the header describes. std::nullopt for anything
     // else, including an empty string, a name with a count this cannot place,
     // a list with more than kMaxSlots entries or a token it does not know.
+    // A name that expands to more than kMaxSlots locations ("9.2.6" is 17) is
+    // rejected too: parsing never drops a speaker to make a layout fit.
     [[nodiscard]] static std::optional<OutputLayout> parse(std::string_view text) {
         const std::string_view trimmed = trim(text);
         if (trimmed.empty()) {
@@ -236,11 +241,16 @@ class OutputLayout {
         }
         std::array<Location, kMaxSlots> locations{};
         std::size_t count = 0;
+        bool overflow = false;
+        // A name that expands past kMaxSlots is an error, never a layout with
+        // the tail quietly dropped: "9.2.6" is 17 locations, not 16.
         const auto add = [&](std::initializer_list<Location> more) {
             for (const Location location : more) {
-                if (count < locations.size()) {
-                    locations[count++] = location;
+                if (count >= locations.size()) {
+                    overflow = true;
+                    return;
                 }
+                locations[count++] = location;
             }
         };
         switch (fields[0]) {
@@ -281,6 +291,9 @@ class OutputLayout {
             case 1: add({Location::kLfe}); break;
             case 2: add({Location::kLfe, Location::kLfe2}); break;
             default: return std::nullopt;
+        }
+        if (overflow) {
+            return std::nullopt;
         }
         auto out = from_locations(std::span<const Location>(locations.data(), count));
         if (!out) {
@@ -658,7 +671,8 @@ class OutputLayout {
                 }
                 const auto azimuth = number(trim(base.substr(0, slash)));
                 const auto elevation = number(trim(base.substr(slash + 1)));
-                if (!azimuth || !elevation || *elevation < -90.0 || *elevation > 90.0) {
+                if (!azimuth || !elevation || !std::isfinite(*azimuth) || !std::isfinite(*elevation) ||
+                    *elevation < -90.0 || *elevation > 90.0) {
                     return std::nullopt;
                 }
                 speaker.kind = Speaker::Kind::kSpeaker;
