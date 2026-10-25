@@ -140,8 +140,56 @@ network the same way.
 The same routes answer without the page (`GET /api` lists them): `GET /status` for a script, and
 `PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is, and
 `GET` and `PUT /trim` and `POST /identify` for the speakers' levels and the test tone. A
-new name is advertised from the board's next restart. The page and the routes have no password
-([Security](#security)).
+new name is advertised at once ([Name, restart and reset](#name-restart-and-reset)). The page and
+the routes have no password ([Security](#security)).
+
+## Name, restart and reset
+
+**The name.** A board is called `hearth-` and the last six hex digits of its MAC address until you
+name it, with the page's *Name* field or `PUT /name`. A name is 1 to 32 bytes of text (a letter with
+an accent is two) with no control character in it and no space at either end; the board answers
+`409` to anything else, and keeps the name it had. **A rename takes effect at once, with no
+restart:**
+
+| What | What a rename does |
+|---|---|
+| mDNS | The host name (`<name>.local`: lower case, a hyphen between words, a Latin letter with an accent as the letter it is spelt with, so "Café" is `cafe`), the instance name and the `_sendspin._tcp` record all change. |
+| The servers | The name in the player's hello changes. An idle board tells its servers to dial again and they list it under the new name; a board that is playing waits until the stream has ended, so that a rename never cuts the music. |
+| The page, the screen's footer, Improv | Their next draw or request reads it. |
+| The pairings | **Nothing.** A pairing is the server's key and the board's own key, not the name, so every server stays paired. |
+| The router's list of clients | The name the board gave DHCP changes at its next boot; an address already leased keeps the old name until then. |
+
+A name that a person gave the player on the server (Music Assistant keeps its own) is not changed.
+
+**Restart.** `POST /restart` restarts the board into the image that runs now, after telling its
+servers it is going. It is refused (`409`) while an update is under way, and while the running
+image is still on trial, when a restart would go back to the image before it. On the ESP32-P4 it
+resets the whole system, which a Wi-Fi link behind the companion chip needs
+([An ESP32-P4 sink](sink-esp32-p4.md#name-restart-and-reset)).
+
+**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to the
+image's defaults, at once and with no restart: what the screen shows without lyrics, when it dims,
+the time zone, and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and
+the choice between the cable and Wi-Fi, the DAC wiring and the speaker layout, the time server and
+whether the board asks it, and the pairings.
+
+**Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
+(the board gets a new identity, so each server has to pair with it again, and has to remove it from
+its list first), then every setting (the name, the network and its passphrase, the wiring, the
+layout and the preferences), then the Wi-Fi driver's own copy of the network, and restarts the board
+as a new one. It is taken only for a request that names the board by its own address or name, as the
+firmware routes are.
+
+**A board on Wi-Fi alone has no network after a factory reset.** It cannot be reached to be told
+one. Connect it to a computer with a USB cable and give it a network over Improv, as
+[Join a network](#join-a-network) says. A board with a cable (the ESP32-P4X kit) stays on it and
+asks the router for an address again. An image built with a Wi-Fi network of its own (a development
+build; no published image has one) joins that network again.
+
+```bash
+curl -X POST http://hearth-1a2b3c.local/reset-preferences
+curl -X POST -d "erase everything" http://hearth-1a2b3c.local/factory-reset
+```
 
 ## Pair a server
 

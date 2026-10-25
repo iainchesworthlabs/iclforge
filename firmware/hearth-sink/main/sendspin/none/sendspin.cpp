@@ -22,6 +22,8 @@ bool sendspin_set_layout(const iclforge::render::OutputLayout& /*layout*/) { ret
 
 void sendspin_board_changed() {}
 
+void sendspin_name_changed() {}
+
 void sendspin_leave() {}
 
 std::optional<iclforge::ControlSendspin> sendspin_status() { return std::nullopt; }
