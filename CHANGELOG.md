@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
+  stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
+  let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
+  internal heap: a board that had played the Atmos demo read 7 to 14 KB free while it played PCM, where the same image after a
+  boot reads 70 KB, and Wi-Fi's receive buffers are made from what is left. A PCM stream now lets the AC-3 and E-AC-3 decoders
+  go on a part with PSRAM, which makes them again for the next coded stream as it does after a boot (`iclforge/decoder_keep.hpp`);
+  the ESP32-C6, which has none, keeps them as before.
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
   (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
