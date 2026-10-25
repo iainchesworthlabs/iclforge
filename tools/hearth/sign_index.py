@@ -150,13 +150,25 @@ def annotate(level: str, text: str) -> None:
     print(f"{prefix}{text}", file=sys.stderr)
 
 
+def not_after_utc(cert: Any) -> dt.datetime:
+    """When a certificate ends, as an aware UTC time on every `cryptography` that has x509.
+
+    cryptography 42 added not_valid_after_utc and deprecated not_valid_after, a naive UTC time; a CI
+    image may have either.
+    """
+    aware = getattr(cert, "not_valid_after_utc", None)
+    if aware is not None:
+        return aware
+    return cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+
+
 def check_leaf(leaf: Any, key: Any, now: dt.datetime, min_days: int) -> None:
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # noqa: PLC0415
 
     public = key.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
     if leaf.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo) != public:
         raise SignError("the certificate is not the key's")
-    not_after = leaf.not_valid_after_utc
+    not_after = not_after_utc(leaf)
     if now > not_after:
         raise SignError(
             f"the signing certificate expired on {not_after:%Y-%m-%d}: issue a new leaf"

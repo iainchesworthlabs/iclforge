@@ -37,6 +37,29 @@ except ImportError:  # pragma: no cover
     HAVE_CRYPTO = False
 
 
+class NotAfter(unittest.TestCase):
+    """The end of a leaf on a cryptography before and after 42 (CI's image may have either)."""
+
+    def test_an_older_cryptography_gives_a_naive_utc_time(self) -> None:
+        end = dt.datetime(2028, 10, 25, 1, 2, 3)
+
+        class Old:
+            not_valid_after = end
+
+        got = s.not_after_utc(Old())
+        self.assertEqual(got, end.replace(tzinfo=dt.timezone.utc))
+        self.assertIsNotNone(got.utcoffset())
+
+    def test_a_newer_one_is_used_as_it_is(self) -> None:
+        end = dt.datetime(2028, 10, 25, tzinfo=dt.timezone.utc)
+
+        class New:
+            not_valid_after_utc = end
+            not_valid_after = dt.datetime(2000, 1, 1)  # the deprecated one is not read
+
+        self.assertIs(s.not_after_utc(New()), end)
+
+
 @unittest.skipUnless(HAVE_CRYPTO, "the cryptography package is not installed")
 class Signing(unittest.TestCase):
     @classmethod
