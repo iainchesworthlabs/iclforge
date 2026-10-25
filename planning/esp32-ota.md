@@ -1554,7 +1554,8 @@ to the C6 took 67 s start to accepted on 2026-09-25, so "about two minutes" is t
 | Installing | "Downloading 62%", then "Checking the download", then "Restarting" | none |
 | Done | "Updated to v0.11.0-beta.1" or "Went back to v0.10.0-beta.1: the player did not find a network in time" | OK |
 | Failed | The reason, in words ("The player does not know the date yet", "Could not reach GitHub", "This version has no image for this board", "Stop what is playing and try again", "The download did not match its checksum: nothing was changed") | Try again |
-| Not available | A greyed row with its reason: "This player is not connected to a network", "...time sync is off", "...is still on trial; wait 4 minutes or go back", "...firmware carries no update key", "...has no room for a secure connection" | none |
+| Not available | A greyed row with its reason, for good: "This board has no network", "This board has one app slot; an update over the network needs a USB flash first", "This firmware carries no update key (a development build)", "This firmware has no room for a secure connection" | none |
+| Not now | A greyed row with its reason, for the moment: "The player has no network address yet", "The player does not know the date yet", "Time sync is off", "This version is still being tried; wait 4 minutes, or go back to the previous one", "An update is already running", "Stop what is playing and try again" | none |
 
 The words come from one place, `firmware_update.hpp` in `libs/device` (below), so the screen, the page,
 `ota.py` and ac3hearth cannot drift; the panel code only draws them. An install's progress is
@@ -1565,7 +1566,7 @@ Firmware tab show it with no change.
 
 | Route | What it does | Replies |
 |---|---|---|
-| `GET /firmware/available` | The update flow: `supported` and `why` (so a greyed row has its reason), `state` (`idle`, `checking`, `up_to_date`, `available`, `installing`, `failed`), `channel`, `running`, `checked` (seconds, or null), `latest` (version, released, size, notes link, image name, or null), `error` (code and text, or null), `skipped` (a version that went back, or null). Every key is always present | `200`, JSON |
+| `GET /firmware/available` | The update flow: `supported` and `why` (what is true of this board for good, so a greyed row has its reason), `blocked` (what stops a check or an install now, or null), `state` (`idle`, `checking`, `up_to_date`, `available`, `installing`, `failed`), `channel`, `running`, `checked` (seconds, or null), `latest` (version, released, size, notes link, image name, or null), `error` (code and text, or null), `skipped` (a version that went back, or null). Every key is always present | `200`, JSON |
 | `POST /firmware/check` | Starts a check and returns; the result is on `GET /firmware/available` | `202`; `409` flash mode, on trial, an update running; `503` no memory beside what is playing |
 | `PUT /firmware/from-release` | Body: the version, as text, which must equal what the last check offered. Enters flash mode, downloads, checks, writes, restarts | `202` then a restart; `403` the `Host` is not the board's; `409` nothing offered (check again), on trial or already running; `412` no key, no clock or no pull in this build; `503` no memory |
 | `PUT /firmware/channel` | Body: `stable` or `beta`; stored | `200`; `400` |
@@ -1583,14 +1584,44 @@ replies (`/firmware/available` for each state).
 
 ### The screen and the page
 
-- **Preferences (the screen).** Four registry entries in group Updates, for `prefs-core`'s registry (kind,
-  label, availability, get/set bound to the routes above), added **after prefs-core's PR merges**; nothing
-  in `lyric_screen.cpp` before. A text row "Version" (read-only), a choice row "Update channel" (stable or
-  beta, applies at once), an action "Check for updates", and an action "Install <version>" that exists
-  while the state is `available` and opens the confirm. Availability is `GET /firmware/available`'s
-  `supported`/`why`, mapped by the registry to "shown, greyed, with the reason", so a board that cannot pull
-  shows the row and says why. The panel talks to the pull through a seam like `panel.hpp`, with a null
-  implementation in a build with no screen (`panel/none` links no LVGL).
+- **Preferences (the screen).** Added **after prefs-core's PR merges**; nothing in `lyric_screen.cpp`
+  before. Its contract is `board_caps.hpp`, `board_variants.hpp` and `preferences.hpp` (branch
+  `feature/hearth-preferences-core`, 6c47ca278): an entry is a `Pref` in `kRegistry`, whose availability is a
+  function of `BoardCaps` and whose `inert` is a function of `Backend`, and a value is a word. Four entries in
+  group Updates, and no bespoke button:
+
+  | id | Kind, apply, route | Shows or does |
+  |---|---|---|
+  | `update-status` | `kText`, live | Read-only: the sentence `firmware_update.hpp` renders for the state: "Version v0.10.0-beta.1-2039-gf5aded471. You have the newest version. Checked 14:02", "Version v0.11.0-beta.1 is available (1.6 MB, 5 Nov)", "Downloading 62%", or the failure in words |
+  | `update-channel` | `kChoice` (stable, beta), live, `/firmware/channel` | The channel |
+  | `update-check` | `kAction`, live, `/firmware/check` | Check for updates |
+  | `update-install` | `kAction`, restart, `/firmware/from-release` | Install the offered version; its label takes the version, and it needs a confirm |
+
+  **Greyed for good** is `availability(caps)`, each a sentence about the board: no `caps.network.any()`;
+  no `caps.wall_clock` ("keeps no time, and a secure connection needs the date"); no `caps.firmware_slots`;
+  no `caps.update.pull`; `caps.update.trusted_keys == 0`. **Greyed for now** is `inert(backend)`, the text of
+  `UpdateStatus::blocked`, which `firmware_update.hpp` works out from the board's facts at that moment (an
+  address held, the clock set, time sync on, not on trial, not in flash mode, no update running, room for a
+  session); `update-install` is also inert with "Check for updates first" until a check has offered a version.
+  `GET /firmware/available`'s `supported`/`why` and `blocked` are the same two things for the page.
+
+  **What this asks of the contract** (for prefs-core, through the coordinator), nothing else:
+  1. `BoardCaps::update`, an `UpdateCaps` of two build facts, filled once at boot in `board_caps.cpp`:
+     `bool pull` (the image has the HTTPS client, the bundle and the routes: `ICLFORGE_FIRMWARE_PULL`) and
+     `int trusted_keys` (the signature blocks of the running image; 0 for a development build). The
+     variants in `board_variants.hpp` get them: `pull` and one key on the shipping boards, none on the frame
+     buffer bench build, and a new `c6-4mb` variant with `pull` false, so the greyed reason is tested. The
+     other facts it needs are already there: `network`, `wall_clock`, `firmware_slots`.
+  2. `Backend` gains `update_status()` (an `UpdateStatus` from `firmware_update.hpp`, so O10a lands before
+     O10d), `start_update_check()`, `start_update_install()` and the channel's getter and setter.
+  3. A `confirm` text on a `kAction` `Pref`, shown before `set` runs: the install's ("The player stops
+     playing, downloads it (about two minutes), and restarts..."), and the same field serves the restart and
+     the resets another session is building.
+  4. While a check or an install runs the screen resolves the Updates group once a second, so that
+     `update-status` follows the progress; no editor of its own is needed.
+
+  The panel reaches the pull through a seam like `panel.hpp`, with a null implementation in a build with
+  no screen (`panel/none` links no LVGL).
 - **The device page.** A section under Firmware, beside Update firmware: the version, **Check for updates**,
   the result line, an **Install** button that opens a dialog like Restart's, the release-notes link
   (`target="_blank" rel="noopener"`), the channel choice, and the same progress. The page budget
@@ -1645,7 +1676,7 @@ Each is a PR of its own, in this order. Nothing here touches a board until the c
 | **O10a, signing, packaging and a host-tested library** | `firmware_update.hpp` in `libs/device` (version compare, index parse, image selection, the policy table, the state's JSON and words; no ESP-IDF); `firmware_image.hpp` reads `secure_version` and finds the signature sector; `firmware_status.hpp` gains `signing`; `sdkconfig.sign`; `sign_firmware.py`, `package_firmware.py` and `check_firmware_package.py` as above; `ota.py` refuses an unsigned file for a board that wants signatures | Host: Catch2 cases for every rule and a version table; Python suites for the tools. **QEMU** (S3): new steps in `run_ota_qemu.py` with throwaway keys: an unsigned image is accepted by an unsigned build and then the first signed one is taken; a wrong-key image, an unsigned image, and an image with one of two keys are handled as the rules say; a key rotation; what a signed-in-code, unsigned-in-fact image does (the `ESP_ERR_NOT_FOUND` case). C6 and P4 images build | Yes, last: the first signed image on one board of each chip (S3, C6, P4 rev1, the P4X kit), with the owner's go-ahead, to prove "no USB flash" |
 | **O10b, the board's pull** | `firmware_pull.cpp` in the component next to `firmware.cpp` (the upload core takes chunks from either source), the four routes, Kconfig (`ICLFORGE_FIRMWARE_PULL`, `_UPDATE_BASE_URL`, `_UPDATE_CHANNEL`), the certificate bundle, the NVS keys, the four-place route word list, `stub.js` | Host: the policy and JSON from O10a. **QEMU:** a loopback HTTP server serves an index and a signed image; the base URL accepts `http://` only in `sdkconfig.ci-ota`, and the signature rules are not relaxed; TLS is not tested here (no clock) | Yes: the TLS handshake with the three real hosts, RAM and flash measured, on the S3, the C6 (16 MB) and the P4 or the kit; a real pull from a throwaway release in the repository |
 | **O10c, the release pipeline** | Items 5 to 7 above, on a throwaway tag first | `release.yml` dry run; a signed image from the job verifies with the committed keys | No (the owner's environment and secret) |
-| **O10d, Preferences and the page** | The four registry entries; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
+| **O10d, Preferences and the page** | The four registry entries, `BoardCaps::update` and its variants, the `Backend` methods; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
 
 **Exit of the whole:** a board on the desk checks, installs a signed release from GitHub, passes its
 trial and reports "Updated to ...", and the same board refuses an unsigned image by `PUT /firmware`.
