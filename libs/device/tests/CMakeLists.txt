@@ -8,6 +8,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_block_ring.cpp
     test_board_caps.cpp
     test_dac_queue_model.cpp
+    test_decoder_keep.cpp
     test_dev_view.cpp
     test_device_name.cpp
     test_firmware_image.cpp
@@ -29,6 +30,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_settings_keys.cpp
     test_sink_plan.cpp
     test_system_actions.cpp
+    test_system_prefs.cpp
     test_tcp_arrivals.cpp
     test_time_zones.cpp
     test_title_card.cpp

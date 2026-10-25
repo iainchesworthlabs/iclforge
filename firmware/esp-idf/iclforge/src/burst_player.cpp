@@ -48,6 +48,7 @@
 #include "opus_stream.hpp"
 
 #include "iclforge/access_units.hpp"
+#include "iclforge/decoder_keep.hpp"
 #include "iclforge/object_limit.hpp"
 #include "iclforge/pcm_unpack.hpp"
 
@@ -756,29 +757,35 @@ struct BurstPlayer::Impl {
         (void)heap_caps_monitor_local_minimum_free_size_start();
         // An Opus stream's decoder is kept from one Opus stream to the next, as the AC-3 ones are,
         // and let go when another kind of stream starts; the AC-3 ones are let go when an Opus
-        // stream does. Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
+        // stream does, and when a PCM stream does on a part with PSRAM to make them again (iclforge/
+        // decoder_keep.hpp). Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
         // An AC-4 stream's decoder is the largest by far, 286 KB at 2.0: it goes with the AC-3
         // ones when any other kind starts, and they go when it does. Its allocations go where
         // CONFIG_ICLFORGE_AC4_INTERNAL_BELOW puts them for as long as the stream plays.
         const bool ac4_stream = kind == Stream::kBursts && data_type == ac::DataType::kAc4;
+        const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
+        const DecoderNeed need = ac4_stream    ? DecoderNeed::kAc4
+                                 : opus_stream ? DecoderNeed::kOpus
+                                 : kind == Stream::kPcm ? DecoderNeed::kNone
+                                                        : DecoderNeed::kAc3Family;
+        const DecodersKept keep = decoders_kept(need, heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0);
         ac4_failed = false;
         ac4_frame_samples = 0;
-        if (!ac4_stream) {
-            ac4.reset();
-        } else {
+        if (!keep.ac3_family) {
             ac3_decoder.reset();
             eac3_decoder.reset();
-            opus.reset();
+        }
+        if (!keep.ac4) {
+            ac4.reset();
+        } else {
             if (!ac4) {
                 ac4 = std::make_unique<Ac4Stream>();
             }
             ac4->begin_stream();
         }
-        const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
         if (!opus_stream) {
             opus.reset();
         } else if (!opus) {
-            drop_decoders();
             auto decoder = std::make_unique<OpusStream>();
             if (decoder->open(pcm_format.sample_rate, pcm_format.channels)) {
                 opus = std::move(decoder);

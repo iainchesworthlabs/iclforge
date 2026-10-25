@@ -797,18 +797,9 @@ iclforge::ControlHandlers control_handlers() {
     h.layout = []() { return player::layout_text(); };
     h.set_layout = accept_layout;
     h.name = []() { return std::string(player::settings().name.data()); };
-    h.set_name = [](std::string_view text) {
-        if (!player::settings_set_name(text)) {
-            return false;
-        }
-        // What a rename changes (iclforge/device_name.hpp): the mDNS host name and the Sendspin service's
-        // instance and `name` now, with no restart; what a server lists the board as comes from its hello,
-        // which follows now, or when the stream that plays has ended. The web page, the screen's footer and
-        // Improv read the setting when they next draw.
-        player::discovery_rename();
-        player::sendspin_name_changed();
-        return true;
-    };
+    // The same call the screen's keyboard makes (preferences.cpp): what a rename changes is
+    // iclforge/device_name.hpp's to say.
+    h.set_name = [](std::string_view text) { return player::preferences().set_name(text); };
     // The listener's sound (planning/p4x-preferences.md): a level and distance for each speaker, and a test tone out
     // of each, where a Sendspin player is there to apply them. The others answer that they have none.
     if (player::sendspin_sound_caps().player) {
@@ -900,22 +891,16 @@ iclforge::ControlHandlers control_handlers() {
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
         // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
         // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
-        h.brightness = []() { return player::settings().brightness_percent; };
-        h.set_brightness = [](int percent) {
-            if (!player::panel_display_caps().backlight || !player::settings_set_brightness(percent)) {
-                return false;
-            }
-            player::panel_set_brightness(percent);
-            return true;
-        };
-        h.clock_format = []() { return player::settings().clock_format; };
+        // All three go through the preferences' backend, as the Preferences screen does, so that a route and the screen
+        // cannot disagree about what a setting is or when it is refused.
+        h.brightness = []() { return player::preferences().brightness(); };
+        h.set_brightness = [](int percent) { return player::preferences().set_brightness(percent); };
+        h.clock_format = []() { return player::preferences().clock_format(); };
         h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
-            if (!player::settings_set_clock_format(format)) {
-                return false;
-            }
-            player::panel_set_clock_format(format);
-            return true;
+            return player::preferences().set_clock_format(format);
         };
+        h.night = []() { return player::preferences().night(); };
+        h.set_night = [](const iclforge::nowview::NightSchedule& night) { return player::preferences().set_night(night); };
     }
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
     // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
@@ -940,15 +925,7 @@ iclforge::ControlHandlers control_handlers() {
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
         h.set_time_zone = [](std::string_view zone, std::string_view name) {
-            const std::string previous = player::settings().time_zone.data();
-            if (!player::wall_clock_set_zone(zone)) {
-                return false;
-            }
-            if (!player::settings_set_time_zone(zone, name)) {
-                (void)player::wall_clock_set_zone(previous);
-                return false;
-            }
-            return true;
+            return player::preferences().set_time_zone({.posix = std::string(zone), .name = std::string(name)});
         };
         h.ntp_server = []() { return iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data()); };
         h.set_ntp_server = [](std::string_view server) {
@@ -1151,21 +1128,6 @@ std::optional<std::string> refusal(iclforge::sysactions::Action action) {
     return availability.reason;
 }
 
-// What the settings that were just reset or erased drive, told the new values: the screen's view and dim
-// time, the clock's zone. A preference added to the registry that a subsystem acts on adds its line here.
-void apply_preferences_now() {
-    if (panel_built()) {
-        if (panel_has_view(settings().now_view)) {
-            panel_set_view(settings().now_view);
-        }
-        panel_set_dim_after(settings().dim_after_minutes);
-    }
-    if (wall_clock_built()) {
-        (void)wall_clock_set_zone(settings().time_zone.data());
-    }
-    sendspin_set_dynamic_range(settings().dynamic_range);
-}
-
 }  // namespace
 
 iclforge::sysactions::Situation system_situation() {
@@ -1210,9 +1172,9 @@ std::optional<std::string> system_reset_preferences() {
     if (const auto why = refusal(iclforge::sysactions::Action::reset_preferences)) {
         return why;
     }
-    const bool all = settings_reset_preferences();
-    apply_preferences_now();
-    if (!all) {
+    // From the registry: every entry that says it is reset goes back to its default through its own setter, so that the
+    // screen, the clock and the rest follow as they follow a change.
+    if (!iclforge::prefs::reset_preferences(preferences()).ok()) {
         return std::string("Some preferences could not be reset; the rest were.");
     }
     return std::nullopt;
@@ -1232,7 +1194,6 @@ std::optional<std::string> system_factory_reset() {
     if (!settings_forget()) {
         return std::string("The settings could not be erased (the flash refused); the paired servers already were.");
     }
-    apply_preferences_now();
     // The WiFi driver's own copy of the network is erased once the answer has gone out over it.
     schedule_restart("after a factory reset", true);
     return std::nullopt;

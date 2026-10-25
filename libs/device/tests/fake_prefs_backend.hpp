@@ -20,6 +20,10 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    int brightness_ = nowview::kDefaultBrightness;
+    wallclock::ClockFormat clock_;
+    nowview::NightSchedule night_;
+    wallclock::ZoneChoice zone_;
     std::string layout_ = "2.0";
     bool playing_ = false;
 
@@ -42,6 +46,42 @@ class FakeBackend final : public Backend {
         dim_minutes_ = minutes;
         return true;
     }
+    [[nodiscard]] int brightness() const override { return brightness_; }
+    [[nodiscard]] bool set_brightness(int percent) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        brightness_ = percent;
+        return true;
+    }
+    [[nodiscard]] wallclock::ClockFormat clock_format() const override { return clock_; }
+    [[nodiscard]] bool set_clock_format(wallclock::ClockFormat format) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        clock_ = format;
+        return true;
+    }
+    [[nodiscard]] nowview::NightSchedule night() const override { return night_; }
+    [[nodiscard]] bool set_night(const nowview::NightSchedule& night) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        night_ = night;
+        return true;
+    }
+    [[nodiscard]] wallclock::ZoneChoice time_zone() const override { return zone_; }
+    [[nodiscard]] bool set_time_zone(const wallclock::ZoneChoice& zone) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        zone_ = zone;
+        return true;
+    }
     [[nodiscard]] std::string layout() const override { return layout_; }
     [[nodiscard]] bool set_layout(std::string_view layout) override {
         ++sets;
@@ -52,6 +92,65 @@ class FakeBackend final : public Backend {
         return true;
     }
     [[nodiscard]] bool playing() const override { return playing_; }
+
+    // --- Network and System (E4)
+    std::string network_pref_ = "auto";
+    std::string name_ = "hearth-a1b2c3";
+    // What facts() and situation() answer: a test sets the part it is about.
+    devview::Facts facts_;
+    sysactions::Situation situation_;
+    // What restart() and factory_reset() answer (nothing is done, and the reason is given) and how often each ran.
+    std::optional<std::string> action_refusal;
+    int restarts = 0;
+    int factory_resets = 0;
+    std::vector<sysactions::paired::Server> paired_;
+    std::vector<std::string> forgotten_;
+
+    [[nodiscard]] std::string network_preference() const override { return network_pref_; }
+    [[nodiscard]] bool set_network_preference(std::string_view word) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        network_pref_ = std::string(word);
+        return true;
+    }
+    [[nodiscard]] std::string name() const override { return name_; }
+    [[nodiscard]] bool set_name(std::string_view name) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        name_ = std::string(name);
+        return true;
+    }
+    [[nodiscard]] devview::Facts facts() const override { return facts_; }
+    [[nodiscard]] sysactions::Situation situation() const override { return situation_; }
+    [[nodiscard]] std::optional<std::string> restart() override {
+        if (action_refusal) {
+            return action_refusal;
+        }
+        ++restarts;
+        return std::nullopt;
+    }
+    [[nodiscard]] std::optional<std::string> factory_reset() override {
+        if (action_refusal) {
+            return action_refusal;
+        }
+        ++factory_resets;
+        return std::nullopt;
+    }
+    [[nodiscard]] std::vector<sysactions::paired::Server> paired_servers() const override { return paired_; }
+    [[nodiscard]] bool forget_server(std::string_view server_id) override {
+        for (auto it = paired_.begin(); it != paired_.end(); ++it) {
+            if (it->server_id == server_id) {
+                forgotten_.push_back(it->server_id);
+                paired_.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
 
    private:
     bool take_refusal() {
