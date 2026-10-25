@@ -43,6 +43,7 @@ const REPLIES = {
         'POST /volume        body: 0.0 to 1.0',
         'GET  /layout        the output layout',
         'PUT  /layout        body: a name (5.1.4) or a speaker list; next play',
+        'GET  /layout-options  the layouts to choose from, each supported, with limits or unavailable on this board and why, as JSON',
         "GET  /name          this board's name; PUT one to change it",
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
@@ -78,6 +79,7 @@ const REPLIES = {
     layoutRefused:
         'not a layout this player can play: check the name or the list, and that it has no more slots than the sink\n',
     layoutOk: 'ok; takes effect at the next play\n',
+    layoutOptionsNone: 'this player has no layout to choose\n',
     nameEmpty: 'PUT /name wants a name\n',
     nameRefused: 'not a name this player can hold: it is too long, or it could not be stored\n',
     slotWidthBad: 'PUT /slot-width wants a number of bits\n',
@@ -165,6 +167,7 @@ const ROUTES = [
     'POST /volume',
     'GET /layout',
     'PUT /layout',
+    'GET /layout-options',
     'GET /name',
     'PUT /name',
     'GET /wiring',
@@ -239,6 +242,33 @@ function speakersOf(text) {
 function slotsOf(text) {
     const speakers = speakersOf(text);
     return speakers ? speakers.length : 0;
+}
+
+// GET /layout-options (iclforge/layout_options.hpp): the layouts the chooser lists, each judged against
+// the sink. The model knows the ceiling and nothing finer: whether a layout is supported or past the
+// sink, in the firmware's words for the second. The limits and the setting that would lift one are the
+// firmware's host tests' to hold (libs/device/tests/test_layout_options.cpp); a test that needs them
+// scripts device.layoutOptions.
+const LAYOUT_CATALOG = ['1.0', '2.0', '2.1', '5.0', '5.1', '5.1.2', '7.1', '5.1.4', '7.1.2', '7.1.4', '9.1.2', '9.1.4', '9.1.6'];
+
+function layoutOptions(device) {
+    return {
+        layout: device.layout,
+        slots: device.sinkSlots,
+        slot_bits: device.slotBits,
+        ...(typeof device.secondLine === 'boolean' ? { second_line: device.secondLine } : {}),
+        profile: '',
+        options: LAYOUT_CATALOG.map((name) => {
+            const slots = slotsOf(name);
+            if (slots <= device.sinkSlots) {
+                return { layout: name, slots, verdict: 'supported', fix: 'none', verified: true };
+            }
+            return {
+                layout: name, slots, verdict: 'unavailable', fix: 'hardware', verified: false,
+                reason: `${name} needs ${slots} slots; this board's output carries ${device.sinkSlots}.`,
+            };
+        }),
+    };
 }
 
 // How the player serves a layout (planning/esp32-device-ui.md, "The output
@@ -736,6 +766,9 @@ async function startStub() {
         ssid: 'kitchen',
         password: '',
         layout: '2.0',
+        // GET /layout-options: undefined for the model's (layoutOptions), a body a test scripts, or null for
+        // a firmware with no such route.
+        layoutOptions: undefined,
         volume: 1,
         // A Sendspin player's firmware (sdkconfig.sendspin). Undefined for a
         // firmware with no player, whose /status has no "sendspin" key, and
@@ -1221,6 +1254,17 @@ async function startStub() {
             }
             case 'GET /layout':
                 return send(res, 200, device.layout + '\n');
+            case 'GET /layout-options':
+                // device.layoutOptions: a body a test scripts, or null for a firmware with no such route.
+                if (device.layoutOptions === null) {
+                    return send(res, 404, REPLIES.layoutOptionsNone);
+                }
+                {
+                    // A test that fixes GET /status has fixed the sink's ceiling too: the board's answers agree.
+                    const fixed = payload === null ? undefined : JSON.parse(payload).sink_slots;
+                    const slots = typeof fixed === 'number' ? fixed : device.sinkSlots;
+                    return send(res, 200, JSON.stringify(device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: slots })) + '\n', 'application/json');
+                }
             case 'PUT /layout': {
                 if (!body) {
                     return send(res, 400, REPLIES.layoutEmpty);

@@ -230,6 +230,91 @@ test.describe('with the clock running', () => {
         await expect(page.getByLabel('Output layout')).toHaveAccessibleDescription(/This sink has 16 slots\.$/);
     });
 
+    // GET /layout-options (iclforge/layout_options.hpp): the board's own verdict on each preset.
+    const option = (layout, slots, verdict, reason) => ({ layout, slots, verdict, fix: 'none', verified: verdict === 'supported', ...(reason ? { reason } : {}) });
+
+    test('a preset the board calls unavailable is greyed with its reason, one with a limit keeps its place', async ({ page, stub }) => {
+        stub.device.sinkSlots = 8;
+        stub.device.layoutOptions = {
+            layout: '2.0', slots: 8, slot_bits: 16, profile: 'c6-16mb',
+            options: [
+                option('1.0', 1, 'supported'),
+                option('2.0', 2, 'supported'),
+                option('5.1', 6, 'limits', 'This build decodes streams of at most 2 channels, so a wider stream is decoded elsewhere and sent narrower, and 5.1 plays through no more than 2 of its speakers.'),
+                option('7.1', 8, 'supported'),
+                option('7.1.4', 12, 'unavailable', "7.1.4 needs 12 slots; this board's output carries 8 (16-bit slots, one line). The most this board can carry is 8."),
+            ],
+        };
+        await page.reload();
+        const preset = (name) => page.getByRole('radio', { name, exact: true });
+        await expect(preset('7.1.4')).toBeDisabled();
+        await expect(preset('5.1')).toBeEnabled();
+        await expect(preset('7.1')).toBeEnabled();
+        // A preset the answer does not list falls back to the page's own count of slots.
+        await expect(preset('9.1.6')).toBeDisabled();
+        await expect(preset('5.1.2')).toBeEnabled();
+        await expect(page.locator('#layouts label').filter({ has: preset('7.1.4') })).toHaveAttribute('title', /^7\.1\.4 needs 12 slots; this board's output carries 8/);
+        await expect(page.locator('#layouts label').filter({ has: preset('5.1') })).toHaveAttribute('title', /decodes streams of at most 2 channels/);
+        await expect(page.locator('#layouts label').filter({ has: preset('7.1') })).toHaveAttribute('title', '');
+        // The reasons, once each, with the layout named where the sentence does not.
+        await expect(page.locator('#layout-why-sum')).toHaveText('Why 2 layouts are unavailable or limited');
+        const why = page.locator('#layout-why li');
+        await expect(why).toHaveCount(2);
+        await expect(why.nth(0)).toHaveText(/^5\.1: This build decodes streams of at most 2 channels/);
+        await expect(why.nth(1)).toHaveText(/^7\.1\.4 needs 12 slots; this board's output carries 8/);
+    });
+
+    test('one layout unavailable reads in the singular, and none hides the list', async ({ page, stub }) => {
+        stub.device.layoutOptions = {
+            layout: '2.0', slots: 2,
+            options: [option('2.0', 2, 'supported'), option('5.1', 6, 'unavailable', '5.1 needs 6 slots; this board\'s output carries 2.')],
+        };
+        await page.reload();
+        await expect(page.locator('#layout-why-sum')).toHaveText('Why 1 layout is unavailable or limited');
+        stub.device.layoutOptions = { layout: '2.0', slots: 2, options: [option('2.0', 2, 'supported')] };
+        stub.device.sinkSlots = 6; // the ceiling moved, so the options are read again
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+    });
+
+    test('a board without GET /layout-options leaves the presets to their own count', async ({ page, stub }) => {
+        stub.device.layoutOptions = null;
+        await page.reload();
+        await expect.poll(() => stub.sent('GET /layout-options').length).toBeGreaterThan(0);
+        await expect(page.getByRole('radio', { name: '5.1', exact: true })).toBeDisabled();
+        await expect(page.getByRole('radio', { name: '2.0', exact: true })).toBeEnabled();
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+        // Asked once for this ceiling, not at every poll.
+        const asked = stub.sent('GET /layout-options').length;
+        await page.waitForTimeout(2200);
+        expect(stub.sent('GET /layout-options')).toHaveLength(asked);
+    });
+
+    test('an answer that is not the list is read again at the next poll', async ({ page, stub }) => {
+        stub.next('GET /layout-options', { status: 200, body: 'not json' });
+        stub.device.sinkSlots = 12;
+        await page.reload();
+        await expect.poll(() => stub.sent('GET /layout-options').length).toBeGreaterThan(1);
+        await expect(page.getByRole('radio', { name: '7.1.4', exact: true })).toBeEnabled();
+        await expect(page.getByRole('radio', { name: '9.1.6', exact: true })).toBeDisabled();
+        await expect(page.locator('#layout-why li').first()).toContainText('needs');
+    });
+
+    test('a list that is not a list leaves the presets to their count', async ({ page, stub }) => {
+        stub.device.layoutOptions = { layout: '2.0', options: 'none' };
+        await page.reload();
+        await expect(page.getByRole('radio', { name: '5.1', exact: true })).toBeDisabled();
+    });
+
+    test('the options are read again when the sink grows', async ({ page, stub }) => {
+        const enabled = () =>
+            page.locator('#layouts input').evaluateAll((presets) => presets.filter((p) => !p.disabled).map((p) => p.value));
+        await expect.poll(enabled).toEqual(['1.0', '2.0']);
+        stub.device.sinkSlots = 16;
+        await expect.poll(enabled).toEqual(['1.0', '2.0', '5.1', '7.1', '5.1.2', '5.1.4', '7.1.4', '9.1.6']);
+        expect(stub.sent('GET /layout-options').length).toBeGreaterThan(1);
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+    });
+
     test("a play's own output, the speakers it leaves silent, and the next play's layout", async ({ page, stub }) => {
         Object.assign(stub.device, { sinkSlots: 12, layout: '7.1.4', framesPerPoll: 1 });
         await page.reload();

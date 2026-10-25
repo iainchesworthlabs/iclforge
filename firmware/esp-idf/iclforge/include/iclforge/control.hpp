@@ -331,6 +331,12 @@ struct ControlHandlers {
     // default for a sink whose ceiling is not a function of slot width at
     // all (a capture/null sink has no TDM frame to divide).
     std::function<int()> sink_max_slots_bits;
+    // GET /layout-options: the widest syncframe, in coded channels, the Sendspin player decodes in
+    // this build (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS; 0 states no limit), which a
+    // layout wider than it cannot be fed beyond. Left empty states none. The route builds the rest of
+    // iclforge/layout_options.hpp's facts from the handlers above (sink_slots, slot_bits,
+    // second_line, sink_max_slots, sink_max_slots_bits, profile) and from the chip.
+    std::function<int()> max_coded_channels;
     // "playing", "stopped", "finished", "failed" - the owner knows.
     std::function<const char*()> state;
 

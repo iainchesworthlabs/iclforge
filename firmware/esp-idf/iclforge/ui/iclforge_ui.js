@@ -89,6 +89,9 @@
   let code = '';
   let hardwareShown = false;
   let hardware = {};
+  // GET /layout-options by layout name, and the slots, slot width and wiring it was read for.
+  let layoutOptions = new Map();
+  let layoutKey = '';
   // GET /firmware: the last body (null on a board without the route), whether
   // to read it at the next poll, the running version the page was loaded
   // against, and when the page last asked the board to restart (0: not since
@@ -384,14 +387,50 @@
     }
   }
 
+  // Which layouts the board can be set to, and why not: read again when the sink's slots, slot width
+  // or wiring change. A board without the route leaves the presets to their own count.
+  async function loadLayoutOptions(key) {
+    layoutKey = key;
+    layoutOptions = new Map();
+    try {
+      const r = await call('GET', 'layout-options');
+      const list = r.status === 200 ? JSON.parse(r.text).options : [];
+      for (const o of Array.isArray(list) ? list : []) layoutOptions.set(o.layout, o);
+    } catch {
+      layoutKey = ''; // asked again at the next poll
+    }
+    const unmet = [...layoutOptions.values()].filter((o) => o.verdict !== 'supported' && str(o.reason));
+    $('layout-why').replaceChildren(...unmet.map((o) => {
+      const li = document.createElement('li');
+      li.textContent = o.reason.startsWith(o.layout) ? o.reason : o.layout + ': ' + o.reason;
+      return li;
+    }));
+    $('layout-why-box').hidden = !unmet.length;
+    $('layout-why-sum').textContent = 'Why ' + unmet.length + (unmet.length === 1 ? ' layout is' : ' layouts are') + ' unavailable or limited';
+    markLayouts(status);
+  }
+
+  // A preset the board cannot carry is greyed, with the reason on hover and in the list below; one it
+  // carries with a limit keeps its place and the reason.
+  function markLayouts(s) {
+    for (const preset of radios('layout')) {
+      const o = layoutOptions.get(preset.value);
+      preset.disabled = o ? o.verdict === 'unavailable' : num(s.sink_slots) && need(preset.value) > s.sink_slots;
+      preset.parentNode.title = str(o?.reason) ?? '';
+    }
+  }
+
   // What the board is and what it runs, after a status read and one request
   // at a time, as the board has few sockets: GET /hardware until it has
-  // answered, and GET /firmware when it is due. After a restart the page asked
+  // answered, GET /layout-options when the sink's ceiling moved, and GET
+  // /firmware when it is due. After a restart the page asked
   // for, GET /firmware at each poll for a while: a board back within a few
   // seconds may never fail a poll, since the browser sends a request that
   // meets a closed connection again.
   async function board() {
     if (!hardwareShown) await loadHardware();
+    const key = [status.sink_slots, status.slot_bits, status.second_line].join();
+    if (str(status.layout) && layoutKey !== key) await loadLayoutOptions(key);
     const asked = restarting && Date.now() - restarting < RESTART_MS;
     if (!sending && (fwDue || asked || (fw && (fw.trial || fw.upload)))) await loadFirmware();
   }
@@ -518,10 +557,8 @@
     $('layout-fit').textContent = fit && ' ' + fit;
     if (num(s.slot_bits) && fresh('slot')) radios('slot-width').forEach((r) => (r.checked = r.value === String(s.slot_bits)));
     if (typeof s.second_line === 'boolean' && fresh('wiring')) $('wiring').checked = s.second_line;
-    for (const preset of radios('layout')) {
-      preset.disabled = num(s.sink_slots) && need(preset.value) > s.sink_slots;
-      if (fresh('layout')) preset.checked = preset.value === s.layout;
-    }
+    markLayouts(s);
+    if (fresh('layout')) for (const preset of radios('layout')) preset.checked = preset.value === s.layout;
     if (!filled) {
       filled = true;
       // The device keeps 95 characters of a layout's text and cuts the rest, so a text

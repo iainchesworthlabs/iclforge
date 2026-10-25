@@ -63,6 +63,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/firmware.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/player.hpp"
 
@@ -534,9 +535,11 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
 
 // A layout for the next play, from the control surface: parsed here, on the
 // server's task, so a refusal is answered at once; applied by app_main.
+// What GET /layout-options offers is held to this rule (iclforge/layout_options.hpp,
+// layout_fits_sink): a layout it calls available is one this takes.
 bool accept_layout(std::string_view text) {
     const auto layout = iclforge::render::OutputLayout::parse(text);
-    if (!layout.has_value() || layout->slots() > static_cast<std::size_t>(player::sink_slots())) {
+    if (!layout.has_value() || !iclforge::layout_fits_sink(layout->slots(), player::sink_slots())) {
         return false;
     }
     // The Sendspin player's too, for streams whose server sets no layout.
@@ -853,6 +856,10 @@ iclforge::ControlHandlers control_handlers() {
     h.sink_max_slots = []() { return player::sink_max_slots(); };
     h.sink_max_slots_bits = []() { return player::sink_max_slots_bit_width(); };
     h.state = []() { return g_state.load(); };
+    // The widest stream the Sendspin player decodes, which GET /layout-options sets a wider layout against.
+    if (player::sendspin_built()) {
+        h.max_coded_channels = []() { return static_cast<int>(CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS); };
+    }
     // A build with the player reports on it, as null until it runs; a build
     // without leaves the object out of /status.
     if (player::sendspin_built()) {

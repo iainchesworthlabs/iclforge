@@ -521,6 +521,7 @@ configurations set 80; the default is 0, none), the component's
 | `POST /stop` | |
 | `POST /volume` | body: `0.0` to `1.0`, a linear gain the decode task applies before the sink |
 | `GET /layout` | the output layout, as text |
+| `GET /layout-options` | the layouts to choose from (`1.0` to `9.1.6`), each `supported`, `limits` or `unavailable` on this board with the sentence that says why, as JSON. Read-only; `404` on a build with no sink. [Choosing the speaker layout](../../docs/hearth/sink-layouts.md) |
 | `PUT /layout` | body: a name (`5.1.4`) or a speaker list (`L,R,C,LFE,Ls,Rs`), the same grammar as `CONFIG_ICLFORGE_EXAMPLE_LAYOUT`. Takes effect at the next play - the `i2s` sink reconfigures its mode and slot count to match, so this never needs a rebuild. `400` for text that is not a layout, `409` for one with more slots than the sink's ceiling. |
 | `GET /name` | what the board calls itself, as text |
 | `PUT /name` | body: a name, up to 32 bytes. Stored on the board, so it survives a reflash; it is the mDNS instance name and what a server lists the sink under. `409` if it does not fit or NVS refused it. |

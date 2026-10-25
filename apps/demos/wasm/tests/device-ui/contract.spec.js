@@ -139,6 +139,7 @@ test('every request the page makes is to a route the firmware registers', () => 
     expect(made.sort((a, b) => a.localeCompare(b))).toEqual([
         'GET /firmware',
         'GET /hardware',
+        'GET /layout-options',
         'GET /pairing',
         'GET /status',
         'POST /pairing',
@@ -297,6 +298,29 @@ test("the stand-in writes GET /hardware's keys in the firmware's order", async (
     try {
         const body = JSON.parse(await (await fetch(`${stub.url}hardware`)).text());
         expect(Object.keys(body)).toEqual(firmware);
+    } finally {
+        await stub.close();
+    }
+});
+
+test("the stand-in writes GET /layout-options' keys in the firmware's order", async () => {
+    // on_layout_options_get writes the board's line (head) and then each layout's (item); a layout the
+    // sink cannot carry has a reason, which a supported one leaves out.
+    const firmware = [
+        ...CONTROL.slice(
+            CONTROL.indexOf('static esp_err_t on_layout_options_get'),
+            CONTROL.indexOf('static esp_err_t on_name_get'),
+        ).matchAll(/append_\w+\((?:head|item), "([a-z_]+)"/g),
+    ].map((m) => m[1]);
+    expect(firmware.length).toBeGreaterThan(8);
+    const stub = await startStub();
+    try {
+        const body = JSON.parse(await (await fetch(`${stub.url}layout-options`)).text());
+        const { options, ...head } = body;
+        const refused = options.find((o) => o.reason);
+        expect(refused, 'the stand-in lists a layout the sink cannot carry').toBeDefined();
+        expect([...Object.keys(head), ...Object.keys(refused)]).toEqual(firmware);
+        expect(options.find((o) => !o.reason)).not.toHaveProperty('reason');
     } finally {
         await stub.close();
     }

@@ -21,6 +21,7 @@
 
 #include "iclforge/firmware.hpp"
 #include "iclforge/hardware_info.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/wall_clock.hpp"
@@ -298,8 +299,7 @@ std::string_view app_field(const char (&field)[N]) {
     return {field, static_cast<std::size_t>(std::find(field, field + N, '\0') - field)};
 }
 
-std::string build_hardware_json(const ControlHandlers& handlers) {
-    const HardwareFacts facts = gather_hardware_facts(handlers);
+std::string build_hardware_json(const ControlHandlers& handlers, const HardwareFacts& facts) {
     const HardwareReport report = describe_hardware(facts);
     // The firmware on the board, from the description the build stamps into
     // the image: the project's name, its version (PROJECT_VER, or `git
@@ -421,6 +421,9 @@ struct Control::Impl {
     // it changes while the board runs, so on_hardware has nothing to compute
     // and no player to read.
     std::string hardware_json;
+    // Why the chip cannot open a multi-channel output, or empty (tdm_blocked_clause): the same
+    // gathering, kept for GET /layout-options.
+    std::string tdm_blocked;
 
     static Impl* self(httpd_req_t* req) { return static_cast<Impl*>(req->user_ctx); }
 
@@ -469,6 +472,8 @@ struct Control::Impl {
                          "POST /volume        body: 0.0 to 1.0\n"
                          "GET  /layout        the output layout\n"
                          "PUT  /layout        body: a name (5.1.4) or a speaker list; next play\n"
+                         "GET  /layout-options  the layouts to choose from, each supported, with limits or "
+                         "unavailable on this board and why, as JSON\n"
                          "GET  /name          this board's name; PUT one to change it\n"
                          "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
                          "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
@@ -737,6 +742,72 @@ struct Control::Impl {
                              "that it has no more slots than the sink\n");
         }
         return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+    }
+
+    // The board's own facts for iclforge/layout_options.hpp, read from the handlers /status reads.
+    static LayoutFacts layout_facts(const Impl& impl) {
+        const ControlHandlers& h = impl.handlers;
+        LayoutFacts facts;
+        facts.profile = h.profile;
+        facts.slots_now = h.sink_slots ? h.sink_slots() : 0;
+        facts.slot_bits = h.slot_bits ? h.slot_bits() : 0;
+        facts.slots_max = h.sink_max_slots ? h.sink_max_slots() : 0;
+        facts.slots_max_bits = h.sink_max_slots_bits ? h.sink_max_slots_bits() : 0;
+        facts.second_line_possible = static_cast<bool>(h.second_line);
+        facts.second_line_wired = h.second_line && h.second_line();
+        facts.coded_channels_max = h.max_coded_channels ? h.max_coded_channels() : 0;
+        facts.tdm_blocked = impl.tdm_blocked;
+        return facts;
+    }
+
+    // GET /layout-options: every layout the chooser lists, each judged against what this sink has now
+    // (layout_options.hpp). Read-only; PUT /layout stays the one way to set one. Sent one option at a
+    // time: the whole list is some 3 KB, and the server's task has 6 KB of stack and no heap to spare
+    // on a small part.
+    static esp_err_t on_layout_options_get(httpd_req_t* req) {
+        const Impl& impl = *self(req);
+        const ControlHandlers& h = impl.handlers;
+        if (!h.sink_slots || !h.layout) {
+            return send_text(req, "404 Not Found", "this player has no layout to choose\n");
+        }
+        const LayoutFacts facts = layout_facts(impl);
+        std::string head = "{";
+        append_string(head, "layout", h.layout());
+        append_number(head, "slots", static_cast<unsigned long long>(std::max(facts.slots_now, 0)));
+        if (facts.slot_bits > 0) {
+            append_number(head, "slot_bits", static_cast<unsigned long long>(facts.slot_bits));
+        }
+        if (facts.second_line_possible) {
+            append_bool(head, "second_line", facts.second_line_wired);
+        }
+        append_string(head, "profile", facts.profile);
+        head += ",\"options\":[";
+        httpd_resp_set_type(req, "application/json");
+        if (httpd_resp_send_chunk(req, head.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        bool first = true;
+        for (const CatalogLayout& entry : kLayoutCatalog) {
+            const LayoutOption option = evaluate_layout(facts, entry.name, entry.slots);
+            std::string item = first ? "{" : ",{";
+            append_string(item, "layout", option.name);
+            append_number(item, "slots", option.slots);
+            append_string(item, "verdict", word(option.verdict));
+            append_string(item, "fix", word(option.fix));
+            append_bool(item, "verified", option.verified);
+            if (!option.reason.empty()) {
+                append_string(item, "reason", option.reason);
+            }
+            item += '}';
+            if (httpd_resp_send_chunk(req, item.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+                return ESP_FAIL;
+            }
+            first = false;
+        }
+        if (httpd_resp_send_chunk(req, "]}\n", HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        return httpd_resp_send_chunk(req, nullptr, 0);
     }
 
     static esp_err_t on_name_get(httpd_req_t* req) {
@@ -1183,7 +1254,9 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
     }
     impl_ = new Impl{};
     impl_->handlers = handlers;
-    impl_->hardware_json = build_hardware_json(handlers);
+    const HardwareFacts hardware = gather_hardware_facts(handlers);
+    impl_->hardware_json = build_hardware_json(handlers, hardware);
+    impl_->tdm_blocked = tdm_blocked_clause(hardware);
 
     // Copied into value-initialised httpd_uri_t below: the SDK's struct has
     // WebSocket members when a project turns WebSocket support on, as the
@@ -1204,6 +1277,7 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/volume", .method = HTTP_POST, .handler = &Impl::on_volume},
         {.uri = "/layout", .method = HTTP_GET, .handler = &Impl::on_layout_get},
         {.uri = "/layout", .method = HTTP_PUT, .handler = &Impl::on_layout_put},
+        {.uri = "/layout-options", .method = HTTP_GET, .handler = &Impl::on_layout_options_get},
         {.uri = "/slot-width", .method = HTTP_GET, .handler = &Impl::on_slot_width_get},
         {.uri = "/slot-width", .method = HTTP_PUT, .handler = &Impl::on_slot_width_put},
         {.uri = "/name", .method = HTTP_GET, .handler = &Impl::on_name_get},
