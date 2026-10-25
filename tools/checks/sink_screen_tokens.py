@@ -26,7 +26,8 @@ TOKENS = ROOT / "docs/hearth/design/sink-screen-tokens.json"
 KOTLIN = ROOT / "apps/hearth/android/app/src/main/java/com/iclforge/hearth/Tokens.kt"
 QML = ROOT / "apps/shared/theme/assets/qml/Theme.qml"
 PANEL = ROOT / "firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp"
-# The panel's sizes are the display's (iclforge::screen::metrics_for): the kit's 1024 by 600 is its first block.
+# The panel's sizes are the display's (iclforge::screen::metrics_for): the kit's 1024 by 600 is
+# its first block.
 METRICS = ROOT / "libs/device/include/iclforge/screen_metrics.hpp"
 
 # Theme.qml's names for the rungs of Signal dark that the sink screen uses.
@@ -252,7 +253,8 @@ def check_metrics(tokens: dict, text: str) -> list[str]:
     # The first block of metrics_for(): the one for a display whose shorter side is the canvas's.
     block = re.search(r"shorter\s*>=\s*(\d+)\s*\)\s*\{(.*?)\}", text, re.S)
     if block is None or int(block.group(1)) > min(canvas["width"], canvas["height"]):
-        return [f"{where}: metrics_for() has no block for the canvas, {canvas['width']} by {canvas['height']}"]
+        size = f"{canvas['width']} by {canvas['height']}"
+        return [f"{where}: metrics_for() has no block for the canvas, {size}"]
     lay = tokens["layout"]
     expected = {
         "margin": lay["margin"],
@@ -292,7 +294,8 @@ def check(
             f"{_shown(kotlin_path)} is not current: "
             "run python3 tools/checks/sink_screen_tokens.py --write"
         )
-    for path, check_one in ((qml_path, check_qml), (panel_path, check_panel), (metrics_path, check_metrics)):
+    sources = ((qml_path, check_qml), (panel_path, check_panel), (metrics_path, check_metrics))
+    for path, check_one in sources:
         if not path.exists():
             problems.append(f"{path}: not found")
             continue
