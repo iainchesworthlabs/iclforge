@@ -3,6 +3,7 @@
 #include "preferences.hpp"
 
 #include "board_caps.hpp"
+#include "layout_control.hpp"
 #include "panel/panel.hpp"
 #include "settings.hpp"
 
@@ -33,6 +34,14 @@ class Board final : public iclforge::prefs::Backend {
         panel_set_dim_after(minutes);
         return true;
     }
+
+    [[nodiscard]] std::string layout() const override { return layout_text(); }
+
+    // The same decision PUT /layout makes (judged over board_caps(), queued, stored); the registry has asked the
+    // verdict already, and a layout the board cannot carry never gets here.
+    [[nodiscard]] bool set_layout(std::string_view layout) override { return layout_set(layout).accepted; }
+
+    [[nodiscard]] bool playing() const override { return player::playing(); }
 };
 
 }  // namespace
