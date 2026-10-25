@@ -53,4 +53,8 @@ void station_stop();
 [[nodiscard]] const char* station_source();
 void station_adopt_built_in();
 
+// Erases what the WiFi driver keeps of its own about the network it was given (network.hpp:
+// network_forget_driver_state()).
+void station_forget_driver_state();
+
 }  // namespace player::net

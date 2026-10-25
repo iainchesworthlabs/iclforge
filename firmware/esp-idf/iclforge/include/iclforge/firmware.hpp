@@ -145,6 +145,23 @@ class Firmware {
     // setting then.
     [[nodiscard]] bool flash_mode() const;
 
+    // What a restart would interrupt, for an owner that restarts the board from somewhere other than
+    // POST /restart (the screen's Restart, the factory reset): the running image is still on trial, so
+    // a restart goes back to the image before it; an upload or a rollback is under way, or the board is
+    // in flash mode. The routes refuse in the same cases.
+    struct Activity {
+        bool on_trial = false;
+        bool busy = false;
+        bool flash_mode = false;
+    };
+    [[nodiscard]] Activity activity() const;
+
+    // Whether the request names this board by its own address or its mDNS host name in its Host header
+    // (hooks.host_names): the check the firmware routes make, so that a page on another site cannot get a
+    // browser to make a destructive request of the board by a name it controls. For any other route that
+    // must be taken only that way.
+    [[nodiscard]] bool host_allowed(httpd_req* req) const;
+
     // A restart its owner asks for, outside the routes, made as a route's
     // restart is: `why` on the console ("firmware: restarting <why>"), and
     // before_restart first. An image still on trial goes back at this
