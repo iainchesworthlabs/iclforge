@@ -337,6 +337,10 @@ So stage 4 is that, and nothing from the seven:
   invalid in a refresh). Measured with 32 and 128 the glow is identical in every room and the pulse differs only at
   9.1.6 (166 against 144 thousand), so the compile definition is not worth carrying. It matters for any busier view:
   the bands option flushed 5.5 million pixels a second in a 7.1.4 room with 32 and 0.27 million with 128.
+- **The owner's decision** (2026-10-25, after a picture and an animation of the old glow, the new glow and the pulse in 2.0
+  and 5.1): the pulse stays at plus and minus 12% as drawn, and both styles stay as a choice, glow (the new
+  responsive one) the default. The setting becomes a Preferences registry entry (choice, group Display) once that
+  branch has merged; until then it is `PUT /speakers-style`.
 - **To do on the kit:** the A/B of `burst_us` (E-AC-3 5.1, stereo PCM, AC-4 5.1) with the old glow, the new glow and
   the pulse, in alternating order, against the +0.4% the first design cost a 5.1 burst; and the owner's eye on the
   glass.

@@ -228,6 +228,12 @@ redraws the circle's rectangle and nothing else. It needs no meter and no seam t
 set with `PUT /speakers-style` (and, once Preferences is on the board, from there); the value is kept on the
 board as `np_style` (0 glow, 1 pulse; never renumbered).
 
+![The speakers in the pulse style, 5.1: the louder a speaker, the larger its circle](screenshots/p4-panel-speakers-pulse-5-1.png)
+![The speakers in the pulse style, 2.0](screenshots/p4-panel-speakers-pulse-2-0.png)
+
+Both styles stay: the owner, 2026-10-25, saw the glow, as it was and as it became, beside the pulse at plus and
+minus 12% (the bound is `kPulseReach`), and kept both as a choice, with the glow the default.
+
 Which screen shows is the owner's: `speakers` (the default), `title`, `clock` ([below](#the-clock)),
 `dark`, or `off`, which is the old sentence. The plan, with how each was chosen and built, is
 ([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
