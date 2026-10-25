@@ -190,6 +190,8 @@ std::unique_ptr<iclforge::nowview::TitleStore> g_title;
 // show.
 std::unique_ptr<iclforge::render::OutputLayout> g_pending_layout;
 bool g_board_changed = false;
+// A rename that waits for the stream that is playing to end (sendspin_name_changed()).
+std::atomic<bool> g_name_pending{false};
 
 // The player and its host, or nothing until both have started.
 [[nodiscard]] const Running* running() { return g_running.load(); }
@@ -977,6 +979,15 @@ void sendspin_board_changed() {
     r->host->set_player_config(player_config(*r->player));
 }
 
+void sendspin_name_changed() {
+    if (sendspin_playing()) {
+        g_name_pending.store(true);
+        std::printf("sendspin: renamed; the servers hear the new name when the stream that plays has ended\n");
+        return;
+    }
+    sendspin_board_changed();
+}
+
 std::optional<iclforge::ControlSendspin> sendspin_status() {
     const Running* const r = running();
     if (r == nullptr) {
@@ -1275,6 +1286,10 @@ void sendspin_poll() {
     }
     const iclforge::BurstPlayerStatus status = r->player->status();
     const bool playing = status.stream != std::string_view("idle");
+    // A rename waited for the stream to end: it has.
+    if (!playing && g_name_pending.exchange(false)) {
+        sendspin_board_changed();
+    }
     const std::int64_t now = esp_timer_get_time();
     ac::State state = role_state(status, playing);
     bool send = false;

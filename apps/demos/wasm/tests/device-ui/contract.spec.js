@@ -570,3 +570,120 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         await stub.close();
     }
 });
+
+// Names the firmware takes and refuses: the same lists as libs/device/tests/test_device_name.cpp, which holds
+// the rule itself (check_name), so that the stand-in's copy of it cannot drift from the board's.
+const NAMES_TAKEN = ['hearth-a1b2c3', 'Sitting room', "Dad's study (TV) #2", 'K\u00fcche', 'a', 'x'.repeat(32), '\u00e9'.repeat(16)];
+const NAMES_REFUSED = [
+    'x'.repeat(33),
+    '\u00e9'.repeat(17),
+    ' Attic',
+    'At\ttic',
+    'At\ntic',
+    'At\u0085tic',
+    'At\u2028tic',
+    'At\u202etic',
+    'At\u200btic',
+    'At\ufefftic',
+];
+
+test('the stand-in answers /name as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        let reply = await fetch(`${stub.url}name`, { method: 'PUT', body: '' });
+        expect(reply.status).toBe(400);
+        expect(await reply.text()).toBe(REPLIES.nameEmpty);
+        for (const name of NAMES_TAKEN) {
+            reply = await fetch(`${stub.url}name`, { method: 'PUT', body: name });
+            expect(reply.status, JSON.stringify(name)).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.ok);
+            expect(await (await fetch(`${stub.url}name`)).text()).toBe(name + '\n');
+        }
+        // The line ending a shell puts after the name is not part of it.
+        reply = await fetch(`${stub.url}name`, { method: 'PUT', body: 'Attic\n' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}name`)).text()).toBe('Attic\n');
+        for (const name of NAMES_REFUSED) {
+            reply = await fetch(`${stub.url}name`, { method: 'PUT', body: name });
+            expect(reply.status, JSON.stringify(name)).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.nameRefused);
+        }
+        // A refused name leaves the name as it was.
+        expect(await (await fetch(`${stub.url}name`)).text()).toBe('Attic\n');
+    } finally {
+        await stub.close();
+    }
+});
+
+// A POST with a Host header of the test's choosing, which fetch does not let it set.
+function post(stub, route, body, host) {
+    const url = new URL(stub.url);
+    return new Promise((resolve, reject) => {
+        const request = require('http').request(
+            { host: url.hostname, port: url.port, path: `/${route}`, method: 'POST', headers: host ? { Host: host } : {} },
+            (res) => {
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
+                res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));
+            },
+        );
+        request.on('error', reject);
+        request.end(body);
+    });
+}
+
+test('the stand-in answers /reset-preferences as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with a screen, set to what a person chose, and named, and on a network.
+        stub.device.screen = screenBoard();
+        Object.assign(stub.device.screen, { view: 'clock', dimAfter: '30' });
+        stub.device.time.zone = 'JST-9';
+        stub.device.name = 'Attic';
+        stub.device.pairings = [pairedServer()];
+        const reply = await post(stub, 'reset-preferences', '');
+        expect(reply.status).toBe(200);
+        expect(reply.text).toBe(REPLIES.resetPreferencesOk);
+        // What a person chose is back; what the board is stays.
+        expect(stub.device.screen.view).toBe('speakers');
+        expect(stub.device.screen.dimAfter).toBe('5');
+        expect(stub.device.time.zone).toBe('none');
+        expect(stub.device.name).toBe('Attic');
+        expect(stub.device.ssid).toBe('kitchen');
+        expect(stub.device.pairings).toHaveLength(1);
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /factory-reset as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        stub.device.screen = screenBoard();
+        Object.assign(stub.device.screen, { view: 'clock' });
+        stub.device.name = 'Attic';
+        stub.device.pairings = [pairedServer()];
+        // Only the words erase anything, and only said to the board by its own address or name.
+        for (const wrong of ['', 'factory', 'erase everything please', 'ERASE EVERYTHING']) {
+            const reply = await post(stub, 'factory-reset', wrong);
+            expect(reply.status, JSON.stringify(wrong)).toBe(400);
+            expect(reply.text).toBe(REPLIES.factoryResetBad);
+        }
+        let reply = await post(stub, 'factory-reset', 'erase everything', 'attacker.example');
+        expect(reply.status).toBe(403);
+        expect(reply.text).toBe(REPLIES.factoryResetHost);
+        expect(stub.device.name).toBe('Attic');
+        expect(stub.device.pairings).toHaveLength(1);
+        // By the board's name, or its address, it erases: the name, the network, the pairings, the choices.
+        reply = await post(stub, 'factory-reset', 'erase everything', 'attic.local');
+        expect(reply.status).toBe(200);
+        expect(reply.text).toBe(REPLIES.factoryResetOk);
+        expect(stub.device.name).toBe('hearth-a1b2c3');
+        expect(stub.device.ssid).toBe('');
+        expect(stub.device.pairings).toHaveLength(0);
+        expect(stub.device.screen.view).toBe('speakers');
+        expect(stub.device.sendspin.client_id).not.toBe(idleSendspin().client_id);
+    } finally {
+        await stub.close();
+    }
+});

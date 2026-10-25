@@ -491,6 +491,10 @@ struct Control::Impl {
                          "GET  /firmware/coredump  the last crash's core dump, as it lies in flash\n"
                          "DELETE /firmware/coredump  erase it\n"
                          "POST /restart       restart into the image that runs now\n"
+                         "POST /reset-preferences  the screen's choices back to the defaults; the name, network, wiring "
+                         "and pairings stay\n"
+                         "POST /factory-reset body: erase everything; erases the name, network, pairings and every "
+                         "setting, then restarts\n"
                          "GET  /log           recent console output; ?from=N for what came after byte N\n");
     }
 
@@ -763,8 +767,8 @@ struct Control::Impl {
         }
         if (!h.set_name(body)) {
             return send_text(req, "409 Conflict",
-                             "not a name this player can hold: it is too long, or it could not "
-                             "be stored\n");
+                             "not a name this player can hold: 1 to 32 bytes of text, with no control "
+                             "character in it and no space at either end, or it could not be stored\n");
         }
         return send_text(req, "200 OK", "ok\n");
     }
@@ -1068,6 +1072,47 @@ struct Control::Impl {
         return send_text(req, "200 OK", "ok\n");
     }
 
+    // The reset routes. Here, below on_play, for the reason on_pairing_get gives.
+    static esp_err_t on_reset_preferences(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        if (!h.reset_preferences) {
+            return send_text(req, "409 Conflict", "this board keeps no preferences to reset\n");
+        }
+        if (const std::optional<std::string> why = h.reset_preferences()) {
+            return send_text(req, "409 Conflict", (*why + "\n").c_str());
+        }
+        return send_text(req, "200 OK",
+                         "ok; the preferences are back to the defaults, and the name, the network, the wiring and the "
+                         "pairings are kept\n");
+    }
+
+    static esp_err_t on_factory_reset(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        // Taken only by the board's own address or name, as the firmware routes are.
+        const Firmware* firmware = h.firmware;
+        if (firmware != nullptr && !firmware->host_allowed(req)) {
+            return send_text(req, "403 Forbidden",
+                             "a factory reset is taken only on the board's own address or name\n");
+        }
+        if (read_body(req) != "erase everything") {
+            return send_text(req, "400 Bad Request", "POST /factory-reset wants the body: erase everything\n");
+        }
+        if (!h.factory_reset) {
+            return send_text(req, "409 Conflict", "this board cannot be reset to its factory state\n");
+        }
+        if (const std::optional<std::string> why = h.factory_reset()) {
+            return send_text(req, "409 Conflict", (*why + "\n").c_str());
+        }
+        return send_text(req, "200 OK",
+                         "erased; the board restarts with no name, network or pairings of its own\n");
+    }
+
     static esp_err_t on_slot_width_get(httpd_req_t* req) {
         auto& h = self(req)->handlers;
         if (!h.slot_bits) {
@@ -1232,6 +1277,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/firmware/coredump", .method = HTTP_GET, .handler = &Impl::on_coredump_get},
         {.uri = "/firmware/coredump", .method = HTTP_DELETE, .handler = &Impl::on_coredump_delete},
         {.uri = "/restart", .method = HTTP_POST, .handler = &Impl::on_restart},
+        {.uri = "/reset-preferences", .method = HTTP_POST, .handler = &Impl::on_reset_preferences},
+        {.uri = "/factory-reset", .method = HTTP_POST, .handler = &Impl::on_factory_reset},
         {.uri = "/log", .method = HTTP_GET, .handler = &Impl::on_log},
     };
 

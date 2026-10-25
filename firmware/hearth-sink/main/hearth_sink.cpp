@@ -75,6 +75,7 @@
 #include "panel/panel.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "system_control.hpp"
 #include "system_reset.hpp"
 #include "wall_clock.hpp"
 
@@ -220,12 +221,15 @@ class MeteredSink final : public iclforge::PcmSink {
 // meet in a queue for commands and a mutex for the player's snapshot. Nothing
 // the server's task does touches the player directly.
 
-enum class CommandKind : std::uint8_t { kPlay, kStop, kVolume, kLayout, kFlashMode };
+enum class CommandKind : std::uint8_t { kPlay, kStop, kVolume, kLayout, kFlashMode, kRestart };
 
 struct Command {
     CommandKind kind = CommandKind::kStop;
     float volume = 1.0F;
-    char text[512] = {};  // a location for kPlay, a layout for kLayout
+    // For kRestart: erase the WiFi driver's own copy of the network first (a factory reset), now that the
+    // reply has gone out over it.
+    bool forget_wifi_driver = false;
+    char text[512] = {};  // a location for kPlay, a layout for kLayout, the reason for kRestart
 };
 
 QueueHandle_t g_commands = nullptr;
@@ -663,8 +667,12 @@ iclforge::ControlHandlers control_handlers() {
         if (!player::settings_set_name(text)) {
             return false;
         }
-        // What a server lists the board as comes from its hello.
-        player::sendspin_board_changed();
+        // What a rename changes (iclforge/device_name.hpp): the mDNS host name and the Sendspin service's
+        // instance and `name` now, with no restart; what a server lists the board as comes from its hello,
+        // which follows now, or when the stream that plays has ended. The web page, the screen's footer and
+        // Improv read the setting when they next draw.
+        player::discovery_rename();
+        player::sendspin_name_changed();
         return true;
     };
     // On a part with one I2S controller (an ESP32-C6), and on a sink that
@@ -861,6 +869,8 @@ iclforge::ControlHandlers control_handlers() {
         h.pairings = []() { return player::sendspin_pairings(); };
         h.forget_server = [](std::string_view server_id) { return player::sendspin_forget_server(server_id); };
     }
+    h.reset_preferences = []() { return player::system_reset_preferences(); };
+    h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;
     return h;
 }
@@ -917,6 +927,136 @@ iclforge::FirmwareConfig firmware_config() {
 }  // namespace
 
 namespace player {
+
+namespace {
+
+// Asks app_main to restart the board on its own task, so that the caller - the HTTP server's, the
+// screen's - has its answer to give first. `why` is a string literal: it is kept if the queue is full and
+// the restart has to be made from a task of its own.
+void schedule_restart(const char* why, bool forget_wifi_driver) {
+    Command c;
+    c.kind = CommandKind::kRestart;
+    c.forget_wifi_driver = forget_wifi_driver;
+    std::snprintf(c.text, sizeof c.text, "%s", why);
+    if (g_commands != nullptr && xQueueSend(g_commands, &c, pdMS_TO_TICKS(500)) == pdTRUE) {
+        return;
+    }
+    std::printf("restart: the player took no command for half a second; restarting from a task of its own\n");
+    static const char* s_why = nullptr;
+    static bool s_forget = false;
+    s_why = why;
+    s_forget = forget_wifi_driver;
+    if (xTaskCreate(
+            [](void*) {
+                vTaskDelay(pdMS_TO_TICKS(300));
+                if (s_forget) {
+                    player::network_forget_driver_state();
+                }
+                g_firmware.restart(s_why);
+            },
+            "restart", 4096, nullptr, tskIDLE_PRIORITY + 5, nullptr) != pdPASS) {
+        std::printf("restart: no room for a task to restart from\n");
+    }
+}
+
+// Why the firmware will not let `action` be done now, in the words of the confirming steps.
+std::optional<std::string> refusal(iclforge::sysactions::Action action) {
+    iclforge::sysactions::Situation s;
+    const iclforge::Firmware::Activity activity = g_firmware.activity();
+    s.firmware_on_trial = activity.on_trial;
+    s.update_busy = activity.busy || activity.flash_mode;
+    const iclforge::sysactions::Availability availability = iclforge::sysactions::availability(action, s);
+    if (availability.available) {
+        return std::nullopt;
+    }
+    return availability.reason;
+}
+
+// What the settings that were just reset or erased drive, told the new values: the screen's view and dim
+// time, the clock's zone. A preference added to the registry that a subsystem acts on adds its line here.
+void apply_preferences_now() {
+    if (panel_built()) {
+        if (panel_has_view(settings().now_view)) {
+            panel_set_view(settings().now_view);
+        }
+        panel_set_dim_after(settings().dim_after_minutes);
+    }
+    if (wall_clock_built()) {
+        (void)wall_clock_set_zone(settings().time_zone.data());
+    }
+}
+
+}  // namespace
+
+iclforge::sysactions::Situation system_situation() {
+    iclforge::sysactions::Situation s;
+    const iclforge::Firmware::Activity activity = g_firmware.activity();
+    s.firmware_on_trial = activity.on_trial;
+    s.update_busy = activity.busy || activity.flash_mode;
+    if (g_player_mutex != nullptr) {
+        xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+        s.streaming = g_player != nullptr;
+        xSemaphoreGive(g_player_mutex);
+    }
+    s.streaming = s.streaming || sendspin_playing();
+    // The same reading the developer view makes of the network (panel/lvgl/dev_info.cpp).
+    const NetworkLink link = network_link();
+    if (link.preference != nullptr) {
+        s.has_cable = link.ethernet.present;
+        s.cable_link = link.ethernet.link;
+        s.has_wifi = link.wifi.present;
+    } else if (link.kind != nullptr && std::strcmp(link.kind, "ethernet") == 0) {
+        s.has_cable = true;
+        s.cable_link = !network_address().empty();
+    } else if (link.kind != nullptr) {
+        s.has_wifi = true;
+    }
+    s.network_built_in = std::strcmp(network_source(), "built-in") == 0;
+    if (const auto status = sendspin_status()) {
+        s.paired = status->paired;
+    }
+    return s;
+}
+
+std::optional<std::string> system_restart() {
+    if (const auto why = refusal(iclforge::sysactions::Action::restart)) {
+        return why;
+    }
+    schedule_restart("because the screen asked for it", false);
+    return std::nullopt;
+}
+
+std::optional<std::string> system_reset_preferences() {
+    if (const auto why = refusal(iclforge::sysactions::Action::reset_preferences)) {
+        return why;
+    }
+    const bool all = settings_reset_preferences();
+    apply_preferences_now();
+    if (!all) {
+        return std::string("Some preferences could not be reset; the rest were.");
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> system_factory_reset() {
+    if (const auto why = refusal(iclforge::sysactions::Action::factory_reset)) {
+        return why;
+    }
+    std::printf("settings: FACTORY RESET - erasing the pairings, then every setting\n");
+    // The pairings first, so that a board where anything below fails is still on its network and can be
+    // told again: the settings are what leave it with nothing to join. A new identity, and the servers'
+    // connections close.
+    if (sendspin_running() && !sendspin_pairing("forget")) {
+        return std::string("The paired servers could not be erased, and nothing else was.");
+    }
+    if (!settings_forget()) {
+        return std::string("The settings could not be erased (the flash refused); the paired servers already were.");
+    }
+    apply_preferences_now();
+    // The WiFi driver's own copy of the network is erased once the answer has gone out over it.
+    schedule_restart("after a factory reset", true);
+    return std::nullopt;
+}
 
 // The panel's developer view reads these (board_report.hpp). The figures are the ones GET /status
 // reports from the same stats: the player's own, or those of the last play when it has ended.
@@ -1229,6 +1369,16 @@ extern "C" void app_main() {
                         std::printf("control: layout %s for the next play\n",
                                     g_layout.text().data());
                     }
+                    break;
+                case CommandKind::kRestart:
+                    // The screen's Restart and the factory reset (system_control.hpp): through Firmware, as
+                    // POST /restart restarts, so that servers hear the board is going and a P4 resets the
+                    // whole system. The 100 ms this task sleeps between looks, and the half second
+                    // restart() waits, let the answer to whoever asked leave first.
+                    if (cmd.forget_wifi_driver) {
+                        player::network_forget_driver_state();
+                    }
+                    g_firmware.restart(cmd.text);
                     break;
                 case CommandKind::kFlashMode:
                     // Flash mode (planning/esp32-ota.md): every play stops,
