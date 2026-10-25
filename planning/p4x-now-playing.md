@@ -16,7 +16,7 @@
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Built; run on the kit: see [Stage 2](#stage-2-the-title-card-as-built) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
     | 4 | **Preferences** the owner picked on 2026-10-25: brightness, the clock's 12 or 24 hours, a night schedule, a time-zone picker | Brightness, the clock's format and the zone table are built (settings, routes, the screen, the web page); the night schedule's rule is built and host-tested, and its setting, routes and use by the screen, and the editors, follow the Preferences screen: [Stage 4](#stage-4-display-and-time-preferences) |
-    | 5 | The speakers **follow every window and can pulse**: the screen reads each 100 ms level, judges it against the room's loudest, and a `speakers style` (`glow` / `pulse`) | Built and host-tested, the preview run; the kit A/B is to do: see [Stage 4](#stage-4-the-speakers-follow-the-sound) |
+    | 5 | The speakers **follow every window and can pulse**: the screen reads each 100 ms level, judges it against the room's loudest, and a `speakers style` (`glow` / `pulse`) | Built and host-tested, the preview run; the kit A/B is to do: see [Stage 5](#stage-5-the-speakers-follow-the-sound) |
 
     **2026-10-25: the view and the dim time moved out of Adjust.** The owner asked for Adjust to be only
     adjustments and for a **Preferences** sheet beside it for what is chosen once. Where this page says "the
