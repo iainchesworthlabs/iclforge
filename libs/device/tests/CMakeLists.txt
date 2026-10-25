@@ -26,6 +26,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_settings_keys.cpp
     test_sink_plan.cpp
     test_system_actions.cpp
+    test_system_prefs.cpp
     test_tcp_arrivals.cpp
     test_title_card.cpp
     test_unit_hold.cpp

@@ -81,6 +81,13 @@ TEST_CASE("every entry is well formed", "[preferences]") {
         REQUIRE(pref.get != nullptr);
         REQUIRE(pref.set != nullptr);
         REQUIRE(prefs::find(pref.id) == &pref);
+        // Every entry says whether Reset preferences touches it, and only a value with a default can be reset.
+        REQUIRE(pref.on_reset != prefs::OnReset::kUnset);
+        if (pref.on_reset == prefs::OnReset::kReset) {
+            REQUIRE(pref.default_word[0] != '\0');
+            REQUIRE((pref.kind == prefs::Kind::kChoice || pref.kind == prefs::Kind::kStepper ||
+                     pref.kind == prefs::Kind::kToggle));
+        }
 
         if (pref.kind == prefs::Kind::kChoice || pref.kind == prefs::Kind::kStepper ||
             pref.kind == prefs::Kind::kToggle) {
@@ -160,7 +167,8 @@ TEST_CASE("each entry against each known board: a reason wherever it is greyed, 
                 }
                 any_choice_available |= choice.availability.available;
             }
-            if (entry.availability.available) {
+            // An entry that is not a choice among words (a name, an action, a list, About) has no starting point to check.
+            if (entry.availability.available && !pref.choices.empty()) {
                 // Something to choose, and the board's starting point is one the board can make.
                 REQUIRE(any_choice_available);
                 const prefs::ChoiceState* const start = choice_of(entry, pref.default_word);

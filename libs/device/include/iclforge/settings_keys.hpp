@@ -141,6 +141,9 @@ inline std::string joined(const std::vector<std::string>& parts) {
 
 }  // namespace detail
 
+// A list as a sentence's words: "a", "a and b", "a, b and c".
+[[nodiscard]] inline std::string joined(const std::vector<std::string>& parts) { return detail::joined(parts); }
+
 // "what the screen shows without lyrics, when the screen dims and time zone": what Reset preferences
 // changes, from the table, for the confirming step.
 [[nodiscard]] inline std::string reset_words() { return detail::joined(detail::words(true)); }
