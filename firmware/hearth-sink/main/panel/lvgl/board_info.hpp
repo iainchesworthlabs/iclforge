@@ -96,6 +96,10 @@ bool read_now_title(NowTitle& out);
 struct NowSettings {
     iclforge::nowview::View view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    // The night schedule, and the board's local minute of the day while the schedule is on and the time is known
+    // (nothing otherwise: a board that does not know the time is never dark by accident).
+    iclforge::nowview::NightSchedule night;
+    std::optional<int> minute_of_day;
 };
 [[nodiscard]] NowSettings read_now_settings();
 

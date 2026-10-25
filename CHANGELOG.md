@@ -121,8 +121,16 @@ The sections below contain the complete change list and fixes.
   offsets to 2036. `PUT /timezone Australia/Melbourne` stores the zone and the name (`GET /time-zones` lists the names,
   `GET /status`'s `time` object has `zone_name`), and the board's web page offers a region and a city. A POSIX string is
   taken as before. The night schedule's rule (`dim_state()` with a window of times and the board's local minute, held to
-  Melbourne's daylight saving changeovers) is built and host-tested; its setting and its use on the screen follow with
-  the Preferences screen.
+  Melbourne's daylight saving changeovers) is built and host-tested.
+- **A night schedule.** `GET` and `PUT /night-schedule` (`22:00-07:00 on`) make a board with a screen and a clock go dark
+  between two times by its own time, as the dark view does: a touch lights it for 30 seconds, and a board that does not
+  know the time is lit. Off until switched on; kept as one NVS number and returned by Reset preferences. Whether it
+  darkens the idle screen between songs too is a switch of its own, `GET` and `PUT /night-idle`, off.
+- **The Preferences screen has them all.** Brightness, the clock's hours and seconds, the night schedule, its two times
+  and the time zone are rows, and the two that are not a few buttons open an editor over the sheet: the pair of times
+  steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
+  place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
+  down to 240 by 240. The routes now go through the same backend as the screen.
 
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 

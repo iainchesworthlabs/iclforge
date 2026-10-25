@@ -45,6 +45,8 @@
 #include "iclforge/board_caps.hpp"
 #include "iclforge/layout_options.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/time_zones.hpp"
+#include "iclforge/wall_clock.hpp"
 
 namespace iclforge::prefs {
 
@@ -97,10 +99,12 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction };
 // When a change takes effect.
 enum class Apply : std::uint8_t { kLive, kNextPlay, kRestart };
 
-// How a screen draws a kChoice's choices. kButtons: side by side, wrapping, with the reasons of the greyed ones in
-// lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to read as
-// buttons (the speaker layouts, whose limits each need a sentence).
-enum class Editor : std::uint8_t { kButtons, kList };
+// How a screen draws an entry's value. kButtons: a kChoice's choices side by side, wrapping, with the reasons of the
+// greyed ones in lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to
+// read as buttons (the speaker layouts, whose limits each need a sentence). kTimes and kZone are for a kText entry
+// whose value is chosen in an editor of its own over the sheet and not typed (a pair of times, a place in a list):
+// panel/lvgl/prefs_editors.cpp draws them. A page or the REST routes need none.
+enum class Editor : std::uint8_t { kButtons, kList, kTimes, kZone };
 
 [[nodiscard]] constexpr const char* apply_name(Apply apply) {
     switch (apply) {
@@ -145,6 +149,20 @@ class Backend {
     [[nodiscard]] virtual int dim_after_minutes() const = 0;
     [[nodiscard]] virtual bool set_dim_after_minutes(int minutes) = 0;
 
+    // Display: the backlight's lit level in percent (nowview::kBrightnessMin to kBrightnessMax), how the clock view
+    // writes the time, and the night schedule (when the screen goes dark by the board's own time).
+    [[nodiscard]] virtual int brightness() const = 0;
+    [[nodiscard]] virtual bool set_brightness(int percent) = 0;
+    [[nodiscard]] virtual wallclock::ClockFormat clock_format() const = 0;
+    [[nodiscard]] virtual bool set_clock_format(wallclock::ClockFormat format) = 0;
+    [[nodiscard]] virtual nowview::NightSchedule night() const = 0;
+    [[nodiscard]] virtual bool set_night(const nowview::NightSchedule& night) = 0;
+
+    // Time: the zone as the clock reads it (a POSIX string, empty for none) and the name a person chose it by
+    // (wallclock::ZoneChoice; the name is empty for a string they typed).
+    [[nodiscard]] virtual wallclock::ZoneChoice time_zone() const = 0;
+    [[nodiscard]] virtual bool set_time_zone(const wallclock::ZoneChoice& zone) = 0;
+
     // Sound: the speakers this player drives, as the name or the list PUT /layout takes. The setter is that route's
     // own decision (layout_options.hpp, the same verdict set_value() has already asked), and false when the layout
     // could not be queued or stored.
@@ -160,6 +178,9 @@ using SetFn = bool (*)(Backend&, std::string_view word);
 // A reason the control does nothing RIGHT NOW because of another setting (not because of the hardware): non-empty
 // text is shown instead of the control's effect, with the control greyed. Empty when the control applies.
 using InertFn = std::string (*)(const Backend&);
+// How a kText entry's value is shown, where the word a route takes is not what a person reads ("Australia/Melbourne"
+// as "Melbourne (Australia)"). Null: the value as it is.
+using LabelFn = std::string (*)(std::string_view value);
 
 struct ChoiceDef {
     const char* id = "";
@@ -193,13 +214,21 @@ struct Pref {
     InertFn inert = nullptr;
     GetFn get = nullptr;
     SetFn set = nullptr;
-    // How the screen draws the choices of a kChoice.
+    // How the screen draws the choices of a kChoice (kButtons, kList), or the editor of its own that a kText's value
+    // is chosen in over the sheet (kTimes, kZone: prefs_editors.cpp). See Editor.
     Editor editor = Editor::kButtons;
+    // How a kText entry with an editor shows its value, where the word a route takes is not what a person reads.
+    LabelFn label_of = nullptr;
     // What a change costs while a stream plays ("Changing the speakers makes the music drop out for a moment."); the
     // screen asks "<this> Change to <choice>?" before it applies a change then, and never when nothing plays. Empty:
     // a change costs nothing and is applied at a tap.
     const char* confirm = "";
 };
+
+// Whether the entry's value is chosen in an editor of its own over the sheet (a pair of times, a place in a list).
+[[nodiscard]] constexpr bool has_screen_editor(const Pref& pref) {
+    return pref.editor == Editor::kTimes || pref.editor == Editor::kZone;
+}
 
 // --- the seed: what exists today ----------------------------------------------------------------------
 
@@ -228,6 +257,29 @@ namespace detail {
                            : Availability::no("This board keeps no time: it has no network to ask a time server on.");
 }
 
+// The backlight is what brightness sets: a glass whose backlight is not under the board's control cannot be dimmed.
+[[nodiscard]] inline Availability needs_backlight(const BoardCaps& caps) {
+    if (!caps.has_screen()) {
+        return Availability::no("This board has no screen.");
+    }
+    return caps.display.backlight ? Availability::yes()
+                                  : Availability::no("This screen's backlight is not under the board's control.");
+}
+
+// The clock view's format means something where there is a screen and a time to write on it.
+[[nodiscard]] inline Availability needs_screen_with_clock(const BoardCaps& caps) {
+    if (!caps.has_screen()) {
+        return Availability::no("This board has no screen.");
+    }
+    return needs_clock(caps);
+}
+
+// The night schedule: a screen that goes dark by the board's own time, and that a touch can light again.
+[[nodiscard]] inline Availability needs_screen_with_touch_and_clock(const BoardCaps& caps) {
+    const Availability screen = needs_screen_with_touch(caps);
+    return screen.available ? needs_clock(caps) : screen;
+}
+
 inline constexpr std::array<ChoiceDef, 5> kNowViewChoices{{
     {.id = "speakers", .label = "Speakers"},
     {.id = "title", .label = "Title"},
@@ -247,6 +299,168 @@ inline constexpr std::array<ChoiceDef, 8> kDimAfterChoices{{
     {.id = "240", .label = "4 hours"},
     {.id = "never", .label = "Never"},
 }};
+
+// Brightness: a stepper of ten stops, every tenth from 10 to 100 (nowview::brightness_stepped); a route takes any
+// whole number between.
+inline constexpr std::array<ChoiceDef, 10> kBrightnessChoices{{
+    {.id = "10", .label = "10%"},  {.id = "20", .label = "20%"},  {.id = "30", .label = "30%"},
+    {.id = "40", .label = "40%"},  {.id = "50", .label = "50%"},  {.id = "60", .label = "60%"},
+    {.id = "70", .label = "70%"},  {.id = "80", .label = "80%"},  {.id = "90", .label = "90%"},
+    {.id = "100", .label = "100%"},
+}};
+
+inline constexpr std::array<ChoiceDef, 2> kClockHoursChoices{{
+    {.id = "24", .label = "24 hour"},
+    {.id = "12", .label = "12 hour"},
+}};
+
+inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
+    {.id = "on", .label = "On"},
+    {.id = "off", .label = "Off"},
+}};
+
+[[nodiscard]] inline std::string get_brightness(const Backend& backend) { return std::to_string(backend.brightness()); }
+
+[[nodiscard]] inline bool set_brightness(Backend& backend, std::string_view word) {
+    const std::optional<int> percent = nowview::parse_brightness(word);
+    return percent.has_value() && backend.set_brightness(*percent);
+}
+
+[[nodiscard]] inline std::string get_clock_hours(const Backend& backend) {
+    return backend.clock_format().twelve_hour ? "12" : "24";
+}
+
+[[nodiscard]] inline bool set_clock_hours(Backend& backend, std::string_view word) {
+    if (word != "12" && word != "24") {
+        return false;
+    }
+    wallclock::ClockFormat format = backend.clock_format();
+    format.twelve_hour = word == "12";
+    return backend.set_clock_format(format);
+}
+
+[[nodiscard]] inline std::string get_clock_seconds(const Backend& backend) {
+    return nowview::on_off_text(backend.clock_format().seconds);
+}
+
+[[nodiscard]] inline bool set_clock_seconds(Backend& backend, std::string_view word) {
+    const std::optional<bool> on = nowview::parse_on_off(word);
+    if (!on) {
+        return false;
+    }
+    wallclock::ClockFormat format = backend.clock_format();
+    format.seconds = *on;
+    return backend.set_clock_format(format);
+}
+
+[[nodiscard]] inline std::string get_night_schedule(const Backend& backend) {
+    return nowview::on_off_text(backend.night().enabled);
+}
+
+[[nodiscard]] inline bool set_night_schedule(Backend& backend, std::string_view word) {
+    const std::optional<bool> on = nowview::parse_on_off(word);
+    if (!on) {
+        return false;
+    }
+    nowview::NightSchedule night = backend.night();
+    night.enabled = *on;
+    return backend.set_night(night);
+}
+
+// The two times, as the routes write them (`22:00-07:00`), without the state: setting them leaves the schedule as on or
+// off as it was.
+[[nodiscard]] inline std::string get_night_times(const Backend& backend) {
+    const nowview::NightSchedule night = backend.night();
+    return nowview::time_of_day_text(night.from_min) + "-" + nowview::time_of_day_text(night.to_min);
+}
+
+[[nodiscard]] inline bool set_night_times(Backend& backend, std::string_view word) {
+    // Two times and nothing else: `on`, `off` and a state after the times are the toggle's and the route's words.
+    if (word.size() != 11) {
+        return false;
+    }
+    const nowview::NightSchedule now = backend.night();
+    const std::optional<nowview::NightSchedule> night =
+        nowview::parse_night_schedule(std::string(word) + (now.enabled ? " on" : " off"), now);
+    return night.has_value() && backend.set_night(*night);
+}
+
+// The schedule is moot where the screen is dark already, and where it has nothing to darken: the Dark view, and the
+// Off view (its sentence is not what the schedule covers).
+[[nodiscard]] inline std::string night_inert(const Backend& backend) {
+    switch (backend.now_view()) {
+        case nowview::View::kDark:
+            return "The Dark view is dark already: a touch lights it for " + std::to_string(nowview::kDarkAwakeMs / 1000) +
+                   " seconds, as at night.";
+        case nowview::View::kOff:
+            return "Not used while the screen without lyrics is Off.";
+        case nowview::View::kSpeakers:
+        case nowview::View::kTitle:
+        case nowview::View::kClock:
+            break;
+    }
+    return {};
+}
+
+[[nodiscard]] inline std::string get_night_idle(const Backend& backend) {
+    return nowview::on_off_text(backend.night().idle);
+}
+
+[[nodiscard]] inline bool set_night_idle(Backend& backend, std::string_view word) {
+    const std::optional<bool> on = nowview::parse_on_off(word);
+    if (!on) {
+        return false;
+    }
+    nowview::NightSchedule night = backend.night();
+    night.idle = *on;
+    return backend.set_night(night);
+}
+
+// The idle screen is darkened by the schedule only while the schedule is on.
+[[nodiscard]] inline std::string night_idle_inert(const Backend& backend) {
+    return backend.night().enabled ? std::string() : "Used while the night schedule is on.";
+}
+
+// The zone, as a route says it: its name where a person chose it by name, else its string, else `none`.
+[[nodiscard]] inline std::string get_time_zone(const Backend& backend) {
+    const wallclock::ZoneChoice zone = backend.time_zone();
+    if (!zone.name.empty()) {
+        return zone.name;
+    }
+    return wallclock::zone_setting_text(zone.posix);
+}
+
+[[nodiscard]] inline bool set_time_zone(Backend& backend, std::string_view word) {
+    const std::optional<wallclock::ZoneChoice> zone = wallclock::parse_zone_choice(word);
+    return zone.has_value() && backend.set_time_zone(*zone);
+}
+
+// "22:00-07:00" as a person reads it on the button that opens the editor: "22:00 to 07:00".
+[[nodiscard]] inline std::string night_times_label(std::string_view value) {
+    const std::size_t dash = value.find('-');
+    if (dash == std::string_view::npos) {
+        return std::string(value);
+    }
+    return std::string(value.substr(0, dash)) + " to " + std::string(value.substr(dash + 1));
+}
+
+// What a person reads for a zone: "Melbourne (Australia)" for a name, "UTC" for none, a string as it is.
+[[nodiscard]] inline std::string time_zone_label(std::string_view value) {
+    if (value == wallclock::kNoZone) {
+        return "UTC";
+    }
+    const std::optional<wallclock::NamedZone> named = wallclock::find_time_zone(value);
+    if (!named) {
+        return std::string(value);
+    }
+    // A city with a place between it and its region already says where it is ("Buenos Aires (Argentina)").
+    const std::string city = wallclock::zone_label(named->name);
+    const std::string_view region = wallclock::zone_region(named->name);
+    if (region == wallclock::kOtherRegion || city.find(" (") != std::string::npos) {
+        return city;
+    }
+    return city + " (" + std::string(region) + ")";
+}
 
 [[nodiscard]] inline std::string get_now_view(const Backend& backend) {
     return nowview::view_name(backend.now_view());
@@ -304,7 +518,7 @@ inline constexpr std::array<ChoiceDef, kLayoutCatalog.size()> kLayoutChoices =
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 3> kRegistry{{
+inline constexpr std::array<Pref, 10> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -331,6 +545,96 @@ inline constexpr std::array<Pref, 3> kRegistry{{
      .inert = &detail::dim_after_inert,
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after},
+    {.id = "brightness",
+     .group = Group::kDisplay,
+     .label = "Brightness",
+     .note = "How bright the screen is while it is lit. Dimmed, it is never brighter than this.",
+     .kind = Kind::kStepper,
+     .apply = Apply::kLive,
+     .route = "/brightness",
+     .default_word = "80",
+     .unit = "%",
+     .choices = detail::kBrightnessChoices,
+     .availability = &detail::needs_backlight,
+     .get = &detail::get_brightness,
+     .set = &detail::set_brightness},
+    {.id = "clock-hours",
+     .group = Group::kDisplay,
+     .label = "Clock hours",
+     .note = "How the clock view writes the time.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/clock-format",
+     .default_word = "24",
+     .choices = detail::kClockHoursChoices,
+     .availability = &detail::needs_screen_with_clock,
+     .get = &detail::get_clock_hours,
+     .set = &detail::set_clock_hours},
+    {.id = "clock-seconds",
+     .group = Group::kDisplay,
+     .label = "Clock seconds",
+     .note = "Show the seconds beside the time.",
+     .kind = Kind::kToggle,
+     .apply = Apply::kLive,
+     .route = "/clock-format",
+     .default_word = "off",
+     .choices = detail::kOnOffChoices,
+     .availability = &detail::needs_screen_with_clock,
+     .get = &detail::get_clock_seconds,
+     .set = &detail::set_clock_seconds},
+    {.id = "night-schedule",
+     .group = Group::kDisplay,
+     .label = "Night schedule",
+     .note = "Go dark between two times. A touch lights the screen for a while.",
+     .kind = Kind::kToggle,
+     .apply = Apply::kLive,
+     .route = "/night-schedule",
+     .default_word = "off",
+     .choices = detail::kOnOffChoices,
+     .availability = &detail::needs_screen_with_touch_and_clock,
+     .inert = &detail::night_inert,
+     .get = &detail::get_night_schedule,
+     .set = &detail::set_night_schedule},
+    {.id = "night-times",
+     .group = Group::kDisplay,
+     .label = "Night from and to",
+     .note = "The board's own time.",
+     .kind = Kind::kText,
+     .apply = Apply::kLive,
+     .route = "/night-schedule",
+     .default_word = "22:00-07:00",
+     .availability = &detail::needs_screen_with_touch_and_clock,
+     .inert = &detail::night_inert,
+     .get = &detail::get_night_times,
+     .set = &detail::set_night_times,
+     .editor = Editor::kTimes,
+     .label_of = &detail::night_times_label},
+    {.id = "night-idle",
+     .group = Group::kDisplay,
+     .label = "Night covers idle screen",
+     .note = "Also go dark between songs, not only while a song with no lyrics plays.",
+     .kind = Kind::kToggle,
+     .apply = Apply::kLive,
+     .route = "/night-idle",
+     .default_word = "off",
+     .choices = detail::kOnOffChoices,
+     .availability = &detail::needs_screen_with_touch_and_clock,
+     .inert = &detail::night_idle_inert,
+     .get = &detail::get_night_idle,
+     .set = &detail::set_night_idle},
+    {.id = "time-zone",
+     .group = Group::kTime,
+     .label = "Time zone",
+     .note = "Where the board is, for its clock.",
+     .kind = Kind::kText,
+     .apply = Apply::kLive,
+     .route = "/timezone",
+     .default_word = "none",
+     .availability = &detail::needs_clock,
+     .get = &detail::get_time_zone,
+     .set = &detail::set_time_zone,
+     .editor = Editor::kZone,
+     .label_of = &detail::time_zone_label},
     {.id = "speaker-layout",
      .group = Group::kSound,
      .label = "Speaker layout",
@@ -435,6 +739,9 @@ namespace detail {
         if (entry.value == choice.id) {
             entry.value_label = choice.label;
         }
+    }
+    if (entry.value_label.empty() && pref.label_of != nullptr) {
+        entry.value_label = pref.label_of(entry.value);
     }
     if (entry.value_label.empty() && !entry.value.empty()) {
         entry.value_label = entry.value;
