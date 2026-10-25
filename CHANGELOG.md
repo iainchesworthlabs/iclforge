@@ -36,6 +36,12 @@ This release adds:
   clock) what it can do, so a choice the board cannot make is greyed with the reason and never hidden, and
   `GET /preferences` lists the same on every board; Adjust keeps only the lyric delay and the text size; both sheets
   take their sizes from the display and are checked at four screen sizes;
+- Hearth's network sinks say which speaker layouts a board can take and why not for the others: `GET /layout-options`
+  lists thirteen layouts, each supported, taken with a limit, or unavailable with the reason and the setting that
+  would help; `PUT /layout`, the Preferences list (Speaker layout, with a question before a change that breaks the
+  music that plays) and the device page all ask the same verdict over the board's capabilities, so a layout offered
+  is one the board takes. An ESP32-P4 below revision v3.0 now reports the two slots its chip can open, and refuses a
+  wider layout with that reason, where it used to accept one it could not play;
 - new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
   `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
   self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`

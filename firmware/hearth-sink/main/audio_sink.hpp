@@ -146,6 +146,12 @@ namespace player {
 // sink_slots() is a fixed count. Read once, for the board's capability description (iclforge/board_caps.hpp).
 [[nodiscard]] int sink_frame_bit_max();
 
+// Whether the part under the sink can open a TDM frame at all. False only on an ESP32-P4 below chip revision v3.0
+// (iclforge::kEsp32p4TdmClockRevision), which has no PLL clock source for I2S: only standard 1-2 channel I2S
+// reaches it, so sink_slots() and sink_max_slots() report two there, whatever the frame width says, and
+// PUT /layout refuses a wider layout with the chip as the reason (iclforge/layout_options.hpp). True everywhere else.
+[[nodiscard]] bool sink_tdm_usable();
+
 // The slot width in force, in bits, and setting it.
 //
 // Which width a board wants is a property of the DACs it is wired to, not of
