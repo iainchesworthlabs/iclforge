@@ -59,7 +59,8 @@ enum class Kind : std::uint8_t {
     identity,
     // How the board is joined to its network: kept by Reset preferences.
     network,
-    // How the board's outputs are wired and what room they serve: kept by Reset preferences.
+    // How the board's outputs are wired, what room they serve and where that room is (its time zone): kept by Reset
+    // preferences. A person set these up for the room, not for taste.
     setup,
     // A technical setting that stays out of Preferences (planning/p4x-preferences.md): kept by Reset
     // preferences.
@@ -81,11 +82,11 @@ inline constexpr std::array kKeys = {
     Key{kSlotBits, Kind::setup, "DAC wiring"},
     Key{kSecondLine, Kind::setup, "DAC wiring"},
     Key{kLayout, Kind::setup, "speaker layout"},
+    Key{kTimeZone, Kind::setup, "time zone"},
     Key{kNtpServer, Kind::technical, "time server"},
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
-    Key{kTimeZone, Kind::preference, "time zone"},
     // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
     // Reset preferences keeps the time zone).
     Key{kTimeZoneName, Kind::setup, "time zone"},
@@ -149,7 +150,7 @@ inline std::string joined(const std::vector<std::string>& parts) {
 
 }  // namespace detail
 
-// "what the screen shows without lyrics, when the screen dims and time zone": what Reset preferences
+// "what the screen shows without lyrics and when the screen dims": what Reset preferences
 // changes, from the table, for the confirming step.
 [[nodiscard]] inline std::string reset_words() { return detail::joined(detail::words(true)); }
 
