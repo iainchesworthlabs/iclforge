@@ -15,6 +15,7 @@
     | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built; the rule tested on the host and in the preview tool, and run on the kit with a stream and injected taps; a finger and the glass not yet looked at: [The dark view](#the-dark-view) |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Built; run on the kit: see [Stage 2](#stage-2-the-title-card-as-built) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
+    | 4 | **Preferences** the owner picked on 2026-10-25: brightness, the clock's 12 or 24 hours, a night schedule, a time-zone picker | Brightness, the clock's format and the zone table are built (settings, routes, the screen, the web page); the night schedule's rule is built and host-tested, and its setting, routes and use by the screen, and the editors, follow the Preferences screen: [Stage 4](#stage-4-display-and-time-preferences) |
 
     **2026-10-25: the view and the dim time moved out of Adjust.** The owner asked for Adjust to be only
     adjustments and for a **Preferences** sheet beside it for what is chosen once. Where this page says "the
@@ -315,17 +316,104 @@ board that is turned `off` shows no time at all rather than an old one; the page
 65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 42 zones and cities (*UTC+10 Melbourne,
 Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and the 400 says why.
 
+## Stage 4: display and time preferences
+
+The owner, 2026-10-25, picked four things for the new Preferences screen (the programme's brief is
+`planning/p4x-preferences.md`, which is not in the tree yet): **brightness**, the **clock in 12 or 24 hours**, a
+**night schedule** ("go dark between two times") and a **time-zone picker**. They are built as settings and
+routes first, for any board with the capability (a screen with a backlight, a clock), and drawn on the
+Preferences screen when that exists; nothing here is the P4X's alone.
+
+**Brightness** (plan D6 said "not a setting"; it is now). The lit level of the backlight is stored (`bright`,
+10 to 100 percent, 80 unless set; Kconfig `ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT`) and followed at once:
+`GET` and `PUT /brightness` take any whole number in that range, and the Preferences stepper moves it by 10. The
+screen asks for one of three named levels (lit, dimmed, off) and the panel seam gives the glass the person's
+level for the first, **the dim floor (4%) under it, never above it** for the second, and 0 for the third
+(`iclforge::nowview::backlight_percent`, host-tested for every level from 10 to 100): a screen set as low as
+the floor does not light up when it dims. The developer view still forces the screen lit, at the person's level.
+A glass with no backlight to dim (the frame buffer a board with no panel runs) has no brightness: `PUT` is a
+409 and `DisplayCaps::backlight` is false, which is what the Preferences entry reads to grey itself with the
+reason.
+
+**The clock's format.** `GET` and `PUT /clock-format` take `24`, `12`, `24 seconds` or `12 seconds` (stored as one
+number, `clock_fmt`: bit 0 the 12-hour clock, bit 1 the seconds, 0 the default). 12 hours has no leading zero
+and no hour 0 (midnight is 12:05 AM). The digits stay in the 200 px face; **what goes small beside them (the
+seconds, AM or PM) is a label of its own**, so a second that passes redraws about 9,600 pixels and not the
+digits' 300,000 (the preview counts both, and fails its run if a second with the seconds off flushes anything).
+The text is made in `libs/device/include/iclforge/wall_clock.hpp` (`face()`, host-tested at every hour of the
+day) and handed to the view in the clock's reading, so the drawing code changed only where the time's text is set.
+
+**The night schedule.** Dark between two times of day, by the board's own local time (the stored zone and the
+converged SNTP time): `dim_state()` in `now_view.hpp` takes the schedule and the board's local minute of the day
+and, while the schedule is in force, **any no-lyrics view is the dark view**: dark from the moment it begins to
+show, lit for 30 s by a touch, the cover swallowing the wake tap. The rule, and what it was held to on the host:
+
+| Case | Rule |
+|---|---|
+| A window across midnight (22:00 to 07:00) | in from 22:00 to 06:59, out at 07:00; a window inside one day is the same rule |
+| From equal to to | an empty window, **never dark** (a whole day is the dark view) |
+| A clock that has not converged | the schedule is not in force and a lit screen stays lit: the panel passes no minute at all, not the zeroed reading, which is 00:00 and inside a window that wraps midnight |
+| Daylight saving | kept by the wall clock. Melbourne's changeovers are tested at the real instants (2026-10-04 and 2026-04-05, and 2027 and 2028): the night the clocks go forward is eight real hours of dark and the night they go back ten, with no gap at the jump; a window that starts in the hour that does not exist begins at the jump, and one that starts in the hour lived twice is dark in both passes |
+| Night begins while a song plays | lit until nothing has touched the glass for 30 s, then dark |
+
+**What is built so far is the rule and its words**, not the setting: `parse_night_schedule` reads `22:00-07:00` (the
+times, and on), `on`, `off` (the times kept) or both (`22:00-07:00 off`) and `night_schedule_text` writes `22:00-07:00 on`,
+which are what `GET` and `PUT /night-schedule` will take and say. The setting (NVS and Kconfig), the routes and the
+screen's use of `dim_state()` go in with the Preferences screen, because the screen's drawing code (`lyric_screen.cpp`) is
+where they act. Days of the week are not in it.
+
+**The idle screen is a separate setting, and off.** Whether the night schedule also darkens the idle screen between
+two songs is the question [Open](#open) already asks about dimming, and the owner has not answered it. It will be
+its own setting (`night-idle`, `on` or `off`, default `off`; `NightSchedule::idle`), and `dark_state()` is the rule it would use;
+nothing is decided here.
+
+**The time-zone picker.** The board has no zone database, so a zone is still a POSIX string; what is new is a table
+of the zones people choose by region and city, each with the string its rules end in. It is generated, not written:
+`tools/hearth/gen_time_zones.py` reads IANA's tzdata (public domain; release 2026e, from the `tzdata` package) and
+writes `libs/device/include/iclforge/time_zone_data.hpp`, which is checked in with it.
+
+| | |
+|---|---|
+| Entries | **420**: tzdata's own `zone.tab` (418, one per country and zone, so Amsterdam and Oslo are there), `UTC`, and `Australia/Canberra` (a link to Sydney that `zone.tab` leaves out) |
+| Australia | all of it: Adelaide, Brisbane, Broken Hill, Canberra, Darwin, Eucla, Hobart, Lindeman, Lord Howe, Melbourne, Perth, Sydney |
+| Regions | Africa 52, America 144, Antarctica 11, Arctic 1, Asia 82, Atlantic 10, Australia 12, Europe 58, Indian 11, Pacific 38, Other 1 (UTC) |
+| Flash | **11,578 bytes**: 3,360 for the 420 rows (two 4-byte pointers each), 6,910 for the names, 1,308 for the 89 distinct strings (420 names share them: Melbourne, Sydney, Hobart and Canberra are one) |
+| Held to tzdata | `gen_time_zones.py --verify` reads every string a second time and compares it with the offsets Python's `zoneinfo` gives at every change from 2026-11-02 to 2036, found to the second: 4,500 changes, **0 disagreements**. glibc, asked through `TZ` in WSL, reads every string the same way at 2,680 instants around the 2027 and 2028 changes (0 disagreements). The C++ evaluator is held to the same real instants for 16 zones (Melbourne, Sydney, Adelaide, Lord Howe, Hobart, New York, Los Angeles, London, Dublin, Berlin, Santiago, Nuuk, Cairo, Auckland, Troll and Gaza), 2027 and 2028 |
+
+Two things in the data that a person may not expect. **A string rules only from its zone's last explicit
+transition**: in 2026e Vancouver, Edmonton, Winnipeg and Inuvik settle on a permanent time on 2026-11-01 and Casablanca
+on 2026-09-20, so their strings are right from those days (and before them by the luck of the offsets); Gaza and
+Hebron have explicit transitions to 2086 and agree with their string to 2036, which is as far as `--verify` looks.
+And **`UTC+10` is ten hours west**: it is a valid POSIX string, and the table's `UTC` is the zone people mean.
+
+*Which choice is kept.* `PUT /timezone` still takes a POSIX string and `none`, and now also **a name from the
+table** (`PUT /timezone Australia/Melbourne`), which stores both. The name goes in a second NVS key (`tz_name`),
+because a string cannot say which city was meant (89 strings stand for 420 names) and the screen must show
+*Melbourne*; a reverse lookup was rejected for that reason, since Melbourne, Sydney, Hobart and Canberra are the
+same string. The string stays the key the clock reads (`time_zone`, unchanged, so a board that goes back to an
+older image still tells the right time). The two never disagree: a name the table does not know is dropped at boot,
+a typed string stores no name, and **a name the table knows says the zone**, so a release that changes a city's
+rules moves the boards that chose that city and no others. `GET /time-zones` lists the names, one a line (sent in
+pieces: 8 KB is never one allocation), and `GET /status`'s `time` object has `zone_name`. The device web page
+offers the same list as a region and a city: it asks the board for the names, and no longer carries a list of 42
+zones of its own, so the page is 50 bytes smaller.
+
+**Not built, not decided.** The schedule's setting and screen (above). The idle screen under it. Days of the week. A zone
+typed on the screen (the web page and `PUT /timezone` have it). The editors, which wait for the Preferences screen.
+Nothing has been run on the kit.
+
 ## Open
 
 - **The idle screen is not dimmed.** It is on for hours too (Q7 of the panel's plan). The owner's
   answer was about this screen; whether idle follows is a question for the owner. It matters more now
   that there is a dark view: a listener who chose it may see the idle screen light up between two
   songs, if the server ends one stream before it starts the next. Whether it does has not been looked
-  at on the kit.
+  at on the kit. The night schedule asks the same question ([Stage 4](#stage-4-display-and-time-preferences)): it
+  will be its own setting, `night-idle`, off, until the owner says.
 - **Does a dark screen save the scan-out?** Stopping the DSI engine while the cover is up is the
   experiment; the kit's AC-4 5.1 glitches are the reason to try it.
-- **Brightness** is still not a setting (plan D6): the sheet has room for a fourth row only by being
-  taller again or by a second page.
+- **Brightness** was not a setting (plan D6) and is one now, on the Preferences screen and `PUT /brightness`
+  ([Stage 4](#stage-4-display-and-time-preferences)); the Adjust sheet stays as it is.
 - **Music Assistant, live.** It had not reconnected to the kit by 22:00Z on 2026-10-21, an hour after the
   title-card image went on (the same happened after each earlier reflash), so what the owner's Music Assistant
   sends this role has been read from aiosendspin's source and not seen on the board. When it connects and plays,

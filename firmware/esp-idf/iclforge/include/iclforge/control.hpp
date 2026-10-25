@@ -11,6 +11,7 @@
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/player.hpp"
 #include "iclforge/preferences.hpp"
+#include "iclforge/wall_clock.hpp"
 
 // The control surface: a few HTTP verbs over the player, for the ESP-IDF
 // integrator whose controller is not Home Assistant. planning/esp32-player.md
@@ -53,9 +54,9 @@
 //
 // And the board's own settings, which ControlHandlers lists: GET and PUT
 // /name, /slot-width and /wiring, PUT /network, GET and PUT /network-preference on
-// a board with a cable and a station, and GET and PUT /now-playing and
-// /dim-after on a board with a screen, and GET and PUT /trim and GET and POST /identify on a board with a Sendspin
-// player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
+// a board with a cable and a station, and GET and PUT /now-playing,
+// /dim-after, /brightness and /clock-format on a board with a screen, and GET and PUT /trim and GET and POST /identify on a
+// board with a Sendspin player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
 //
 // And updates over the network, which Control hands to the owner's Firmware
 // (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
@@ -172,8 +173,10 @@ struct ControlTime {
     bool synced = false;
     // The time to the second in the board's zone ("2026-10-21 08:09:44"); empty until a server has answered.
     std::string local;
-    // The zone as set, or "none" (the time is UTC), and the server a person named, or "none".
+    // The zone as set, or "none" (the time is UTC), the name the person chose it by (iclforge/time_zones.hpp,
+    // "Australia/Melbourne"), or "none" when they typed a string or set none, and the server a person named, or "none".
     std::string zone;
+    std::string zone_name;
     std::string server;
     // The servers lwIP is set to ask, as text, and how many answers there have been since boot.
     std::string servers;
@@ -315,6 +318,16 @@ struct ControlHandlers {
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
 
+    // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
+    // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter
+    // already read), and GET and PUT /clock-format, 24 or 12 hours with or without seconds (iclforge/wall_clock.hpp).
+    // A board with no screen leaves all four empty and the routes answer that it has none. set_brightness is false
+    // when the glass has no backlight that can be dimmed or the setting could not be stored. Both act at once.
+    std::function<int()> brightness;
+    std::function<bool(int percent)> set_brightness;
+    std::function<wallclock::ClockFormat()> clock_format;
+    std::function<bool(wallclock::ClockFormat format)> set_clock_format;
+
     // GET and PUT /dynamic-range: how much of a Dolby stream's dynamic range the listener wants
     // (iclforge/base/dynamic_range.hpp, planning/hearth-late-night.md). dynamic_range answers with
     // the words a PUT takes, "standard" or "late-night"; set_dynamic_range is handed one of them
@@ -325,14 +338,15 @@ struct ControlHandlers {
     std::function<bool(std::string_view range)> set_dynamic_range;
 
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
-    // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps
-    // no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each setter
-    // is handed what the route has already read as the setting (wallclock::parse_zone_setting and the like: an
+    // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, GET /time-zones and GET /status's "time". A board
+    // that keeps no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each
+    // setter is handed what the route has already read as the setting (wallclock::parse_zone_choice and the like: an
     // empty string is `none`); false means the board could not take it (its C library reads a zone differently,
     // or it could not be stored). They act at once, with no restart. The getters answer with the words a PUT
-    // takes: a zone or a server or `none`, and `on` or `off`.
+    // takes: a zone or a server or `none`, and `on` or `off`. set_time_zone is handed the POSIX string and the
+    // name the person chose it by (iclforge/time_zones.hpp), empty for a string they typed or none.
     std::function<std::string()> time_zone;
-    std::function<bool(std::string_view zone)> set_time_zone;
+    std::function<bool(std::string_view zone, std::string_view name)> set_time_zone;
     std::function<std::string()> ntp_server;
     std::function<bool(std::string_view server)> set_ntp_server;
     std::function<std::string()> time_sync;

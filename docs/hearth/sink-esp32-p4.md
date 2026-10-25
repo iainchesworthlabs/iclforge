@@ -368,21 +368,32 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 |---|---|---|
 | `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
+| `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |
+| `GET` and `PUT /clock-format` | `24`, `12`, `24 seconds` or `12 seconds` | `24` |
 
-Both are stored on the board and take effect at once, with no restart; a board with no panel answers
-404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
-dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; whether Preferences is open (`prefs_view`),
-how many times it was built and the longest a build took (`prefs_builds`, `prefs_build_us_max`); and the
+All four are stored on the board and take effect at once, with no restart; a board with no panel answers
+404. **The brightness is the lit level, and the dim floor stays under it**: the dimmed screen is at 4%, or at
+the brightness if that is lower, and the dark view is off whatever it is. A screen whose backlight cannot be
+dimmed (the frame buffer a board with no panel runs) refuses it with a 409. `GET :8081/panel` says which `view`
+is chosen, whether the screen is `dimmed` (a black cover is up, dimmed or dark) and the `backlight` in percent:
+80 lit (or the brightness set), 4 dimmed, 0 dark; whether Preferences is open (`prefs_view`), how many times
+it was built and the longest a build took (`prefs_builds`, `prefs_build_us_max`); and the
 [time of day](#the-time-of-day)'s state.
 
 #### The clock
 
-The time of day, for a room where the sound is the thing and the panel is a glance: **the time in 24
-hours at 200 px, the date under it, and nothing else**, in the muted tone (the time at about 80% of
-it and the date at about 60%, so that neither is the brightest thing in a dim room). It shows no
-seconds, so what the screen redraws is the time's rectangle once a minute (the preview counts 224,000
-pixels, against none for a second that passes), and the line over it still says what the stream is
-(*Dolby Digital Plus 5.1 to 5.1*).
+The time of day, for a room where the sound is the thing and the panel is a glance: **the time at 200 px, the
+date under it, and nothing else**, in the muted tone (the time at about 80% of it and the date at about 60%, so
+that neither is the brightest thing in a dim room). By default it is in 24 hours and shows no seconds, so what the
+screen redraws is the time's rectangle once a minute (the preview counts 224,000 pixels, against none for a second
+that passes), and the line over it still says what the stream is (*Dolby Digital Plus 5.1 to 5.1*).
+
+**A person can have 12 hours** (*9:47*, with a small *PM* beside it; midnight is 12:05 AM) **and the seconds**
+(small beside the digits, *:12*), in any combination: `PUT /clock-format` takes `24`, `12`, `24 seconds` or `12 seconds`.
+The small text is a label of its own, so a second that passes redraws about 9,600 pixels and not the digits' 300,000,
+and with the seconds off a second redraws nothing.
+
+![The clock in 12 hours with the seconds: 9:05, :07 AM](screenshots/p4-panel-clock-12h-seconds.png)
 
 ![The clock: 21:47 and Tuesday 20 October](screenshots/p4-panel-clock.png)
 
@@ -503,23 +514,28 @@ starts the question again at once if no server has answered yet.
 |---|---|---|
 | `GET` and `PUT /time-sync` | `on` or `off` | `on` |
 | `GET` and `PUT /ntp-server` | a host name or an IPv4 address, or `none` | `none`: the router's, then the pool |
-| `GET` and `PUT /timezone` | a POSIX time zone, or `none` | `none`: UTC |
+| `GET` and `PUT /timezone` | a name from `GET /time-zones` (`Australia/Melbourne`), a POSIX time zone, or `none` | `none`: UTC |
+| `GET /time-zones` | the names `PUT /timezone` takes, one a line | 420 of them |
 
-All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`) and take effect at once,
-with no restart. **They are on the board's own web page too**, in a Time section of Settings: the time
-the board keeps and how it got it, a checkbox for whether to ask a time server, and a list of zones and cities
-(*UTC+10 Melbourne, Sydney, Hobart, Canberra*; 42 of them, each a POSIX string the board's C library is
-held to) with a field for any other, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
-object (`sync`, `asking`, `synced`, `local`, `zone`, `server`, `servers`, `answers`), and the console
+All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`, and `tz_name` for the name a person
+chose) and take effect at once, with no restart. **They are on the board's own web page too**, in a Time section
+of Settings: the time the board keeps and how it got it, a checkbox for whether to ask a time server, a region and a
+city (the page asks the board for its list of zones) with a field for any other zone, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
+object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `server`, `servers`, `answers`), and the console
 says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
 pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
 it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
 made up), and a clock view then shows only its heading.
 
-**The time zone is a POSIX string**, because the firmware has no zone database and a list of names
-would be a table to keep: `PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and
-Hobart. Its offset is the hours *west* of UTC, so an Australian zone has a minus sign; `none` takes
-the zone away. A string that is not a zone, or one with daylight saving and no rules (which the
+**The time zone is a POSIX string**, because the firmware has no zone database: `PUT /timezone
+AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and Hobart. Its offset is the hours *west* of UTC, so an
+Australian zone has a minus sign; `none` takes the zone away. **A person need not type one.** The board carries a table of
+the zones people choose by region and city, **420 of them in 11,578 bytes of flash**, generated from IANA's tzdata (2026e;
+`tools/hearth/gen_time_zones.py`), Australia complete: `PUT /timezone Australia/Melbourne` stores the string that
+name stands for **and the name**, so the screen can say *Melbourne* (the string alone could not: Melbourne, Sydney, Hobart and
+Canberra are one string). A name from the table says the zone, so a release that carries a government's new rules
+moves the boards that chose that city and no others. A name that is not in the table is a 400, as is a string that is
+not a zone. A string that is not a zone, or one with daylight saving and no rules (which the
 board's C library would give its own for, differently from the next one's), is refused with a 400
 that says so; one the grammar accepts is then read by the board's own C library, on a day in January
 and a day in July, and refused with a 409 if the library did not read it as written (a library that
@@ -527,8 +543,10 @@ cannot parse a string falls back to UTC without saying so). With none set the ti
 
 The grammar and the words (`libs/device/include/iclforge/wall_clock.hpp`) are held to the letter by
 the host tests (`test_wall_clock.cpp`: the zones and the servers taken and the ones refused, the offsets,
-the dates and the words), and the device page's stand-in is held to the same lists
-(`apps/demos/wasm/tests/device-ui/contract.spec.js`).
+the dates and the words; `test_time_zones.cpp`: every string in the table taken by the board's reader, Australia
+complete, and Melbourne's changeovers, with 15 other zones', at tzdata's own instants), and the device page's
+stand-in is held to the same lists (`apps/demos/wasm/tests/device-ui/contract.spec.js`). The generator holds every
+string to tzdata itself (`gen_time_zones.py --verify`: 4,500 changes from 2026 to 2036, no disagreement).
 
 ### Wiring
 

@@ -1148,6 +1148,24 @@ config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_MV
     default 2500
     range 500 3300
 
+# What a person chooses once and leaves (the Preferences screen, planning/p4x-preferences.md), as the board
+# has it before anyone has chosen: NVS holds the choice, and a QEMU run or a new board uses these. Read by every
+# build (settings.cpp) and acted on by the one with a panel.
+config ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT
+    int "Backlight when lit, percent (10 to 100)"
+    default 80
+    range 10 100
+    help
+        The level of the backlight while the screen is lit. The dimmed screen goes to a floor of 4 percent
+        (never above this), and the dark view turns it off.
+
+config ICLFORGE_EXAMPLE_CLOCK_FORMAT
+    int "Clock view: 24 hours (0), 12 hours (1), 24 hours with seconds (2), 12 hours with seconds (3)"
+    default 0
+    range 0 3
+    help
+        Bit 0 is the 12-hour clock and bit 1 the seconds: the stored value of iclforge::wallclock::ClockFormat.
+
 endmenu
 
 endmenu
