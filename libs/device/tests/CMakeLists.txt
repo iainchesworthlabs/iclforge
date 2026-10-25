@@ -5,6 +5,7 @@
 iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_ac4_sync_frame.cpp
     test_block_ring.cpp
+    test_board_caps.cpp
     test_dac_queue_model.cpp
     test_dev_view.cpp
     test_firmware_image.cpp
@@ -19,6 +20,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_pairing_records.cpp
     test_pcm_unpack.cpp
     test_playout.cpp
+    test_preferences.cpp
     test_sink_plan.cpp
     test_tcp_arrivals.cpp
     test_title_card.cpp
