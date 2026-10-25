@@ -10,6 +10,12 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
+  about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
+  where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
+  locked in `s3-n16r8`). On an S3 the same stream now leaves 70 KB or more, PCM reads 93 KB free where it read 69, and the boot
+  figure rises 14 KB; the decode of an E-AC-3 stream takes about 14 % longer (17.9 against 15.7 ms of the 32 ms a chunk lasts).
+  `s3-n16r8-ac4`, the P4 and the C6 profiles are unchanged: the AC-4 S3 profile's board suite hung at its first play with the lower limit.
 - **The speakers follow the sound more closely, and can pulse.** The P4X's no-lyrics screen reads the level of every
   100 ms window (it read every other one), judges it against the loudest the room has lately been (so the same music shows
   the same at any volume), and moves in six steps that fall fast enough for a hit to show, for about 56,000 pixels a second
