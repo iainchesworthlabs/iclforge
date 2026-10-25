@@ -236,17 +236,10 @@ create them through the API (as was done on 2026-10-25), or click them in *Setti
 
 | Environment | Rule | Secrets |
 |---|---|---|
-| `firmware-beta` | Deployment branches and tags: `main` and `v*`. **No reviewer**: it signs on its own (your decision) | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` |
-| `firmware-stable` | Deployment branches and tags: **`v*` only**, not `main`. **Required reviewers: you**, so every signing run waits for your approval (your decision). Leave *Prevent self-review* **off** (you start the run by cutting the tag, and you are the one who approves it). Turn *Allow administrators to bypass configured protection rules* **off**, if the page shows it, so the approval cannot be skipped | the same two names, with the stable leaf's values |
+| `firmware-beta` | Deployment branches and tags: **`main` only**. **No reviewer**: it signs on its own (your decision) | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` |
+| `firmware-stable` | Deployment branches and tags: **`main` only**. **Required reviewers: you**, so every signing run waits for your approval (your decision). Leave *Prevent self-review* **off** (you start the release, and you are the one who approves its signing). Turn *Allow administrators to bypass configured protection rules* **off**, if the page shows it, so the approval cannot be skipped | the same two names, with the stable leaf's values |
 
-**The tag ruleset for `v*` is optional while you are the only writer** (*Settings, Rules*): an environment secret can
-be read by a run on any ref the environment allows, and for stable that is a tag, so who can make a tag is who can
-read a key ([CI signing](esp32-ota.md#ci-signing)). Know the cost first: `release.yml`'s `workflow_dispatch` path
-creates the release tag itself with `GITHUB_TOKEN`, and a ruleset that restricts creating `v*` tags blocks it (a
-ruleset's bypass list cannot hold `GITHUB_TOKEN`). With the ruleset you cut the tag by hand and the tag push starts the
-release. It was deferred on 2026-10-25: add it when a second person gets write access. Note too that stable's
-environment allows only tag refs, so a stable signing job runs only from a tag (a tag push, or a dispatch with the tag
-chosen under "Use workflow from"), never from a run started on `main`.
+**There is no tag ruleset.** The signing workflow starts when the `Release` workflow has finished (`workflow_run`), and a workflow started that way always runs the copy of the file on `main`; with both environments allowing `main` only, a key can be read only by a workflow file that has been merged, and a tag cannot reach one ([CI signing](esp32-ota.md#ci-signing)). An earlier version of this guide asked for stable on `v*` tags and a `v*` tag ruleset; `release.yml`'s dispatch path pushes the release tag itself with `GITHUB_TOKEN`, which a ruleset that restricts creating `v*` tags blocks (a ruleset's bypass list cannot hold `GITHUB_TOKEN`), and a job it called ran with the ref `main`, which an environment limited to tags refuses. If you set an environment to `v*` already, change it: *Settings, Environments, (the environment), Deployment branches and tags*: remove the `v*` rule and leave `main`.
 
 Make each PFX in PowerShell, from the key folder (it asks for the key's passphrase, then for an **export password**
 twice: a long generated one, kept in your password manager):
@@ -282,8 +275,7 @@ the channels for real; set it to `false` first if you want a `dry_run` dispatch 
 
 - `firmware-ca.pem` (the sub-CA's public certificate): it becomes `firmware/keys/trust.pem` in the firmware.
 - The step 6 output for both leaves, or the paths of the two certificate files.
-- That both environments, their four secret names and the variable are set as in step 7 (and the tag ruleset, if you
-  made it).
+- That both environments (`main` only), their four secret names and the variable are set as in step 7.
 
 Rolling a leaf over later: activate the firmware CA's token, make a new key and CSR as step 4, issue it with the same
 name as step 5 (the CA does not enforce unique DNs, step 2, so a new end entity with the same name is accepted; or
@@ -299,7 +291,7 @@ and run the signing workflow again for the current release. No board changes.
 | Profiles | certificate profiles `FIRMWARE-SUBCA`, `FIRMWARE-CODESIGNER`; end entity profile `Firmware CodeSigning`; the sub-CA's soft token has auto-activation off and is locked when not issuing |
 | `Hearth Firmware Stable` | valid 2026-10-25 to 2028-10-24, SHA-256 `16:75:8E:FD:99:6A:D1:70:0D:5D:02:71:E7:80:C4:86:96:13:79:E5:73:54:39:F4:60:6C:6C:92:19:50:CB:05` |
 | `Hearth Firmware Beta` | valid 2026-10-25 to 2028-10-24, SHA-256 `2F:BA:1A:6F:E9:AC:29:24:0D:6B:78:A4:B0:27:F5:5D:0E:EC:87:50:21:06:D6:6D:C7:46:AB:04:E7:82:A5:BB` |
-| GitHub | environments `firmware-beta` and `firmware-stable` as in step 7, each with the two secrets; variable `PUBLISH_FIRMWARE_CHANNELS` set to `true`; no `v*` tag ruleset yet |
+| GitHub | environments `firmware-beta` and `firmware-stable` as in step 7, each with the two secrets; variable `PUBLISH_FIRMWARE_CHANNELS` set to `true`; no `v*` tag ruleset (not needed) |
 
 Dates to act on: both leaves end **2028-10-24** (the CI job warns 60 days before, about 2028-08-25), and the sub-CA and
 everything under it end **2034-10-23**, so an anchor rollover ([Rollover](esp32-ota.md#rollover-floors-and-revocation))
