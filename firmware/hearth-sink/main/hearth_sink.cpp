@@ -849,6 +849,10 @@ iclforge::ControlHandlers control_handlers() {
         if (!changed) {
             return false;
         }
+        // Kept over a restart. The width sets how many slots the sink carries (a line holds 4 at 32-bit, 8 at 16),
+        // and boot applies it before it judges the stored layout: without it a 5.1.2 set on an S3 or a C6 came
+        // back as 2.0 after every update or restart, because the layout no longer fitted the default width.
+        (void)player::settings_set_slot_bits(bits);
         // Reopen at the next play whatever its layout asks for: the width
         // change closed the lines, and a layout needing the same slot count
         // as the last one would otherwise find them already open.

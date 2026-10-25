@@ -10,6 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: an S3 or C6 sink came back from every update or restart at 2.0 and 32-bit slots.** `PUT /slot-width` changed the sink but stored nothing, so the width went back to the image's 32 at boot; a line holds 4 slots at 32-bit and 8 at 16-bit, so the stored layout (`PUT /layout` was always stored) no longer fitted, and boot kept 2.0. The width is now stored when it is set and applied at boot before the stored layout is judged, so a 5.1.2 at 16-bit stays through an update. A board set to 16-bit before this build is still at 32-bit after the first update to it, and needs the width set once more. (The P4X's wide sink, with 16 slots at either width, kept its layout all along.)
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
   (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
