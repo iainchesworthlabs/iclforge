@@ -72,3 +72,15 @@ CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM=1
 # sendspin.progress line). GET /log keeps the console's lines in PSRAM, and a
 # crash still says it panicked in GET /firmware's last update.
 CONFIG_ESP_COREDUMP_ENABLE_TO_NONE=y
+#
+# The TCP receive window, 16 segments rather than lwIP's 4 (5,760 bytes). A window is the most a connection can have in
+# flight, so it caps a stream at window / round-trip time and, at 4 segments, leaves a lost one only the retransmission
+# timer to repair it (no three duplicate ACKs to start a fast retransmit). With five boards streaming PCM on one 2.4 GHz
+# channel the round trip rose from 10-15 ms to 32-50 ms, 5,760 bytes then carried 115-175 kB/s against the 192 kB/s of
+# 16-bit stereo, and a server saw `Slow send_bytes` stalls of 0.8-2 s and skipped 5-26 % of the stream as late. On S3b with
+# 23,040 bytes, the same load and round trip: no stall, 45.9 bursts/s against 33 on the control (findings/26-esp32-pcm-perf.md,
+# sections 8-9, 2026-10-25). The segments arrive as small ones as well, so the receive mailbox holds that many (the P4 sets
+# the same for its own reason, sdkconfig.p4). The buffers are PSRAM's (SPIRAM_TRY_ALLOCATE_WIFI_LWIP above): the first board
+# kept 89.8 KB of internal heap free while playing PCM with it.
+CONFIG_LWIP_TCP_WND_DEFAULT=23040
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=32

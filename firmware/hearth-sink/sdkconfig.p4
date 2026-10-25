@@ -99,6 +99,13 @@ CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_FRAMES=256
 # (planning/karaoke-p4x-panel.md, "What the glitches were").
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
 
+# The TCP receive window, 16 segments rather than lwIP's 4 (5,760 bytes): a window caps a stream at window / round-trip
+# time, and with several boards streaming PCM on one 2.4 GHz channel the round trip rose to 32-50 ms, where 5,760 bytes
+# carry 115-175 kB/s against the 288 kB/s of 24-bit stereo (P4b lost 26 % of the stream, P4a at 18 ms none). The mailbox
+# above already holds that many small segments. findings/26-esp32-pcm-perf.md, sections 8-9; the same value as the S3's
+# (sdkconfig.psram). Applies to the wired kit too, where it costs only PSRAM-backed buffers.
+CONFIG_LWIP_TCP_WND_DEFAULT=23040
+
 # PSRAM, on: this board has 32 MB of it (docs/platforms/bare-metal/esp32-p4.md),
 # unlike the minimum-footprint bare-metal probe that deliberately leaves it off
 # to measure what fits in internal SRAM alone - hearth_sink has no such goal,

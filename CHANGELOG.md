@@ -10,6 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: an S3 or P4 sink takes a TCP window of 23,040 bytes, not lwIP's 5,760.** A window caps a stream at its size over the round-trip time and, at four segments, leaves a lost one only the retransmission timer to repair it. With five boards streaming PCM on one 2.4 GHz channel the round trip rose from 10-15 ms to 32-50 ms: a server saw 0.8-2 s stalls on three boards and skipped 5 to 26 % of the stream as late, while the board counters showed one to a few underruns. On the S3 that had the larger window (S3b), the same load had no stall. S3 profiles also take a receive mailbox of 32 (the P4 profiles had it). The C6 keeps the small window: its heap cannot spare 22 KB, and it takes Opus.
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
   (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
