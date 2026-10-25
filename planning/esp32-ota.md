@@ -1442,7 +1442,9 @@ The owner, once, with [the EJBCA guide](hearth-firmware-signing-ejbca.md):
    pinned does the same job and the board is unchanged.
 2. **Two profiles** copied from the Windows pair (`code signer`, `local code signing`) and narrowed to this one
    sub-CA, RSA 3072 only, two years, `CA:FALSE`, key usage `digitalSignature` only, extended key usage
-   `codeSigning` only, all critical, with no CRL, AIA, OCSP or alternative name (the board checks none).
+   `codeSigning` only (basic constraints and key usage critical, the extended key usage as the Windows profile has
+   it: the board and the tool check that code signing is present, never its criticality), with no CRL, AIA, OCSP or
+   alternative name (the board checks none).
 3. **Two leaves**, `Hearth Firmware Stable` and `Hearth Firmware Beta` (the names are the pins), each from a key
    and a certificate request made on the owner's machine, so a private key never reaches EJBCA. RSA 3072 with
    SHA-256 is what the existing profile issues, a board already carries RSA for TLS, and ECDSA P-256 would save
