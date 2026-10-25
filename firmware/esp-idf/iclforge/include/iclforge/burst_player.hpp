@@ -16,6 +16,7 @@
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/serving.hpp"
 #include "iclforge/render/identify_request.hpp"
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
@@ -153,6 +154,10 @@ struct BurstPlayerConfig {
     iclforge::ac3::DecoderConfig decoder{.output = {.mode = iclforge::ac3::OperatingMode::kLine}};
     iclforge::ac3::DownmixTarget stereo_fold = iclforge::ac3::DownmixTarget::kLoRo;
     iclforge::ac3::render::ObjectsPolicy objects = iclforge::ac3::render::ObjectsPolicy::kAuto;
+    // The listener's choice of dynamic range (iclforge/base/dynamic_range.hpp), which is applied
+    // last, over the decoder settings above and over a server's: late night wins over a server's
+    // mode and compression keys, standard leaves them be. Changed with set_dynamic_range().
+    iclforge::base::DynamicRange dynamic_range = iclforge::base::kDefaultDynamicRange;
 
     Playout::Tuning tuning;
 
@@ -282,6 +287,9 @@ class BurstPlayer {
     // applied at the next burst boundary, and replaced by the next settings a
     // server sends. False for a layout the sink cannot carry.
     [[nodiscard]] bool set_layout(const iclforge::render::OutputLayout& layout);
+    // The listener's choice of dynamic range, from the next stream's start: a stream that is
+    // playing finishes as it began. Safe from any task.
+    void set_dynamic_range(iclforge::base::DynamicRange range);
     // The identify tone on one output at `level_db`, or none: a server's, which it starts and stops itself.
     void identify(std::optional<iclforge::sendspin::player::Identify> tone);
     // The board's own identify (planning/p4x-preferences.md): the tone, through the same output stage as the
