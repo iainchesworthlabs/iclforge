@@ -174,11 +174,12 @@ tool's `verify` on each (no board):
 | `p4-rev3` | 2,604,576 | 2,631,184 (+26,608) | 2,600,000 (main was already over it) |
 | `c6-16mb` | 1,874,608 | 1,901,472 (+26,864) | 1,880,000 |
 
-All three are over the budgets main has. The budgets are growth alarms and the guard that reads them
-runs on pushes to `main` only; the pull request that raises them for every change in flight
-(#1645: 1,750,000, 2,000,000 and 2,900,000) covers this branch's sizes with room, and the C6's
-1,901,472 stays under the 1,966,080 slot of the 4 MB table. This branch leaves `profiles.json`'s
-budgets alone so that the two do not conflict.
+All three were over the budgets main had. The budgets are growth alarms and the guard that reads them
+runs on pushes to `main` only; #1645 raised them for everything in flight (1,750,000, 2,000,000 and
+2,900,000), which covers these sizes with room, and the C6's 1,901,472 stays under the 1,966,080 slot of
+the 4 MB table. This branch leaves `profiles.json`'s budgets alone. Built again after merging main
+(2026-10-25 17:53): `s3-n16r8` 1,621,008, `p4-rev3` 2,638,688 and `c6-16mb` 1,908,912 bytes, each held by
+`verify` with the new budgets.
 
 Where the S3's 23 KB went, by object file: `burst_player.cpp` +6.4 KB (the stage, the sequence,
 the role tables and the report), `hearth_sink.cpp` +6.4 KB (the two JSON writers, the statement
