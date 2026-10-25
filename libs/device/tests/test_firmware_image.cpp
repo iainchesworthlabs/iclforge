@@ -41,6 +41,7 @@ struct HeadSpec {
     bool hash_appended = true;
     std::uint8_t segments = 5;
     std::string version = "v0.10.0-beta.1-1858-gb49a966c";
+    std::uint32_t secure_version = 0;
     std::string project = "iclforge_hearth_sink";
     std::string idf = "v6.1";
 };
@@ -74,6 +75,9 @@ std::vector<std::uint8_t> head_bytes(const HeadSpec& spec) {
     bytes[33] = 0x54;
     bytes[34] = 0xCD;
     bytes[35] = 0xAB;
+    for (std::size_t i = 0; i < 4; ++i) {
+        bytes[36 + i] = static_cast<std::uint8_t>(spec.secure_version >> (8 * i));  // little-endian
+    }
     put_text(bytes, 48, spec.version);
     put_text(bytes, 80, spec.project);
     put_text(bytes, 144, spec.idf);
@@ -119,6 +123,16 @@ TEST_CASE("an application image's head is read field by field", "[io][firmware_i
     CHECK(head.idf_version == "v6.1");
     CHECK(head.elf_sha256[0] == 1);
     CHECK(head.elf_sha256[31] == 32);
+    CHECK(head.secure_version == 0);
+}
+
+TEST_CASE("an image's secure version is read from its application description",
+          "[io][firmware_image]") {
+    HeadSpec spec;
+    spec.secure_version = 0x01020304U;
+    CHECK(parsed(spec).secure_version == 0x01020304U);
+    spec.secure_version = 0xFFFFFFFFU;
+    CHECK(parsed(spec).secure_version == 0xFFFFFFFFU);
 }
 
 TEST_CASE("a text field that fills its whole array is read to its end", "[io][firmware_image]") {

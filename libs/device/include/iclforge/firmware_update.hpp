@@ -1057,6 +1057,16 @@ inline constexpr std::string_view kChannelsReleaseTag = "firmware-channels";
          "from a computer."},
         {"older_security",
          "This release is below the security level of the version running, so it was not offered."},
+        {"write_failed", "Writing the new firmware failed: nothing was changed."},
+        {"no_slot", "This board takes no updates over the network."},
+        {"on_trial",
+         "This version is still being tried; wait for it to be accepted, or go back to the "
+         "previous "
+         "one."},
+        {"busy", "An update is already running."},
+        {"nothing_offered", "No update is waiting: check for updates first."},
+        {"offer_stale", "That check is too old: check for updates again."},
+        {"not_supported", "This player cannot update itself from GitHub."},
     };
     for (const Entry& entry : kEntries) {
         if (entry.code == code) {
