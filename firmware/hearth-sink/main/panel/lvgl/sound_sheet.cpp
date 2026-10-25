@@ -575,7 +575,7 @@ void paint() {
     std::string key = std::string(st::role_name(g.selected)) + "|" + std::to_string(g.data.tone_role) + "|" +
                       (g.data.tone_running ? "1" : "0") + (g.repeating ? "1" : "0") + (g.data.delay ? "1" : "0") + "|" +
                       std::to_string(speaker->trim.half_db) + "|" + std::to_string(speaker->trim.cm) + "|" +
-                      std::to_string(speaker->applied_delay_samples) + "|" + std::to_string(speaker->applied_level_db) +
+                      std::to_string(speaker->applied_delay_samples) + "|" + std::to_string(std::lround(speaker->applied_level_db * 2.0F)) +
                       "|" + g.data.tone_blocked + (speaker->delay_clamped ? "c" : "-") + (g.data.server_level ? "l" : "-") +
                       (g.data.server_delay ? "d" : "-");
     if (key == g.painted) {
