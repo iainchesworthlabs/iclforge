@@ -51,6 +51,7 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
         'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
@@ -181,6 +182,7 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /preferences',
     'GET /timezone',
     'PUT /timezone',
     'GET /ntp-server',
@@ -465,6 +467,67 @@ function cableNetwork(preference = 'auto') {
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
 function screenBoard() {
     return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+}
+
+// The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
+// registry's entries with the registry's words, as far as the stand-in models them. Today that is the two of the
+// screen; contract.spec.js holds each to the registry. A board with no screen lists them greyed, with the reason.
+const PREFERENCES = [
+    {
+        id: 'now-view',
+        group: 'Display',
+        label: 'Screen without lyrics',
+        kind: 'choice',
+        apply: 'live',
+        route: '/now-playing',
+        choices: [
+            ['speakers', 'Speakers'],
+            ['title', 'Title'],
+            ['clock', 'Clock'],
+            ['dark', 'Dark'],
+            ['off', 'Off'],
+        ],
+    },
+    {
+        id: 'dim-after',
+        group: 'Display',
+        label: 'Dim after',
+        kind: 'stepper',
+        apply: 'live',
+        route: '/dim-after',
+        choices: [
+            ['1', '1 min'],
+            ['5', '5 min'],
+            ['15', '15 min'],
+            ['30', '30 min'],
+            ['60', '1 hour'],
+            ['120', '2 hours'],
+            ['240', '4 hours'],
+            ['never', 'Never'],
+        ],
+    },
+];
+
+function preferencesJson(device) {
+    const screen = device.screen;
+    const reason = screen ? '' : 'This board has no screen.';
+    const entries = PREFERENCES.map((p) => ({
+        id: p.id,
+        group: p.group,
+        label: p.label,
+        kind: p.kind,
+        apply: p.apply,
+        route: p.route,
+        value: screen ? (p.id === 'now-view' ? screen.view : screen.dimAfter) : '',
+        available: Boolean(screen),
+        reason,
+        choices: p.choices.map(([id, label]) => ({ id, label, available: Boolean(screen), reason })),
+    }));
+    return JSON.stringify({
+        profile: (device.hardware && device.hardware.profile) || '',
+        display: screen ? 'dsi' : 'none',
+        preferences: entries,
+    }) + '\n';
 }
 
 // The time of a board that keeps it (firmware/hearth-sink/main/clock/sntp, every board with a network): in the
@@ -1155,6 +1218,8 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /preferences':
+                return send(res, 200, preferencesJson(device), 'application/json');
             case 'GET /timezone':
                 if (!device.time) {
                     return send(res, 404, REPLIES.noClock);
@@ -1448,6 +1513,7 @@ module.exports = {
     cableNetwork,
     screenBoard,
     timeBoard,
+    PREFERENCES,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,
