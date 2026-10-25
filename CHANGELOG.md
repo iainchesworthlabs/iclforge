@@ -144,8 +144,8 @@ The sections below contain the complete change list and fixes.
   Latin letter with an accent as the letter ("Café" is `cafe.local`).
   ([Name, restart and reset](docs/hearth/sink-esp32-s3.md#name-restart-and-reset).)
 - **`POST /reset-preferences`** puts the choices a person made once back to the image's defaults, at
-  once: what the screen shows without lyrics, when it dims, the time zone. It keeps the name, the Wi-Fi
-  network, the cable-or-Wi-Fi choice, the wiring, the layout, the time server and the pairings.
+  once: what the screen shows without lyrics and when it dims. It keeps the name, the Wi-Fi network, the
+  cable-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
   **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
   name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
   restarts the board as a new one. Both are listed in `GET /api`.
