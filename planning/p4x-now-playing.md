@@ -418,6 +418,12 @@ narrower than 400 px), and a tap on a place chooses it. Both are drawn from the 
 by the preview tool at 1024 by 600, 800 by 480, 480 by 320, 320 by 240 and 240 by 240 (every target 48 px or more,
 nothing cut off, the longest list, America's 144 places, scrolled); a typed zone stays the web page's and the route's.
 
+**What the night schedule and the editors cost** (images built here, each held to its profile by `sink_profile.py verify`):
+the P4X's grew 16,032 bytes (2,646,640 to 2,662,672: the editors, the six rows, the routes and the setting), the S3's 7,168
+and the C6's 7,280, which are boards with no panel and so none of the screen's code: the setting, the two routes, the
+registry's new rows and the backend. The 4 MB C6's slot (1,966,080 bytes, the same image as the 16 MB profile's) is left
+with 53,648 bytes free, where the zone table alone left 73,024.
+
 **Not built, not decided.** Days of the week. A zone typed on the screen. The idle screen under the night schedule is the
 owner's to decide. Nothing has been run on the kit.
 
