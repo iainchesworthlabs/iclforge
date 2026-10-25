@@ -236,7 +236,7 @@ class Board:
 
     def layout_options(self) -> dict[str, Any] | None:
         """GET /layout-options: what the board can be set to, layout by layout, and why not, as the
-        firmware's one verdict over its capabilities (libs/device/include/iclforge/layout_options.hpp).
+        firmware's one verdict over its capabilities (iclforge/layout_options.hpp in libs/device).
         None on a firmware that has no such route (a 404), which a row is then played as before."""
         status, _, data = self._request("GET", "/layout-options")
         if status == 404:

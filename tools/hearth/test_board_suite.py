@@ -632,7 +632,9 @@ class Run(unittest.TestCase):
         self.assertEqual(results[0].findings, [])
         self.assertEqual(results[0].state, "refused-layout")
         self.assertEqual(results[0].why, self.CHIP)
-        self.assertTrue(any("is refused, as the board's listing says" in n for n in results[0].notes))
+        self.assertTrue(
+            any("is refused, as the board's listing says" in n for n in results[0].notes)
+        )
         self.assertEqual(stand_in.plays, [], "nothing is played: there is no layout to play on")
         self.assertEqual(stand_in.layout_puts, ["9.1.6"])
         self.assertEqual(stand_in.layout, "2.0")
@@ -650,7 +652,9 @@ class Run(unittest.TestCase):
         listing = self.listing(**{"9_1_6": "unavailable"})
         results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
         self.assertTrue(
-            any("was refused with 'more slots than this sink has'" in f for f in results[0].findings),
+            any(
+                "was refused with 'more slots than this sink has'" in f for f in results[0].findings
+            ),
             results[0].findings,
         )
 
@@ -672,8 +676,15 @@ class Run(unittest.TestCase):
         listing = self.listing(**{"9_1_6": "unavailable"})
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
         results = bs.run_suite(
-            board, "p4-rev3", suite, "http://127.0.0.1:1", self.pins, only=["ac3-5.1-tdm16"],
-            sleep=0.01, timeout=5.0, layouts=listing,
+            board,
+            "p4-rev3",
+            suite,
+            "http://127.0.0.1:1",
+            self.pins,
+            only=["ac3-5.1-tdm16"],
+            sleep=0.01,
+            timeout=5.0,
+            layouts=listing,
         )
         self.assertEqual(results[0].findings, [])
         self.assertEqual(results[0].state, "skipped")
@@ -706,10 +717,22 @@ class Run(unittest.TestCase):
         # On a chip with no clock for a TDM frame the fold is still testable: a row with no layout
         # plays on the board's own 2.0. (The row that set 5.1 to test it is the capability row.)
         stand_in = self.board("p4-rev1", {"ffmpeg.ac3": Behaviour(units=79, slots=2)})
-        row = {"id": "ac3-5.1-fold", "stream": "ac3-5.1", "stream_spec": self.suite["streams"]["ac3-5.1"]}
+        row = {
+            "id": "ac3-5.1-fold",
+            "stream": "ac3-5.1",
+            "stream_spec": self.suite["streams"]["ac3-5.1"],
+        }
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
         played, _ = bs.run_play(
-            board, row, "http://127.0.0.1:1", 1, None, self.suite, self.pins, 5.0, 0.01,
+            board,
+            row,
+            "http://127.0.0.1:1",
+            1,
+            None,
+            self.suite,
+            self.pins,
+            5.0,
+            0.01,
             layouts=self.listing(**{"5_1": "unavailable"}),
         )
         self.assertEqual(played.findings, [])
