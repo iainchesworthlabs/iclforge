@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
+  player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
+  (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
+  while the sound came from L and R, and `GET /status`'s peak and RMS said the same. The player now reads where the renderer
+  puts each channel (`LayoutRenderer::unity_slot()` and `folded_slot()`) and which output the patch sends that slot to,
+  and measures the floats where the renderer does more than copy a channel to one slot (a small speaker's bass management,
+  a mono stream in a room with no centre). The sound was always right; only the meter was.
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
@@ -29,6 +36,12 @@ This release adds:
   clock) what it can do, so a choice the board cannot make is greyed with the reason and never hidden, and
   `GET /preferences` lists the same on every board; Adjust keeps only the lyric delay and the text size; both sheets
   take their sizes from the display and are checked at four screen sizes;
+- Hearth's network sinks say which speaker layouts a board can take and why not for the others: `GET /layout-options`
+  lists thirteen layouts, each supported, taken with a limit, or unavailable with the reason and the setting that
+  would help; `PUT /layout`, the Preferences list (Speaker layout, with a question before a change that breaks the
+  music that plays) and the device page all ask the same verdict over the board's capabilities, so a layout offered
+  is one the board takes. An ESP32-P4 below revision v3.0 now reports the two slots its chip can open, and refuses a
+  wider layout with that reason, where it used to accept one it could not play;
 - new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
   `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
   self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`

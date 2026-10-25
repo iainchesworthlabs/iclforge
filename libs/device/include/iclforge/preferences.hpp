@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "iclforge/board_caps.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
@@ -95,12 +96,15 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction };
     return "choice";
 }
 
-// A kText entry whose value is chosen in an editor of its own on a screen (a list, a pair of times) and not typed:
-// the editors are drawn by panel/lvgl/prefs_editors.cpp and the entry says which. A page or the REST routes need none.
-enum class Editor : std::uint8_t { kNone, kTimes, kZone };
-
 // When a change takes effect.
 enum class Apply : std::uint8_t { kLive, kNextPlay, kRestart };
+
+// How a screen draws an entry's value. kButtons: a kChoice's choices side by side, wrapping, with the reasons of the
+// greyed ones in lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to
+// read as buttons (the speaker layouts, whose limits each need a sentence). kTimes and kZone are for a kText entry
+// whose value is chosen in an editor of its own over the sheet and not typed (a pair of times, a place in a list):
+// panel/lvgl/prefs_editors.cpp draws them. A page or the REST routes need none.
+enum class Editor : std::uint8_t { kButtons, kList, kTimes, kZone };
 
 [[nodiscard]] constexpr const char* apply_name(Apply apply) {
     switch (apply) {
@@ -158,6 +162,15 @@ class Backend {
     // (wallclock::ZoneChoice; the name is empty for a string they typed).
     [[nodiscard]] virtual wallclock::ZoneChoice time_zone() const = 0;
     [[nodiscard]] virtual bool set_time_zone(const wallclock::ZoneChoice& zone) = 0;
+
+    // Sound: the speakers this player drives, as the name or the list PUT /layout takes. The setter is that route's
+    // own decision (layout_options.hpp, the same verdict set_value() has already asked), and false when the layout
+    // could not be queued or stored.
+    [[nodiscard]] virtual std::string layout() const = 0;
+    [[nodiscard]] virtual bool set_layout(std::string_view layout) = 0;
+
+    // Whether a stream is playing now: what an entry with a `confirm` asks about before it breaks the playback.
+    [[nodiscard]] virtual bool playing() const = 0;
 };
 
 using GetFn = std::string (*)(const Backend&);
@@ -201,10 +214,21 @@ struct Pref {
     InertFn inert = nullptr;
     GetFn get = nullptr;
     SetFn set = nullptr;
-    // A kText entry's editor on a screen, and how it shows its value; see Editor and LabelFn.
-    Editor editor = Editor::kNone;
+    // How the screen draws the choices of a kChoice (kButtons, kList), or the editor of its own that a kText's value
+    // is chosen in over the sheet (kTimes, kZone: prefs_editors.cpp). See Editor.
+    Editor editor = Editor::kButtons;
+    // How a kText entry with an editor shows its value, where the word a route takes is not what a person reads.
     LabelFn label_of = nullptr;
+    // What a change costs while a stream plays ("Changing the speakers makes the music drop out for a moment."); the
+    // screen asks "<this> Change to <choice>?" before it applies a change then, and never when nothing plays. Empty:
+    // a change costs nothing and is applied at a tap.
+    const char* confirm = "";
 };
+
+// Whether the entry's value is chosen in an editor of its own over the sheet (a pair of times, a place in a list).
+[[nodiscard]] constexpr bool has_screen_editor(const Pref& pref) {
+    return pref.editor == Editor::kTimes || pref.editor == Editor::kZone;
+}
 
 // --- the seed: what exists today ----------------------------------------------------------------------
 
@@ -465,9 +489,36 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
            " seconds, then it is dark again.";
 }
 
+// The speaker layout: one choice for each layout in the catalog (layout_options.hpp), each asking the same verdict
+// the route and the web page ask. A layout with a limit is available and carries its sentence as the note.
+[[nodiscard]] inline Availability layout_needs_sink(const BoardCaps& caps) {
+    return caps.sink.slots_most() > 0 ? Availability::yes()
+                                      : Availability::no("This board has no audio output to set a layout for.");
+}
+
+template <std::size_t I>
+[[nodiscard]] inline Availability layout_choice(const BoardCaps& caps) {
+    const LayoutOption option = evaluate_layout(caps, kLayoutCatalog[I].name, kLayoutCatalog[I].slots);
+    return option.accepted() ? Availability{true, option.reason} : Availability::no(option.reason);
+}
+
+template <std::size_t... I>
+[[nodiscard]] constexpr std::array<ChoiceDef, sizeof...(I)> layout_choices(std::index_sequence<I...>) {
+    return {{{.id = kLayoutCatalog[I].name.data(),
+              .label = kLayoutCatalog[I].name.data(),
+              .availability = &layout_choice<I>}...}};
+}
+
+inline constexpr std::array<ChoiceDef, kLayoutCatalog.size()> kLayoutChoices =
+    layout_choices(std::make_index_sequence<kLayoutCatalog.size()>{});
+
+[[nodiscard]] inline std::string get_layout(const Backend& backend) { return backend.layout(); }
+
+[[nodiscard]] inline bool set_layout(Backend& backend, std::string_view word) { return backend.set_layout(word); }
+
 }  // namespace detail
 
-inline constexpr std::array<Pref, 9> kRegistry{{
+inline constexpr std::array<Pref, 10> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -584,6 +635,20 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .set = &detail::set_time_zone,
      .editor = Editor::kZone,
      .label_of = &detail::time_zone_label},
+    {.id = "speaker-layout",
+     .group = Group::kSound,
+     .label = "Speaker layout",
+     .note = "The speakers this player drives, one for each output. Greyed ones are not available on this board.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/layout",
+     .default_word = "2.0",
+     .choices = detail::kLayoutChoices,
+     .availability = &detail::layout_needs_sink,
+     .get = &detail::get_layout,
+     .set = &detail::set_layout,
+     .editor = Editor::kList,
+     .confirm = "Changing the speakers makes the music drop out for a moment."},
 }};
 
 [[nodiscard]] inline std::span<const Pref> registry() { return kRegistry; }

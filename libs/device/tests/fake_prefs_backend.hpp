@@ -24,6 +24,8 @@ class FakeBackend final : public Backend {
     wallclock::ClockFormat clock_;
     nowview::NightSchedule night_;
     wallclock::ZoneChoice zone_;
+    std::string layout_ = "2.0";
+    bool playing_ = false;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -80,6 +82,16 @@ class FakeBackend final : public Backend {
         zone_ = zone;
         return true;
     }
+    [[nodiscard]] std::string layout() const override { return layout_; }
+    [[nodiscard]] bool set_layout(std::string_view layout) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        layout_ = std::string(layout);
+        return true;
+    }
+    [[nodiscard]] bool playing() const override { return playing_; }
 
    private:
     bool take_refusal() {

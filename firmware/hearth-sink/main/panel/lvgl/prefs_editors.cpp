@@ -54,7 +54,7 @@ struct Item {
 struct Editor {
     EditorKit kit;
     const prefs::Pref* pref = nullptr;
-    prefs::Editor kind = prefs::Editor::kNone;
+    prefs::Editor kind = prefs::Editor::kButtons;
 
     lv_obj_t* root = nullptr;
     lv_obj_t* title = nullptr;
@@ -504,7 +504,7 @@ void on_press(lv_event_t* event) {
 }  // namespace
 
 bool editor_open(const EditorKit& kit, const prefs::Pref& pref) {
-    if (g.root != nullptr || pref.editor == prefs::Editor::kNone) {
+    if (g.root != nullptr || !prefs::has_screen_editor(pref)) {
         return false;
     }
     g = Editor{};

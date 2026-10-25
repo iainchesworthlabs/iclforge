@@ -170,6 +170,7 @@ nav:
       - An ESP32-P4 sink: hearth/sink-esp32-p4.md
       - Sink firmware: hearth/sink-firmware.md
       - Install from the browser: hearth/sink-installer.md
+      - Choosing the speaker layout: hearth/sink-layouts.md
       - Design record: hearth/design/player-appliance.md
   - Platforms:
       - Which platform: platforms/index.md

@@ -144,6 +144,10 @@ struct BoardCaps {
     // The E-AC-3 objects the board places in real time (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS): 0 none,
     // nothing when the build states no figure and places whatever it is sent.
     std::optional<int> max_objects;
+    // The widest syncframe, in coded channels, the Sendspin player decodes in this build
+    // (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS: 2 on the ESP32-C6); 0 states no limit. A layout
+    // wider than this plays through no more speakers than the stream has channels (layout_options.hpp).
+    int coded_channels_max = 0;
     // The image can be replaced over the network: two app slots with a trial and a rollback
     // (planning/esp32-ota.md).
     bool firmware_slots = false;

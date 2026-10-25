@@ -40,7 +40,7 @@ struct Chain {
 };
 
 // What a touch target does, packed with its row and its index into the user data of its event.
-enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3, kEdit = 4 };
+enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3, kConfirm = 4, kCancel = 5, kEdit = 6 };
 
 struct Row {
     std::size_t entry = 0;
@@ -48,6 +48,8 @@ struct Row {
     lv_obj_t* details = nullptr;
     // kChoice and kToggle: one button a choice.
     std::vector<lv_obj_t*> choices;
+    // An entry drawn as a list (Editor::kList): beside each choice, its note or the reason it is greyed.
+    std::vector<lv_obj_t*> notes;
     // kStepper: - value +. kText: the value.
     lv_obj_t* minus = nullptr;
     lv_obj_t* plus = nullptr;
@@ -78,6 +80,12 @@ struct Prefs {
     lv_obj_t* root = nullptr;
     lv_obj_t* list = nullptr;
     lv_obj_t* status = nullptr;
+
+    // The question asked before a change that breaks the music that plays (Pref::confirm): the cover over the sheet
+    // while it is up, and the change it would make.
+    lv_obj_t* confirm = nullptr;
+    std::size_t confirm_row = 0;
+    std::string confirm_word;
 
     std::vector<prefs::Entry> entries;
     std::vector<Row> rows;
@@ -242,9 +250,21 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
         if (!entry.inert.empty()) {
             lines.push_back(entry.inert);
         }
-        for (const prefs::ChoiceState& choice : entry.choices) {
-            if (!choice.availability.available) {
-                lines.push_back(choice.label + ": " + choice.availability.reason);
+        if (entry.pref->editor == prefs::Editor::kList) {
+            // The reasons are beside their choices. What is in use is said here when it is none of the choices (a list
+            // of speakers a person wrote).
+            bool listed = false;
+            for (const prefs::ChoiceState& choice : entry.choices) {
+                listed = listed || choice.id == entry.value;
+            }
+            if (!listed && !entry.value.empty()) {
+                lines.push_back("In use: " + entry.value);
+            }
+        } else {
+            for (const prefs::ChoiceState& choice : entry.choices) {
+                if (!choice.availability.available) {
+                    lines.push_back(choice.label + ": " + choice.availability.reason);
+                }
             }
         }
     }
@@ -266,6 +286,10 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
                       details_of(entry) + "|";
     for (const prefs::ChoiceState& choice : entry.choices) {
         key += choice.availability.available ? '1' : '0';
+        // A note that changes while the choice stays available (a limit that gains a sentence) is a repaint too.
+        if (entry.pref->editor == prefs::Editor::kList) {
+            key += choice.availability.reason + "|";
+        }
     }
     key += prefs::step_target(entry, -1) ? 'l' : '-';
     key += prefs::step_target(entry, +1) ? 'm' : '-';
@@ -299,6 +323,17 @@ void paint_row(Row& row, const prefs::Entry& entry) {
     lv_obj_set_style_text_color(row.label, color(on ? g.c.text : g.c.muted), 0);
     for (std::size_t i = 0; i < row.choices.size() && i < entry.choices.size(); ++i) {
         style_button(row.choices[i], entry.value == entry.choices[i].id, entry.choices[i].availability.available);
+    }
+    for (std::size_t i = 0; i < row.notes.size() && i < entry.choices.size(); ++i) {
+        // Beside a choice: why it is greyed, or the limit it is taken with. Quiet type either way; the button says
+        // which it is.
+        lv_label_set_text(row.notes[i], entry.choices[i].availability.reason.c_str());
+        lv_obj_set_style_text_color(row.notes[i], color(on ? g.c.muted : g.c.faint), 0);
+        if (entry.choices[i].availability.reason.empty()) {
+            lv_obj_add_flag(row.notes[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(row.notes[i], LV_OBJ_FLAG_HIDDEN);
+        }
     }
     if (row.value != nullptr) {
         lv_label_set_text(row.value, entry.value_label.c_str());
@@ -367,7 +402,7 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             control_w = 2 * g.m.row_target + 2 * gap + value_w;
             break;
         case prefs::Kind::kText:
-            if (pref.editor != prefs::Editor::kNone) {
+            if (prefs::has_screen_editor(pref)) {
                 value_w = std::min(content_w, edit_button_width());
             } else {
                 value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value), g.m.row_target));
@@ -379,7 +414,9 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             break;
     }
     const int label_w = text_width(g.body.latin, pref.label);
-    const bool one_line = label_w + 2 * gap + control_w <= content_w;
+    // A list of choices (Editor::kList) is a column under its label, a choice a line with its note beside it.
+    const bool as_list = pref.kind == prefs::Kind::kChoice && pref.editor == prefs::Editor::kList;
+    const bool one_line = !as_list && label_w + 2 * gap + control_w <= content_w;
 
     lv_obj_t* const box = make_box(parent);
     lv_obj_set_size(box, content_w, LV_SIZE_CONTENT);
@@ -403,7 +440,7 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
 
     lv_obj_t* const controls = make_box(top);
     lv_obj_set_size(controls, one_line ? control_w : content_w, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_flow(controls, as_list ? LV_FLEX_FLOW_COLUMN : LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_column(controls, gap, 0);
     lv_obj_set_style_pad_row(controls, gap, 0);
     lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -411,6 +448,25 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
     switch (pref.kind) {
         case prefs::Kind::kChoice:
         case prefs::Kind::kToggle:
+            if (as_list) {
+                int button_w = 0;
+                for (const prefs::ChoiceState& choice : entry.choices) {
+                    button_w = std::max(button_w, button_width(choice.label));
+                }
+                const int note_w = std::max(content_w - button_w - gap, 2 * g.m.target);
+                for (std::size_t i = 0; i < entry.choices.size(); ++i) {
+                    lv_obj_t* const line = make_box(controls);
+                    lv_obj_set_size(line, content_w, LV_SIZE_CONTENT);
+                    lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
+                    lv_obj_set_style_pad_column(line, gap, 0);
+                    lv_obj_set_flex_align(line, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+                    row.choices.push_back(make_button(line, entry.choices[i].label, button_w, g.m.row_target,
+                                                      g.c.surface_up, g.c.text, &on_target,
+                                                      pack(Op::kChoose, index, i), nullptr));
+                    row.notes.push_back(make_paragraph(line, "", g.note.latin, g.c.muted, note_w));
+                }
+                break;
+            }
             for (std::size_t i = 0; i < entry.choices.size(); ++i) {
                 const std::string& text = entry.choices[i].label;
                 row.choices.push_back(make_button(controls, text, button_width(text), g.m.row_target, g.c.surface_up,
@@ -428,7 +484,7 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
                                    pack(Op::kPlus, index, 0), nullptr);
             break;
         case prefs::Kind::kText:
-            if (pref.editor != prefs::Editor::kNone) {
+            if (prefs::has_screen_editor(pref)) {
                 // Chosen in an editor of its own (prefs_editors.cpp): the value is the button that opens it.
                 row.edit = make_button(controls, "", value_w, g.m.row_target, g.c.surface_up, g.c.text, &on_target,
                                        pack(Op::kEdit, index, 0), nullptr);
@@ -537,6 +593,8 @@ void take_down() {
     g.root = nullptr;
     g.list = nullptr;
     g.status = nullptr;
+    g.confirm = nullptr;  // a child of the root: deleted with it
+    g.confirm_word.clear();
     g.rows.clear();
     g.entries.clear();
     g.open = false;
@@ -545,11 +603,90 @@ void take_down() {
 
 // --- events ----------------------------------------------------------------------------------------
 
+// The question before a change that breaks the music that plays (Pref::confirm): the sheet under it is covered, so
+// that a tap cannot reach it, and the two answers are the only things to touch. An answer hides it, and the next
+// question builds another: an object is not deleted from inside the event of a button it holds.
+void close_confirm() {
+    if (g.confirm != nullptr) {
+        lv_obj_add_flag(g.confirm, LV_OBJ_FLAG_HIDDEN);
+    }
+    g.confirm_word.clear();
+}
+
+void open_confirm(std::size_t row, const std::string& word, const std::string& label) {
+    if (g.confirm != nullptr) {
+        lv_obj_delete(g.confirm);
+        g.confirm = nullptr;
+    }
+    const iclforge::screen::Metrics& m = g.m;
+    const prefs::Pref& pref = *g.entries[row].pref;
+    g.confirm_row = row;
+    g.confirm_word = word;
+    lv_obj_t* const cover = make_box(g.root);
+    g.confirm = cover;
+    lv_obj_set_size(cover, m.width, m.height);
+    lv_obj_set_pos(cover, 0, 0);
+    lv_obj_add_flag(cover, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_opa(cover, LV_OPA_80, 0);
+    lv_obj_set_style_bg_color(cover, color(g.c.bg), 0);
+
+    const int panel_w = std::min(m.width - 2 * m.margin, 22 * m.text);
+    const int inner_w = panel_w - 2 * m.margin;
+    lv_obj_t* const panel = make_box(cover);
+    lv_obj_set_width(panel, panel_w);
+    lv_obj_set_height(panel, LV_SIZE_CONTENT);
+    lv_obj_center(panel);
+    lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(panel, color(g.c.surface), 0);
+    lv_obj_set_style_border_width(panel, 2, 0);
+    lv_obj_set_style_border_color(panel, color(g.c.accent), 0);
+    lv_obj_set_style_pad_all(panel, m.margin, 0);
+    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(panel, m.gap, 0);
+
+    const std::string question = std::string(pref.confirm) + " Change to " + label + "?";
+    make_paragraph(panel, question, g.body.latin, g.c.text, inner_w);
+
+    lv_obj_t* const buttons = make_box(panel);
+    lv_obj_set_size(buttons, inner_w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(buttons, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(buttons, m.gap, 0);
+    lv_obj_set_style_pad_row(buttons, m.gap, 0);
+    const std::string yes = "Change";
+    const std::string no = "Cancel";
+    make_button(buttons, yes, button_width(yes), m.row_target, g.c.accent, g.c.bg, &on_target, pack(Op::kConfirm, row, 0),
+                nullptr);
+    make_button(buttons, no, button_width(no), m.row_target, g.c.surface_up, g.c.text, &on_target,
+                pack(Op::kCancel, row, 0), nullptr);
+}
+
+// A word chosen on a row: refused by the registry before the board is asked, or taken; a refusal is said in the bar.
+void apply_value(std::size_t row, const std::string& word) {
+    if (row >= g.entries.size()) {
+        return;
+    }
+    const prefs::SetResult result = prefs::set_value(preferences_backend(), *g.entries[row].pref, word);
+    g.status_text = result.ok ? std::string() : result.message;
+    g.status_ms = now_ms();
+    g.dirty = true;
+}
+
 void on_target(lv_event_t* event) {
     const auto code = reinterpret_cast<std::uintptr_t>(lv_event_get_user_data(event));
     const std::size_t row = (code >> 16) & 0xFFU;
     const std::size_t index = (code >> 8) & 0xFFU;
     const auto op = static_cast<Op>(code & 0xFFU);
+    if (op == Op::kCancel) {
+        close_confirm();
+        return;
+    }
+    if (op == Op::kConfirm) {
+        const std::size_t asked = g.confirm_row;
+        const std::string word = g.confirm_word;
+        close_confirm();
+        apply_value(asked, word);
+        return;
+    }
     if (row >= g.entries.size()) {
         return;
     }
@@ -562,6 +699,11 @@ void on_target(lv_event_t* event) {
                 return;
             }
             word = entry.choices[index].id;
+            // A change that breaks the music that plays asks first; the same layout again, or nothing playing, does not.
+            if (entry.pref->confirm[0] != '\0' && word != entry.value && preferences_backend().playing()) {
+                open_confirm(row, word, entry.choices[index].label);
+                return;
+            }
             break;
         case Op::kMinus:
         case Op::kPlus: {
@@ -575,6 +717,9 @@ void on_target(lv_event_t* event) {
         case Op::kRun:
             word = "run";
             break;
+        case Op::kConfirm:
+        case Op::kCancel:
+            return;  // answered above
         case Op::kEdit:
             // A greyed entry says why beside the control; a tap on it opens nothing.
             if (entry.availability.available) {
@@ -582,10 +727,7 @@ void on_target(lv_event_t* event) {
             }
             return;
     }
-    const prefs::SetResult result = prefs::set_value(preferences_backend(), *entry.pref, word);
-    g.status_text = result.ok ? std::string() : result.message;
-    g.status_ms = now_ms();
-    g.dirty = true;
+    apply_value(row, word);
 }
 
 // --- refreshing ------------------------------------------------------------------------------------
