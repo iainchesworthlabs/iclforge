@@ -128,6 +128,10 @@
       "commit": "54afe292ef88cfea2525de57f5be9b42e9dbb6fb",
       "what": "the tree panel_preview was built from: the Preferences sheet beside Adjust, with its registry, capability description and sizes from the display, 2026-10-25"
     },
+    "639f44e1b": {
+      "commit": "639f44e1be05a9673ca7dd470fcd81955ce18fe6",
+      "what": "the tree panel_preview was built from: the Sound group of Preferences and the Speakers sheet, 2026-10-25"
+    },
     "36ede3929": {
       "commit": "36ede392944907870b11fa98dc0f55332aeebfb9",
       "what": "the tree panel_preview was built from: the clock in 12 hours with the seconds beside the time (display and time preferences), 2026-10-25"
@@ -1377,6 +1381,24 @@
       "program": "panel_preview (firmware/hearth-sink/preview)",
       "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-factory-320x240, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
       "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-sound.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`; this one is its prefs-sound-playing-1024x600 (the Preferences list with the Sound group while the test tone plays) BMP, converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "639f44e1b"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-speakers.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`; this one is its speakers-lit-1024x600 (the Speakers sheet, the left surround chosen and lit) BMP, converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "639f44e1b"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-speakers-small.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`; this one is its speakers-refused-480x320 (the Speakers sheet on a 480 by 320 screen, a refusal said above the controls) BMP, converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "639f44e1b"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-clock-12h-seconds.png",

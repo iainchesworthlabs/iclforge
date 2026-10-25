@@ -105,6 +105,10 @@ TEST_CASE("every entry is well formed", "[preferences]") {
             }
             REQUIRE(default_is_a_choice);
         }
+        if (pref.kind == prefs::Kind::kSheet) {
+            // A sheet's value is its summary, not one of a few words: no choices to draw.
+            REQUIRE(pref.choices.empty());
+        }
         if (pref.kind == prefs::Kind::kToggle) {
             REQUIRE(pref.choices.size() == 2);
             REQUIRE(std::string(pref.choices[0].id) == "on");
@@ -192,6 +196,10 @@ TEST_CASE("each entry against each known board: a reason wherever it is greyed, 
                 if (pref.default_word[0] != '\0') {
                     REQUIRE(entry.value == pref.default_word);
                     REQUIRE_FALSE(entry.value_label.empty());
+                }
+                // A sheet says what is set.
+                if (pref.kind == prefs::Kind::kSheet) {
+                    REQUIRE_FALSE(entry.value.empty());
                 }
             }
         }
@@ -674,4 +682,109 @@ TEST_CASE("the listing carries the new entries with their routes, kinds and valu
     // A text has no choices to list.
     const std::size_t at = json.find("\"id\":\"time-zone\"");
     REQUIRE(json.find("\"choices\"", at) == std::string::npos);
+}
+
+// --- Sound: the identify tone and the per-speaker trim ---------------------------------------------------------------
+
+TEST_CASE("Identify speakers is a button that says Stop while its tone plays", "[preferences][sound]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& identify = *prefs::find("identify-speakers");
+    REQUIRE(identify.kind == prefs::Kind::kAction);
+    REQUIRE(identify.group == prefs::Group::kSound);
+    REQUIRE(std::string(identify.route) == "/identify");
+
+    const prefs::Entry rest = prefs::resolve(identify, backend, backend.caps());
+    REQUIRE(rest.availability.available);
+    REQUIRE(rest.value == "run");
+    REQUIRE(rest.value_label == "Play each");
+    REQUIRE(rest.inert.empty());
+
+    // A press starts the tone through the board, once.
+    const prefs::SetResult started = prefs::set_value(backend, identify, "run");
+    REQUIRE(started.ok);
+    REQUIRE(backend.identifying_);
+    REQUIRE(backend.tones_started == 1);
+    const prefs::Entry playing = prefs::resolve(identify, backend, backend.caps());
+    REQUIRE(playing.value == "running");
+    REQUIRE(playing.value_label == "Stop");
+
+    // The same button, pressed while it plays, stops it, and does not start a second.
+    REQUIRE(prefs::set_value(backend, identify, "run").ok);
+    REQUIRE_FALSE(backend.identifying_);
+    REQUIRE(backend.tones_started == 1);
+    REQUIRE(prefs::resolve(identify, backend, backend.caps()).value_label == "Play each");
+}
+
+TEST_CASE("Identify speakers says why it cannot play now, and the board's refusal is reported", "[preferences][sound]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& identify = *prefs::find("identify-speakers");
+    backend.blocked_ = "A song is playing: the test tone waits until it stops.";
+    const prefs::Entry blocked = prefs::resolve(identify, backend, backend.caps());
+    REQUIRE(blocked.availability.available);  // the board can; it is busy
+    REQUIRE(blocked.inert == backend.blocked_);
+    const prefs::SetResult refused = prefs::set_value(backend, identify, "run");
+    REQUIRE_FALSE(refused.ok);
+    REQUIRE_FALSE(backend.identifying_);
+
+    // Once it plays the Stop button is never held back, whatever else has come to hold the sink.
+    backend.blocked_.clear();
+    REQUIRE(prefs::set_value(backend, identify, "run").ok);
+    backend.blocked_ = "A song is playing: the test tone waits until it stops.";
+    REQUIRE(prefs::resolve(identify, backend, backend.caps()).inert.empty());
+    REQUIRE(prefs::set_value(backend, identify, "run").ok);
+    REQUIRE_FALSE(backend.identifying_);
+}
+
+TEST_CASE("the speaker trim is a sheet whose row says what is set, and its text goes to the board whole",
+          "[preferences][sound]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& trim = *prefs::find("speaker-trim");
+    REQUIRE(trim.kind == prefs::Kind::kSheet);
+    REQUIRE(std::string(prefs::kind_name(trim.kind)) == "sheet");
+    REQUIRE(std::string(trim.route) == "/trim");
+    REQUIRE(prefs::resolve(trim, backend, backend.caps()).value == "none set");
+
+    REQUIRE(prefs::set_value(backend, trim, "L level=-1.5 distance=2.4").ok);
+    REQUIRE(backend.trim_text_ == "L level=-1.5 distance=2.4");
+    const prefs::Entry set = prefs::resolve(trim, backend, backend.caps());
+    REQUIRE(set.value == "1 speaker set");
+    REQUIRE(set.value_label == "1 speaker set");
+
+    backend.refuse_next = true;
+    const prefs::SetResult refused = prefs::set_value(backend, trim, "reset");
+    REQUIRE_FALSE(refused.ok);
+    REQUIRE(backend.trim_summary_ == "1 speaker set");
+}
+
+TEST_CASE("a build with no player has no tone and no trim, says why, and the board is never asked",
+          "[preferences][sound]") {
+    BoardCaps caps = iclforge::variants::p4_rev3_kit();
+    caps.sendspin = false;
+    FakeBackend backend(caps);
+    for (const char* id : {"identify-speakers", "speaker-trim"}) {
+        INFO(id);
+        const prefs::Entry entry = prefs::resolve(*prefs::find(id), backend, backend.caps());
+        REQUIRE_FALSE(entry.availability.available);
+        REQUIRE(contains(entry.availability.reason, "no player"));
+        const prefs::SetResult result = prefs::set_value(backend, *prefs::find(id), "run");
+        REQUIRE_FALSE(result.ok);
+        REQUIRE(contains(result.message, "no player"));
+    }
+    REQUIRE(backend.sets == 0);
+}
+
+TEST_CASE("the listing carries the Sound group, after Display, with the kinds action and sheet", "[preferences][sound]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    backend.trim_summary_ = "3 speakers set";
+    const std::string json = prefs::to_json(backend);
+    REQUIRE(json_is_balanced(json));
+    REQUIRE(contains(json, "\"id\":\"identify-speakers\",\"group\":\"Sound\",\"label\":\"Identify speakers\",\"kind\":\"action\""));
+    REQUIRE(contains(json, "\"route\":\"/identify\",\"value\":\"run\",\"available\":true"));
+    REQUIRE(contains(json, "\"id\":\"speaker-trim\",\"group\":\"Sound\",\"label\":\"Speaker levels and distances\",\"kind\":\"sheet\""));
+    REQUIRE(contains(json, "\"route\":\"/trim\",\"value\":\"3 speakers set\",\"available\":true"));
+    REQUIRE(json.find("\"id\":\"dim-after\"") < json.find("\"id\":\"identify-speakers\""));
+    // A sheet has no choices to list (the entries after it may).
+    const std::size_t at = json.find("\"id\":\"speaker-trim\"");
+    const std::size_t next = json.find("\"id\":", at + 1);
+    REQUIRE(json.substr(at, next - at).find("\"choices\"") == std::string::npos);
 }

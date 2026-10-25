@@ -325,6 +325,12 @@ class SpeakerTrimTable {
         return std::all_of(trims_.begin(), trims_.end(), [](const SpeakerTrim& t) { return t.neutral(); });
     }
 
+    // How many roles are not at the default: the number the Preferences row says ("3 speakers set").
+    [[nodiscard]] std::size_t set_count() const {
+        return static_cast<std::size_t>(
+            std::count_if(trims_.begin(), trims_.end(), [](const SpeakerTrim& t) { return !t.neutral(); }));
+    }
+
     // The stored form: only the roles that are not the default. Returns the bytes written to `out`, which must
     // hold kBlobBytes.
     [[nodiscard]] std::size_t to_blob(std::span<std::uint8_t> out) const {
@@ -477,6 +483,108 @@ class SpeakerTrimTable {
 
     std::array<SpeakerTrim, kRoles> trims_{};
 };
+
+// --- what a screen's editor does with a trim ------------------------------------------------------------
+// The stepping and the words of the Speakers sheet (panel/lvgl/sound_sheet.cpp), here so that the host tests hold
+// them: a finger moves a level or a distance along the same grid a PUT /trim is held to, and nothing in the sheet
+// can ask the table for a value it would refuse.
+
+// The level `direction` (+1 more, -1 less) from `half_db`, in half decibels; nothing at the end of the range.
+[[nodiscard]] constexpr std::optional<std::int8_t> step_half_db(std::int8_t half_db, int direction) {
+    constexpr int kMostHalfDb = static_cast<int>(kLevelMaxDb / kLevelStepDb);
+    const int next = static_cast<int>(half_db) + (direction > 0 ? 1 : direction < 0 ? -1 : 0);
+    if (direction == 0 || next < -kMostHalfDb || next > kMostHalfDb) {
+        return std::nullopt;
+    }
+    return static_cast<std::int8_t>(next);
+}
+
+// The distance `direction` from `cm`: exactly `step_cm` more or less, held to the range the table takes. A speaker with
+// no distance (0) steps up to `seed_cm`, the distance the editor starts one at, whatever the step; stepping down from the
+// nearest distance takes it away again (0), and a step that would pass the nearest stops at it first. Nothing past the
+// far end.
+[[nodiscard]] constexpr std::optional<std::uint16_t> step_distance_cm(std::uint16_t cm, int direction,
+                                                                      std::uint16_t step_cm, std::uint16_t seed_cm) {
+    if (direction == 0 || step_cm == 0) {
+        return std::nullopt;
+    }
+    if (cm == 0) {
+        if (direction < 0) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint16_t>(std::clamp<int>(seed_cm, kDistanceMinCm, kDistanceMaxCm));
+    }
+    if (direction > 0) {
+        if (cm >= kDistanceMaxCm) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint16_t>(std::min<int>(static_cast<int>(cm) + step_cm, kDistanceMaxCm));
+    }
+    if (cm <= kDistanceMinCm) {
+        return std::uint16_t{0};
+    }
+    return static_cast<std::uint16_t>(std::max<int>(static_cast<int>(cm) - step_cm, kDistanceMinCm));
+}
+
+// "+1.5 dB", "-12 dB", "0 dB": the sign only on a level that is not zero, and a whole number without a point.
+[[nodiscard]] inline std::string level_text(std::int8_t half_db) {
+    std::array<char, 24> text{};
+    const int magnitude = half_db < 0 ? -half_db : half_db;
+    const char* const sign = half_db < 0 ? "-" : (half_db > 0 ? "+" : "");
+    if ((magnitude % 2) == 0) {
+        std::snprintf(text.data(), text.size(), "%s%d dB", sign, magnitude / 2);
+    } else {
+        std::snprintf(text.data(), text.size(), "%s%d.5 dB", sign, magnitude / 2);
+    }
+    return text.data();
+}
+
+// "2.4 m", "2.45 m", "3 m", or "not set" for 0.
+[[nodiscard]] inline std::string distance_text(std::uint16_t cm) {
+    if (cm == 0) {
+        return "not set";
+    }
+    std::array<char, 24> text{};
+    if ((cm % 100) == 0) {
+        std::snprintf(text.data(), text.size(), "%u m", static_cast<unsigned>(cm / 100));
+    } else if ((cm % 10) == 0) {
+        std::snprintf(text.data(), text.size(), "%u.%u m", static_cast<unsigned>(cm / 100), static_cast<unsigned>((cm % 100) / 10));
+    } else {
+        std::snprintf(text.data(), text.size(), "%u.%02u m", static_cast<unsigned>(cm / 100), static_cast<unsigned>(cm % 100));
+    }
+    return text.data();
+}
+
+// The statements a screen hands to PUT /trim's parser (SpeakerTrimTable::apply_text): "Ls level=-1.5",
+// "Ls distance=2.4" (or "Ls distance=none" for 0) and "Ls reset".
+[[nodiscard]] inline std::string level_statement(RoleCode role, std::int8_t half_db) {
+    std::array<char, 40> text{};
+    std::snprintf(text.data(), text.size(), "%.*s level=%.1f", static_cast<int>(role_name(role).size()), role_name(role).data(),
+                  static_cast<double>(half_db) * kLevelStepDb);
+    return text.data();
+}
+
+[[nodiscard]] inline std::string distance_statement(RoleCode role, std::uint16_t cm) {
+    std::array<char, 40> text{};
+    if (cm == 0) {
+        std::snprintf(text.data(), text.size(), "%.*s distance=none", static_cast<int>(role_name(role).size()), role_name(role).data());
+    } else {
+        std::snprintf(text.data(), text.size(), "%.*s distance=%u.%02u", static_cast<int>(role_name(role).size()),
+                      role_name(role).data(), static_cast<unsigned>(cm / 100), static_cast<unsigned>(cm % 100));
+    }
+    return text.data();
+}
+
+[[nodiscard]] inline std::string reset_statement(RoleCode role) { return std::string(role_name(role)) + " reset"; }
+
+// What the Preferences row says about the table: "none set", "1 speaker set", "3 speakers set".
+[[nodiscard]] inline std::string summary_text(const SpeakerTrimTable& table) {
+    const std::size_t count = table.set_count();
+    if (count == 0) {
+        return "none set";
+    }
+    return std::to_string(count) + (count == 1 ? " speaker set" : " speakers set");
+}
 
 // What a build can do with a trim. Level needs nothing; a delay needs a delay line for each output
 // (TrimDelay::storage_floats()), which a board holds in PSRAM or does not hold.

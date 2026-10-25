@@ -25,6 +25,7 @@
 #include "iclforge/preferences.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/title_card.hpp"
 #include "iclforge/wall_clock.hpp"
 #include "panel/lvgl/board_info.hpp"
@@ -35,7 +36,9 @@
 #include "panel/lvgl/prefs_editors.hpp"
 #include "panel/lvgl/prefs_pages.hpp"
 #include "panel/lvgl/prefs_screen.hpp"
+#include "panel/lvgl/sound_sheet.hpp"
 #include "panel/lyrics_reader.hpp"
+#include "sound.hpp"
 
 namespace fs = std::filesystem;
 
@@ -78,6 +81,12 @@ std::uint16_t g_buffer_a[kMaxWidth * kBufferRows];
 std::uint16_t g_buffer_b[kMaxWidth * kBufferRows];
 // The board the preferences are drawn for (iclforge/board_variants.hpp): the kit, until a scenario says another.
 iclforge::BoardCaps g_caps = iclforge::variants::p4_rev3_kit();
+
+// The Speakers sheet's board: the layout in force with a role at each output, what is set for each, and the tone; and
+// what the sheet asked of it, for the checks to read.
+player::SoundSheet g_sound;
+std::vector<std::string> g_tone_requests;
+std::vector<std::string> g_trim_requests;
 // The System group's side is fixtures: a name that is stored when it is saved, a network preference, the facts a kit
 // reports of itself, a few paired servers that Forget takes away, and what a restart or a reset was asked for (none of
 // which restarts anything on a computer).
@@ -1136,6 +1145,307 @@ int check_display_and_time(lv_obj_t* prefs, int width, int height, const fs::pat
     return failures;
 }
 
+// --- Sound: the Identify speakers button and the Speakers sheet (planning/hearth-speaker-trim-identify.md) --------------------
+
+namespace st = iclforge::render::speaker_trim;
+
+// The board's sound answers for a room: a role at each output of the layout, the trims and the tone at rest.
+void refresh_sound_trims() {
+    std::uint16_t farthest = 0;
+    for (player::SoundSheet::Speaker& speaker : g_sound.speakers) {
+        speaker.trim = g_sound.table.get(speaker.role);
+        farthest = std::max(farthest, speaker.trim.cm);
+    }
+    g_sound.farthest_cm = farthest;
+    for (player::SoundSheet::Speaker& speaker : g_sound.speakers) {
+        speaker.applied_level_db = static_cast<float>(speaker.trim.level_db());
+        const std::uint32_t extra = speaker.trim.cm == 0 || farthest == 0 ? 0U : static_cast<std::uint32_t>(farthest - speaker.trim.cm);
+        speaker.applied_delay_samples = st::delay_samples_for(extra, player::kSinkSampleRate);
+    }
+}
+
+void set_room(const char* text) {
+    const auto layout = iclforge::render::OutputLayout::parse(text);
+    if (!layout) {
+        std::fprintf(stderr, "no such layout: %s\n", text);
+        std::exit(2);
+    }
+    g_sound.player = true;
+    g_sound.layout = text;
+    g_sound.speakers.clear();
+    for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
+        const st::RoleCode role = st::role_of_slot(*layout, slot);
+        if (role != st::kNoRole) {
+            player::SoundSheet::Speaker speaker;
+            speaker.role = role;
+            speaker.output = static_cast<std::uint8_t>(slot);
+            g_sound.speakers.push_back(speaker);
+        }
+    }
+    g_sound.delay = true;
+    g_sound.delay_reason.clear();
+    g_sound.max_span_cm = 686;
+    refresh_sound_trims();
+}
+
+// Every touch target under `root` that says `text`, in tree order.
+std::vector<lv_obj_t*> buttons_in(lv_obj_t* root, const std::string& text) {
+    std::vector<lv_obj_t*> targets;
+    collect_touch_targets(root, targets);
+    std::vector<lv_obj_t*> found;
+    for (lv_obj_t* const target : targets) {
+        if (button_text(target) == text) {
+            found.push_back(target);
+        }
+    }
+    return found;
+}
+
+// A tap on the `nth` button under `root` that says `text`, scrolled into view first.
+bool tap_in(lv_obj_t* root, const std::string& text, std::size_t nth = 0) {
+    const std::vector<lv_obj_t*> found = buttons_in(root, text);
+    if (nth >= found.size()) {
+        std::printf("  no button \"%s\" (%zu) is shown\n", text.c_str(), nth);
+        return false;
+    }
+    lv_obj_scroll_to_view_recursive(found[nth], LV_ANIM_OFF);
+    lv_obj_update_layout(found[nth]);
+    lv_area_t area;
+    lv_obj_get_coords(found[nth], &area);
+    tap((area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2);
+    return true;
+}
+
+// The Sound group of the Preferences sheet that is open, and the Speakers sheet it opens, at one size. Returns the number of
+// failures, having said each.
+int check_sound_group(int width, int height, const fs::path& out, const std::string& size) {
+    int failures = 0;
+    const auto expect = [&](bool ok, const std::string& what) {
+        if (!ok) {
+            std::printf("  FAIL %s: %s\n", size.c_str(), what.c_str());
+            ++failures;
+        }
+    };
+    lv_obj_t* const prefs = player::panel::prefs_root();
+    if (prefs == nullptr) {
+        expect(false, "the Preferences sheet is open for the Sound group");
+        return failures;
+    }
+
+    // The list: the group, the button, and what is set.
+    g_sound = {};
+    g_tone_requests.clear();
+    g_trim_requests.clear();
+    set_room("5.1");
+    pump(8);
+    for (const char* shown : {"SOUND", "Identify speakers", "Speaker levels and distances", "none set"}) {
+        expect(shows_text(prefs, shown), std::string("Preferences shows ") + shown);
+    }
+    expect(shows_text(prefs, "Plays a quiet test tone", true), "the Identify row says what it does");
+
+    // Identify speakers: Play each starts the tone through every speaker, the button says Stop while it plays.
+    expect(tap_in(prefs, "Play each"), "the Identify row has a Play each button");
+    expect(!g_tone_requests.empty() && g_tone_requests.back() == "all", "Play each asks for every speaker in turn");
+    expect(g_sound.tone_running, "and the tone is running");
+    pump(8);
+    expect(!buttons_in(prefs, "Stop").empty() && buttons_in(prefs, "Play each").empty(), "while it plays the button says Stop");
+    write_bmp(out / ("prefs-sound-playing-" + size + ".bmp"));
+    expect(tap_in(prefs, "Stop"), "and Stop is there to press");
+    expect(g_tone_requests.back() == "off" && !g_sound.tone_running, "Stop stops it");
+    pump(8);
+    expect(!buttons_in(prefs, "Play each").empty(), "and the button is Play each again");
+
+    // A song is playing: the board says so under the row, and the tone does not start.
+    g_sound.tone_blocked = "A song is playing: the test tone waits until it stops.";
+    g_now_us += 1'000'000;  // the list looks at the board once a second
+    pump(8);
+    expect(shows_text(prefs, "A song is playing", true), "a song playing is said under the Identify row");
+    const std::size_t asked = g_tone_requests.size();
+    tap_in(prefs, "Play each");
+    pump(4);
+    expect(!g_sound.tone_running, "and a tap on it does not play over the song");
+    expect(g_tone_requests.size() == asked + 1, "the board was asked, and said no");
+    g_sound.tone_blocked.clear();
+    pump(8);
+
+    // The tone started from the list is stopped by closing it.
+    tap_in(prefs, "Play each");
+    expect(g_sound.tone_running, "the tone is running again");
+    // (closed below, with the Speakers sheet under it)
+
+    // The Speakers sheet.
+    expect(tap_in(prefs, "Edit"), "the speaker trim row has an Edit button");
+    pump(8);
+    lv_obj_t* const sheet = player::panel::sound_sheet_root();
+    expect(sheet != nullptr, "Edit opens the Speakers sheet");
+    if (sheet == nullptr) {
+        return failures;
+    }
+    write_bmp(out / ("speakers-" + size + ".bmp"));
+    failures += audit(sheet, "speakers " + size);
+    for (const char* shown : {"Speakers", "Level", "Distance", "Front left", "0 dB", "not set"}) {
+        expect(shows_text(sheet, shown, std::string(shown) == "Front left"), std::string("the sheet shows ") + shown);
+    }
+    for (const char* role : {"L", "C", "R", "Ls", "Rs", "LFE"}) {
+        expect(!buttons_in(sheet, role).empty(), std::string("the room has the ") + role + " speaker to touch");
+    }
+    // The tone from the list went on into the sheet; the sheet takes it away with it.
+
+    // A tap on a speaker chooses it and plays the tone through it.
+    expect(tap_in(sheet, "Ls"), "a speaker of the room can be tapped");
+    expect(g_tone_requests.back() == "Ls", "a tap on Ls plays Ls");
+    pump(8);
+    expect(shows_text(sheet, "Left surround", true), "and the sheet is about the left surround");
+    write_bmp(out / ("speakers-lit-" + size + ".bmp"));
+    {
+        const std::vector<lv_obj_t*> lit = buttons_in(sheet, "Ls");
+        const std::vector<lv_obj_t*> other = buttons_in(sheet, "Rs");
+        expect(!lit.empty() && !other.empty() &&
+                   lv_color_to_u32(lv_obj_get_style_bg_color(lit.front(), LV_PART_MAIN)) !=
+                       lv_color_to_u32(lv_obj_get_style_bg_color(other.front(), LV_PART_MAIN)),
+               "the speaker the tone is on is lit and the others are not");
+    }
+    g_sound.tone_role = *st::parse_role("Rs");
+    pump(8);
+    {
+        const std::vector<lv_obj_t*> lit = buttons_in(sheet, "Rs");
+        const std::vector<lv_obj_t*> other = buttons_in(sheet, "Ls");
+        expect(!lit.empty() && !other.empty() &&
+                   lv_color_to_u32(lv_obj_get_style_bg_color(lit.front(), LV_PART_MAIN)) !=
+                       lv_color_to_u32(lv_obj_get_style_bg_color(other.front(), LV_PART_MAIN)),
+               "and the light follows the tone to the next speaker");
+    }
+
+    // The level: a half decibel a step, in both directions, and the sheet says what it is.
+    tap_in(sheet, "+", 0);
+    pump(4);
+    expect(g_trim_requests.back() == "Ls level=0.5", "+ asks for half a decibel more");
+    expect(shows_text(sheet, "+0.5 dB"), "and the sheet says +0.5 dB");
+    tap_in(sheet, "-", 0);
+    tap_in(sheet, "-", 0);
+    pump(4);
+    expect(g_trim_requests.back() == "Ls level=-0.5", "- twice goes to half a decibel less");
+    expect(shows_text(sheet, "-0.5 dB"), "and the sheet says -0.5 dB");
+    for (int i = 0; i < 30; ++i) {
+        tap_in(sheet, "-", 0);
+    }
+    pump(4);
+    expect(g_sound.table.get(*st::parse_role("Ls")).half_db == -24, "the level stops at -12 dB");
+    expect(shows_text(sheet, "-12 dB"), "and the sheet says so");
+    write_bmp(out / ("speakers-level-" + size + ".bmp"));
+
+    // The distance: from nothing it starts at three metres, by a tenth or a metre a step.
+    tap_in(sheet, "+", 1);
+    pump(4);
+    expect(g_trim_requests.back() == "Ls distance=3.00", "+ on a distance that is not set starts it at 3 m");
+    expect(shows_text(sheet, "3 m"), "and the sheet says 3 m");
+    tap_in(sheet, "+1 m");
+    tap_in(sheet, "+", 1);
+    pump(4);
+    expect(g_trim_requests.back() == "Ls distance=4.10", "+1 m then + is 4.1 m");
+    expect(shows_text(sheet, "4.1 m"), "and the sheet says 4.1 m");
+    // Another speaker starts where the farthest is, which moves nothing yet.
+    tap_in(sheet, "R");
+    pump(4);
+    tap_in(sheet, "+", 1);
+    pump(4);
+    expect(g_trim_requests.back() == "R distance=4.10", "a second speaker starts at the farthest distance");
+    tap_in(sheet, "-1 m");
+    tap_in(sheet, "-1 m");
+    tap_in(sheet, "-1 m");
+    pump(4);
+    expect(g_trim_requests.back() == "R distance=1.10", "and moves by metres");
+    write_bmp(out / ("speakers-distance-" + size + ".bmp"));
+    // Past what the delay lines hold, the board says no and the sheet says why.
+    tap_in(sheet, "Ls");
+    for (int i = 0; i < 6; ++i) {
+        tap_in(sheet, "+1 m");
+    }
+    pump(4);
+    expect(g_sound.table.get(*st::parse_role("Ls")).cm <= 1100 + 686, "the board keeps the speakers within what its delay lines hold");
+    if (width >= 480) {
+        expect(shows_text(sheet, "at most 6.86 m", true), "and the sheet says how far apart they can be");
+        write_bmp(out / ("speakers-refused-" + size + ".bmp"));
+    }
+    tap_in(sheet, "R");
+    pump(4);
+
+    // Repeat, Play each and Stop.
+    tap_in(sheet, "Repeat");
+    expect(g_tone_requests.back() == "R loop", "Repeat asks for the chosen speaker over and over");
+    pump(4);
+    tap_in(sheet, "Repeat");
+    expect(g_tone_requests.back() == "off", "and Repeat again stops it");
+    tap_in(sheet, "Play each");
+    expect(g_tone_requests.back() == "all", "Play each plays every speaker in turn");
+    pump(4);
+    tap_in(sheet, "Stop");
+    expect(g_tone_requests.back() == "off", "Stop stops it");
+
+    // Reset puts the chosen speaker back.
+    tap_in(sheet, "Reset");
+    pump(4);
+    expect(g_trim_requests.back() == "R reset", "Reset puts the chosen speaker back");
+    expect(g_sound.table.get(*st::parse_role("R")).neutral(), "to 0 dB and no distance");
+
+    // A song starts: the tone buttons say why they do nothing.
+    g_sound.tone_blocked = "A song is playing: the test tone waits until it stops.";
+    pump(8);
+    expect(shows_text(sheet, "A song is playing", true), "the sheet says a song is playing");
+    write_bmp(out / ("speakers-blocked-" + size + ".bmp"));
+    const std::size_t before = g_tone_requests.size();
+    tap_in(sheet, "Play");
+    pump(4);
+    expect(!g_sound.tone_running, "and Play does not play over it");
+    expect(g_tone_requests.size() == before + 1, "(the board was asked)");
+    g_sound.tone_blocked.clear();
+
+    // The layout changes under the sheet: it is drawn again for the room it is now.
+    set_room("7.1.4");
+    pump(8);
+    expect(player::panel::sound_sheet_root() != nullptr, "the sheet is still up when the layout changes");
+    for (const char* role : {"Lrs", "Rrs", "Vhl", "Vhr"}) {
+        expect(!buttons_in(player::panel::sound_sheet_root(), role).empty(), std::string("7.1.4 has the ") + role + " speaker to touch");
+    }
+    write_bmp(out / ("speakers-7-1-4-" + size + ".bmp"));
+    failures += audit(player::panel::sound_sheet_root(), "speakers 7.1.4 " + size);
+
+    // A board with no delay lines keeps the level and greys the distance, with its reason.
+    g_sound.delay = false;
+    g_sound.delay_reason = "This board has no memory for delay lines.";
+    pump(8);
+    expect(shows_text(player::panel::sound_sheet_root(), "no memory for delay lines", true), "no delay lines is said on the sheet");
+    write_bmp(out / ("speakers-no-delay-" + size + ".bmp"));
+    failures += audit(player::panel::sound_sheet_root(), "speakers no delay " + size);
+    g_sound.delay = true;
+    g_sound.delay_reason.clear();
+    set_room("5.1");
+    pump(8);
+
+    // A server sets the levels: the sheet says so.
+    g_sound.server_level = true;
+    pump(8);
+    expect(shows_text(player::panel::sound_sheet_root(), "Sendspin server", true), "a server setting the levels is said on the sheet");
+    g_sound.server_level = false;
+    pump(8);
+
+    // Back: the page goes, the tone with it, and the list is under it as it was.
+    tap_in(player::panel::sound_sheet_root(), "Play each");
+    expect(g_sound.tone_running, "the tone is running when the sheet is left");
+    expect(tap_in(player::panel::sound_sheet_root(), "Back"), "the sheet has a Back button");
+    pump(8);
+    expect(player::panel::sound_sheet_root() == nullptr, "Back puts the sheet away");
+    expect(!g_sound.tone_running, "and the tone with it");
+    expect(player::panel::prefs_root() != nullptr, "the Preferences list is under it");
+    expect(shows_text(player::panel::prefs_root(), "2 speakers set", true) || shows_text(player::panel::prefs_root(), "1 speaker set", true),
+           "and says what is set");
+
+    // Leaving the Preferences stops a tone the list started.
+    tap_in(player::panel::prefs_root(), "Play each");
+    expect(g_sound.tone_running, "the list starts the tone");
+    return failures;
+}
+
 // The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
 // board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
 // taps the way a person does. Returns the number of failures, having said each.
@@ -1165,6 +1475,9 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         }
         return nullptr;
     };
+
+    g_sound = {};
+    set_room("5.1");
 
     // A kit-like board whose screen is this size, playing a song with lyrics.
     g_caps = iclforge::variants::p4_rev3_kit();
@@ -1298,10 +1611,12 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(tap_button("Off"), "a control past the first screenful is reached");
         expect(g_settings.view == nv::View::kOff, "and works");
         tap_button("Speakers");
+        failures += check_sound_group(width, height, out, size);
         failures += check_system_group(width, height, out, size, prefs, scroller_of(prefs));
         tap_button("Close");
         pump(6);
         expect(player::panel::prefs_root() == nullptr, "Close puts the Preferences sheet away");
+        expect(!g_sound.tone_running, "and a tone the list started goes with it");
     }
 
     // Dimming and Preferences: the tap that wakes a dimmed screen does not also open Preferences, the sheet keeps the
@@ -1564,6 +1879,13 @@ void set_backlight(int percent) { g_backlight = percent; }
 
 class PreviewBackend final : public iclforge::prefs::Backend {
    public:
+    [[nodiscard]] bool identify_running() const override { return g_sound.tone_running; }
+    [[nodiscard]] std::string identify_blocked() const override { return g_sound.tone_blocked; }
+    [[nodiscard]] bool identify_each(bool start) override { return player::sound_identify_request(start ? "all" : "off").empty(); }
+    [[nodiscard]] std::string speaker_trim_summary() const override { return player::sound_trim_summary(); }
+    [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
+        return player::sound_set_trim_text(statements).empty();
+    }
     [[nodiscard]] iclforge::BoardCaps caps() const override { return g_caps; }
     [[nodiscard]] iclforge::nowview::View now_view() const override { return g_settings.view; }
     [[nodiscard]] bool set_now_view(iclforge::nowview::View view) override {
@@ -1682,6 +2004,60 @@ FontFile noto_sans_hebrew_semibold() {
 }
 
 }  // namespace player::panel
+
+// What main/sound.cpp answers on a board, answered from the fixture the checks set up.
+namespace player {
+
+SoundSheet sound_sheet() { return g_sound; }
+
+bool sound_identify_running() { return g_sound.tone_running; }
+
+std::string sound_identify_blocked() { return g_sound.tone_blocked; }
+
+std::string sound_trim_summary() { return iclforge::render::speaker_trim::summary_text(g_sound.table); }
+
+std::string sound_identify_request(std::string_view request) {
+    namespace st = iclforge::render::speaker_trim;
+    g_tone_requests.emplace_back(request);
+    const bool off = request == "off";
+    if (!off && !g_sound.tone_blocked.empty()) {
+        return g_sound.tone_blocked;
+    }
+    g_sound.tone_running = !off;
+    if (off) {
+        g_sound.tone_role = st::kNoRole;
+    } else if (request == "all") {
+        g_sound.tone_role = g_sound.speakers.empty() ? st::kNoRole : g_sound.speakers.front().role;
+    } else if (const std::optional<st::RoleCode> role = st::parse_role(request.substr(0, request.find(' ')))) {
+        g_sound.tone_role = *role;
+    }
+    return {};
+}
+
+std::string sound_set_trim_text(std::string_view statements) {
+    namespace st = iclforge::render::speaker_trim;
+    g_trim_requests.emplace_back(statements);
+    st::SpeakerTrimTable next = g_sound.table;
+    const st::ParseResult parsed = next.apply_text(statements);
+    if (!parsed.ok) {
+        return std::string("PUT /trim: ") + parsed.error;
+    }
+    if (!g_sound.delay) {
+        for (st::RoleCode role = 0; role < st::kRoles; ++role) {
+            if (next.get(role).cm != g_sound.table.get(role).cm) {
+                return "A distance is a delay, and " + g_sound.delay_reason;
+            }
+        }
+    }
+    if (next.span_cm() > g_sound.max_span_cm && next.span_cm() > g_sound.table.span_cm()) {
+        return "The nearest and the farthest speaker can be at most 6.86 m apart on this board (its delay lines hold 20 ms).";
+    }
+    g_sound.table = next;
+    refresh_sound_trims();
+    return {};
+}
+
+}  // namespace player
 
 int main(int argc, char** argv) {
     const fs::path out = argc > 1 ? fs::path(argv[1]) : fs::path("panel-preview");

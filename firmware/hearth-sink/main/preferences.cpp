@@ -9,6 +9,7 @@
 #include "panel/panel.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "sound.hpp"
 #include "system_control.hpp"
 #include "wall_clock.hpp"
 
@@ -156,6 +157,15 @@ class Board final : public iclforge::prefs::Backend {
     [[nodiscard]] bool set_layout(std::string_view layout) override { return layout_set(layout).accepted; }
 
     [[nodiscard]] bool playing() const override { return player::playing(); }
+
+    // Sound: sound.cpp, the same code the routes and the Speakers sheet go through.
+    [[nodiscard]] bool identify_running() const override { return sound_identify_running(); }
+    [[nodiscard]] std::string identify_blocked() const override { return sound_identify_blocked(); }
+    [[nodiscard]] bool identify_each(bool start) override { return sound_identify_request(start ? "all" : "off").empty(); }
+    [[nodiscard]] std::string speaker_trim_summary() const override { return sound_trim_summary(); }
+    [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
+        return sound_set_trim_text(statements).empty();
+    }
 };
 
 }  // namespace

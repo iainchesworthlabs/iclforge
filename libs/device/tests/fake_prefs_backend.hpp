@@ -93,6 +93,36 @@ class FakeBackend final : public Backend {
     }
     [[nodiscard]] bool playing() const override { return playing_; }
 
+    // Sound: the tone is running or not, something else may have the sink, and the trim is held as the words of PUT /trim
+    // would leave it (the host test of the real table is libs/render's; this holds what the registry handed over).
+    bool identifying_ = false;
+    std::string blocked_;
+    std::string trim_summary_ = "none set";
+    std::string trim_text_;
+    int tones_started = 0;
+
+    [[nodiscard]] bool identify_running() const override { return identifying_; }
+    [[nodiscard]] std::string identify_blocked() const override { return blocked_; }
+    [[nodiscard]] bool identify_each(bool start) override {
+        ++sets;
+        if (take_refusal() || (start && !blocked_.empty())) {
+            return false;
+        }
+        identifying_ = start;
+        tones_started += start ? 1 : 0;
+        return true;
+    }
+    [[nodiscard]] std::string speaker_trim_summary() const override { return trim_summary_; }
+    [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        trim_text_ = std::string(statements);
+        trim_summary_ = statements == "reset" ? "none set" : "1 speaker set";
+        return true;
+    }
+
     // --- Network and System (E4)
     std::string network_pref_ = "auto";
     std::string name_ = "hearth-a1b2c3";
