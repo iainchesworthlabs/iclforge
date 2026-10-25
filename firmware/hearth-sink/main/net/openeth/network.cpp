@@ -140,6 +140,8 @@ const char* network_source() { return "wired"; }
 
 void network_adopt_built_in() {}
 
+void network_forget_driver_state() {}
+
 // One network, and no station beside it.
 bool network_has_choice() { return false; }
 

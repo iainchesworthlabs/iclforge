@@ -27,6 +27,11 @@ struct TouchCounters;
 // held, so it takes no lock of the panel's and waits for nothing for long.
 [[nodiscard]] iclforge::devview::Facts read_dev_facts();
 
+// What About shows (iclforge/about_view.hpp): the same reading as the developer view's, for the part of
+// it About uses - the network, the configuration and the pairing count - and none of the performance
+// counters. Firmware only. The network part is cached for two seconds, as the developer view's is.
+[[nodiscard]] iclforge::devview::Facts gather_about_facts();
+
 // The console's last `limit` bytes (the ring GET /log serves), or nothing where there is no ring.
 [[nodiscard]] std::string read_log_tail(std::size_t limit);
 

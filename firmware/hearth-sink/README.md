@@ -1300,7 +1300,9 @@ as a name — `2.0` (the default), `5.1`, `7.1`, `5.1.4`, `7.1.4`, `9.2.4`,
 `5.0.4` — or as a speaker list, one token per slot in slot order:
 `L,R,C,LFE,Ls,Rs` for a 5.1 DAC wired in WAV order, `30/0,-30/0,lfe` by angles,
 `-` for a slot nothing is on. A name is Table E2.5's order with the LFE last, so
-`5.1` is L C R Ls Rs LFE; a list is whatever order the board is wired in. The
+`5.1` is L C R Ls Rs LFE; a list is whatever order the board is wired in. A
+name or list is at most sixteen slots: `9.1.6` is exactly sixteen, and `9.2.6`
+(seventeen) is refused rather than trimmed. The
 grammar is [`iclforge/render/layout.hpp`](../../libs/render/include/iclforge/render/layout.hpp)'s and
 `PUT /layout` on the control surface takes the same text for the next play.
 
