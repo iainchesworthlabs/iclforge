@@ -66,6 +66,13 @@
 # Firmware. src/log.cpp keeps the console's recent output for GET /log
 # (include/iclforge/log.hpp), once the firmware calls log_start().
 set(ICLFORGE_COMPONENT_SRCS "src/player.cpp" "src/control.cpp" "src/firmware.cpp" "src/log.cpp" "src/tcp_arrivals.cpp")
+# The update from GitHub releases (include/iclforge/firmware_pull.hpp): the one that does it, or the one
+# that says a build has none. Chosen here, as the Opus decoder is.
+if(CONFIG_ICLFORGE_FIRMWARE_PULL)
+    list(APPEND ICLFORGE_COMPONENT_SRCS "src/firmware_pull.cpp")
+else()
+    list(APPEND ICLFORGE_COMPONENT_SRCS "src/firmware_pull_none.cpp")
+endif()
 if(CONFIG_LWIP_IPV6)
     list(APPEND ICLFORGE_COMPONENT_SRCS "src/peer/dual_stack/ipv4_peer.cpp")
 else()
@@ -110,7 +117,10 @@ idf_component_register(
     # espcoredump: the same file's report and routes for the last crash's
     # core dump, when the project keeps one (CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH).
     # vfs: src/log.cpp's device, which stdout is reopened on.
+    # esp_http_client: src/firmware_pull.cpp's connection to GitHub, with the certificate bundle of mbedtls
+    # (esp_crt_bundle.h); the index's signature is checked with mbedtls's x509 and pk.
     PRIV_REQUIRES lwip esp_psram esp_app_format app_update esp_partition spi_flash hal espcoredump vfs
+                  esp_http_client
     EMBED_FILES "ui/iclforge_ui.html" "ui/iclforge_ui.js")
 
 # libopus, built into this component when the Sendspin player is to decode Opus (opus.cmake).

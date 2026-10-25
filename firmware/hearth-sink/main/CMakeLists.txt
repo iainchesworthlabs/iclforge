@@ -155,6 +155,29 @@ idf_component_register(
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
 
+# The trust anchors a pull verifies a signed update index against (planning/esp32-ota.md, O10): a PEM file of
+# public certificates, embedded as it is. ICLFORGE_TRUST_ANCHORS_FILE (a cache variable, for CI's QEMU test,
+# whose throwaway CA is made before the build) wins over the project's ICLFORGE_EXAMPLE_TRUST_ANCHORS; with
+# neither the image carries an empty file, and says it cannot verify a pull. Copied to a name of its own so
+# that the symbols the linker makes (_binary_trust_anchors_pem_start and _end) do not depend on the file's.
+# Only a build that pulls carries it.
+set(ICLFORGE_TRUST_ANCHORS_FILE "" CACHE FILEPATH "CI only: the trust anchors to embed")
+if(CONFIG_ICLFORGE_FIRMWARE_PULL)
+    set(iclforge_anchors_copy "${CMAKE_CURRENT_BINARY_DIR}/trust_anchors.pem")
+    if(ICLFORGE_TRUST_ANCHORS_FILE)
+        configure_file("${ICLFORGE_TRUST_ANCHORS_FILE}" "${iclforge_anchors_copy}" COPYONLY)
+    elseif(CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS)
+        configure_file("${PROJECT_DIR}/${CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS}" "${iclforge_anchors_copy}" COPYONLY)
+    else()
+        file(WRITE "${iclforge_anchors_copy}" "")
+    endif()
+    target_add_binary_data(${COMPONENT_LIB} "${iclforge_anchors_copy}" TEXT)
+    # hearth_sink.cpp names the symbols weakly, so that a build without them links, and a weak reference
+    # does not take an object out of an archive: the data would be left in libmain.a and the board would
+    # say it has no trust anchor. Naming the start undefined takes the member, and the end with it.
+    target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=_binary_trust_anchors_pem_start")
+endif()
+
 # The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): Archivo, which the apps bundle, and
 # Noto Sans for Greek and Cyrillic and for Hebrew, under the SIL Open Font License (panel/fonts/*OFL.txt),
 # rasterised by LVGL's tiny_ttf from flash. In the
