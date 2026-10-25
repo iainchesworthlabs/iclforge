@@ -21,6 +21,7 @@ class FakeBackend final : public Backend {
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
     std::string layout_ = "2.0";
+    bool playing_ = false;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -50,6 +51,7 @@ class FakeBackend final : public Backend {
         layout_ = std::string(layout);
         return true;
     }
+    [[nodiscard]] bool playing() const override { return playing_; }
 
    private:
     bool take_refusal() {

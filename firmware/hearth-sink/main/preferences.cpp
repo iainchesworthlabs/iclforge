@@ -40,6 +40,8 @@ class Board final : public iclforge::prefs::Backend {
     // The same decision PUT /layout makes (judged over board_caps(), queued, stored); the registry has asked the
     // verdict already, and a layout the board cannot carry never gets here.
     [[nodiscard]] bool set_layout(std::string_view layout) override { return layout_set(layout).accepted; }
+
+    [[nodiscard]] bool playing() const override { return player::playing(); }
 };
 
 }  // namespace

@@ -22,4 +22,8 @@ namespace player {
 // the note. Safe from any task.
 [[nodiscard]] iclforge::ControlLayoutAnswer layout_set(std::string_view text);
 
+// Whether a stream is playing now: a server's over Sendspin, or a play started with POST /play. A layout change
+// breaks the audio of one that is (the sink is opened again), which the Preferences list says before it applies one.
+[[nodiscard]] bool playing();
+
 }  // namespace player

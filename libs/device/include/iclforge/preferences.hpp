@@ -92,6 +92,11 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction };
 // When a change takes effect.
 enum class Apply : std::uint8_t { kLive, kNextPlay, kRestart };
 
+// How a screen draws a kChoice's choices. kButtons: side by side, wrapping, with the reasons of the greyed ones in
+// lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to read as
+// buttons (the speaker layouts, whose limits each need a sentence).
+enum class Editor : std::uint8_t { kButtons, kList };
+
 [[nodiscard]] constexpr const char* apply_name(Apply apply) {
     switch (apply) {
         case Apply::kNextPlay:
@@ -140,6 +145,9 @@ class Backend {
     // could not be queued or stored.
     [[nodiscard]] virtual std::string layout() const = 0;
     [[nodiscard]] virtual bool set_layout(std::string_view layout) = 0;
+
+    // Whether a stream is playing now: what an entry with a `confirm` asks about before it breaks the playback.
+    [[nodiscard]] virtual bool playing() const = 0;
 };
 
 using GetFn = std::string (*)(const Backend&);
@@ -179,6 +187,12 @@ struct Pref {
     InertFn inert = nullptr;
     GetFn get = nullptr;
     SetFn set = nullptr;
+    // How the screen draws the choices of a kChoice.
+    Editor editor = Editor::kButtons;
+    // What a change costs while a stream plays ("Changing the speakers makes the music drop out for a moment."); the
+    // screen asks "<this> Change to <choice>?" before it applies a change then, and never when nothing plays. Empty:
+    // a change costs nothing and is applied at a tap.
+    const char* confirm = "";
 };
 
 // --- the seed: what exists today ----------------------------------------------------------------------
@@ -322,7 +336,9 @@ inline constexpr std::array<Pref, 3> kRegistry{{
      .choices = detail::kLayoutChoices,
      .availability = &detail::layout_needs_sink,
      .get = &detail::get_layout,
-     .set = &detail::set_layout},
+     .set = &detail::set_layout,
+     .editor = Editor::kList,
+     .confirm = "Changing the speakers makes the music drop out for a moment."},
 }};
 
 [[nodiscard]] inline std::span<const Pref> registry() { return kRegistry; }

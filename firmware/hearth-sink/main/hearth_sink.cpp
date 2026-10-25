@@ -926,6 +926,8 @@ std::string layout_text() {
 
 iclforge::ControlLayoutAnswer layout_set(std::string_view text) { return accept_layout(text); }
 
+bool playing() { return sendspin_playing() || std::strcmp(g_state.load(), "playing") == 0; }
+
 // The panel's developer view reads these (board_report.hpp). The figures are the ones GET /status
 // reports from the same stats: the player's own, or those of the last play when it has ended.
 BoardReport board_report() {
