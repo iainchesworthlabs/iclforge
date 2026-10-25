@@ -104,12 +104,17 @@ page in Hearth are a follow-up in `libs/sendspin` and the app.
 | `s3-n16r8` | 1,593,232 B | budget 1,600,000 B |
 | `s3-n16r8-ac4`, `p4-rev1-ac4` | link | the two profiles that compile `ac4_stream.cpp`, where the AC-4 half of this change lives (the published profiles have the AC-4 decoder off) |
 
-## Preferences entry (after prefs-core merges)
+## The Preferences entry
 
-A `choice` entry, group Sound, label *Late night*, choices *Standard* and *Late night*, applies at the next stream
-(`needs_restart` false), bound to `GET`/`PUT /dynamic-range`. `availability(caps)`: unavailable with the reason
-"This board decodes no Dolby stream" when it has no Sendspin player; available otherwise, with the note "Applies to
-AC-3, E-AC-3 and AC-4 streams; PCM is played as it comes" and, per codec the board decodes, which paths honour it.
+`late-night` in `libs/device/include/iclforge/preferences.hpp`: a `choice` entry in the Sound group, label *Late night*,
+choices *Standard* and *Late night*, `Apply::kNextPlay`, bound to `GET` and `PUT /dynamic-range`, default `standard`,
+`OnReset::kReset` (the owner's call: Reset preferences puts it back). Its availability is `BoardCaps::sendspin`: a build
+with no Sendspin player decodes no Dolby stream and the entry, and both choices, are greyed with *This board decodes no
+Dolby stream: it has no Sendspin player.* No new capability field: the choice is honoured for AC-3 and E-AC-3 on every
+board with a player, and the limits that vary (PCM has nothing to compress, AC-4 needs the AC-4 build and, on an S3, a
+measurement) are in the note under the row: *Quiets loud passages and lifts quiet ones in Dolby streams (AC-3, E-AC-3,
+AC-4). PCM is unchanged.* The Backend's `late_night()` and `set_late_night(bool)` are the firmware's
+`settings_set_dynamic_range` plus `sendspin_set_dynamic_range`, and `PUT /dynamic-range` goes through the same setter.
 
 ## Not verified on a board
 

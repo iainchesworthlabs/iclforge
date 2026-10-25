@@ -797,12 +797,9 @@ iclforge::ControlHandlers control_handlers() {
             return std::string(iclforge::ac3::dynamic_range_name(player::settings().dynamic_range));
         };
         h.set_dynamic_range = [](std::string_view word) {
+            // The preferences' backend stores it and has the player follow, as the Late night entry does.
             const auto range = iclforge::ac3::parse_dynamic_range(word);
-            if (!range || !player::settings_set_dynamic_range(*range)) {
-                return false;
-            }
-            player::sendspin_set_dynamic_range(*range);
-            return true;
+            return range.has_value() && player::preferences().set_late_night(*range == iclforge::ac3::DynamicRange::kLateNight);
         };
     }
     // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):

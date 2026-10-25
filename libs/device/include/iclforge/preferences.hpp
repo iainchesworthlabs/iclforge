@@ -201,6 +201,11 @@ class Backend {
     [[nodiscard]] virtual std::string speaker_trim_summary() const = 0;
     [[nodiscard]] virtual bool set_speaker_trim_text(std::string_view statements) = 0;
 
+    // Sound: whether late night is on (iclforge/base/dynamic_range.hpp: "standard" or "late-night", the words of
+    // PUT /dynamic-range). The setter stores it and tells the Sendspin player, which follows from the next stream.
+    [[nodiscard]] virtual bool late_night() const = 0;
+    [[nodiscard]] virtual bool set_late_night(bool on) = 0;
+
     // Network: which of its networks a board with a cable and Wi-Fi uses, as the word PUT /network-preference takes
     // ("auto", "ethernet", "wifi"). The setter returns at once and the change is made on a task of its own, as
     // network_set_preference() does; the board keeps the preference only once the interface it names holds an address.
@@ -748,9 +753,33 @@ inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
     return backend.set_speaker_trim_text(statements);
 }
 
+// Late night is the player's decoders' (planning/hearth-late-night.md): a board with no Sendspin player decodes no
+// Dolby stream, and PCM, which is all a player may be sent, carries no metadata to compress.
+[[nodiscard]] inline Availability needs_dolby_decoder(const BoardCaps& caps) {
+    return caps.sendspin ? Availability::yes()
+                         : Availability::no("This board decodes no Dolby stream: it has no Sendspin player.");
+}
+
+// The words of PUT /dynamic-range: "standard" is the board as it always was.
+inline constexpr std::array<ChoiceDef, 2> kLateNightChoices{{
+    {.id = "standard", .label = "Standard"},
+    {.id = "late-night", .label = "Late night"},
+}};
+
+[[nodiscard]] inline std::string get_late_night(const Backend& backend) {
+    return backend.late_night() ? "late-night" : "standard";
+}
+
+[[nodiscard]] inline bool set_late_night(Backend& backend, std::string_view word) {
+    if (word == "standard") {
+        return backend.set_late_night(false);
+    }
+    return word == "late-night" && backend.set_late_night(true);
+}
+
 }  // namespace detail
 
-inline constexpr std::array<Pref, 19> kRegistry{{
+inline constexpr std::array<Pref, 20> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -916,6 +945,21 @@ inline constexpr std::array<Pref, 19> kRegistry{{
      .get = &detail::get_speaker_trim,
      .set = &detail::set_speaker_trim,
      .on_reset = OnReset::kKeep},
+    // The stream's own heavy compression at the level dialogue is already heard at, not RF mode's 11 dB higher.
+    // Chosen once and left, so Reset preferences puts it back; it is followed from the next stream.
+    {.id = "late-night",
+     .group = Group::kSound,
+     .label = "Late night",
+     .note = "Quiets loud passages and lifts quiet ones in Dolby streams (AC-3, E-AC-3, AC-4). PCM is unchanged.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kNextPlay,
+     .route = "/dynamic-range",
+     .default_word = "standard",
+     .choices = detail::kLateNightChoices,
+     .availability = &detail::needs_dolby_decoder,
+     .get = &detail::get_late_night,
+     .set = &detail::set_late_night,
+     .on_reset = OnReset::kReset},
     // --- Network
     // A board with a cable and Wi-Fi uses one of them, or whichever is linked. The control is the developer view's,
     // with its confirming step. Kept by Reset preferences: a reset must not change how the board is joined.

@@ -87,6 +87,8 @@ iclforge::BoardCaps g_caps = iclforge::variants::p4_rev3_kit();
 player::SoundSheet g_sound;
 std::vector<std::string> g_tone_requests;
 std::vector<std::string> g_trim_requests;
+// Late night, as the Preferences sheet last set it.
+bool g_late_night = false;
 // The System group's side is fixtures: a name that is stored when it is saved, a network preference, the facts a kit
 // reports of itself, a few paired servers that Forget takes away, and what a restart or a reset was asked for (none of
 // which restarts anything on a computer).
@@ -1885,6 +1887,11 @@ class PreviewBackend final : public iclforge::prefs::Backend {
     [[nodiscard]] std::string speaker_trim_summary() const override { return player::sound_trim_summary(); }
     [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
         return player::sound_set_trim_text(statements).empty();
+    }
+    [[nodiscard]] bool late_night() const override { return g_late_night; }
+    [[nodiscard]] bool set_late_night(bool on) override {
+        g_late_night = on;
+        return true;
     }
     [[nodiscard]] iclforge::BoardCaps caps() const override { return g_caps; }
     [[nodiscard]] iclforge::nowview::View now_view() const override { return g_settings.view; }

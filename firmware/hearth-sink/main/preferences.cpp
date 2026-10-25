@@ -166,6 +166,20 @@ class Board final : public iclforge::prefs::Backend {
     [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
         return sound_set_trim_text(statements).empty();
     }
+
+    // Late night (planning/hearth-late-night.md): stored, and the Sendspin player follows from the next stream.
+    [[nodiscard]] bool late_night() const override {
+        return settings().dynamic_range == iclforge::ac3::DynamicRange::kLateNight;
+    }
+    [[nodiscard]] bool set_late_night(bool on) override {
+        const iclforge::ac3::DynamicRange range =
+            on ? iclforge::ac3::DynamicRange::kLateNight : iclforge::ac3::DynamicRange::kStandard;
+        if (!settings_set_dynamic_range(range)) {
+            return false;
+        }
+        sendspin_set_dynamic_range(range);
+        return true;
+    }
 };
 
 }  // namespace

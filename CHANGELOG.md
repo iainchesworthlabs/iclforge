@@ -84,8 +84,8 @@ The sections below contain the complete change list and fixes.
   of their dynamic range is kept: `GET` and `PUT /dynamic-range`, `standard` (the default, and what a sink always
   did) or `late-night`, which applies the stream's own heavy compression (`compr`, or an AC-4 speaker DRC mode) at the
   level dialogue was already heard at, not RF mode's 11 dB higher. It is stored on the board, followed from the next
-  stream, and wins over a server's decoder mode while it is on. The plan and the measurements are
-  `planning/hearth-late-night.md`.
+  stream, and wins over a server's decoder mode while it is on; a board with a screen has it as *Late night* under
+  Preferences, which Reset preferences puts back. The plan and the measurements are `planning/hearth-late-night.md`.
 - **The title card.** The sink lists `metadata@v1` in its hello (a board with a screen only), so a server tells it what is
   playing, and the panel can show the title, the artist, and the album and year, with the song's time and a progress line
   as the lyric screens have. The card is the third choice in Adjust (`PUT /now-playing title`); until a server has said a

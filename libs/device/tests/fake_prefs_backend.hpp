@@ -20,6 +20,7 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    bool late_night_ = false;
     int brightness_ = nowview::kDefaultBrightness;
     wallclock::ClockFormat clock_;
     nowview::NightSchedule night_;
@@ -120,6 +121,15 @@ class FakeBackend final : public Backend {
         }
         trim_text_ = std::string(statements);
         trim_summary_ = statements == "reset" ? "none set" : "1 speaker set";
+        return true;
+    }
+    [[nodiscard]] bool late_night() const override { return late_night_; }
+    [[nodiscard]] bool set_late_night(bool on) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        late_night_ = on;
         return true;
     }
 

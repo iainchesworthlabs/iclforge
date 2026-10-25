@@ -279,6 +279,7 @@ greyed, and a default that is never a choice the board cannot make.
 | Factory reset | `factory-reset` | `/factory-reset` | as Restart |
 | Identify speakers: a button, *Play each*, that says *Stop* while its tone plays | `identify-speakers` | `/identify` | the build has a Sendspin player; a song playing says so under the row |
 | Speaker levels and distances: a sheet (kind `sheet`) with the room, a level and a distance for each speaker | `speaker-trim` | `/trim` | the build has a Sendspin player; the distance needs delay lines (PSRAM) |
+| Late night: standard or late night; from the next stream, and put back by Reset preferences ([Late night](sink-esp32-s3.md#late-night)) | `late-night` | `/dynamic-range` | the build has a Sendspin player: it decodes the Dolby streams |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the

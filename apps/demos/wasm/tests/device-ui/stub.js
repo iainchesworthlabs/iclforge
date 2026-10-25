@@ -570,6 +570,7 @@ function screenBoard() {
 const NO_SCREEN = 'This board has no screen.';
 const NO_CLOCK = 'This board keeps no time: it has no network to ask a time server on.';
 const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
+const NO_DOLBY = 'This board decodes no Dolby stream: it has no Sendspin player.';
 const ON_OFF = [
     ['on', 'On'],
     ['off', 'Off'],
@@ -697,6 +698,19 @@ const PREFERENCES = [
         choices: [],
     },
     {
+        id: 'late-night',
+        group: 'Sound',
+        label: 'Late night',
+        kind: 'choice',
+        apply: 'next-play',
+        route: '/dynamic-range',
+        needs: 'dolby',
+        choices: [
+            ['standard', 'Standard'],
+            ['late-night', 'Late night'],
+        ],
+    },
+    {
         id: 'time-zone',
         group: 'Time',
         label: 'Time zone',
@@ -721,6 +735,8 @@ function unavailableReason(p, device) {
             return !screen ? NO_SCREEN : clock;
         case 'player':
             return device.sound ? '' : NO_PLAYER;
+        case 'dolby':
+            return device.dynamicRange ? '' : NO_DOLBY;
         default:
             return clock;
     }
@@ -750,6 +766,8 @@ function preferenceValue(p, device) {
             return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
         case 'identify-speakers':
             return device.sound && device.sound.identify.active ? 'running' : 'run';
+        case 'late-night':
+            return device.dynamicRange || '';
         case 'speaker-trim': {
             // libs/render's summary_text: how many speakers have a level or a distance set.
             const set = device.sound ? device.sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
