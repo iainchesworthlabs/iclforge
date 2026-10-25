@@ -29,7 +29,13 @@ refusal:
 4. **Asserts**, per row: finished and not failed, every unit, no resynchronised byte, no sink
    underrun, no failed allocation, no reboot, and for AC-4 the PCM hash the host pins
    (testdata/ac4-probe-pcm-hashes.json). A row that expects the C6's refusal expects state
-   failed, why "memory", and no reboot.
+   failed, why "memory", and no reboot. A row that names a `layout` needs the board to carry it,
+   and the suite asks the board (GET /layout-options, the firmware's one verdict over its
+   capabilities, which PUT /layout applies too): where the board carries the layout the row is
+   played; where it does not, `if_unavailable` says what the row is: "refuse" (the default) has
+   PUT /layout answer 409 with the board's own reason, which is the row's pass, and "skip" leaves
+   the row out with the reason stated. A layout carried with a limit is played and the limit
+   noted. Neither is a play, so neither has figures beyond its state and reason.
 5. **Figures**, per row: the decoder's time per frame (`us_per_frame` less the sink's and the
    renderer's, over the frame's 32 ms; an AC-4 play's own `decoder_permille`), the decode stack
    left, the sink queue's least headroom. On an I2S sink `realtime_permille` is not one of them:
@@ -218,8 +224,32 @@ class Board:
         return data.decode("utf-8", "replace").strip()
 
     def set_layout(self, name: str) -> int:
-        """PUT /layout: the status code (200, or 409 for a layout the sink has no slots for)."""
-        return self._request("PUT", "/layout", name.encode("utf-8"))[0]
+        """PUT /layout: the status code (200, or 409 for a layout the board cannot carry)."""
+        return self.put_layout(name)[0]
+
+    def put_layout(self, name: str) -> tuple[int, str]:
+        """PUT /layout: the status code and the board's words. A layout the board cannot carry is a
+        409 whose body is the reason (iclforge/layout_options.hpp), the sentence GET /layout-options
+        lists for it; one it takes with a limit is a 200 that says the limit after the ok."""
+        status, _, data = self._request("PUT", "/layout", name.encode("utf-8"))
+        return status, data.decode("utf-8", "replace").strip()
+
+    def layout_options(self) -> dict[str, Any] | None:
+        """GET /layout-options: what the board can be set to, layout by layout, and why not, as the
+        firmware's one verdict over its capabilities (iclforge/layout_options.hpp in libs/device).
+        None on a firmware that has no such route (a 404), which a row is then played as before."""
+        status, _, data = self._request("GET", "/layout-options")
+        if status == 404:
+            return None
+        if status != 200:
+            raise SuiteError(f"{self.host}: GET /layout-options answered {status}")
+        try:
+            options = json.loads(data.decode("utf-8", "replace"))
+        except ValueError as error:
+            raise SuiteError(f"{self.host}: GET /layout-options is not JSON: {error}") from error
+        if not isinstance(options, dict) or not isinstance(options.get("options"), list):
+            raise SuiteError(f"{self.host}: GET /layout-options has no list of options")
+        return options
 
     def sendspin(self) -> dict[str, Any]:
         """/status's `sendspin` object, the fields the suite reads by name (the network object is
@@ -441,8 +471,92 @@ def plan(
             raise SuiteError(
                 f"play {row['id']} names stream '{row['stream']}', which is not listed"
             )
+        policy = row.get("if_unavailable")
+        if policy is not None and policy not in UNAVAILABLE_POLICIES:
+            raise SuiteError(
+                f"play {row['id']} says if_unavailable '{policy}': it is "
+                + " or ".join(UNAVAILABLE_POLICIES)
+            )
+        if policy is not None and not row.get("layout"):
+            raise SuiteError(
+                f"play {row['id']} says what to do if its layout is unavailable and names none"
+            )
         out.append({**row, "stream_spec": stream})
     return out
+
+
+# --- what a board can carry -----------------------------------------------------------------
+
+# A row that names a `layout` needs the board to carry it. The board says which layouts it can
+# (GET /layout-options: the firmware's one verdict over its capabilities, the same one PUT /layout
+# applies), and the suite does not guess from the profile: a row runs where the board carries its
+# layout, and where the board does not, `if_unavailable` says what the row is: "refuse" (the
+# default) expects PUT /layout to answer 409 with the board's own reason, and that refusal is the
+# row's pass, since a board that is told a layout it cannot carry is meant to say no; "skip" leaves
+# the row out, with the reason stated. A layout the board carries with a limit is played, and the
+# limit is a note.
+UNAVAILABLE_POLICIES = ("refuse", "skip")
+
+
+def layout_entry(options: dict[str, Any] | None, layout: str) -> dict[str, Any] | None:
+    """The board's listing for one layout, or None when it has none: a firmware without
+    GET /layout-options, or a layout that the listing's catalog does not carry."""
+    for entry in (options or {}).get("options", []):
+        if isinstance(entry, dict) and entry.get("layout") == layout:
+            return entry
+    return None
+
+
+def describe_layouts(options: dict[str, Any] | None) -> str:
+    """The board's listing in one line: what it carries, what it carries with a limit, what it
+    does not."""
+    if options is None:
+        return "layouts: the board has no GET /layout-options; every row is played as written"
+    groups: dict[str, list[str]] = {"supported": [], "limits": [], "unavailable": []}
+    for entry in options.get("options", []):
+        if isinstance(entry, dict):
+            groups.setdefault(str(entry.get("verdict")), []).append(str(entry.get("layout")))
+    return (
+        f"layouts ({options.get('slots')} slots): supported {' '.join(groups['supported']) or '-'}"
+        f"; with limits {' '.join(groups['limits']) or '-'}"
+        f"; unavailable {' '.join(groups['unavailable']) or '-'}"
+    )
+
+
+def layout_outcome(
+    board: Board, row: dict[str, Any], layout: str, options: dict[str, Any] | None
+) -> PlayResult | None:
+    """What a row on a layout is when the board says it cannot carry that layout, or None when
+    the row is to be played: the board lists it as carried (with or without a limit), or lists
+    nothing about it."""
+    entry = layout_entry(options, layout)
+    if entry is None or entry.get("verdict") != "unavailable":
+        return None
+    reason = str(entry.get("reason") or "")
+    result = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
+    result.why = reason or None
+    if row.get("if_unavailable", "refuse") == "skip":
+        result.state = "skipped"
+        result.notes.append(f"skipped: this board cannot carry {layout}: {reason}")
+        return result
+    previous = board.layout()
+    code, body = board.put_layout(layout)
+    if code == 200:
+        # It took a layout it listed as unavailable: the finding below, and the board's own back.
+        board.set_layout(previous)
+    result.state = "refused-layout"
+    if code != 409:
+        result.findings.append(
+            f"PUT /layout {layout} answered {code}, expected 409: the board's own listing says it "
+            f"cannot carry it ({reason})"
+        )
+    elif body != reason:
+        result.findings.append(
+            f"PUT /layout {layout} was refused with {body!r}, the board's listing gives {reason!r}"
+        )
+    else:
+        result.notes.append(f"{layout} is refused, as the board's listing says: {reason}")
+    return result
 
 
 def lan_address_for(host: str) -> str:
@@ -681,26 +795,39 @@ def run_play(
     timeout: float,
     sleep: float,
     sendspin: SendspinContext | None = None,
+    layouts: dict[str, Any] | None = None,
 ) -> tuple[PlayResult, int | None]:
-    """One row, played; returns its result and the log offset to carry on from."""
+    """One row, played; returns its result and the log offset to carry on from. `layouts` is the
+    board's own listing (GET /layout-options): a row on a layout the board cannot carry is not
+    played, and is what its `if_unavailable` says (layout_outcome)."""
     if row.get("via") == "sendspin":
         return run_sendspin_play(board, row, suite, sendspin, mark)
     layout = row.get("layout")
     if not layout:
         return _play_http(board, row, base_url, counter, mark, suite, pins, timeout, sleep)
+    outcome = layout_outcome(board, row, layout, layouts)
+    if outcome is not None:
+        return outcome, mark
     # A row on another layout (the P4X's full TDM frame, where the board's own is 2.0): set for the
     # play and put back after it, so that the next row is played as it would have been without it.
     previous = board.layout()
-    code = board.set_layout(layout)
+    code, body = board.put_layout(layout)
     if code != 200:
         refused = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
         refused.state = "refused"
-        refused.findings.append(f"PUT /layout {layout} answered {code}, expected 200")
+        refused.findings.append(
+            f"PUT /layout {layout} answered {code}, expected 200" + (f": {body}" if body else "")
+        )
         return refused, mark
     try:
-        return _play_http(board, row, base_url, counter, mark, suite, pins, timeout, sleep)
+        played, mark = _play_http(board, row, base_url, counter, mark, suite, pins, timeout, sleep)
     finally:
         board.set_layout(previous)
+    # A layout the board carries with a limit on it is played, and the limit is said.
+    entry = layout_entry(layouts, layout)
+    if entry is not None and entry.get("verdict") == "limits" and entry.get("reason"):
+        played.notes.append(f"{layout} is listed with a limit: {entry['reason']}")
+    return played, mark
 
 
 def _play_http(
@@ -849,6 +976,7 @@ def run_suite(
     timeout: float = 120.0,
     sleep: float = 0.4,
     sendspin: SendspinContext | None = None,
+    layouts: dict[str, Any] | None = None,
 ) -> list[PlayResult]:
     rows = plan(suite, profile, only)
     mark: int | None = None
@@ -860,7 +988,7 @@ def run_suite(
         for _ in range(max(1, repeat)):
             counter += 1
             played, mark = run_play(
-                board, row, base_url, counter, mark, suite, pins, timeout, sleep, sendspin
+                board, row, base_url, counter, mark, suite, pins, timeout, sleep, sendspin, layouts
             )
             runs.append(played)
             if played.findings and played.state in (None, "refused"):
@@ -1012,7 +1140,12 @@ def compare(
             regressions.append(f"{play}: not in the run")
             continue
         if now.get("state") != base.get("state"):
-            regressions.append(f"{play}: state {now.get('state')}, baseline {base.get('state')}")
+            # A row the board no longer carries the layout of says why, in the board's words.
+            why = now.get("why") if now.get("state") in ("skipped", "refused-layout") else None
+            regressions.append(
+                f"{play}: state {now.get('state')}, baseline {base.get('state')}"
+                + (f" ({why})" if why else "")
+            )
             continue
         base_time, now_time = base.get("decoder_permille"), now.get("decoder_permille")
         if base_time is not None and now_time is not None:
@@ -1155,6 +1288,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         before = board.status()
         if before.get("state") != "stopped":
             raise SuiteError(f"the board's /status is {before.get('state')!r}, not 'stopped'")
+        # What the board says it can carry: a row on a layout it cannot is its refusal, not a play.
+        layouts = board.layout_options() if any(row.get("layout") for row in rows) else None
+        if any(row.get("layout") for row in rows):
+            print(describe_layouts(layouts))
         print(
             f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
             f"profile {args.profile} at {hardware.get('profile_hash')}"
@@ -1191,6 +1328,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.repeat,
             args.play_timeout,
             sendspin=sendspin,
+            layouts=layouts,
         )
         board.stop()
         record = run_record(args.profile, hardware, results, boot, args.board, boots)
