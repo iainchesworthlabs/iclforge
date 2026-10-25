@@ -120,10 +120,6 @@
       "commit": "2d6d4bf3f5f006284c6f2e325310c3049e59c8fb",
       "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
     },
-    "8cb778bfe": {
-      "commit": "8cb778bfea00e093daaa8e2558aec7dbdda026bf",
-      "what": "the tree panel_preview was built from: the Speaker layout list in Preferences, each layout with its reason beside it, and the question asked while a stream plays, 2026-10-25"
-    },
     "54afe292e": {
       "commit": "54afe292ef88cfea2525de57f5be9b42e9dbb6fb",
       "what": "the tree panel_preview was built from: the Preferences sheet beside Adjust, with its registry, capability description and sizes from the display, 2026-10-25"
