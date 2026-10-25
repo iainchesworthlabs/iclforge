@@ -250,7 +250,7 @@ the stream's own words: a stream that carries no `compr` word decodes exactly as
 Music Assistant has no such words at all. On a stream with them, the loud-to-quiet distance of the test stream fell
 from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). Every board with a Sendspin player
 answers the route; a board with no AC-4 decoder (the C6) is sent PCM for AC-4 and so has nothing to compress there.
-What was measured, and what was not, is in [the plan](../../planning/hearth-late-night.md).
+What was measured, and what was not, is in `planning/hearth-late-night.md`.
 
 ## Groups
 
