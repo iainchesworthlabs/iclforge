@@ -195,6 +195,19 @@ TEST_CASE("the speakers style is inert where the screen draws no speakers", "[pr
     }
 }
 
+TEST_CASE("Reset preferences puts the speakers style back to glow, on a board with a screen only", "[preferences]") {
+    REQUIRE(prefs::find("speakers-style")->on_reset == prefs::OnReset::kReset);
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        backend.style_ = nv::SpeakersStyle::kPulse;
+        const prefs::ResetReport report = prefs::reset_preferences(backend);
+        const bool listed = std::find(report.reset.begin(), report.reset.end(), "speakers-style") != report.reset.end();
+        REQUIRE(listed == variant.caps.has_screen());
+        REQUIRE(backend.style_ == (variant.caps.has_screen() ? nv::SpeakersStyle::kGlow : nv::SpeakersStyle::kPulse));
+    }
+}
+
 TEST_CASE("each entry against each known board: a reason wherever it is greyed, a default wherever it is on",
           "[preferences]") {
     for (const auto& variant : iclforge::known_variants()) {

@@ -1005,6 +1005,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         Object.assign(stub.device.screen, {
             view: 'clock',
             dimAfter: '30',
+            speakersStyle: 'pulse',
             brightness: 40,
             clockFormat: '12 seconds',
             night: { enabled: true, from: '23:00', to: '06:00', idle: true },
@@ -1018,6 +1019,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         // What a person chose is back; what the board is stays.
         expect(stub.device.screen.view).toBe('speakers');
         expect(stub.device.screen.dimAfter).toBe('5');
+        expect(stub.device.screen.speakersStyle).toBe('glow');
         expect(stub.device.screen.brightness).toBe(80);
         expect(stub.device.screen.clockFormat).toBe('24');
         expect(stub.device.screen.night).toEqual({ enabled: false, from: '22:00', to: '07:00', idle: false });

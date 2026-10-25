@@ -1770,7 +1770,7 @@ async function startStub() {
             // pairings and the time zone stay (libs/device's settings_keys.hpp). At once.
             case 'POST /reset-preferences':
                 if (device.screen) {
-                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                 }
                 return send(res, 200, REPLIES.resetPreferencesOk);
             // The factory reset: only by the board's own address or name, and only for the words; then
@@ -1790,7 +1790,7 @@ async function startStub() {
                         device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
                     }
                     if (device.screen) {
-                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                     }
                     if (device.time) {
                         Object.assign(device.time, { zone: 'none', zoneName: 'none', server: 'none', sync: 'on' });
