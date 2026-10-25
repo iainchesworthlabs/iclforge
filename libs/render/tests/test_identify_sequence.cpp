@@ -170,7 +170,7 @@ TEST_CASE("a burst fades in and out, so no speaker is clicked", "[render][identi
         if (72'000 - 1 - k < 960) {
             gain = std::min(gain, fade(72'000 - 1 - k));
         }
-        REQUIRE(out[k] == Approx(plain[k] * gain).margin(1e-6).epsilon(1e-5));
+        REQUIRE(out[k] == Approx(static_cast<double>(plain[k]) * gain).margin(1e-6).epsilon(1e-5));
     }
     // So the first and last samples are almost nothing, and the middle is the noise as it is.
     REQUIRE(std::fabs(out[0]) < 0.001F);
