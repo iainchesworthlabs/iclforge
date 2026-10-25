@@ -13,7 +13,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
@@ -40,6 +42,7 @@ constexpr std::size_t kN = 256;
 // fold of a room of one or two speakers. Each channel is a constant, so that the peak of a slot says which channel
 // is on it.
 struct Played {
+    explicit Played(OutputLayout room) : layout(std::move(room)) {}
     OutputLayout layout;
     bool folded = false;
     std::size_t channels = 0;
@@ -49,7 +52,7 @@ struct Played {
 };
 
 Played play(const char* text, std::size_t channels, std::array<float, 2> amplitude = {0.5F, 0.125F}) {
-    Played out{*OutputLayout::parse(text)};
+    Played out(*OutputLayout::parse(text));
     out.channels = channels;
     const auto serving = serve(out.layout, DownmixTarget::kLoRo, ObjectsPolicy::kAuto);
     out.folded = serving.fold.has_value();
