@@ -56,3 +56,69 @@ TEST_CASE("no stream keeps the decoders of more than one family", "[decoder_keep
         }
     }
 }
+
+namespace {
+
+// The decoders a board holds across a run of streams, the way burst_player.cpp's new_stream() holds
+// them: what the next stream does not keep is let go, and a coded stream makes its own decoder at
+// its first chunk when it has none.
+struct Resident {
+    bool ac3_family = false;
+    bool opus = false;
+    bool ac4 = false;
+};
+
+Resident begin_stream(Resident held, DecoderNeed need, bool psram) {
+    const auto kept = decoders_kept(need, psram);
+    held.ac3_family = held.ac3_family && kept.ac3_family;
+    held.opus = held.opus && kept.opus;
+    held.ac4 = held.ac4 && kept.ac4;
+    held.ac3_family = held.ac3_family || need == DecoderNeed::kAc3Family;
+    held.opus = held.opus || need == DecoderNeed::kOpus;
+    held.ac4 = held.ac4 || need == DecoderNeed::kAc4;
+    return held;
+}
+
+}  // namespace
+
+TEST_CASE("a PCM stream drops the resident AC-3 decoder and the next coded stream makes it again",
+          "[decoder_keep]") {
+    Resident held;
+    held = begin_stream(held, DecoderNeed::kAc3Family, true);
+    CHECK(held.ac3_family);
+
+    held = begin_stream(held, DecoderNeed::kNone, true);
+    CHECK_FALSE(held.ac3_family);
+
+    held = begin_stream(held, DecoderNeed::kAc3Family, true);
+    CHECK(held.ac3_family);
+}
+
+TEST_CASE("a coded stream after a coded stream keeps its decoder", "[decoder_keep]") {
+    Resident held;
+    held = begin_stream(held, DecoderNeed::kAc3Family, true);
+    held = begin_stream(held, DecoderNeed::kAc3Family, true);
+    CHECK(held.ac3_family);
+}
+
+TEST_CASE("a part without PSRAM keeps the AC-3 decoder through a PCM stream", "[decoder_keep]") {
+    Resident held;
+    held = begin_stream(held, DecoderNeed::kAc3Family, false);
+    held = begin_stream(held, DecoderNeed::kNone, false);
+    CHECK(held.ac3_family);
+}
+
+TEST_CASE("an Opus or AC-4 decoder never outlives its stream into PCM", "[decoder_keep]") {
+    for (const bool psram : {false, true}) {
+        Resident held;
+        held = begin_stream(held, DecoderNeed::kOpus, psram);
+        CHECK(held.opus);
+        held = begin_stream(held, DecoderNeed::kNone, psram);
+        CHECK_FALSE(held.opus);
+
+        held = begin_stream(held, DecoderNeed::kAc4, psram);
+        CHECK(held.ac4);
+        held = begin_stream(held, DecoderNeed::kNone, psram);
+        CHECK_FALSE(held.ac4);
+    }
+}
