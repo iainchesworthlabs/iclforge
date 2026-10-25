@@ -60,9 +60,7 @@
 #include "freertos/task.h"
 
 #include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/render/identify_request.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/firmware.hpp"
 #include "iclforge/log.hpp"
@@ -78,6 +76,8 @@
 #include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "sound.hpp"
+#include "sound_routes.hpp"
 #include "system_control.hpp"
 #include "system_reset.hpp"
 #include "wall_clock.hpp"
@@ -101,7 +101,7 @@ const void* thread_token() noexcept {
 
 namespace {
 
-constexpr std::uint32_t kSampleRate = 48000;
+constexpr std::uint32_t kSampleRate = player::kSinkSampleRate;
 constexpr std::uint64_t kFrameDurationUs = 32000;  // §5.3.2: 1,536 samples at 48 kHz
 constexpr std::size_t kMaxSlots = iclforge::render::OutputLayout::kMaxSlots;
 
@@ -630,130 +630,6 @@ void report_end(const Session& session, const iclforge::PlayerStats& stats) {
     std::printf("result=%s\n", (stats.frames_played > 0 && !stats.failed) ? "pass" : "fail");
 }
 
-// GET /trim: the listener's level and distance for each speaker the layout in force has at an output, with what is
-// really in force there (a server's settings can differ) and what this build can do (iclforge/render/
-// speaker_trim.hpp). Nothing on a board with no player.
-std::optional<std::string> speaker_trim_json() {
-    namespace st = iclforge::render::speaker_trim;
-    const player::SoundCaps caps = player::sendspin_sound_caps();
-    if (!caps.player) {
-        return std::nullopt;
-    }
-    const std::optional<player::SpeakerTrimStatus> status = player::sendspin_speaker_trim_status();
-    const st::SpeakerTrimTable& table = player::settings().speaker_trim;
-    st::TrimReport report;
-    report.caps = caps.trim;
-    report.sample_rate_hz = kSampleRate;
-    if (status) {
-        report.layout = status->layout.data();
-        report.server_level = status->server_level;
-        report.server_delay = status->server_delay;
-        report.farthest_m = static_cast<double>(status->farthest_cm) / 100.0;
-        for (std::size_t i = 0; i < status->count; ++i) {
-            const player::SpeakerTrimStatus::Row& row = status->rows[i];
-            const st::SpeakerTrim own = table.get(row.role);
-            report.rows.push_back(st::TrimRow{.role = row.role,
-                                              .output = row.output,
-                                              .level_db = own.level_db(),
-                                              .distance_m = own.distance_m(),
-                                              .applied_level_db = static_cast<double>(row.applied_level_db),
-                                              .applied_delay_samples = row.applied_delay_samples,
-                                              .delay_clamped = row.delay_clamped});
-        }
-    }
-    return st::trim_json(report);
-}
-
-// PUT /trim: statements that change the table (SpeakerTrimTable::apply_text), taken whole or not at all, stored,
-// and handed to the player, which puts them in force at its next chunk.
-std::optional<iclforge::ControlRefusal> set_speaker_trim(std::string_view body) {
-    using Kind = iclforge::ControlRefusal::Kind;
-    const player::SoundCaps caps = player::sendspin_sound_caps();
-    if (!caps.player) {
-        return iclforge::ControlRefusal{Kind::kMissing, "this board has no player to apply a speaker trim to"};
-    }
-    iclforge::render::speaker_trim::SpeakerTrimTable next = player::settings().speaker_trim;
-    const iclforge::render::speaker_trim::ParseResult parsed = next.apply_text(body);
-    if (!parsed.ok) {
-        return iclforge::ControlRefusal{Kind::kBadRequest, std::string("PUT /trim: ") + parsed.error};
-    }
-    if (next == player::settings().speaker_trim) {
-        return std::nullopt;
-    }
-    // A distance is a delay, which needs delay lines: levels are taken, and a distance is refused with the reason
-    // rather than stored for a board that will never play it.
-    if (!caps.trim.delay) {
-        for (iclforge::render::speaker_trim::RoleCode role = 0; role < iclforge::render::speaker_trim::kRoles; ++role) {
-            if (next.get(role).cm != player::settings().speaker_trim.get(role).cm) {
-                return iclforge::ControlRefusal{Kind::kConflict,
-                                                std::string("a distance is a delay, and ") + caps.trim.delay_reason};
-            }
-        }
-    }
-    // And the delay lines hold only so much: the nearest and the farthest speaker can be no further apart than
-    // sound travels in them. A span that is already past it (a table stored by a build with longer lines) can
-    // still be made smaller, or left alone while a level is set.
-    if (next.span_cm() > caps.trim.max_span_cm && next.span_cm() > player::settings().speaker_trim.span_cm()) {
-        std::array<char, 16> apart{};
-        std::snprintf(apart.data(), apart.size(), "%u.%02u", static_cast<unsigned>(caps.trim.max_span_cm / 100),
-                      static_cast<unsigned>(caps.trim.max_span_cm % 100));
-        return iclforge::ControlRefusal{
-            Kind::kConflict, std::string("the nearest and the farthest speaker can be at most ") + apart.data() +
-                                 " m apart on this board (its delay lines hold " +
-                                 std::to_string((caps.trim.max_delay_samples * 1000U) / kSampleRate) + " ms)"};
-    }
-    if (!player::settings_set_speaker_trim(next)) {
-        return iclforge::ControlRefusal{Kind::kConflict, "the trim could not be stored"};
-    }
-    player::sendspin_set_speaker_trim(next);
-    return std::nullopt;
-}
-
-// GET /identify: what the test tone is doing, and the speakers it can play.
-std::optional<std::string> identify_json() {
-    const player::SoundCaps caps = player::sendspin_sound_caps();
-    iclforge::render::IdentifyReport report;
-    report.available = caps.player;
-    report.reason = caps.identify_reason;
-    const player::IdentifyStatus now = player::sendspin_identify_status();
-    report.active = now.active;
-    report.output = now.output;
-    report.role = now.role;
-    report.remaining_ms = now.remaining_ms;
-    if (const std::optional<player::SpeakerTrimStatus> trim = player::sendspin_speaker_trim_status()) {
-        for (std::size_t i = 0; i < trim->count && report.speaker_count < report.speakers.size(); ++i) {
-            report.speakers[report.speaker_count++] = trim->rows[i].role;
-        }
-    }
-    return iclforge::render::identify_json(report);
-}
-
-// POST /identify: off, all, a speaker, or a speaker and loop. Never over a play from the control surface (which
-// holds the player), and the player refuses it over a stream.
-std::optional<iclforge::ControlRefusal> set_identify(std::string_view body) {
-    using Kind = iclforge::ControlRefusal::Kind;
-    namespace render = iclforge::render;
-    const std::optional<render::IdentifyRequest> request = render::parse_identify(body);
-    if (!request) {
-        return iclforge::ControlRefusal{
-            Kind::kBadRequest, "POST /identify wants off, all, a speaker such as L, Ls or LFE, or a speaker and loop"};
-    }
-    if (request->shape != render::IdentifyRequest::Shape::kOff) {
-        xSemaphoreTake(g_player_mutex, portMAX_DELAY);
-        const bool playing = g_player != nullptr;
-        xSemaphoreGive(g_player_mutex);
-        if (playing) {
-            return iclforge::ControlRefusal{Kind::kConflict, render::identify_outcome_text(render::IdentifyOutcome::kBusy)};
-        }
-    }
-    const render::IdentifyOutcome outcome = player::sendspin_identify(*request);
-    if (render::identify_accepted(outcome)) {
-        return std::nullopt;
-    }
-    return iclforge::ControlRefusal{outcome == render::IdentifyOutcome::kNoPlayer ? Kind::kMissing : Kind::kConflict,
-                                    render::identify_outcome_text(outcome)};
-}
-
 // The control surface's view, all of it through the mutex, the queue or an
 // atomic.
 iclforge::ControlHandlers control_handlers() {
@@ -805,10 +681,10 @@ iclforge::ControlHandlers control_handlers() {
     // The listener's sound (planning/p4x-preferences.md): a level and distance for each speaker, and a test tone out
     // of each, where a Sendspin player is there to apply them. The others answer that they have none.
     if (player::sendspin_sound_caps().player) {
-        h.trim = speaker_trim_json;
-        h.set_trim = set_speaker_trim;
-        h.identify = identify_json;
-        h.set_identify = set_identify;
+        h.trim = player::sound_trim_json;
+        h.set_trim = player::sound_set_trim;
+        h.identify = player::sound_identify_json;
+        h.set_identify = player::sound_identify;
     }
     // On a part with one I2S controller (an ESP32-C6), and on a sink that
     // drives one line only, there is no second line to wire: /status leaves
@@ -1053,6 +929,15 @@ iclforge::FirmwareConfig firmware_config() {
 }  // namespace
 
 namespace player {
+
+// A play from the control surface (POST /play) holds the player; the test tone does not play over it.
+bool control_play_active() {
+    xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+    const bool playing = g_player != nullptr;
+    xSemaphoreGive(g_player_mutex);
+    return playing;
+}
+
 
 namespace {
 

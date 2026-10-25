@@ -463,8 +463,11 @@ function screenBoard() {
 }
 
 // The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
-// registry's entries with the registry's words, as far as the stand-in models them. Today that is the two of the
-// screen; contract.spec.js holds each to the registry. A board with no screen lists them greyed, with the reason.
+// registry's entries with the registry's words, as far as the stand-in models them: the two of the screen and the two of
+// the sound; contract.spec.js holds each to the registry. A board with no screen lists the first two greyed, with the
+// reason, and one with no player the last two.
+const NO_SCREEN = 'This board has no screen.';
+const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
 const PREFERENCES = [
     {
         id: 'now-view',
@@ -473,6 +476,7 @@ const PREFERENCES = [
         kind: 'choice',
         apply: 'live',
         route: '/now-playing',
+        needs: 'screen',
         choices: [
             ['speakers', 'Speakers'],
             ['title', 'Title'],
@@ -488,6 +492,7 @@ const PREFERENCES = [
         kind: 'stepper',
         apply: 'live',
         route: '/dim-after',
+        needs: 'screen',
         choices: [
             ['1', '1 min'],
             ['5', '5 min'],
@@ -499,23 +504,72 @@ const PREFERENCES = [
             ['never', 'Never'],
         ],
     },
+    {
+        id: 'identify-speakers',
+        group: 'Sound',
+        label: 'Identify speakers',
+        kind: 'action',
+        apply: 'live',
+        route: '/identify',
+        needs: 'player',
+        choices: [
+            ['run', 'Play each'],
+            ['running', 'Stop'],
+        ],
+    },
+    {
+        id: 'speaker-trim',
+        group: 'Sound',
+        label: 'Speaker levels and distances',
+        kind: 'sheet',
+        apply: 'live',
+        route: '/trim',
+        needs: 'player',
+        choices: [],
+    },
 ];
+
+// What an entry's value says: the screen's view and dim time, the tone at rest or running, and how many speakers have
+// a level or a distance set (libs/render's summary_text).
+function preferenceValue(device, p) {
+    const screen = device.screen;
+    const sound = device.sound;
+    switch (p.id) {
+        case 'now-view':
+            return screen ? screen.view : '';
+        case 'dim-after':
+            return screen ? screen.dimAfter : '';
+        case 'identify-speakers':
+            return sound && sound.identify.active ? 'running' : 'run';
+        default: {
+            const set = sound ? sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
+            return set === 0 ? 'none set' : `${set} ${set === 1 ? 'speaker' : 'speakers'} set`;
+        }
+    }
+}
 
 function preferencesJson(device) {
     const screen = device.screen;
-    const reason = screen ? '' : 'This board has no screen.';
-    const entries = PREFERENCES.map((p) => ({
-        id: p.id,
-        group: p.group,
-        label: p.label,
-        kind: p.kind,
-        apply: p.apply,
-        route: p.route,
-        value: screen ? (p.id === 'now-view' ? screen.view : screen.dimAfter) : '',
-        available: Boolean(screen),
-        reason,
-        choices: p.choices.map(([id, label]) => ({ id, label, available: Boolean(screen), reason })),
-    }));
+    const entries = PREFERENCES.map((p) => {
+        const on = p.needs === 'screen' ? Boolean(screen) : Boolean(device.sound);
+        const reason = on ? '' : p.needs === 'screen' ? NO_SCREEN : NO_PLAYER;
+        const entry = {
+            id: p.id,
+            group: p.group,
+            label: p.label,
+            kind: p.kind,
+            apply: p.apply,
+            route: p.route,
+            value: preferenceValue(device, p),
+            available: on,
+            reason,
+        };
+        // A sheet has no choices to list.
+        if (p.choices.length > 0) {
+            entry.choices = p.choices.map(([id, label]) => ({ id, label, available: on, reason }));
+        }
+        return entry;
+    });
     return JSON.stringify({
         profile: (device.hardware && device.hardware.profile) || '',
         display: screen ? 'dsi' : 'none',

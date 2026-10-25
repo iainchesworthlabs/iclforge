@@ -607,8 +607,8 @@ test('the stand-in lists the preferences, greyed with the reason where the board
     try {
         let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.display).toBe('none');
-        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after']);
-        for (const p of listing.preferences) {
+        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after', 'identify-speakers', 'speaker-trim']);
+        for (const p of listing.preferences.filter((x) => x.group === 'Display')) {
             expect(p.available).toBe(false);
             expect(p.reason).toBe('This board has no screen.');
             for (const choice of p.choices) {
@@ -625,6 +625,52 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.preferences[1].value).toBe('30');
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in lists the sound preferences with the player, and greyed with the reason without one', async () => {
+    const stub = await startStub();
+    try {
+        let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        // The board has a player (the stand-in's default): the tone is a button at rest, the trim a sheet that says what is set.
+        expect(listing.preferences[2]).toMatchObject({
+            id: 'identify-speakers',
+            group: 'Sound',
+            kind: 'action',
+            route: '/identify',
+            value: 'run',
+            available: true,
+            reason: '',
+        });
+        expect(listing.preferences[2].choices.map((c) => c.id)).toEqual(['run', 'running']);
+        expect(listing.preferences[3]).toMatchObject({
+            id: 'speaker-trim',
+            group: 'Sound',
+            kind: 'sheet',
+            route: '/trim',
+            value: 'none set',
+            available: true,
+        });
+        expect(listing.preferences[3].choices).toBeUndefined();
+        // A trim made through its own route is counted; a tone running says so.
+        await fetch(`${stub.url}trim`, { method: 'PUT', body: 'L level=-1.5\nC distance=2.4\n' });
+        await fetch(`${stub.url}identify`, { method: 'POST', body: 'L loop\n' });
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences[3].value).toBe('2 speakers set');
+        expect(listing.preferences[2].value).toBe('running');
+        // No player: both greyed, with the reason, and the sheet still has no choices.
+        stub.device.sound = null;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        for (const p of listing.preferences.filter((x) => x.group === 'Sound')) {
+            expect(p.available).toBe(false);
+            expect(p.reason).toBe('This build has no player, so it has no speakers to play a tone through.');
+        }
+        expect(listing.preferences[3].choices).toBeUndefined();
+        for (const choice of listing.preferences[2].choices) {
+            expect(choice.available).toBe(false);
+        }
     } finally {
         await stub.close();
     }

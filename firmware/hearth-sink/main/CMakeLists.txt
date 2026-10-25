@@ -123,7 +123,8 @@ if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
                             "panel/lvgl/dev_screen.cpp" "panel/lvgl/dev_info.cpp"
                             "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
-                            "panel/lvgl/prefs_screen.cpp" "panel/lvgl/lv_memory.cpp")
+                            "panel/lvgl/prefs_screen.cpp" "panel/lvgl/sound_sheet.cpp"
+                            "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
         list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")
     else()
@@ -138,6 +139,7 @@ idf_component_register(
          "board_caps.cpp"
          "preferences.cpp"
          "settings.cpp"
+         "sound.cpp"
          "provision.cpp"
          "system_reset.cpp"
          "discovery.cpp"

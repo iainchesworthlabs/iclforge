@@ -74,8 +74,10 @@ inline constexpr std::array<Group, 6> kGroups{Group::kDisplay, Group::kSound, Gr
 
 // kChoice: a few words, all shown as buttons. kStepper: an ordered list of stops, shown as - value +. kToggle: two
 // choices, "on" and "off". kText: a value typed in (read-only on a screen until an editor is written for it).
-// kAction: does something when pressed (a check, a restart); its setter is handed "run".
-enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction };
+// kAction: does something when pressed (a check, a restart); its setter is handed "run". kSheet: a row that says what
+// is set ("3 speakers set") and opens an editor of its own on the screen (the per-speaker level and distance); its value
+// is the summary, and its setter takes the board's own text form of the whole (the body of a PUT on its route).
+enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kSheet };
 
 [[nodiscard]] constexpr const char* kind_name(Kind kind) {
     switch (kind) {
@@ -87,6 +89,8 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction };
             return "text";
         case Kind::kAction:
             return "action";
+        case Kind::kSheet:
+            return "sheet";
         case Kind::kChoice:
             break;
     }
@@ -138,6 +142,20 @@ class Backend {
     [[nodiscard]] virtual bool set_now_view(nowview::View view) = 0;
     [[nodiscard]] virtual int dim_after_minutes() const = 0;
     [[nodiscard]] virtual bool set_dim_after_minutes(int minutes) = 0;
+
+    // Sound: the test tone through the speakers one after another (identify_each), and the level and distance kept for
+    // each speaker. The tone is the board's own, played through the output stage the music plays through; it is refused
+    // while something else has the sink, and it stops of its own accord after a minute at most (planning/
+    // hearth-speaker-trim-identify.md). A trim is read and written as the words of PUT /trim ("L level=-1.5
+    // distance=2.4"): the tone and the numbers are applied by the Sendspin player, which this library knows nothing of.
+    [[nodiscard]] virtual bool identify_running() const = 0;
+    // Why the tone cannot start now ("A song is playing."), or empty when it can.
+    [[nodiscard]] virtual std::string identify_blocked() const = 0;
+    // Start the tone at every speaker in turn, once; or stop it. False when the board refused.
+    [[nodiscard]] virtual bool identify_each(bool start) = 0;
+    // "none set", "1 speaker set", "3 speakers set".
+    [[nodiscard]] virtual std::string speaker_trim_summary() const = 0;
+    [[nodiscard]] virtual bool set_speaker_trim_text(std::string_view statements) = 0;
 };
 
 using GetFn = std::string (*)(const Backend&);
@@ -245,6 +263,38 @@ inline constexpr std::array<ChoiceDef, 8> kDimAfterChoices{{
     return minutes.has_value() && backend.set_dim_after_minutes(*minutes);
 }
 
+// The test tone and the trims are the Sendspin player's: they are applied in the stage the music plays through.
+[[nodiscard]] inline Availability needs_player(const BoardCaps& caps) {
+    return caps.sendspin ? Availability::yes()
+                         : Availability::no("This build has no player, so it has no speakers to play a tone through.");
+}
+
+// "run" is the button at rest, "running" the same button saying Stop: the tone ends of its own accord, so the state
+// is read from the board each time the screen looks.
+inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
+    {.id = "run", .label = "Play each"},
+    {.id = "running", .label = "Stop"},
+}};
+
+[[nodiscard]] inline std::string get_identify(const Backend& backend) {
+    return backend.identify_running() ? "running" : "run";
+}
+
+// Pressed while it plays, the button is Stop: the board is told what the person sees.
+[[nodiscard]] inline bool set_identify(Backend& backend, std::string_view /*word*/) {
+    return backend.identify_each(!backend.identify_running());
+}
+
+[[nodiscard]] inline std::string identify_inert(const Backend& backend) {
+    return backend.identify_running() ? std::string() : backend.identify_blocked();
+}
+
+[[nodiscard]] inline std::string get_speaker_trim(const Backend& backend) { return backend.speaker_trim_summary(); }
+
+[[nodiscard]] inline bool set_speaker_trim(Backend& backend, std::string_view statements) {
+    return backend.set_speaker_trim_text(statements);
+}
+
 // The Dark view is dark from the moment a song with no lyrics begins: it has no time to dim after.
 [[nodiscard]] inline std::string dim_after_inert(const Backend& backend) {
     if (backend.now_view() != nowview::View::kDark) {
@@ -256,7 +306,7 @@ inline constexpr std::array<ChoiceDef, 8> kDimAfterChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 2> kRegistry{{
+inline constexpr std::array<Pref, 4> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -283,6 +333,29 @@ inline constexpr std::array<Pref, 2> kRegistry{{
      .inert = &detail::dim_after_inert,
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after},
+    {.id = "identify-speakers",
+     .group = Group::kSound,
+     .label = "Identify speakers",
+     .note = "Plays a quiet test tone through each speaker in turn, so that you can hear which is which.",
+     .kind = Kind::kAction,
+     .apply = Apply::kLive,
+     .route = "/identify",
+     .default_word = "run",
+     .choices = detail::kIdentifyChoices,
+     .availability = &detail::needs_player,
+     .inert = &detail::identify_inert,
+     .get = &detail::get_identify,
+     .set = &detail::set_identify},
+    {.id = "speaker-trim",
+     .group = Group::kSound,
+     .label = "Speaker levels and distances",
+     .note = "Make a speaker louder or quieter, and say how far each one is from where you sit.",
+     .kind = Kind::kSheet,
+     .apply = Apply::kLive,
+     .route = "/trim",
+     .availability = &detail::needs_player,
+     .get = &detail::get_speaker_trim,
+     .set = &detail::set_speaker_trim},
 }};
 
 [[nodiscard]] inline std::span<const Pref> registry() { return kRegistry; }

@@ -5,6 +5,7 @@
 #include "board_caps.hpp"
 #include "panel/panel.hpp"
 #include "settings.hpp"
+#include "sound.hpp"
 
 namespace player {
 namespace {
@@ -32,6 +33,15 @@ class Board final : public iclforge::prefs::Backend {
         }
         panel_set_dim_after(minutes);
         return true;
+    }
+
+    // Sound: sound.cpp, the same code the routes and the Speakers sheet go through.
+    [[nodiscard]] bool identify_running() const override { return sound_identify_running(); }
+    [[nodiscard]] std::string identify_blocked() const override { return sound_identify_blocked(); }
+    [[nodiscard]] bool identify_each(bool start) override { return sound_identify_request(start ? "all" : "off").empty(); }
+    [[nodiscard]] std::string speaker_trim_summary() const override { return sound_trim_summary(); }
+    [[nodiscard]] bool set_speaker_trim_text(std::string_view statements) override {
+        return sound_set_trim_text(statements).empty();
     }
 };
 
