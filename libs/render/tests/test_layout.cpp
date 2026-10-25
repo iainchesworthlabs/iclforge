@@ -21,6 +21,7 @@
 #include <numbers>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -177,6 +178,56 @@ TEST_CASE("the named layouts that exist, and the ones that do not", "[io][layout
     }
     // Whitespace around a name is a configuration file's, not the name's.
     REQUIRE(OutputLayout::parse(" 5.1 \n").has_value());
+}
+
+TEST_CASE("a name never parses to fewer speakers than it says", "[io][layout]") {
+    // Every F.L.H the grammar can spell, with and without a realization
+    // modifier: either refused, or every one of F + L + H locations is there.
+    std::size_t accepted = 0;
+    for (int f = 0; f <= 9; ++f) {
+        for (int l = 0; l <= 9; ++l) {
+            for (int h = 0; h <= 9; ++h) {
+                for (const char* modifier : {"", ":top", ":height", ":upfiring"}) {
+                    const std::string name = std::to_string(f) + "." + std::to_string(l) + "." +
+                                             std::to_string(h) + modifier;
+                    CAPTURE(name);
+                    const auto layout = OutputLayout::parse(name);
+                    if (!layout) {
+                        continue;
+                    }
+                    ++accepted;
+                    REQUIRE(layout->speaker_count() + layout->lfe_count() ==
+                            static_cast<std::size_t>(f + l + h));
+                    REQUIRE(layout->slots() <= OutputLayout::kMaxSlots);
+                    REQUIRE(layout->text() == name);
+                    const auto again = OutputLayout::parse(layout->text());
+                    REQUIRE(again.has_value());
+                    REQUIRE(again->slots() == layout->slots());
+                }
+            }
+        }
+    }
+    CHECK(accepted > 50);
+
+    const auto widest = OutputLayout::parse("9.1.6");
+    REQUIRE(widest.has_value());
+    REQUIRE(widest->slots() == 16);
+    REQUIRE_FALSE(OutputLayout::parse("9.2.6").has_value());
+    REQUIRE_FALSE(OutputLayout::named("9.2.6").has_value());
+    REQUIRE_FALSE(OutputLayout::parse("9.2.6:top").has_value());
+}
+
+TEST_CASE("a list refuses non-finite angles and a seventeenth slot", "[io][layout]") {
+    REQUIRE_FALSE(OutputLayout::parse("nan/0,30/0").has_value());
+    REQUIRE_FALSE(OutputLayout::parse("30/nan,-30/0").has_value());
+    REQUIRE_FALSE(OutputLayout::parse("inf/0").has_value());
+    std::string seventeen = "30/0";
+    for (int i = 1; i < 17; ++i) {
+        seventeen += ",-" + std::to_string(i * 10) + "/0";
+    }
+    REQUIRE_FALSE(OutputLayout::parse(seventeen).has_value());
+    seventeen.erase(seventeen.rfind(','));
+    REQUIRE(OutputLayout::parse(seventeen).has_value());
 }
 
 TEST_CASE("2.0 and 1.0 fold in the decoder; anything else is rendered", "[io][layout]") {
