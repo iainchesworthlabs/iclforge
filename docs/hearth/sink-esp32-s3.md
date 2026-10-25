@@ -166,9 +166,9 @@ resets the whole system, which a Wi-Fi link behind the companion chip needs
 
 **Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to the
 image's defaults, at once and with no restart: what the screen shows without lyrics, when it dims,
-the time zone, and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and
-the choice between the cable and Wi-Fi, the DAC wiring and the speaker layout, the time server and
-whether the board asks it, and the pairings.
+and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and the choice
+between the cable and Wi-Fi, the DAC wiring, the speaker layout and the time zone (the room's, not a
+matter of taste), the time server and whether the board asks it, and the pairings.
 
 **Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
 (the board gets a new identity, so each server has to pair with it again, and has to remove it from
@@ -278,6 +278,27 @@ within 0.25 dB for as coded, aware, and capable with a vocal, with none, and wit
 and a vocal moved. One E-AC-3 run of three missed the part-level case and is not explained.
 Run it with `ICLFORGE_HEARTH_LIVE_KARAOKE_SINK=<the board's mDNS name>` and the tests named
 `network sinks live: ... karaoke stream is reproduced by the board that decodes it`.
+
+## Late night
+
+A film's loud passages and its quiet ones can be a long way apart, and at night the neighbours hear the first
+and you cannot hear the second. The streams the board decodes carry the mixer's own instructions for closing that
+distance, and the board has a setting that uses them: `GET` and `PUT /dynamic-range`, `standard` or `late-night`.
+
+- **`standard`** is what the board always did, and the default: AC-3 and E-AC-3 as the build's operating mode (line, so
+  dialogue is brought to the -31 dBFS reference and the stream's `dynrng` words are applied), AC-4 as coded, and
+  whatever a server sends for the decoder.
+- **`late-night`** applies the stream's heavy compression (the `compr` words of AC-3 and E-AC-3, the speaker DRC
+  modes of AC-4) at the same level dialogue was heard at, so that switching it on moves no stream by its dialnorm. It
+  is *not* RF mode, which would be 11 dB louder. It is the listener's choice at the board, and it wins over a server's
+  decoder mode and compression settings for as long as it is on.
+
+It changes the next stream, not the one that is playing, and it is kept over a restart. It can only be as strong as
+the stream's own words: a stream that carries no `compr` word decodes exactly as it does in `standard`, and PCM from
+Music Assistant has no such words at all. On a stream with them, the loud-to-quiet distance of the test stream fell
+from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). Every board with a Sendspin player
+answers the route; a board with no AC-4 decoder (the C6) is sent PCM for AC-4 and so has nothing to compress there.
+What was measured, and what was not, is in `planning/hearth-late-night.md`.
 
 ## Groups
 

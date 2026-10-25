@@ -6,6 +6,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_about_view.cpp
     test_ac4_sync_frame.cpp
     test_block_ring.cpp
+    test_board_caps.cpp
     test_dac_queue_model.cpp
     test_dev_view.cpp
     test_device_name.cpp
@@ -16,12 +17,15 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_hardware_info.cpp
     test_improv.cpp
     test_interleave.cpp
+    test_layout_options.cpp
     test_log_ring.cpp
     test_now_view.cpp
     test_object_limit.cpp
     test_pairing_records.cpp
     test_pcm_unpack.cpp
     test_playout.cpp
+    test_preferences.cpp
+    test_screen_metrics.cpp
     test_settings_keys.cpp
     test_sink_plan.cpp
     test_system_actions.cpp
@@ -30,6 +34,8 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_unit_hold.cpp
     test_wall_clock.cpp)
 
-target_link_libraries(iclforge-device-tests PRIVATE iclforge::device)
+# iclforge::render is the judge of what a layout is in test_layout_options.cpp (its parser and slot
+# counts); the headers under test stay free of it.
+target_link_libraries(iclforge-device-tests PRIVATE iclforge::device iclforge::render)
 # test_settings_keys.cpp reads two sources of the firmware, to hold the table to what settings.cpp does.
 target_compile_definitions(iclforge-device-tests PRIVATE "ICLFORGE_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")

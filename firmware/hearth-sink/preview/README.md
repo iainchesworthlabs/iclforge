@@ -11,6 +11,14 @@ and the developer view, which it opens as a person does,
 with three taps on the board's name (what it shows is a fixture in `preview.cpp`: a healthy kit, one in
 trouble, one with nothing playing, and the confirming step of the network preference).
 
+It then draws the **Adjust** and **Preferences** sheets at four display sizes (1024 by 600, 800 by 480, 480 by 320 and
+320 by 240: `adjust-`, `prefs-`, `prefs-greyed-` (a board whose screen has no touch), `prefs-dark-` and `footer-` BMPs
+named for the size) and checks them, which fails the run (exit 3): text that does not fit its label, a control that
+sticks out of what holds it or off the screen, a touch target under 48 px or closer than 6 px to another, a tap that
+does nothing, a greyed choice that answers a tap, a list longer than the glass that does not scroll under a finger,
+and the dim time and the minute's idle close behaving with Preferences open. Buttons are found by what they say, not by
+where they are, so a change of layout does not break the taps. The boards drawn are `iclforge/board_variants.hpp`'s.
+
 It exists because the screen is a file that changes, and a firmware build is ten minutes and a
 flash. What it leaves out is the board: the Sendspin player, the DSI host, the PSRAM and the
 timing. It reads the example songs from `examples/karaoke` and the fonts from `main/panel/fonts`.

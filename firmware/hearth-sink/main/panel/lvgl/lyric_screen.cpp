@@ -14,6 +14,7 @@
 #include <cstring>
 #include <iterator>
 #include <map>
+#include <new>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -23,6 +24,7 @@
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/screen_metrics.hpp"
 
 #include "../lyrics_reader.hpp"
 #include "board_info.hpp"
@@ -32,6 +34,7 @@
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
 #include "now_screen.hpp"
+#include "prefs_screen.hpp"
 
 namespace player::panel {
 
@@ -53,11 +56,9 @@ constexpr std::uint32_t kAccent = 0xFF5C40;
 constexpr std::uint32_t kMuted = 0x8B8583;
 constexpr std::uint32_t kFaint = 0x4B4645;
 
-constexpr int kMargin = 32;
-constexpr int kHeaderHeight = 64;
-// The song's time at the header's right, "23:32 / 24:45" for a long piece: 120 px cut its first figure.
-constexpr int kHeaderClockWidth = 176;
-constexpr int kFooterHeight = 64;
+// The margins, the header, the footer and the type are the display's (iclforge/screen_metrics.hpp, g.m): the
+// sheets and the footer are drawn from the size of the screen they are on, and the kit's 1024 by 600 gives the
+// sizes this file was written with.
 constexpr int kDuetIndent = 184;  // 18 % of 1024, the desktop's rule for the second vocal
 // A line already sung is the accent colour at this opacity of 255: 70 %, which is 3.5 : 1 against the
 // background (55 % was 2.6 : 1; the shared sink-screen spec asked for the change).
@@ -288,41 +289,13 @@ struct WordCell {
     int painted = -1;
 };
 
-enum class Button : int {
-    kAdjust, kDelayLess, kDelayMore, kSmaller, kLarger, kClose,
-    // The no-lyrics screen's view, one a view in the order of View, and when it dims.
-    kViewSpeakers, kViewTitle, kViewClock, kViewOff, kViewDark,
-    kDimNever, kDim5, kDim30
-};
-
-// The views the sheet offers, in the order it shows them: only those this build draws.
-struct ViewChoice {
-    iclforge::nowview::View view;
-    Button button;
-    const char* label;
-};
-constexpr std::array<ViewChoice, 5> kViewChoices{{
-    {iclforge::nowview::View::kSpeakers, Button::kViewSpeakers, "Speakers"},
-    {iclforge::nowview::View::kTitle, Button::kViewTitle, "Title"},
-    {iclforge::nowview::View::kClock, Button::kViewClock, "Clock"},
-    {iclforge::nowview::View::kDark, Button::kViewDark, "Dark"},
-    {iclforge::nowview::View::kOff, Button::kViewOff, "Off"},
-}};
-struct DimChoice {
-    int minutes;
-    Button button;
-    const char* label;
-};
-constexpr std::array<DimChoice, 3> kDimChoices{{
-    {iclforge::nowview::kDimNever, Button::kDimNever, "Never"},
-    {5, Button::kDim5, "5 min"},
-    {30, Button::kDim30, "30 min"},
-}};
+enum class Button : int { kAdjust, kPreferences, kDelayLess, kDelayMore, kSmaller, kLarger, kClose };
 
 struct Screen {
     lv_display_t* disp = nullptr;
     int width = 0;
     int height = 0;
+    iclforge::screen::Metrics m;
     Face current;  // Archivo SemiBold, the line being sung
     Face context;  // Archivo Regular, the lines before and after
     Face small;    // Archivo Regular at 24, the header and the footer
@@ -344,13 +317,11 @@ struct Screen {
     lv_obj_t* sheet = nullptr;
     lv_obj_t* sheet_delay = nullptr;
     lv_obj_t* sheet_size = nullptr;
-    // The no-lyrics screen's own choices on the sheet, and the buttons that carry them (the chosen one
-    // is the accent).
-    std::array<lv_obj_t*, kViewChoices.size()> view_buttons{};
-    std::array<lv_obj_t*, kDimChoices.size()> dim_buttons{};
-    // What the sheet paints as chosen, -1 before it has painted anything.
-    int shown_view = -1;
-    int shown_dim = -1;
+    lv_obj_t* footer = nullptr;
+    // The footer's chips beyond the name (the line and the delay) show only where they leave the buttons room.
+    bool chips = false;
+    // The Adjust sheet's delay says "+50 ms" and not "Delay +50 ms" where the longer would not fit between its buttons.
+    bool short_delay = false;
     // What the no-lyrics screen follows (settings, read every frame), and what the player says is playing
     // (read five times a second while the speakers show).
     NowSettings now_set;
@@ -390,9 +361,6 @@ struct Screen {
     lv_obj_t* dim_cover = nullptr;
     lv_obj_t* dim_text = nullptr;
     std::string dim_text_shown;
-    // The sheet's dim row, which the dark view replaces with a sentence: it has no dim time.
-    lv_obj_t* dim_title = nullptr;
-    lv_obj_t* dim_note = nullptr;
 
     // The rows of the line on the stage.
     std::vector<WordCell> words;
@@ -413,6 +381,8 @@ struct Screen {
     // Three taps on the board's name open the developer view (dev_screen.hpp).
     iclforge::devview::TapStreak name_taps;
     std::string chip_name_text;
+    // What the header's title says now; a byte no title has, so that the first title is always set.
+    std::string title_text = "\x01";
     std::string clock_text;
     std::string line_text;
     std::string delay_text;
@@ -465,6 +435,13 @@ Screen g;
     char buffer[32];
     std::snprintf(buffer, sizeof buffer, "Delay %+d ms", static_cast<int>(ms));
     return buffer;
+}
+
+// The delay as the Adjust sheet says it between its buttons: the footer's words, or just the figure where the sheet
+// is too narrow for "Delay -1000 ms" and two buttons (a 240 pixel screen).
+[[nodiscard]] std::string sheet_delay_string(std::int32_t ms) {
+    const std::string full = delay_string(ms);
+    return g.short_delay ? full.substr(sizeof "Delay " - 1) : full;
 }
 
 // The text size step as the sheet says it. The idle screen draws no lyrics to resize, so without
@@ -578,6 +555,11 @@ void on_button(lv_event_t* event) {
         case Button::kAdjust:
             g.sheet_visible = !g.sheet_visible;
             break;
+        case Button::kPreferences:
+            // Preferences is a sheet of its own over the whole screen (prefs_screen.hpp); Adjust is put away.
+            g.sheet_visible = false;
+            prefs_open();
+            break;
         case Button::kDelayLess:
             g.delay_ms = std::max(g.delay_ms - kDelayStepMs, -kDelayMaxMs);
             break;
@@ -592,26 +574,6 @@ void on_button(lv_event_t* event) {
             break;
         case Button::kClose:
             g.sheet_visible = false;
-            break;
-        case Button::kViewSpeakers:
-        case Button::kViewTitle:
-        case Button::kViewClock:
-        case Button::kViewOff:
-        case Button::kViewDark:
-            for (const ViewChoice& choice : kViewChoices) {
-                if (choice.button == which) {
-                    choose_now_view(choice.view);
-                }
-            }
-            break;
-        case Button::kDimNever:
-        case Button::kDim5:
-        case Button::kDim30:
-            for (const DimChoice& choice : kDimChoices) {
-                if (choice.button == which) {
-                    choose_dim_after(choice.minutes);
-                }
-            }
             break;
     }
 }
@@ -631,6 +593,8 @@ lv_obj_t* make_button(lv_obj_t* parent, const char* text, int w, int h, Button w
     lv_obj_t* const button = lv_obj_create(parent);
     plain_box(button);
     lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
+    // A touch target: the preview tool holds every one of these to the fingertip size.
+    lv_obj_add_flag(button, kTouchTargetFlag);
     lv_obj_set_size(button, w, h);
     lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(button, color(accent ? kAccent : kSurfaceUp), 0);
@@ -644,13 +608,49 @@ lv_obj_t* make_button(lv_obj_t* parent, const char* text, int w, int h, Button w
     return button;
 }
 
+// The width of a button for its label: the type and the padding either side, and not less than `least`.
+[[nodiscard]] int button_width(const char* text, int least) {
+    return std::max(least, text_width(text, g.small) + 2 * g.m.pad);
+}
+
+// One row of the Adjust sheet: its title at the left and the controls at the right, on one line where they fit and
+// on two where they do not. Returns the box the controls go in.
+lv_obj_t* sheet_row(lv_obj_t* parent, const char* title, int content_w) {
+    lv_obj_t* const row = make_box(parent);
+    lv_obj_set_size(row, content_w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_row(row, g.m.gap, 0);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    make_label(row, title, g.small, kMuted);
+    lv_obj_t* const controls = make_box(row);
+    lv_obj_set_size(controls, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(controls, g.m.gap, 0);
+    lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    return controls;
+}
+
+// A value between two buttons: a fixed width, wide enough for the longest it says, so that the buttons do not move.
+lv_obj_t* sheet_value(lv_obj_t* parent, const std::string& text, int width) {
+    lv_obj_t* const label = make_label(parent, text, g.small, kText);
+    lv_obj_set_width(label, width);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    return label;
+}
+
+// Adjust: the in-the-moment tweaks of the lyric screen, the lyric delay and the text size, and Close. The
+// choices made once and left (what the screen shows without lyrics, when it dims, and the rest) are in Preferences.
 void build_sheet() {
-    // 352 px at the bottom, over the footer and the stage: the targets are 72 px, in three rows (the lyric
-    // delay and the text size, then the no-lyrics screen's view and when it dims) and the Close button.
-    const int sheet_h = 352;
+    const iclforge::screen::Metrics& m = g.m;
+    const int content_w = g.width - 2 * m.margin;
     g.sheet = make_box(g.root);
-    lv_obj_set_size(g.sheet, g.width, sheet_h);
-    lv_obj_set_pos(g.sheet, 0, g.height - sheet_h);
+    lv_obj_set_size(g.sheet, g.width, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(g.sheet, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_left(g.sheet, m.margin, 0);
+    lv_obj_set_style_pad_right(g.sheet, m.margin, 0);
+    lv_obj_set_style_pad_top(g.sheet, m.gap, 0);
+    lv_obj_set_style_pad_bottom(g.sheet, m.gap, 0);
+    lv_obj_set_style_pad_row(g.sheet, m.gap, 0);
     lv_obj_set_style_bg_opa(g.sheet, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(g.sheet, color(kSurface), 0);
     lv_obj_set_style_border_side(g.sheet, LV_BORDER_SIDE_TOP, 0);
@@ -658,106 +658,31 @@ void build_sheet() {
     lv_obj_set_style_border_color(g.sheet, color(kAccent), 0);
     lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_CLICKABLE);
 
-    lv_obj_t* const delay_title = make_label(g.sheet, "Lyric delay", g.small, kMuted);
-    lv_obj_set_pos(delay_title, kMargin, 18);
-    make_button(g.sheet, "-", 72, 72, Button::kDelayLess, false);
-    lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), kMargin, 60);
-    g.sheet_delay = make_label(g.sheet, delay_string(g.delay_ms), g.small, kText);
-    lv_obj_set_pos(g.sheet_delay, kMargin + 72 + 24, 86);
-    make_button(g.sheet, "+", 72, 72, Button::kDelayMore, false);
-    lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), kMargin + 72 + 24 + 230, 60);
+    lv_obj_t* controls = sheet_row(g.sheet, "Lyric delay", content_w);
+    make_button(controls, "-", m.target, m.target, Button::kDelayLess, false);
+    g.short_delay = text_width(delay_string(-kDelayMaxMs), g.small) + 4 + 2 * (m.target + m.gap) > content_w;
+    g.sheet_delay =
+        sheet_value(controls, sheet_delay_string(g.delay_ms), text_width(sheet_delay_string(-kDelayMaxMs), g.small) + 4);
+    make_button(controls, "+", m.target, m.target, Button::kDelayMore, false);
 
-    lv_obj_t* const size_title = make_label(g.sheet, "Text size", g.small, kMuted);
-    lv_obj_set_pos(size_title, 560, 18);
-    g.sheet_size = make_label(g.sheet, size_string(g.scale), g.small, kText);
-    lv_obj_set_pos(g.sheet_size, 560 + 130, 18);
-    make_button(g.sheet, "Smaller", 150, 72, Button::kSmaller, false);
-    lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), 560, 60);
-    make_button(g.sheet, "Larger", 150, 72, Button::kLarger, false);
-    lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), 560 + 150 + 16, 60);
+    controls = sheet_row(g.sheet, "Text size", content_w);
+    const int smaller_w = button_width("Smaller", m.target);
+    const int larger_w = button_width("Larger", m.target);
+    make_button(controls, "Smaller", smaller_w, m.target, Button::kSmaller, false);
+    g.sheet_size = sheet_value(controls, size_string(g.scale),
+                               std::max(text_width("Smaller", g.small), text_width("Larger", g.small)) + 4);
+    make_button(controls, "Larger", larger_w, m.target, Button::kLarger, false);
 
-    // The screen for a song with no lyrics: which view (only the views this build draws), and when it dims.
-    lv_obj_t* const view_title = make_label(g.sheet, "Screen while a song has no lyrics", g.small, kMuted);
-    lv_obj_set_pos(view_title, kMargin, 148);
-    // 128 px a button when they fit before the dim row (x = 600), narrower when more views are drawn.
-    int drawn = 0;
-    for (const ViewChoice& choice : kViewChoices) {
-        drawn += now_view_drawn(choice.view) ? 1 : 0;
-    }
-    drawn = std::max(drawn, 1);
-    const int view_w = std::min(128, (592 - kMargin - 8 * (drawn - 1)) / drawn);
-    int x = kMargin;
-    for (std::size_t i = 0; i < kViewChoices.size(); ++i) {
-        if (!now_view_drawn(kViewChoices[i].view)) {
-            continue;
-        }
-        g.view_buttons[i] = make_button(g.sheet, kViewChoices[i].label, view_w, 72, kViewChoices[i].button, false);
-        lv_obj_set_pos(g.view_buttons[i], x, 190);
-        x += view_w + 8;
-    }
-    g.dim_title = make_label(g.sheet, "Dim after", g.small, kMuted);
-    lv_obj_set_pos(g.dim_title, 600, 148);
-    x = 600;
-    for (std::size_t i = 0; i < kDimChoices.size(); ++i) {
-        g.dim_buttons[i] = make_button(g.sheet, kDimChoices[i].label, 112, 72, kDimChoices[i].button, false);
-        lv_obj_set_pos(g.dim_buttons[i], x, 190);
-        x += 112 + 12;
-    }
-    // The dark view has no dim time (it is dark already): its row says what a touch does instead, in
-    // the place of the buttons, which are hidden while it is the view.
-    char note[48];
-    std::snprintf(note, sizeof note, "%u seconds, then dark again",
-                  static_cast<unsigned>(iclforge::nowview::kDarkAwakeMs / 1000));
-    g.dim_note = make_label(g.sheet, note, g.small, kText);
-    lv_obj_set_pos(g.dim_note, 600, 214);
-    lv_obj_add_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
-    g.shown_view = -1;
-    g.shown_dim = -1;
+    lv_obj_t* const close_row = make_box(g.sheet);
+    lv_obj_set_size(close_row, content_w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(close_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(close_row, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    make_button(close_row, "Close", button_width("Close", m.footer_button_width), m.bar_button, Button::kClose, true);
 
-    lv_obj_t* const close = make_button(g.sheet, "Close", 160, 56, Button::kClose, true);
-    lv_obj_set_pos(close, g.width - kMargin - 160, sheet_h - 56 - 14);
+    // At the bottom of the screen, over the footer: as tall as its rows.
+    lv_obj_update_layout(g.sheet);
+    lv_obj_set_pos(g.sheet, 0, g.height - lv_obj_get_height(g.sheet));
     lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_HIDDEN);
-}
-
-// The chosen view and dim time are the accent; the rest are the sheet's surface. Painted when the
-// setting changes (a tap here, or PUT /now-playing from elsewhere).
-void paint_sheet_choices() {
-    const int view = static_cast<int>(g.now_set.view);
-    if (view != g.shown_view) {
-        g.shown_view = view;
-        for (std::size_t i = 0; i < kViewChoices.size(); ++i) {
-            lv_obj_t* const button = g.view_buttons[i];
-            if (button == nullptr) {
-                continue;
-            }
-            const bool chosen = static_cast<int>(kViewChoices[i].view) == view;
-            lv_obj_set_style_bg_color(button, color(chosen ? kAccent : kSurfaceUp), 0);
-            lv_obj_set_style_text_color(lv_obj_get_child(button, 0), color(chosen ? kBg : kText), 0);
-        }
-        // The dim row: its buttons for the views that dim after a time, a sentence for the dark view.
-        const bool dark = view == static_cast<int>(iclforge::nowview::View::kDark);
-        lv_label_set_text(g.dim_title, dark ? "A touch lights the screen for" : "Dim after");
-        for (lv_obj_t* const button : g.dim_buttons) {
-            if (dark) {
-                lv_obj_add_flag(button, LV_OBJ_FLAG_HIDDEN);
-            } else {
-                lv_obj_remove_flag(button, LV_OBJ_FLAG_HIDDEN);
-            }
-        }
-        if (dark) {
-            lv_obj_remove_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(g.dim_note, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    if (g.now_set.dim_after_minutes != g.shown_dim) {
-        g.shown_dim = g.now_set.dim_after_minutes;
-        for (std::size_t i = 0; i < kDimChoices.size(); ++i) {
-            const bool chosen = kDimChoices[i].minutes == g.shown_dim;
-            lv_obj_set_style_bg_color(g.dim_buttons[i], color(chosen ? kAccent : kSurfaceUp), 0);
-            lv_obj_set_style_text_color(lv_obj_get_child(g.dim_buttons[i], 0), color(chosen ? kBg : kText), 0);
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -774,8 +699,8 @@ void build_dim_cover() {
     lv_obj_set_style_bg_color(g.dim_cover, color(0x000000), 0);
     lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_CLICKABLE);
     g.dim_text = make_label(g.dim_cover, "", g.small, kMuted);
-    lv_obj_set_width(g.dim_text, g.width - 2 * kMargin);
-    lv_obj_set_pos(g.dim_text, kMargin, g.height - kMargin - 24);
+    lv_obj_set_width(g.dim_text, g.width - 2 * g.m.margin);
+    lv_obj_set_pos(g.dim_text, g.m.margin, g.height - g.m.margin - lv_font_get_line_height(g.small.latin));
     lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -816,66 +741,101 @@ void set_dimmed(iclforge::nowview::Dim dim) {
 }
 
 void build_frame() {
+    const iclforge::screen::Metrics& m = g.m;
     g.root = lv_screen_active();
     plain_box(g.root);
     lv_obj_set_style_bg_opa(g.root, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(g.root, color(kBg), 0);
 
     // Header: the title at the left, the time at the right, a hairline for the progress under both.
+    const int line_h = lv_font_get_line_height(g.small.latin);
+    const int clock_w = m.text * 176 / 24;  // "23:32 / 24:45" for a long piece: 120 px cut its first figure at 24 px
     g.title = make_label(g.root, "", g.small, kText);
-    lv_obj_set_width(g.title, g.width - 2 * kMargin - kHeaderClockWidth - 20);
-    lv_obj_set_pos(g.title, kMargin, 18);
+    lv_obj_set_width(g.title, g.width - 2 * m.margin - clock_w - 20);
+    lv_obj_set_pos(g.title, m.margin, (m.header - line_h) / 2);
     g.clock = make_label(g.root, "", g.small, kMuted);
     lv_obj_set_style_text_align(g.clock, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_width(g.clock, kHeaderClockWidth);
-    lv_obj_set_pos(g.clock, g.width - kMargin - kHeaderClockWidth, 18);
+    lv_obj_set_width(g.clock, clock_w);
+    lv_obj_set_pos(g.clock, g.width - m.margin - clock_w, (m.header - line_h) / 2);
     lv_obj_t* const back = make_box(g.root);
     lv_obj_set_size(back, g.width, 2);
-    lv_obj_set_pos(back, 0, kHeaderHeight - 2);
+    lv_obj_set_pos(back, 0, m.header - 2);
     lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(back, color(kFaint), 0);
     g.progress = make_box(g.root);
     lv_obj_set_size(g.progress, 0, 2);
-    lv_obj_set_pos(g.progress, 0, kHeaderHeight - 2);
+    lv_obj_set_pos(g.progress, 0, m.header - 2);
     lv_obj_set_style_bg_opa(g.progress, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(g.progress, color(kAccent), 0);
 
     // The stage, which clips what a long line would spill.
     g.stage_box = make_box(g.root);
-    lv_obj_set_size(g.stage_box, g.width, g.height - kHeaderHeight - kFooterHeight);
-    lv_obj_set_pos(g.stage_box, 0, kHeaderHeight);
+    lv_obj_set_size(g.stage_box, g.width, g.height - m.header - m.footer);
+    lv_obj_set_pos(g.stage_box, 0, m.header);
 
-    // Footer: the board's name, where in the song, the delay, and the button that opens the sheet.
+    // Footer: the board's name, where in the song, the delay, and the buttons that open the sheets: Adjust, at the
+    // right, and Preferences beside it.
     lv_obj_t* const footer = make_box(g.root);
-    lv_obj_set_size(footer, g.width, kFooterHeight);
-    lv_obj_set_pos(footer, 0, g.height - kFooterHeight);
+    g.footer = footer;
+    lv_obj_set_size(footer, g.width, m.footer);
+    lv_obj_set_pos(footer, 0, g.height - m.footer);
     lv_obj_set_style_bg_opa(footer, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(footer, color(kSurface), 0);
+    const int adjust_w = button_width("Adjust", m.footer_button_width);
+    const int prefs_w = button_width("Preferences", m.footer_button_width);
+    const int adjust_x = g.width - m.margin - adjust_w;
+    const int prefs_x = adjust_x - m.gap - prefs_w;
+    const int button_y = (m.footer - m.footer_button) / 2;
+    // The room to the left of the buttons. A wide screen has the kit's columns: the name, the stream's line (a screen
+    // with no lyrics), and the lyric chips (line, delay); a narrower one has the name and the stream's line.
+    const int room = prefs_x - m.gap;
+    const bool wide = g.width >= 960;
+    const int label_y = (m.footer - line_h) / 2;
+    // A narrower screen shows the name only where a name the length of a default one ("hearth-4f2a91") fits whole, and
+    // not cut off; where it does not, the footer is the buttons.
+    const int default_name_w = text_width("hearth-4f2a91", g.small);
+    const int name_w = wide ? 220 : (room - m.margin >= default_name_w ? default_name_w : 0);
     g.chip_name = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_name, 220);
+    lv_obj_set_width(g.chip_name, std::max(name_w, 1));
     lv_label_set_long_mode(g.chip_name, LV_LABEL_LONG_MODE_CLIP);
-    lv_obj_set_pos(g.chip_name, kMargin, 18);
-    // The target of the three taps: the footer's whole height (64 px, a finger's, where the label is
-    // 28), from the edge to the next thing, drawing nothing and moving nothing.
+    lv_obj_set_pos(g.chip_name, m.margin, label_y);
+    if (name_w == 0) {
+        lv_obj_add_flag(g.chip_name, LV_OBJ_FLAG_HIDDEN);
+    }
+    // The target of the three taps: the footer's whole height (a finger's, where the label is a line), from the edge
+    // to the next thing, drawing nothing and moving nothing.
     lv_obj_t* const name_target = make_box(footer);
     lv_obj_add_flag(name_target, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(name_target, 340, kFooterHeight);
+    lv_obj_set_size(name_target, std::min(340, std::max(room, 1)), m.footer);
     lv_obj_set_pos(name_target, 0, 0);
     lv_obj_add_event_cb(name_target, &on_name_tap, LV_EVENT_CLICKED, nullptr);
+    // The lyric chips: "Line 12 of 40" (up to "Line 100 of 100") from x = 290, "Delay -1000 ms" from x = 458, which end
+    // before the Preferences button at the kit's 1024 by 600 (the chips are not shown where they would not).
+    const int line_x = 290;
+    const int delay_x = 458;
+    const int delay_w = text_width(delay_string(-kDelayMaxMs), g.small);
+    g.chips = wide && delay_x + delay_w <= room;
     g.chip_line = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_line, 220);
-    lv_obj_set_pos(g.chip_line, 360, 18);
+    lv_obj_set_width(g.chip_line, delay_x - line_x - 4);
+    lv_obj_set_pos(g.chip_line, line_x, label_y);
     g.chip_delay = make_label(footer, delay_string(g.delay_ms), g.small, kMuted);
-    lv_obj_set_width(g.chip_delay, 220);
-    lv_obj_set_pos(g.chip_delay, 620, 18);
-    // From the lyric chips' column to the button, less a gap each side.
-    g.stream_room = g.width - kMargin - 160 - 24 - 250;
+    lv_obj_set_width(g.chip_delay, delay_w + 4);
+    lv_obj_set_pos(g.chip_delay, delay_x, label_y);
+    if (!g.chips) {
+        lv_obj_add_flag(g.chip_line, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
+    }
+    // From the name to the buttons, less a gap each side.
+    const int stream_x = wide ? 250 : m.margin + std::max(name_w, 0) + m.gap;
+    g.stream_room = std::max(0, prefs_x - 24 - stream_x);
     g.chip_stream = make_label(footer, "", g.small, kMuted);
-    lv_obj_set_width(g.chip_stream, g.stream_room);
+    lv_obj_set_width(g.chip_stream, std::max(g.stream_room, 1));
     lv_label_set_long_mode(g.chip_stream, LV_LABEL_LONG_MODE_CLIP);
-    lv_obj_set_pos(g.chip_stream, 250, 18);
-    make_button(footer, "Adjust", 160, 48, Button::kAdjust, false);
-    lv_obj_set_pos(lv_obj_get_child(footer, -1), g.width - kMargin - 160, 8);
+    lv_obj_set_pos(g.chip_stream, stream_x, label_y);
+    lv_obj_t* const prefs = make_button(footer, "Preferences", prefs_w, m.footer_button, Button::kPreferences, false);
+    lv_obj_set_pos(prefs, prefs_x, button_y);
+    lv_obj_t* const adjust = make_button(footer, "Adjust", adjust_w, m.footer_button, Button::kAdjust, false);
+    lv_obj_set_pos(adjust, adjust_x, button_y);
 
     build_sheet();
     build_dim_cover();
@@ -1135,7 +1095,7 @@ void build_idle(int content_w) {
 void build_plain(int content_w) {
     lv_obj_t* const scroller = make_box(g.stage_box);
     lv_obj_set_size(scroller, content_w, lv_obj_get_height(g.stage_box) - 16);
-    lv_obj_set_pos(scroller, kMargin, 8);
+    lv_obj_set_pos(scroller, g.m.margin, 8);
     lv_obj_add_flag(scroller, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(scroller, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_scrollbar_mode(scroller, LV_SCROLLBAR_MODE_OFF);
@@ -1186,7 +1146,7 @@ void build_no_lyrics(int content_w) {
                          .date = g.context.latin,
                          .title = g.current.latin,
                          .artist = g.context.latin,
-                         .margin = kMargin};
+                         .margin = g.m.margin};
     switch (no_lyrics_shown()) {
         case NoLyrics::kTitle:
             // The title's size is the lyric line's rule on its length (72 down to 34 px, then the singer's
@@ -1239,10 +1199,10 @@ void place_rows(const std::vector<lv_obj_t*>& past, const std::vector<lv_obj_t*>
     const int stage_h = lv_obj_get_height(g.stage_box);
     const int centre_h = lv_obj_get_height(centre);
     const int gap = 18;
-    lv_obj_set_pos(centre, kMargin, std::max(0, (stage_h - centre_h) / 2));
+    lv_obj_set_pos(centre, g.m.margin, std::max(0, (stage_h - centre_h) / 2));
     int above = std::max(0, (stage_h - centre_h) / 2) - gap;
     for (auto it = past.rbegin(); it != past.rend(); ++it) {
-        lv_obj_set_pos(*it, kMargin, 0);
+        lv_obj_set_pos(*it, g.m.margin, 0);
         lv_obj_update_layout(*it);
         above -= lv_obj_get_height(*it);
         lv_obj_set_y(*it, above);
@@ -1250,7 +1210,7 @@ void place_rows(const std::vector<lv_obj_t*>& past, const std::vector<lv_obj_t*>
     }
     int below = std::max(0, (stage_h - centre_h) / 2) + centre_h + gap;
     for (lv_obj_t* const row : next) {
-        lv_obj_set_pos(row, kMargin, below);
+        lv_obj_set_pos(row, g.m.margin, below);
         lv_obj_update_layout(row);
         below += lv_obj_get_height(row) + 10;
     }
@@ -1260,9 +1220,11 @@ void place_rows(const std::vector<lv_obj_t*>& past, const std::vector<lv_obj_t*>
 void rebuild(const Signature& sig) {
     const std::int64_t started = time_us();
     clear_stage();
-    lv_obj_remove_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
+    if (g.chips) {
+        lv_obj_remove_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
+    }
     const Stage& stage = g.snap.stage;
-    const int content_w = g.width - 2 * kMargin;
+    const int content_w = g.width - 2 * g.m.margin;
     const bool duet = g.snap.held && (g.snap.first_name.size() + g.snap.second_name.size() > 0 ||
                                       [&] {
                                           for (std::size_t i = 0; i < stage.before_count; ++i) {
@@ -1420,10 +1382,9 @@ void update_header_and_footer(const Stage& stage) {
         }
         wanted = lyric_title;
     }
-    static std::string shown_title = "\x01";
-    if (wanted != shown_title) {
-        shown_title.assign(wanted);
-        lv_label_set_text(g.title, shown_title.c_str());
+    if (wanted != g.title_text) {
+        g.title_text.assign(wanted);
+        lv_label_set_text(g.title, g.title_text.c_str());
     }
     // The song's time: the lyric stage's while one is shown, and the server's (metadata@v1) over a view
     // with no lyrics once it gave a progress and the board's clock can say where the song is.
@@ -1488,7 +1449,7 @@ void update_header_and_footer(const Stage& stage) {
         g.delay_text = delay;
         lv_label_set_text(g.chip_delay, delay.c_str());
         if (g.sheet_delay != nullptr) {
-            lv_label_set_text(g.sheet_delay, delay.c_str());
+            lv_label_set_text(g.sheet_delay, sheet_delay_string(g.delay_ms).c_str());
         }
     }
     const char* const size = size_string(g.scale);
@@ -1503,9 +1464,13 @@ void update_header_and_footer(const Stage& stage) {
 }  // namespace
 
 bool screen_init(lv_display_t* disp, int width, int height) {
+    // Built again from nothing, so that the preview tool can draw the screen at one size after another.
+    g.~Screen();
+    new (&g) Screen();
     g.disp = disp;
     g.width = width;
     g.height = height;
+    g.m = iclforge::screen::metrics_for(width, height);
     const FontFile regular = archivo_regular();
     const FontFile semibold = archivo_semibold();
     const FontFile greek_regular = noto_sans_greek_cyrillic_regular();
@@ -1514,7 +1479,7 @@ bool screen_init(lv_display_t* disp, int width, int height) {
     const FontFile hebrew_semibold = noto_sans_hebrew_semibold();
     const bool ok = make_face(g.current, semibold, greek_semibold, hebrew_semibold, 64) &&
                     make_face(g.context, regular, greek_regular, hebrew_regular, 36) &&
-                    make_face(g.small, regular, greek_regular, hebrew_regular, 24) &&
+                    make_face(g.small, regular, greek_regular, hebrew_regular, g.m.text) &&
                     make_face(g.big, semibold, greek_semibold, hebrew_semibold, 72);
     if (!ok) {
         std::printf("panel: the fonts did not come up\n");
@@ -1522,6 +1487,7 @@ bool screen_init(lv_display_t* disp, int width, int height) {
     }
     build_frame();
     dev_init(width, height, DevColours{kBg, kSurface, kSurfaceUp, kText, kAccent, kMuted, kFaint});
+    prefs_init(g.m, DevColours{kBg, kSurface, kSurfaceUp, kText, kAccent, kMuted, kFaint});
     return true;
 }
 
@@ -1670,7 +1636,6 @@ bool screen_update() {
             lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_HIDDEN);
         }
     }
-    paint_sheet_choices();
 
     // Dimming: with the speakers showing and nothing touched for the time set, the screen goes dark, and
     // a touch brings it back. The time counts from when the speakers began to show as well as from the
@@ -1687,15 +1652,21 @@ bool screen_update() {
     const std::uint32_t showing_ms = showing ? now - g.np_since_ms : 0;
     iclforge::nowview::Dim dim = iclforge::nowview::dim_state(g.now_set.view, showing,
                                                               g.now_set.dim_after_minutes, inactive, showing_ms);
-    if (dev_is_open()) {
+    if (dev_is_open() || prefs_is_open()) {
         dim = iclforge::nowview::Dim::kNone;
     }
     set_dimmed(dim);
     // The developer view, when it is asked for, is on top of all this (a dimmed screen is dark under it
     // and a touch to open it has woken the screen).
     dev_update(now);
+    // Preferences likewise: it is read and touched, and keeps the screen lit while it is open.
+    prefs_update(now);
     return g.filling;
 }
+
+lv_obj_t* screen_sheet_object() { return g.sheet_visible ? g.sheet : nullptr; }
+
+lv_obj_t* screen_footer_object() { return g.footer; }
 
 ScreenStats screen_stats() {
     ScreenStats stats;
@@ -1707,6 +1678,11 @@ ScreenStats screen_stats() {
     stats.dev_refreshes = dev.refreshes;
     stats.dev_refresh_us_last = dev.refresh_us_last;
     stats.dev_refresh_us_max = dev.refresh_us_max;
+    stats.prefs_view = prefs_is_open();
+    const PrefsStats prefs = prefs_stats();
+    stats.prefs_builds = prefs.builds;
+    stats.prefs_build_us_max = prefs.build_us_max;
+    stats.prefs_refresh_us_max = prefs.refresh_us_max;
     stats.dimmed = g.dimmed;
     stats.backlight = g.backlight;
     return stats;

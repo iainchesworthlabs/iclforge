@@ -259,6 +259,11 @@ int sink_max_slots_bit_width() { return 0; }
 
 bool sink_second_line_possible() { return false; }
 
+// A fixed build-time slot count, not a TDM frame of some width.
+int sink_frame_bit_max() { return 0; }
+
+bool sink_tdm_usable() { return true; }
+
 // Built for one width and checked against it (kWide above): this sink's whole
 // job is to convert exactly as the i2s sink does and check the result, so the
 // width is a property of the shape CI built, not something to change under it.

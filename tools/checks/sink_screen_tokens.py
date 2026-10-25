@@ -26,6 +26,9 @@ TOKENS = ROOT / "docs/hearth/design/sink-screen-tokens.json"
 KOTLIN = ROOT / "apps/hearth/android/app/src/main/java/com/iclforge/hearth/Tokens.kt"
 QML = ROOT / "apps/shared/theme/assets/qml/Theme.qml"
 PANEL = ROOT / "firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp"
+# The panel's sizes are the display's (iclforge::screen::metrics_for): the kit's 1024 by 600 is
+# its first block.
+METRICS = ROOT / "libs/device/include/iclforge/screen_metrics.hpp"
 
 # Theme.qml's names for the rungs of Signal dark that the sink screen uses.
 QML_RUNGS = {
@@ -219,9 +222,6 @@ def check_panel(tokens: dict, text: str) -> list[str]:
     lay = tokens["layout"]
     canvas_width = tokens["canvas"]["width"]
     expected = {
-        "kMargin": lay["margin"],
-        "kHeaderHeight": lay["header"],
-        "kFooterHeight": lay["footer"],
         "kDuetIndent": round(canvas_width * lay["duet_indent_percent"] / 100),
         "kDelayStepMs": tokens["delay"]["step_ms"],
         "kDelayMaxMs": tokens["delay"]["max_ms"],
@@ -246,6 +246,32 @@ def check_panel(tokens: dict, text: str) -> list[str]:
     return problems
 
 
+def check_metrics(tokens: dict, text: str) -> list[str]:
+    """The sizes the panel is drawn at on the kit's canvas, against the layout tokens."""
+    where = METRICS.relative_to(ROOT)
+    canvas = tokens["canvas"]
+    # The first block of metrics_for(): the one for a display whose shorter side is the canvas's.
+    block = re.search(r"shorter\s*>=\s*(\d+)\s*\)\s*\{(.*?)\}", text, re.S)
+    if block is None or int(block.group(1)) > min(canvas["width"], canvas["height"]):
+        size = f"{canvas['width']} by {canvas['height']}"
+        return [f"{where}: metrics_for() has no block for the canvas, {size}"]
+    lay = tokens["layout"]
+    expected = {
+        "margin": lay["margin"],
+        "header": lay["header"],
+        "footer": lay["footer"],
+        "text": lay["small"],
+        "target": lay["min_target"],
+    }
+    problems = []
+    for name, want in expected.items():
+        found = re.search(rf"\.{name}\s*=\s*(\d+)", block.group(2))
+        have = int(found.group(1)) if found else None
+        if have != want:
+            problems.append(f"{where}: the canvas's {name} is {have}, the tokens say {want}")
+    return problems
+
+
 def _shown(path: Path) -> str:
     return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
 
@@ -255,6 +281,7 @@ def check(
     kotlin_path: Path = KOTLIN,
     qml_path: Path = QML,
     panel_path: Path = PANEL,
+    metrics_path: Path = METRICS,
 ) -> list[str]:
     tokens = load(tokens_path)
     problems = []
@@ -267,7 +294,8 @@ def check(
             f"{_shown(kotlin_path)} is not current: "
             "run python3 tools/checks/sink_screen_tokens.py --write"
         )
-    for path, check_one in ((qml_path, check_qml), (panel_path, check_panel)):
+    sources = ((qml_path, check_qml), (panel_path, check_panel), (metrics_path, check_metrics))
+    for path, check_one in sources:
         if not path.exists():
             problems.append(f"{path}: not found")
             continue

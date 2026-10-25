@@ -64,6 +64,7 @@
 #include "iclforge/control.hpp"
 #include "iclforge/firmware.hpp"
 #include "iclforge/firmware_pull.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/player.hpp"
 #include "iclforge/render/layout.hpp"
@@ -75,6 +76,9 @@
 #include "network.hpp"
 #include "provision.hpp"
 #include "panel/panel.hpp"
+#include "board_caps.hpp"
+#include "layout_control.hpp"
+#include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
 #include "system_control.hpp"
@@ -549,28 +553,37 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
 
 // A layout for the next play, from the control surface: parsed here, on the
 // server's task, so a refusal is answered at once; applied by app_main.
-bool accept_layout(std::string_view text) {
+// The verdict is the one GET /layout-options and the Preferences list give (iclforge/layout_options.hpp, over
+// board_caps()): a layout they call available is one this takes, and one they refuse is refused here with the
+// same sentence. A layout with a limit on it is taken with the limit as the note. A refusal with no message is
+// text that is not a layout, or a layout the board could not queue.
+iclforge::ControlLayoutAnswer accept_layout(std::string_view text) {
     const auto layout = iclforge::render::OutputLayout::parse(text);
-    if (!layout.has_value() || layout->slots() > static_cast<std::size_t>(player::sink_slots())) {
-        return false;
+    if (!layout.has_value()) {
+        return {};
+    }
+    const iclforge::LayoutOption verdict =
+        iclforge::evaluate_layout(player::board_caps(), layout->text(), layout->slots());
+    if (!verdict.accepted()) {
+        return {false, verdict.reason};
     }
     // The Sendspin player's too, for streams whose server sets no layout.
     if (!player::sendspin_set_layout(*layout)) {
-        return false;
+        return {};
     }
     Command c;
     c.kind = CommandKind::kLayout;
     if (text.size() >= sizeof(c.text)) {
-        return false;
+        return {};
     }
     std::memcpy(c.text, text.data(), text.size());
     if (xQueueSend(g_commands, &c, 0) != pdTRUE) {
-        return false;
+        return {};
     }
     // Kept over a restart, so that a board a server never sends a layout to (Music Assistant sends none)
     // starts in the room it was set to. Too long a speaker list to store still applies until the restart.
     (void)player::settings_set_layout(text);
-    return true;
+    return {true, verdict.reason};
 }
 
 // The verdict. stream.audio_ms against stream.wall_ms is the whole-pipeline
@@ -666,12 +679,7 @@ iclforge::ControlHandlers control_handlers() {
         return xQueueSend(g_commands, &c, 0) == pdTRUE;
     };
     h.volume = []() { return g_volume.load(); };
-    h.layout = []() {
-        xSemaphoreTake(g_player_mutex, portMAX_DELAY);
-        std::string text{g_layout.text()};
-        xSemaphoreGive(g_player_mutex);
-        return text;
-    };
+    h.layout = []() { return player::layout_text(); };
     h.set_layout = accept_layout;
     h.name = []() { return std::string(player::settings().name.data()); };
     h.set_name = [](std::string_view text) {
@@ -761,20 +769,26 @@ iclforge::ControlHandlers control_handlers() {
     if (player::panel_built()) {
         h.now_playing = []() { return std::string(iclforge::nowview::view_name(player::settings().now_view)); };
         h.set_now_playing = [](std::string_view word) {
+            // The preferences' backend refuses a view this build cannot draw, stores the rest and has the screen follow.
             const auto view = iclforge::nowview::parse_view(word);
-            // A view this build cannot draw is refused, and not stored for a later image to find.
-            if (!view || !player::panel_has_view(*view) || !player::settings_set_now_view(*view)) {
-                return false;
-            }
-            player::panel_set_view(*view);
-            return true;
+            return view.has_value() && player::preferences().set_now_view(*view);
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
-        h.set_dim_after = [](int minutes) {
-            if (!player::settings_set_dim_after(minutes)) {
+        h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
+    }
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
+    // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
+    // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
+    if (player::sendspin_built()) {
+        h.dynamic_range = []() {
+            return std::string(iclforge::ac3::dynamic_range_name(player::settings().dynamic_range));
+        };
+        h.set_dynamic_range = [](std::string_view word) {
+            const auto range = iclforge::ac3::parse_dynamic_range(word);
+            if (!range || !player::settings_set_dynamic_range(*range)) {
                 return false;
             }
-            player::panel_set_dim_after(minutes);
+            player::sendspin_set_dynamic_range(*range);
             return true;
         };
     }
@@ -880,6 +894,7 @@ iclforge::ControlHandlers control_handlers() {
         h.pairings = []() { return player::sendspin_pairings(); };
         h.forget_server = [](std::string_view server_id) { return player::sendspin_forget_server(server_id); };
     }
+    h.preferences = &player::preferences();
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;
@@ -987,6 +1002,17 @@ iclforge::FirmwareConfig firmware_config() {
 
 namespace player {
 
+std::string layout_text() {
+    xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+    std::string text{g_layout.text()};
+    xSemaphoreGive(g_player_mutex);
+    return text;
+}
+
+iclforge::ControlLayoutAnswer layout_set(std::string_view text) { return accept_layout(text); }
+
+bool playing() { return sendspin_playing() || std::strcmp(g_state.load(), "playing") == 0; }
+
 namespace {
 
 // Asks app_main to restart the board on its own task, so that the caller - the HTTP server's, the
@@ -1043,6 +1069,7 @@ void apply_preferences_now() {
     if (wall_clock_built()) {
         (void)wall_clock_set_zone(settings().time_zone.data());
     }
+    sendspin_set_dynamic_range(settings().dynamic_range);
 }
 
 }  // namespace

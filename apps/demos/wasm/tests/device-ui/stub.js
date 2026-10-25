@@ -43,6 +43,7 @@ const REPLIES = {
         'POST /volume        body: 0.0 to 1.0',
         'GET  /layout        the output layout',
         'PUT  /layout        body: a name (5.1.4) or a speaker list; next play',
+        'GET  /layout-options  the layouts to choose from, each supported, with limits or unavailable on this board and why, as JSON',
         "GET  /name          this board's name; PUT one to change it",
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
@@ -50,6 +51,8 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is kept; PUT one to change it (from the next stream)",
+        'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
         'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
@@ -84,6 +87,8 @@ const REPLIES = {
     layoutRefused:
         'not a layout this player can play: check the name or the list, and that it has no more slots than the sink\n',
     layoutOk: 'ok; takes effect at the next play\n',
+    layoutNote: 'ok; takes effect at the next play. Note: ',
+    layoutOptionsNone: 'this player has no layout to choose\n',
     nameEmpty: 'PUT /name wants a name\n',
     nameRefused:
         'not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored\n',
@@ -107,6 +112,10 @@ const REPLIES = {
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
+    noDynamicRange: 'this board decodes no Dolby stream, so it has no dynamic range to choose\n',
+    dynamicRangeBad: 'PUT /dynamic-range wants standard or late-night\n',
+    dynamicRangeRefused: 'that setting could not be stored\n',
+    dynamicRangeOk: 'ok; takes effect from the next stream\n',
     noClock: 'this board keeps no time\n',
     timeZoneBad:
         'PUT /timezone wants a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
@@ -181,6 +190,7 @@ const ROUTES = [
     'POST /volume',
     'GET /layout',
     'PUT /layout',
+    'GET /layout-options',
     'GET /name',
     'PUT /name',
     'GET /wiring',
@@ -194,6 +204,9 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /dynamic-range',
+    'PUT /dynamic-range',
+    'GET /preferences',
     'GET /timezone',
     'PUT /timezone',
     'GET /ntp-server',
@@ -261,6 +274,35 @@ function speakersOf(text) {
 function slotsOf(text) {
     const speakers = speakersOf(text);
     return speakers ? speakers.length : 0;
+}
+
+// GET /layout-options (iclforge/layout_options.hpp): the layouts the chooser lists, each judged against
+// the sink. The model knows the ceiling and nothing finer: whether a layout is supported or past the
+// sink, in the firmware's words for the second. The limits and the setting that would lift one are the
+// firmware's host tests' to hold (libs/device/tests/test_layout_options.cpp); a test that needs them
+// scripts device.layoutOptions.
+const LAYOUT_CATALOG = ['1.0', '2.0', '2.1', '5.0', '5.1', '5.1.2', '7.1', '5.1.4', '7.1.2', '7.1.4', '9.1.2', '9.1.4', '9.1.6'];
+
+const tooWide = (name, slots, carries) => `${name} needs ${slots} slots; this board's output carries ${carries}.`;
+
+function layoutOptions(device) {
+    return {
+        layout: device.layout,
+        slots: device.sinkSlots,
+        slot_bits: device.slotBits,
+        ...(typeof device.secondLine === 'boolean' ? { second_line: device.secondLine } : {}),
+        profile: '',
+        options: LAYOUT_CATALOG.map((name) => {
+            const slots = slotsOf(name);
+            if (slots <= device.sinkSlots) {
+                return { layout: name, slots, verdict: 'supported', fix: 'none', verified: true };
+            }
+            return {
+                layout: name, slots, verdict: 'unavailable', fix: 'hardware', verified: false,
+                reason: tooWide(name, slots, device.sinkSlots),
+            };
+        }),
+    };
 }
 
 // How the player serves a layout (planning/esp32-device-ui.md, "The output
@@ -457,6 +499,67 @@ function cableNetwork(preference = 'auto') {
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
 function screenBoard() {
     return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+}
+
+// The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
+// registry's entries with the registry's words, as far as the stand-in models them. Today that is the two of the
+// screen; contract.spec.js holds each to the registry. A board with no screen lists them greyed, with the reason.
+const PREFERENCES = [
+    {
+        id: 'now-view',
+        group: 'Display',
+        label: 'Screen without lyrics',
+        kind: 'choice',
+        apply: 'live',
+        route: '/now-playing',
+        choices: [
+            ['speakers', 'Speakers'],
+            ['title', 'Title'],
+            ['clock', 'Clock'],
+            ['dark', 'Dark'],
+            ['off', 'Off'],
+        ],
+    },
+    {
+        id: 'dim-after',
+        group: 'Display',
+        label: 'Dim after',
+        kind: 'stepper',
+        apply: 'live',
+        route: '/dim-after',
+        choices: [
+            ['1', '1 min'],
+            ['5', '5 min'],
+            ['15', '15 min'],
+            ['30', '30 min'],
+            ['60', '1 hour'],
+            ['120', '2 hours'],
+            ['240', '4 hours'],
+            ['never', 'Never'],
+        ],
+    },
+];
+
+function preferencesJson(device) {
+    const screen = device.screen;
+    const reason = screen ? '' : 'This board has no screen.';
+    const entries = PREFERENCES.map((p) => ({
+        id: p.id,
+        group: p.group,
+        label: p.label,
+        kind: p.kind,
+        apply: p.apply,
+        route: p.route,
+        value: screen ? (p.id === 'now-view' ? screen.view : screen.dimAfter) : '',
+        available: Boolean(screen),
+        reason,
+        choices: p.choices.map(([id, label]) => ({ id, label, available: Boolean(screen), reason })),
+    }));
+    return JSON.stringify({
+        profile: (device.hardware && device.hardware.profile) || '',
+        display: screen ? 'dsi' : 'none',
+        preferences: entries,
+    }) + '\n';
 }
 
 // The time of a board that keeps it (firmware/hearth-sink/main/clock/sntp, every board with a network): in the
@@ -819,6 +922,9 @@ async function startStub() {
         ssid: 'kitchen',
         password: '',
         layout: '2.0',
+        // GET /layout-options: undefined for the model's (layoutOptions), a body a test scripts, or null for
+        // a firmware with no such route.
+        layoutOptions: undefined,
         volume: 1,
         // A Sendspin player's firmware (sdkconfig.sendspin). Undefined for a
         // firmware with no player, whose /status has no "sendspin" key, and
@@ -834,6 +940,10 @@ async function startStub() {
         // A board with a screen (a test sets screenBoard()): the view it shows while a song has no
         // lyrics, the views this build has, and when it dims. Null for a board with none.
         screen: null,
+        // How much of a Dolby stream's dynamic range the listener wants: 'standard' or 'late-night' on a board
+        // with a Sendspin player, which decodes for a listener; null for one that decodes none, whose routes
+        // answer 404.
+        dynamicRange: 'standard',
         // What the board says about its time (timeBoard); undefined for a firmware that keeps none (no
         // network, or QEMU's), whose /status has no "time" key and whose time routes answer 404.
         time: timeBoard(),
@@ -1208,6 +1318,24 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /dynamic-range':
+                if (!device.dynamicRange) {
+                    return send(res, 404, REPLIES.noDynamicRange);
+                }
+                return send(res, 200, device.dynamicRange + '\n');
+            case 'PUT /dynamic-range': {
+                const word = body.trim();
+                if (!['standard', 'late-night'].includes(word)) {
+                    return send(res, 400, REPLIES.dynamicRangeBad);
+                }
+                if (!device.dynamicRange) {
+                    return send(res, 409, REPLIES.noDynamicRange);
+                }
+                device.dynamicRange = word;
+                return send(res, 200, REPLIES.dynamicRangeOk);
+            }
+            case 'GET /preferences':
+                return send(res, 200, preferencesJson(device), 'application/json');
             case 'GET /timezone':
                 if (!device.time) {
                     return send(res, 404, REPLIES.noClock);
@@ -1307,16 +1435,34 @@ async function startStub() {
             }
             case 'GET /layout':
                 return send(res, 200, device.layout + '\n');
+            case 'GET /layout-options':
+                // device.layoutOptions: a body a test scripts, or null for a firmware with no such route.
+                if (device.layoutOptions === null) {
+                    return send(res, 404, REPLIES.layoutOptionsNone);
+                }
+                {
+                    // A test that fixes GET /status has fixed the sink's ceiling too: the board's answers agree.
+                    const fixed = payload === null ? undefined : JSON.parse(payload).sink_slots;
+                    const slots = typeof fixed === 'number' ? fixed : device.sinkSlots;
+                    return send(res, 200, JSON.stringify(device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: slots })) + '\n', 'application/json');
+                }
             case 'PUT /layout': {
                 if (!body) {
                     return send(res, 400, REPLIES.layoutEmpty);
                 }
                 const slots = slotsOf(body);
-                if (!slots || slots > device.sinkSlots) {
+                if (!slots) {
                     return send(res, 409, REPLIES.layoutRefused);
                 }
+                // The verdict GET /layout-options gives, which this route answers with (the board has one): a layout
+                // past the sink is refused with its sentence, and one with a limit on it is taken with the note.
+                const listed = device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: device.sinkSlots });
+                const judged = (listed.options ?? []).find((o) => o.layout === body);
+                if (slots > device.sinkSlots || judged?.verdict === 'unavailable') {
+                    return send(res, 409, `${judged?.reason ?? tooWide(body, slots, device.sinkSlots)}\n`);
+                }
                 device.layout = body;
-                return send(res, 200, REPLIES.layoutOk);
+                return send(res, 200, judged?.verdict === 'limits' && judged.reason ? `${REPLIES.layoutNote}${judged.reason}\n` : REPLIES.layoutOk);
             }
             // Updates over the network (planning/esp32-ota.md). A firmware
             // without them answers every one of these routes 404.
@@ -1539,6 +1685,7 @@ module.exports = {
     cableNetwork,
     screenBoard,
     timeBoard,
+    PREFERENCES,
     validName,
     hostNames,
     defaultHardware,
