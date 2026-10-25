@@ -174,8 +174,12 @@ A session never creates a secret. In the repository's *Settings, Environments*:
 
 | Environment | Rule | Secrets |
 |---|---|---|
-| `firmware-beta` | Deployment branches and tags: `main` and `v*`. No reviewer (the owner's decision is open: [the signing design](esp32-ota.md#trust-and-signing)) | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` |
-| `firmware-stable` | The same, and **Required reviewers: you** (recommended) | the same two names, with the stable leaf's values |
+| `firmware-beta` | Deployment branches and tags: `main` and `v*`. **No reviewer**: it signs on its own (your decision) | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` |
+| `firmware-stable` | Deployment branches and tags: **`v*` only**, not `main`. **Required reviewers: you**, so every signing run waits for your approval (your decision). Leave *Prevent self-review* **off** (you start the run by cutting the tag, and you are the one who approves it). Turn *Allow administrators to bypass configured protection rules* **off**, if the page shows it, so the approval cannot be skipped | the same two names, with the stable leaf's values |
+
+Also add the tag ruleset for `v*` (*Settings, Rules*) so that only you can create a tag that matches: an environment
+secret can be read by a run on any ref the environment allows, and for stable that is a tag. The reasons are in
+[CI signing](esp32-ota.md#ci-signing).
 
 Make each value this way, then paste it into the secret's box in the browser (do not use a command that puts a key
 on a command line):
@@ -195,7 +199,8 @@ as the offline copy (two places), and delete the `.pfx` and `.b64` files once th
 
 - `firmware-ca.pem` (the sub-CA's public certificate): it becomes `firmware/keys/trust.pem` in the firmware.
 - The step 6 output for both leaves.
-- Which environment rule you chose for beta and stable.
+- That both environments, the tag ruleset and the two switches above are set as in step 7's table (a screenshot of
+  each environment's page, without the secrets' values, will do).
 
 Rolling a leaf over later: make a new key and CSR as step 4, issue it with the same name as step 5, replace the two
 secrets in that environment, and run the signing workflow again for the current release. No board changes.
