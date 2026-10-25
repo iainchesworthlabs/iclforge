@@ -76,6 +76,9 @@ struct Confirm {
     Tone tone = Tone::text;
     // The accept button is held (HoldConfirm::kHoldMs), not tapped.
     bool hold = false;
+    // The board is certain to refuse what this step asks (the network preference's switch to an interface that holds
+    // no address): the step says so and offers no way to go on.
+    bool blocked = false;
 };
 
 namespace detail {
@@ -99,14 +102,22 @@ namespace detail {
     return confirm;
 }
 
-[[nodiscard]] inline Confirm reset_preferences_confirm(const Situation&) {
+// `changed` is what Reset preferences sets back on THIS board, as words for a sentence (the registry's
+// reset_labels(caps)): "screen without lyrics", "dim after".
+[[nodiscard]] inline Confirm reset_preferences_confirm(const std::vector<std::string>& changed) {
     Confirm confirm;
     confirm.title = "Reset preferences?";
-    confirm.lines.push_back("These go back to how a new player behaves: " + settingskeys::reset_words() + ".");
+    confirm.lines.push_back("These go back to how a new player behaves: " +
+                            (changed.empty() ? std::string("nothing on this board") : settingskeys::joined(changed)) + ".");
     confirm.lines.push_back("These stay as they are: " + settingskeys::kept_words() + ", and the paired servers.");
     confirm.lines.push_back("The screen follows at once; the player does not restart.");
     confirm.accept = "Reset";
     return confirm;
+}
+
+// ... and as the key table words them, for a caller that has no registry to ask.
+[[nodiscard]] inline Confirm reset_preferences_confirm(const Situation&) {
+    return reset_preferences_confirm(settingskeys::detail::words(true));
 }
 
 // The first step of the factory reset: what is lost, whether the board can still be reached, and what

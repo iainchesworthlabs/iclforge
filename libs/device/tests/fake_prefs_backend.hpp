@@ -93,6 +93,65 @@ class FakeBackend final : public Backend {
     }
     [[nodiscard]] bool playing() const override { return playing_; }
 
+    // --- Network and System (E4)
+    std::string network_pref_ = "auto";
+    std::string name_ = "hearth-a1b2c3";
+    // What facts() and situation() answer: a test sets the part it is about.
+    devview::Facts facts_;
+    sysactions::Situation situation_;
+    // What restart() and factory_reset() answer (nothing is done, and the reason is given) and how often each ran.
+    std::optional<std::string> action_refusal;
+    int restarts = 0;
+    int factory_resets = 0;
+    std::vector<sysactions::paired::Server> paired_;
+    std::vector<std::string> forgotten_;
+
+    [[nodiscard]] std::string network_preference() const override { return network_pref_; }
+    [[nodiscard]] bool set_network_preference(std::string_view word) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        network_pref_ = std::string(word);
+        return true;
+    }
+    [[nodiscard]] std::string name() const override { return name_; }
+    [[nodiscard]] bool set_name(std::string_view name) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        name_ = std::string(name);
+        return true;
+    }
+    [[nodiscard]] devview::Facts facts() const override { return facts_; }
+    [[nodiscard]] sysactions::Situation situation() const override { return situation_; }
+    [[nodiscard]] std::optional<std::string> restart() override {
+        if (action_refusal) {
+            return action_refusal;
+        }
+        ++restarts;
+        return std::nullopt;
+    }
+    [[nodiscard]] std::optional<std::string> factory_reset() override {
+        if (action_refusal) {
+            return action_refusal;
+        }
+        ++factory_resets;
+        return std::nullopt;
+    }
+    [[nodiscard]] std::vector<sysactions::paired::Server> paired_servers() const override { return paired_; }
+    [[nodiscard]] bool forget_server(std::string_view server_id) override {
+        for (auto it = paired_.begin(); it != paired_.end(); ++it) {
+            if (it->server_id == server_id) {
+                forgotten_.push_back(it->server_id);
+                paired_.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
    private:
     bool take_refusal() {
         const bool refused = refuse_next;

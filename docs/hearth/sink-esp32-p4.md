@@ -200,7 +200,9 @@ Network, Time, Updates and System (a group with nothing in it is not drawn), wit
 screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
 closes, so the lyric screen is as it was with it shut. It holds what the screen shows while a song has no lyrics and
 when it dims (the two settings that were in Adjust), the screen's **brightness**, how the clock view writes the time,
-the **night schedule**, and the **time zone**. The technical settings (slot width, the second I2S line, the time
+the **night schedule** and the **time zone**, then the Network and System groups: wired or
+Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset
+([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time
 server) stay in the [developer view](#the-developer-view) and the routes.
 
 ![Preferences: brightness, the clock's hours and seconds, and the night schedule](screenshots/p4-panel-prefs-display.png)
@@ -239,10 +241,11 @@ product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an
 touch) for the host tests to walk.
 
 The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
-and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text or action),
-whether a change applies live, at the next play or after a restart, the route that sets the same value, its choices,
-and **`availability(caps)`**, once for the entry and once for each choice: whether this board can do it and, if not,
-why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action, info
+or list), whether a change applies live, at the next play or after a restart, the route that sets the same value, its
+choices, what **Reset preferences** does with it (`on_reset`: put back to its default word, or keep; an entry that says
+neither fails a host test), and **`availability(caps)`**, once for the entry and once for each choice: whether this board
+can do it and, if not, why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
 functions (`main/preferences.cpp`), so the screen, the routes and the host tests go through the same code.
 
 **A preference the board cannot support is shown, greyed, with the reason, and never hidden.** On a board whose screen
@@ -266,6 +269,13 @@ greyed, and a default that is never a choice the board cannot make.
 | Night from and to: a pair of times (editor) | `night-times` | `/night-schedule` | the same |
 | Night covers idle screen: on or off | `night-idle` | `/night-idle` | the same |
 | Time zone: a place by region (editor) | `time-zone` | `/timezone` | the board keeps the time |
+| Wired or Wi-Fi: automatic, cable, Wi-Fi | `network-preference` | `/network-preference` | the board has both a cable and Wi-Fi |
+| Name of this player | `name` | `/name` | always |
+| About | `about` | `/hardware` | always |
+| Paired servers | `paired-servers` | `/pairing` | the board runs the Sendspin player |
+| Restart | `restart` | `/restart` | not while an update is under way, nor while the new image is on trial |
+| Reset preferences | `reset-preferences` | `/reset-preferences` | not while an update is under way |
+| Factory reset | `factory-reset` | `/factory-reset` | as Restart |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
@@ -776,6 +786,88 @@ what a rename changes); what the kit adds is below.
   started. *Not yet checked on the kit.*
 - **Restart is refused for about half a minute after an update**: the new image is on trial, and a
   restart then goes back to the image before it.
+
+#### On the screen
+
+The footer's **Preferences** button opens the sheet of everything a person chooses once, and its **Network**
+and **System** groups are these routes with a screen over them. Each is a registry entry
+(`libs/device/include/iclforge/preferences.hpp`), so a board with no screen has the same choices over REST, and
+a choice the board cannot make is shown greyed with the reason and not hidden: a board with Wi-Fi alone shows
+"Wired or Wi-Fi" greyed, "This board has Wi-Fi only, so there is nothing to choose between." Every page below is
+drawn at the size of the display it is on: the preview holds each one to the fingertip size and to text that is
+not cut off at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240.
+
+![The System group of the Preferences sheet: About, Paired servers, Restart, Reset preferences and Factory reset, each with the button that opens or runs it](screenshots/p4-panel-prefs-system.png)
+
+| Entry | A tap |
+|---|---|
+| **Wired or Wi-Fi** | Automatic, Cable or Wi-Fi, on a board that has both. It asks first, in the developer view's words, and a switch the board is certain to refuse says so and cannot be made. |
+| **Name of this player** | Opens the keyboard. |
+| **About** | Opens the version, the slot it runs from, the name, the address and MAC of each interface, the page's address, the chip, the layout and the number of paired servers. |
+| **Paired servers** | Opens the list, each server with a Forget. |
+| **Restart** | Asks, and restarts as `POST /restart` does. |
+| **Reset preferences** | Asks, naming what changes on this board, and puts those choices back. |
+| **Factory reset** | Asks twice: what is lost, and then a button held for three seconds. |
+
+**The switch between the cable and Wi-Fi** is the developer view's control (the same words, the same call), here
+with a card over the sheet. The board keeps the preference only once the interface it names holds an address, as
+[the cable section](#the-cable-and-wi-fi) says.
+
+![Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-prefs-network.png)
+
+**The name** is typed on a keyboard of its own: lower case, a shift for one capital, digits and the punctuation a
+room's name uses (`- _ . , ' & ( ) # + !`), and two pages of accented letters (Latin-1, and the Latin Extended-A
+letters that Polish, Czech, Hungarian, Turkish and Romanian add). It offers only what the name's rule accepts and
+the screen's fonts can draw, counts bytes and not letters (an accented letter is two, and the counter says how many
+of the 32 are used), takes the last letter back whole, and enables Save only for a name that passes, saying why
+when it does not. A saved name takes effect at once, with no restart.
+
+![The keyboard with "Study" typed: 5 of 32 bytes used, the lower-case page, a page tab for digits, accents and the Latin Extended-A letters, a shift, and Space](screenshots/p4-panel-prefs-name.png)
+
+The same keyboard on a 480 by 320 panel, where the keys scroll under the name:
+
+![The keyboard on a 480 by 320 panel, with the name above the keys](screenshots/p4-panel-prefs-name-small.png)
+
+**About** is the friendly subset of the developer view, read the same way (it shares the developer view's reading
+of the board), and never shows the Wi-Fi passphrase or the pairing token. The developer view stays behind the three
+taps on the name.
+
+![About: the version, the slot, the name, the cable's and the radio's addresses and MACs, the page, the chip, the layout and the paired servers](screenshots/p4-panel-prefs-about.png)
+
+**The paired servers** are listed by name, with what each is doing ("playing now", "connected", "played here
+last", "not seen since the player started"), and a Forget on each. Forgetting one asks first and says what
+follows: that server has to pair with the player again, and to remove the player from its list first. **The server
+that is playing is allowed**, with a warning that the music stops: it is the one a person gives a board away from.
+The list never offers the board's bare `forget` (every pairing and a new identity): that is `pair forget` on the
+console and *Forget every server* on the page.
+
+![Paired servers: Music Assistant, playing now, and Hearth on STUDIO-PC, each with Forget](screenshots/p4-panel-prefs-servers.png)
+
+![Forget Music Assistant? It is playing to this player now: the music stops. This player stops listening to it and erases its pairing. Cancel, Forget](screenshots/p4-panel-prefs-forget.png)
+
+**Reset preferences** puts back the choices that every registry entry says are reset (the screen without
+lyrics, its dim time, the brightness, the clock's hours and seconds and the night schedule; an entry that another page
+adds says for itself) and keeps the name, the Wi-Fi network, the choice between the cable and Wi-Fi, the wiring, the
+speaker layout, the time zone and the pairings. It goes through each entry's own
+setter, so the screen and the clock follow as they follow a change.
+
+**Factory reset** is the one action that can strand a board, so it asks twice. The first card says what is lost
+(the name, the network and its password, the paired servers, the layout, the DAC wiring and every preference), how
+many servers will have to pair again, and, from what the board sees, whether it stays reachable: with a cable
+plugged in, "The cable stays in use"; with no cable, or on a board that has Wi-Fi alone, "After the reset it has NO
+network", and what brings it back (Improv over the USB cable, at improv-wifi.com in Chrome or Edge).
+
+![Erase everything? What is lost, that two servers have to pair again, and that the cable stays in use. Cancel, Continue](screenshots/p4-panel-prefs-factory.png)
+
+The second step is a button that has to be held for three seconds, its progress filling it; letting go cancels, and
+a tap does nothing.
+
+![Hold to erase: Keep your finger on the button for 3 seconds. Letting go cancels. The button half filled](screenshots/p4-panel-prefs-hold.png)
+
+On a 320 by 240 panel the card is taller than the glass, so its paragraphs scroll and its buttons stay where a
+finger finds them:
+
+![The factory reset's first card on a 320 by 240 panel: its text scrolls above Cancel and Continue](screenshots/p4-panel-prefs-factory-small.png)
 
 ### Memory and time
 
