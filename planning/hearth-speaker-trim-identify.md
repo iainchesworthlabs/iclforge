@@ -1,6 +1,7 @@
 # Speaker trim and the identify tone
 
-Task E1 of the Preferences programme ([p4x-preferences.md](p4x-preferences.md)). The owner asked for
+Task E1 of the Preferences programme (Preferences and Adjust for a board with a screen, started
+2026-10-25 and kept by its coordinator). The owner asked for
 two things under Preferences: *Identify speakers*, a test tone out of each output, and a
 *per-speaker level and distance trim*. This page is the design of the board's side of both: what
 was already there, what was decided, what it costs, and what is left to check on a board. The user
@@ -230,6 +231,6 @@ A refusal is 400 for words the route does not read, 409 for what the board canno
 ## Not done here
 
 The Preferences entries and editors: an *Identify speakers* action and a per-output grid for the trim
-wait for the registry of [prefs-core](p4x-preferences.md), and the on-screen room reuses
-`libs/render/room_plan.hpp` read-only, with the speaker being tested lit from `GET /identify`'s `output`
-and `role`.
+wait for the preference registry of the programme's first task (prefs-core), and the on-screen room
+reuses `room_plan.hpp` of `libs/render` read-only, with the speaker being tested lit from
+`GET /identify`'s `output` and `role`.
