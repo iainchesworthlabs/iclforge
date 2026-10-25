@@ -31,6 +31,7 @@
 #include "ac4_stream.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
@@ -176,7 +177,10 @@ class TimedSink final : public PlayoutSink {
 struct BurstPlayer::Impl {
     Impl(const BurstPlayerConfig& cfg, ScheduledSink& snk)
         : config(cfg), sink(snk), timed(snk), layout(cfg.layout), renderer(cfg.layout, cfg.sample_rate),
-          tone(cfg.sample_rate) {}
+          tone(cfg.sample_rate) {
+        applied_range = cfg.dynamic_range;
+        wanted_range.store(static_cast<std::uint8_t>(cfg.dynamic_range));
+    }
 
     BurstPlayerConfig config;
     ScheduledSink& sink;
@@ -265,7 +269,15 @@ struct BurstPlayer::Impl {
 
     OutputLayout layout;
     iclforge::ac3::render::Serving serving;
+    // The decoder settings as the board and the server left them (the server's replace the board's
+    // whole), and what the decoders are made with: those, served for the layout, and the listener's
+    // dynamic range over them (rebuild_decoder_config).
+    iclforge::ac3::DecoderConfig decoder_base;
     iclforge::ac3::DecoderConfig decoder_config;
+    // The dynamic range the decoders were made for, and the one the listener last chose: the
+    // decoders are made again, at a stream's start, when the two differ.
+    iclforge::base::DynamicRange applied_range = iclforge::base::kDefaultDynamicRange;
+    std::atomic<std::uint8_t> wanted_range{static_cast<std::uint8_t>(iclforge::base::kDefaultDynamicRange)};
     LayoutRenderer renderer;
     Routing routing;
     TrimDelay trim_delay;
@@ -403,9 +415,8 @@ struct BurstPlayer::Impl {
         layout = new_layout;
         serving = iclforge::ac3::render::serve(layout, fold, objects);
         objects_always = objects == iclforge::ac3::render::ObjectsPolicy::kAlways;
-        decoder_config = decoder;
-        iclforge::ac3::render::configure_decoder(serving, decoder_config);
-        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        decoder_base = decoder;
+        rebuild_decoder_config();
         renderer = LayoutRenderer{layout, config.sample_rate, crossover_hz};
         renderer_bed.reset();
         if (new_routing) {
@@ -423,6 +434,28 @@ struct BurstPlayer::Impl {
         drop_decoders();  // made with the settings these are
         open_outputs(false);
         reset_decoding();
+    }
+
+    // The configuration the AC-3 and E-AC-3 decoders are made with: the board's and the server's
+    // settings, the layout's serving, and the listener's dynamic range over all of it.
+    void rebuild_decoder_config() {
+        decoder_config = decoder_base;
+        iclforge::ac3::render::configure_decoder(serving, decoder_config);
+        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        iclforge::ac3::apply_dynamic_range(applied_range, decoder_config);
+    }
+
+    // The listener's latest choice, taken up at a stream's start: the decoders made for the one
+    // before are let go, and made again (AC-4's with the new range in its config) by the stream.
+    void take_up_dynamic_range() {
+        const auto wanted = static_cast<iclforge::base::DynamicRange>(wanted_range.load());
+        if (wanted == applied_range) {
+            return;
+        }
+        applied_range = wanted;
+        rebuild_decoder_config();
+        drop_decoders();
+        std::printf("burst player: dynamic range %s\n", iclforge::base::dynamic_range_name(applied_range).data());
     }
 
     // The decoders given back, for a change of the configuration they were made with.
@@ -626,6 +659,7 @@ struct BurstPlayer::Impl {
     }
 
     void new_stream(Stream kind) {
+        take_up_dynamic_range();
         reset_decoding();
         stream = kind;
         have_origin = false;
@@ -1192,7 +1226,8 @@ struct BurstPlayer::Impl {
                        .executor = lane.has_value() ? &*lane : nullptr,
                        .max_channels = config.max_ac4_channels,
                        .sample_rate_hz = config.sample_rate,
-                       .max_frame_rate = config.max_ac4_frame_rate})) {
+                       .max_frame_rate = config.max_ac4_frame_rate,
+                       .dynamic_range = applied_range})) {
             return true;
         }
         ac4_failed = true;
@@ -1930,6 +1965,10 @@ bool BurstPlayer::set_layout(const OutputLayout& layout) {
     impl_->config.layout = layout;
     impl_->pending_layout = layout;
     return true;
+}
+
+void BurstPlayer::set_dynamic_range(iclforge::base::DynamicRange range) {
+    impl_->wanted_range.store(static_cast<std::uint8_t>(range));
 }
 
 void BurstPlayer::identify(std::optional<ac::Identify> tone) {

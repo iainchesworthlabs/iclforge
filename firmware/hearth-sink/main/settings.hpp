@@ -24,6 +24,7 @@
 #include <span>
 #include <string_view>
 
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/wall_clock.hpp"
 
@@ -93,6 +94,12 @@ struct Settings {
     // (CONFIG_ICLFORGE_EXAMPLE_LAYOUT) stands. A server that sends a layout of its own (Hearth does, a
     // Music Assistant does not) replaces it for the stream.
     std::array<char, kMaxPasswordBytes + 1> layout{};
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
+    // planning/hearth-late-night.md): standard is the decode this board always made, late night is
+    // the stream's own compression on top of it. Read by every build and acted on by the one that
+    // decodes (the Sendspin player), at the start of the next stream. The image's own answer is
+    // CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE, standard unless a build says otherwise.
+    iclforge::base::DynamicRange dynamic_range = iclforge::base::kDefaultDynamicRange;
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -132,6 +139,9 @@ void settings_load();
 [[nodiscard]] bool settings_set_time_sync(bool on);
 // The stored layout text (already checked as a layout by the caller); an empty string takes it away.
 [[nodiscard]] bool settings_set_layout(std::string_view layout);
+
+// Standard or late night. Refused only when NVS refuses the write.
+[[nodiscard]] bool settings_set_dynamic_range(iclforge::base::DynamicRange range);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

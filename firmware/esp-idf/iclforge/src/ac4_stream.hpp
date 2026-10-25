@@ -9,6 +9,7 @@
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/base/executor.hpp"
 
 // The AC-4 decoder as the Sendspin player's burst path uses it (planning/ac4.md, I6): one AC-4
@@ -70,6 +71,11 @@ class Ac4Stream {
         // dropped by decode_by_block(). A presentation of objects alone is then refused, which
         // the server's own choice of PCM for it makes rare.
         bool skip_objects = true;
+        // The listener's dynamic range (iclforge/ac4/decoder/dynamic_range.hpp). Standard leaves
+        // the decoder as it is made: no output level, and so no dialnorm and no DRC. Late night
+        // brings it to a DRC mode the stream configures, at the stream's own dialnorm, from the
+        // frame after the first one that says what the dialnorm is.
+        iclforge::base::DynamicRange dynamic_range = iclforge::base::kDefaultDynamicRange;
     };
 
     // What the decoder found in the last frame that decoded.

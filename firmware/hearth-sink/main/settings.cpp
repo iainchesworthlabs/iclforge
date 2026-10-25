@@ -32,6 +32,7 @@ constexpr const char* kKeyTimeZone = "time_zone";
 constexpr const char* kKeyNtpServer = "ntp_server";
 constexpr const char* kKeyTimeSync = "time_sync";
 constexpr const char* kKeyLayout = "layout";
+constexpr const char* kKeyDynamicRange = "dyn_range";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -145,6 +146,9 @@ void settings_load() {
     g_settings.ntp_server = {};
     g_settings.time_sync = true;
     g_settings.layout = {};
+    g_settings.dynamic_range =
+        iclforge::base::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
+            .value_or(iclforge::base::kDefaultDynamicRange);
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -221,12 +225,21 @@ void settings_load() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, kKeyLayout, g_settings.layout);
+    if (nvs_get_i32(handle, kKeyDynamicRange, &stored) == ESP_OK) {
+        if (const auto range = iclforge::base::dynamic_range_from_stored(stored)) {
+            g_settings.dynamic_range = *range;
+        } else {
+            std::printf("settings: stored dynamic range %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored),
+                        iclforge::base::dynamic_range_name(g_settings.dynamic_range).data());
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s\n",
+                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
@@ -235,7 +248,8 @@ void settings_load() {
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
-                iclforge::wallclock::time_sync_text(g_settings.time_sync));
+                iclforge::wallclock::time_sync_text(g_settings.time_sync),
+                iclforge::base::dynamic_range_name(g_settings.dynamic_range).data());
 }
 
 const Settings& settings() { return g_settings; }
@@ -349,6 +363,14 @@ bool settings_set_time_sync(bool on) {
         return false;
     }
     g_settings.time_sync = on;
+    return true;
+}
+
+bool settings_set_dynamic_range(iclforge::base::DynamicRange range) {
+    if (!write_int(kKeyDynamicRange, static_cast<std::int32_t>(range))) {
+        return false;
+    }
+    g_settings.dynamic_range = range;
     return true;
 }
 

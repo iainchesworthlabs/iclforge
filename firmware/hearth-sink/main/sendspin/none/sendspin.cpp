@@ -20,6 +20,8 @@ void sendspin_set_external(bool /*external*/) {}
 
 bool sendspin_set_layout(const iclforge::render::OutputLayout& /*layout*/) { return true; }
 
+void sendspin_set_dynamic_range(iclforge::base::DynamicRange /*range*/) {}
+
 void sendspin_board_changed() {}
 
 void sendspin_leave() {}

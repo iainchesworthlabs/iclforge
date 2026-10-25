@@ -759,6 +759,22 @@ iclforge::ControlHandlers control_handlers() {
             return true;
         };
     }
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
+    // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
+    // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
+    if (player::sendspin_built()) {
+        h.dynamic_range = []() {
+            return std::string(iclforge::base::dynamic_range_name(player::settings().dynamic_range));
+        };
+        h.set_dynamic_range = [](std::string_view word) {
+            const auto range = iclforge::base::parse_dynamic_range(word);
+            if (!range || !player::settings_set_dynamic_range(*range)) {
+                return false;
+            }
+            player::sendspin_set_dynamic_range(*range);
+            return true;
+        };
+    }
     // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
     // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
     // at once. A zone is applied first, because the board's C library must read it as the route did, and is
