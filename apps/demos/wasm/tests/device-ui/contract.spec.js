@@ -144,6 +144,8 @@ test('every request the page makes is to a route the firmware registers', () => 
         'GET /pairing',
         'GET /status',
         'GET /time-zones',
+        'GET /trim',
+        'POST /identify',
         'POST /pairing',
         'POST /restart',
         'PUT /firmware',
@@ -155,6 +157,7 @@ test('every request the page makes is to a route the firmware registers', () => 
         'PUT /slot-width',
         'PUT /time-sync',
         'PUT /timezone',
+        'PUT /trim',
         'PUT /wiring',
     ]);
     for (const route of made) {

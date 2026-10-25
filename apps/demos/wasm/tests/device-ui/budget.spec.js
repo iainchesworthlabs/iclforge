@@ -37,6 +37,10 @@
 // shown; Restart and Roll back behind the dialog, which now asks before
 // anything that cannot be taken back. Decision 22's second re-derivation has
 // the images.
+//
+// 69,632 since the Speakers section (a level and a distance for each speaker, a test tone out of each, and what the
+// build can do about a delay: planning/p4x-preferences.md), which every board with a Sendspin player has: a table
+// of the layout's speakers, two fields and a button a row, and three buttons. About 4.7 KB; the images have room.
 
 const fs = require('fs');
 const path = require('path');

@@ -349,6 +349,59 @@
     return li;
   }
 
+  // GET /trim: the speakers the layout in force has at an output, each with the level and distance the listener
+  // set (iclforge/render/speaker_trim.hpp). A board with no Sendspin player answers 404 and the section stays
+  // hidden. Read again when the layout changes and after each change the page makes.
+  let trimRead = false;
+  let trimLayout;
+  async function loadTrim() {
+    let t;
+    try {
+      const r = await call('GET', 'trim');
+      if (r.status !== 200 && r.status !== 404) return; // read again at the next poll
+      t = r.status === 200 ? JSON.parse(r.text) : null;
+    } catch {
+      return;
+    }
+    trimRead = true;
+    trimLayout = status.layout;
+    $('sound').hidden = !t;
+    if (!t) return;
+    const notes = [];
+    if (!t.delay.available) notes.push('Distance is not available: ' + t.delay.reason + '.');
+    if (t.server_level || t.server_delay) notes.push('A server has set the ' + (t.server_level ? 'levels' : 'distances') + ' that play now, in place of these.');
+    $('sound-note').textContent = notes.join(' ');
+    $('sound-note').hidden = !notes.length;
+    $('trim-rows').replaceChildren(...t.speakers.map((x) => trimRow(x, t.delay)));
+  }
+
+  // PUT /trim's statements and POST /identify's words, one call each.
+  const trim = (label, body, done) => act(label, 'PUT', 'trim', body, done, { key: 'trim' });
+  const tone = (label, body, done) => act(label, 'POST', 'identify', body, done);
+
+  // A speaker's row: two fields that send one statement each (PUT /trim), what the delay comes to, and its tone.
+  function trimRow(x, delay) {
+    const tr = document.createElement('tr');
+    const th = tr.appendChild(document.createElement('th'));
+    th.scope = 'row';
+    th.textContent = x.label;
+    const field = (what, value, min, max, off, send) => {
+      const input = tr.appendChild(document.createElement('td')).appendChild(document.createElement('input'));
+      Object.assign(input, { type: 'number', min, max, step: what === 'level' ? 0.5 : 0.01, disabled: off, value });
+      input.setAttribute('aria-label', x.label + ' ' + what);
+      input.addEventListener('change', () => trim(x.label + ' ' + what, x.role + ' ' + send(input.value), loadTrim));
+    };
+    field('level', x.level_db, -12, 12, false, (v) => 'level=' + (v || 0));
+    field('distance', x.distance_m || '', 0.1, 10, !delay.available, (v) => 'distance=' + (v || 'none'));
+    tr.appendChild(document.createElement('td')).textContent = x.delay_ms.toFixed(1) + ' ms';
+    const play = tr.appendChild(document.createElement('td')).appendChild(document.createElement('button'));
+    play.type = 'button';
+    play.textContent = 'Play';
+    play.setAttribute('aria-label', 'Play a tone from the ' + x.label);
+    play.addEventListener('click', () => tone('Tone from the ' + x.label, x.role, () => {}));
+    return tr;
+  }
+
   // What this board is: fetched once, since nothing in it changes while the
   // board runs (unlike everything else this page polls). Tried again at the
   // next successful status poll if it failed the first time - a board whose
@@ -429,6 +482,7 @@
   // meets a closed connection again.
   async function board() {
     if (!hardwareShown) await loadHardware();
+    if (!trimRead || status.layout !== trimLayout) await loadTrim();
     const key = [status.sink_slots, status.slot_bits, status.second_line].join();
     if (str(status.layout) && layoutKey !== key) await loadLayoutOptions(key);
     const asked = restarting && Date.now() - restarting < RESTART_MS;
@@ -727,6 +781,17 @@
     act('Time server', 'PUT', 'ntp-server', server || 'none',
       () => say(server ? 'Asking ' + server + ' for the time.' : 'Asking the router\'s time server, then pool.ntp.org.'));
   });
+
+  // The test tone stops by itself; these end it sooner, start the whole round, and put every speaker back.
+  $('tone-all').addEventListener('click', () => tone('Test tones', 'all', () => say('Each speaker in turn, quietly.')));
+
+  $('tone-off').addEventListener('click', () => tone('Stop the tone', 'off', () => say('Stopped.')));
+
+  $('trim-reset').addEventListener('click', () => ask('Reset every speaker?', 'Every level goes back to 0 dB and every distance is cleared.', 'Reset',
+    () => trim('Reset', 'reset', () => say('Levels and distances are cleared.')).then(loadTrim)));
+
+  // Leaving the page ends a tone that is still going.
+  addEventListener('pagehide', () => $('sound').hidden || navigator.sendBeacon('identify', 'off'));
 
   $('ss-cancel').addEventListener('click', () => pairing('Cancel pairing', 'cancel', 'Pairing cancelled.'));
 

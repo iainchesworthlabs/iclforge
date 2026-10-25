@@ -28,6 +28,7 @@
 #include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/device_name.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
 
@@ -108,6 +109,12 @@ struct Settings {
     // (CONFIG_ICLFORGE_EXAMPLE_LAYOUT) stands. A server that sends a layout of its own (Hearth does, a
     // Music Assistant does not) replaces it for the stream.
     std::array<char, kMaxPasswordBytes + 1> layout{};
+    // The listener's own level and distance for each speaker, by the speaker's role in the layout
+    // (iclforge/render/speaker_trim.hpp), so that a trim follows its speaker when the layout changes. Every
+    // speaker at 0 dB with no distance unless CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM or a person says otherwise;
+    // the player applies it to every stream, after the decode and before the DAC. Read by every build, acted
+    // on by the one with a Sendspin player.
+    iclforge::render::speaker_trim::SpeakerTrimTable speaker_trim;
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/ac3/decoder/dynamic_range.hpp,
     // planning/hearth-late-night.md): standard is the decode this board always made, late night is
     // the stream's own compression on top of it. Read by every build and acted on by the one that
@@ -158,6 +165,9 @@ void settings_load();
 [[nodiscard]] bool settings_set_time_sync(bool on);
 // The stored layout text (already checked as a layout by the caller); an empty string takes it away.
 [[nodiscard]] bool settings_set_layout(std::string_view layout);
+// The speaker trim, whole. Stored as the table's own compact form (SpeakerTrimTable::to_blob), so a role that is
+// not set costs nothing and the stored role numbers are never renumbered.
+[[nodiscard]] bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table);
 
 // Standard or late night. Refused only when NVS refuses the write.
 [[nodiscard]] bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range);
