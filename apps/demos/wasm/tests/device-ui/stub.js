@@ -53,6 +53,8 @@ const REPLIES = {
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
         'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
         'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
+        "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off",
+        'GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; PUT one',
         "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is kept; PUT one to change it (from the next stream)",
         'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
         'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one, or a name from /time-zones',
@@ -127,6 +129,11 @@ const REPLIES = {
     clockFormatBad: 'PUT /clock-format wants 24 or 12, and seconds after it when they are shown: 24, 12 seconds\n',
     clockFormatRefused: 'that format could not be stored\n',
     clockFormatOk: 'ok; takes effect at once\n',
+    nightScheduleBad: 'PUT /night-schedule wants two times of day and a state, 22:00-07:00 on, or just on or off\n',
+    nightIdleBad: 'PUT /night-idle wants on or off\n',
+    nightRefused: 'that schedule could not be stored\n',
+    nightIdleRefused: 'that setting could not be stored\n',
+    nightOk: 'ok; takes effect at once\n',
     timeZoneBad:
         'PUT /timezone wants a name from /time-zones (Australia/Melbourne), a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
     timeZoneRefused:
@@ -219,6 +226,10 @@ const ROUTES = [
     'PUT /brightness',
     'GET /clock-format',
     'PUT /clock-format',
+    'GET /night-schedule',
+    'PUT /night-schedule',
+    'GET /night-idle',
+    'PUT /night-idle',
     'GET /time-zones',
     'GET /dynamic-range',
     'PUT /dynamic-range',
@@ -513,17 +524,46 @@ function cableNetwork(preference = 'auto') {
 // The panel of a board with a screen (firmware/hearth-sink/main/panel/): what it shows while a song has
 // no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing and GET
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
+// The night schedule a board starts with (iclforge::nowview::NightSchedule): off, 22:00 to 07:00, the idle screen not covered.
+function nightDefault() {
+    return { enabled: false, from: '22:00', to: '07:00', idle: false };
+}
+
+// GET /night-schedule's words: the two times, then the state.
+function nightText(night) {
+    return `${night.from}-${night.to} ${night.enabled ? 'on' : 'off'}`;
+}
+
+// What PUT /night-schedule takes (libs/device's now_view.hpp parse_night_schedule, rule for rule): `on` or `off`, the
+// times kept; or `HH:MM-HH:MM` alone (on) or followed by ` on` or ` off`. Nothing for any other body.
+function parseNight(body, current) {
+    const text = body.trim();
+    if (text === 'on' || text === 'off') {
+        return { ...current, enabled: text === 'on' };
+    }
+    const m = /^([01][0-9]|2[0-3]):([0-5][0-9])-([01][0-9]|2[0-3]):([0-5][0-9])( on| off)?$/.exec(text);
+    if (!m) {
+        return null;
+    }
+    return { ...current, from: `${m[1]}:${m[2]}`, to: `${m[3]}:${m[4]}`, enabled: m[5] !== ' off' };
+}
+
 function screenBoard() {
     // `dimmable` is a glass whose backlight can be dimmed; a frame buffer with no panel behind it has none.
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', brightness: 80, dimmable: true, clockFormat: '24' };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
 }
 
 // The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
-// registry's entries with the registry's words, as far as the stand-in models them: the two of the screen and the two of
-// the sound; contract.spec.js holds each to the registry. A board with no screen lists the first two greyed, with the
-// reason, and one with no player the last two.
+// registry's entries with the registry's words, as far as the stand-in models them, in the registry's order.
+// contract.spec.js holds each to the registry. `needs` is what the entry asks of the board (the registry's
+// availability), and a board that lacks it lists the entry greyed, with the reason.
 const NO_SCREEN = 'This board has no screen.';
+const NO_CLOCK = 'This board keeps no time: it has no network to ask a time server on.';
 const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
+const ON_OFF = [
+    ['on', 'On'],
+    ['off', 'Off'],
+];
 const PREFERENCES = [
     {
         id: 'now-view',
@@ -561,6 +601,69 @@ const PREFERENCES = [
         ],
     },
     {
+        id: 'brightness',
+        group: 'Display',
+        label: 'Brightness',
+        kind: 'stepper',
+        apply: 'live',
+        route: '/brightness',
+        needs: 'backlight',
+        choices: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => [String(n), `${n}%`]),
+    },
+    {
+        id: 'clock-hours',
+        group: 'Display',
+        label: 'Clock hours',
+        kind: 'choice',
+        apply: 'live',
+        route: '/clock-format',
+        needs: 'screenClock',
+        choices: [
+            ['24', '24 hour'],
+            ['12', '12 hour'],
+        ],
+    },
+    {
+        id: 'clock-seconds',
+        group: 'Display',
+        label: 'Clock seconds',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/clock-format',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
+        id: 'night-schedule',
+        group: 'Display',
+        label: 'Night schedule',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/night-schedule',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
+        id: 'night-times',
+        group: 'Display',
+        label: 'Night from and to',
+        kind: 'text',
+        apply: 'live',
+        route: '/night-schedule',
+        needs: 'screenClock',
+        choices: [],
+    },
+    {
+        id: 'night-idle',
+        group: 'Display',
+        label: 'Night covers idle screen',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/night-idle',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
         id: 'identify-speakers',
         group: 'Sound',
         label: 'Identify speakers',
@@ -583,32 +686,82 @@ const PREFERENCES = [
         needs: 'player',
         choices: [],
     },
+    {
+        id: 'time-zone',
+        group: 'Time',
+        label: 'Time zone',
+        kind: 'text',
+        apply: 'live',
+        route: '/timezone',
+        needs: 'clock',
+        choices: [],
+    },
 ];
 
-// What an entry's value says: the screen's view and dim time, the tone at rest or running, and how many speakers have
-// a level or a distance set (libs/render's summary_text).
-function preferenceValue(device, p) {
+// Why the board cannot use the entry, or '' when it can (the registry's availability functions, word for word).
+function unavailableReason(p, device) {
     const screen = device.screen;
-    const sound = device.sound;
+    const clock = device.time ? '' : NO_CLOCK;
+    switch (p.needs) {
+        case 'screen':
+            return screen ? '' : NO_SCREEN;
+        case 'backlight':
+            return !screen ? NO_SCREEN : screen.dimmable ? '' : "This screen's backlight is not under the board's control.";
+        case 'screenClock':
+            return !screen ? NO_SCREEN : clock;
+        case 'player':
+            return device.sound ? '' : NO_PLAYER;
+        default:
+            return clock;
+    }
+}
+
+// The entry's value in the words its route takes (the registry's get functions).
+function preferenceValue(p, device) {
+    const screen = device.screen;
     switch (p.id) {
         case 'now-view':
             return screen ? screen.view : '';
         case 'dim-after':
             return screen ? screen.dimAfter : '';
+        case 'brightness':
+            return screen ? String(screen.brightness) : '';
+        case 'clock-hours':
+            return screen ? (screen.clockFormat.startsWith('12') ? '12' : '24') : '';
+        case 'clock-seconds':
+            return screen ? (screen.clockFormat.endsWith('seconds') ? 'on' : 'off') : '';
+        case 'night-schedule':
+            return screen ? (screen.night.enabled ? 'on' : 'off') : '';
+        case 'night-times':
+            return screen ? `${screen.night.from}-${screen.night.to}` : '';
+        case 'night-idle':
+            return screen ? (screen.night.idle ? 'on' : 'off') : '';
+        case 'time-zone':
+            return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
         case 'identify-speakers':
-            return sound && sound.identify.active ? 'running' : 'run';
-        default: {
-            const set = sound ? sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
+            return device.sound && device.sound.identify.active ? 'running' : 'run';
+        case 'speaker-trim': {
+            // libs/render's summary_text: how many speakers have a level or a distance set.
+            const set = device.sound ? device.sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
             return set === 0 ? 'none set' : `${set} ${set === 1 ? 'speaker' : 'speakers'} set`;
         }
+        default:
+            return '';
     }
 }
 
+// What the night schedule says when the screen without lyrics makes it moot (preferences.hpp, night_inert).
+function nightNote(device) {
+    const view = device.screen ? device.screen.view : '';
+    if (view === 'dark') {
+        return 'The Dark view is dark already: a touch lights it for 30 seconds, as at night.';
+    }
+    return view === 'off' ? 'Not used while the screen without lyrics is Off.' : '';
+}
+
 function preferencesJson(device) {
-    const screen = device.screen;
     const entries = PREFERENCES.map((p) => {
-        const on = p.needs === 'screen' ? Boolean(screen) : Boolean(device.sound);
-        const reason = on ? '' : p.needs === 'screen' ? NO_SCREEN : NO_PLAYER;
+        const reason = unavailableReason(p, device);
         const entry = {
             id: p.id,
             group: p.group,
@@ -616,19 +769,22 @@ function preferencesJson(device) {
             kind: p.kind,
             apply: p.apply,
             route: p.route,
-            value: preferenceValue(device, p),
-            available: on,
+            value: preferenceValue(p, device),
+            available: reason === '',
             reason,
         };
-        // A sheet has no choices to list.
+        const note = p.id === 'night-idle' ? (!reason && !device.screen.night.enabled ? 'Used while the night schedule is on.' : '') : p.id.startsWith('night-') && !reason ? nightNote(device) : '';
+        if (note) {
+            entry.note = note;
+        }
         if (p.choices.length > 0) {
-            entry.choices = p.choices.map(([id, label]) => ({ id, label, available: on, reason }));
+            entry.choices = p.choices.map(([id, label]) => ({ id, label, available: reason === '', reason }));
         }
         return entry;
     });
     return JSON.stringify({
         profile: (device.hardware && device.hardware.profile) || '',
-        display: screen ? 'dsi' : 'none',
+        display: device.screen ? 'dsi' : 'none',
         preferences: entries,
     }) + '\n';
 }
@@ -1579,6 +1735,38 @@ async function startStub() {
                 device.screen.clockFormat = word;
                 return send(res, 200, REPLIES.clockFormatOk);
             }
+            case 'GET /night-schedule':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, nightText(device.screen.night) + '\n');
+            case 'PUT /night-schedule': {
+                const night = parseNight(body, device.screen ? device.screen.night : nightDefault());
+                if (!night) {
+                    return send(res, 400, REPLIES.nightScheduleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.night = night;
+                return send(res, 200, REPLIES.nightOk);
+            }
+            case 'GET /night-idle':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, (device.screen.night.idle ? 'on' : 'off') + '\n');
+            case 'PUT /night-idle': {
+                const word = body.trim();
+                if (word !== 'on' && word !== 'off') {
+                    return send(res, 400, REPLIES.nightIdleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.night.idle = word === 'on';
+                return send(res, 200, REPLIES.nightOk);
+            }
             case 'GET /time-zones':
                 if (!device.time) {
                     return send(res, 404, REPLIES.noClock);
@@ -1798,14 +1986,11 @@ async function startStub() {
                 }
                 send(res, 200, FIRMWARE.restarting);
                 return restart(() => (fw.mode = 'normal'));
-            // Reset preferences: the screen's choices and the time zone go back to the image's; the name, the
-            // network, the wiring and the pairings stay (libs/device's settings_keys.hpp). At once.
+            // Reset preferences: the screen's choices go back to the image's; the name, the network, the wiring, the
+            // pairings and the time zone stay (libs/device's settings_keys.hpp). At once.
             case 'POST /reset-preferences':
                 if (device.screen) {
-                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5' });
-                }
-                if (device.time) {
-                    device.time.zone = 'none';
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
                 }
                 return send(res, 200, REPLIES.resetPreferencesOk);
             // The factory reset: only by the board's own address or name, and only for the words; then
@@ -1825,10 +2010,10 @@ async function startStub() {
                         device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
                     }
                     if (device.screen) {
-                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5' });
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
                     }
                     if (device.time) {
-                        Object.assign(device.time, { zone: 'none', server: 'none', sync: 'on' });
+                        Object.assign(device.time, { zone: 'none', zoneName: 'none', server: 'none', sync: 'on' });
                     }
                     if (fw) {
                         fw.mode = 'normal';

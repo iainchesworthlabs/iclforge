@@ -16,10 +16,14 @@ void panel_set_brightness(int /*percent*/) {}
 
 void panel_set_clock_format(iclforge::wallclock::ClockFormat /*format*/) {}
 
+void panel_set_night(const iclforge::nowview::NightSchedule& /*night*/) {}
+
 bool panel_start() { return false; }
 
 PanelStats panel_stats() { return {}; }
 
 iclforge::DisplayCaps panel_display_caps() { return {}; }
+
+iclforge::devview::Facts panel_board_facts() { return {}; }
 
 }  // namespace player

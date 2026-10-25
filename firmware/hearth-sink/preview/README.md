@@ -16,7 +16,11 @@ It then draws the **Adjust** and **Preferences** sheets at four display sizes (1
 named for the size) and checks them, which fails the run (exit 3): text that does not fit its label, a control that
 sticks out of what holds it or off the screen, a touch target under 48 px or closer than 6 px to another, a tap that
 does nothing, a greyed choice that answers a tap, a list longer than the glass that does not scroll under a finger,
-and the dim time and the minute's idle close behaving with Preferences open. Buttons are found by what they say, not by
+and the dim time and the minute's idle close behaving with Preferences open. It also drives the **editors** of the
+Preferences sheet (the night schedule's two times, held buttons included, and the time zone's regions and places, America's
+144 among them) and the **night schedule** on the screen itself (dark at 23:00, a touch lights it for 30 seconds, lit with no
+time known, the idle screen dark only when told); each editor is held to the same rules, and writes `prefs-night-times-`,
+`prefs-zone-regions-`, `prefs-zone-cities-` and `prefs-zone-reopened-` BMPs for the size. Buttons are found by what they say, not by
 where they are, so a change of layout does not break the taps. The boards drawn are `iclforge/board_variants.hpp`'s.
 
 It exists because the screen is a file that changes, and a firmware build is ten minutes and a

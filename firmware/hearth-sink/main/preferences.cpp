@@ -3,10 +3,15 @@
 #include "preferences.hpp"
 
 #include "board_caps.hpp"
+#include "discovery.hpp"
 #include "layout_control.hpp"
+#include "network.hpp"
 #include "panel/panel.hpp"
+#include "sendspin.hpp"
 #include "settings.hpp"
 #include "sound.hpp"
+#include "system_control.hpp"
+#include "wall_clock.hpp"
 
 namespace player {
 namespace {
@@ -33,6 +38,115 @@ class Board final : public iclforge::prefs::Backend {
             return false;
         }
         panel_set_dim_after(minutes);
+        return true;
+    }
+
+    // Network. Only a board with both a cable and Wi-Fi has a choice; the call returns at once and the work is done on
+    // a task of its own (network_set_preference), which the board keeps only once the interface holds an address.
+    [[nodiscard]] std::string network_preference() const override {
+        return network_has_choice() ? network_preference_name(settings().network_preference) : std::string();
+    }
+
+    [[nodiscard]] bool set_network_preference(std::string_view word) override {
+        if (!network_has_choice()) {
+            return false;
+        }
+        if (word == "auto") {
+            return network_set_preference(NetworkPreference::automatic);
+        }
+        if (word == "ethernet") {
+            return network_set_preference(NetworkPreference::ethernet);
+        }
+        return word == "wifi" && network_set_preference(NetworkPreference::wifi);
+    }
+
+    [[nodiscard]] std::string name() const override { return settings().name.data(); }
+
+    // What a rename changes is iclforge/device_name.hpp's to say: the mDNS names now, with no restart, and the
+    // Sendspin hello now or when the stream that plays has ended.
+    [[nodiscard]] bool set_name(std::string_view name) override {
+        if (!settings_set_name(name)) {
+            return false;
+        }
+        discovery_rename();
+        sendspin_name_changed();
+        return true;
+    }
+
+    // System.
+    [[nodiscard]] iclforge::devview::Facts facts() const override { return panel_board_facts(); }
+    [[nodiscard]] iclforge::sysactions::Situation situation() const override { return system_situation(); }
+    [[nodiscard]] std::optional<std::string> restart() override { return system_restart(); }
+    [[nodiscard]] std::optional<std::string> factory_reset() override { return system_factory_reset(); }
+
+    // The pairings are read from the Sendspin player's store; a build without the player has none.
+    [[nodiscard]] std::vector<iclforge::sysactions::paired::Server> paired_servers() const override {
+        std::vector<iclforge::sysactions::paired::Server> servers;
+        if (const std::optional<iclforge::ControlPairings> listed = sendspin_pairings()) {
+            servers.reserve(listed->servers.size());
+            for (const iclforge::ControlPairing& p : listed->servers) {
+                iclforge::sysactions::paired::Server server;
+                server.server_id = p.server_id;
+                server.name = p.name;
+                server.connected = p.connected;
+                server.last_playback = p.last_playback;
+                server.seen = p.seen;
+                servers.push_back(std::move(server));
+            }
+        }
+        return servers;
+    }
+
+    [[nodiscard]] bool forget_server(std::string_view server_id) override {
+        return sendspin_forget_server(server_id).value_or(false);
+    }
+
+    [[nodiscard]] int brightness() const override { return settings().brightness_percent; }
+
+    // A glass whose backlight is not under the board's control has no level to set, and is refused.
+    [[nodiscard]] bool set_brightness(int percent) override {
+        if (!panel_display_caps().backlight || !settings_set_brightness(percent)) {
+            return false;
+        }
+        panel_set_brightness(percent);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::wallclock::ClockFormat clock_format() const override { return settings().clock_format; }
+
+    [[nodiscard]] bool set_clock_format(iclforge::wallclock::ClockFormat format) override {
+        if (!settings_set_clock_format(format)) {
+            return false;
+        }
+        panel_set_clock_format(format);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::nowview::NightSchedule night() const override { return settings().night; }
+
+    [[nodiscard]] bool set_night(const iclforge::nowview::NightSchedule& night) override {
+        if (!settings_set_night(night)) {
+            return false;
+        }
+        panel_set_night(night);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::wallclock::ZoneChoice time_zone() const override {
+        return {.posix = settings().time_zone.data(), .name = settings().time_zone_name.data()};
+    }
+
+    // The zone is applied first, because the board's C library must read it as the route did, and is not left applied
+    // if it cannot be stored.
+    [[nodiscard]] bool set_time_zone(const iclforge::wallclock::ZoneChoice& zone) override {
+        const std::string previous = settings().time_zone.data();
+        if (!wall_clock_set_zone(zone.posix)) {
+            return false;
+        }
+        if (!settings_set_time_zone(zone.posix, zone.name)) {
+            (void)wall_clock_set_zone(previous);
+            return false;
+        }
         return true;
     }
 
