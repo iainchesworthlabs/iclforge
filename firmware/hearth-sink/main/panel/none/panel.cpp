@@ -25,4 +25,6 @@ PanelStats panel_stats() { return {}; }
 
 iclforge::DisplayCaps panel_display_caps() { return {}; }
 
+iclforge::devview::Facts panel_board_facts() { return {}; }
+
 }  // namespace player
