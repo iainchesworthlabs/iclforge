@@ -837,6 +837,11 @@ class PreviewBackend final : public iclforge::prefs::Backend {
         g_settings.dim_after_minutes = minutes;
         return true;
     }
+    [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return g_settings.speakers_style; }
+    [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
+        g_settings.speakers_style = style;
+        return true;
+    }
 };
 
 iclforge::prefs::Backend& preferences_backend() {
