@@ -1643,15 +1643,20 @@ bool screen_update() {
     // The dark view is dark from the moment a song with no lyrics begins, and a touch lights it for
     // iclforge::nowview::kDarkAwakeMs: dim_state() is the whole rule, tested on the host. The developer
     // view keeps the screen lit while it is open: it is read, not touched.
-    const bool showing = g.np_active || dark_view;
+    // The night schedule (planning/p4x-preferences.md) makes the no-lyrics view the dark view while it is in force,
+    // and the idle screen too when that setting is on: the idle screen then counts as showing from the moment the
+    // night begins, like the dark view.
+    const bool night_idle = idle && iclforge::nowview::night_covers_idle(g.now_set.night, g.now_set.minute_of_day);
+    const bool showing = g.np_active || dark_view || night_idle;
     if (showing && !g.np_was_showing) {
         g.np_since_ms = now;
     }
     g.np_was_showing = showing;
     const std::uint32_t inactive = lv_display_get_inactive_time(g.disp);
     const std::uint32_t showing_ms = showing ? now - g.np_since_ms : 0;
-    iclforge::nowview::Dim dim = iclforge::nowview::dim_state(g.now_set.view, showing,
-                                                              g.now_set.dim_after_minutes, inactive, showing_ms);
+    iclforge::nowview::Dim dim = iclforge::nowview::dim_state(g.now_set.view, showing, g.now_set.dim_after_minutes,
+                                                              inactive, showing_ms, g.now_set.night,
+                                                              g.now_set.minute_of_day);
     if (dev_is_open() || prefs_is_open()) {
         dim = iclforge::nowview::Dim::kNone;
     }

@@ -26,8 +26,9 @@
 // key: at most 15 characters.
 //
 // ADDING A SETTING: add its name below, add a row to kKeys with its class and the words the screen
-// uses for it (`what`), and, if it is a preference, a case in settings_reset_preferences() so the
-// running board follows. Never rename or renumber a key that has been stored: a board in the field has
+// uses for it (`what`), and, if it is a preference, a registry entry (preferences.hpp) that says
+// `on_reset = kReset`, so Reset preferences puts it back through its own setter and the running board
+// follows. Never rename or renumber a key that has been stored: a board in the field has
 // it under that name.
 
 namespace iclforge::settingskeys {
@@ -42,9 +43,15 @@ inline constexpr const char* kNetworkPreference = "net_pref";
 inline constexpr const char* kNowView = "np_view";
 inline constexpr const char* kDimAfter = "np_dim";
 inline constexpr const char* kTimeZone = "time_zone";
+inline constexpr const char* kTimeZoneName = "tz_name";
+inline constexpr const char* kBrightness = "bright";
+inline constexpr const char* kClockFormat = "clock_fmt";
+inline constexpr const char* kNight = "night";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
+inline constexpr const char* kSpeakerTrim = "speaker_trim";
+inline constexpr const char* kDynamicRange = "dyn_range";
 
 // The longest an NVS key may be.
 inline constexpr std::size_t kMaxKeyChars = 15;
@@ -56,7 +63,8 @@ enum class Kind : std::uint8_t {
     identity,
     // How the board is joined to its network: kept by Reset preferences.
     network,
-    // How the board's outputs are wired and what room they serve: kept by Reset preferences.
+    // How the board's outputs are wired, what room they serve and where that room is (its time zone): kept by Reset
+    // preferences. A person set these up for the room, not for taste.
     setup,
     // A technical setting that stays out of Preferences (planning/p4x-preferences.md): kept by Reset
     // preferences.
@@ -78,11 +86,19 @@ inline constexpr std::array kKeys = {
     Key{kSlotBits, Kind::setup, "DAC wiring"},
     Key{kSecondLine, Kind::setup, "DAC wiring"},
     Key{kLayout, Kind::setup, "speaker layout"},
+    Key{kSpeakerTrim, Kind::setup, "per-speaker trims and delays"},
+    Key{kTimeZone, Kind::setup, "time zone"},
     Key{kNtpServer, Kind::technical, "time server"},
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
-    Key{kTimeZone, Kind::preference, "time zone"},
+    // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
+    // Reset preferences keeps the time zone).
+    Key{kTimeZoneName, Kind::setup, "time zone"},
+    Key{kBrightness, Kind::preference, "brightness"},
+    Key{kClockFormat, Kind::preference, "clock format"},
+    Key{kNight, Kind::preference, "night schedule"},
+    Key{kDynamicRange, Kind::preference, "late-night mode"},
 };
 
 [[nodiscard]] constexpr bool is_preference(Kind kind) { return kind == Kind::preference; }
@@ -141,7 +157,10 @@ inline std::string joined(const std::vector<std::string>& parts) {
 
 }  // namespace detail
 
-// "what the screen shows without lyrics, when the screen dims and time zone": what Reset preferences
+// A list as a sentence's words: "a", "a and b", "a, b and c".
+[[nodiscard]] inline std::string joined(const std::vector<std::string>& parts) { return detail::joined(parts); }
+
+// "what the screen shows without lyrics and when the screen dims": what Reset preferences
 // changes, from the table, for the confirming step.
 [[nodiscard]] inline std::string reset_words() { return detail::joined(detail::words(true)); }
 

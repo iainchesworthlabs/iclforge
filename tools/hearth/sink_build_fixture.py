@@ -57,6 +57,7 @@ def app_image(
     flash_code: int = 4,
     segment_bytes: int = 1024,
     seed: int = 1,
+    secure_version: int = 0,
 ) -> bytes:
     header = bytearray(24)
     header[0] = 0xE9
@@ -69,7 +70,7 @@ def app_image(
     header[23] = 1  # hash_appended
     segment = bytearray((i * 7 + seed) & 0xFF for i in range(segment_bytes))
     segment[:256] = bytes(256)
-    struct.pack_into("<I", segment, 0, 0xABCD5432)
+    struct.pack_into("<II", segment, 0, 0xABCD5432, secure_version)
     segment[16 : 16 + len(version)] = version.encode()
     segment[48 : 48 + len(project)] = project.encode()
     segment[112:116] = b"v6.1"
@@ -105,6 +106,7 @@ def make_build(
     min_rev: int = 0,
     max_rev: int = 99,
     app: bytes | None = None,
+    secure_version: int = 0,
 ) -> Path:
     """A build directory under `root`, with the audio source beside it; returns the directory."""
     build = root / "build"
@@ -120,6 +122,7 @@ def make_build(
             flash_code=FLASH_CODES[flash_size],
             min_rev=min_rev,
             max_rev=max_rev,
+            secure_version=secure_version,
         )
     (build / "bootloader" / "bootloader.bin").write_bytes(bytes(range(256)) * 20)
     (build / "partition_table" / "partition-table.bin").write_bytes(partition_table(table))

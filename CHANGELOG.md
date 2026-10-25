@@ -10,6 +10,21 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
+  stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
+  let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
+  internal heap: a board that had played the Atmos demo read 7 to 14 KB free while it played PCM, where the same image after a
+  boot reads 70 KB, and Wi-Fi's receive buffers are made from what is left. A PCM stream now lets the AC-3 and E-AC-3 decoders
+  go on a part with PSRAM, which makes them again for the next coded stream as it does after a boot (`iclforge/decoder_keep.hpp`);
+  the ESP32-C6, which has none, keeps them as before.
+- **Fixed: an S3 or C6 sink came back from every update or restart at 2.0 and 32-bit slots.** `PUT /slot-width` changed the sink but stored nothing, so the width went back to the image's 32 at boot; a line holds 4 slots at 32-bit and 8 at 16-bit, so the stored layout (`PUT /layout` was always stored) no longer fitted, and boot kept 2.0. The width is now stored when it is set and applied at boot before the stored layout is judged, so a 5.1.2 at 16-bit stays through an update. A board set to 16-bit before this build is still at 32-bit after the first update to it, and needs the width set once more. (The P4X's wide sink, with 16 slots at either width, kept its layout all along.)
+- **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
+  player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
+  (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
+  while the sound came from L and R, and `GET /status`'s peak and RMS said the same. The player now reads where the renderer
+  puts each channel (`LayoutRenderer::unity_slot()` and `folded_slot()`) and which output the patch sends that slot to,
+  and measures the floats where the renderer does more than copy a channel to one slot (a small speaker's bass management,
+  a mono stream in a room with no centre). The sound was always right; only the meter was.
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
@@ -65,6 +80,12 @@ The sections below contain the complete change list and fixes.
   /now-playing` (`speakers`, `title`, `clock`, `off`) and `GET` and `PUT /dim-after` (`never`, or minutes)
   set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
   `planning/p4x-now-playing.md`.
+- **Late night.** A sink decodes AC-3, E-AC-3 (with Atmos objects) and AC-4 for a listener who can choose how much
+  of their dynamic range is kept: `GET` and `PUT /dynamic-range`, `standard` (the default, and what a sink always
+  did) or `late-night`, which applies the stream's own heavy compression (`compr`, or an AC-4 speaker DRC mode) at the
+  level dialogue was already heard at, not RF mode's 11 dB higher. It is stored on the board, followed from the next
+  stream, and wins over a server's decoder mode while it is on. The plan and the measurements are
+  `planning/hearth-late-night.md`.
 - **The title card.** The sink lists `metadata@v1` in its hello (a board with a screen only), so a server tells it what is
   playing, and the panel can show the title, the artist, and the album and year, with the song's time and a progress line
   as the lyric screens have. The card is the third choice in Adjust (`PUT /now-playing title`); until a server has said a
@@ -94,6 +115,30 @@ The sections below contain the complete change list and fixes.
   on the board; with none the time is UTC, and the clock says so) and `GET` and `PUT /time-sync` (`on` or `off`) set it,
   `GET /status` has a `time` object, and the board's own web page has a Time section with the same three settings and the
   time it keeps. QEMU's network and a build with no network keep no time, and those routes answer 404.
+
+**Display and time preferences: brightness, the clock's format, and 420 time zones by name**
+
+- **Brightness is a setting.** `GET` and `PUT /brightness` (10 to 100 percent, 80 by default) set the level of a board
+  screen's backlight while it is lit, at once and kept over a restart; the dimmed screen stays under it (the floor is
+  4 percent, and never above the brightness) and the dark view is off. A glass with no backlight to dim refuses it.
+- **The clock view can be in 12 hours and can show the seconds.** `GET` and `PUT /clock-format` take `24`, `12`,
+  `24 seconds` and `12 seconds`. The seconds and the AM or PM are small beside the digits, so a second redraws about
+  9,600 pixels and not the digits'.
+- **The time zone can be chosen by name.** The board carries 420 zones by region and city (IANA tzdata 2026e, Australia
+  complete, 11,578 bytes of flash), written by `tools/hearth/gen_time_zones.py`, which holds every one to tzdata's own
+  offsets to 2036. `PUT /timezone Australia/Melbourne` stores the zone and the name (`GET /time-zones` lists the names,
+  `GET /status`'s `time` object has `zone_name`), and the board's web page offers a region and a city. A POSIX string is
+  taken as before. The night schedule's rule (`dim_state()` with a window of times and the board's local minute, held to
+  Melbourne's daylight saving changeovers) is built and host-tested.
+- **A night schedule.** `GET` and `PUT /night-schedule` (`22:00-07:00 on`) make a board with a screen and a clock go dark
+  between two times by its own time, as the dark view does: a touch lights it for 30 seconds, and a board that does not
+  know the time is lit. Off until switched on; kept as one NVS number and returned by Reset preferences. Whether it
+  darkens the idle screen between songs too is a switch of its own, `GET` and `PUT /night-idle`, off.
+- **The Preferences screen has them all.** Brightness, the clock's hours and seconds, the night schedule, its two times
+  and the time zone are rows, and the two that are not a few buttons open an editor over the sheet: the pair of times
+  steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
+  place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
+  down to 240 by 240. The routes now go through the same backend as the screen.
 
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
@@ -154,9 +199,11 @@ The sections below contain the complete change list and fixes.
   space at either end (`409` otherwise, as for one that was too long), and the host name spells a
   Latin letter with an accent as the letter ("Café" is `cafe.local`).
   ([Name, restart and reset](docs/hearth/sink-esp32-s3.md#name-restart-and-reset).)
-- **`POST /reset-preferences`** puts the choices a person made once back to the image's defaults, at
-  once: what the screen shows without lyrics, when it dims, the time zone. It keeps the name, the Wi-Fi
-  network, the cable-or-Wi-Fi choice, the wiring, the layout, the time server and the pairings.
+- **`POST /reset-preferences`** puts the choices a person made once back to their defaults, at once:
+  every entry of the preferences registry that says it is reset (what the screen shows without lyrics,
+  when it dims, the brightness, the clock's hours and seconds and the night schedule), each through its
+  own setter. It keeps the name, the Wi-Fi network, the
+  cable-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
   **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
   name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
   restarts the board as a new one. Both are listed in `GET /api`.
@@ -167,6 +214,19 @@ The sections below contain the complete change list and fixes.
   them a reset keeps (`settings_keys.hpp`); the words of the restart, the resets and the forgetting of
   a paired server, with the button that is held for three seconds (`system_actions.hpp`); and the rows
   of About (`about_view.hpp`).
+
+**The System group of the ESP32-P4X's Preferences sheet**
+
+- **Wired or Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset**
+  are entries of the preferences registry and pages of the sheet, at the size of the display they are on (the
+  preview checks 1024 by 600, 800 by 480, 480 by 320 and 320 by 240). The switch between the cable and Wi-Fi
+  asks first in the developer view's words. The name is typed on a keyboard that offers only what the name's rule
+  accepts and the fonts can draw (the Latin subset, accents included), counted in bytes. About is the friendly
+  subset of the developer view. The paired servers are listed with a Forget on each, the one that plays included,
+  with a warning that the music stops. The factory reset asks twice: what is lost and whether the board stays
+  reachable (a cable plugged in, or no network and Improv over USB to bring it back), and then a button held for
+  three seconds. A board that cannot make a choice shows it greyed, with the reason.
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#on-the-screen).)
 
 **The Forge GUI, Hearth and Crucible open where they were left**
 

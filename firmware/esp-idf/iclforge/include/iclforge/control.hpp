@@ -11,6 +11,7 @@
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/player.hpp"
 #include "iclforge/preferences.hpp"
+#include "iclforge/wall_clock.hpp"
 
 // The control surface: a few HTTP verbs over the player, for the ESP-IDF
 // integrator whose controller is not Home Assistant. planning/esp32-player.md
@@ -53,8 +54,9 @@
 //
 // And the board's own settings, which ControlHandlers lists: GET and PUT
 // /name, /slot-width and /wiring, PUT /network, GET and PUT /network-preference on
-// a board with a cable and a station, and GET and PUT /now-playing and
-// /dim-after on a board with a screen.
+// a board with a cable and a station, and GET and PUT /now-playing,
+// /dim-after, /brightness and /clock-format on a board with a screen, and GET and PUT /trim and GET and POST /identify on a
+// board with a Sendspin player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
 //
 // And updates over the network, which Control hands to the owner's Firmware
 // (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
@@ -70,6 +72,7 @@
 namespace iclforge {
 
 class Firmware;
+class FirmwarePull;
 
 // GET /status's "sendspin" object, for a board that is a Sendspin player
 // (sendspin_host.hpp, burst_player.hpp). Plain values, so that the control
@@ -171,8 +174,10 @@ struct ControlTime {
     bool synced = false;
     // The time to the second in the board's zone ("2026-10-21 08:09:44"); empty until a server has answered.
     std::string local;
-    // The zone as set, or "none" (the time is UTC), and the server a person named, or "none".
+    // The zone as set, or "none" (the time is UTC), the name the person chose it by (iclforge/time_zones.hpp,
+    // "Australia/Melbourne"), or "none" when they typed a string or set none, and the server a person named, or "none".
     std::string zone;
+    std::string zone_name;
     std::string server;
     // The servers lwIP is set to ask, as text, and how many answers there have been since boot.
     std::string servers;
@@ -223,6 +228,14 @@ struct ControlNetwork {
     };
     std::optional<Interface> wifi;
     std::optional<Interface> ethernet;
+};
+
+// Why a handler refused a request that a route can only pass on: the words to say, and which of the three
+// ways to say no it is (400 the request is wrong, 409 the board cannot now, 404 there is nothing here).
+struct ControlRefusal {
+    enum class Kind : std::uint8_t { kBadRequest, kConflict, kMissing };
+    Kind kind = Kind::kConflict;
+    std::string why;
 };
 
 struct ControlHandlers {
@@ -306,21 +319,61 @@ struct ControlHandlers {
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
 
+    // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
+    // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter
+    // already read), and GET and PUT /clock-format, 24 or 12 hours with or without seconds (iclforge/wall_clock.hpp).
+    // A board with no screen leaves all four empty and the routes answer that it has none. set_brightness is false
+    // when the glass has no backlight that can be dimmed or the setting could not be stored. Both act at once.
+    std::function<int()> brightness;
+    std::function<bool(int percent)> set_brightness;
+    std::function<wallclock::ClockFormat()> clock_format;
+    std::function<bool(wallclock::ClockFormat format)> set_clock_format;
+    // The night schedule (iclforge/now_view.hpp): GET and PUT /night-schedule, the two times by the board's own time
+    // and whether it is on (`22:00-07:00 on`; PUT takes the same, or `on`, or `off`), and GET and PUT /night-idle, on or
+    // off, whether it also covers the idle screen. set_night is handed the whole schedule, already read over the one
+    // `night` returns. A board with no screen leaves both empty and the routes answer that it has none.
+    std::function<nowview::NightSchedule()> night;
+    std::function<bool(const nowview::NightSchedule& night)> set_night;
+
+    // GET and PUT /dynamic-range: how much of a Dolby stream's dynamic range the listener wants
+    // (iclforge/base/dynamic_range.hpp, planning/hearth-late-night.md). dynamic_range answers with
+    // the words a PUT takes, "standard" or "late-night"; set_dynamic_range is handed one of them
+    // and stores it, and the decoder follows from the next stream's start. A board that decodes
+    // none of the Dolby codecs leaves both empty, and the routes answer that it has nothing to
+    // choose.
+    std::function<std::string()> dynamic_range;
+    std::function<bool(std::string_view range)> set_dynamic_range;
+
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
-    // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps
-    // no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each setter
-    // is handed what the route has already read as the setting (wallclock::parse_zone_setting and the like: an
+    // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, GET /time-zones and GET /status's "time". A board
+    // that keeps no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each
+    // setter is handed what the route has already read as the setting (wallclock::parse_zone_choice and the like: an
     // empty string is `none`); false means the board could not take it (its C library reads a zone differently,
     // or it could not be stored). They act at once, with no restart. The getters answer with the words a PUT
-    // takes: a zone or a server or `none`, and `on` or `off`.
+    // takes: a zone or a server or `none`, and `on` or `off`. set_time_zone is handed the POSIX string and the
+    // name the person chose it by (iclforge/time_zones.hpp), empty for a string they typed or none.
     std::function<std::string()> time_zone;
-    std::function<bool(std::string_view zone)> set_time_zone;
+    std::function<bool(std::string_view zone, std::string_view name)> set_time_zone;
     std::function<std::string()> ntp_server;
     std::function<bool(std::string_view server)> set_ntp_server;
     std::function<std::string()> time_sync;
     std::function<bool(bool on)> set_time_sync;
     // GET /status's "time": see ControlTime.
     std::function<std::optional<ControlTime>()> time;
+
+    // GET and PUT /trim: the listener's level (+-12 dB) and distance (0.1 to 10 m) for each speaker of the layout
+    // in force (iclforge/render/speaker_trim.hpp), as JSON, and a body of statements that changes them
+    // ("L level=-1.5 distance=2.4; reset"). `trim` is nothing, and the route answers 404, on a board with no
+    // player to apply it. set_trim answers nothing when the table was taken, stored and put in force at once,
+    // and why not otherwise. A board whose build holds no delay lines takes levels and says distance is
+    // unavailable (the JSON's "delay" object).
+    std::function<std::optional<std::string>()> trim;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_trim;
+    // GET and POST /identify: what the board's own test tone is doing, as JSON, and a request for it: off, all,
+    // a speaker's name, or a name and "loop" (iclforge/render/identify_request.hpp). Refused while a stream
+    // plays; stops at once when one begins; ends by its own limits in any case.
+    std::function<std::optional<std::string>()> identify;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_identify;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.
@@ -385,6 +438,10 @@ struct ControlHandlers {
     // leaves the routes answering that the board takes no updates. The owner
     // keeps it alive for as long as Control runs.
     Firmware* firmware = nullptr;
+    // The routes of an update from GitHub releases (firmware_pull.hpp, planning/esp32-ota.md, O10):
+    // GET /firmware/available, POST /firmware/check, PUT /firmware/from-release and PUT
+    // /firmware/channel. Null answers that the board takes no firmware updates.
+    FirmwarePull* firmware_pull = nullptr;
 };
 
 // What this board is - chip, revision, cores, FPU, PSRAM, and the sink ceiling the caller states - gathered from

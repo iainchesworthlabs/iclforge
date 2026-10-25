@@ -26,8 +26,9 @@ live in the library because it is made of FreeRTOS:
   surface over whatever owns a player - `GET /status`, `GET /hardware`, `POST /play` with a
   location, `POST /stop`, `POST /volume`, `GET`/`PUT /layout` - on `esp_http_server`, with
   callbacks the owner supplies so the server's task never touches the player itself. The board's
-  own settings (`/name`, `/slot-width`, `/wiring`, `PUT /network`, `/network-preference`, and on a board with a panel `/now-playing` and `/dim-after`, and on a board with a network `/timezone`, `/ntp-server` and `/time-sync`, and on every board `GET /preferences`, the list of them that this board can use), a Sendspin player's pairings
+  own settings (`/name`, `/slot-width`, `/wiring`, `PUT /network`, `/network-preference`, and on a board with a panel `/now-playing` and `/dim-after`, and on a board with a Sendspin player `/dynamic-range`, and on a board with a network `/timezone`, `/ntp-server` and `/time-sync`, and on every board `GET /preferences`, the list of them that this board can use), a Sendspin player's pairings
   (`/pairing`) and updates over the network (`/firmware`, `/firmware/mode`, `/firmware/rollback`,
+  `/firmware/available`, `/firmware/check`, `/firmware/from-release`, `/firmware/channel`,
   `/firmware/coredump`, `POST /restart`, and the console's recent output at `GET /log`) go
   through the same server. `GET /` is a web page for the routes, and the only client they need:
   the state, the stream, the layout, the volume and the decode's timing, and the four actions,

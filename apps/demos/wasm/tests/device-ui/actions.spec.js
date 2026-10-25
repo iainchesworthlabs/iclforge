@@ -47,7 +47,7 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Name').fill('Kitchen');
         await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
         await expect(page.getByRole('status')).toHaveText(
-            'Name Kitchen refused (409): not a name this player can hold: it is too long, or it could not be stored',
+            'Name Kitchen refused (409): not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored',
         );
         await expect(page.getByRole('status')).toHaveClass(/error/);
     });
@@ -342,6 +342,61 @@ test.describe('with the clock running', () => {
         await page.getByRole('button', { name: 'Apply' }).click();
         await expect(page.getByRole('status')).toHaveText('Enter an output layout.');
         expect(stub.sent('PUT /layout')).toHaveLength(0);
+    });
+
+    test('a time zone is chosen by region and then city, and sent by its name', async ({ page, stub }) => {
+        const region = page.locator('#zone-select');
+        const city = page.locator('#zone-city');
+        await expect(page.locator('#zone-pick')).toBeVisible();
+        // No zone chosen: both lists are at their prompts, and a region alone sends nothing.
+        await expect(region).toHaveValue('');
+        await expect(city).toHaveValue('');
+        await region.selectOption('Australia');
+        await expect(city.locator('option')).toHaveCount(13); // the prompt, and Australia's twelve
+        await expect(city.locator('option', { hasText: 'Broken Hill' })).toHaveCount(1);
+        expect(stub.sent('PUT /timezone')).toHaveLength(0);
+        // A city is sent by its name, and the page then shows it as the board holds it.
+        await city.selectOption({ label: 'Melbourne' });
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne']);
+        await expect(page.getByRole('status')).toHaveText('Time zone Australia/Melbourne.');
+        await expect(page.locator('#zone-input')).toHaveValue('AEST-10AEDT,M10.1.0,M4.1.0/3');
+        await expect(region).toHaveValue('Australia');
+        await expect(city).toHaveValue('Australia/Melbourne');
+        // A city with a place between its region and itself is named with it.
+        await region.selectOption('America');
+        await expect(city.locator('option', { hasText: 'Buenos Aires (Argentina)' })).toHaveCount(1);
+        await expect(city.locator('option', { hasText: 'New Salem (North Dakota)' })).toHaveCount(1);
+        await expect(city.locator('option', { hasText: 'New York' })).toHaveCount(1);
+        // A name that has no region is in Other.
+        await region.selectOption('Other');
+        await city.selectOption({ label: 'UTC' });
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC']);
+        // A string typed instead has no name: both lists go back to their prompts.
+        await page.locator('#zone-input').fill('JST-9');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC', 'JST-9']);
+        await expect(region).toHaveValue('');
+        await expect(city).toHaveValue('');
+    });
+
+    test("a board that has no list of zones, or whose list cannot be read at first, still takes a typed zone", async ({
+        page,
+        stub,
+    }) => {
+        // No list: the choice of region and city is not offered, and the field under it is.
+        stub.next('GET /time-zones', { status: 404, body: REPLIES.noClock });
+        await page.reload();
+        await expect(page.locator('#state')).toHaveText('Stopped');
+        await expect(page.locator('#zone-input')).toBeVisible();
+        await expect(page.locator('#zone-pick')).toBeHidden();
+        await page.locator('#zone-input').fill('EST5EDT,M3.2.0,M11.1.0');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['EST5EDT,M3.2.0,M11.1.0']);
+        // A read that fails is made again at the next poll, and the list then appears.
+        stub.next('GET /time-zones', 'drop');
+        await page.reload();
+        await expect(page.locator('#zone-pick')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('#zone-select option')).toHaveCount(12); // the prompt, and the eleven regions
     });
 });
 

@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -63,6 +64,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/firmware.hpp"
+#include "iclforge/firmware_pull.hpp"
 #include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/player.hpp"
@@ -79,6 +81,8 @@
 #include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "sound.hpp"
+#include "sound_routes.hpp"
 #include "system_control.hpp"
 #include "system_reset.hpp"
 #include "wall_clock.hpp"
@@ -102,7 +106,7 @@ const void* thread_token() noexcept {
 
 namespace {
 
-constexpr std::uint32_t kSampleRate = 48000;
+constexpr std::uint32_t kSampleRate = player::kSinkSampleRate;
 constexpr std::uint64_t kFrameDurationUs = 32000;  // §5.3.2: 1,536 samples at 48 kHz
 constexpr std::size_t kMaxSlots = iclforge::render::OutputLayout::kMaxSlots;
 
@@ -256,6 +260,15 @@ int g_sink_channels_open = 0;
 // app_main's task, which owns the player, and the firmware's task waits for
 // it on g_flash_mode_done. g_control_started is one of the trial's conditions.
 iclforge::Firmware g_firmware;
+iclforge::FirmwarePull g_firmware_pull;
+
+// The trust anchors main/CMakeLists.txt embeds in a build that pulls updates from GitHub releases.
+// Weak, so that a build without them (and the code that reads them) links; a null start says there
+// are none.
+extern "C" const char g_trust_anchors_start[] asm("_binary_trust_anchors_pem_start")
+    __attribute__((weak));
+extern "C" const char g_trust_anchors_end[] asm("_binary_trust_anchors_pem_end")
+    __attribute__((weak));
 SemaphoreHandle_t g_flash_mode_done = nullptr;
 std::atomic<bool> g_control_started{false};
 
@@ -671,18 +684,17 @@ iclforge::ControlHandlers control_handlers() {
     h.layout = []() { return player::layout_text(); };
     h.set_layout = accept_layout;
     h.name = []() { return std::string(player::settings().name.data()); };
-    h.set_name = [](std::string_view text) {
-        if (!player::settings_set_name(text)) {
-            return false;
-        }
-        // What a rename changes (iclforge/device_name.hpp): the mDNS host name and the Sendspin service's
-        // instance and `name` now, with no restart; what a server lists the board as comes from its hello,
-        // which follows now, or when the stream that plays has ended. The web page, the screen's footer and
-        // Improv read the setting when they next draw.
-        player::discovery_rename();
-        player::sendspin_name_changed();
-        return true;
-    };
+    // The same call the screen's keyboard makes (preferences.cpp): what a rename changes is
+    // iclforge/device_name.hpp's to say.
+    h.set_name = [](std::string_view text) { return player::preferences().set_name(text); };
+    // The listener's sound (planning/p4x-preferences.md): a level and distance for each speaker, and a test tone out
+    // of each, where a Sendspin player is there to apply them. The others answer that they have none.
+    if (player::sendspin_sound_caps().player) {
+        h.trim = player::sound_trim_json;
+        h.set_trim = player::sound_set_trim;
+        h.identify = player::sound_identify_json;
+        h.set_identify = player::sound_identify;
+    }
     // On a part with one I2S controller (an ESP32-C6), and on a sink that
     // drives one line only, there is no second line to wire: /status leaves
     // the wiring out, so the page offers no choice about it, and PUT /wiring
@@ -764,6 +776,34 @@ iclforge::ControlHandlers control_handlers() {
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
+        // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
+        // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
+        // All three go through the preferences' backend, as the Preferences screen does, so that a route and the screen
+        // cannot disagree about what a setting is or when it is refused.
+        h.brightness = []() { return player::preferences().brightness(); };
+        h.set_brightness = [](int percent) { return player::preferences().set_brightness(percent); };
+        h.clock_format = []() { return player::preferences().clock_format(); };
+        h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
+            return player::preferences().set_clock_format(format);
+        };
+        h.night = []() { return player::preferences().night(); };
+        h.set_night = [](const iclforge::nowview::NightSchedule& night) { return player::preferences().set_night(night); };
+    }
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
+    // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
+    // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
+    if (player::sendspin_built()) {
+        h.dynamic_range = []() {
+            return std::string(iclforge::ac3::dynamic_range_name(player::settings().dynamic_range));
+        };
+        h.set_dynamic_range = [](std::string_view word) {
+            const auto range = iclforge::ac3::parse_dynamic_range(word);
+            if (!range || !player::settings_set_dynamic_range(*range)) {
+                return false;
+            }
+            player::sendspin_set_dynamic_range(*range);
+            return true;
+        };
     }
     // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
     // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
@@ -771,16 +811,8 @@ iclforge::ControlHandlers control_handlers() {
     // not left applied if it cannot be stored.
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
-        h.set_time_zone = [](std::string_view zone) {
-            const std::string previous = player::settings().time_zone.data();
-            if (!player::wall_clock_set_zone(zone)) {
-                return false;
-            }
-            if (!player::settings_set_time_zone(zone)) {
-                (void)player::wall_clock_set_zone(previous);
-                return false;
-            }
-            return true;
+        h.set_time_zone = [](std::string_view zone, std::string_view name) {
+            return player::preferences().set_time_zone({.posix = std::string(zone), .name = std::string(name)});
         };
         h.ntp_server = []() { return iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data()); };
         h.set_ntp_server = [](std::string_view server) {
@@ -809,6 +841,7 @@ iclforge::ControlHandlers control_handlers() {
                 time.local = iclforge::wallclock::local_text(reading.local);
             }
             time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
+            time.zone_name = iclforge::wallclock::zone_setting_text(player::settings().time_zone_name.data());
             time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
             time.servers = player::wall_clock_servers();
             time.answers = stats.syncs;
@@ -833,6 +866,10 @@ iclforge::ControlHandlers control_handlers() {
         if (!changed) {
             return false;
         }
+        // Kept over a restart. The width sets how many slots the sink carries (a line holds 4 at 32-bit, 8 at 16),
+        // and boot applies it before it judges the stored layout: without it a 5.1.2 set on an S3 or a C6 came
+        // back as 2.0 after every update or restart, because the layout no longer fitted the default width.
+        (void)player::settings_set_slot_bits(bits);
         // Reopen at the next play whatever its layout asks for: the width
         // change closed the lines, and a layout needing the same slot count
         // as the last one would otherwise find them already open.
@@ -871,6 +908,7 @@ iclforge::ControlHandlers control_handlers() {
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;
+    h.firmware_pull = &g_firmware_pull;
     return h;
 }
 
@@ -912,6 +950,53 @@ iclforge::FirmwareHooks firmware_hooks() {
     return hooks;
 }
 
+// Whether this board has PSRAM, from the heap: esp_psram's own functions are not in the link of a
+// target with no PSRAM bus at all (the ESP32-C6).
+bool has_psram() {
+    return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+}
+
+// What only this board knows about an update from GitHub releases (iclforge::PullHooks).
+iclforge::PullHooks pull_hooks() {
+    iclforge::PullHooks hooks;
+    hooks.network_up = [] { return player::network_ready(); };
+    // The time of day, once a time server has answered: never a time the board made up.
+    hooks.clock_unix = []() -> std::optional<std::int64_t> {
+        if (!player::wall_clock_read().known) {
+            return std::nullopt;
+        }
+        return static_cast<std::int64_t>(std::time(nullptr));
+    };
+    hooks.time_sync_on = [] { return player::settings().time_sync; };
+    // A TLS session is tens of KB: with PSRAM the allocations that large go there, and without it
+    // (the ESP32-C6) they do not fit beside a playing stream (planning/esp32-ota.md, "TLS on the
+    // board").
+    hooks.room_beside_stream = [] {
+        return has_psram() || !(g_player != nullptr || player::sendspin_playing());
+    };
+    return hooks;
+}
+
+iclforge::PullConfig pull_config() {
+    iclforge::PullConfig config;
+    config.base_url = CONFIG_ICLFORGE_FIRMWARE_UPDATE_BASE_URL;
+    config.default_channel = CONFIG_ICLFORGE_FIRMWARE_UPDATE_CHANNEL;
+    config.leaf_stable = CONFIG_ICLFORGE_FIRMWARE_LEAF_STABLE;
+    config.leaf_beta = CONFIG_ICLFORGE_FIRMWARE_LEAF_BETA;
+    const char* anchors_start = g_trust_anchors_start;
+    const char* anchors_end = g_trust_anchors_end;
+    if (anchors_start != nullptr && anchors_end > anchors_start) {
+        config.anchors_pem =
+            std::string_view(anchors_start, static_cast<std::size_t>(anchors_end - anchors_start));
+    }
+    config.has_clock = player::wall_clock_built();
+    config.psram = has_psram();
+    // CI's loopback test only: no clock to judge dates by, and an http:// address.
+    config.allow_http = CONFIG_ICLFORGE_FIRMWARE_PULL_TEST_HTTP != 0;
+    config.judge_dates = CONFIG_ICLFORGE_FIRMWARE_PULL_TEST_HTTP == 0;
+    return config;
+}
+
 iclforge::FirmwareConfig firmware_config() {
     iclforge::FirmwareConfig config;
     config.trial.hold_ms = static_cast<std::uint32_t>(CONFIG_ICLFORGE_FIRMWARE_TRIAL_HOLD_S) * 1000U;
@@ -926,6 +1011,14 @@ iclforge::FirmwareConfig firmware_config() {
 }  // namespace
 
 namespace player {
+
+// A play from the control surface (POST /play) holds the player; the test tone does not play over it.
+bool control_play_active() {
+    xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+    const bool playing = g_player != nullptr;
+    xSemaphoreGive(g_player_mutex);
+    return playing;
+}
 
 std::string layout_text() {
     xSemaphoreTake(g_player_mutex, portMAX_DELAY);
@@ -982,20 +1075,6 @@ std::optional<std::string> refusal(iclforge::sysactions::Action action) {
     return availability.reason;
 }
 
-// What the settings that were just reset or erased drive, told the new values: the screen's view and dim
-// time, the clock's zone. A preference added to the registry that a subsystem acts on adds its line here.
-void apply_preferences_now() {
-    if (panel_built()) {
-        if (panel_has_view(settings().now_view)) {
-            panel_set_view(settings().now_view);
-        }
-        panel_set_dim_after(settings().dim_after_minutes);
-    }
-    if (wall_clock_built()) {
-        (void)wall_clock_set_zone(settings().time_zone.data());
-    }
-}
-
 }  // namespace
 
 iclforge::sysactions::Situation system_situation() {
@@ -1040,9 +1119,9 @@ std::optional<std::string> system_reset_preferences() {
     if (const auto why = refusal(iclforge::sysactions::Action::reset_preferences)) {
         return why;
     }
-    const bool all = settings_reset_preferences();
-    apply_preferences_now();
-    if (!all) {
+    // From the registry: every entry that says it is reset goes back to its default through its own setter, so that the
+    // screen, the clock and the rest follow as they follow a change.
+    if (!iclforge::prefs::reset_preferences(preferences()).ok()) {
         return std::string("Some preferences could not be reset; the rest were.");
     }
     return std::nullopt;
@@ -1062,7 +1141,6 @@ std::optional<std::string> system_factory_reset() {
     if (!settings_forget()) {
         return std::string("The settings could not be erased (the flash refused); the paired servers already were.");
     }
-    apply_preferences_now();
     // The WiFi driver's own copy of the network is erased once the answer has gone out over it.
     schedule_restart("after a factory reset", true);
     return std::nullopt;
@@ -1204,6 +1282,7 @@ extern "C" void app_main() {
     // starts its clock here (iclforge/firmware.hpp).
     g_flash_mode_done = xSemaphoreCreateBinary();
     (void)g_firmware.start(firmware_hooks(), firmware_config());
+    (void)g_firmware_pull.start(g_firmware, pull_hooks(), pull_config());
 
     // The network, if this build has one, before anything plays: a sink is
     // found before it is played to, so the control surface has to answer and

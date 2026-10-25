@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <span>
+#include <string>
 
 #include "esp_err.h"
 #include "esp_mac.h"
@@ -122,10 +123,28 @@ Settings image_defaults() {
     defaults.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     defaults.now_view = iclforge::nowview::kDefaultView;
     defaults.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    defaults.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
+    defaults.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
+                                .value_or(iclforge::wallclock::ClockFormat{});
+    defaults.night = iclforge::nowview::parse_night_schedule(CONFIG_ICLFORGE_EXAMPLE_NIGHT_SCHEDULE, {})
+                         .value_or(iclforge::nowview::NightSchedule{});
+    defaults.night.idle = CONFIG_ICLFORGE_EXAMPLE_NIGHT_IDLE != 0;
     defaults.time_zone = {};
+    defaults.time_zone_name = {};
     defaults.ntp_server = {};
     defaults.time_sync = true;
     defaults.layout = {};
+    // What the build starts with, when it says (a CI shape, a product's own room): the same statements PUT /trim
+    // takes. A string that is wrong is said and leaves every speaker at the default.
+    if (const std::string_view built_in = CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM; !built_in.empty()) {
+        if (const auto result = defaults.speaker_trim.apply_text(built_in); !result.ok) {
+            std::printf("settings: the build's speaker trim is not one this board reads (%s); every speaker at the default\n",
+                        result.error);
+            defaults.speaker_trim = {};
+        }
+    }
+    defaults.dynamic_range = iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
+                                 .value_or(iclforge::ac3::kDefaultDynamicRange);
     return defaults;
 }
 
@@ -190,6 +209,32 @@ void load_all() {
                         g_settings.dim_after_minutes);
         }
     }
+    if (nvs_get_i32(handle, sk::kBrightness, &stored) == ESP_OK) {
+        if (const auto percent = iclforge::nowview::brightness_from_stored(stored)) {
+            g_settings.brightness_percent = *percent;
+        } else {
+            std::printf("settings: stored brightness %ld is not %d to %d percent; keeping %d\n",
+                        static_cast<long>(stored), iclforge::nowview::kBrightnessMin, iclforge::nowview::kBrightnessMax,
+                        g_settings.brightness_percent);
+        }
+    }
+    if (nvs_get_i32(handle, sk::kClockFormat, &stored) == ESP_OK) {
+        if (const auto format = iclforge::wallclock::clock_format_from_stored(stored)) {
+            g_settings.clock_format = *format;
+        } else {
+            std::printf("settings: stored clock format %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored),
+                        iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str());
+        }
+    }
+    if (nvs_get_i32(handle, sk::kNight, &stored) == ESP_OK) {
+        if (const auto night = iclforge::nowview::night_from_stored(stored)) {
+            g_settings.night = *night;
+        } else {
+            std::printf("settings: stored night schedule %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::night_schedule_text(g_settings.night).c_str());
+        }
+    }
     // A stored zone that is not one this build reads (a partition written by a later image) is said, and
     // the clock says UTC.
     read_string(handle, sk::kTimeZone, g_settings.time_zone);
@@ -197,6 +242,19 @@ void load_all() {
         std::printf("settings: stored time zone '%s' is not one this build reads; the clock says UTC\n",
                     g_settings.time_zone.data());
         g_settings.time_zone[0] = '\0';
+    }
+    // The name the person chose it by: a name this build's table knows says the zone (so a release that changes a
+    // city's rules moves the boards that chose that city), and one it does not know is dropped.
+    read_string(handle, sk::kTimeZoneName, g_settings.time_zone_name);
+    {
+        const iclforge::wallclock::ZoneChoice zone =
+            iclforge::wallclock::reconcile_zone(g_settings.time_zone.data(), g_settings.time_zone_name.data());
+        if (!zone.name.empty() && zone.posix != g_settings.time_zone.data()) {
+            std::printf("settings: time zone %s is now %s (this build's rule for it; stored: '%s')\n",
+                        zone.name.c_str(), zone.posix.c_str(), g_settings.time_zone.data());
+        }
+        copy_into(g_settings.time_zone, zone.posix);
+        copy_into(g_settings.time_zone_name, zone.name);
     }
     read_string(handle, sk::kNtpServer, g_settings.ntp_server);
     if (g_settings.ntp_server[0] != '\0' && !iclforge::wallclock::valid_ntp_server(g_settings.ntp_server.data())) {
@@ -208,21 +266,45 @@ void load_all() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, sk::kLayout, g_settings.layout);
+    // A stored trim that is not one this build reads (a partition written by a later image, or damaged) is
+    // said, and the build's own stands: a speaker at the wrong level is worse than one at none.
+    {
+        std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+        std::size_t blob_length = blob.size();
+        if (nvs_get_blob(handle, sk::kSpeakerTrim, blob.data(), &blob_length) == ESP_OK &&
+            !g_settings.speaker_trim.from_blob(std::span<const std::uint8_t>(blob.data(), blob_length))) {
+            std::printf("settings: the stored speaker trim is not one this build reads; keeping the build's own\n");
+        }
+    }
+    if (nvs_get_i32(handle, sk::kDynamicRange, &stored) == ESP_OK) {
+        if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
+            g_settings.dynamic_range = *range;
+        } else {
+            std::printf("settings: stored dynamic range %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s\n",
+                "no-lyrics screen %s, dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
+                "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
+                g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
+                iclforge::nowview::night_schedule_text(g_settings.night).c_str(),
+                g_settings.night.idle ? " (idle screen too)" : "",
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
+                g_settings.time_zone_name[0] != '\0' ? " = " : "", g_settings.time_zone_name.data(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
-                iclforge::wallclock::time_sync_text(g_settings.time_sync));
+                iclforge::wallclock::time_sync_text(g_settings.time_sync),
+                iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
 }
 
 }  // namespace
@@ -338,18 +420,91 @@ bool settings_set_dim_after(int minutes) {
     return true;
 }
 
+bool settings_set_brightness(int percent) {
+    if (!iclforge::nowview::brightness_from_stored(percent)) {
+        std::printf("settings: %d percent is not a brightness (%d to %d)\n", percent,
+                    iclforge::nowview::kBrightnessMin, iclforge::nowview::kBrightnessMax);
+        return false;
+    }
+    if (!write_int(sk::kBrightness, percent)) {
+        return false;
+    }
+    g_settings.brightness_percent = percent;
+    return true;
+}
+
+bool settings_set_clock_format(iclforge::wallclock::ClockFormat format) {
+    if (!write_int(sk::kClockFormat, iclforge::wallclock::clock_format_stored(format))) {
+        return false;
+    }
+    g_settings.clock_format = format;
+    return true;
+}
+
+bool settings_set_night(const iclforge::nowview::NightSchedule& night) {
+    if (!iclforge::nowview::night_from_stored(iclforge::nowview::night_stored(night))) {
+        std::printf("settings: %d and %d are not times of day\n", night.from_min, night.to_min);
+        return false;
+    }
+    if (!write_int(sk::kNight, iclforge::nowview::night_stored(night))) {
+        return false;
+    }
+    g_settings.night = night;
+    return true;
+}
+
 bool settings_set_layout(std::string_view layout) {
     return write_string(sk::kLayout, layout, g_settings.layout);
 }
 
-bool settings_set_time_zone(std::string_view zone) {
+bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table) {
+    std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+    const std::size_t length = table.to_blob(blob);
+    nvs_handle_t handle = 0;
+    if (length == 0 || nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
+        std::printf("settings: could not open NVS to write %s\n", sk::kSpeakerTrim);
+        return false;
+    }
+    const esp_err_t err = nvs_set_blob(handle, sk::kSpeakerTrim, blob.data(), length);
+    if (err == ESP_OK) {
+        (void)nvs_commit(handle);
+        g_settings.speaker_trim = table;
+    } else {
+        std::printf("settings: NVS refused %s (%s)\n", sk::kSpeakerTrim, esp_err_to_name(err));
+    }
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+bool settings_set_time_zone(std::string_view zone, std::string_view name) {
     if (!zone.empty() && !iclforge::wallclock::valid_time_zone(zone)) {
         std::printf("settings: '%.*s' is not a time zone this board reads\n", static_cast<int>(zone.size()),
                     zone.data());
         return false;
     }
+    // The name is kept only when the table says it stands for this string: anything else is a string somebody typed.
+    std::string_view kept;
+    if (!name.empty()) {
+        const auto named = iclforge::wallclock::find_time_zone(name);
+        if (named && named->posix == zone) {
+            kept = named->name;
+        } else {
+            std::printf("settings: '%.*s' is not the name of that time zone; keeping the string alone\n",
+                        static_cast<int>(name.size()), name.data());
+        }
+    }
+    const std::string previous_zone = g_settings.time_zone.data();
     // An empty string is stored as such, and read back as no zone: NVS keeps the key, the clock says UTC.
-    return write_string(sk::kTimeZone, zone, g_settings.time_zone);
+    if (!write_string(sk::kTimeZone, zone, g_settings.time_zone)) {
+        return false;
+    }
+    // The name is always written, empty for a typed string, so that an old name never stands for a new string. If it
+    // cannot be, the string goes back: the two must agree, and a boot reads the name's rule over the string.
+    if (!write_string(sk::kTimeZoneName, kept, g_settings.time_zone_name)) {
+        (void)write_string(sk::kTimeZone, previous_zone, g_settings.time_zone);
+        return false;
+    }
+    return true;
 }
 
 bool settings_set_ntp_server(std::string_view server) {
@@ -366,6 +521,14 @@ bool settings_set_time_sync(bool on) {
         return false;
     }
     g_settings.time_sync = on;
+    return true;
+}
+
+bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range) {
+    if (!write_int(sk::kDynamicRange, static_cast<std::int32_t>(range))) {
+        return false;
+    }
+    g_settings.dynamic_range = range;
     return true;
 }
 
@@ -391,60 +554,5 @@ bool settings_forget() {
     return true;
 }
 
-namespace {
-
-// A preference's field in memory back to the image's answer, so the running board follows without a
-// restart. A preference added to the table without a case here is erased from NVS all the same and
-// follows at the next start, which is said.
-void reset_in_memory(std::string_view key, const Settings& defaults) {
-    if (key == sk::kNowView) {
-        g_settings.now_view = defaults.now_view;
-    } else if (key == sk::kDimAfter) {
-        g_settings.dim_after_minutes = defaults.dim_after_minutes;
-    } else if (key == sk::kTimeZone) {
-        g_settings.time_zone = defaults.time_zone;
-    } else {
-        std::printf("settings: '%.*s' is erased; the board follows at its next start\n", static_cast<int>(key.size()),
-                    key.data());
-    }
-}
-
-}  // namespace
-
-bool settings_reset_preferences() {
-    nvs_handle_t handle = 0;
-    if (nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
-        std::printf("settings: could not open NVS to reset the preferences\n");
-        return false;
-    }
-    bool ok = true;
-    for (const sk::Key& key : sk::kKeys) {
-        if (!sk::is_preference(key.kind)) {
-            continue;
-        }
-        // A key that was never written is already at its default.
-        const esp_err_t err = nvs_erase_key(handle, key.nvs);
-        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-            std::printf("settings: NVS refused to erase %s (%s)\n", key.nvs, esp_err_to_name(err));
-            ok = false;
-        }
-    }
-    const esp_err_t committed = nvs_commit(handle);
-    nvs_close(handle);
-    if (committed != ESP_OK) {
-        std::printf("settings: NVS refused the reset (%s)\n", esp_err_to_name(committed));
-        return false;
-    }
-    // The fields follow the keys, one at a time: the running board is reading them.
-    const Settings defaults = image_defaults();
-    for (const sk::Key& key : sk::kKeys) {
-        if (sk::is_preference(key.kind)) {
-            reset_in_memory(key.nvs, defaults);
-        }
-    }
-    std::printf("settings: preferences reset to the image's defaults; the name, the network, the wiring and the "
-                "pairings are kept\n");
-    return ok;
-}
 
 }  // namespace player

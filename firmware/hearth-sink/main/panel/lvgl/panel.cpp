@@ -56,6 +56,26 @@ namespace {
 std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
 std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
 
+// What a person chose for the screen (planning/p4x-preferences.md), set from the control surface's task and read
+// by the panel's: the lit level of the backlight, percent, and how the clock view writes the time (the stored
+// number of iclforge::wallclock::ClockFormat).
+std::atomic<int> g_brightness{iclforge::nowview::kDefaultBrightness};
+// The night schedule, as iclforge::nowview::night_stored writes it: one number, so the screen never reads half of it.
+std::atomic<std::int32_t> g_night{iclforge::nowview::night_stored(iclforge::nowview::NightSchedule{})};
+std::atomic<int> g_clock_format{0};
+// The level the screen last asked for, one of display.hpp's three (lit, the dim floor, off).
+std::atomic<int> g_backlight_request{panel::kBacklightNormalPercent};
+
+// The percent the glass is given for a level the screen asked for: the person's brightness for lit, the floor under
+// it for dimmed, nothing for off (iclforge::nowview::backlight_percent).
+int effective_backlight(int request) {
+    using iclforge::nowview::Dim;
+    const Dim dim = request <= panel::kBacklightOffPercent    ? Dim::kDark
+                    : request <= panel::kBacklightDimPercent ? Dim::kDimmed
+                                                              : Dim::kNone;
+    return iclforge::nowview::backlight_percent(dim, g_brightness.load());
+}
+
 }  // namespace
 }  // namespace player
 
@@ -237,12 +257,28 @@ NowSettings read_now_settings() {
     NowSettings settings;
     settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
     settings.dim_after_minutes = g_dim_after_minutes.load();
+    settings.night = iclforge::nowview::night_from_stored(g_night.load()).value_or(iclforge::nowview::NightSchedule{});
+    // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
+    if (settings.night.enabled) {
+        settings.minute_of_day = iclforge::wallclock::minute_of_day(player::wall_clock_read());
+    }
     return settings;
 }
 
-iclforge::wallclock::Reading read_wall_clock() { return player::wall_clock_read(); }
+iclforge::wallclock::Reading read_wall_clock() {
+    iclforge::wallclock::Reading reading = player::wall_clock_read();
+    // How the person who owns the board wants it written is the panel's to know, not the clock's.
+    reading.format = iclforge::wallclock::clock_format_from_stored(g_clock_format.load())
+                         .value_or(iclforge::wallclock::ClockFormat{});
+    return reading;
+}
 
-void set_backlight(int percent) { display_set_backlight(percent); }
+void set_backlight(int percent) {
+    g_backlight_request.store(percent);
+    display_set_backlight(effective_backlight(percent));
+}
+
+int backlight_lit_percent() { return effective_backlight(kBacklightNormalPercent); }
 
 iclforge::prefs::Backend& preferences_backend() { return player::preferences(); }
 
@@ -335,7 +371,7 @@ void run(void* /*arg*/) {
             const panel::ScreenStats screen = panel::screen_stats();
             g_stats.screen = screen.name;
             g_stats.dimmed = screen.dimmed;
-            g_stats.backlight = screen.backlight;
+            g_stats.backlight = effective_backlight(screen.backlight);
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
@@ -632,9 +668,29 @@ iclforge::DisplayCaps panel_display_caps() {
     return caps;
 }
 
+iclforge::devview::Facts panel_board_facts() { return panel::gather_about_facts(); }
+
 void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
+
+void panel_set_brightness(int percent) {
+    g_brightness.store(percent);
+    // At once: the glass is at the lit level or at the floor under it, and either moves with this. Asked again for the
+    // level the screen last asked for, under the lock the screen's own calls hold.
+    if (g_started.load()) {
+        const std::lock_guard lock(g_lock);
+        panel::set_backlight(g_backlight_request.load());
+    }
+}
+
+void panel_set_clock_format(iclforge::wallclock::ClockFormat format) {
+    g_clock_format.store(iclforge::wallclock::clock_format_stored(format));
+}
+
+void panel_set_night(const iclforge::nowview::NightSchedule& night) {
+    g_night.store(iclforge::nowview::night_stored(night));
+}
 
 bool panel_start() {
     if (g_started.exchange(true)) {
@@ -646,6 +702,9 @@ bool panel_start() {
     }
     g_now_view.store(static_cast<int>(settings().now_view));
     g_dim_after_minutes.store(settings().dim_after_minutes);
+    g_brightness.store(settings().brightness_percent);
+    g_clock_format.store(iclforge::wallclock::clock_format_stored(settings().clock_format));
+    g_night.store(iclforge::nowview::night_stored(settings().night));
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {

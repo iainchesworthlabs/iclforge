@@ -19,6 +19,9 @@
 
 #include "board_info.hpp"
 #include "fonts.hpp"
+#include "prefs_editors.hpp"
+#include "prefs_pages.hpp"
+#include "sound_sheet.hpp"
 
 namespace prefs = iclforge::prefs;
 
@@ -39,7 +42,18 @@ struct Chain {
 };
 
 // What a touch target does, packed with its row and its index into the user data of its event.
-enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3, kConfirm = 4, kCancel = 5 };
+enum class Op : int {
+    kChoose = 0,
+    kMinus = 1,
+    kPlus = 2,
+    kRun = 3,
+    kEdit = 4,     // a text is typed on its keyboard (prefs_pages.cpp)
+    kOpen = 5,     // About and a list open on a page of their own
+    kConfirm = 6,  // the question before a change that breaks the music (Pref::confirm)
+    kCancel = 7,
+    kEditor = 8,   // a value chosen in an editor over the sheet (a pair of times, a place: prefs_editors.cpp)
+    kOpenSheet = 9,  // the Speakers sheet of the speaker trim (sound_sheet.cpp)
+};
 
 struct Row {
     std::size_t entry = 0;
@@ -53,8 +67,10 @@ struct Row {
     lv_obj_t* minus = nullptr;
     lv_obj_t* plus = nullptr;
     lv_obj_t* value = nullptr;
-    // kAction: the button.
+    // kAction, kInfo, kList and kSheet: the button. kText: the button that holds the value and opens the keyboard.
     lv_obj_t* action = nullptr;
+    // kText with an editor: the value as a button, which opens it.
+    lv_obj_t* edit = nullptr;
     // What was painted last: the row is repainted when this changes.
     std::string painted;
 };
@@ -214,6 +230,24 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
     return std::max(g.m.row_target, text_width(g.body.latin, text) + 2 * g.m.pad);
 }
 
+// What the editors are drawn with: this sheet's own sizes, colours and type, over this sheet.
+[[nodiscard]] EditorKit editor_kit() {
+    EditorKit kit;
+    kit.m = g.m;
+    kit.c = g.c;
+    kit.body = g.body.latin;
+    kit.note = g.note.latin;
+    kit.title = g.title;
+    kit.parent = g.root;
+    return kit;
+}
+
+// The widest a value that has an editor reads: a place with its country, or a pair of times.
+[[nodiscard]] int edit_button_width() {
+    const int widest = std::max(text_width(g.body.latin, "Melbourne (Australia)"), text_width(g.body.latin, "22:00 to 07:00"));
+    return widest + 2 * g.m.pad;
+}
+
 // --- what a row says -------------------------------------------------------------------------------
 
 // The lines under a row's control: why the whole entry is greyed, or its note; why another setting makes it moot; why
@@ -318,6 +352,10 @@ void paint_row(Row& row, const prefs::Entry& entry) {
         lv_label_set_text(row.value, entry.value_label.c_str());
         lv_obj_set_style_text_color(row.value, color(on ? g.c.text : g.c.faint), 0);
     }
+    if (row.edit != nullptr) {
+        lv_label_set_text(lv_obj_get_child(row.edit, 0), entry.value_label.c_str());
+        style_button(row.edit, false, on);
+    }
     if (row.minus != nullptr) {
         style_button(row.minus, false, on && prefs::step_target(entry, -1).has_value());
     }
@@ -325,7 +363,12 @@ void paint_row(Row& row, const prefs::Entry& entry) {
         style_button(row.plus, false, on && prefs::step_target(entry, +1).has_value());
     }
     if (row.action != nullptr) {
-        style_button(row.action, false, on);
+        // Greyed by the board (it cannot) or by the moment (an update is under way): the reason is under the row.
+        style_button(row.action, false, on && entry.inert.empty());
+        // An action whose choices say its state (Play each, Stop) shows the one it is in.
+        if (entry.pref->kind == prefs::Kind::kAction && !entry.choices.empty() && !entry.value_label.empty()) {
+            lv_label_set_text(lv_obj_get_child(row.action, 0), entry.value_label.c_str());
+        }
     }
     const std::string details = details_of(entry);
     if (row.details != nullptr) {
@@ -357,7 +400,8 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
 
     // How wide the control is, to decide whether the label and the control share a line.
     int control_w = 0;
-    const std::string button_text = pref.kind == prefs::Kind::kAction && !entry.choices.empty()
+    const std::string button_text = pref.button[0] != '\0' ? std::string(pref.button)
+                                    : pref.kind == prefs::Kind::kAction && !entry.choices.empty()
                                         ? entry.choices.front().label
                                         : std::string("Run");
     int value_w = 0;
@@ -377,11 +421,24 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             control_w = 2 * g.m.row_target + 2 * gap + value_w;
             break;
         case prefs::Kind::kText:
-            value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value), g.m.row_target));
+            if (prefs::has_screen_editor(pref)) {
+                value_w = std::min(content_w, edit_button_width());
+            } else {
+                // The value is a button: a tap on it opens the keyboard. Where it and the label do not fit on one
+                // line it goes on the next, with the whole width, so a name is not cut to half a narrow display.
+                value_w = std::min(content_w, std::max(text_width(g.body.latin, entry.value) + 2 * g.m.pad, g.m.row_target));
+            }
             control_w = value_w;
             break;
         case prefs::Kind::kAction:
+        case prefs::Kind::kInfo:
+        case prefs::Kind::kList:
             control_w = button_width(button_text);
+            break;
+        case prefs::Kind::kSheet:
+            // What is set, and the button that opens the sheet it is set on.
+            value_w = std::max(text_width(g.body.latin, "16 speakers set"), text_width(g.body.latin, entry.value));
+            control_w = value_w + gap + button_width("Edit");
             break;
     }
     const int label_w = text_width(g.body.latin, pref.label);
@@ -455,14 +512,39 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
                                    pack(Op::kPlus, index, 0), nullptr);
             break;
         case prefs::Kind::kText:
-            row.value = make_label(controls, "", g.body.latin, g.c.text);
+            if (prefs::has_screen_editor(pref)) {
+                // Chosen in an editor of its own (prefs_editors.cpp): the value is the button that opens it.
+                row.edit = make_button(controls, "", value_w, g.m.row_target, g.c.surface_up, g.c.text, &on_target,
+                                       pack(Op::kEditor, index, 0), nullptr);
+                lv_label_set_long_mode(lv_obj_get_child(row.edit, 0), LV_LABEL_LONG_MODE_DOTS);
+                lv_obj_set_width(lv_obj_get_child(row.edit, 0), value_w - 2 * g.m.gap);
+                lv_obj_set_style_text_align(lv_obj_get_child(row.edit, 0), LV_TEXT_ALIGN_CENTER, 0);
+                lv_obj_center(lv_obj_get_child(row.edit, 0));
+                break;
+            }
+            // Typed on the keyboard of prefs_pages.cpp: the value is the button that opens it.
+            row.action = make_button(controls, "", value_w, g.m.row_target, g.c.surface_up, g.c.text, &on_target,
+                                     pack(Op::kEdit, index, 0), &row.value);
             lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_DOTS);
-            lv_obj_set_size(row.value, value_w, lv_font_get_line_height(g.body.latin));
-            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_set_width(row.value, value_w - 2 * g.m.pad);
+            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_CENTER, 0);
             break;
         case prefs::Kind::kAction:
             row.action = make_button(controls, button_text, button_width(button_text), g.m.row_target, g.c.surface_up,
                                      g.c.text, &on_target, pack(Op::kRun, index, 0), nullptr);
+            break;
+        case prefs::Kind::kInfo:
+        case prefs::Kind::kList:
+            row.action = make_button(controls, button_text, button_width(button_text), g.m.row_target, g.c.surface_up,
+                                     g.c.text, &on_target, pack(Op::kOpen, index, 0), nullptr);
+            break;
+        case prefs::Kind::kSheet:
+            row.value = make_label(controls, "", g.body.latin, g.c.muted);
+            lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_CLIP);
+            lv_obj_set_width(row.value, value_w);
+            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_RIGHT, 0);
+            row.action = make_button(controls, "Edit", button_width("Edit"), g.m.row_target, g.c.surface_up, g.c.text,
+                                     &on_target, pack(Op::kOpenSheet, index, 0), nullptr);
             break;
     }
 
@@ -546,6 +628,11 @@ void build_view() {
 }
 
 void take_down() {
+    // The Speakers sheet covers this one, and stops a test tone the sheet or the list started.
+    sound_sheet_close();
+    // A page or an editor is a child of the sheet's root; it goes first, with whatever it has not yet written.
+    pages_close();
+    editor_close();
     if (g.root != nullptr) {
         lv_obj_delete(g.root);
     }
@@ -658,6 +745,11 @@ void on_target(lv_event_t* event) {
                 return;
             }
             word = entry.choices[index].id;
+            // A change that asks first (the switch between the cable and Wi-Fi) is made on the page that asks.
+            if (entry.pref->confirm_step != nullptr && word != entry.value) {
+                pages_open(*entry.pref, word);
+                return;
+            }
             // A change that breaks the music that plays asks first; the same layout again, or nothing playing, does not.
             if (entry.pref->confirm[0] != '\0' && word != entry.value && preferences_backend().playing()) {
                 open_confirm(row, word, entry.choices[index].label);
@@ -674,11 +766,45 @@ void on_target(lv_event_t* event) {
             break;
         }
         case Op::kRun:
+            // An action that asks first is run from the page that asks; one the moment forbids says why under its row.
+            if (entry.pref->confirm_step != nullptr && entry.availability.available) {
+                if (entry.inert.empty()) {
+                    pages_open(*entry.pref, "run");
+                }
+                return;
+            }
             word = "run";
             break;
+        case Op::kEdit:
+        case Op::kOpen:
+            // A text is typed, a list or About is read, each on a page of its own.
+            if (!entry.availability.available) {
+                g.status_text = entry.availability.reason;
+                g.status_ms = now_ms();
+                g.dirty = true;
+            } else {
+                pages_open(*entry.pref, "");
+            }
+            return;
+        case Op::kOpenSheet:
+            // The sheet is built by its own update, outside this event; a board that cannot says why in the bar.
+            if (!entry.availability.available) {
+                g.status_text = entry.availability.reason;
+                g.status_ms = now_ms();
+                g.dirty = true;
+            } else {
+                sound_sheet_open();
+            }
+            return;
         case Op::kConfirm:
         case Op::kCancel:
             return;  // answered above
+        case Op::kEditor:
+            // A greyed entry says why beside the control; a tap on it opens nothing.
+            if (entry.availability.available) {
+                (void)editor_open(editor_kit(), *entry.pref);
+            }
+            return;
     }
     apply_value(row, word);
 }
@@ -768,9 +894,43 @@ void prefs_update(std::uint32_t now) {
         take_down();
         return;
     }
+    pages_update(now);
+    editor_update(now);
+    sound_sheet_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }
 }
+
+// --- for the pages the sheet opens ---------------------------------------------------------------------------------
+
+PrefsUi prefs_ui() { return {&g.m, &g.c, g.body.latin, g.note.latin, g.heading, g.title}; }
+
+lv_obj_t* prefs_box(lv_obj_t* parent) { return make_box(parent); }
+
+lv_obj_t* prefs_label(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb) {
+    return make_label(parent, text, font, rgb);
+}
+
+lv_obj_t* prefs_paragraph(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb, int width) {
+    return make_paragraph(parent, text, font, rgb, width);
+}
+
+lv_obj_t* prefs_button(lv_obj_t* parent, const std::string& text, int width, int height, std::uint32_t bg, std::uint32_t fg,
+                       lv_event_cb_t callback, std::uintptr_t user_data, lv_obj_t** label_out) {
+    return make_button(parent, text, width, height, bg, fg, callback, user_data, label_out);
+}
+
+void prefs_style_button(lv_obj_t* button, bool chosen, bool available) { style_button(button, chosen, available); }
+
+int prefs_text_width(const lv_font_t* font, const std::string& text) { return text_width(font, text); }
+
+void prefs_say(const std::string& text) {
+    g.status_text = text;
+    g.status_ms = now_ms();
+    g.dirty = true;
+}
+
+void prefs_changed() { g.dirty = true; }
 
 }  // namespace player::panel
