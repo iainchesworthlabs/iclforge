@@ -523,8 +523,12 @@ def read_pem_certificates(text: str) -> list[bytes]:
 
 # --- the index and its signature ----------------------------------------------------------------
 
+# Up to nine digits a number, as the board reads one; ASCII digits only; \Z, not $, which would let
+# a trailing newline through.
 _VERSION = re.compile(
-    r"^v?(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?(?:-(\d+)-g[0-9a-f]*)?(?:-dirty)?$"
+    r"^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-(alpha|beta|rc)\.(\d{1,9}))?"
+    r"(?:-(\d{1,9})-g[0-9a-f]*)?(?:-dirty)?\Z",
+    re.ASCII,
 )
 _STAGES = {"alpha": 1, "beta": 2, "rc": 3}
 

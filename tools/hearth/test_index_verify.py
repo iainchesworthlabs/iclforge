@@ -48,7 +48,22 @@ VERSION_CASES = [
     ("v1.0.0", "v0.99.99", 1),
     ("v0.10.0-beta.1-5-gabc-dirty", "v0.10.0-beta.1-5-gdef", 0),
 ]
-NOT_VERSIONS = ["", "1", "fa3b9c2", "v1.2", "v1.2.3.4", "main", "v1.2.3-beta", "v1.2.3-gamma.1"]
+NOT_VERSIONS = [
+    "",
+    "1",
+    "fa3b9c2",
+    "v1.2",
+    "v1.2.3.4",
+    "main",
+    "v1.2.3-beta",
+    "v1.2.3-gamma.1",
+    "v1.2.3" + chr(10),
+    "v1.2.3 ",
+    "v1.2.3-5",
+    "v1.2.3-5-x",
+    "v1234567890.0.0",
+    "v1.2.3-dirty-dirty",
+]
 
 
 def load(kind: str, name: str) -> bytes:

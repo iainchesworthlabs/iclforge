@@ -10,6 +10,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_firmware_image.cpp
     test_firmware_status.cpp
     test_firmware_trial.cpp
+    test_firmware_update.cpp
     test_hardware_info.cpp
     test_improv.cpp
     test_interleave.cpp
