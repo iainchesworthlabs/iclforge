@@ -51,9 +51,12 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
+        'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
         "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is kept; PUT one to change it (from the next stream)",
         'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
-        'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
+        'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one, or a name from /time-zones',
+        'GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
         'GET  /pairing       the servers this board is paired with, as JSON',
@@ -117,8 +120,15 @@ const REPLIES = {
     dynamicRangeRefused: 'that setting could not be stored\n',
     dynamicRangeOk: 'ok; takes effect from the next stream\n',
     noClock: 'this board keeps no time\n',
+    brightnessBad: 'PUT /brightness wants a number of percent from 10 to 100\n',
+    brightnessRefused:
+        'that brightness could not be set: this screen has no backlight to dim, or the setting could not be stored\n',
+    brightnessOk: 'ok; takes effect at once\n',
+    clockFormatBad: 'PUT /clock-format wants 24 or 12, and seconds after it when they are shown: 24, 12 seconds\n',
+    clockFormatRefused: 'that format could not be stored\n',
+    clockFormatOk: 'ok; takes effect at once\n',
     timeZoneBad:
-        'PUT /timezone wants a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
+        'PUT /timezone wants a name from /time-zones (Australia/Melbourne), a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
     timeZoneRefused:
         "that zone could not be taken: this board's C library reads it differently, or it could not be stored\n",
     timeZoneOk: 'ok; the clock follows at once\n',
@@ -204,6 +214,11 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /brightness',
+    'PUT /brightness',
+    'GET /clock-format',
+    'PUT /clock-format',
+    'GET /time-zones',
     'GET /dynamic-range',
     'PUT /dynamic-range',
     'GET /preferences',
@@ -498,7 +513,8 @@ function cableNetwork(preference = 'auto') {
 // no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing and GET
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
 function screenBoard() {
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+    // `dimmable` is a glass whose backlight can be dimmed; a frame buffer with no panel behind it has none.
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', brightness: 80, dimmable: true, clockFormat: '24' };
 }
 
 // The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
@@ -569,6 +585,7 @@ function timeBoard() {
     return {
         sync: 'on',
         zone: 'none',
+        zoneName: 'none',
         server: 'none',
         asking: true,
         synced: true,
@@ -578,6 +595,11 @@ function timeBoard() {
         zoneRefused: false,
     };
 }
+
+// The time zones the firmware offers by name: the rows of libs/device's time_zone_data.hpp, which tools/hearth/
+// gen_time_zones.py writes, read here so that the stand-in's list is the board's and cannot drift from it.
+const ZONE_DATA = path.resolve(__dirname, '../../../../../libs/device/include/iclforge/time_zone_data.hpp');
+const ZONE_TABLE = [...fs.readFileSync(ZONE_DATA, 'utf8').matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
 
 // Whether a string is a time server the firmware takes: libs/device's wall_clock.hpp valid_ntp_server, rule for
 // rule: an IPv4 address (four parts, no leading zero) or a host name (RFC 1123 labels, the last not all digits),
@@ -848,6 +870,7 @@ function timeStatus(t) {
         synced: t.synced,
         local: t.synced ? t.local : null,
         zone: t.zone,
+        zone_name: t.zoneName,
         server: t.server,
         servers: t.servers,
         answers: t.answers,
@@ -1318,6 +1341,47 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /brightness':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.brightness + '\n');
+            case 'PUT /brightness': {
+                const word = body.trim();
+                const percent = /^[0-9]{1,3}$/.test(word) ? Number.parseInt(word, 10) : -1;
+                if (percent < 10 || percent > 100) {
+                    return send(res, 400, REPLIES.brightnessBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                if (!device.screen.dimmable) {
+                    return send(res, 409, REPLIES.brightnessRefused);
+                }
+                device.screen.brightness = percent;
+                return send(res, 200, REPLIES.brightnessOk);
+            }
+            case 'GET /clock-format':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.clockFormat + '\n');
+            case 'PUT /clock-format': {
+                const word = body.trim();
+                if (!['24', '24 seconds', '12', '12 seconds'].includes(word)) {
+                    return send(res, 400, REPLIES.clockFormatBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.clockFormat = word;
+                return send(res, 200, REPLIES.clockFormatOk);
+            }
+            case 'GET /time-zones':
+                if (!device.time) {
+                    return send(res, 404, REPLIES.noClock);
+                }
+                return send(res, 200, ZONE_TABLE.map((z) => z[0] + '\n').join(''));
             case 'GET /dynamic-range':
                 if (!device.dynamicRange) {
                     return send(res, 404, REPLIES.noDynamicRange);
@@ -1343,7 +1407,9 @@ async function startStub() {
                 return send(res, 200, device.time.zone + '\n');
             case 'PUT /timezone': {
                 const word = body.trim();
-                if (word !== 'none' && !validTimeZone(word)) {
+                // A name from the table, stored with the string it stands for; or a string, which has no name.
+                const named = ZONE_TABLE.find((z) => z[0] === word);
+                if (!named && word !== 'none' && !validTimeZone(word)) {
                     return send(res, 400, REPLIES.timeZoneBad);
                 }
                 if (!device.time) {
@@ -1352,7 +1418,8 @@ async function startStub() {
                 if (device.time.zoneRefused) {
                     return send(res, 409, REPLIES.timeZoneRefused);
                 }
-                device.time.zone = word;
+                device.time.zone = named ? named[1] : word;
+                device.time.zoneName = named ? named[0] : 'none';
                 return send(res, 200, REPLIES.timeZoneOk);
             }
             case 'GET /ntp-server':
