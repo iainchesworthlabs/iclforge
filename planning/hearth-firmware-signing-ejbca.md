@@ -291,7 +291,7 @@ and run the signing workflow again for the current release. No board changes.
 | Profiles | certificate profiles `FIRMWARE-SUBCA`, `FIRMWARE-CODESIGNER`; end entity profile `Firmware CodeSigning`; the sub-CA's soft token has auto-activation off and is locked when not issuing |
 | `Hearth Firmware Stable` | valid 2026-10-25 to 2028-10-24, SHA-256 `16:75:8E:FD:99:6A:D1:70:0D:5D:02:71:E7:80:C4:86:96:13:79:E5:73:54:39:F4:60:6C:6C:92:19:50:CB:05` |
 | `Hearth Firmware Beta` | valid 2026-10-25 to 2028-10-24, SHA-256 `2F:BA:1A:6F:E9:AC:29:24:0D:6B:78:A4:B0:27:F5:5D:0E:EC:87:50:21:06:D6:6D:C7:46:AB:04:E7:82:A5:BB` |
-| GitHub | environments `firmware-beta` and `firmware-stable` as in step 7, each with the two secrets; variable `PUBLISH_FIRMWARE_CHANNELS` set to `true`; no `v*` tag ruleset (not needed) |
+| GitHub | read back from GitHub on 2026-10-25: `firmware-beta` allows `main` only, no reviewer; `firmware-stable` allows `main` only, required reviewer the owner, *Prevent self-review* off, administrators cannot bypass; each has the two secrets; variable `PUBLISH_FIRMWARE_CHANNELS` is `true`; no `v*` tag ruleset (not needed; the repository's rulesets are the merge queue and a disabled code-scanning gate) |
 
 Dates to act on: both leaves end **2028-10-24** (the CI job warns 60 days before, about 2028-08-25), and the sub-CA and
 everything under it end **2034-10-23**, so an anchor rollover ([Rollover](esp32-ota.md#rollover-floors-and-revocation))
