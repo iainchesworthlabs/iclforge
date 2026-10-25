@@ -20,6 +20,8 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    std::string layout_ = "2.0";
+    bool playing_ = false;
     nowview::SpeakersStyle style_ = nowview::kDefaultSpeakersStyle;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
@@ -41,6 +43,16 @@ class FakeBackend final : public Backend {
         dim_minutes_ = minutes;
         return true;
     }
+    [[nodiscard]] std::string layout() const override { return layout_; }
+    [[nodiscard]] bool set_layout(std::string_view layout) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        layout_ = std::string(layout);
+        return true;
+    }
+    [[nodiscard]] bool playing() const override { return playing_; }
     [[nodiscard]] nowview::SpeakersStyle speakers_style() const override { return style_; }
     [[nodiscard]] bool set_speakers_style(nowview::SpeakersStyle style) override {
         ++sets;

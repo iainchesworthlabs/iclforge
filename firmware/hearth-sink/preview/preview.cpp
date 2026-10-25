@@ -76,6 +76,8 @@ std::uint16_t g_buffer_a[kMaxWidth * kBufferRows];
 std::uint16_t g_buffer_b[kMaxWidth * kBufferRows];
 // The board the preferences are drawn for (iclforge/board_variants.hpp): the kit, until a scenario says another.
 iclforge::BoardCaps g_caps = iclforge::variants::p4_rev3_kit();
+// The speaker layout the board holds (the preference of that name), as the text PUT /layout takes.
+std::string g_layout = "2.0";
 
 struct Pointer {
     int x = 0;
@@ -683,7 +685,10 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
                 std::printf("  scrolled to %d\n", static_cast<int>(lv_obj_get_scroll_y(list)));
                 expect(lv_obj_get_scroll_y(list) > 0, "a finger dragged up scrolls the list");
                 write_bmp(out / ("prefs-scrolled-" + size + ".bmp"));
-                drag(width / 2, height / 4, height * 3 / 4);
+                // A longer list takes more than one drag to bring back to its top.
+                for (int again = 0; again < 8 && lv_obj_get_scroll_y(list) > 0; ++again) {
+                    drag(width / 2, height / 4, height * 3 / 4);
+                }
                 std::printf("  scrolled back to %d\n", static_cast<int>(lv_obj_get_scroll_y(list)));
                 expect(lv_obj_get_scroll_y(list) == 0, "and dragged down scrolls it back");
             }
@@ -755,6 +760,100 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(g_settings.view == nv::View::kClock, "the choices it can make still work");
         tap_button("Close");
         pump(6);
+    }
+
+    // The speaker layout: a board that can carry only some of the layouts (an ESP32-S3, four 32-bit slots on one line)
+    // lists every one, the ones it cannot carry greyed with the reason beside them, and a tap on a greyed one does
+    // nothing. One it carries with a limit is taken. While a stream plays a change is asked about first, and nothing
+    // plays on the question's other side until it is answered.
+    g_caps = iclforge::variants::s3_spi_320x240();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "2.0";
+    g_settings = {nv::View::kSpeakers, 5};
+    g_now_playing = false;
+    expect(tap_button("Preferences"), "the footer has a Preferences button on an S3");
+    pump(8);
+    lv_obj_t* const sound = player::panel::prefs_root();
+    expect(sound != nullptr, "Preferences opens on an S3");
+    if (sound != nullptr) {
+        failures += audit(sound, "preferences, speaker layout " + size);
+        expect(shows_text(sound, "Speaker layout"), "the Sound group has the speaker layout");
+        for (const char* layout : {"1.0", "2.0", "2.1", "5.1", "7.1.4", "9.1.6"}) {
+            expect(find_button(layout) != nullptr, std::string("the layout list shows ") + layout);
+        }
+        lv_obj_scroll_to_view_recursive(find_button("5.1"), LV_ANIM_OFF);
+        pump(4);
+        write_bmp(out / ("prefs-layout-s3-" + size + ".bmp"));
+        expect(shows_text(sound, "5.1 needs 6 slots; this board's output carries 4 (32-bit slots, one line).", true),
+               "a layout the board cannot carry says what it needs and what the board has");
+        expect(shows_text(sound, "16-bit slots would carry 8", true), "and what would help");
+        expect(shows_text(sound, "Not verified", true), "a layout nobody has measured says so");
+        tap_button("5.1");
+        pump(4);
+        expect(g_layout == "2.0", "a tap on a layout the board cannot carry does nothing");
+        tap_button("2.1");
+        pump(4);
+        expect(g_layout == "2.1", "a layout the board carries with a limit is taken");
+        tap_button("2.0");
+        pump(4);
+        expect(g_layout == "2.0", "and so is the board's own again");
+
+        // Music playing: the change is asked about, and Cancel leaves it as it was.
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(4);
+        tap_button("1.0");
+        pump(4);
+        expect(g_layout == "2.0", "while a stream plays a tap on a layout asks before it changes it");
+        expect(shows_text(sound, "drop out for a moment", true), "and the question says what it costs");
+        expect(shows_text(sound, "Change to 1.0?", true), "and what the change is");
+        write_bmp(out / ("prefs-layout-confirm-" + size + ".bmp"));
+        // The question covers the sheet (a tap cannot reach it); what is held to the fingertip rule is the question.
+        failures += audit(lv_obj_get_child(sound, static_cast<std::int32_t>(lv_obj_get_child_count(sound)) - 1),
+                          "preferences, speaker layout question " + size);
+        tap_button("Cancel");
+        pump(4);
+        expect(g_layout == "2.0", "Cancel leaves the layout as it was");
+        expect(!shows_text(sound, "drop out for a moment", true), "and puts the question away");
+        tap_button("1.0");
+        pump(4);
+        tap_button("Change");
+        pump(4);
+        expect(g_layout == "1.0", "Change makes it");
+        tap_button("2.0");
+        pump(4);
+        tap_button("Change");
+        pump(4);
+        expect(g_layout == "2.0", "and the question can be asked again");
+        g_now_playing = false;
+        g_settings = {nv::View::kSpeakers, 5};
+        hold(lrc, 5'750);
+        pump(6);
+        tap_button("Close");
+        pump(6);
+    }
+
+    // A kit (sixteen 32-bit slots, a chip that clocks them) carries every layout, with no note on any.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "7.1.4";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const kit = player::panel::prefs_root();
+        expect(kit != nullptr, "Preferences opens on the kit");
+        if (kit != nullptr) {
+            failures += audit(kit, "preferences, speaker layout, kit " + size);
+            lv_obj_scroll_to_view_recursive(find_button("5.1"), LV_ANIM_OFF);
+            pump(4);
+            write_bmp(out / ("prefs-layout-kit-" + size + ".bmp"));
+            expect(!shows_text(kit, "needs", true), "nothing is greyed on a board that carries them all");
+            tap_button("9.1.6");
+            pump(4);
+            expect(g_layout == "9.1.6", "9.1.6 is taken on the kit");
+            tap_button("Close");
+            pump(6);
+        }
     }
     return failures;
 }
@@ -842,6 +941,12 @@ class PreviewBackend final : public iclforge::prefs::Backend {
         g_settings.speakers_style = style;
         return true;
     }
+    [[nodiscard]] std::string layout() const override { return g_layout; }
+    [[nodiscard]] bool set_layout(std::string_view layout) override {
+        g_layout = std::string(layout);
+        return true;
+    }
+    [[nodiscard]] bool playing() const override { return g_now_playing; }
 };
 
 iclforge::prefs::Backend& preferences_backend() {
