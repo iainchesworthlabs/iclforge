@@ -168,8 +168,9 @@ resets the whole system, which a Wi-Fi link behind the companion chip needs
 defaults, at once and with no restart: every entry of the board's preferences that says it is reset
 (today what the screen shows without lyrics and when it dims; an entry added later says for itself),
 each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
-the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring and the
-speaker layout, the time server and whether the board asks it, and the pairings. On a board with a
+the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring, the
+speaker layout and the time zone (the room's, not a matter of taste), the time server and whether
+the board asks it, and the pairings. On a board with a
 screen the same thing is *Reset preferences* on the sheet
 ([An ESP32-P4 sink](sink-esp32-p4.md#on-the-screen)).
 

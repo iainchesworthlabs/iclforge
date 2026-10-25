@@ -98,8 +98,9 @@ TEST_CASE("the reset-preferences step lists what changes and what stays, from th
     CHECK_FALSE(confirm.hold);
     REQUIRE(confirm.lines.size() == 3);
     CHECK(confirm.lines[0].find("what the screen shows without lyrics") != std::string::npos);
-    CHECK(confirm.lines[0].find("time zone") != std::string::npos);
+    CHECK(confirm.lines[0].find("time zone") == std::string::npos);
     CHECK(confirm.lines[1].find("name") != std::string::npos);
+    CHECK(confirm.lines[1].find("time zone") != std::string::npos);
     CHECK(confirm.lines[1].find("Wi-Fi network") != std::string::npos);
     CHECK(confirm.lines[1].find("paired servers") != std::string::npos);
     CHECK(confirm.lines[2].find("does not restart") != std::string::npos);

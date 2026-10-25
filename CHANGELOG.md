@@ -151,7 +151,7 @@ The sections below contain the complete change list and fixes.
 - **`POST /reset-preferences`** puts the choices a person made once back to their defaults, at once:
   every entry of the preferences registry that says it is reset (today what the screen shows without
   lyrics and when it dims), each through its own setter. It keeps the name, the Wi-Fi network, the
-  cable-or-Wi-Fi choice, the wiring, the layout, the time server and the pairings.
+  cable-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
   **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
   name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
   restarts the board as a new one. Both are listed in `GET /api`.
