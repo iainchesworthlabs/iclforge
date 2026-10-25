@@ -34,6 +34,7 @@
 #include "iclforge/lyrics/stage.hpp"
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/panel_follow.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
 
@@ -51,21 +52,11 @@
 namespace player {
 namespace {
 
-// What the no-lyrics screen follows: set from the control surface's task (PUT /now-playing, /dim-after)
-// and read by the panel's, every frame.
-std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
-std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
-std::atomic<int> g_speakers_style{static_cast<int>(iclforge::nowview::kDefaultSpeakersStyle)};
-
-// What a person chose for the screen (planning/p4x-preferences.md), set from the control surface's task and read
-// by the panel's: the lit level of the backlight, percent, and how the clock view writes the time (the stored
-// number of iclforge::wallclock::ClockFormat).
-std::atomic<int> g_brightness{iclforge::nowview::kDefaultBrightness};
-// The night schedule, as iclforge::nowview::night_stored writes it: one number, so the screen never reads half of it.
-std::atomic<std::int32_t> g_night{iclforge::nowview::night_stored(iclforge::nowview::NightSchedule{})};
-std::atomic<int> g_clock_format{0};
-// The level the screen last asked for, one of display.hpp's three (lit, the dim floor, off).
-std::atomic<int> g_backlight_request{panel::kBacklightNormalPercent};
+// What the screen follows of the board's settings (the screen without lyrics, when it dims, the speakers' style, the
+// backlight's lit level, the clock's format, the night schedule, and the level the screen last asked the glass for, one
+// of display.hpp's three: lit, the dim floor, off). A tap on the Preferences sheet reaches the setters ON THIS TASK, while
+// g_lock is held, so none of them may take it: PanelFollow is atomics and nothing else (iclforge/panel_follow.hpp).
+iclforge::panelfollow::PanelFollow g_follow{panel::kBacklightNormalPercent};
 
 // The percent the glass is given for a level the screen asked for: the person's brightness for lit, the floor under
 // it for dimmed, nothing for off (iclforge::nowview::backlight_percent).
@@ -74,7 +65,7 @@ int effective_backlight(int request) {
     const Dim dim = request <= panel::kBacklightOffPercent    ? Dim::kDark
                     : request <= panel::kBacklightDimPercent ? Dim::kDimmed
                                                               : Dim::kNone;
-    return iclforge::nowview::backlight_percent(dim, g_brightness.load());
+    return iclforge::nowview::backlight_percent(dim, g_follow.brightness());
 }
 
 }  // namespace
@@ -268,10 +259,10 @@ bool read_now_title(NowTitle& out) {
 
 NowSettings read_now_settings() {
     NowSettings settings;
-    settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
-    settings.dim_after_minutes = g_dim_after_minutes.load();
-    settings.speakers_style = static_cast<iclforge::nowview::SpeakersStyle>(g_speakers_style.load());
-    settings.night = iclforge::nowview::night_from_stored(g_night.load()).value_or(iclforge::nowview::NightSchedule{});
+    settings.view = g_follow.view();
+    settings.dim_after_minutes = g_follow.dim_after_minutes();
+    settings.speakers_style = g_follow.speakers_style();
+    settings.night = g_follow.night();
     // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
     if (settings.night.enabled) {
         settings.minute_of_day = iclforge::wallclock::minute_of_day(player::wall_clock_read());
@@ -282,13 +273,12 @@ NowSettings read_now_settings() {
 iclforge::wallclock::Reading read_wall_clock() {
     iclforge::wallclock::Reading reading = player::wall_clock_read();
     // How the person who owns the board wants it written is the panel's to know, not the clock's.
-    reading.format = iclforge::wallclock::clock_format_from_stored(g_clock_format.load())
-                         .value_or(iclforge::wallclock::ClockFormat{});
+    reading.format = g_follow.clock_format();
     return reading;
 }
 
 void set_backlight(int percent) {
-    g_backlight_request.store(percent);
+    g_follow.ask_backlight(percent);
     display_set_backlight(effective_backlight(percent));
 }
 
@@ -380,6 +370,11 @@ void run(void* /*arg*/) {
         bool filling = false;
         {
             const std::lock_guard lock(g_lock);
+            // A brightness set since the last cycle (by a PUT, or by a tap on this task): the glass is given the level
+            // for what the screen last asked for, here, where the glass is the panel's alone.
+            if (g_follow.take_backlight_stale()) {
+                panel::set_backlight(g_follow.backlight_request());
+            }
             filling = panel::screen_update();
             (void)lv_timer_handler();
             const panel::ScreenStats screen = panel::screen_stats();
@@ -468,7 +463,7 @@ void run(void* /*arg*/) {
                   static_cast<unsigned long>(counters.failures.load()),
                   static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
-                  iclforge::nowview::view_name(static_cast<iclforge::nowview::View>(g_now_view.load())),
+                  iclforge::nowview::view_name(g_follow.view()),
                   stats.dimmed ? "true" : "false", stats.backlight, stats.dev_view ? "true" : "false",
                   stats.prefs_view ? "true" : "false",
                   static_cast<unsigned long>(stats.prefs_builds),
@@ -684,28 +679,21 @@ iclforge::DisplayCaps panel_display_caps() {
 
 iclforge::devview::Facts panel_board_facts() { return panel::gather_about_facts(); }
 
-void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
+// The setters below are called by the preferences' backend: on the control surface's task (a PUT), and on THIS panel's
+// task for a tap on the Preferences sheet, which holds g_lock for the frame that reads the tap. None of them takes g_lock
+// (std::mutex is not recursive: the brightness setter did, and a tap on Brightness - or + hung the screen for good), and
+// none touches the glass: PanelFollow is atomics, and the brightness only marks the glass stale for the loop below.
+void panel_set_view(iclforge::nowview::View view) { g_follow.set_view(view); }
 
-void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
+void panel_set_dim_after(int minutes) { g_follow.set_dim_after(minutes); }
 
-void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_speakers_style.store(static_cast<int>(style)); }
-void panel_set_brightness(int percent) {
-    g_brightness.store(percent);
-    // At once: the glass is at the lit level or at the floor under it, and either moves with this. Asked again for the
-    // level the screen last asked for, under the lock the screen's own calls hold.
-    if (g_started.load()) {
-        const std::lock_guard lock(g_lock);
-        panel::set_backlight(g_backlight_request.load());
-    }
-}
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_follow.set_speakers_style(style); }
 
-void panel_set_clock_format(iclforge::wallclock::ClockFormat format) {
-    g_clock_format.store(iclforge::wallclock::clock_format_stored(format));
-}
+void panel_set_brightness(int percent) { g_follow.set_brightness(percent); }
 
-void panel_set_night(const iclforge::nowview::NightSchedule& night) {
-    g_night.store(iclforge::nowview::night_stored(night));
-}
+void panel_set_clock_format(iclforge::wallclock::ClockFormat format) { g_follow.set_clock_format(format); }
+
+void panel_set_night(const iclforge::nowview::NightSchedule& night) { g_follow.set_night(night); }
 
 bool panel_start() {
     if (g_started.exchange(true)) {
@@ -715,12 +703,12 @@ bool panel_start() {
         std::printf("panel: no PSRAM, which LVGL's heap is; no screen\n");
         return false;
     }
-    g_now_view.store(static_cast<int>(settings().now_view));
-    g_dim_after_minutes.store(settings().dim_after_minutes);
-    g_speakers_style.store(static_cast<int>(settings().speakers_style));
-    g_brightness.store(settings().brightness_percent);
-    g_clock_format.store(iclforge::wallclock::clock_format_stored(settings().clock_format));
-    g_night.store(iclforge::nowview::night_stored(settings().night));
+    g_follow.set_view(settings().now_view);
+    g_follow.set_dim_after(settings().dim_after_minutes);
+    g_follow.set_speakers_style(settings().speakers_style);
+    g_follow.set_brightness(settings().brightness_percent);
+    g_follow.set_clock_format(settings().clock_format);
+    g_follow.set_night(settings().night);
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {
@@ -758,6 +746,11 @@ bool panel_start() {
 }
 
 PanelStats panel_stats() {
+    // Not from the panel's own task, which holds g_lock for the frame: it reads the counters as they stand, as the
+    // developer view does (read_dev_facts()), and a caller that forgot would otherwise hang the screen.
+    if (xTaskGetCurrentTaskHandle() == g_task) {
+        return g_stats;
+    }
     const std::lock_guard lock(g_lock);
     return g_stats;
 }

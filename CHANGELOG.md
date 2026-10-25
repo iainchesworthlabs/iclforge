@@ -153,6 +153,10 @@ The sections below contain the complete change list and fixes.
   steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
   place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
   down to 240 by 240. The routes now go through the same backend as the screen.
+- **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
+  which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
+  `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`
+  and fails if a setter is given one again.
 
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
