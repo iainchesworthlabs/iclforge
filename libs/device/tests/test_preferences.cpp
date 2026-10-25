@@ -681,6 +681,8 @@ TEST_CASE("the listing carries the new entries with their routes, kinds and valu
     REQUIRE(contains(json, "\"route\":\"/timezone\",\"value\":\"Australia/Melbourne\",\"available\":true"));
     // A text has no choices to list.
     const std::size_t at = json.find("\"id\":\"time-zone\"");
+    REQUIRE(json.find("\"choices\"", at) == std::string::npos);
+}
 
 // --- Sound: the identify tone and the per-speaker trim ---------------------------------------------------------------
 
@@ -781,7 +783,8 @@ TEST_CASE("the listing carries the Sound group, after Display, with the kinds ac
     REQUIRE(contains(json, "\"id\":\"speaker-trim\",\"group\":\"Sound\",\"label\":\"Speaker levels and distances\",\"kind\":\"sheet\""));
     REQUIRE(contains(json, "\"route\":\"/trim\",\"value\":\"3 speakers set\",\"available\":true"));
     REQUIRE(json.find("\"id\":\"dim-after\"") < json.find("\"id\":\"identify-speakers\""));
-    // A sheet has no choices to list.
+    // A sheet has no choices to list (the entries after it may).
     const std::size_t at = json.find("\"id\":\"speaker-trim\"");
-    REQUIRE(json.find("\"choices\"", at) == std::string::npos);
+    const std::size_t next = json.find("\"id\":", at + 1);
+    REQUIRE(json.substr(at, next - at).find("\"choices\"") == std::string::npos);
 }
