@@ -807,7 +807,7 @@ inline constexpr std::array<ChoiceDef, 2> kLateNightChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 20> kRegistry{{
+inline constexpr std::array<Pref, 21> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
