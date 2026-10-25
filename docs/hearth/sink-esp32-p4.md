@@ -580,6 +580,29 @@ board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is
 (the cable goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
 out if the cable goes, and the first move to PoE should be done with the USB cable at hand.**
 
+### Name, restart and reset
+
+The routes that name, restart and reset a board are the same on every Hearth board
+([Name, restart and reset](sink-esp32-s3.md#name-restart-and-reset) has the rules and the table of
+what a rename changes); what the kit adds is below.
+
+- **A restart resets the whole system**, not the CPU alone, through the RTC watchdog
+  (`system_reset.cpp`), because a CPU reset sometimes left the radio on the ESP32-C6 with a dead link.
+  The restart a person asks for - `POST /restart`, and the restart that Restart and the factory
+  reset end in - all go through it, a second slower than a CPU reset, with the USB console's port
+  gone for a second or two.
+- **A factory reset leaves the kit reachable on its cable.** The cable needs nothing stored: the
+  kit asks the router for an address again, and has no Wi-Fi network until you give it one (the
+  page's *Wi-Fi network* field, or Improv over the USB-C marked JTAG). **The same reset on a board
+  without a cable plugged in leaves it with no network at all.** Whether a cable is in is what the
+  confirming step reads, and it says which of the two the board is in.
+- **The radio's own copy of the network.** ESP-IDF's Wi-Fi driver keeps the SSID and passphrase it is
+  given in NVS, and on the kit the driver is the ESP32-C6's. The factory reset asks the radio to forget
+  them (`esp_wifi_restore`) when the Wi-Fi was up this run; it cannot reach a radio that was never
+  started. *Not yet checked on the kit.*
+- **Restart is refused for about half a minute after an update**: the new image is on trial, and a
+  restart then goes back to the image before it.
+
 ### Memory and time
 
 The screen's own memory is in PSRAM, none in the internal RAM the AC-4 decoder leaves 1 to 11 KB

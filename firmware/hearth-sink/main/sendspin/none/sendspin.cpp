@@ -24,6 +24,8 @@ void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange /*range*/) {}
 
 void sendspin_board_changed() {}
 
+void sendspin_name_changed() {}
+
 void sendspin_leave() {}
 
 std::optional<iclforge::ControlSendspin> sendspin_status() { return std::nullopt; }

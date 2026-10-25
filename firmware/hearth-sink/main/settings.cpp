@@ -13,26 +13,20 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 
+#include "iclforge/device_name.hpp"
+#include "iclforge/settings_keys.hpp"
+
 namespace player {
 namespace {
+
+// The keys are libs/device's, spelled once with the class that says what Reset preferences does to each
+// (iclforge/settings_keys.hpp): a key written here is a key listed there.
+namespace sk = iclforge::settingskeys;
 
 // One namespace, opened per write and closed again: these are written by a
 // person pressing something, not in a loop, and a handle held open for the
 // life of the run is a handle to leak on any path that fails.
 constexpr const char* kNamespace = "hearth_sink";
-constexpr const char* kKeyName = "name";
-constexpr const char* kKeySsid = "ssid";
-constexpr const char* kKeyPassword = "password";
-constexpr const char* kKeySlotBits = "slot_bits";
-constexpr const char* kKeySecondLine = "second_line";
-constexpr const char* kKeyNetworkPreference = "net_pref";
-constexpr const char* kKeyNowView = "np_view";
-constexpr const char* kKeyDimAfter = "np_dim";
-constexpr const char* kKeyTimeZone = "time_zone";
-constexpr const char* kKeyNtpServer = "ntp_server";
-constexpr const char* kKeyTimeSync = "time_sync";
-constexpr const char* kKeyLayout = "layout";
-constexpr const char* kKeyDynamicRange = "dyn_range";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -113,42 +107,33 @@ bool write_int(const char* key, std::int32_t value) {
     return err == ESP_OK;
 }
 
-}  // namespace
+// The image's own answers for every field, so a board with nothing stored behaves
+// exactly as it did before there was anywhere to store anything. The
+// network is the exception: its Kconfig pair exists only in a build that
+// compiled the WiFi seam, so the fallback to it lives there
+// (source/http/net/wifi/network.cpp) and an unprovisioned board simply
+// has no network here. A whole struct, not the fields that happen to have a
+// Kconfig answer: a reload after a factory reset must not keep the network
+// the board has just been told to forget.
+Settings image_defaults() {
+    Settings defaults;
+    default_name(defaults.name);
+    defaults.slot_bits = CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS;
+    defaults.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
+    defaults.now_view = iclforge::nowview::kDefaultView;
+    defaults.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    defaults.time_zone = {};
+    defaults.ntp_server = {};
+    defaults.time_sync = true;
+    defaults.layout = {};
+    defaults.dynamic_range = iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
+                                 .value_or(iclforge::ac3::kDefaultDynamicRange);
+    return defaults;
+}
 
-void settings_load() {
-    if (g_loaded) {
-        return;
-    }
-    g_loaded = true;
-
-    // WiFi's own calibration data lives in NVS too, and network_up() used to
-    // be what initialised it. Doing it here means the settings are readable on
-    // a board whose network never comes up at all.
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(err);
-
-    // The image's own answers first, so a board with nothing stored behaves
-    // exactly as it did before there was anywhere to store anything. The
-    // network is the exception: its Kconfig pair exists only in a build that
-    // compiled the WiFi seam, so the fallback to it lives there
-    // (source/http/net/wifi/network.cpp) and an unprovisioned board simply
-    // has no network here.
-    default_name(g_settings.name);
-    g_settings.slot_bits = CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS;
-    g_settings.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
-    g_settings.now_view = iclforge::nowview::kDefaultView;
-    g_settings.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
-    g_settings.time_zone = {};
-    g_settings.ntp_server = {};
-    g_settings.time_sync = true;
-    g_settings.layout = {};
-    g_settings.dynamic_range =
-        iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
-            .value_or(iclforge::ac3::kDefaultDynamicRange);
+// The image's answers, then whatever NVS holds over them.
+void load_all() {
+    g_settings = image_defaults();
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -158,11 +143,11 @@ void settings_load() {
                     g_settings.second_line ? "a second" : "no second");
         return;
     }
-    read_string(handle, kKeyName, g_settings.name);
-    read_string(handle, kKeySsid, g_settings.ssid);
-    read_string(handle, kKeyPassword, g_settings.password);
+    read_string(handle, sk::kName, g_settings.name);
+    read_string(handle, sk::kSsid, g_settings.ssid);
+    read_string(handle, sk::kPassword, g_settings.password);
     std::int32_t stored = 0;
-    if (nvs_get_i32(handle, kKeySlotBits, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kSlotBits, &stored) == ESP_OK) {
         // Checked here as well as where it is written, and said out loud when
         // it fails: a width that is neither 16 nor 32 reaches line_ceiling(),
         // which answers "no such width", and plan_sink then refuses to open
@@ -176,10 +161,10 @@ void settings_load() {
                         static_cast<long>(stored), g_settings.slot_bits);
         }
     }
-    if (nvs_get_i32(handle, kKeySecondLine, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kSecondLine, &stored) == ESP_OK) {
         g_settings.second_line = stored != 0;
     }
-    if (nvs_get_i32(handle, kKeyNetworkPreference, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kNetworkPreference, &stored) == ESP_OK) {
         // Said out loud like the slot width: a stored number this build does not know is
         // a partition written by another build, and the policy stands.
         if (stored >= 0 && stored <= static_cast<std::int32_t>(NetworkPreference::wifi)) {
@@ -190,7 +175,7 @@ void settings_load() {
                         static_cast<long>(stored));
         }
     }
-    if (nvs_get_i32(handle, kKeyNowView, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kNowView, &stored) == ESP_OK) {
         if (const auto view = iclforge::nowview::view_from_stored(stored)) {
             g_settings.now_view = *view;
         } else {
@@ -198,7 +183,7 @@ void settings_load() {
                         static_cast<long>(stored), iclforge::nowview::view_name(g_settings.now_view));
         }
     }
-    if (nvs_get_i32(handle, kKeyDimAfter, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kDimAfter, &stored) == ESP_OK) {
         if (stored >= iclforge::nowview::kDimNever && stored <= iclforge::nowview::kDimMaxMinutes) {
             g_settings.dim_after_minutes = static_cast<int>(stored);
         } else {
@@ -209,29 +194,28 @@ void settings_load() {
     }
     // A stored zone that is not one this build reads (a partition written by a later image) is said, and
     // the clock says UTC.
-    read_string(handle, kKeyTimeZone, g_settings.time_zone);
+    read_string(handle, sk::kTimeZone, g_settings.time_zone);
     if (g_settings.time_zone[0] != '\0' && !iclforge::wallclock::valid_time_zone(g_settings.time_zone.data())) {
         std::printf("settings: stored time zone '%s' is not one this build reads; the clock says UTC\n",
                     g_settings.time_zone.data());
         g_settings.time_zone[0] = '\0';
     }
-    read_string(handle, kKeyNtpServer, g_settings.ntp_server);
+    read_string(handle, sk::kNtpServer, g_settings.ntp_server);
     if (g_settings.ntp_server[0] != '\0' && !iclforge::wallclock::valid_ntp_server(g_settings.ntp_server.data())) {
         std::printf("settings: stored time server '%s' is not one this build reads; the router's and the pool\n",
                     g_settings.ntp_server.data());
         g_settings.ntp_server[0] = '\0';
     }
-    if (nvs_get_i32(handle, kKeyTimeSync, &stored) == ESP_OK) {
+    if (nvs_get_i32(handle, sk::kTimeSync, &stored) == ESP_OK) {
         g_settings.time_sync = stored != 0;
     }
-    read_string(handle, kKeyLayout, g_settings.layout);
-    if (nvs_get_i32(handle, kKeyDynamicRange, &stored) == ESP_OK) {
+    read_string(handle, sk::kLayout, g_settings.layout);
+    if (nvs_get_i32(handle, sk::kDynamicRange, &stored) == ESP_OK) {
         if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
             g_settings.dynamic_range = *range;
         } else {
             std::printf("settings: stored dynamic range %ld is not one this build knows; keeping %s\n",
-                        static_cast<long>(stored),
-                        iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
+                        static_cast<long>(stored), iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
         }
     }
     nvs_close(handle);
@@ -252,6 +236,27 @@ void settings_load() {
                 iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
 }
 
+}  // namespace
+
+void settings_load() {
+    if (g_loaded) {
+        return;
+    }
+    g_loaded = true;
+
+    // WiFi's own calibration data lives in NVS too, and network_up() used to
+    // be what initialised it. Doing it here means the settings are readable on
+    // a board whose network never comes up at all.
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+
+    load_all();
+}
+
 const Settings& settings() { return g_settings; }
 
 bool board_mac(std::span<std::uint8_t, 6> mac) {
@@ -269,11 +274,20 @@ bool board_mac(std::span<std::uint8_t, 6> mac) {
 }
 
 bool settings_set_name(std::string_view name) {
-    if (name.empty()) {
-        std::printf("settings: a name cannot be empty\n");
+    // The check every route and the on-screen keyboard hold a name to (iclforge/device_name.hpp): 1 to 32
+    // bytes of well-formed text with nothing invisible in it and no space at either end.
+    const iclforge::devname::Check check = iclforge::devname::check_name(name);
+    if (!check.ok()) {
+        std::printf("settings: not a name: %s\n", iclforge::devname::problem_text(check.problem));
         return false;
     }
-    return write_string(kKeyName, name, g_settings.name);
+    return write_string(sk::kName, name, g_settings.name);
+}
+
+std::string settings_default_name() {
+    std::array<char, kMaxNameBytes + 1> name{};
+    default_name(name);
+    return name.data();
 }
 
 bool settings_set_network(std::string_view ssid, std::string_view password) {
@@ -281,10 +295,10 @@ bool settings_set_network(std::string_view ssid, std::string_view password) {
         std::printf("settings: an SSID cannot be empty\n");
         return false;
     }
-    if (!write_string(kKeySsid, ssid, g_settings.ssid)) {
+    if (!write_string(sk::kSsid, ssid, g_settings.ssid)) {
         return false;
     }
-    return write_string(kKeyPassword, password, g_settings.password);
+    return write_string(sk::kPassword, password, g_settings.password);
 }
 
 bool settings_set_slot_bits(int bits) {
@@ -292,7 +306,7 @@ bool settings_set_slot_bits(int bits) {
         std::printf("settings: %d-bit slots is not a width (16 or 32)\n", bits);
         return false;
     }
-    if (!write_int(kKeySlotBits, bits)) {
+    if (!write_int(sk::kSlotBits, bits)) {
         return false;
     }
     g_settings.slot_bits = bits;
@@ -300,7 +314,7 @@ bool settings_set_slot_bits(int bits) {
 }
 
 bool settings_set_second_line(bool wired) {
-    if (!write_int(kKeySecondLine, wired ? 1 : 0)) {
+    if (!write_int(sk::kSecondLine, wired ? 1 : 0)) {
         return false;
     }
     g_settings.second_line = wired;
@@ -308,7 +322,7 @@ bool settings_set_second_line(bool wired) {
 }
 
 bool settings_set_network_preference(NetworkPreference preference) {
-    if (!write_int(kKeyNetworkPreference, static_cast<std::int32_t>(preference))) {
+    if (!write_int(sk::kNetworkPreference, static_cast<std::int32_t>(preference))) {
         return false;
     }
     g_settings.network_preference = preference;
@@ -316,7 +330,7 @@ bool settings_set_network_preference(NetworkPreference preference) {
 }
 
 bool settings_set_now_view(iclforge::nowview::View view) {
-    if (!write_int(kKeyNowView, static_cast<std::int32_t>(view))) {
+    if (!write_int(sk::kNowView, static_cast<std::int32_t>(view))) {
         return false;
     }
     g_settings.now_view = view;
@@ -328,7 +342,7 @@ bool settings_set_dim_after(int minutes) {
         std::printf("settings: %d minutes is not a time to dim after\n", minutes);
         return false;
     }
-    if (!write_int(kKeyDimAfter, minutes)) {
+    if (!write_int(sk::kDimAfter, minutes)) {
         return false;
     }
     g_settings.dim_after_minutes = minutes;
@@ -336,7 +350,7 @@ bool settings_set_dim_after(int minutes) {
 }
 
 bool settings_set_layout(std::string_view layout) {
-    return write_string(kKeyLayout, layout, g_settings.layout);
+    return write_string(sk::kLayout, layout, g_settings.layout);
 }
 
 bool settings_set_time_zone(std::string_view zone) {
@@ -346,7 +360,7 @@ bool settings_set_time_zone(std::string_view zone) {
         return false;
     }
     // An empty string is stored as such, and read back as no zone: NVS keeps the key, the clock says UTC.
-    return write_string(kKeyTimeZone, zone, g_settings.time_zone);
+    return write_string(sk::kTimeZone, zone, g_settings.time_zone);
 }
 
 bool settings_set_ntp_server(std::string_view server) {
@@ -355,11 +369,11 @@ bool settings_set_ntp_server(std::string_view server) {
                     server.data());
         return false;
     }
-    return write_string(kKeyNtpServer, server, g_settings.ntp_server);
+    return write_string(sk::kNtpServer, server, g_settings.ntp_server);
 }
 
 bool settings_set_time_sync(bool on) {
-    if (!write_int(kKeyTimeSync, on ? 1 : 0)) {
+    if (!write_int(sk::kTimeSync, on ? 1 : 0)) {
         return false;
     }
     g_settings.time_sync = on;
@@ -367,7 +381,7 @@ bool settings_set_time_sync(bool on) {
 }
 
 bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range) {
-    if (!write_int(kKeyDynamicRange, static_cast<std::int32_t>(range))) {
+    if (!write_int(sk::kDynamicRange, static_cast<std::int32_t>(range))) {
         return false;
     }
     g_settings.dynamic_range = range;
@@ -389,9 +403,69 @@ bool settings_forget() {
         std::printf("settings: NVS refused the erase (%s)\n", esp_err_to_name(err));
         return false;
     }
-    g_loaded = false;
-    settings_load();
+    // Every field back to the image's, the network and the choice between networks too: the board
+    // restarts next, but whatever reads a setting before then must not find the network it was told to forget.
+    g_loaded = true;
+    load_all();
     return true;
+}
+
+namespace {
+
+// A preference's field in memory back to the image's answer, so the running board follows without a
+// restart. A preference added to the table without a case here is erased from NVS all the same and
+// follows at the next start, which is said.
+void reset_in_memory(std::string_view key, const Settings& defaults) {
+    if (key == sk::kNowView) {
+        g_settings.now_view = defaults.now_view;
+    } else if (key == sk::kDimAfter) {
+        g_settings.dim_after_minutes = defaults.dim_after_minutes;
+    } else if (key == sk::kTimeZone) {
+        g_settings.time_zone = defaults.time_zone;
+    } else if (key == sk::kDynamicRange) {
+        g_settings.dynamic_range = defaults.dynamic_range;
+    } else {
+        std::printf("settings: '%.*s' is erased; the board follows at its next start\n", static_cast<int>(key.size()),
+                    key.data());
+    }
+}
+
+}  // namespace
+
+bool settings_reset_preferences() {
+    nvs_handle_t handle = 0;
+    if (nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
+        std::printf("settings: could not open NVS to reset the preferences\n");
+        return false;
+    }
+    bool ok = true;
+    for (const sk::Key& key : sk::kKeys) {
+        if (!sk::is_preference(key.kind)) {
+            continue;
+        }
+        // A key that was never written is already at its default.
+        const esp_err_t err = nvs_erase_key(handle, key.nvs);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+            std::printf("settings: NVS refused to erase %s (%s)\n", key.nvs, esp_err_to_name(err));
+            ok = false;
+        }
+    }
+    const esp_err_t committed = nvs_commit(handle);
+    nvs_close(handle);
+    if (committed != ESP_OK) {
+        std::printf("settings: NVS refused the reset (%s)\n", esp_err_to_name(committed));
+        return false;
+    }
+    // The fields follow the keys, one at a time: the running board is reading them.
+    const Settings defaults = image_defaults();
+    for (const sk::Key& key : sk::kKeys) {
+        if (sk::is_preference(key.kind)) {
+            reset_in_memory(key.nvs, defaults);
+        }
+    }
+    std::printf("settings: preferences reset to the image's defaults; the name, the network, the wiring and the "
+                "pairings are kept\n");
+    return ok;
 }
 
 }  // namespace player

@@ -363,6 +363,16 @@ struct ControlHandlers {
     // empty. Called for every GET /status, on the server's task.
     std::function<std::optional<ControlNetwork>()> network;
 
+    // POST /reset-preferences: the choices a person made once (what the screen shows, when it dims, the
+    // time zone, ...) go back to the image's defaults, at once; the name, the network, the wiring and
+    // the pairings stay (iclforge/settings_keys.hpp says which is which). Nothing, when it is done;
+    // otherwise why not, in words for the reply.
+    std::function<std::optional<std::string>()> reset_preferences;
+    // POST /factory-reset, body "erase everything": the pairings, the name, the network and every setting
+    // are erased, and the board restarts as a new one. Called only for a request that named this board by
+    // its own address or name. Nothing once it has erased and the restart is under way; otherwise why not.
+    std::function<std::optional<std::string>()> factory_reset;
+
     // The firmware routes (firmware.hpp), and flash mode's refusals. Null
     // leaves the routes answering that the board takes no updates. The owner
     // keeps it alive for as long as Control runs.
