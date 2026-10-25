@@ -180,8 +180,6 @@ class Firmware {
 
     // For firmware_pull.hpp (O10). The board and its update state as of now.
     [[nodiscard]] FirmwareFacts facts() const;
-    // Whether the request names this board (the Host check of the firmware PUTs).
-    [[nodiscard]] bool host_allowed(httpd_req* req) const;
     // Writes an image the caller downloads, on the caller's own task, which needs the stack an
     // upload does (task_stack_bytes) and more for TLS, from internal RAM: a task that writes flash
     // may not have its stack where the cache is needed to reach it. Enters flash mode, writes the

@@ -1495,10 +1495,6 @@ FirmwareFacts Firmware::facts() const {
     return f;
 }
 
-bool Firmware::host_allowed(httpd_req* req) const {
-    return impl_ != nullptr && impl_->host_allowed(req);
-}
-
 PullInstall Firmware::install_pulled(PulledImage& image) {
     if (impl_ == nullptr || impl_->other == nullptr) {
         return {"no_slot", "This board takes no updates over the network."};
