@@ -111,7 +111,7 @@ TEST_CASE("time_zones: Australia is complete", "[time_zones]") {
     // ... and only those are in the region.
     std::size_t in_region = 0;
     for (std::size_t i = 0; i < wc::time_zone_count(); ++i) {
-        in_region += wc::zone_region(wc::time_zone_at(i).name) == "Australia" ? 1 : 0;
+        in_region += wc::zone_region(wc::time_zone_at(i).name) == "Australia" ? 1U : 0U;
     }
     CHECK(in_region == std::size(expected));
     // The ones that share a rule share the string, and the ones that do not have their own.
