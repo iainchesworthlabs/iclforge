@@ -494,25 +494,36 @@
   // this page last sent: a choice whose request is out, or that a read begun
   // before its answer would undo, keeps what the user chose, and a field is
   // never changed under someone typing in it.
-  // The zones the page offers: a label and the POSIX string the board is given, `;` between them and `|` inside.
-  // A zone not here is typed in the field under it.
-  const ZONES = ('UTC, no daylight saving|none;UTC-12 Baker Island|<-12>12;UTC-11 Pago Pago|<-11>11;UTC-10 Honolulu|HST10;' +
-    'UTC-9 Anchorage|AKST9AKDT,M3.2.0,M11.1.0;UTC-8 Los Angeles, Vancouver|PST8PDT,M3.2.0,M11.1.0;' +
-    'UTC-7 Denver, Calgary|MST7MDT,M3.2.0,M11.1.0;UTC-7 Phoenix|MST7;UTC-6 Chicago, Winnipeg|CST6CDT,M3.2.0,M11.1.0;' +
-    'UTC-6 Mexico City|CST6;UTC-5 New York, Toronto|EST5EDT,M3.2.0,M11.1.0;UTC-5 Bogota, Lima|<-05>5;' +
-    'UTC-4 Halifax|AST4ADT,M3.2.0,M11.1.0;UTC-3:30 St John\'s|NST3:30NDT,M3.2.0,M11.1.0;' +
-    'UTC-3 Sao Paulo, Buenos Aires|<-03>3;UTC-2 South Georgia|<-02>2;UTC-1 Azores|<-01>1<+00>,M3.5.0/0,M10.5.0/1;' +
-    'UTC+0 London, Dublin, Lisbon|GMT0BST,M3.5.0/1,M10.5.0;UTC+0 Reykjavik, Accra|GMT0;' +
-    'UTC+1 Paris, Berlin, Rome, Madrid|CET-1CEST,M3.5.0,M10.5.0/3;UTC+1 Lagos|<+01>-1;' +
-    'UTC+2 Athens, Helsinki, Kyiv|EET-2EEST,M3.5.0/3,M10.5.0/4;UTC+2 Cairo, Johannesburg|SAST-2;' +
-    'UTC+3 Moscow, Istanbul, Riyadh|<+03>-3;UTC+3:30 Tehran|<+0330>-3:30;UTC+4 Dubai, Baku|<+04>-4;' +
-    'UTC+4:30 Kabul|<+0430>-4:30;UTC+5 Karachi, Tashkent|<+05>-5;UTC+5:30 Mumbai, Delhi, Colombo|IST-5:30;' +
-    'UTC+5:45 Kathmandu|<+0545>-5:45;UTC+6 Dhaka, Almaty|<+06>-6;UTC+7 Bangkok, Jakarta, Hanoi|<+07>-7;' +
-    'UTC+8 Singapore, Beijing, Perth|<+08>-8;UTC+9 Tokyo, Seoul|JST-9;UTC+9:30 Adelaide|ACST-9:30ACDT,M10.1.0,M4.1.0/3;' +
-    'UTC+9:30 Darwin|ACST-9:30;UTC+10 Melbourne, Sydney, Hobart, Canberra|AEST-10AEDT,M10.1.0,M4.1.0/3;' +
-    'UTC+10 Brisbane, Port Moresby|AEST-10;UTC+11 Noumea, Honiara|<+11>-11;' +
-    'UTC+12 Auckland, Wellington|NZST-12NZDT,M9.5.0,M4.1.0/3;UTC+12 Fiji|<+12>-12;UTC+13 Tonga|<+13>-13')
-    .split(';').map((z) => z.split('|'));
+  // The time zones the board offers (GET /time-zones, asked for once when the Time section first shows): one name
+  // each, `Australia/Melbourne`, chosen by region and then city. A zone not in the list is typed in the field under it.
+  let zoneNames = null;
+  let zonesAsked = false;
+  const zoneRegion = (name) => (name.includes('/') ? name.slice(0, name.indexOf('/')) : 'Other');
+  // A city as a person reads it: underscores as spaces, and what lies between region and city in brackets after it.
+  function zoneCity(name) {
+    const parts = name.split('/').slice(1).map((p) => p.replaceAll('_', ' '));
+    return parts.length ? parts.pop() + (parts.length ? ' (' + parts.join(', ') + ')' : '') : name;
+  }
+  function zoneCities(region, chosen) {
+    const city = $('zone-city');
+    city.replaceChildren(new Option('City', ''));
+    for (const name of zoneNames.filter((n) => zoneRegion(n) === region)) city.add(new Option(zoneCity(name), name));
+    city.value = chosen;
+  }
+  async function loadZones() {
+    if (zonesAsked) return;
+    zonesAsked = true;
+    try {
+      const r = await call('GET', 'time-zones');
+      zoneNames = r.status === 200 ? r.text.split('\n').filter(Boolean) : [];
+    } catch {
+      zonesAsked = false; // asked again at the next read
+      return;
+    }
+    $('zone-select').replaceChildren(new Option('Region', ''));
+    for (const region of new Set(zoneNames.map(zoneRegion))) $('zone-select').add(new Option(region, region));
+    $('zone-pick').hidden = zoneNames.length === 0;
+  }
 
   // A field is set to what the board says unless someone is typing in it or has typed in it since.
   function field(input, value) {
@@ -530,8 +541,12 @@
       : t.sync ? 'Waiting for a time server.' : 'Not kept: no time server is asked.';
     if (fresh('timesync')) $('time-sync').checked = t.sync === true;
     field($('zone-input'), t.zone === 'none' ? '' : str(t.zone));
-    if (document.activeElement !== $('zone-select')) {
-      $('zone-select').value = ZONES.some((z) => z[1] === t.zone) ? t.zone : 'other';
+    loadZones();
+    // The zone the person chose by name is shown by it; a string they typed leaves both lists at their prompts.
+    if (zoneNames?.length && document.activeElement !== $('zone-select') && document.activeElement !== $('zone-city')) {
+      const named = zoneNames.includes(t.zone_name) ? t.zone_name : '';
+      $('zone-select').value = named ? zoneRegion(named) : '';
+      zoneCities(named ? zoneRegion(named) : '', named);
     }
     field($('ntp-input'), t.server === 'none' ? '' : str(t.server));
     $('ntp-help').textContent = 'A host name or an IPv4 address. Empty is the router\'s, then pool.ntp.org.' +
@@ -695,13 +710,10 @@
   const setZone = (zone) => act('Time zone', 'PUT', 'timezone', zone || 'none',
     () => say(zone && zone !== 'none' ? 'Time zone ' + zone + '.' : 'No time zone: UTC.'), { why: 'this board reads that zone differently.' });
 
-  for (const [label, zone] of [...ZONES, ['Other: type a POSIX string below', 'other']]) {
-    $('zone-select').add(new Option(label, zone));
-  }
+  $('zone-select').addEventListener('change', (event) => zoneCities(event.target.value, ''));
 
-  $('zone-select').addEventListener('change', (event) => {
-    if (event.target.value === 'other') $('zone-input').focus();
-    else setZone(event.target.value);
+  $('zone-city').addEventListener('change', (event) => {
+    if (event.target.value) setZone(event.target.value);
   });
 
   $('zone-form').addEventListener('submit', (event) => {
