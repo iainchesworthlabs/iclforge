@@ -624,6 +624,14 @@ struct Reading {
     friend constexpr bool operator==(const Reading&, const Reading&) = default;
 };
 
+// Minutes after local midnight, for the rules that go by the hour (the night schedule): nothing until the time is known.
+[[nodiscard]] constexpr std::optional<int> minute_of_day(const Reading& reading) {
+    if (!reading.known) {
+        return std::nullopt;
+    }
+    return reading.local.hour * 60 + reading.local.minute;
+}
+
 // What the screen draws: the time (24 hours and no seconds unless the format says otherwise: the screen redraws
 // when the minute does), what goes small beside it (the seconds, and AM or PM, when there are any), the date and
 // the sentence for a board with no zone. Empty strings while the time is not known.

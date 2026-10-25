@@ -766,22 +766,16 @@ iclforge::ControlHandlers control_handlers() {
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
         // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
         // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
-        h.brightness = []() { return player::settings().brightness_percent; };
-        h.set_brightness = [](int percent) {
-            if (!player::panel_display_caps().backlight || !player::settings_set_brightness(percent)) {
-                return false;
-            }
-            player::panel_set_brightness(percent);
-            return true;
-        };
-        h.clock_format = []() { return player::settings().clock_format; };
+        // All three go through the preferences' backend, as the Preferences screen does, so that a route and the screen
+        // cannot disagree about what a setting is or when it is refused.
+        h.brightness = []() { return player::preferences().brightness(); };
+        h.set_brightness = [](int percent) { return player::preferences().set_brightness(percent); };
+        h.clock_format = []() { return player::preferences().clock_format(); };
         h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
-            if (!player::settings_set_clock_format(format)) {
-                return false;
-            }
-            player::panel_set_clock_format(format);
-            return true;
+            return player::preferences().set_clock_format(format);
         };
+        h.night = []() { return player::preferences().night(); };
+        h.set_night = [](const iclforge::nowview::NightSchedule& night) { return player::preferences().set_night(night); };
     }
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
     // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
@@ -806,15 +800,7 @@ iclforge::ControlHandlers control_handlers() {
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
         h.set_time_zone = [](std::string_view zone, std::string_view name) {
-            const std::string previous = player::settings().time_zone.data();
-            if (!player::wall_clock_set_zone(zone)) {
-                return false;
-            }
-            if (!player::settings_set_time_zone(zone, name)) {
-                (void)player::wall_clock_set_zone(previous);
-                return false;
-            }
-            return true;
+            return player::preferences().set_time_zone({.posix = std::string(zone), .name = std::string(name)});
         };
         h.ntp_server = []() { return iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data()); };
         h.set_ntp_server = [](std::string_view server) {
