@@ -20,6 +20,7 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    nowview::SpeakersStyle style_ = nowview::kDefaultSpeakersStyle;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -38,6 +39,15 @@ class FakeBackend final : public Backend {
             return false;
         }
         dim_minutes_ = minutes;
+        return true;
+    }
+    [[nodiscard]] nowview::SpeakersStyle speakers_style() const override { return style_; }
+    [[nodiscard]] bool set_speakers_style(nowview::SpeakersStyle style) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        style_ = style;
         return true;
     }
 

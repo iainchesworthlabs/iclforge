@@ -33,6 +33,16 @@ class Board final : public iclforge::prefs::Backend {
         panel_set_dim_after(minutes);
         return true;
     }
+
+    [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return settings().speakers_style; }
+
+    [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
+        if (!settings_set_speakers_style(style)) {
+            return false;
+        }
+        panel_set_speakers_style(style);
+        return true;
+    }
 };
 
 }  // namespace

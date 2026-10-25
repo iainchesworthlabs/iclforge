@@ -636,7 +636,7 @@ test('the stand-in lists the preferences, greyed with the reason where the board
     try {
         let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.display).toBe('none');
-        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after']);
+        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after', 'speakers-style']);
         for (const p of listing.preferences) {
             expect(p.available).toBe(false);
             expect(p.reason).toBe('This board has no screen.');
@@ -651,9 +651,12 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         expect(listing.display).toBe('dsi');
         expect(listing.preferences[0]).toMatchObject({ id: 'now-view', value: 'speakers', available: true, reason: '' });
         expect(listing.preferences[1]).toMatchObject({ id: 'dim-after', value: '5', available: true, reason: '' });
+        expect(listing.preferences[2]).toMatchObject({ id: 'speakers-style', value: 'glow', available: true, reason: '' });
         await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
+        await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse\n' });
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.preferences[1].value).toBe('30');
+        expect(listing.preferences[2].value).toBe('pulse');
     } finally {
         await stub.close();
     }

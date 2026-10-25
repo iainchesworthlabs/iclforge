@@ -493,6 +493,18 @@ const PREFERENCES = [
             ['never', 'Never'],
         ],
     },
+    {
+        id: 'speakers-style',
+        group: 'Display',
+        label: 'Speakers style',
+        kind: 'choice',
+        apply: 'live',
+        route: '/speakers-style',
+        choices: [
+            ['glow', 'Glow'],
+            ['pulse', 'Pulse'],
+        ],
+    },
 ];
 
 function preferencesJson(device) {
@@ -505,7 +517,7 @@ function preferencesJson(device) {
         kind: p.kind,
         apply: p.apply,
         route: p.route,
-        value: screen ? (p.id === 'now-view' ? screen.view : screen.dimAfter) : '',
+        value: screen ? { 'now-view': screen.view, 'dim-after': screen.dimAfter, 'speakers-style': screen.speakersStyle }[p.id] : '',
         available: Boolean(screen),
         reason,
         choices: p.choices.map(([id, label]) => ({ id, label, available: Boolean(screen), reason })),

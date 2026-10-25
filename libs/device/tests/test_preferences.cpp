@@ -130,6 +130,51 @@ TEST_CASE("the groups have their words, in order", "[preferences]") {
 TEST_CASE("the defaults are the Kconfig defaults the settings start from", "[preferences]") {
     REQUIRE(std::string(prefs::find("now-view")->default_word) == nv::view_name(nv::kDefaultView));
     REQUIRE(std::string(prefs::find("dim-after")->default_word) == nv::dim_after_text(nv::kDefaultDimMinutes));
+    REQUIRE(std::string(prefs::find("speakers-style")->default_word) == nv::speakers_style_name(nv::kDefaultSpeakersStyle));
+}
+
+TEST_CASE("the speakers style: glow or pulse, on a board with a screen, set by word and followed by the route",
+          "[preferences]") {
+    const prefs::Pref& style = *prefs::find("speakers-style");
+    REQUIRE(style.group == prefs::Group::kDisplay);
+    REQUIRE(std::string(style.route) == "/speakers-style");
+    REQUIRE(style.choices.size() == 2);
+    // The choices are the words the route takes, in the order the screen shows them.
+    REQUIRE(std::string(style.choices[0].id) == nv::speakers_style_name(nv::SpeakersStyle::kGlow));
+    REQUIRE(std::string(style.choices[1].id) == nv::speakers_style_name(nv::SpeakersStyle::kPulse));
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        const prefs::Entry entry = prefs::resolve(style, backend, variant.caps);
+        // A screen is what it needs and nothing else (no touch, no clock, no objects).
+        REQUIRE(entry.availability.available == variant.caps.has_screen());
+        if (entry.availability.available) {
+            REQUIRE(entry.value == "glow");
+            REQUIRE(prefs::set_value(backend, style, "pulse").ok);
+            REQUIRE(backend.style_ == nv::SpeakersStyle::kPulse);
+            REQUIRE(prefs::resolve(style, backend, variant.caps).value == "pulse");
+            REQUIRE_FALSE(prefs::set_value(backend, style, "Pulse").ok);
+            REQUIRE_FALSE(prefs::set_value(backend, style, "speakers").ok);
+            backend.refuse_next = true;
+            REQUIRE_FALSE(prefs::set_value(backend, style, "glow").ok);
+            REQUIRE(backend.style_ == nv::SpeakersStyle::kPulse);
+        }
+    }
+}
+
+TEST_CASE("the speakers style is inert where the screen draws no speakers", "[preferences]") {
+    const prefs::Pref& style = *prefs::find("speakers-style");
+    FakeBackend backend(iclforge::known_variants().front().caps);
+    for (const nv::View view : {nv::View::kSpeakers, nv::View::kTitle, nv::View::kDark}) {
+        backend.view_ = view;
+        REQUIRE(style.inert(backend).empty());
+    }
+    for (const nv::View view : {nv::View::kClock, nv::View::kOff}) {
+        backend.view_ = view;
+        const std::string why = style.inert(backend);
+        REQUIRE_FALSE(why.empty());
+        REQUIRE(why.back() == '.');
+    }
 }
 
 TEST_CASE("each entry against each known board: a reason wherever it is greyed, a default wherever it is on",
