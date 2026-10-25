@@ -145,8 +145,7 @@ it is:
   every profile with no screen, where it is inert, and `snapshot` skips a free key, while
   `verify` reads a locked key first. A test holds it locked here and in no other profile.
 - **Budgets**, about 5% over what the build measured, as the S3's and C6's are: the app
-  2,700,000 bytes (2,469,920 built; CI's #1400 build 2,466,032; 2,604,576 on main on 2026-10-25 and 2,631,184 with
-  the speaker trim and the test tone, which is what the rise from 2,600,000 is for), static internal RAM 175,000
+  2,600,000 bytes (2,469,920 built; CI's #1400 build 2,466,032), static internal RAM 175,000
   (DIRAM 166,948), the bootloader 24,576 (22,448).
 - **CI reads it**: the `_build.yml` step for this image takes its fragments from
   `sink_profile.py defaults p4-rev3`, is held by `verify` and packaged with `--profile p4-rev3`,

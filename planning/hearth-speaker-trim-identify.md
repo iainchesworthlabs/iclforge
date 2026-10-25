@@ -168,18 +168,23 @@ The S3 has no delay line in internal RAM, and none at all without PSRAM.
 **Flash.** The images built from main on 2026-10-25 (0e45f23a7) and from this branch, with the profile
 tool's `verify` on each (no board):
 
-| Profile | Main | This branch | Budget before | Budget now |
-|---|---|---|---|---|
-| `s3-n16r8` | 1,591,216 | 1,614,192 (+22,976) | 1,600,000 | 1,650,000 |
-| `p4-rev3` | 2,604,576 | 2,631,184 (+26,608) | 2,600,000 (main was already over it) | 2,700,000 |
-| `c6-16mb` | 1,874,608 | 1,901,472 (+26,864) | 1,880,000 | 1,950,000 (below the 1,966,080 slot of the 4 MB table) |
+| Profile | Main | This branch | Budget on main |
+|---|---|---|---|
+| `s3-n16r8` | 1,591,216 | 1,614,192 (+22,976) | 1,600,000 |
+| `p4-rev3` | 2,604,576 | 2,631,184 (+26,608) | 2,600,000 (main was already over it) |
+| `c6-16mb` | 1,874,608 | 1,901,472 (+26,864) | 1,880,000 |
+
+All three are over the budgets main has. The budgets are growth alarms and the guard that reads them
+runs on pushes to `main` only; the pull request that raises them for every change in flight
+(#1645: 1,750,000, 2,000,000 and 2,900,000) covers this branch's sizes with room, and the C6's
+1,901,472 stays under the 1,966,080 slot of the 4 MB table. This branch leaves `profiles.json`'s
+budgets alone so that the two do not conflict.
 
 Where the S3's 23 KB went, by object file: `burst_player.cpp` +6.4 KB (the stage, the sequence,
 the role tables and the report), `hearth_sink.cpp` +6.4 KB (the two JSON writers, the statement
 parser, the words of `POST /identify`), the device page +4.7 KB, string data +2.6 KB, `sendspin.cpp`
 +0.8 KB, `control.cpp` +0.8 KB, `settings.cpp` +0.7 KB. Static internal RAM on the S3 is
-161,445 -> 161,597 bytes (the table in `Settings`; the budget is 185,000). The budgets are not part of
-a profile's hash, so no baseline is re-recorded by them. The delay-line default is unchanged at 20 ms
+161,445 -> 161,597 bytes (the table in `Settings`; the budget is 185,000). The delay-line default is unchanged at 20 ms
 for the reason in D6, so the boot heap on a board is the player's extra kilobyte and nothing else:
 the kit run below reads it against main's.
 

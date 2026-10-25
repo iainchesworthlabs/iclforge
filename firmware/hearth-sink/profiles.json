@@ -96,7 +96,7 @@
         "refuse_above": null
       },
       "budget": {
-        "app_bytes_max": 1650000,
+        "app_bytes_max": 1600000,
         "bootloader_bytes_max": 32768,
         "internal_static_bytes_max": 185000
       },
@@ -384,7 +384,7 @@
         "refuse_above": null
       },
       "budget": {
-        "app_bytes_max": 1950000,
+        "app_bytes_max": 1880000,
         "bootloader_bytes_max": 32768,
         "internal_static_bytes_max": 117000
       },
@@ -933,7 +933,7 @@
         "refuse_above": 399
       },
       "budget": {
-        "app_bytes_max": 2700000,
+        "app_bytes_max": 2600000,
         "bootloader_bytes_max": 24576,
         "internal_static_bytes_max": 175000
       },
