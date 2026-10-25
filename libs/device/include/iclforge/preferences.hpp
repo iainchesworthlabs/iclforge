@@ -47,6 +47,7 @@
 #include "iclforge/board_caps.hpp"
 #include "iclforge/dev_view.hpp"
 #include "iclforge/device_name.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/system_actions.hpp"
 
@@ -107,6 +108,11 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kIn
 // When a change takes effect.
 enum class Apply : std::uint8_t { kLive, kNextPlay, kRestart };
 
+// How a screen draws a kChoice's choices. kButtons: side by side, wrapping, with the reasons of the greyed ones in
+// lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to read as
+// buttons (the speaker layouts, whose limits each need a sentence).
+enum class Editor : std::uint8_t { kButtons, kList };
+
 [[nodiscard]] constexpr const char* apply_name(Apply apply) {
     switch (apply) {
         case Apply::kNextPlay:
@@ -149,6 +155,15 @@ class Backend {
     [[nodiscard]] virtual bool set_now_view(nowview::View view) = 0;
     [[nodiscard]] virtual int dim_after_minutes() const = 0;
     [[nodiscard]] virtual bool set_dim_after_minutes(int minutes) = 0;
+
+    // Sound: the speakers this player drives, as the name or the list PUT /layout takes. The setter is that route's
+    // own decision (layout_options.hpp, the same verdict set_value() has already asked), and false when the layout
+    // could not be queued or stored.
+    [[nodiscard]] virtual std::string layout() const = 0;
+    [[nodiscard]] virtual bool set_layout(std::string_view layout) = 0;
+
+    // Whether a stream is playing now: what an entry with a `confirm` asks about before it breaks the playback.
+    [[nodiscard]] virtual bool playing() const = 0;
 
     // Network: which of its networks a board with a cable and Wi-Fi uses, as the word PUT /network-preference takes
     // ("auto", "ethernet", "wifi"). The setter returns at once and the change is made on a task of its own, as
@@ -226,12 +241,20 @@ struct Pref {
     SetFn set = nullptr;
     // Reset preferences (see OnReset).
     OnReset on_reset = OnReset::kUnset;
-    // The step before a change, and, for a change that cannot be undone, the held button after it (the factory reset).
-    ConfirmFn confirm = nullptr;
+    // The step before a change, which is a card of its own (restart, the resets, the switch of network), and, for a
+    // change that cannot be undone, the held button after it (the factory reset). `confirm` below is another thing: a
+    // sentence about what a change costs while a stream plays.
+    ConfirmFn confirm_step = nullptr;
     ConfirmFn then_hold = nullptr;
     // What the button that runs or opens the entry says ("Restart", "View"): an action, an info entry and a list have
     // one. Empty is "Run".
     const char* button = "";
+    // How the screen draws the choices of a kChoice.
+    Editor editor = Editor::kButtons;
+    // What a change costs while a stream plays ("Changing the speakers makes the music drop out for a moment."); the
+    // screen asks "<this> Change to <choice>?" before it applies a change then, and never when nothing plays. Empty:
+    // a change costs nothing and is applied at a tap.
+    const char* confirm = "";
 };
 
 // --- the seed: what exists today ----------------------------------------------------------------------
@@ -307,6 +330,33 @@ inline constexpr std::array<ChoiceDef, 8> kDimAfterChoices{{
     return "Not used by the Dark view: a touch lights it for " + std::to_string(nowview::kDarkAwakeMs / 1000) +
            " seconds, then it is dark again.";
 }
+
+// The speaker layout: one choice for each layout in the catalog (layout_options.hpp), each asking the same verdict
+// the route and the web page ask. A layout with a limit is available and carries its sentence as the note.
+[[nodiscard]] inline Availability layout_needs_sink(const BoardCaps& caps) {
+    return caps.sink.slots_most() > 0 ? Availability::yes()
+                                      : Availability::no("This board has no audio output to set a layout for.");
+}
+
+template <std::size_t I>
+[[nodiscard]] inline Availability layout_choice(const BoardCaps& caps) {
+    const LayoutOption option = evaluate_layout(caps, kLayoutCatalog[I].name, kLayoutCatalog[I].slots);
+    return option.accepted() ? Availability{true, option.reason} : Availability::no(option.reason);
+}
+
+template <std::size_t... I>
+[[nodiscard]] constexpr std::array<ChoiceDef, sizeof...(I)> layout_choices(std::index_sequence<I...>) {
+    return {{{.id = kLayoutCatalog[I].name.data(),
+              .label = kLayoutCatalog[I].name.data(),
+              .availability = &layout_choice<I>}...}};
+}
+
+inline constexpr std::array<ChoiceDef, kLayoutCatalog.size()> kLayoutChoices =
+    layout_choices(std::make_index_sequence<kLayoutCatalog.size()>{});
+
+[[nodiscard]] inline std::string get_layout(const Backend& backend) { return backend.layout(); }
+
+[[nodiscard]] inline bool set_layout(Backend& backend, std::string_view word) { return backend.set_layout(word); }
 
 }  // namespace detail
 
@@ -432,7 +482,7 @@ inline constexpr std::array<ChoiceDef, 3> kNetworkChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 9> kRegistry{{
+inline constexpr std::array<Pref, 10> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -461,6 +511,21 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after,
      .on_reset = OnReset::kReset},
+    {.id = "speaker-layout",
+     .group = Group::kSound,
+     .label = "Speaker layout",
+     .note = "The speakers this player drives, one for each output. Greyed ones are not available on this board.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/layout",
+     .default_word = "2.0",
+     .choices = detail::kLayoutChoices,
+     .availability = &detail::layout_needs_sink,
+     .get = &detail::get_layout,
+     .set = &detail::set_layout,
+     .on_reset = OnReset::kKeep,
+     .editor = Editor::kList,
+     .confirm = "Changing the speakers makes the music drop out for a moment."},
     // --- Network
     // A board with a cable and Wi-Fi uses one of them, or whichever is linked. The control is the developer view's,
     // with its confirming step. Kept by Reset preferences: a reset must not change how the board is joined.
@@ -477,7 +542,7 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_network_preference,
      .set = &detail::set_network_preference,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::network_preference_confirm},
+     .confirm_step = &detail::network_preference_confirm},
     // What servers and the network call this player. Typed on the screen's keyboard. Kept by Reset preferences.
     {.id = "name",
      .group = Group::kNetwork,
@@ -524,7 +589,7 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_nothing,
      .set = &detail::set_restart,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::restart_confirm,
+     .confirm_step = &detail::restart_confirm,
      .button = "Restart"},
     {.id = "reset-preferences",
      .group = Group::kSystem,
@@ -537,7 +602,7 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_nothing,
      .set = &detail::set_reset_preferences,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::reset_preferences_confirm,
+     .confirm_step = &detail::reset_preferences_confirm,
      .button = "Reset"},
     {.id = "factory-reset",
      .group = Group::kSystem,
@@ -550,7 +615,7 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_nothing,
      .set = &detail::set_factory_reset,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::factory_reset_confirm,
+     .confirm_step = &detail::factory_reset_confirm,
      .then_hold = &detail::factory_reset_hold,
      .button = "Erase"},
 }};

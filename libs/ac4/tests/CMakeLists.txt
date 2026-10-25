@@ -75,6 +75,7 @@ if(NOT BUILD_SHARED_LIBS)
         decoder/test_de.cpp
         decoder/test_downmix.cpp
         decoder/test_drc.cpp
+        decoder/test_dynamic_range.cpp
         decoder/test_ehfr.cpp
         decoder/test_hsf.cpp
         decoder/test_immersive.cpp

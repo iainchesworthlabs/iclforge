@@ -156,6 +156,13 @@ struct ControlPairings {
 
 // GET /status's "time" object: what a board that keeps the time says about it, for a page that offers to set the
 // zone and the server and for someone asking why a clock shows nothing.
+// PUT /layout's answer from the owner: whether the layout was taken, and the sentence that goes with it (see
+// ControlHandlers::set_layout). An empty message on a refusal leaves the route's own text.
+struct ControlLayoutAnswer {
+    bool accepted = false;
+    std::string message;
+};
+
 struct ControlTime {
     // The board keeps its time with a time server (PUT /time-sync).
     bool sync = false;
@@ -233,11 +240,14 @@ struct ControlHandlers {
     // POST /volume. False means this sink has nothing to set.
     std::function<bool(float volume)> set_volume;
     std::function<float()> volume;
-    // GET and PUT /layout. set_layout returns false for text that is not a
-    // layout or one the sink cannot carry; the owner applies it at its next
-    // play, and `layout` reports whatever will play next.
+    // GET and PUT /layout. set_layout is the owner's decision on a text: not a layout, or one the board cannot carry
+    // (iclforge/layout_options.hpp, the same verdict GET /layout-options and the Preferences list give), is refused
+    // with the reason in `message`, which the route sends as the body of its 409; an accepted layout may carry a
+    // note in `message` (a limit the layout sits under), which the route appends to its 200. The owner applies an
+    // accepted layout as it can (a stream that plays takes it at its next burst, a play from POST /play at its next
+    // play), and `layout` reports whatever is in force or next.
     std::function<std::string()> layout;
-    std::function<bool(std::string_view text)> set_layout;
+    std::function<ControlLayoutAnswer(std::string_view text)> set_layout;
 
     // GET and PUT /slot-width, in bits. How wide a slot the sink's bus
     // carries is a property of the DACs a board is wired to, so it is a
@@ -295,6 +305,15 @@ struct ControlHandlers {
     std::function<bool(std::string_view view)> set_now_playing;
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
+
+    // GET and PUT /dynamic-range: how much of a Dolby stream's dynamic range the listener wants
+    // (iclforge/base/dynamic_range.hpp, planning/hearth-late-night.md). dynamic_range answers with
+    // the words a PUT takes, "standard" or "late-night"; set_dynamic_range is handed one of them
+    // and stores it, and the decoder follows from the next stream's start. A board that decodes
+    // none of the Dolby codecs leaves both empty, and the routes answer that it has nothing to
+    // choose.
+    std::function<std::string()> dynamic_range;
+    std::function<bool(std::string_view range)> set_dynamic_range;
 
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
     // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps

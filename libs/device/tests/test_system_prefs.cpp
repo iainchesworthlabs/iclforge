@@ -136,9 +136,9 @@ TEST_CASE("the network preference asks first, in the words of the developer view
     facts.wifi.present = facts.wifi.enabled = facts.wifi.link = facts.wifi.configured = true;
     facts.wifi.address = "192.168.1.251";
     const prefs::Pref& pref = *prefs::find("network-preference");
-    REQUIRE(pref.confirm != nullptr);
+    REQUIRE(pref.confirm_step != nullptr);
 
-    const sa::Confirm wifi = pref.confirm(kit, "wifi");
+    const sa::Confirm wifi = pref.confirm_step(kit, "wifi");
     const iclforge::devview::Confirm said = iclforge::devview::confirm_text(facts, iclforge::devview::Preference::wifi);
     REQUIRE(wifi.title == said.headline);
     REQUIRE(wifi.lines.size() == 1);
@@ -150,12 +150,12 @@ TEST_CASE("the network preference asks first, in the words of the developer view
 
     // A switch the board is certain to refuse says so and offers no way on.
     facts.wifi.configured = false;
-    const sa::Confirm blocked = pref.confirm(kit, "wifi");
+    const sa::Confirm blocked = pref.confirm_step(kit, "wifi");
     REQUIRE(blocked.blocked);
     REQUIRE(blocked.tone == iclforge::devview::Tone::attention);
     REQUIRE(contains(blocked.lines[0], "No Wi-Fi network is stored"));
     // A word that is not a preference has no step.
-    REQUIRE(pref.confirm(kit, "cable").title.empty());
+    REQUIRE(pref.confirm_step(kit, "cable").title.empty());
 }
 
 TEST_CASE("a name is held to the rule before the board is asked", "[prefs-system]") {
@@ -247,10 +247,10 @@ TEST_CASE("forgetting a paired server names it, and nothing else forgets", "[pre
 TEST_CASE("Restart asks first, runs through the board and says why it cannot", "[prefs-system]") {
     FakeBackend kit(iclforge::variants::p4_rev3_kit());
     const prefs::Pref& pref = *prefs::find("restart");
-    REQUIRE(pref.confirm != nullptr);
+    REQUIRE(pref.confirm_step != nullptr);
     REQUIRE(pref.then_hold == nullptr);
     kit.situation_.streaming = true;
-    REQUIRE(contains(pref.confirm(kit, "run").lines.back(), "What is playing stops."));
+    REQUIRE(contains(pref.confirm_step(kit, "run").lines.back(), "What is playing stops."));
 
     REQUIRE(resolved(kit, "restart").inert.empty());
     REQUIRE(prefs::set_value(kit, pref, "run").ok);
@@ -270,14 +270,14 @@ TEST_CASE("Restart asks first, runs through the board and says why it cannot", "
 TEST_CASE("Factory reset is two steps, the second a held button, and its first step reads the board", "[prefs-system]") {
     FakeBackend kit(iclforge::variants::p4_rev3_kit());
     const prefs::Pref& pref = *prefs::find("factory-reset");
-    REQUIRE(pref.confirm != nullptr);
+    REQUIRE(pref.confirm_step != nullptr);
     REQUIRE(pref.then_hold != nullptr);
 
     kit.situation_.has_cable = true;
     kit.situation_.cable_link = true;
     kit.situation_.has_wifi = true;
     kit.situation_.paired = 2;
-    const sa::Confirm first = pref.confirm(kit, "run");
+    const sa::Confirm first = pref.confirm_step(kit, "run");
     REQUIRE(first.title == "Erase everything?");
     REQUIRE_FALSE(first.hold);
     REQUIRE(contains(first.lines[0], "its name, its Wi-Fi network and password"));
@@ -286,7 +286,7 @@ TEST_CASE("Factory reset is two steps, the second a held button, and its first s
 
     // No cable plugged in: the same step says the board is stranded, and what brings it back.
     kit.situation_.cable_link = false;
-    const sa::Confirm stranded = pref.confirm(kit, "run");
+    const sa::Confirm stranded = pref.confirm_step(kit, "run");
     REQUIRE(contains(stranded.lines.back(), "improv-wifi.com"));
     REQUIRE(stranded.tone == sa::Tone::attention);
 
@@ -363,7 +363,7 @@ TEST_CASE("the entry for Reset preferences runs the reset and is refused while t
     kit.situation_.update_busy = true;
     REQUIRE(resolved(kit, "reset-preferences").inert == "A firmware update is under way.");
     // And the step before it names what changes on THIS board, from the registry.
-    const sa::Confirm confirm = pref.confirm(kit, "run");
+    const sa::Confirm confirm = pref.confirm_step(kit, "run");
     REQUIRE(contains(confirm.lines[0], "screen without lyrics and dim after"));
     REQUIRE(contains(confirm.lines[1], "name"));
     REQUIRE(contains(confirm.lines[1], "paired servers"));

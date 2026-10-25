@@ -19,8 +19,10 @@
 #include "esp_http_server.h"
 #include "esp_psram.h"
 
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/firmware.hpp"
 #include "iclforge/hardware_info.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/preferences.hpp"
@@ -277,7 +279,7 @@ HardwareFacts gather_hardware_facts(int sink_max_slots, int sink_max_slots_bits)
     // revision_notice_at above: a chip this old can only ever be running a
     // build lenient enough to accept it, so there is no build-flag case
     // where the limit does not apply.
-    facts.revision_hard_limit_below = 300;  // v3.0
+    facts.revision_hard_limit_below = kEsp32p4TdmClockRevision;  // v3.0, which the wide sink reads too
     facts.revision_hard_limit_cost =
         "This chip has no PLL clock source for I2S (hal/i2s_ll.h), and the APLL fallback's own "
         "125 MHz ceiling falls short of what a full-width TDM frame needs: TDM output cannot "
@@ -471,6 +473,8 @@ struct Control::Impl {
                          "POST /volume        body: 0.0 to 1.0\n"
                          "GET  /layout        the output layout\n"
                          "PUT  /layout        body: a name (5.1.4) or a speaker list; next play\n"
+                         "GET  /layout-options  the layouts to choose from, each supported, with limits or "
+                         "unavailable on this board and why, as JSON\n"
                          "GET  /name          this board's name; PUT one to change it\n"
                          "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
                          "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
@@ -479,6 +483,8 @@ struct Control::Impl {
                          "to change it\n"
                          "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
+                         "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is "
+                         "kept; PUT one to change it (from the next stream)\n"
                          "GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; "
                          "change one through its own route\n"
                          "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one\n"
@@ -739,12 +745,52 @@ struct Control::Impl {
         if (!h.set_layout) {
             return send_text(req, "409 Conflict", "this player's layout is fixed\n");
         }
-        if (!h.set_layout(body)) {
-            return send_text(req, "409 Conflict",
-                             "not a layout this player can play: check the name or the list, and "
-                             "that it has no more slots than the sink\n");
+        const ControlLayoutAnswer answer = h.set_layout(body);
+        if (!answer.accepted) {
+            // The reason the board cannot carry it, from the verdict GET /layout-options and the Preferences list
+            // give; the route's own words when the owner has none (text that is not a layout).
+            if (answer.message.empty()) {
+                return send_text(req, "409 Conflict",
+                                 "not a layout this player can play: check the name or the list, and "
+                                 "that it has no more slots than the sink\n");
+            }
+            return send_text(req, "409 Conflict", (answer.message + '\n').c_str());
         }
-        return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        if (answer.message.empty()) {
+            return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        }
+        // Taken, with a limit on it: said, so that a person is not told "ok" about a layout that plays narrower.
+        return send_text(req, "200 OK",
+                         ("ok; takes effect at the next play. Note: " + answer.message + '\n').c_str());
+    }
+
+    // GET /layout-options: every layout the chooser lists, each judged against this board's capabilities
+    // (iclforge/layout_options.hpp, the verdict PUT /layout and the Preferences list ask too). Read-only. Sent
+    // one option at a time: the whole list is some 3 KB, and the server's task has 6 KB of stack and no heap to
+    // spare on a small part.
+    static esp_err_t on_layout_options_get(httpd_req_t* req) {
+        const ControlHandlers& h = self(req)->handlers;
+        if (h.preferences == nullptr || !h.layout) {
+            return send_text(req, "404 Not Found", "this player has no layout to choose\n");
+        }
+        const BoardCaps caps = h.preferences->caps();
+        const std::string head = layout_options_head_json(caps, h.layout());
+        httpd_resp_set_type(req, "application/json");
+        if (httpd_resp_send_chunk(req, head.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        bool first = true;
+        for (const CatalogLayout& entry : kLayoutCatalog) {
+            const std::string item = layout_option_json(evaluate_layout(caps, entry.name, entry.slots), first);
+            if (httpd_resp_send_chunk(req, item.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+                return ESP_FAIL;
+            }
+            first = false;
+        }
+        if (httpd_resp_send_chunk(req, "]}\n", HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        return httpd_resp_send_chunk(req, nullptr, 0);
     }
 
     static esp_err_t on_name_get(httpd_req_t* req) {
@@ -897,6 +943,35 @@ struct Control::Impl {
                              "that view is not in this build, or the setting could not be stored\n");
         }
         return send_text(req, "200 OK", "ok; the screen follows at once\n");
+    }
+
+    static esp_err_t on_dynamic_range_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.dynamic_range) {
+            return send_text(req, "404 Not Found", "this board decodes no Dolby stream, so it has no dynamic range to choose\n");
+        }
+        std::string text = h.dynamic_range();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_dynamic_range_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::string body = read_body(req);
+        const std::optional<base::DynamicRange> range = base::parse_dynamic_range(body);
+        if (!range) {
+            return send_text(req, "400 Bad Request", "PUT /dynamic-range wants standard or late-night\n");
+        }
+        if (!h.set_dynamic_range) {
+            return send_text(req, "409 Conflict", "this board decodes no Dolby stream, so it has no dynamic range to choose\n");
+        }
+        if (!h.set_dynamic_range(base::dynamic_range_name(*range))) {
+            return send_text(req, "409 Conflict", "that setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect from the next stream\n");
     }
 
     static esp_err_t on_dim_after_get(httpd_req_t* req) {
@@ -1263,6 +1338,7 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/volume", .method = HTTP_POST, .handler = &Impl::on_volume},
         {.uri = "/layout", .method = HTTP_GET, .handler = &Impl::on_layout_get},
         {.uri = "/layout", .method = HTTP_PUT, .handler = &Impl::on_layout_put},
+        {.uri = "/layout-options", .method = HTTP_GET, .handler = &Impl::on_layout_options_get},
         {.uri = "/slot-width", .method = HTTP_GET, .handler = &Impl::on_slot_width_get},
         {.uri = "/slot-width", .method = HTTP_PUT, .handler = &Impl::on_slot_width_put},
         {.uri = "/name", .method = HTTP_GET, .handler = &Impl::on_name_get},
@@ -1276,6 +1352,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
+        {.uri = "/dynamic-range", .method = HTTP_GET, .handler = &Impl::on_dynamic_range_get},
+        {.uri = "/dynamic-range", .method = HTTP_PUT, .handler = &Impl::on_dynamic_range_put},
         {.uri = "/preferences", .method = HTTP_GET, .handler = &Impl::on_preferences_get},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
         {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},

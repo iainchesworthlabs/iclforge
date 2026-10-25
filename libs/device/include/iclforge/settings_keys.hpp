@@ -45,6 +45,7 @@ inline constexpr const char* kTimeZone = "time_zone";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
+inline constexpr const char* kDynamicRange = "dyn_range";
 
 // The longest an NVS key may be.
 inline constexpr std::size_t kMaxKeyChars = 15;
@@ -84,6 +85,7 @@ inline constexpr std::array kKeys = {
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
+    Key{kDynamicRange, Kind::preference, "late-night mode"},
 };
 
 [[nodiscard]] constexpr bool is_preference(Kind kind) { return kind == Kind::preference; }

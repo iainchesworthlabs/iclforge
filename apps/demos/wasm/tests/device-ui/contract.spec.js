@@ -140,6 +140,7 @@ test('every request the page makes is to a route the firmware registers', () => 
     expect(made.sort((a, b) => a.localeCompare(b))).toEqual([
         'GET /firmware',
         'GET /hardware',
+        'GET /layout-options',
         'GET /pairing',
         'GET /status',
         'POST /pairing',
@@ -298,6 +299,38 @@ test("the stand-in writes GET /hardware's keys in the firmware's order", async (
     try {
         const body = JSON.parse(await (await fetch(`${stub.url}hardware`)).text());
         expect(Object.keys(body)).toEqual(firmware);
+    } finally {
+        await stub.close();
+    }
+});
+
+test("the stand-in writes GET /layout-options' keys in the firmware's order", async () => {
+    // layout_options.hpp writes the board's line (layout_options_head_json) and then each layout's
+    // (layout_option_json), and control.cpp sends them; a layout the sink cannot carry has a reason, which a
+    // supported one leaves out. The keys in the order the source writes them, a key written twice (a true and a
+    // false) once.
+    const LAYOUT_OPTIONS = fs.readFileSync(path.join(LIBS_DEVICE, 'layout_options.hpp'), 'utf8');
+    const keys = (from, to) => {
+        const found = [...LAYOUT_OPTIONS.slice(LAYOUT_OPTIONS.indexOf(from), LAYOUT_OPTIONS.indexOf(to)).matchAll(/\\"([a-z_]+)\\":/g)].map(
+            (m) => m[1],
+        );
+        return found.filter((key, at) => found.indexOf(key) === at);
+    };
+    const firmware = [
+        ...keys('layout_options_head_json(const BoardCaps', 'layout_option_json(const LayoutOption'),
+        ...keys('layout_option_json(const LayoutOption', 'layout_options_json(const BoardCaps'),
+    ];
+    // The head's last key opens the list; the stand-in's options array is that key.
+    expect(firmware.length).toBeGreaterThan(8);
+    expect(CONTROL).toContain('layout_options_head_json(caps, h.layout())');
+    const stub = await startStub();
+    try {
+        const body = JSON.parse(await (await fetch(`${stub.url}layout-options`)).text());
+        const { options, ...head } = body;
+        const refused = options.find((o) => o.reason);
+        expect(refused, 'the stand-in lists a layout the sink cannot carry').toBeDefined();
+        expect([...Object.keys(head), 'options', ...Object.keys(refused)]).toEqual(firmware);
+        expect(options.find((o) => !o.reason)).not.toHaveProperty('reason');
     } finally {
         await stub.close();
     }
@@ -567,6 +600,39 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
         expect(reply.status).toBe(200);
         expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('30\n');
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /dynamic-range as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board that decodes no Dolby stream has nothing to choose.
+        stub.device.dynamicRange = null;
+        let reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        // One that does starts on standard and takes the two words, with or without a line ending.
+        stub.device.dynamicRange = 'standard';
+        reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('standard\n');
+        for (const bad of ['late night', 'Late-night', 'wide', '']) {
+            reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.dynamicRangeBad);
+        }
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.dynamicRangeOk);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('late-night\n');
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'standard' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('standard\n');
     } finally {
         await stub.close();
     }

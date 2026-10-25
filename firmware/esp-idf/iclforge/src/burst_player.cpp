@@ -31,6 +31,7 @@
 #include "ac4_stream.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
@@ -176,7 +177,10 @@ class TimedSink final : public PlayoutSink {
 struct BurstPlayer::Impl {
     Impl(const BurstPlayerConfig& cfg, ScheduledSink& snk)
         : config(cfg), sink(snk), timed(snk), layout(cfg.layout), renderer(cfg.layout, cfg.sample_rate),
-          tone(cfg.sample_rate) {}
+          tone(cfg.sample_rate) {
+        applied_range = cfg.dynamic_range;
+        wanted_range.store(static_cast<std::uint8_t>(cfg.dynamic_range));
+    }
 
     BurstPlayerConfig config;
     ScheduledSink& sink;
@@ -265,7 +269,15 @@ struct BurstPlayer::Impl {
 
     OutputLayout layout;
     iclforge::ac3::render::Serving serving;
+    // The decoder settings as the board and the server left them (the server's replace the board's
+    // whole), and what the decoders are made with: those, served for the layout, and the listener's
+    // dynamic range over them (rebuild_decoder_config).
+    iclforge::ac3::DecoderConfig decoder_base;
     iclforge::ac3::DecoderConfig decoder_config;
+    // The dynamic range the decoders were made for, and the one the listener last chose: the
+    // decoders are made again, at a stream's start, when the two differ.
+    iclforge::base::DynamicRange applied_range = iclforge::base::kDefaultDynamicRange;
+    std::atomic<std::uint8_t> wanted_range{static_cast<std::uint8_t>(iclforge::base::kDefaultDynamicRange)};
     LayoutRenderer renderer;
     Routing routing;
     TrimDelay trim_delay;
@@ -301,6 +313,11 @@ struct BurstPlayer::Impl {
     // else: a burst's blocks have no source of this kind.
     const PcmLevel* source_levels = nullptr;
     std::size_t source_channels = 0;
+    // The output each source channel's level is for, or -1 where the level is not the output's own: the
+    // slot the renderer puts the channel on, and the output that slot is patched to (play_pcm()). A channel
+    // is not on the output of its own number: a stereo bed in a 5.1 room puts R on slot 2, which is C's
+    // number in the room's order.
+    std::array<int, 2> source_outputs{-1, -1};
     unsigned source_bits = 16;
 
     // The meter.
@@ -403,9 +420,8 @@ struct BurstPlayer::Impl {
         layout = new_layout;
         serving = iclforge::ac3::render::serve(layout, fold, objects);
         objects_always = objects == iclforge::ac3::render::ObjectsPolicy::kAlways;
-        decoder_config = decoder;
-        iclforge::ac3::render::configure_decoder(serving, decoder_config);
-        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        decoder_base = decoder;
+        rebuild_decoder_config();
         renderer = LayoutRenderer{layout, config.sample_rate, crossover_hz};
         renderer_bed.reset();
         if (new_routing) {
@@ -423,6 +439,28 @@ struct BurstPlayer::Impl {
         drop_decoders();  // made with the settings these are
         open_outputs(false);
         reset_decoding();
+    }
+
+    // The configuration the AC-3 and E-AC-3 decoders are made with: the board's and the server's
+    // settings, the layout's serving, and the listener's dynamic range over all of it.
+    void rebuild_decoder_config() {
+        decoder_config = decoder_base;
+        iclforge::ac3::render::configure_decoder(serving, decoder_config);
+        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        iclforge::ac3::apply_dynamic_range(applied_range, decoder_config);
+    }
+
+    // The listener's latest choice, taken up at a stream's start: the decoders made for the one
+    // before are let go, and made again (AC-4's with the new range in its config) by the stream.
+    void take_up_dynamic_range() {
+        const auto wanted = static_cast<iclforge::base::DynamicRange>(wanted_range.load());
+        if (wanted == applied_range) {
+            return;
+        }
+        applied_range = wanted;
+        rebuild_decoder_config();
+        drop_decoders();
+        std::printf("burst player: dynamic range %s\n", iclforge::base::dynamic_range_name(applied_range).data());
     }
 
     // The decoders given back, for a change of the configuration they were made with.
@@ -626,6 +664,7 @@ struct BurstPlayer::Impl {
     }
 
     void new_stream(Stream kind) {
+        take_up_dynamic_range();
         reset_decoding();
         stream = kind;
         have_origin = false;
@@ -992,27 +1031,27 @@ struct BurstPlayer::Impl {
     }
 
     // The block's levels from the integers its PCM source was unpacked from (play_pcm()), where the
-    // outputs carry that source and nothing else: unity gain, every source channel on the output of
-    // its own number, no trim or delay, no identify tone (and, which the caller checks, no gain
-    // applied to the block). The same peak and mean square the floats would give, without a
+    // outputs carry that source and nothing else: unity gain, every source channel on one output
+    // (source_outputs, which is where the renderer and the patch put it, not the channel's number), no
+    // trim or delay, no identify tone (and, which the caller checks, no gain applied to the block). The same peak and mean square the floats would give, without a
     // soft-float operation a sample. False when any of that does not hold, and the caller measures
     // the floats.
     [[nodiscard]] bool meter_from_source(std::size_t n) {
-        if (source_levels == nullptr || identifying || !trim_neutral ||
-            source_channels > outputs_open) {
+        if (source_levels == nullptr || identifying || !trim_neutral) {
             return false;
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            if (routing.output_of(c) != static_cast<int>(c)) {
+            if (source_outputs[c] < 0) {
                 return false;
             }
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            window_peak[c] =
-                std::max(window_peak[c], pcm_level_peak(source_levels[c], source_bits));
+            const std::size_t o = static_cast<std::size_t>(source_outputs[c]);
+            window_peak[o] =
+                std::max(window_peak[o], pcm_level_peak(source_levels[c], source_bits));
             const double sum = pcm_level_square_sum(source_levels[c], source_bits);
-            window_sum[c] += sum;
-            stream_sum[c] += sum;
+            window_sum[o] += sum;
+            stream_sum[o] += sum;
         }
         meter_commit(n);
         return true;
@@ -1192,7 +1231,8 @@ struct BurstPlayer::Impl {
                        .executor = lane.has_value() ? &*lane : nullptr,
                        .max_channels = config.max_ac4_channels,
                        .sample_rate_hz = config.sample_rate,
-                       .max_frame_rate = config.max_ac4_frame_rate})) {
+                       .max_frame_rate = config.max_ac4_frame_rate,
+                       .dynamic_range = applied_range})) {
             return true;
         }
         ac4_failed = true;
@@ -1510,12 +1550,30 @@ struct BurstPlayer::Impl {
                 source_levels = levels.data();
                 source_channels = channels;
                 source_bits = width == 2 ? 16U : 24U;
+                for (std::size_t c = 0; c < source_outputs.size(); ++c) {
+                    source_outputs[c] = c < channels ? output_of_slot_only(serving.fold ? renderer.folded_slot(c, channels)
+                                                                                     : renderer.unity_slot(c))
+                                                     : -1;
+                }
             }
             emit(n, reached);
             source_levels = nullptr;
             done += n;
         }
         count_time(started);
+    }
+
+    // The output a slot is patched to, when the slot's samples are all that output carries; else -1.
+    [[nodiscard]] int output_of_slot_only(int slot) const {
+        if (slot < 0) {
+            return -1;
+        }
+        const int output = routing.output_of(static_cast<std::size_t>(slot));
+        if (output < 0 || static_cast<std::size_t>(output) >= outputs_open ||
+            routing.channel_of(static_cast<std::size_t>(output)) != slot) {
+            return -1;
+        }
+        return output;
     }
 
     // The identify tone with nothing playing: blocks of it straight to the
@@ -1930,6 +1988,10 @@ bool BurstPlayer::set_layout(const OutputLayout& layout) {
     impl_->config.layout = layout;
     impl_->pending_layout = layout;
     return true;
+}
+
+void BurstPlayer::set_dynamic_range(iclforge::base::DynamicRange range) {
+    impl_->wanted_range.store(static_cast<std::uint8_t>(range));
 }
 
 void BurstPlayer::identify(std::optional<ac::Identify> tone) {

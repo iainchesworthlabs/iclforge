@@ -818,8 +818,8 @@ void editors_open(const prefs::Pref& pref, const std::string& word) {
         case prefs::Kind::kStepper:
         case prefs::Kind::kToggle:
         case prefs::Kind::kAction:
-            if (pref.confirm != nullptr) {
-                open_dialog(pref, word, pref.confirm(preferences_backend(), word), State::Then::kSet);
+            if (pref.confirm_step != nullptr) {
+                open_dialog(pref, word, pref.confirm_step(preferences_backend(), word), State::Then::kSet);
             }
             break;
     }

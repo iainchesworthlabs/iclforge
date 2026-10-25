@@ -1,0 +1,8 @@
+# The firmware update index's signing tool (tools/hearth/sign_index.py, planning/esp32-ota.md, O10)
+# and its tests: it opens a PKCS#12 file and signs with the leaf's key. Verifying a signed index
+# (tools/hearth/index_verify.py) needs nothing and is not here.
+#
+# The workflow that signs in CI installs the pip-compile --generate-hashes lock of this file
+# (requirements-firmware-sign.txt, made with the workflow in the slice that adds it), the way the
+# other jobs install theirs, so the one job that holds a signing key runs a locked, hashed package.
+cryptography
