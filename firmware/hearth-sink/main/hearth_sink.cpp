@@ -73,6 +73,7 @@
 #include "network.hpp"
 #include "provision.hpp"
 #include "panel/panel.hpp"
+#include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
 #include "system_control.hpp"
@@ -750,27 +751,17 @@ iclforge::ControlHandlers control_handlers() {
     if (player::panel_built()) {
         h.now_playing = []() { return std::string(iclforge::nowview::view_name(player::settings().now_view)); };
         h.set_now_playing = [](std::string_view word) {
+            // The preferences' backend refuses a view this build cannot draw, stores the rest and has the screen follow.
             const auto view = iclforge::nowview::parse_view(word);
-            // A view this build cannot draw is refused, and not stored for a later image to find.
-            if (!view || !player::panel_has_view(*view) || !player::settings_set_now_view(*view)) {
-                return false;
-            }
-            player::panel_set_view(*view);
-            return true;
+            return view.has_value() && player::preferences().set_now_view(*view);
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
-        h.set_dim_after = [](int minutes) {
-            if (!player::settings_set_dim_after(minutes)) {
-                return false;
-            }
-            player::panel_set_dim_after(minutes);
-            return true;
-        };
+        h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
         // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
         // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
         h.brightness = []() { return player::settings().brightness_percent; };
         h.set_brightness = [](int percent) {
-            if (!player::panel_stats().dimmable || !player::settings_set_brightness(percent)) {
+            if (!player::panel_display_caps().backlight || !player::settings_set_brightness(percent)) {
                 return false;
             }
             player::panel_set_brightness(percent);
@@ -888,6 +879,7 @@ iclforge::ControlHandlers control_handlers() {
         h.pairings = []() { return player::sendspin_pairings(); };
         h.forget_server = [](std::string_view server_id) { return player::sendspin_forget_server(server_id); };
     }
+    h.preferences = &player::preferences();
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;

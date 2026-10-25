@@ -18,6 +18,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "esp_app_desc.h"
@@ -37,6 +38,7 @@
 #include "iclforge/render/room_plan.hpp"
 
 #include "../../network.hpp"
+#include "../../preferences.hpp"
 #include "../../sendspin.hpp"
 #include "../../settings.hpp"
 #include "../../wall_clock.hpp"
@@ -271,17 +273,7 @@ void set_backlight(int percent) {
 
 int backlight_lit_percent() { return effective_backlight(kBacklightNormalPercent); }
 
-void choose_now_view(iclforge::nowview::View view) {
-    // A tap is followed even where the store is refused (the console says so): the screen does what it
-    // was told until the next boot.
-    (void)settings_set_now_view(view);
-    g_now_view.store(static_cast<int>(view));
-}
-
-void choose_dim_after(int minutes) {
-    (void)settings_set_dim_after(minutes);
-    g_dim_after_minutes.store(minutes);
-}
+iclforge::prefs::Backend& preferences_backend() { return player::preferences(); }
 
 std::int64_t time_us() { return esp_timer_get_time(); }
 
@@ -305,6 +297,8 @@ std::mutex g_lock;
 panel::Display g_display;
 PanelStats g_stats;
 std::atomic<bool> g_started{false};
+// The display is open and the screen is built on it: g_display is read-only from here on.
+std::atomic<bool> g_display_ready{false};
 std::int64_t g_refresh_started_us = 0;
 std::uint64_t g_render_total_us = 0;
 TaskHandle_t g_task = nullptr;
@@ -374,6 +368,9 @@ void run(void* /*arg*/) {
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
+            g_stats.prefs_view = screen.prefs_view;
+            g_stats.prefs_builds = screen.prefs_builds;
+            g_stats.prefs_build_us_max = screen.prefs_build_us_max;
             g_stats.dev_refreshes = screen.dev_refreshes;
             g_stats.dev_refresh_us_last = screen.dev_refresh_us_last;
             g_stats.dev_refresh_us_max = screen.dev_refresh_us_max;
@@ -433,12 +430,12 @@ void run(void* /*arg*/) {
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
     const WallClockStats clock = wall_clock_stats();
-    char buffer[1536];
+    char buffer[1792];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
-                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"dev_refreshes\":%lu,"
+                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"prefs_view\":%s,\"prefs_builds\":%lu,\"prefs_build_us_max\":%lu,\"dev_refreshes\":%lu,"
                   "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,"
                   "\"clock_enabled\":%s,\"clock_asking\":%s,\"clock_synced\":%s,\"clock_syncs\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
@@ -452,6 +449,9 @@ void run(void* /*arg*/) {
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
                   iclforge::nowview::view_name(static_cast<iclforge::nowview::View>(g_now_view.load())),
                   stats.dimmed ? "true" : "false", stats.backlight, stats.dev_view ? "true" : "false",
+                  stats.prefs_view ? "true" : "false",
+                  static_cast<unsigned long>(stats.prefs_builds),
+                  static_cast<unsigned long>(stats.prefs_build_us_max),
                   static_cast<unsigned long>(stats.dev_refreshes),
                   static_cast<unsigned long>(stats.dev_refresh_us_last),
                   static_cast<unsigned long>(stats.dev_refresh_us_max), clock.enabled ? "true" : "false",
@@ -647,6 +647,20 @@ bool panel_built() { return true; }
 
 bool panel_has_view(iclforge::nowview::View view) { return panel::now_view_drawn(view); }
 
+iclforge::DisplayCaps panel_display_caps() {
+    iclforge::DisplayCaps caps;
+    if (!g_display_ready.load()) {
+        return caps;
+    }
+    const std::string_view kind = g_display.kind;
+    caps.kind = kind == "dsi" ? iclforge::DisplayKind::kDsi : iclforge::DisplayKind::kFrameBuffer;
+    caps.width = g_display.width;
+    caps.height = g_display.height;
+    caps.touch = g_display.touch;
+    caps.backlight = g_display.backlight;
+    return caps;
+}
+
 void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
@@ -690,11 +704,11 @@ bool panel_start() {
         return false;
     }
 
+    g_display_ready.store(true);
     g_stats.kind = g_display.kind;
     g_stats.width = g_display.width;
     g_stats.height = g_display.height;
     g_stats.touch = g_display.touch;
-    g_stats.dimmable = g_display.backlight;
     g_stats.screen = "idle";
 
     // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point.

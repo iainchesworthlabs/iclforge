@@ -17,6 +17,11 @@
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
     | 4 | **Preferences** the owner picked on 2026-10-25: brightness, the clock's 12 or 24 hours, a night schedule, a time-zone picker | Brightness, the clock's format and the zone table are built (settings, routes, the screen, the web page); the night schedule's rule is built and host-tested, and its setting, routes and use by the screen, and the editors, follow the Preferences screen: [Stage 4](#stage-4-display-and-time-preferences) |
 
+    **2026-10-25: the view and the dim time moved out of Adjust.** The owner asked for Adjust to be only
+    adjustments and for a **Preferences** sheet beside it for what is chosen once. Where this page says "the
+    Adjust sheet" for the view, the dim time, the third row or the 352 px, it describes what was built
+    on 2026-10-21; [Preferences](#preferences-2026-10-25) says what replaced it.
+
 ## What the board knows while a song plays
 
 Read from the code, 2026-10-20; the levels and the layout are the Sendspin player's own status
@@ -110,8 +115,8 @@ followed at once when they change, with no restart:
 
 Both are in the control surface's route list (`GET /api`) on a board that has a panel and answer 404
 on one that has none. A stored number this build does not know (a partition written by a later
-image) is said on the console and the default stands. The sheet's buttons make the same change and
-store it, and the sheet shows what the routes set.
+image) is said on the console and the default stands. The Preferences sheet's controls make the same change and
+store it (through the same code: `iclforge::prefs::Backend`), and show what the routes set.
 
 **The speakers view.** The layout in force, from above, front at the top, left on the left
 (`libs/render/include/iclforge/render/room_plan.hpp`, 14 host test cases): ear-level speakers are
@@ -143,7 +148,7 @@ layout text changes.
 
 ![The speakers in a 5.1 room](../docs/hearth/screenshots/p4-panel-speakers-5-1.png)
 ![The speakers in a 7.1.4 room](../docs/hearth/screenshots/p4-panel-speakers-7-1-4.png)
-![The Adjust sheet with its third row](../docs/hearth/screenshots/p4-panel-controls.png)
+![Preferences, where the view and the dim time are now (they were Adjust's third row)](../docs/hearth/screenshots/p4-panel-prefs.png)
 ![The dark screen](../docs/hearth/screenshots/p4-panel-dimmed.png)
 
 ## The dark view
@@ -181,7 +186,7 @@ rule checked against `dimmed()` on every input it takes); the real screen code i
 which fails its run if the screen is not dark at the start, is not lit by a touch, is not lit at 28 s,
 is not dark at 32 s, or a second touch does not move it on (all pass); and a picture of the sheet:
 
-![The Adjust sheet with Dark chosen](../docs/hearth/screenshots/p4-panel-controls-dark.png)
+![Preferences with Dark chosen: the dim row says it is not used](../docs/hearth/screenshots/p4-panel-prefs-dark.png)
 
 **On the kit (2026-10-21, over the cable, the bench lock held).** The image of this change (`p4-rev3`,
 profile hash `ff9b27a6c4fd`, 2,562,880 bytes) was sent with `ota.py push` and accepted on its 30 s
@@ -327,7 +332,7 @@ level for the first, **the dim floor (4%) under it, never above it** for the sec
 (`iclforge::nowview::backlight_percent`, host-tested for every level from 10 to 100): a screen set as low as
 the floor does not light up when it dims. The developer view still forces the screen lit, at the person's level.
 A glass with no backlight to dim (the frame buffer a board with no panel runs) has no brightness: `PUT` is a
-409 and `PanelStats::dimmable` is false, which is what the Preferences entry reads to grey itself with the
+409 and `DisplayCaps::backlight` is false, which is what the Preferences entry reads to grey itself with the
 reason.
 
 **The clock's format.** `GET` and `PUT /clock-format` take `24`, `12`, `24 seconds` or `12 seconds` (stored as one
@@ -414,6 +419,41 @@ Nothing has been run on the kit.
   sends this role has been read from aiosendspin's source and not seen on the board. When it connects and plays,
   `python tools/hearth/bench.py log P4X` shows each object as *sendspin: metadata (whole state): ...* with how
   far ahead it was stamped.
+
+## Preferences (2026-10-25)
+
+The owner, 2026-10-25: *"There is a screen with an Adjust button, and the Adjust sheet holds: what the screen does for a
+song with no lyrics, dim after, text size, lyric delay. ... the adjustment screen should just be for adjustments, and
+there should be a **Preferences** button as well."* And: *"It is not just for the P4X ... If it were a C3 or an S3 with a
+screen, Preferences should still work ... a generic product base that different hardware versions then run with
+different supported configurations."*
+
+**What was built** (the foundation; [docs/hearth/sink-esp32-p4.md](../docs/hearth/sink-esp32-p4.md#adjust-and-preferences)
+has the pictures and the sizes):
+
+- **Adjust** keeps the lyric delay and the text size: 250 px tall (it was 352), put away after eight seconds untouched.
+- **Preferences**, a button beside Adjust in the footer: a full-screen scrollable list, grouped Display, Sound,
+  Network, Time, Updates and System, drawn from a registry. *What the screen shows for a song with no lyrics* (the
+  five views of this page) and *Dim after* (a stepper: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never) are in it; the dim
+  time is greyed, with a sentence, while Dark is chosen.
+- **A capability description** (`iclforge::BoardCaps`, `libs/device`), filled once at boot from the build and the
+  hardware, and **availability** per preference and per choice against it. A choice the board cannot make is shown
+  greyed with its reason (a screen with no touch cannot offer Dark or a dim time; a board that keeps no time cannot
+  offer the clock); `board_variants.hpp` has every board the product knows, plus an S3 and a C3 with a 320 by 240 panel
+  and no touch, and the host tests walk each entry against each.
+- **`GET /preferences`**, read-only, on every board: the same registry as JSON, which the web page will draw from.
+- **Sizes from the display**, not 1024 by 600: `screen_metrics.hpp`, a 48 px fingertip floor, and a preview that draws
+  and checks both sheets at four sizes.
+
+**Decided without asking** (the owner can say otherwise): Preferences is a full sheet and not a half one (a list of
+many entries needs the room, and Adjust stays the small one); it puts itself away after a minute, not eight seconds (a
+list is read, and Adjust is a tweak); Adjust stays at the right of the footer, where tools tap it, with Preferences to
+its left; the dim time is a stepper over a few stops, and a number a `PUT` stored that is not a stop is shown as it is
+("7 min"); the dim time is greyed and not hidden while Dark is chosen.
+
+**Not built:** the other preferences (the speaker layout, the speakers' style, brightness, the clock's format, the
+network choice, updates: other sessions of the same programme, plugging into this registry), a display backend for a
+chip other than the P4, and a measurement of what Preferences costs on the kit (see the docs page).
 
 ## On the kit
 

@@ -516,6 +516,8 @@ int sink_max_slots_bit_width() { return 16; }
 
 bool sink_second_line_possible() { return kSecondController; }
 
+int sink_frame_bit_max() { return I2S_LL_SLOT_FRAME_BIT_MAX; }
+
 int sink_slot_bits() { return g_slot_bits; }
 
 bool sink_set_slot_bits(int bits) {

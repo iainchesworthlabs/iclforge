@@ -17,10 +17,12 @@
 
 #include "lvgl.h"
 
+#include "iclforge/board_variants.hpp"
 #include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/preferences.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
 #include "iclforge/title_card.hpp"
@@ -30,14 +32,18 @@
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
 #include "panel/lvgl/now_screen.hpp"
+#include "panel/lvgl/prefs_screen.hpp"
 #include "panel/lyrics_reader.hpp"
 
 namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kWidth = 1024;
-constexpr int kHeight = 600;
+// The display the screen is drawn on: the kit's 1024 by 600 for the screens of planning/karaoke-p4x-panel.md, and
+// then each size the Adjust and Preferences sheets are checked at (open_display()).
+int g_width = 1024;
+int g_height = 600;
+constexpr int kMaxWidth = 1024;
 constexpr int kBufferRows = 40;
 
 // --- the preview's player: one document, one position, one clock.
@@ -64,7 +70,12 @@ iclforge::wallclock::Reading g_wall;
 std::uint64_t g_flushed_pixels = 0;
 std::uint32_t g_flushed_areas = 0;
 
-std::vector<std::uint16_t> g_frame(static_cast<std::size_t>(kWidth) * kHeight, 0);
+std::vector<std::uint16_t> g_frame;
+lv_indev_t* g_pointer_device = nullptr;
+std::uint16_t g_buffer_a[kMaxWidth * kBufferRows];
+std::uint16_t g_buffer_b[kMaxWidth * kBufferRows];
+// The board the preferences are drawn for (iclforge/board_variants.hpp): the kit, until a scenario says another.
+iclforge::BoardCaps g_caps = iclforge::variants::p4_rev3_kit();
 
 struct Pointer {
     int x = 0;
@@ -98,7 +109,7 @@ void flush(lv_display_t* disp, const lv_area_t* area, std::uint8_t* px_map) {
     ++g_flushed_areas;
     const auto* src = reinterpret_cast<const std::uint16_t*>(px_map);
     for (int y = area->y1; y <= area->y2; ++y) {
-        std::copy(src, src + width, g_frame.begin() + static_cast<std::ptrdiff_t>(y) * kWidth + area->x1);
+        std::copy(src, src + width, g_frame.begin() + static_cast<std::ptrdiff_t>(y) * g_width + area->x1);
         src += width;
     }
     lv_display_flush_ready(disp);
@@ -112,8 +123,8 @@ void read_pointer(lv_indev_t*, lv_indev_data_t* data) {
 
 // One 24-bit BMP, bottom row first.
 void write_bmp(const fs::path& path) {
-    const std::size_t row_bytes = (static_cast<std::size_t>(kWidth) * 3 + 3) / 4 * 4;
-    const std::size_t image = row_bytes * kHeight;
+    const std::size_t row_bytes = (static_cast<std::size_t>(g_width) * 3 + 3) / 4 * 4;
+    const std::size_t image = row_bytes * g_height;
     std::vector<std::uint8_t> out(54 + image, 0);
     const auto put = [&](std::size_t at, std::uint32_t value) {
         for (int i = 0; i < 4; ++i) {
@@ -125,15 +136,15 @@ void write_bmp(const fs::path& path) {
     put(2, static_cast<std::uint32_t>(out.size()));
     put(10, 54);
     put(14, 40);
-    put(18, kWidth);
-    put(22, kHeight);
+    put(18, g_width);
+    put(22, g_height);
     out[26] = 1;
     out[28] = 24;
     put(34, static_cast<std::uint32_t>(image));
-    for (int y = 0; y < kHeight; ++y) {
-        std::uint8_t* row = out.data() + 54 + static_cast<std::size_t>(kHeight - 1 - y) * row_bytes;
-        for (int x = 0; x < kWidth; ++x) {
-            const std::uint16_t p = g_frame[static_cast<std::size_t>(y) * kWidth + x];
+    for (int y = 0; y < g_height; ++y) {
+        std::uint8_t* row = out.data() + 54 + static_cast<std::size_t>(g_height - 1 - y) * row_bytes;
+        for (int x = 0; x < g_width; ++x) {
+            const std::uint16_t p = g_frame[static_cast<std::size_t>(y) * g_width + x];
             const std::uint8_t r5 = (p >> 11) & 0x1F;
             const std::uint8_t g6 = (p >> 5) & 0x3F;
             const std::uint8_t b5 = p & 0x1F;
@@ -172,6 +183,208 @@ void tap(int x, int y) {
     pump(4);
     g_pointer.down = false;
     pump(4);
+}
+
+// A finger dragged from one height to another along a column, as a person scrolls a list.
+void drag(int x, int y_from, int y_to) {
+    g_pointer = {x, y_from, true};
+    pump(2);
+    constexpr int kSteps = 8;
+    for (int i = 1; i <= kSteps; ++i) {
+        g_pointer.y = y_from + (y_to - y_from) * i / kSteps;
+        pump(1);
+    }
+    g_pointer.down = false;
+    // Long enough for the list's throw and its elastic edge to come to rest.
+    pump(45);
+}
+
+// The display, at a size: a frame to flush into, and the pointer attached to it. The one before it, if there is one,
+// is deleted with the screen that was built on it.
+lv_display_t* open_display(int width, int height, lv_display_t* previous) {
+    g_width = width;
+    g_height = height;
+    g_frame.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
+    lv_display_t* const disp = lv_display_create(width, height);
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(disp, g_buffer_a, g_buffer_b, sizeof g_buffer_a, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(disp, &flush);
+    lv_display_set_default(disp);
+    lv_indev_set_display(g_pointer_device, disp);
+    if (previous != nullptr) {
+        lv_display_delete(previous);
+    }
+    return disp;
+}
+
+// --- finding things on the screen the way a person does: by what they say ---------------------------------------
+
+void collect_touch_targets(lv_obj_t* object, std::vector<lv_obj_t*>& out) {
+    if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+    if (lv_obj_has_flag(object, player::panel::kTouchTargetFlag)) {
+        out.push_back(object);
+    }
+    const std::uint32_t count = lv_obj_get_child_count(object);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        collect_touch_targets(lv_obj_get_child(object, static_cast<std::int32_t>(i)), out);
+    }
+}
+
+std::string label_text(lv_obj_t* object) {
+    return object != nullptr && lv_obj_check_type(object, &lv_label_class) ? std::string(lv_label_get_text(object))
+                                                                           : std::string();
+}
+
+// What a button says: its label.
+std::string button_text(lv_obj_t* button) { return label_text(lv_obj_get_child(button, 0)); }
+
+lv_obj_t* find_button(const std::string& text) {
+    std::vector<lv_obj_t*> targets;
+    collect_touch_targets(lv_screen_active(), targets);
+    for (lv_obj_t* const target : targets) {
+        if (button_text(target) == text) {
+            return target;
+        }
+    }
+    return nullptr;
+}
+
+// Whether a label under `object` that is shown says `text` (or, with `contains`, has it in what it says).
+bool shows_text(lv_obj_t* object, const std::string& text, bool contains = false) {
+    if (object == nullptr || lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) {
+        return false;
+    }
+    const std::string said = label_text(object);
+    if (!said.empty() && (contains ? said.find(text) != std::string::npos : said == text)) {
+        return true;
+    }
+    const std::uint32_t count = lv_obj_get_child_count(object);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        if (shows_text(lv_obj_get_child(object, static_cast<std::int32_t>(i)), text, contains)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// A tap on the middle of the button that says `text`, scrolled into view first if it is on a list.
+bool tap_button(const std::string& text) {
+    lv_obj_t* const button = find_button(text);
+    if (button == nullptr) {
+        std::printf("  no button \"%s\" is shown\n", text.c_str());
+        return false;
+    }
+    lv_obj_scroll_to_view_recursive(button, LV_ANIM_OFF);
+    lv_obj_update_layout(button);
+    lv_area_t area;
+    lv_obj_get_coords(button, &area);
+    tap((area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2);
+    return true;
+}
+
+// --- holding a sheet to what it promises ---------------------------------------------------------------------------
+
+struct Rect {
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+};
+
+Rect rect_of(lv_obj_t* object) {
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return {area.x1, area.y1, area.x2, area.y2};
+}
+
+// Walks the sheet under `root` and fails the run for text that is cut off, a control that sticks out of what holds it
+// or off the screen, a touch target smaller than a fingertip (iclforge::screen::kMinTargetPx), two of them
+// overlapping or closer than iclforge::screen::kMinGapPx. A list that scrolls is checked in full, not only the part
+// that is on the glass. Returns the number of failures, having said each.
+int audit(lv_obj_t* root, const std::string& what) {
+    if (root == nullptr) {
+        std::printf("  FAIL %s: there is no sheet to look at\n", what.c_str());
+        return 1;
+    }
+    lv_obj_update_layout(root);
+    int failures = 0;
+    const auto fail = [&](lv_obj_t* object, const char* why) {
+        const Rect r = rect_of(object);
+        std::string name = label_text(object);
+        if (name.empty()) {
+            name = button_text(object);
+        }
+        std::printf("  FAIL %s: \"%s\" %s (%d,%d)-(%d,%d)\n", what.c_str(), name.c_str(), why, r.x1, r.y1, r.x2, r.y2);
+        ++failures;
+    };
+    std::vector<lv_obj_t*> targets;
+    const auto walk = [&](auto&& self, lv_obj_t* parent, bool scrolling) -> void {
+        const bool under_scroll = scrolling || lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+        const Rect p = rect_of(parent);
+        const std::uint32_t count = lv_obj_get_child_count(parent);
+        for (std::uint32_t i = 0; i < count; ++i) {
+            lv_obj_t* const child = lv_obj_get_child(parent, static_cast<std::int32_t>(i));
+            if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
+                continue;
+            }
+            const Rect r = rect_of(child);
+            if (r.x1 < p.x1 || r.x2 > p.x2) {
+                fail(child, "sticks out of what holds it, sideways");
+            }
+            if (!under_scroll && (r.y1 < p.y1 || r.y2 > p.y2)) {
+                fail(child, "sticks out of what holds it, vertically");
+            }
+            if (!under_scroll && (r.x1 < 0 || r.y1 < 0 || r.x2 >= g_width || r.y2 >= g_height)) {
+                fail(child, "is off the screen");
+            }
+            if (lv_obj_check_type(child, &lv_label_class) && !label_text(child).empty()) {
+                const std::string text = label_text(child);
+                const bool wraps = lv_label_get_long_mode(child) == LV_LABEL_LONG_MODE_WRAP;
+                const std::int32_t width = lv_obj_get_content_width(child);
+                lv_point_t size{0, 0};
+                lv_text_get_size(&size, text.c_str(), lv_obj_get_style_text_font(child, LV_PART_MAIN),
+                                 lv_obj_get_style_text_letter_space(child, LV_PART_MAIN),
+                                 lv_obj_get_style_text_line_space(child, LV_PART_MAIN), wraps ? width : LV_COORD_MAX,
+                                 LV_TEXT_FLAG_NONE);
+                if (wraps ? size.y > lv_obj_get_content_height(child) + 1 : size.x > width + 1) {
+                    fail(child, "is clipped: the text does not fit its label");
+                }
+            }
+            if (lv_obj_has_flag(child, player::panel::kTouchTargetFlag)) {
+                targets.push_back(child);
+                const int w = r.x2 - r.x1 + 1;
+                const int h = r.y2 - r.y1 + 1;
+                if (std::min(w, h) < iclforge::screen::kMinTargetPx) {
+                    fail(child, ("is a touch target of " + std::to_string(w) + " by " + std::to_string(h) +
+                                 ", smaller than a fingertip")
+                                    .c_str());
+                }
+            }
+            self(self, child, under_scroll);
+        }
+    };
+    walk(walk, root, false);
+    int smallest = 1 << 20;
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+        const Rect a = rect_of(targets[i]);
+        smallest = std::min({smallest, a.x2 - a.x1 + 1, a.y2 - a.y1 + 1});
+        for (std::size_t j = i + 1; j < targets.size(); ++j) {
+            const Rect b = rect_of(targets[j]);
+            // The space between them along each axis, negative where they overlap on it.
+            const int dx = std::max(a.x1, b.x1) - std::min(a.x2, b.x2) - 1;
+            const int dy = std::max(a.y1, b.y1) - std::min(a.y2, b.y2) - 1;
+            if (dx < 0 && dy < 0) {
+                fail(targets[i], "overlaps another touch target");
+            } else if ((dx < 0 && dy < iclforge::screen::kMinGapPx) || (dy < 0 && dx < iclforge::screen::kMinGapPx)) {
+                fail(targets[i], "is closer to another touch target than the least gap");
+            }
+        }
+    }
+    std::printf("  %-26s %2zu touch targets, the smallest %d px, %d failures\n", what.c_str(), targets.size(),
+                targets.empty() ? 0 : smallest, failures);
+    return failures;
 }
 
 // One output's level over the last 100 ms, in dB of full scale: the peak and the RMS.
@@ -323,6 +536,229 @@ const char* const kHealthyLog =
     "I (31470) net: ethernet: link up, 100 Mb/s full duplex\n"
     "I (41480) panel: lyrics, 2290 refreshes, render 6100 us mean 21000 max, rebuild 3100 us max, 0 late\n";
 
+// The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
+// board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
+// taps the way a person does. Returns the number of failures, having said each.
+int check_sheets(int width, int height, const fs::path& out, const std::string& lrc, lv_display_t*& disp) {
+    namespace nv = iclforge::nowview;
+    const std::string size = std::to_string(width) + "x" + std::to_string(height);
+    std::printf("-- %s\n", size.c_str());
+    disp = open_display(width, height, disp);
+    if (!player::panel::screen_init(disp, width, height)) {
+        std::puts("  FAIL the screen did not come up");
+        return 1;
+    }
+    int failures = 0;
+    const auto expect = [&](bool ok, const std::string& what) {
+        if (!ok) {
+            std::printf("  FAIL %s: %s\n", size.c_str(), what.c_str());
+            ++failures;
+        }
+    };
+    const auto scroller_of = [](lv_obj_t* root) -> lv_obj_t* {
+        const std::uint32_t count = lv_obj_get_child_count(root);
+        for (std::uint32_t i = 0; i < count; ++i) {
+            lv_obj_t* const child = lv_obj_get_child(root, static_cast<std::int32_t>(i));
+            if (lv_obj_has_flag(child, LV_OBJ_FLAG_SCROLLABLE)) {
+                return child;
+            }
+        }
+        return nullptr;
+    };
+
+    // A kit-like board whose screen is this size, playing a song with lyrics.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_settings = {nv::View::kSpeakers, 5};
+    g_board = {};
+    g_board.name = "hearth-4f2a91";
+    g_board.address = "192.168.1.50";
+    g_board.network = "HomeNet";
+    g_board.firmware = "0.11.0";
+    g_board.player = true;
+    g_board.stream = "bursts";
+    g_now_playing = false;
+    hold(lrc, 5'750);
+    g_now_us += 1'000'000;
+    pump(6);
+    write_bmp(out / ("footer-" + size + ".bmp"));
+    failures += audit(player::panel::screen_footer_object(), "footer " + size);
+    // A screen wide enough for the kit's columns still says where in the song it is and the delay, beside the buttons.
+    if (width >= 960) {
+        expect(shows_text(player::panel::screen_footer_object(), "Line ", true), "the footer says which line is being sung");
+        expect(shows_text(player::panel::screen_footer_object(), "Delay +0 ms"), "and the lyric delay");
+    }
+
+    // Adjust: the lyric delay and the text size, and nothing else.
+    expect(tap_button("Adjust"), "the footer has an Adjust button");
+    pump(6);
+    lv_obj_t* const sheet = player::panel::screen_sheet_object();
+    expect(sheet != nullptr, "Adjust opens its sheet");
+    if (sheet != nullptr) {
+        write_bmp(out / ("adjust-" + size + ".bmp"));
+        const Rect r = rect_of(sheet);
+        const int sheet_h = r.y2 - r.y1 + 1;
+        std::printf("  the Adjust sheet is %d px tall\n", sheet_h);
+        failures += audit(sheet, "adjust " + size);
+        for (const char* gone : {"Speakers", "Title", "Clock", "Dark", "Off", "5 min", "30 min", "Never"}) {
+            expect(find_button(gone) == nullptr, std::string("Adjust no longer has the ") + gone + " button");
+        }
+        for (const char* kept : {"-", "+", "Smaller", "Larger", "Close"}) {
+            expect(find_button(kept) != nullptr, std::string("Adjust has a ") + kept + " button");
+        }
+        if (width == 1024 && height == 600) {
+            expect(sheet_h < 352, "the sheet is shorter than the 352 px it was");
+        }
+        tap_button("+");
+        pump(2);
+        // "Delay +50 ms", or "+50 ms" on a screen too narrow for the longer between the two buttons.
+        expect(shows_text(sheet, "+50 ms", true), "+ adds 50 ms to the lyric delay");
+        tap_button("-");
+        tap_button("-");
+        pump(2);
+        expect(shows_text(sheet, "-50 ms", true), "- takes 50 ms off the lyric delay");
+        tap_button("+");
+        tap_button("Larger");
+        pump(2);
+        expect(!shows_text(sheet, "Normal"), "Larger changes the text size");
+        tap_button("Smaller");
+        pump(2);
+        expect(shows_text(sheet, "Normal"), "Smaller puts it back");
+    }
+    // Left alone, the sheet puts itself away.
+    g_now_us += 9'000'000;
+    pump(4);
+    expect(player::panel::screen_sheet_object() == nullptr, "the Adjust sheet puts itself away after eight seconds");
+
+    // Preferences, for the kit: everything is available.
+    expect(tap_button("Preferences"), "the footer has a Preferences button");
+    pump(8);
+    lv_obj_t* const prefs = player::panel::prefs_root();
+    expect(prefs != nullptr, "Preferences opens its sheet");
+    if (prefs != nullptr) {
+        write_bmp(out / ("prefs-" + size + ".bmp"));
+        failures += audit(prefs, "preferences " + size);
+        for (const char* shown : {"Screen without lyrics", "Dim after", "DISPLAY"}) {
+            expect(shows_text(prefs, shown), std::string("Preferences shows ") + shown);
+        }
+        // The view is chosen by a tap, and the board follows at once.
+        expect(tap_button("Clock"), "the view row has a Clock button");
+        expect(g_settings.view == nv::View::kClock, "a tap on Clock chooses the clock view");
+        expect(tap_button("Dark"), "the view row has a Dark button");
+        expect(g_settings.view == nv::View::kDark, "a tap on Dark chooses the dark view");
+        pump(4);
+        write_bmp(out / ("prefs-dark-" + size + ".bmp"));
+        expect(shows_text(prefs, "Not used by the Dark view", true), "the dim row says the dark view has no dim time");
+        expect(tap_button("Speakers"), "the view row has a Speakers button");
+        expect(g_settings.view == nv::View::kSpeakers, "a tap on Speakers chooses the speakers");
+        pump(4);
+        expect(!shows_text(prefs, "Not used by the Dark view", true), "and the note goes with it");
+        // The dim time steps: 5 minutes, 15, back to 5, and down to the first stop, where - has nowhere to go.
+        expect(shows_text(prefs, "5 min"), "the dim time starts at 5 minutes");
+        tap_button("+");
+        pump(4);
+        expect(g_settings.dim_after_minutes == 15, "+ steps the dim time to 15 minutes");
+        expect(shows_text(prefs, "15 min"), "and the row says so");
+        tap_button("-");
+        tap_button("-");
+        tap_button("-");
+        pump(4);
+        expect(g_settings.dim_after_minutes == 1, "- steps down to 1 minute and stops there");
+        tap_button("+");
+        tap_button("+");
+        pump(4);
+        expect(g_settings.dim_after_minutes == 15, "and + steps back up");
+        tap_button("-");
+        pump(4);
+        // A list that is longer than the glass scrolls under a finger, and a control scrolled to is still a control.
+        lv_obj_t* const list = scroller_of(prefs);
+        expect(list != nullptr, "Preferences has a list that scrolls");
+        if (list != nullptr) {
+            lv_obj_update_layout(list);
+            const int beyond = lv_obj_get_scroll_bottom(list);
+            std::printf("  the list runs %d px past the glass\n", beyond);
+            if (beyond > 0) {
+                drag(width / 2, height * 3 / 4, height / 4);
+                std::printf("  scrolled to %d\n", static_cast<int>(lv_obj_get_scroll_y(list)));
+                expect(lv_obj_get_scroll_y(list) > 0, "a finger dragged up scrolls the list");
+                write_bmp(out / ("prefs-scrolled-" + size + ".bmp"));
+                drag(width / 2, height / 4, height * 3 / 4);
+                std::printf("  scrolled back to %d\n", static_cast<int>(lv_obj_get_scroll_y(list)));
+                expect(lv_obj_get_scroll_y(list) == 0, "and dragged down scrolls it back");
+            }
+        }
+        expect(tap_button("Off"), "a control past the first screenful is reached");
+        expect(g_settings.view == nv::View::kOff, "and works");
+        tap_button("Speakers");
+        tap_button("Close");
+        pump(6);
+        expect(player::panel::prefs_root() == nullptr, "Close puts the Preferences sheet away");
+    }
+
+    // Dimming and Preferences: the tap that wakes a dimmed screen does not also open Preferences, the sheet keeps the
+    // screen lit while it is open, and the dim time counts again from when it is put away.
+    {
+        g_settings = {nv::View::kSpeakers, 1};
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_now_us += 10'000'000;
+        pump(6);
+        g_now_us += 90'000'000;
+        pump(6);
+        expect(player::panel::screen_stats().dimmed, "the speakers dim after a minute alone");
+        tap_button("Preferences");
+        pump(6);
+        expect(player::panel::prefs_root() == nullptr, "the tap that wakes the screen does not open Preferences");
+        expect(!player::panel::screen_stats().dimmed, "but it wakes it");
+        expect(tap_button("Preferences"), "the footer's Preferences button is there once the screen is awake");
+        pump(8);
+        expect(player::panel::prefs_root() != nullptr, "and a second tap opens it");
+        g_now_us += 50'000'000;
+        pump(6);
+        expect(player::panel::prefs_root() != nullptr, "Preferences is still open after 50 s");
+        expect(!player::panel::screen_stats().dimmed, "and it keeps the screen lit past the dim time");
+        g_now_us += 15'000'000;
+        pump(6);
+        expect(player::panel::prefs_root() == nullptr, "left alone for a minute, Preferences puts itself away");
+        pump(6);
+        expect(player::panel::screen_stats().dimmed, "and then the screen dims, as it would have");
+        tap(width / 2, height / 3);
+        pump(6);
+        g_now_playing = false;
+        g_settings = {nv::View::kSpeakers, 5};
+        hold(lrc, 5'750);
+        pump(6);
+    }
+
+    // The same sheet for a board whose screen has no touch: the dark view and the dim time are greyed with their
+    // reason, never hidden, and a tap on them does nothing.
+    g_caps = iclforge::variants::c3_spi_320x240_no_touch();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_settings = {nv::View::kSpeakers, 5};
+    expect(tap_button("Preferences"), "the footer has a Preferences button on a board with no touch");
+    pump(8);
+    lv_obj_t* const greyed = player::panel::prefs_root();
+    expect(greyed != nullptr, "Preferences opens on a board with no touch");
+    if (greyed != nullptr) {
+        write_bmp(out / ("prefs-greyed-" + size + ".bmp"));
+        failures += audit(greyed, "preferences, no touch " + size);
+        expect(find_button("Dark") != nullptr, "the Dark choice is shown, greyed, not hidden");
+        expect(shows_text(greyed, "no touch", true), "and the reason is on the sheet");
+        tap_button("Dark");
+        pump(4);
+        expect(g_settings.view == nv::View::kSpeakers, "a tap on a greyed choice does nothing");
+        tap_button("+");
+        pump(4);
+        expect(g_settings.dim_after_minutes == 5, "nor does a tap on the greyed dim time");
+        tap_button("Clock");
+        expect(g_settings.view == nv::View::kClock, "the choices it can make still work");
+        tap_button("Close");
+        pump(6);
+    }
+    return failures;
+}
+
 }  // namespace
 
 namespace player::panel {
@@ -369,9 +805,29 @@ iclforge::wallclock::Reading read_wall_clock() { return g_wall; }
 
 void set_backlight(int percent) { g_backlight = percent; }
 
-void choose_now_view(iclforge::nowview::View view) { g_settings.view = view; }
+// The board's preferences as the preview holds them: the settings, and the capability description of the board being drawn.
+class PreviewBackend final : public iclforge::prefs::Backend {
+   public:
+    [[nodiscard]] iclforge::BoardCaps caps() const override { return g_caps; }
+    [[nodiscard]] iclforge::nowview::View now_view() const override { return g_settings.view; }
+    [[nodiscard]] bool set_now_view(iclforge::nowview::View view) override {
+        if (!now_view_drawn(view)) {
+            return false;
+        }
+        g_settings.view = view;
+        return true;
+    }
+    [[nodiscard]] int dim_after_minutes() const override { return g_settings.dim_after_minutes; }
+    [[nodiscard]] bool set_dim_after_minutes(int minutes) override {
+        g_settings.dim_after_minutes = minutes;
+        return true;
+    }
+};
 
-void choose_dim_after(int minutes) { g_settings.dim_after_minutes = minutes; }
+iclforge::prefs::Backend& preferences_backend() {
+    static PreviewBackend backend;
+    return backend;
+}
 
 std::int64_t time_us() { return g_now_us; }
 
@@ -442,23 +898,17 @@ int main(int argc, char** argv) {
 
     lv_init();
     lv_tick_set_cb([]() -> std::uint32_t { return static_cast<std::uint32_t>(g_now_us / 1000); });
-    lv_display_t* const disp = lv_display_create(kWidth, kHeight);
-    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
-    static std::uint16_t first[kWidth * kBufferRows];
-    static std::uint16_t second[kWidth * kBufferRows];
-    lv_display_set_buffers(disp, first, second, sizeof first, LV_DISPLAY_RENDER_MODE_PARTIAL);
-    lv_display_set_flush_cb(disp, &flush);
-    lv_indev_t* const pointer = lv_indev_create();
-    lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_read_cb(pointer, &read_pointer);
-    lv_indev_set_display(pointer, disp);
+    g_pointer_device = lv_indev_create();
+    lv_indev_set_type(g_pointer_device, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(g_pointer_device, &read_pointer);
+    lv_display_t* disp = open_display(1024, 600, nullptr);
 
     g_board.name = "hearth-4f2a91";
     g_board.address = "192.168.1.50";
     g_board.network = "HomeNet";
     g_board.firmware = "0.11.0";
     g_board.player = true;
-    if (!player::panel::screen_init(disp, kWidth, kHeight)) {
+    if (!player::panel::screen_init(disp, g_width, g_height)) {
         return 1;
     }
 
@@ -695,7 +1145,7 @@ int main(int argc, char** argv) {
             int count = 0;
             for (int y = y0; y < y1; ++y) {
                 for (int x = x0; x < x1; ++x) {
-                    const std::uint16_t p = g_frame[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)];
+                    const std::uint16_t p = g_frame[static_cast<std::size_t>(y) * g_width + static_cast<std::size_t>(x)];
                     count += ((p >> 11) & 0x1F) > 8 ? 1 : 0;
                 }
             }
@@ -808,7 +1258,7 @@ int main(int argc, char** argv) {
         // The sheet with Dark chosen: the dim row says what a touch does instead of offering dim times.
         tap(500, 300);
         pump(6);
-        tap(1024 - 32 - 80, 600 - 64 + 8 + 24);
+        tap_button("Adjust");
         pump(6);
         write_bmp(out / "s16-controls-dark.bmp");
         std::printf("%2d  %-26s sheet, dark view chosen\n", ++number, "s16-controls-dark");
@@ -822,7 +1272,7 @@ int main(int argc, char** argv) {
     hold(auld, 5'750);
     g_now_us += 1'000'000;
     pump(6);
-    tap(1024 - 32 - 80, 600 - 64 + 8 + 24);
+    tap_button("Adjust");
     pump(6);
     write_bmp(out / "s9-controls.bmp");
     std::printf("%2d  %-26s sheet\n", ++number, "s9-controls");
@@ -914,5 +1364,21 @@ int main(int argc, char** argv) {
     pump(6);
     std::printf("%2d  %-26s closed by a tap: %s\n", ++number, "s15-dev-closed",
                 player::panel::screen_stats().dev_view ? "STILL OPEN" : "yes");
+
+    // Adjust and Preferences at every size the product is drawn at: the kit's panel, and the smaller ones a board
+    // with a screen of its own could have. Checked as well as drawn: text that is cut off, a control smaller than a
+    // fingertip or sticking out of its sheet, a choice that does nothing, fails the run.
+    std::puts("Adjust and Preferences at each display size:");
+    int failures = 0;
+    // 240 by 240 is the first square one (a JetKVM Mini's); its board has no touch, which every size's second pass
+    // (a board whose screen has none) draws and checks as well.
+    for (const auto& [width, height] :
+         {std::pair{1024, 600}, std::pair{800, 480}, std::pair{480, 320}, std::pair{320, 240}, std::pair{240, 240}}) {
+        failures += check_sheets(width, height, out, auld, disp);
+    }
+    if (failures != 0) {
+        std::printf("%d failures\n", failures);
+        return 3;
+    }
     return 0;
 }
