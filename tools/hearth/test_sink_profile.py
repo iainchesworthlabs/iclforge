@@ -136,6 +136,15 @@ class TheFile(unittest.TestCase):
                     (sp.PROJECT / f"sdkconfig.{spec['fragment']}").is_file(), f"overlay {name}"
                 )
 
+    def test_every_profile_has_a_layout_evidence_row(self) -> None:
+        """libs/device/include/iclforge/layout_options.hpp says what a kind of board has been measured
+        to play, by profile id, and answers "not verified" for an id it has no row for. A new profile
+        is a new kind of board: it names its measurements there, or says in the row that it has none."""
+        header = (REPO / "libs/device/include/iclforge/layout_options.hpp").read_text("utf-8")
+        table = header.split("kLayoutEvidence{{", 1)[1].split("}};", 1)[0]
+        rows = set(re.findall(r'^\s*\{"([a-z0-9-]+)",', table, re.MULTILINE))
+        self.assertEqual(rows, set(self.data["profiles"]), "kLayoutEvidence and profiles.json differ")
+
     def test_a_profile_names_a_target_the_packager_knows(self) -> None:
         for ident, spec in self.data["profiles"].items():
             self.assertIn(spec["target"], sp.TARGETS, ident)
