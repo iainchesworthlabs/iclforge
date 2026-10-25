@@ -310,6 +310,15 @@ dv::Facts gather_dev_facts(const PanelStats& panel, const TouchCounters& touch) 
     return facts;
 }
 
+dv::Facts gather_about_facts() {
+    dv::Facts facts;
+    const BoardReport report = board_report();
+    read_stream(facts, report);
+    read_network(facts, facts.player && !facts.stream.empty() && facts.stream != "idle");
+    read_configuration(facts, report);
+    return facts;
+}
+
 std::string read_log_tail(std::size_t limit) {
     if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= kLogReadNeedsInternal) {
         // Whatever is new, a chunk at a time; the first read after the view opens takes the whole ring.

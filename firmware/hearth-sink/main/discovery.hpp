@@ -29,7 +29,14 @@ void discovery_start();
 void discovery_withdraw();
 
 // The host name the board answers to, without ".local": what its stored
-// name becomes under mDNS's rules ("Sitting Room" is sitting-room).
+// name becomes under mDNS's rules ("Sitting Room" is sitting-room, "Cafe with
+// an accent" is cafe: iclforge::devname::mdns_label()).
 [[nodiscard]] std::string discovery_host_name();
+
+// The board was renamed (settings_set_name): its mDNS host name, its instance name and its Sendspin
+// service's instance and `name` text follow at once, with no restart, so a server finds it under the
+// new name. Does nothing before mDNS has started (discovery_start() then uses the new name), and
+// nothing in flash mode, where the service is withdrawn and no setting changes.
+void discovery_rename();
 
 }  // namespace player
