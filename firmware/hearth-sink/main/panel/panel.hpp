@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "iclforge/board_caps.hpp"
 #include "iclforge/now_view.hpp"
 
 // The board's screen (planning/karaoke-p4x-panel.md): the lyrics of the item playing, drawn with the
@@ -49,6 +50,11 @@ struct PanelStats {
     // The developer view (dev_screen.hpp) is open over the screen, and what its refreshes (reading
     // the board, setting the text) have cost the task, microseconds.
     bool dev_view = false;
+    // The Preferences sheet (lvgl/prefs_screen.hpp) is open, how many times it was built and the longest a build
+    // took, microseconds.
+    bool prefs_view = false;
+    std::uint32_t prefs_builds = 0;
+    std::uint32_t prefs_build_us_max = 0;
     std::uint32_t dev_refreshes = 0;
     std::uint32_t dev_refresh_us_last = 0;
     std::uint32_t dev_refresh_us_max = 0;
@@ -71,6 +77,11 @@ void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
 // How the speakers view shows a level (iclforge::nowview::SpeakersStyle, planning/p4x-speakers-options.md).
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+
+// The display the panel opened, as the board's capability description has it (iclforge/board_caps.hpp): its kind,
+// size, whether a touch controller is reading and whether the backlight can be set. Fixed once the panel is up,
+// read without the panel's lock; a build with no panel, or one whose display did not come up, has none.
+[[nodiscard]] iclforge::DisplayCaps panel_display_caps();
 
 // Starts the panel's task: once, from app_main, after the network and the Sendspin player. True when
 // a panel is running; false (having said why) when there is none or it did not come up.

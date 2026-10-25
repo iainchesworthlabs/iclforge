@@ -18,4 +18,6 @@ bool panel_start() { return false; }
 
 PanelStats panel_stats() { return {}; }
 
+iclforge::DisplayCaps panel_display_caps() { return {}; }
+
 }  // namespace player
