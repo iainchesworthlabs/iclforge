@@ -19,7 +19,7 @@
 
 #include "board_info.hpp"
 #include "fonts.hpp"
-#include "prefs_editors.hpp"
+#include "prefs_pages.hpp"
 
 namespace prefs = iclforge::prefs;
 
@@ -559,7 +559,7 @@ void build_view() {
 }
 
 void take_down() {
-    editors_close();
+    pages_close();
     if (g.root != nullptr) {
         lv_obj_delete(g.root);
     }
@@ -674,7 +674,7 @@ void on_target(lv_event_t* event) {
             word = entry.choices[index].id;
             // A change that asks first (the switch between the cable and Wi-Fi) is made on the page that asks.
             if (entry.pref->confirm_step != nullptr && word != entry.value) {
-                editors_open(*entry.pref, word);
+                pages_open(*entry.pref, word);
                 return;
             }
             // A change that breaks the music that plays asks first; the same layout again, or nothing playing, does not.
@@ -696,7 +696,7 @@ void on_target(lv_event_t* event) {
             // An action that asks first is run from the page that asks; one the moment forbids says why under its row.
             if (entry.pref->confirm_step != nullptr && entry.availability.available) {
                 if (entry.inert.empty()) {
-                    editors_open(*entry.pref, "run");
+                    pages_open(*entry.pref, "run");
                 }
                 return;
             }
@@ -710,7 +710,7 @@ void on_target(lv_event_t* event) {
                 g.status_ms = now_ms();
                 g.dirty = true;
             } else {
-                editors_open(*entry.pref, "");
+                pages_open(*entry.pref, "");
             }
             return;
         case Op::kConfirm:
@@ -805,7 +805,7 @@ void prefs_update(std::uint32_t now) {
         take_down();
         return;
     }
-    editors_update(now);
+    pages_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }

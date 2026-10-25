@@ -32,7 +32,7 @@
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
 #include "panel/lvgl/now_screen.hpp"
-#include "panel/lvgl/prefs_editors.hpp"
+#include "panel/lvgl/prefs_pages.hpp"
 #include "panel/lvgl/prefs_screen.hpp"
 #include "panel/lyrics_reader.hpp"
 
@@ -270,7 +270,7 @@ std::string button_text(lv_obj_t* button) {
 lv_obj_t* find_button(const std::string& text) {
     std::vector<lv_obj_t*> targets;
     // The page or the dialog of the Preferences editors covers the sheet: it is the one a finger reaches.
-    collect_touch_targets(player::panel::editors_root() != nullptr ? player::panel::editors_root() : lv_screen_active(), targets);
+    collect_touch_targets(player::panel::pages_root() != nullptr ? player::panel::pages_root() : lv_screen_active(), targets);
     for (lv_obj_t* const target : targets) {
         if (button_text(target) == text) {
             return target;
@@ -649,7 +649,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
             ++failures;
         }
     };
-    const auto page = [] { return player::panel::editors_root(); };
+    const auto page = [] { return player::panel::pages_root(); };
     const auto says = [&](const std::string& text) { return shows_text(lv_screen_active(), text, true); };
     const std::string arrow_left = "\xE2\x86\x90";
     const std::string arrow_up = "\xE2\x86\x91";
@@ -801,7 +801,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
         expect(g_system.restarts == 1, "Restart restarts the board");
         expect(says("Restarting..."), "and the screen says so until it does");
         write_bmp(out / ("system-restarting-" + size + ".bmp"));
-        player::panel::editors_close();
+        player::panel::pages_close();
         pump(4);
     }
     // ... and is greyed, with its reason, while the new firmware is on trial.
@@ -855,7 +855,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
         expect(g_system.factory_resets == 1, "a hold of three seconds erases");
         expect(says("Erasing everything"), "and the screen says so");
         write_bmp(out / ("system-erasing-" + size + ".bmp"));
-        player::panel::editors_close();
+        player::panel::pages_close();
         pump(4);
     }
     // The board that would be stranded says so: no cable plugged in.

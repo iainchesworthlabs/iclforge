@@ -53,8 +53,8 @@ void prefs_open();
 // closed or left alone for a minute, and brings what it shows up to date with the board's settings.
 void prefs_update(std::uint32_t now_ms);
 
-// --- for the pages the sheet opens (prefs_editors.hpp) --------------------------------------------------------------
-// The sheet's tokens and pieces, so that a page the editors put over it is drawn in the same style and at the same size.
+// --- for the pages the sheet opens (prefs_pages.hpp) --------------------------------------------------------------
+// The sheet's tokens and pieces, so that a page put over it is drawn in the same style and at the same size.
 struct PrefsUi {
     const iclforge::screen::Metrics* m = nullptr;
     const DevColours* c = nullptr;

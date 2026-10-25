@@ -1,4 +1,4 @@
-// The pages the System group of Preferences puts over the sheet. See prefs_editors.hpp.
+// The pages the System group of Preferences puts over the sheet. See prefs_pages.hpp.
 //
 // Everything a page SAYS is libs/device's: the confirming steps and the paired-server rows (system_actions.hpp), the keys and
 // the rule for a name (device_name.hpp), the rows of About (about_view.hpp). This file measures them for the display it is
@@ -8,10 +8,10 @@
 // a scrim over the sheet or over a page (a confirming step, the held button of the factory reset, a refusal). A page opens a
 // dialog (Forget on a server), and closing the dialog returns to the page.
 //
-// Nothing is built or deleted inside an event: a tap sets a flag, and editors_update() does the work a frame later, as the sheet
+// Nothing is built or deleted inside an event: a tap sets a flag, and pages_update() does the work a frame later, as the sheet
 // does.
 
-#include "prefs_editors.hpp"
+#include "prefs_pages.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -794,8 +794,8 @@ void on_event(lv_event_t* event) {
 
 }  // namespace
 
-void editors_open(const prefs::Pref& pref, const std::string& word) {
-    if (editors_active()) {
+void pages_open(const prefs::Pref& pref, const std::string& word) {
+    if (pages_active()) {
         return;
     }
     switch (pref.kind) {
@@ -825,19 +825,19 @@ void editors_open(const prefs::Pref& pref, const std::string& word) {
     }
 }
 
-bool editors_active() {
+bool pages_active() {
     return s.page_root != nullptr || s.dialog != nullptr || s.want_page || s.want_dialog;
 }
 
-lv_obj_t* editors_root() { return s.dialog != nullptr ? s.dialog : s.page_root; }
+lv_obj_t* pages_root() { return s.dialog != nullptr ? s.dialog : s.page_root; }
 
-void editors_close() {
+void pages_close() {
     delete_dialog();
     delete_page();
     s = State{};
 }
 
-void editors_update(std::uint32_t /*sheet_ms*/) {
+void pages_update(std::uint32_t /*sheet_ms*/) {
     const std::uint32_t now = now_ms();
     // A dialog taken down first, so that a page it was over is what is left.
     if (s.want_close_dialog) {
