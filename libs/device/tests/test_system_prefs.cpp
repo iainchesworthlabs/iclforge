@@ -2,6 +2,7 @@
 // cable and Wi-Fi, the name, About, the paired servers, Restart, Reset preferences and Factory reset. Against every
 // known board (iclforge/board_variants.hpp), with the in-memory backend of the other registry tests.
 
+#include <algorithm>
 #include <set>
 #include <string>
 #include <vector>
@@ -73,9 +74,13 @@ TEST_CASE("every entry says whether Reset preferences touches it: values reset, 
     // The choices a person made once.
     REQUIRE(reset.contains("now-view"));
     REQUIRE(reset.contains("dim-after"));
-    // What the board IS, how it is joined, and every entry that is not a value.
-    for (const char* id : {"network-preference", "name", "about", "paired-servers", "restart", "reset-preferences",
-                           "factory-reset"}) {
+    for (const char* id : {"brightness", "clock-hours", "clock-seconds", "night-schedule", "night-times", "night-idle"}) {
+        INFO(id);
+        REQUIRE(reset.contains(id));
+    }
+    // What the board IS (where it is, how it is joined, what speakers it drives), and every entry that is not a value.
+    for (const char* id : {"time-zone", "speaker-layout", "network-preference", "name", "about", "paired-servers", "restart",
+                           "reset-preferences", "factory-reset"}) {
         INFO(id);
         REQUIRE(kept.contains(id));
     }
@@ -364,17 +369,53 @@ TEST_CASE("the entry for Reset preferences runs the reset and is refused while t
     REQUIRE(resolved(kit, "reset-preferences").inert == "A firmware update is under way.");
     // And the step before it names what changes on THIS board, from the registry.
     const sa::Confirm confirm = pref.confirm_step(kit, "run");
-    REQUIRE(contains(confirm.lines[0], "screen without lyrics and dim after"));
+    REQUIRE(contains(confirm.lines[0], "screen without lyrics"));
+    REQUIRE(contains(confirm.lines[0], "dim after"));
+    REQUIRE(contains(confirm.lines[0], "brightness"));
+    // The time zone is where the room is: kept, so never in what changes.
+    REQUIRE_FALSE(contains(confirm.lines[0], "time zone"));
     REQUIRE(contains(confirm.lines[1], "name"));
     REQUIRE(contains(confirm.lines[1], "paired servers"));
 }
 
+TEST_CASE("Reset preferences puts back the display and time choices and keeps the time zone", "[prefs-system]") {
+    FakeBackend kit(iclforge::variants::p4_rev3_kit());
+    kit.brightness_ = 30;
+    kit.clock_ = {.twelve_hour = true, .seconds = true};
+    kit.night_ = {.enabled = true, .from_min = 23 * 60, .to_min = 6 * 60 + 30, .idle = true};
+    kit.zone_ = {.posix = "AEST-10AEDT,M10.1.0,M4.1.0/3", .name = "Australia/Melbourne"};
+    const iclforge::wallclock::ZoneChoice zone = kit.zone_;
+
+    const prefs::ResetReport report = prefs::reset_preferences(kit);
+    REQUIRE(report.ok());
+    REQUIRE(kit.brightness_ == iclforge::nowview::kDefaultBrightness);
+    REQUIRE(kit.clock_ == iclforge::wallclock::ClockFormat{});
+    REQUIRE(kit.night_ == iclforge::nowview::NightSchedule{});
+    // Where the room is is not a matter of taste.
+    REQUIRE(kit.zone_ == zone);
+    REQUIRE(prefs::find("time-zone")->on_reset == prefs::OnReset::kKeep);
+}
+
 TEST_CASE("what Reset preferences changes is worded from the registry, for the board it is on", "[prefs-system]") {
-    REQUIRE(prefs::reset_labels(iclforge::variants::p4_rev3_kit()) ==
-            std::vector<std::string>{"screen without lyrics", "dim after"});
-    // A screen with no touch cannot dim, so the sentence does not promise it.
-    REQUIRE(prefs::reset_labels(iclforge::variants::c3_spi_320x240_no_touch()) ==
-            std::vector<std::string>{"screen without lyrics"});
+    const auto has = [](const std::vector<std::string>& labels, const char* label) {
+        return std::find(labels.begin(), labels.end(), label) != labels.end();
+    };
+    const std::vector<std::string> kit = prefs::reset_labels(iclforge::variants::p4_rev3_kit());
+    for (const char* label : {"screen without lyrics", "dim after", "brightness", "clock hours", "clock seconds",
+                              "night schedule"}) {
+        INFO(label);
+        REQUIRE(has(kit, label));
+    }
+    // What is kept is never in the sentence: the time zone, the layout, the name, the network.
+    for (const char* label : {"time zone", "speaker layout", "name of this player", "wired or Wi-Fi"}) {
+        INFO(label);
+        REQUIRE_FALSE(has(kit, label));
+    }
+    // A screen with no touch cannot dim and cannot be touched awake, so the sentence does not promise either.
+    const std::vector<std::string> no_touch = prefs::reset_labels(iclforge::variants::c3_spi_320x240_no_touch());
+    REQUIRE(has(no_touch, "screen without lyrics"));
+    REQUIRE_FALSE(has(no_touch, "dim after"));
+    REQUIRE_FALSE(has(no_touch, "night schedule"));
     REQUIRE(prefs::reset_labels(iclforge::variants::s3_n16r8()).empty());
     const sa::Confirm none = sa::reset_preferences_confirm(prefs::reset_labels(iclforge::variants::s3_n16r8()));
     REQUIRE(contains(none.lines[0], "nothing on this board"));

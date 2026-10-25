@@ -166,7 +166,8 @@ resets the whole system, which a Wi-Fi link behind the companion chip needs
 
 **Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to their
 defaults, at once and with no restart: every entry of the board's preferences that says it is reset
-(today what the screen shows without lyrics and when it dims; an entry added later says for itself),
+(what the screen shows without lyrics, when it dims, the brightness, the clock's hours and seconds and
+the night schedule; an entry added later says for itself),
 each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
 the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring, the
 speaker layout and the time zone (the room's, not a matter of taste), the time server and whether

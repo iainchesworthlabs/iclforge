@@ -1151,6 +1151,22 @@ config ICLFORGE_EXAMPLE_CLOCK_FORMAT
     help
         Bit 0 is the 12-hour clock and bit 1 the seconds: the stored value of iclforge::wallclock::ClockFormat.
 
+config ICLFORGE_EXAMPLE_NIGHT_SCHEDULE
+    string "Night schedule: two times by the board's own time, then on or off"
+    default "22:00-07:00 off"
+    help
+        Go dark between the two times (HH:MM-HH:MM, across midnight when the second is earlier), as the dark view
+        is: a touch lights the screen for a while. The form PUT /night-schedule takes. A board that does not
+        know the time is lit whatever this says.
+
+config ICLFORGE_EXAMPLE_NIGHT_IDLE
+    int "Night schedule also darkens the idle screen (0 or 1)"
+    default 0
+    range 0 1
+    help
+        Whether the night schedule covers the screen shown between songs as well as the one shown while a song
+        with no lyrics plays. Off until the owner decides (planning/p4x-now-playing.md, "Open").
+
 endmenu
 
 endmenu

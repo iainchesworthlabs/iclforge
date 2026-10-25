@@ -10,6 +10,7 @@
 #include "sendspin.hpp"
 #include "settings.hpp"
 #include "system_control.hpp"
+#include "wall_clock.hpp"
 
 namespace player {
 namespace {
@@ -97,6 +98,55 @@ class Board final : public iclforge::prefs::Backend {
 
     [[nodiscard]] bool forget_server(std::string_view server_id) override {
         return sendspin_forget_server(server_id).value_or(false);
+    }
+
+    [[nodiscard]] int brightness() const override { return settings().brightness_percent; }
+
+    // A glass whose backlight is not under the board's control has no level to set, and is refused.
+    [[nodiscard]] bool set_brightness(int percent) override {
+        if (!panel_display_caps().backlight || !settings_set_brightness(percent)) {
+            return false;
+        }
+        panel_set_brightness(percent);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::wallclock::ClockFormat clock_format() const override { return settings().clock_format; }
+
+    [[nodiscard]] bool set_clock_format(iclforge::wallclock::ClockFormat format) override {
+        if (!settings_set_clock_format(format)) {
+            return false;
+        }
+        panel_set_clock_format(format);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::nowview::NightSchedule night() const override { return settings().night; }
+
+    [[nodiscard]] bool set_night(const iclforge::nowview::NightSchedule& night) override {
+        if (!settings_set_night(night)) {
+            return false;
+        }
+        panel_set_night(night);
+        return true;
+    }
+
+    [[nodiscard]] iclforge::wallclock::ZoneChoice time_zone() const override {
+        return {.posix = settings().time_zone.data(), .name = settings().time_zone_name.data()};
+    }
+
+    // The zone is applied first, because the board's C library must read it as the route did, and is not left applied
+    // if it cannot be stored.
+    [[nodiscard]] bool set_time_zone(const iclforge::wallclock::ZoneChoice& zone) override {
+        const std::string previous = settings().time_zone.data();
+        if (!wall_clock_set_zone(zone.posix)) {
+            return false;
+        }
+        if (!settings_set_time_zone(zone.posix, zone.name)) {
+            (void)wall_clock_set_zone(previous);
+            return false;
+        }
+        return true;
     }
 
     [[nodiscard]] std::string layout() const override { return layout_text(); }

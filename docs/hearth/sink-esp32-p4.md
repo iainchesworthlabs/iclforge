@@ -198,11 +198,36 @@ a song with no lyrics and its dim time) and puts itself away after eight seconds
 **Preferences** is a full-screen, scrollable list of everything that is chosen once and left, grouped Display, Sound,
 Network, Time, Updates and System (a group with nothing in it is not drawn), with *Close* at the top right. It keeps the
 screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
-closes, so the lyric screen is as it was with it shut. It holds the two settings that were in Adjust (what the screen
-shows while a song has no lyrics, and when it dims) and the Network and System groups: wired or Wi-Fi, the player's name,
-About, the paired servers, Restart, Reset preferences and Factory reset
-([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time server) stay in the
-[developer view](#the-developer-view) and the routes.
+closes, so the lyric screen is as it was with it shut. It holds what the screen shows while a song has no lyrics and
+when it dims (the two settings that were in Adjust), the screen's **brightness**, how the clock view writes the time,
+the **night schedule** and the **time zone**, then the Network and System groups: wired or
+Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset
+([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time
+server) stay in the [developer view](#the-developer-view) and the routes.
+
+![Preferences: brightness, the clock's hours and seconds, and the night schedule](screenshots/p4-panel-prefs-display.png)
+
+The brightness is a stepper (every tenth from 10% to 100%), the clock's hours and seconds are a choice and a switch, and
+the night schedule is a switch, a button that opens an editor for its two times, and a switch for whether it darkens the
+idle screen too. **A value that is chosen in a list or a pair of times is a button that opens an editor over the sheet**,
+with a *Done* of its own:
+
+![The night schedule's two times: a quarter of an hour a step, and a button held goes on stepping](screenshots/p4-panel-prefs-night-times.png)
+
+Each time steps a quarter of an hour round the clock (22:00 up is 22:15, and 00:00 down is 23:45); a button held keeps
+stepping, ten times a second, and after eight steps moves an hour at a time. The pair is written half a second after
+the last step, so that a held button is one write and not forty. The editor says what the two mean (*Dark from 22:00
+until 07:00, through midnight, by the board's own time. A touch lights the screen for 30 seconds.*), that the schedule is
+switched off when it is, and, for the same time twice, that the screen is never dark.
+
+![The time zone: the regions, then the places in one](screenshots/p4-panel-prefs-zone-regions.png)
+
+The time zone is the same picker as the web page's: the regions of the zone table (Africa to Pacific, and *No zone
+(UTC)* above them), then the places in one, **opening at the region of the zone already chosen with that place in
+view**, so a person who wants the city next to the board's own does not scroll for it. A tap on a place chooses it
+at once; the editor says *Now: Melbourne (Australia)*, and *Regions* (a chevron on a narrow bar) goes back up.
+
+![The places of Australia, with Melbourne chosen](screenshots/p4-panel-prefs-zone.png)
 
 ![Preferences on the kit](screenshots/p4-panel-prefs.png)
 
@@ -237,6 +262,13 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Brightness: 10% to 100% in tens | `brightness` | `/brightness` | the board has a screen whose backlight it controls |
+| Clock hours: 24 or 12 | `clock-hours` | `/clock-format` | the board has a screen and keeps the time |
+| Clock seconds: on or off | `clock-seconds` | `/clock-format` | the board has a screen and keeps the time |
+| Night schedule: on or off | `night-schedule` | `/night-schedule` | a screen with touch, and a clock |
+| Night from and to: a pair of times (editor) | `night-times` | `/night-schedule` | the same |
+| Night covers idle screen: on or off | `night-idle` | `/night-idle` | the same |
+| Time zone: a place by region (editor) | `time-zone` | `/timezone` | the board keeps the time |
 | Wired or Wi-Fi: automatic, cable, Wi-Fi | `network-preference` | `/network-preference` | the board has both a cable and Wi-Fi |
 | Name of this player | `name` | `/name` | always |
 | About | `about` | `/hardware` | always |
@@ -278,8 +310,9 @@ glass does not scroll. A display backend for a chip other than the P4 is not wri
 
 **Adding a preference** is a registry entry (id, group, label, choices and their availability rules), a getter and a
 setter in `Backend` (a pure virtual, so a firmware that forgot the setter does not build), the same pair in the host
-tests' fake, and the firmware's implementation; only a control that is not one of the five kinds (a layout list, a
-time-zone picker) needs an editor in `panel/lvgl/prefs_screen.cpp`. There are no bespoke buttons in `lyric_screen.cpp`.
+tests' fake, and the firmware's implementation; only a control that is not one of the five kinds needs an editor, and
+it names one (`Pref::editor`: a pair of times, a place in a list) which `panel/lvgl/prefs_editors.cpp` draws. There are
+no bespoke buttons in `lyric_screen.cpp`.
 
 #### A song with no lyrics
 
@@ -380,8 +413,10 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
 | `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |
 | `GET` and `PUT /clock-format` | `24`, `12`, `24 seconds` or `12 seconds` | `24` |
+| `GET` and `PUT /night-schedule` | two times and a state: `22:00-07:00 on`; `PUT` also takes just the times (and switches it on), or `on`, or `off` | `22:00-07:00 off` |
+| `GET` and `PUT /night-idle` | `on` or `off` | `off` |
 
-All four are stored on the board and take effect at once, with no restart; a board with no panel answers
+All six are stored on the board and take effect at once, with no restart; a board with no panel answers
 404. **The brightness is the lit level, and the dim floor stays under it**: the dimmed screen is at 4%, or at
 the brightness if that is lower, and the dark view is off whatever it is. A screen whose backlight cannot be
 dimmed (the frame buffer a board with no panel runs) refuses it with a 409. `GET :8081/panel` says which `view`
@@ -420,6 +455,34 @@ answer from before 2026 is a server with a wrong clock, and is not taken for the
 **A dim leaves the clock on the glass.** Dimming lowers the backlight to its floor, as for the speakers,
 but the clock is what a dark room has the screen for, so no black cover goes over it: a clear one
 catches the tap that wakes the screen, and the time goes on changing under it.
+
+#### The night schedule
+
+**Go dark between two times**, by the board's own time (the [time of day](#the-time-of-day), in its zone). It is off
+until a person switches it on, and then it is **22:00 to 07:00** until they change the times. While it is in force
+the no-lyrics screen behaves as the [dark view](#a-song-with-no-lyrics) does: **dark from the moment it begins to show**
+(a song that starts at 23:00 is dark at once; one already playing at 22:00 goes dark once nothing has touched the glass
+for 30 seconds), **a tap lights it for 30 seconds from the last touch**, and the tap that lights it does not also press
+what is under it. A window that ends before it starts crosses midnight; the same time twice is an empty window (never
+dark: a whole day is the Dark view's job); **a board that has not heard the time yet is lit**, never dark by accident;
+and a zone with daylight saving moves the window with the clock (the night the clocks go forward is eight real hours of
+dark, the night they go back ten). With the Dark view chosen, or the screen without lyrics Off, the rows say the schedule
+is not used (*The Dark view is dark already: a touch lights it for 30 seconds, as at night.*).
+
+**The idle screen is a switch of its own** (`night-idle`, *Night covers idle screen*), off. Whether the night should
+darken the screen between two songs as well is the owner's to say; with it on, the idle screen counts as showing while
+the night is in force and is dark from the moment the night begins, with the same touch. It is not used while the
+schedule is off, and the row says so.
+
+**Kept as one number.** NVS `night` holds the two times and both switches (from in bits 0 to 10, to in bits 11 to 21,
+bit 22 on, bit 23 the idle screen), so a power cut cannot leave half a schedule; a number no build wrote is dropped with a
+line on the console and the Kconfig default (`ICLFORGE_EXAMPLE_NIGHT_SCHEDULE`, `22:00-07:00 off`, and
+`ICLFORGE_EXAMPLE_NIGHT_IDLE`) stands. Reset preferences returns it; the time zone it is read in stays. The panel is
+handed the schedule and the board's local minute of the day (read only while the schedule is on, and nothing until the
+clock has converged) and `lyric_screen.cpp` passes both to `dim_state()`: that is the whole of what the screen does for it.
+The rule, its words and its changeover cases are host-tested (`test_now_view.cpp`), and the preview tool drives it on the
+screen: lit at noon, dark at 23:00, a touch lights it for 30 s, lit at 07:00 and with no time known, and the idle screen
+dark only when told.
 
 **On the kit, the title card** (2026-10-21): `hearth-testserver` said a song over Sendspin (`--title`, `--artist`, `--album`, `--year`, `--track-seconds`, and `--then-after` for a second song with no artist) and the panel's read-back was the card above, then the second song alone with nothing kept from the first, and the speakers again when the play ended; a play that said nothing, with the card chosen, showed the speakers; a 119-character title ended in three dots after two rows, and `0:08 / 24:45` fitted. A 5.1 E-AC-3 programme at layout 5.1 took 5,325 µs a burst with the view off, 5,341 with the speakers (their header the song) and 5,333 with the card (three plays each, none late, no underrun or resynchronisation); at 2.0 with a stereo programme 2,614, 2,628 and 2,633; at 7.1.4 6,475, 6,478 and 6,491. The role itself cost nothing that showed: the image without it took 5,364 µs for the same play. The panel redraws about 5.7 times a second for the song's time and line. The owner's Music Assistant had not reconnected to the kit by then, so what it sends this role is from aiosendspin's source (the whole state each time, as the specification has it) and not yet seen on the board.
 
@@ -542,7 +605,7 @@ AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and Hobart. Its offset is the
 Australian zone has a minus sign; `none` takes the zone away. **A person need not type one.** The board carries a table of
 the zones people choose by region and city, **420 of them in 11,578 bytes of flash**, generated from IANA's tzdata (2026e;
 `tools/hearth/gen_time_zones.py`), Australia complete: `PUT /timezone Australia/Melbourne` stores the string that
-name stands for **and the name**, so the screen can say *Melbourne* (the string alone could not: Melbourne, Sydney, Hobart and
+name stands for **and the name** (the Preferences screen has the same picker, [above](#adjust-and-preferences)), so the screen can say *Melbourne* (the string alone could not: Melbourne, Sydney, Hobart and
 Canberra are one string). A name from the table says the zone, so a release that carries a government's new rules
 moves the boards that chose that city and no others. A name that is not in the table is a 400, as is a string that is
 not a zone. A string that is not a zone, or one with daylight saving and no rules (which the
@@ -782,9 +845,10 @@ console and *Forget every server* on the page.
 
 ![Forget Music Assistant? It is playing to this player now: the music stops. This player stops listening to it and erases its pairing. Cancel, Forget](screenshots/p4-panel-prefs-forget.png)
 
-**Reset preferences** puts back the choices that every registry entry says are reset (today the screen without
-lyrics and its dim time; the entries that other pages add say for themselves) and keeps the name, the Wi-Fi network,
-the choice between the cable and Wi-Fi, the wiring, the layout and the pairings. It goes through each entry's own
+**Reset preferences** puts back the choices that every registry entry says are reset (the screen without
+lyrics, its dim time, the brightness, the clock's hours and seconds and the night schedule; an entry that another page
+adds says for itself) and keeps the name, the Wi-Fi network, the choice between the cable and Wi-Fi, the wiring, the
+speaker layout, the time zone and the pairings. It goes through each entry's own
 setter, so the screen and the clock follow as they follow a change.
 
 **Factory reset** is the one action that can strand a board, so it asks twice. The first card says what is lost
