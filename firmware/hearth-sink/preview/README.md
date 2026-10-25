@@ -37,3 +37,9 @@ program's output converted to PNG.
 `speakers_options/` is a project of its own for the speakers view (planning/p4x-speakers-options.md): the old glow, the
 responsive glow and the pulse style drawn over a synthetic groove in 2.0, 5.1, 7.1.4 and 9.1.6 as stills and frame
 sequences, with the pixels each flushes counted, and `speakers_tune`, which chooses the glow's constants without LVGL.
+
+`meters_options/` is a project of its own for a Meters view (planning/p4x-meters-view.md): three variants of an instrument
+display after RME's (a third-octave spectrum with peak holds, level meters, a status line) at 1024 x 600, 480 x 320 and
+240 x 240 over the same groove, as stills and frame sequences, with the pixels each flushes counted at three sizes of LVGL's
+invalid-area table, and `meters_tune`, which holds the spectrum analysis (`spectrum.hpp`, the code a board would run) to
+a sine, to noise and to one long FFT, and prices it.
