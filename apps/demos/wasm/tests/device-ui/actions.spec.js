@@ -46,9 +46,8 @@ test.describe('with the clock running', () => {
         stub.next('PUT /name', { status: 409, body: REPLIES.nameRefused });
         await page.getByLabel('Name').fill('Kitchen');
         await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
-        await expect(page.getByRole('status')).toHaveText(
-            'Name Kitchen refused (409): not a name this player can hold: it is too long, or it could not be stored',
-        );
+        // The reply is the stand-in's, which contract.spec.js holds to control.cpp's: the page shows it as it is.
+        await expect(page.getByRole('status')).toHaveText(`Name Kitchen refused (409): ${REPLIES.nameRefused.trim()}`);
         await expect(page.getByRole('status')).toHaveClass(/error/);
     });
 

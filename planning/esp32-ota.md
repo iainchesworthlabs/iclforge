@@ -1239,9 +1239,9 @@ the network, the upload would pass through the chip being rewritten.
 
 ## Updates from GitHub releases (O10)
 
-**Status, 2026-10-25: designed, nothing built.** The owner took part of it the same day and changed the rest:
-[decisions 23, 26, 27, 29, 30 and 33](#decisions) are taken as recommended, 24, 25 and 28 are replaced by what
-the owner said about signing, and 31, 32 and 34 to 36 wait. This section takes up the two things the plan put
+**Status, 2026-10-25: designed, nothing built.** The owner decided most of it the same day:
+[decisions 23 to 30, 33, 34 and 35](#decisions) are taken (24, 25 and 28 as the owner reshaped them), and
+36's leaf lifetime; 31, 32, the rest of 36 and 37 wait. This section takes up the two things the plan put
 off: **pull** ([decision 3](#decisions): "pull can come later, for updates from a release server") and
 **signing**, which it makes a *process* around a certificate the owner already has, in place of the
 mechanism O7 designed ([Signing, later](#signing-later)). O8 and O9 are the published images and the guide,
@@ -1322,7 +1322,7 @@ published, `stable` (the newest release that is not a Pre-release) and `beta` (t
 {
   "format": 1,
   "channel": "beta",
-  "sequence": 2026110501,                  rises with every index published; a board keeps the highest
+  "sequence": 1793000000,                  unix seconds when CI signed it; a board keeps the highest
   "version": "v0.11.0-beta.1",             the release's tag, which is also the images' version
   "released": "2026-11-05",
   "images": [
@@ -1342,7 +1342,7 @@ published, `stable` (the newest release that is not a Pre-release) and `beta` (t
   "format": 1,
   "alg": "ecdsa-p256-sha256",              or "rsa-pkcs1-sha256", "rsa-pss-sha256"
   "sha256": "<64 hex of the index file, for a person comparing by eye>",
-  "chain": ["<base64 DER of the leaf>", "<base64 DER of the intermediate, if any>"],
+  "chain": ["<base64 DER of the leaf>", "<base64 DER of the sub-CA>"],   the root is never sent
   "signature": "<base64 of the signature over the index file's exact bytes>"
 }
 ```
@@ -1403,8 +1403,8 @@ Only then does the install begin, and the image has to match the entry's size an
 | | What signs, what the board holds | Fits | Does not fit |
 |---|---|---|---|
 | **A. A dedicated key** | A raw key pair made for firmware. The board holds the public key, or a self-signed certificate of it | The least code: no chain, no clock. Fine for a third party with no CA | No expiry, no chain, so a rollover is an update that carries two keys; the owner's CA is not used |
-| **B. A leaf from the owner's local CA, the CA in the board** *(recommended)* | Two new code-signing leaves, `stable` and `beta`, from the local CA. The board holds the CA (or a firmware intermediate under it) as its anchor | Uses the CA the owner has. A leaf can be reissued with no firmware change; beta and stable separate; expiry and a chain are real; a self-signed certificate as the anchor degenerates to option A with the same code, so a third party needs no CA | Needs X.509 on the board (already there for TLS) and a CA ceremony for the owner. A signing key the owner must keep |
-| **C. The Windows code-signing certificate, reused** | The certificate and key already in the owner's Windows store, signed through the store so the key never leaves it | Nothing new to make. Works with a non-exportable key and a smart card | One key signs Windows binaries and firmware, so a leak of either is both. It cannot be in CI. Its renewal follows Windows' rhythm. It cannot separate beta from stable (one leaf). If the anchor is the CA's root, **every** certificate that CA ever made for code signing becomes a firmware key unless the leaf name is pinned. The design accepts it for stable if the owner chooses, by pinning its subject name |
+| **B. A leaf from the owner's local CA, the CA in the board** *(recommended; taken by the owner)* | Two new code-signing leaves, `stable` and `beta`, from the local EJBCA. The board holds a firmware sub-CA (or the CA) as its anchor | Uses the CA the owner has. A leaf can be reissued with no firmware change; beta and stable separate; expiry and a chain are real; a self-signed certificate as the anchor degenerates to option A with the same code, so a third party needs no CA | Needs X.509 on the board (already there for TLS) and a CA ceremony for the owner. Two leaf keys to keep, as secrets of two GitHub environments |
+| **C. The Windows code-signing certificate, reused** | The leaf already in the organisation secrets `WIN_TESTSIGN_PFX_*`, signed with in CI the way `sign-windows` does | Nothing new to make, and CI already has the pattern | One key signs Windows binaries and firmware, so a leak of either is both; the secrets are organisation-wide, readable by the other repositories they are shared with; one leaf for both channels; its renewal follows the Windows leaf's (365 days at most). If the anchor is the CA's root, **every** certificate that CA ever made for code signing becomes a firmware key unless the leaf name is pinned. The design accepts it for stable if the owner chooses, by pinning its subject name |
 | **D. Keyless Sigstore** | GitHub's workflow identity gets a ten-minute certificate from Fulcio and the signature goes in the Rekor log | No key to keep. The release already makes these attestations for people (`gh attestation verify`) | A board would need Fulcio's roots, Rekor's keys and a TUF-distributed trust root that rotates; the certificate is valid for minutes, so the board must verify a log timestamp and an identity extension; a JSON-and-protobuf bundle to parse. Far more code and RAM than A, B or C, and a dependency on a public service being up. Right for people, wrong for a board |
 
 **Recommend B.** One mechanism covers everything from a lone developer's self-signed certificate to the
@@ -1433,36 +1433,38 @@ owner makes the keys, and sessions only write the tools and the documents.
 
 #### Making the keys
 
-The owner, once.
+The owner, once, with [the EJBCA guide](hearth-firmware-signing-ejbca.md):
 
-1. Decide the anchor. Best: a **firmware intermediate** under the local root (a CA certificate that may only
-   sign code-signing leaves, path length 0) so that nothing else the root ever issued can sign firmware. If
-   the local CA cannot make one, the anchor is the root and the leaf-name pin does the same job.
-2. Issue **two leaves** from it, "ICL Forge firmware stable" and "ICL Forge firmware beta" (the names are
-   the pins), each for code signing, each with the key type the CA offers. ECDSA P-256 gives the smallest
-   files; RSA 2048 or better is accepted. Give them about two years, since expiry is a rollover prompt
-   ([Rollover](#rollover-floors-and-revocation)).
-3. Export **only the anchor's public certificate** and give it to the repository as `firmware/keys/trust.pem`
-   (a build setting, `ICLFORGE_FIRMWARE_TRUST_ANCHORS`). That file is public. The leaves' private keys stay
-   where they are: in the Windows store if they were made there, with a backup of the CA kept as the owner
-   already keeps it. The beta key may live somewhere easier to reach than the stable one; that is the point of
-   having two.
-4. Write down, in `docs/releasing.md`, who holds which key and where the backup is.
+1. A **firmware sub-CA** under the local root, "Iain Chesworth Labs Firmware CA" (RSA 3072, path length 0, key
+   usage `keyCertSign` and `cRLSign`), so that nothing else the root ever issued, the Windows signing
+   certificate included, can sign firmware. If the root's key is not in EJBCA the guide's external route makes
+   the same sub-CA; if even that is more than is wanted today, the root as the anchor with the leaf names
+   pinned does the same job and the board is unchanged.
+2. **Two profiles** copied from the Windows pair (`code signer`, `local code signing`) and narrowed to this one
+   sub-CA, RSA 3072 only, two years, `CA:FALSE`, key usage `digitalSignature` only, extended key usage
+   `codeSigning` only, all critical, with no CRL, AIA, OCSP or alternative name (the board checks none).
+3. **Two leaves**, `Hearth Firmware Stable` and `Hearth Firmware Beta` (the names are the pins), each from a key
+   and a certificate request made on the owner's machine, so a private key never reaches EJBCA. RSA 3072 with
+   SHA-256 is what the existing profile issues, a board already carries RSA for TLS, and ECDSA P-256 would save
+   about 2 KB per signature file, so it is chosen only if a profile that allows it already exists.
+4. The public certificate of the sub-CA goes into the repository as `firmware/keys/trust.pem` (a build setting,
+   `ICLFORGE_FIRMWARE_TRUST_ANCHORS`). Each leaf's key and certificate go into a PFX that is saved as the two
+   secrets of its GitHub environment ([CI signing](#ci-signing)); the owner keeps the key files and their
+   passphrases offline in two places, which is the only recovery for a lost leaf key (a new leaf is issued, and no
+   board changes).
+
+Nothing in a session touches key material: sessions write the tools and the documents, and check the public
+certificates and the screenshots the owner sends back.
 
 #### Publishing a release
 
-In the first slices this is by hand, with no workflow edit. CI already builds and packages the
-images (O8). Then, on the owner's machine:
-
-1. `package_firmware.py index` writes `hearth-update-<channel>.json` from the release's manifest.
-2. `sign_index` signs it: a Python script for a key in a file, and a PowerShell script for a key in the
-   Windows store (the key signs through the store and never leaves it). It writes the signature file and
-   verifies it with an independent implementation before it says it is done.
-3. `gh release upload firmware-channels ... --clobber` puts the pair on the channel release, **images first**.
-
-This puts a human at every release, which is the gate, puts no secret in GitHub and edits no workflow.
-Automating beta, the lower-stakes channel, with a leaf held in a reviewer-gated CI environment is the first
-piece of [Later hardening](#later-hardening); stable stays on the owner's machine until the owner says.
+CI does it ([CI signing](#ci-signing)). A release run builds and packages the images (O8) and publishes the
+release. Then the `firmware-channels` workflow builds each channel's index from the release's manifest
+(`package_firmware.py index`), signs it in that channel's GitHub environment (`sign_index.py sign`), uploads the
+pair to the `firmware-channels` release with the images already up and the index last, and downloads it back
+and verifies it as a board would. A `workflow_dispatch` of the same workflow signs any release again, which is how
+a leaf renewal reaches the channels. A person with a leaf key on their machine can do the same by hand with the
+same two commands, which is how a third party without CI publishes ([A third party's own channel](#a-third-partys-own-channel)).
 
 #### Replacing the anchor
 
@@ -1485,7 +1487,7 @@ What can go wrong, and what a person does. None needs a cable unless it says so.
 | What happened | What the board does | What the person does |
 |---|---|---|
 | The anchor in a build is wrong | Pulls fail with "the update list is not trusted"; pushes work | Push a corrected build |
-| A leaf key is lost | Pulls stay as they were; nothing new can be signed | Issue a new leaf from the CA, same name, and sign the next index. No firmware change |
+| A leaf key is lost | Pulls stay as they were; nothing new can be signed | Issue a new leaf from the sub-CA, same name, replace the two secrets of its environment, and run the signing workflow again for the current release. No firmware change |
 | A leaf key leaks | An attacker holding it and the transport can feed boards | Issue a new leaf; publish an index that raises the leaf floor ([Rollover](#rollover-floors-and-revocation)) |
 | The CA key is lost | Existing boards keep trusting a CA that can sign no more | Push (or USB) builds with a new anchor, each board once. A pull cannot do it |
 | The CA key leaks | As above, for every channel it signed | The same, at once |
@@ -1538,6 +1540,83 @@ and closes the TLS session before it verifies, so the check does not sit on top 
 to 12 KiB, and the parsed chain, a few KB, freed after. These are estimates, to be measured in slice O10b. The
 cost to the image is X.509 chain verification and the signature algorithms, which TLS to GitHub already pulls in
 (an ECDSA chain from `github.com`, an RSA one from the CDN).
+
+### CI signing
+
+**What exists (read from the workflows and docs on 2026-10-25).** iclforge signs no Windows binary today: the
+documents say "no code-signing certificate yet", and nothing in `.github` signs a Windows file. The pattern the
+owner means is the shared repository `icl-common-infra`'s `sign-windows` action, which arinc-data-loader's
+release workflow uses:
+
+- a repository variable `SIGN_WINDOWS` that is `false` (the default; nothing signed), `test` or `production`
+  (reserved, fails until a service is chosen);
+- in `test` mode a leaf PFX in **organisation** secrets `WIN_TESTSIGN_PFX_BASE64` and `WIN_TESTSIGN_PFX_PASSWORD`
+  (visible to selected repositories), written to a temporary file on a Windows runner, `signtool sign /fd SHA256`
+  with an RFC 3161 timestamp, the file removed, the signature checked afterwards;
+- the leaf is `CA:FALSE`, key usage `digitalSignature`, extended key usage `codeSigning`, RSA 3072, SHA-256, at
+  most 365 days; the CA key is offline and never in CI, only the leaf reaches it.
+
+**This corrects what an earlier version of this section said**, that the Windows certificate "cannot be in CI". A
+PFX in a secret is exactly how it is. What the firmware keeps from the pattern: the mode variable that makes a
+merged workflow harmless until it is switched on, the leaf PFX in a secret and nothing else, and the check after
+signing. What it does not reuse: the Windows leaf itself (its secrets are organisation-wide, so any repository
+with access could read a firmware key, and one key would do two jobs and both channels), and `signtool`, which is
+Authenticode and has nothing to do with an index file.
+
+**The workflow.** A new `firmware-channels.yml`, modelled on `manifest-bump.yml` (a `workflow_call` that
+`release.yml` calls as its last job, and a `workflow_dispatch` with `version_tag` and `dry_run`, default true, so
+it can be tried against any release that exists):
+
+| Job | Runs on | Needs the secret | Does |
+|---|---|---|---|
+| `index` | `ubuntu-latest`, `contents: read` | no | Downloads the release's `hearth-sink-manifest.json`; `package_firmware.py index` writes the unsigned `beta` index, and the `stable` one when the release is not a Pre-release; refuses an index older than the published one (a re-run of an old tag cannot move a channel back) |
+| `sign-beta` | `ubuntu-latest`, `contents: read`, **`environment: firmware-beta`** | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` | `sign_index.py sign` reads the PFX from the environment into memory (no file), signs, checks the leaf is a code-signing leaf with the pinned name and at least 60 days left (a warning under 60, a failure when expired), and verifies the result against the committed `firmware/keys/trust.pem` |
+| `sign-stable` | the same, **`environment: firmware-stable`** | the same names, the stable leaf's values | the same, for the `stable` index; skipped for a Pre-release |
+| `publish` | `ubuntu-latest`, `contents: write` | no | Makes the `firmware-channels` Pre-release if it is missing; uploads each pair with `--clobber`; downloads the pair back from the public URL with no token and runs `sign_index.py verify`; checks that every file the index names is downloadable. With `dry_run` it stops before the upload |
+
+- **`dry_run` signs with a throwaway CA made in the job**, so every dry run exercises the whole pipeline and no
+  environment secret is read; the pair is verified against that throwaway anchor, and nothing is published.
+- **A switch.** The repository variable `PUBLISH_FIRMWARE_CHANNELS` (`false` by default) gates the real jobs, as
+  `SIGN_WINDOWS` does. This matters: a workflow job that names an environment that does not exist *creates it*
+  with no reviewer, so merging the workflow before the owner has set the environments up would run the stable
+  job unguarded. With the variable `false` nothing runs; the owner sets it to `true` last.
+- **It cannot hurt the release.** Like `manifest-bump`, its job in `release.yml` needs `github-release` and fails
+  after the release is published, never before; the stable job waiting for an approval holds up nothing else.
+- **The signing jobs stay small.** Python and `cryptography`, installed from a hash-locked requirements file,
+  and `actions/checkout` and the artifact actions pinned by SHA as in every workflow here; no other third-party
+  action sees the key. The tools run from `main`, not from the tag, so an old tag can be signed again with
+  today's tool.
+- **Why a separate reusable workflow:** it adds one job at the end of `release.yml` and a file nothing else
+  edits; see the conflicts below.
+
+**What the owner creates** (a session never runs `gh secret set`; these are in the GitHub web pages):
+
+| Where | What | Value |
+|---|---|---|
+| Settings, Environments | `firmware-beta` | Deployment branches and tags: `main` and `v*`. No reviewer (recommended: see below). Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
+| Settings, Environments | `firmware-stable` | The same, and **Required reviewers: the owner** (recommended). The same two secret names, for the **stable** leaf |
+| Settings, Rules | A tag ruleset for `v*` | Only the owner may create a tag that matches. An environment secret is readable by a run on any ref the environment allows, and `v*` allows tags, so who can make a tag is who can read a beta key |
+| Settings, Secrets and variables, Actions, Variables | `PUBLISH_FIRMWARE_CHANNELS` | `true`, **last**, once the two environments and the tag ruleset exist |
+| Not these | `WIN_TESTSIGN_PFX_*` | Never reused for firmware |
+
+**The question for the owner: does stable need a reviewer, and does beta not?** Recommend **yes, and no.** The
+beta leaf signs only what beta boards read (the owner's development kits, which take unsigned pushes anyway), so
+a run that signs it is not worth a click. The stable leaf is the one a person who is not the owner would rely
+on, and a click that shows the owner which release is about to be signed is the gate "a human at every release"
+asked for, at the cost of one approval at each stable release (the job waits; the release is already out). If
+the owner wants no click at all, `firmware-stable` without a reviewer works the same and signs unattended.
+
+**What would conflict with PR #1621 (the release prep), read on 2026-10-25.** #1621 changes `release.yml` in the
+`resolve-version` job (an added `REPO` variable and a `render_release_notes.py --check` call near line 97 to 150),
+`_static.yml`, `CHANGELOG.md`, `firmware/esp-idf/iclforge/idf_component.yml` and `tools/release`. The firmware
+workflow adds a job after `manifest-bump` at the end of `release.yml`, a new file, and tool files under
+`tools/hearth`: no textual overlap, so no conflict while they merge in either order. The one real interaction is
+`CHANGELOG.md`: #1621 turns `[Unreleased]` into the 0.11.0-beta.1 section, and its own notes say to merge it last,
+since anything added to `[Unreleased]` before then becomes part of that release's notes (already 541k characters
+against a 125k limit). So the firmware slices keep their CHANGELOG lines out of `[Unreleased]` until #1621 has
+landed, or the owner decides they belong in 0.11.0-beta.1. Also: the channel index is only published for a
+release that carries sink firmware, which the first one to do so is whichever the owner cuts after the signing
+slice lands.
 
 ### What an update may do
 
@@ -1736,40 +1815,42 @@ replies (`/firmware/available` for each state).
 
 ### Packaging and CI
 
-What the build and the release must emit. **No workflow is edited by the first slices**: the signing is on the
-owner's machine and the publishing is `gh`, so `release.yml`, `wheels.yml` (which publishes to PyPI on a tag
-push) and the release prep (PR #1621) are untouched. When automation is wanted, the coordinator is told before
-any workflow is.
+What the build and the release must emit. Workflow edits are allowed now, each in a PR of its own and told to the
+coordinator first; they are listed under [CI signing](#ci-signing), and `wheels.yml` (which publishes to PyPI on a
+tag push) and the release prep (PR #1621) are not touched by them.
 
 1. `package_firmware.py index` (a new command): writes `hearth-update-<channel>.json` from the merged
    `hearth-sink-manifest.json` of a release, for the channel it is given. The images need nothing new: they
    carry no signature, so there is no `sdkconfig.sign`, no 4 KiB, no change to `check_esp_efuse_free.py` and
    no ESP-IDF setting to prove.
-2. `sign_index` (a new tool beside `ota.py`, in two forms): a Python script that signs with a key in a file
-   (`cryptography`, with `--key`), and a PowerShell script that signs with a certificate in the Windows store
-   (`.NET`'s `SignData`, so the key never leaves the store). Both write the same signature file, both verify
-   it before they finish, and both are tested against an independent verifier. A third command, `verify`,
-   checks a pair against an anchor file: what a person uses to look at a channel before they trust it.
+2. `sign_index.py` (a new tool beside `ota.py`): `sign` signs an index with a leaf from a PFX in the environment
+   or a key file and writes the signature file; `verify` checks a pair against an anchor file the way a board
+   does, and is what a person uses to look at a channel before they trust it; `selftest` makes a throwaway CA and
+   two leaves, for tests and for the workflow's dry run. It needs `cryptography`, installed from a hash-locked
+   requirements file; the rest is the standard library. A PowerShell form that signs through a key in the Windows
+   certificate store (`SignData`, so the key never leaves it) is a manual fallback only: CI cannot use a
+   non-exportable key. Each is tested against an independent verifier.
 3. `check_firmware_package.py`: the index agrees with the manifest (sizes, SHA-256, no image missing for
    a profile that publishes one), and every file name in it is one the release has.
-4. Docs: `docs/hearth/sink-firmware.md` (updating from the screen and the page), `docs/releasing.md` (the key
-   ceremony above, the two publishing commands, rollover, the recovery table), CHANGELOG.
+4. The `firmware-channels.yml` workflow and one job in `release.yml` ([CI signing](#ci-signing)).
+5. Docs: `docs/hearth/sink-firmware.md` (updating from the screen and the page), `docs/releasing.md` (the key
+   ceremony, the environments, rollover, the recovery table), CHANGELOG (after #1621 has landed).
 
 Nightly and pull-request runs build and package images as today and publish no index.
 
 ### Slices
 
-**The smallest first slice that gives value** is O10a, O10b and O10c together, merged one after the other: a
-board checks GitHub, verifies a signed index and installs the image it names, and nothing about pushing
+**The smallest first slice that gives value** is O10a, O10b and O10c together, merged one after the other: CI
+signs an index, a board checks GitHub, verifies it and installs the image it names, and nothing about pushing
 changes. What it leaves out is everything that is machinery rather than value: an anchor stored on the board,
-a policy setting, a leaf floor, CI signing. Each slice is a PR of its own, and none touches a board until the
+a policy setting, a leaf floor. Each slice is a PR of its own, and none touches a board until the
 coordinator gives a window.
 
 | Slice | What | Tested by | Needs a board window |
 |---|---|---|---|
-| **O10a, the index, the signature and a host-tested library** | `firmware_update.hpp` in `libs/device` (version compare, index and signature parse, image selection, the policy table, the state's JSON and words; no ESP-IDF); `package_firmware.py index`; `sign_index` (Python and PowerShell) and `verify`; `check_firmware_package.py`; `ota.py` untouched | Host: Catch2 cases for every rule and a version table, with a verifier result passed in. Python: a signed pair made by `sign_index` is checked by the independent verifier, for RSA and ECDSA, with a throwaway CA kept as a fixture | No |
+| **O10a, the index, the signature and a host-tested library** | `firmware_update.hpp` in `libs/device` (version compare, index and signature parse, image selection, the policy table, the state's JSON and words; no ESP-IDF); `package_firmware.py index`; `sign_index.py` (`sign`, `verify`, `selftest`) and a PowerShell fallback for a Windows-store key; `check_firmware_package.py`; `ota.py` untouched | Host: Catch2 cases for every rule and a version table, with a verifier result passed in. Python: a pair signed by `sign_index.py` with a throwaway CA and leaves made in the test (`selftest`) is checked by an independent verifier, for RSA 3072 and for ECDSA | No |
 | **O10b, the board's pull** | `firmware_pull.cpp` in the component beside `firmware.cpp` (the upload core takes chunks from either source), the chain and signature check with mbedTLS against the build's anchors, the four routes, Kconfig (`ICLFORGE_FIRMWARE_PULL`, `_UPDATE_BASE_URL`, `_UPDATE_CHANNEL`, `_TRUST_ANCHORS`, `_LEAF_STABLE`, `_LEAF_BETA`), the certificate bundle, the NVS keys, the four-place route word list, `stub.js` | Host: the policy and JSON from O10a. **QEMU:** a loopback HTTP server serves an index, its signature and an image, signed by the fixture CA; the base URL accepts `http://` only in `sdkconfig.ci-ota`, and the signature rules are not relaxed; a wrong anchor, a wrong leaf name, a tampered index, an old `sequence`, an expired leaf and a wrong image hash are each refused; a **push of an unsigned image still works**. TLS is not tested here (no clock) | Yes: the TLS handshake with the three real hosts, RAM and flash measured, on the S3, the C6 (16 MB) and the P4 or the kit; a real pull from a throwaway channel release signed by the owner's leaf |
-| **O10c, the process** | `docs/releasing.md`: the key ceremony, the two publishing commands, rollover, recovery. The `firmware-channels` release made by hand, with the public anchor in `firmware/keys/` | `ota.py --release latest` and `installer_site.py` ignore the channel release; a dry run of the commands on a throwaway tag | No (the owner makes the keys and the release) |
+| **O10c, the workflow and the process** | `firmware-channels.yml` and one job in `release.yml` ([CI signing](#ci-signing)), in a PR of its own; `docs/releasing.md`: the key ceremony, the environments, rollover, recovery. The owner's EJBCA work, the environments and the public anchor in `firmware/keys/` | The linters the workflows already pass (actionlint, zizmor); a `dry_run` dispatch, which signs with a throwaway CA and publishes nothing; `ota.py --release latest` and `installer_site.py` ignore the channel release | No (the owner makes the keys, the environments and the variable) |
 | **O10d, Preferences and the page** | The four registry entries, `BoardCaps::update` and its variants, the `Backend` methods; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
 
 ### Later hardening
@@ -1778,9 +1859,6 @@ Each is its own slice, built only if the owner wants it, in this order of value:
 
 - **The leaf floor and `expires`**: `min_leaf_issued` and an optional `expires` in the index, raised and checked
   from signed data; the answer to a leaked leaf and to a freeze.
-- **CI signs beta**: a beta leaf held as an exportable key in a reviewer-gated CI environment (a secret the
-  owner creates; a session never runs `gh secret set`), the index built and signed by the release job. Stable
-  stays by hand.
 - **The anchor at the board**: the NVS override, the presence window (a button on the screen, or a power-on
   reset), "Use the built-in key", and their registry entries and routes (`PUT` and `DELETE /firmware/trust`).
 - **Policy `all`**: an opt-in setting under which a push must also carry a signature (a detached signature over
@@ -1791,8 +1869,8 @@ Each is its own slice, built only if the owner wants it, in this order of value:
   images on the host, where its size does not matter.
 - **An opt-in daily check** that only changes the screen to "available" ([decision 30](#decisions)).
 
-**Exit of the first slice:** a board on the desk checks, installs a release signed by the owner's leaf from
-GitHub, passes its trial, and reports "Updated to ...", while the same board still takes an unsigned build by
+**Exit of the first slice:** a board on the desk checks, installs a release whose index CI signed with the
+owner's leaf from GitHub, passes its trial, and reports "Updated to ...", while the same board still takes an unsigned build by
 `PUT /firmware`, and refuses an index signed by another CA. The exit waits for the owner's CA certificate
 and a signed channel release (O10c).
 
@@ -1957,8 +2035,8 @@ boards leave development, and if that is before O8, O8's images are published si
   a board checks for a newer release, shows it, and installs it, from a signed index. Four slices, each its
   own PR: O10a the index, the signature and a host-tested library; O10b the board's pull and its routes;
   O10c the process (the keys, the first signed channel release); O10d the Preferences entry and the page.
-  Later hardening is listed, not scheduled. **Status: designed 2026-10-25;** the owner took decisions 23, 26,
-  27, 29, 30 and 33 and replaced 24, 25 and 28; 31, 32 and 34 to 36 wait. **Exit:** a board on the desk checks,
+  Later hardening is listed, not scheduled. **Status: designed 2026-10-25;** the owner took decisions 23 to 30,
+  33, 34 and 35; 31, 32, most of 36 and 37 wait. **Exit:** a board on the desk checks,
   installs a release signed by the owner's leaf from GitHub, passes its trial, and still takes an unsigned
   build sent by `PUT /firmware`.
 
@@ -2068,7 +2146,7 @@ Outcomes, 2026-09-30. Decisions 1, 3 to 8 and 10 to 21 were built as recommended
 (a) each time; decision 6 is a decision not to build something, and it stands. Decision 2 was
 taken as (c) while the boards are in development, and its (a) is O7, which is not built.
 Decision 9 was taken as (a), and the study is all of it that exists. Decision 22 is open: nothing
-pins `esp_hosted`. Decisions 23 to 36 are those of O10 (2026-10-25): the owner took 23, 26, 27, 29, 30 and 33, replaced 24, 25 and 28, and the rest are proposals.
+pins `esp_hosted`. Decisions 23 to 37 are those of O10 (2026-10-25): the owner took 23 to 30, 33, 34, 35 and 36's lifetime, and the rest are proposals.
 
 1. **Update scheme.** (a) **two slots and a rollback bootloader**; (b) a small factory recovery
    app plus one update slot; (c) one slot and a staging area. **Recommend (a).** It is the only
@@ -2194,9 +2272,9 @@ pins `esp_hosted`. Decisions 23 to 36 are those of O10 (2026-10-25): the owner t
     what a clean build happened to fetch. Cost: each new release is taken by hand, and once O6
     ships, a new `esp_hosted` means a co-processor update as well.
 
-Taken by the owner on 2026-10-25: 23 (b), 26, 27, 29, 30 and 33, as recommended (26 for a pull only: see
-below). The owner replaced 24, 25 and 28 with what they said about signing, which is what the O10 section
-now describes; 31, 32 and 34 to 36 are proposals.
+Taken by the owner on 2026-10-25: 23 (b), 26, 27, 29, 30 and 33 as recommended (26 for a pull only), 24 (a) and
+25 (a) with the owner's own CA (EJBCA), 28 (a), 34 (a) and 35 (a) (CI signs), and 36's lifetime. 31, 32, the rest
+of 36 and 37 are proposals.
 
 23. **Where a board learns what the newest release is.** (a) GitHub's REST API; (b) **an update index, one
     small JSON file for each channel with a signature file beside it, published as assets of a long-lived
@@ -2222,17 +2300,17 @@ now describes; 31, 32 and 34 to 36 are proposals.
     for a board. (e) leaves every board's code in the hands of whoever holds the GitHub account. Cost of
     (a): X.509 chain verification and a signature algorithm on the board (the code TLS needs anyway), two
     small files fetched beside the index, and a signing tool; it does not defend a board against its own
-    LAN. **Replaces the earlier (a), which the owner's principles rule out.**
+    LAN. **Replaces the earlier (a), which the owner's principles rule out. Taken 2026-10-25: (a).**
 25. **Whose certificate signs.** (a) **two new code-signing leaves, `stable` and `beta`, from the owner's local
-    CA, the CA (best, a firmware intermediate under it) as the anchor in the board, the leaf names pinned in
-    the build**; (b) the Windows code-signing certificate reused, as the stable leaf or both; (c) a raw
+    CA (EJBCA), a firmware sub-CA under it as the anchor in the board, the leaf names pinned in the build**; (b) the Windows code-signing certificate reused, as the stable leaf or both; (c) a raw
     dedicated key or a self-signed certificate; (d) keyless Sigstore. **Recommend (a).** Beta and stable have
     keys that cannot stand in for each other; a leaf is replaced with no firmware change; the Windows key
     signs Windows binaries only. (b) costs nothing now and is allowed by the design (pin its subject name),
-    at the price of one key doing two jobs, no CI, and one leaf for both channels. The owner supplies:
+    at the price of one key doing two jobs, an organisation-wide secret, and one leaf for both channels. The owner supplies:
     the CA's public certificate, whether it can make an intermediate, the key type it offers, and whether a
-    leaf's key can be exported. Cost of (a): a ceremony at the CA, two keys to keep, a rollover about every
-    two years. See [Trust and signing](#trust-and-signing).
+    leaf's key can be exported. Cost of (a): a ceremony at the CA ([the EJBCA guide](hearth-firmware-signing-ejbca.md)),
+    two keys to keep, a rollover about every two years. See [Trust and signing](#trust-and-signing).
+    **Taken 2026-10-25: (a).**
 26. **What an update may do to the version.** (a) **a pull installs only a strictly newer version, with
     `secure_version` and the index's `sequence` no lower than the board's; a push and a rollback are
     unchecked**; (b) any signed image. **Recommend (a).** A signature says who approved an index, not that
@@ -2282,18 +2360,28 @@ now describes; 31, 32 and 34 to 36 are proposals.
     (a).** A push is never refused, so the first way is complete; the override matters only once a policy
     can refuse a push. Cost of (a): until the override exists a person who cannot build must be given an
     image. Cost of (b): a surface that can be set wrong (pulls fail until it is reset) and a presence
-    design to get right before it earns anything.
-35. **Who signs, and when.** (a) **the owner, by hand, on their machine for both channels, with the images
-    first and the signed index last; no workflow edit and no secret in GitHub; later the beta leaf in a
-    reviewer-gated CI environment**; (b) CI signs both from the start; (c) the owner signs both for good.
-    **Recommend (a).** The key may not be exportable at all, a human at each release is the gate the owner
-    wants, and nothing in `release.yml` has to change before a release is cut. Cost: a manual step at every
-    release, and a release is not complete until it is signed; (b) puts a stable key where any workflow can
-    reach it; (c) keeps beta slow.
+    design to get right before it earns anything. **Taken 2026-10-25: (a).**
+35. **Who signs, and when.** (a) **CI, in the release run, each channel's leaf as a secret of a GitHub
+    environment of its own, in a workflow of its own that `release.yml` calls last (the pattern of
+    `manifest-bump.yml`), behind a repository variable that keeps it off until the owner has set the
+    environments up**; (b) the owner, by hand, on their machine; (c) CI for beta and the owner for stable.
+    **Recommend (a),** the owner's: "just let CI do the signing. We already do that for Windows signing."
+    The Windows pattern is a PFX in a secret and `signtool`; this is the same shape with a different leaf and
+    no `signtool`. Cost: a key in GitHub's secret store (two, one for each channel, apart from the Windows
+    one), so who can run a workflow on an allowed ref is who can read it (a tag ruleset and a reviewer on
+    stable narrow that); (b) is a click and a laptop at every release. **Taken 2026-10-25: (a).**
 36. **Revocation, expiry and the clock.** (a) **no revocation list: `sequence` now; a leaf floor
     (`min_leaf_issued`) and an optional `expires`, from signed data, later; the anchor's dates ignored, the
-    leaf's and the intermediate's judged against the clock when it is set, failing closed with a message**;
-    (b) a CRL or OCSP; (c) dates ignored altogether. **Recommend (a).** A board with no clock cannot pull in
-    any case (TLS needs it), and a floor is two dates in signed data. Cost: a leaked leaf stays good on a board
-    that has not fetched a newer index; (b) is machinery a board should not carry; (c) lets an expired
-    leaf, or one made before a CA was rebuilt, sign for ever.
+    leaf's and the intermediate's judged against the clock when it is set, failing closed with a message;
+    leaves last two years and CI warns 60 days before one ends**; (b) a CRL or OCSP; (c) dates ignored
+    altogether. **Recommend (a).** A board with no clock cannot pull in any case (TLS needs it), and a floor is
+    two dates in signed data. Cost: a leaked leaf stays good on a board that has not fetched a newer index;
+    (b) is machinery a board should not carry; (c) lets an expired leaf, or one made before a CA was rebuilt,
+    sign for ever. **Lifetime taken 2026-10-25: one to two years is fine; the rest is a proposal.**
+37. **Who approves a signing run.** (a) **a required reviewer on `firmware-stable` (the owner), none on
+    `firmware-beta`**; (b) none on either; (c) a reviewer on both. **Recommend (a).** The beta leaf signs only
+    what beta boards read, which are development kits that take unsigned pushes anyway; the stable leaf is the
+    one someone who is not the owner relies on, and the click shows the owner which release is about to be
+    signed. Cost: one approval at each stable release, with the release already out meanwhile. (b) signs
+    unattended, and a hostile workflow on an allowed ref could read the stable key without a human seeing it.
+    A proposal.

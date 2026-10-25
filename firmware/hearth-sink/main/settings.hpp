@@ -22,8 +22,10 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 
+#include "iclforge/device_name.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
@@ -31,8 +33,9 @@
 namespace player {
 
 // The longest a name may be, mDNS's own limit on an instance name's label
-// (RFC 6763 §4.1.1 is 63 octets; this is the shorter thing a person types).
-inline constexpr std::size_t kMaxNameBytes = 32;
+// (RFC 6763 §4.1.1 is 63 octets; this is the shorter thing a person types). The rule for what a name
+// is - well-formed text, nothing invisible, no space at either end - is iclforge/device_name.hpp's.
+inline constexpr std::size_t kMaxNameBytes = iclforge::devname::kMaxBytes;
 // WPA2's own limits: 32 octets of SSID, 63 of passphrase.
 inline constexpr std::size_t kMaxSsidBytes = 32;
 inline constexpr std::size_t kMaxPasswordBytes = 63;
@@ -122,9 +125,9 @@ void settings_load();
 [[nodiscard]] bool board_mac(std::span<std::uint8_t, 6> mac);
 
 // Store one field and keep it in `settings()`. Each returns false if the value
-// is not one this board can hold - a name longer than kMaxNameBytes, a slot
-// width that is not 16 or 32 - or if NVS refused the write, and says which on
-// the console. A refused write leaves the setting as it was.
+// is not one this board can hold - a name that iclforge::devname::check_name()
+// refuses, a slot width that is not 16 or 32 - or if NVS refused the write, and
+// says which on the console. A refused write leaves the setting as it was.
 [[nodiscard]] bool settings_set_name(std::string_view name);
 [[nodiscard]] bool settings_set_network(std::string_view ssid, std::string_view password);
 [[nodiscard]] bool settings_set_slot_bits(int bits);
@@ -146,9 +149,21 @@ void settings_load();
 // The stored layout text (already checked as a layout by the caller); an empty string takes it away.
 [[nodiscard]] bool settings_set_layout(std::string_view layout);
 
+// The name a board has until someone names it: "hearth-" and the low three bytes of its MAC.
+[[nodiscard]] std::string settings_default_name();
+
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one
-// derived from the MAC.
+// derived from the MAC, and the network, the wiring and every preference with it,
+// in memory as well as in NVS. This is the factory reset's (the Sendspin pairings
+// are the player's, sendspin_pairing("forget"), and the WiFi driver's own copy of the
+// network is network_forget_driver_state()).
 [[nodiscard]] bool settings_forget();
+
+// Reset preferences: the keys iclforge/settings_keys.hpp lists as preferences are erased and their fields
+// go back to the image's defaults, at once. The name, the network, the wiring, the layout and the
+// technical settings stay, and so do the pairings. False if NVS refused any erase; the preferences that
+// could be reset are.
+[[nodiscard]] bool settings_reset_preferences();
 
 }  // namespace player
