@@ -298,6 +298,7 @@ bool display_open(Display& out) {
     out.height = kHeight;
     out.frame = static_cast<const std::uint16_t*>(g_frame);
     out.touch = touch;
+    out.backlight = g_backlight_ready;
     out.kind = "dsi";
     std::printf("panel: EK79007 %d by %d on MIPI DSI, touch %s\n", kWidth, kHeight,
                 touch ? "on" : "off");

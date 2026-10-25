@@ -5,6 +5,7 @@
 #include <string>
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/preferences.hpp"
 #include "iclforge/render/room_plan.hpp"
 #include "iclforge/wall_clock.hpp"
 
@@ -105,10 +106,9 @@ struct NowSettings {
 // The backlight, percent (display.hpp's display_set_backlight on the firmware).
 void set_backlight(int percent);
 
-// A choice made on the sheet: stored (settings.hpp) and followed at once, as PUT /now-playing and
-// PUT /dim-after do.
-void choose_now_view(iclforge::nowview::View view);
-void choose_dim_after(int minutes);
+// The preferences' side of this board (iclforge/preferences.hpp): what the Preferences sheet reads and sets, stored
+// (settings.hpp) and followed at once, as PUT /now-playing, PUT /dim-after and the rest do.
+[[nodiscard]] iclforge::prefs::Backend& preferences_backend();
 
 // A monotonic clock, microseconds.
 [[nodiscard]] std::int64_t time_us();

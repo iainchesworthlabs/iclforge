@@ -23,6 +23,7 @@
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/preferences.hpp"
 #include "iclforge/wall_clock.hpp"
 
 // The web UI's two files. CMakeLists.txt embeds them (EMBED_FILES) and they stay
@@ -213,7 +214,7 @@ const char* chip_name(esp_chip_model_t model) {
 // runs, unlike everything /status reports. CONFIG_IDF_TARGET and
 // CONFIG_SOC_CPU_HAS_FPU are this build's own, always-defined macros;
 // esp_chip_info and esp_psram_get_size read the silicon actually under it.
-HardwareFacts gather_hardware_facts(const ControlHandlers& handlers) {
+HardwareFacts gather_hardware_facts(int sink_max_slots, int sink_max_slots_bits) {
     HardwareFacts facts;
     facts.target = CONFIG_IDF_TARGET;
     esp_chip_info_t chip{};
@@ -237,12 +238,8 @@ HardwareFacts gather_hardware_facts(const ControlHandlers& handlers) {
 #if CONFIG_SPIRAM
     facts.psram_bytes = esp_psram_get_size();
 #endif
-    if (handlers.sink_max_slots) {
-        facts.sink_max_slots = handlers.sink_max_slots();
-    }
-    if (handlers.sink_max_slots_bits) {
-        facts.sink_max_slots_bits = handlers.sink_max_slots_bits();
-    }
+    facts.sink_max_slots = sink_max_slots;
+    facts.sink_max_slots_bits = sink_max_slots_bits;
 // The ESP32-P4's own pre-production-silicon accommodation
 // (docs/platforms/bare-metal/esp32-p4.md, "The chip revision, and what it
 // blocks"): a build that lowers the bootloader's revision floor below the
@@ -299,7 +296,8 @@ std::string_view app_field(const char (&field)[N]) {
 }
 
 std::string build_hardware_json(const ControlHandlers& handlers) {
-    const HardwareFacts facts = gather_hardware_facts(handlers);
+    const HardwareFacts facts = gather_hardware_facts(handlers.sink_max_slots ? handlers.sink_max_slots() : 0,
+                                                      handlers.sink_max_slots_bits ? handlers.sink_max_slots_bits() : 0);
     const HardwareReport report = describe_hardware(facts);
     // The firmware on the board, from the description the build stamps into
     // the image: the project's name, its version (PROJECT_VER, or `git
@@ -414,6 +412,10 @@ esp_err_t send_file(httpd_req_t* req, const char* type, const char* begin, const
 
 }  // namespace
 
+HardwareFacts hardware_facts(int sink_max_slots, int sink_max_slots_bits) {
+    return gather_hardware_facts(sink_max_slots, sink_max_slots_bits);
+}
+
 struct Control::Impl {
     ControlHandlers handlers;
     httpd_handle_t server = nullptr;
@@ -477,6 +479,8 @@ struct Control::Impl {
                          "to change it\n"
                          "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
+                         "GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; "
+                         "change one through its own route\n"
                          "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one\n"
                          "GET  /ntp-server    the time server a person named, or none (the router's, then the pool); PUT one\n"
                          "GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one\n"
@@ -949,6 +953,16 @@ struct Control::Impl {
         return httpd_resp_send(req, json.c_str(), static_cast<ssize_t>(json.size()));
     }
 
+    static esp_err_t on_preferences_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (h.preferences == nullptr) {
+            return send_text(req, "404 Not Found", "this player has no preferences\n");
+        }
+        const std::string json = prefs::to_json(*h.preferences);
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_send(req, json.c_str(), static_cast<ssize_t>(json.size()));
+    }
+
     static esp_err_t on_trim_get(httpd_req_t* req) {
         auto& h = self(req)->handlers;
         std::optional<std::string> json = h.trim ? h.trim() : std::nullopt;
@@ -1333,6 +1347,7 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
+        {.uri = "/preferences", .method = HTTP_GET, .handler = &Impl::on_preferences_get},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
         {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},
         {.uri = "/ntp-server", .method = HTTP_GET, .handler = &Impl::on_ntp_server_get},

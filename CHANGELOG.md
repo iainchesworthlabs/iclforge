@@ -24,6 +24,11 @@ This release adds:
   `forge`, in a Karaoke flow in the Forge GUI and on a Karaoke page in Hearth, with timed lyrics
   from `.lrc`, SubRip, Advanced SubStation Alpha and MIDI karaoke files, a microphone with a pitch
   score, lyrics on the network sinks and in Crucible, and a browser demo;
+- Hearth's sink screen has a **Preferences** sheet beside **Adjust**, for what a person chooses once and leaves: a
+  scrollable list, grouped, drawn from a registry that asks a description of the board (its screen, sink, networks and
+  clock) what it can do, so a choice the board cannot make is greyed with the reason and never hidden, and
+  `GET /preferences` lists the same on every board; Adjust keeps only the lyric delay and the text size; both sheets
+  take their sizes from the display and are checked at four screen sizes;
 - new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
   `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
   self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`
