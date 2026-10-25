@@ -264,7 +264,8 @@ struct Reach {
                 out.reason += " 16-bit slots and a second line would carry " + number(reach.carries) + ".";
                 break;
             default:
-                out.reason += " The most this board can carry is " + number(sink.slots_most()) + ".";
+                out.reason += " The most this board can carry is " +
+                              number(static_cast<std::size_t>(sink.slots_most())) + ".";
                 break;
         }
         return out;
