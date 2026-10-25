@@ -312,6 +312,15 @@ struct ControlHandlers {
     std::function<std::string()> speakers_style;
     std::function<bool(std::string_view style)> set_speakers_style;
 
+    // GET and PUT /dynamic-range: how much of a Dolby stream's dynamic range the listener wants
+    // (iclforge/base/dynamic_range.hpp, planning/hearth-late-night.md). dynamic_range answers with
+    // the words a PUT takes, "standard" or "late-night"; set_dynamic_range is handed one of them
+    // and stores it, and the decoder follows from the next stream's start. A board that decodes
+    // none of the Dolby codecs leaves both empty, and the routes answer that it has nothing to
+    // choose.
+    std::function<std::string()> dynamic_range;
+    std::function<bool(std::string_view range)> set_dynamic_range;
+
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
     // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps
     // no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each setter

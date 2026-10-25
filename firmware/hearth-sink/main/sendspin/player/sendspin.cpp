@@ -858,6 +858,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.decoder.joc_domain = kJocDomain;
     config.stereo_fold = kStereoFold;
     config.objects = kObjects;
+    config.dynamic_range = settings().dynamic_range;
     auto player = std::make_unique<iclforge::BurstPlayer>(config, g_sink);
     if (!player->start()) {
         std::printf("sendspin: no player: it could not start (the lines above say why)\n");
@@ -900,6 +901,9 @@ void start_player(const iclforge::render::OutputLayout& layout) {
                 }
                 g_pending_layout.reset();
             }
+            // A choice made while the player started: the setting is stored before the route calls
+            // sendspin_set_dynamic_range(), so the stored one is the latest either way.
+            g_started.player->set_dynamic_range(settings().dynamic_range);
             if (!std::exchange(g_board_changed, false)) {
                 g_running.store(&g_started);
                 break;
@@ -963,6 +967,13 @@ bool sendspin_set_layout(const iclforge::render::OutputLayout& layout) {
         g_pending_layout = std::make_unique<iclforge::render::OutputLayout>(layout);
     }
     return true;
+}
+
+void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange range) {
+    if (const Running* const r = running()) {
+        r->player->set_dynamic_range(range);
+    }
+    // A player that has yet to start reads the stored setting as it does.
 }
 
 void sendspin_board_changed() {
