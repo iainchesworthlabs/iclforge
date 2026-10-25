@@ -764,6 +764,34 @@ iclforge::ControlHandlers control_handlers() {
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
+        // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
+        // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
+        // All three go through the preferences' backend, as the Preferences screen does, so that a route and the screen
+        // cannot disagree about what a setting is or when it is refused.
+        h.brightness = []() { return player::preferences().brightness(); };
+        h.set_brightness = [](int percent) { return player::preferences().set_brightness(percent); };
+        h.clock_format = []() { return player::preferences().clock_format(); };
+        h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
+            return player::preferences().set_clock_format(format);
+        };
+        h.night = []() { return player::preferences().night(); };
+        h.set_night = [](const iclforge::nowview::NightSchedule& night) { return player::preferences().set_night(night); };
+    }
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
+    // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
+    // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
+    if (player::sendspin_built()) {
+        h.dynamic_range = []() {
+            return std::string(iclforge::ac3::dynamic_range_name(player::settings().dynamic_range));
+        };
+        h.set_dynamic_range = [](std::string_view word) {
+            const auto range = iclforge::ac3::parse_dynamic_range(word);
+            if (!range || !player::settings_set_dynamic_range(*range)) {
+                return false;
+            }
+            player::sendspin_set_dynamic_range(*range);
+            return true;
+        };
     }
     // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
     // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
@@ -771,16 +799,8 @@ iclforge::ControlHandlers control_handlers() {
     // not left applied if it cannot be stored.
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
-        h.set_time_zone = [](std::string_view zone) {
-            const std::string previous = player::settings().time_zone.data();
-            if (!player::wall_clock_set_zone(zone)) {
-                return false;
-            }
-            if (!player::settings_set_time_zone(zone)) {
-                (void)player::wall_clock_set_zone(previous);
-                return false;
-            }
-            return true;
+        h.set_time_zone = [](std::string_view zone, std::string_view name) {
+            return player::preferences().set_time_zone({.posix = std::string(zone), .name = std::string(name)});
         };
         h.ntp_server = []() { return iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data()); };
         h.set_ntp_server = [](std::string_view server) {
@@ -809,6 +829,7 @@ iclforge::ControlHandlers control_handlers() {
                 time.local = iclforge::wallclock::local_text(reading.local);
             }
             time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
+            time.zone_name = iclforge::wallclock::zone_setting_text(player::settings().time_zone_name.data());
             time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
             time.servers = player::wall_clock_servers();
             time.answers = stats.syncs;
@@ -994,6 +1015,7 @@ void apply_preferences_now() {
     if (wall_clock_built()) {
         (void)wall_clock_set_zone(settings().time_zone.data());
     }
+    sendspin_set_dynamic_range(settings().dynamic_range);
 }
 
 }  // namespace

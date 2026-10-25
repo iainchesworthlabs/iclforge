@@ -143,6 +143,7 @@ test('every request the page makes is to a route the firmware registers', () => 
         'GET /layout-options',
         'GET /pairing',
         'GET /status',
+        'GET /time-zones',
         'POST /pairing',
         'POST /restart',
         'PUT /firmware',
@@ -410,7 +411,7 @@ const ZONES_REFUSED = [
     'AEST',
     '-10',
     'None',
-    'Australia/Sydney',
+    'australia/sydney',
     'AE-10',
     '<>-10',
     'AEST-25',
@@ -449,18 +450,27 @@ const SERVERS_REFUSED = [
     `${'a'.repeat(64)}`,
 ];
 
-test("every zone the page offers is one the firmware takes", async () => {
-    const listed = SCRIPT.match(/const ZONES = \(([\s\S]*?)\)\s*\.split/);
-    expect(listed, 'the page has its list of zones').not.toBeNull();
-    const zones = [...listed[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]).join('').split(';').map((z) => z.split('|'));
-    expect(zones.length).toBeGreaterThan(30);
+// The zones the board offers by name are libs/device's time_zone_data.hpp, written by tools/hearth/gen_time_zones.py;
+// the stand-in serves that file's rows, and the page offers what GET /time-zones sends.
+const ZONE_DATA = fs.readFileSync(path.join(LIBS_DEVICE, 'time_zone_data.hpp'), 'utf8');
+const ZONE_ROWS = [...ZONE_DATA.matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
+
+test('every zone the board offers by name is a string the stand-in takes, and the list is sorted', () => {
+    expect(ZONE_ROWS.length).toBeGreaterThan(400);
+    expect(ZONE_ROWS.length).toBe(Number(ZONE_DATA.match(/(\d+) zones/)[1]));
     // The stand-in's own check, not a request to it: PUT /timezone answers 200 for exactly the zones validTimeZone
-    // takes (the next test drives the route), and what the page's script holds is a file's text that should not
-    // be sent anywhere, not even to a loopback stand-in.
-    for (const [label, zone] of zones) {
-        expect(validTimeZone(zone), `${label}: ${zone}`).toBe(true);
+    // takes (the next tests drive the route); libs/device/tests/test_time_zones.cpp holds the grammar itself to the same
+    // rows, so that the stand-in's copy of it cannot drift from the board's.
+    for (const [name, zone] of ZONE_ROWS) {
+        expect(validTimeZone(zone), `${name}: ${zone}`).toBe(true);
+        expect(validTimeZone(name), `${name} must not read as a POSIX string`).toBe(false);
     }
-    expect(new Set(zones.map((z) => z[1])).size, 'a zone listed twice').toBe(zones.length);
+    const names = ZONE_ROWS.map((z) => z[0]);
+    expect(new Set(names).size, 'a zone listed twice').toBe(names.length);
+    expect([...names].sort()).toEqual(names);
+    for (const name of ['Australia/Melbourne', 'Australia/Sydney', 'Australia/Perth', 'America/New_York', 'Europe/London', 'UTC']) {
+        expect(names).toContain(name);
+    }
 });
 
 test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware does', async () => {
@@ -470,13 +480,18 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         // what does not is refused first, as the routes read the body before they ask whether there is a clock.
         stub.device.time = undefined;
         for (const [route, good, bad] of [
-            ['timezone', 'JST-9', 'Sydney'],
+            ['timezone', 'Australia/Melbourne', 'Sydney'],
             ['ntp-server', 'pool.ntp.org', 'pool.ntp.org:123'],
             ['time-sync', 'off', 'maybe'],
         ]) {
             let reply = await fetch(`${stub.url}${route}`);
             expect(reply.status).toBe(404);
             expect(await reply.text()).toBe(REPLIES.noClock);
+            if (route === 'timezone') {
+                reply = await fetch(`${stub.url}time-zones`);
+                expect(reply.status).toBe(404);
+                expect(await reply.text()).toBe(REPLIES.noClock);
+            }
             reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
             expect(reply.status).toBe(409);
             expect(await reply.text()).toBe(REPLIES.noClock);
@@ -490,7 +505,7 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
         expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('on\n');
 
-        // The zone: a POSIX string or `none`.
+        // The zone: a POSIX string, a name from GET /time-zones, or `none`.
         let reply;
         for (const zone of ZONES_TAKEN) {
             reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: `${zone}\n` });
@@ -516,6 +531,36 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         expect(await reply.text()).toBe(REPLIES.timeZoneRefused);
         expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
         stub.device.time.zoneRefused = false;
+
+        // A name is stored with its string, and says so in GET /status's time (zone_name); a string has none.
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Australia/Melbourne\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.timeZoneOk);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('AEST-10AEDT,M10.1.0,M4.1.0/3\n');
+        let time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone).toBe('AEST-10AEDT,M10.1.0,M4.1.0/3');
+        expect(time.zone_name).toBe('Australia/Melbourne');
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'AEST-10AEDT,M10.1.0,M4.1.0/3' });
+        expect(reply.status).toBe(200);
+        time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone_name, 'a string somebody typed has no name').toBe('none');
+        for (const bad of ['australia/melbourne', 'Australia/Melburne', 'Melbourne', 'Australia/Melbourne extra']) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: bad });
+            expect(reply.status, bad).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+        }
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Pacific/Auckland' });
+        expect(reply.status).toBe(200);
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'none' });
+        expect(reply.status).toBe(200);
+        time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone).toBe('none');
+        expect(time.zone_name).toBe('none');
+
+        // The names a board offers, one a line, in the table's order.
+        reply = await fetch(`${stub.url}time-zones`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(ZONE_ROWS.map((z) => z[0] + '\n').join(''));
 
         // The server: a host name or an IPv4 address, or `none` for the router's and then the pool.
         for (const server of SERVERS_TAKEN) {
@@ -605,6 +650,148 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
     }
 });
 
+test('the stand-in answers /brightness and /clock-format as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        for (const [route, good] of [
+            ['brightness', '50'],
+            ['clock-format', '12'],
+        ]) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+        }
+        stub.device.screen = screenBoard();
+
+        // The brightness: a whole number of percent from 10 to 100, 80 to begin with.
+        expect(await (await fetch(`${stub.url}brightness`)).text()).toBe('80\n');
+        for (const bad of ['', '9', '101', '0', '-50', '80%', 'bright', '1000', '50 50']) {
+            const reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.brightnessBad);
+        }
+        for (const good of ['10', '55', '100', ' 70\r\n']) {
+            const reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: good });
+            expect(reply.status, good).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.brightnessOk);
+            expect(await (await fetch(`${stub.url}brightness`)).text()).toBe(`${good.trim()}\n`);
+        }
+        // A glass with no backlight to dim (a frame buffer with no panel behind it) refuses it, and keeps the last.
+        stub.device.screen.dimmable = false;
+        let reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: '30' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.brightnessRefused);
+        expect(await (await fetch(`${stub.url}brightness`)).text()).toBe('70\n');
+
+        // The clock format: 24 or 12 hours, then " seconds" when they are shown.
+        expect(await (await fetch(`${stub.url}clock-format`)).text()).toBe('24\n');
+        for (const bad of ['', '13', '24h', '12 second', '12  seconds', 'seconds', '12 Seconds', 'twelve']) {
+            reply = await fetch(`${stub.url}clock-format`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.clockFormatBad);
+        }
+        for (const good of ['12', '12 seconds', '24 seconds', '24']) {
+            reply = await fetch(`${stub.url}clock-format`, { method: 'PUT', body: `${good}\n` });
+            expect(reply.status, good).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.clockFormatOk);
+            expect(await (await fetch(`${stub.url}clock-format`)).text()).toBe(`${good}\n`);
+        }
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /night-schedule and /night-idle as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        for (const [route, good] of [
+            ['night-schedule', '22:00-07:00 on'],
+            ['night-idle', 'on'],
+        ]) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+        }
+        stub.device.screen = screenBoard();
+
+        // Off, from 22:00 to 07:00, to begin with.
+        expect(await (await fetch(`${stub.url}night-schedule`)).text()).toBe('22:00-07:00 off\n');
+        expect(await (await fetch(`${stub.url}night-idle`)).text()).toBe('off\n');
+        for (const bad of ['', '22:00', '22:00-', '24:00-07:00', '22:60-07:00', '2:00-07:00', '22:00-07:00 maybe', '22:00-07:00 on off', 'dark', '22.00-07.00', 'on off']) {
+            const reply = await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.nightScheduleBad);
+        }
+        // The two times alone switch it on; `on` and `off` keep the times; both can be given.
+        let reply = await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: '23:30-06:15\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nightOk);
+        expect(await (await fetch(`${stub.url}night-schedule`)).text()).toBe('23:30-06:15 on\n');
+        await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: 'off' });
+        expect(await (await fetch(`${stub.url}night-schedule`)).text()).toBe('23:30-06:15 off\n');
+        await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: 'on' });
+        expect(await (await fetch(`${stub.url}night-schedule`)).text()).toBe('23:30-06:15 on\n');
+        await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: '00:00-23:59 off' });
+        expect(await (await fetch(`${stub.url}night-schedule`)).text()).toBe('00:00-23:59 off\n');
+
+        // The idle screen's own setting is separate, and the schedule's words do not touch it.
+        for (const bad of ['', 'yes', '1', 'On', 'on off']) {
+            reply = await fetch(`${stub.url}night-idle`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.nightIdleBad);
+        }
+        reply = await fetch(`${stub.url}night-idle`, { method: 'PUT', body: 'on\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nightOk);
+        expect(await (await fetch(`${stub.url}night-idle`)).text()).toBe('on\n');
+        await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: '21:00-05:00 on' });
+        expect(await (await fetch(`${stub.url}night-idle`)).text()).toBe('on\n');
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /dynamic-range as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board that decodes no Dolby stream has nothing to choose.
+        stub.device.dynamicRange = null;
+        let reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        // One that does starts on standard and takes the two words, with or without a line ending.
+        stub.device.dynamicRange = 'standard';
+        reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('standard\n');
+        for (const bad of ['late night', 'Late-night', 'wide', '']) {
+            reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.dynamicRangeBad);
+        }
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.dynamicRangeOk);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('late-night\n');
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'standard' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('standard\n');
+    } finally {
+        await stub.close();
+    }
+});
+
 // The preferences registry (libs/device/include/iclforge/preferences.hpp), which GET /preferences lists.
 const PREFERENCES_HPP = fs.readFileSync(path.join(LIBS_DEVICE, 'preferences.hpp'), 'utf8');
 
@@ -637,24 +824,77 @@ test('the stand-in lists the preferences, greyed with the reason where the board
     try {
         let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.display).toBe('none');
-        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after']);
-        for (const p of listing.preferences) {
-            expect(p.available).toBe(false);
-            expect(p.reason).toBe('This board has no screen.');
-            for (const choice of p.choices) {
+        expect(listing.preferences.map((p) => p.id)).toEqual([
+            'now-view',
+            'dim-after',
+            'brightness',
+            'clock-hours',
+            'clock-seconds',
+            'night-schedule',
+            'night-times',
+            'night-idle',
+            'time-zone',
+        ]);
+        // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps.
+        for (const p of listing.preferences.filter((q) => q.id !== 'time-zone')) {
+            expect(p.available, p.id).toBe(false);
+            expect(p.reason, p.id).toBe('This board has no screen.');
+            for (const choice of p.choices ?? []) {
                 expect(choice.available).toBe(false);
                 expect(choice.reason).toBe('This board has no screen.');
             }
         }
+        expect(listing.preferences.at(-1)).toMatchObject({ id: 'time-zone', group: 'Time', available: true, value: 'none' });
         // One with a screen has them on, with their values; a change made through the entry's own route shows.
         stub.device.screen = screenBoard();
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         expect(listing.display).toBe('dsi');
         expect(listing.preferences[0]).toMatchObject({ id: 'now-view', value: 'speakers', available: true, reason: '' });
         expect(listing.preferences[1]).toMatchObject({ id: 'dim-after', value: '5', available: true, reason: '' });
+        expect(listing.preferences.slice(2, 7).map((p) => [p.id, p.value, p.available])).toEqual([
+            ['brightness', '80', true],
+            ['clock-hours', '24', true],
+            ['clock-seconds', 'off', true],
+            ['night-schedule', 'off', true],
+            ['night-times', '22:00-07:00', true],
+        ]);
         await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
+        await fetch(`${stub.url}clock-format`, { method: 'PUT', body: '12 seconds' });
+        await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: '23:30-06:15' });
+        await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Australia/Melbourne' });
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
-        expect(listing.preferences[1].value).toBe('30');
+        const by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        expect(by['dim-after'].value).toBe('30');
+        expect(by['clock-hours'].value).toBe('12');
+        expect(by['clock-seconds'].value).toBe('on');
+        expect(by['night-schedule'].value).toBe('on');
+        expect(by['night-times'].value).toBe('23:30-06:15');
+        expect(by['time-zone'].value).toBe('Australia/Melbourne');
+        // A glass whose backlight cannot be dimmed greys the brightness with its reason, and only that.
+        stub.device.screen.dimmable = false;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences[2]).toMatchObject({
+            id: 'brightness',
+            available: false,
+            reason: "This screen's backlight is not under the board's control.",
+        });
+        expect(listing.preferences[3].available).toBe(true);
+        // The night schedule says why it is moot where the screen without lyrics is dark already, or off.
+        stub.device.screen.view = 'dark';
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences.find((p) => p.id === 'night-schedule').note).toBe(
+            'The Dark view is dark already: a touch lights it for 30 seconds, as at night.',
+        );
+        stub.device.screen.view = 'off';
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences.find((p) => p.id === 'night-times').note).toBe('Not used while the screen without lyrics is Off.');
+        // A board that keeps no time greys the zone, and the screen's clock entries, with the clock's reason.
+        stub.device.time = null;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        const noClock = 'This board keeps no time: it has no network to ask a time server on.';
+        expect(listing.preferences.find((p) => p.id === 'time-zone')).toMatchObject({ available: false, reason: noClock });
+        expect(listing.preferences.find((p) => p.id === 'clock-hours')).toMatchObject({ available: false, reason: noClock });
+        expect(listing.preferences.find((p) => p.id === 'dim-after').available).toBe(true);
     } finally {
         await stub.close();
     }
@@ -726,7 +966,13 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
     try {
         // A board with a screen, set to what a person chose, and named, and on a network.
         stub.device.screen = screenBoard();
-        Object.assign(stub.device.screen, { view: 'clock', dimAfter: '30' });
+        Object.assign(stub.device.screen, {
+            view: 'clock',
+            dimAfter: '30',
+            brightness: 40,
+            clockFormat: '12 seconds',
+            night: { enabled: true, from: '23:00', to: '06:00', idle: true },
+        });
         stub.device.time.zone = 'JST-9';
         stub.device.name = 'Attic';
         stub.device.pairings = [pairedServer()];
@@ -736,7 +982,11 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         // What a person chose is back; what the board is stays.
         expect(stub.device.screen.view).toBe('speakers');
         expect(stub.device.screen.dimAfter).toBe('5');
-        expect(stub.device.time.zone).toBe('none');
+        expect(stub.device.screen.brightness).toBe(80);
+        expect(stub.device.screen.clockFormat).toBe('24');
+        expect(stub.device.screen.night).toEqual({ enabled: false, from: '22:00', to: '07:00', idle: false });
+        // Where the room is stays (the owner, 2026-10-25).
+        expect(stub.device.time.zone).toBe('JST-9');
         expect(stub.device.name).toBe('Attic');
         expect(stub.device.ssid).toBe('kitchen');
         expect(stub.device.pairings).toHaveLength(1);

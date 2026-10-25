@@ -42,9 +42,14 @@ inline constexpr const char* kNetworkPreference = "net_pref";
 inline constexpr const char* kNowView = "np_view";
 inline constexpr const char* kDimAfter = "np_dim";
 inline constexpr const char* kTimeZone = "time_zone";
+inline constexpr const char* kTimeZoneName = "tz_name";
+inline constexpr const char* kBrightness = "bright";
+inline constexpr const char* kClockFormat = "clock_fmt";
+inline constexpr const char* kNight = "night";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
+inline constexpr const char* kDynamicRange = "dyn_range";
 
 // The longest an NVS key may be.
 inline constexpr std::size_t kMaxKeyChars = 15;
@@ -84,6 +89,13 @@ inline constexpr std::array kKeys = {
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
+    // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
+    // Reset preferences keeps the time zone).
+    Key{kTimeZoneName, Kind::setup, "time zone"},
+    Key{kBrightness, Kind::preference, "brightness"},
+    Key{kClockFormat, Kind::preference, "clock format"},
+    Key{kNight, Kind::preference, "night schedule"},
+    Key{kDynamicRange, Kind::preference, "late-night mode"},
 };
 
 [[nodiscard]] constexpr bool is_preference(Kind kind) { return kind == Kind::preference; }

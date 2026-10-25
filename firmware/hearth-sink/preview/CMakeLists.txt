@@ -35,6 +35,7 @@ add_executable(panel_preview
     "${MAIN}/panel/lvgl/dev_screen.cpp"
     "${MAIN}/panel/lvgl/now_screen.cpp"
     "${MAIN}/panel/lvgl/prefs_screen.cpp"
+    "${MAIN}/panel/lvgl/prefs_editors.cpp"
     "${MAIN}/panel/lvgl/glyphs.cpp"
     "${REPO}/libs/lyrics/src/lyrics.cpp"
     "${REPO}/libs/lyrics/src/stage.cpp"
