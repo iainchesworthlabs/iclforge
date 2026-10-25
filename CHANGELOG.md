@@ -10,6 +10,12 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: an ESP32-S3 sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
+  about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
+  where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in `sdkconfig.psram` and in the
+  locked values of `s3-n16r8` and `s3-n16r8-ac4`). On an S3 the same stream now leaves 70 KB or more, PCM reads 93 KB free where
+  it read 69, and the boot figure rises 14 KB; the decode of an E-AC-3 stream takes about 14 % longer (17.9 against 15.7 ms of the
+  32 ms a chunk lasts). The P4 and C6 profiles are unchanged.
 - **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
   stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
   let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
