@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <iterator>
 #include <optional>
 #include <sstream>
@@ -2086,7 +2087,303 @@ std::string sound_set_trim_text(std::string_view statements) {
 
 }  // namespace player
 
+// --- --drive: the screen as a board's, driven by a script
+// ----------------------------------------------------------
+//
+// tools/hearth/screen_script.py starts this and sends one command a line on stdin; each is answered
+// with one line of JSON on stdout. The commands are the ones a board's HTTP side answers (POST
+// :8081/panel/tap, GET :8081/panel.bmp, GET /preferences) plus the two a board cannot: `tap` finds
+// a button by what it says and `shown` reads the screen's own words. A tap that needs the list
+// scrolled first scrolls it with the finger (swipes), not by calling LVGL, and `events` in the
+// answer is every touch made, so that the same touches can be made on a board (README.md).
+namespace {
+
+std::string json_string(const std::string& text) {
+    std::string out = "\"";
+    for (const char c : text) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += c;
+        } else if (static_cast<unsigned char>(c) < 0x20) {
+            out += ' ';
+        } else {
+            out += c;
+        }
+    }
+    return out + '"';
+}
+
+// The words of a command: bare, or in double quotes with \" and \\ inside.
+std::vector<std::string> words_of(const std::string& line) {
+    std::vector<std::string> words;
+    std::size_t i = 0;
+    while (i < line.size()) {
+        if (line[i] == ' ' || line[i] == '\r') {
+            ++i;
+            continue;
+        }
+        std::string word;
+        if (line[i] == '"') {
+            for (++i; i < line.size() && line[i] != '"'; ++i) {
+                if (line[i] == '\\' && i + 1 < line.size()) {
+                    ++i;
+                }
+                word += line[i];
+            }
+            ++i;
+        } else {
+            while (i < line.size() && line[i] != ' ' && line[i] != '\r') {
+                word += line[i++];
+            }
+        }
+        words.push_back(word);
+    }
+    return words;
+}
+
+std::string g_events;  // the touches of the command being answered, as JSON array members
+
+void note_event(const std::string& member) {
+    g_events += (g_events.empty() ? "" : ",") + member;
+}
+
+void finger_tap(int x, int y) {
+    note_event("[\"tap\"," + std::to_string(x) + "," + std::to_string(y) + "]");
+    tap(x, y);
+}
+
+void finger_swipe(int x, int y_from, int y_to) {
+    note_event("[\"swipe\"," + std::to_string(x) + "," + std::to_string(y_from) + "," +
+               std::to_string(y_to) + "]");
+    drag(x, y_from, y_to);
+}
+
+std::string reply(bool ok, const std::string& more = {}) {
+    std::string out = std::string("{\"ok\":") + (ok ? "true" : "false");
+    if (!more.empty()) {
+        out += "," + more;
+    }
+    return out + ",\"events\":[" + g_events + "]}";
+}
+
+std::string failed(const std::string& why) {
+    return reply(false, "\"error\":" + json_string(why));
+}
+
+// The part of the glass an object can be seen on: the display, cut down by every scrolling
+// container it is in.
+lv_area_t visible_part(lv_obj_t* object) {
+    lv_area_t clip{0, 0, g_width - 1, g_height - 1};
+    for (lv_obj_t* parent = lv_obj_get_parent(object); parent != nullptr;
+         parent = lv_obj_get_parent(parent)) {
+        if (lv_obj_get_scroll_top(parent) > 0 || lv_obj_get_scroll_bottom(parent) > 0) {
+            lv_area_t box;
+            lv_obj_get_coords(parent, &box);
+            clip = {std::max(clip.x1, box.x1), std::max(clip.y1, box.y1), std::min(clip.x2, box.x2),
+                    std::min(clip.y2, box.y2)};
+        }
+    }
+    return clip;
+}
+
+bool on_glass(lv_obj_t* object) {
+    lv_obj_update_layout(object);
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    const lv_area_t clip = visible_part(object);
+    return area.x1 >= clip.x1 && area.x2 <= clip.x2 && area.y1 >= clip.y1 && area.y2 <= clip.y2;
+}
+
+// The list that holds `object` and has more to scroll to, the nearest one.
+lv_obj_t* scroller_of(lv_obj_t* object) {
+    for (lv_obj_t* parent = lv_obj_get_parent(object); parent != nullptr;
+         parent = lv_obj_get_parent(parent)) {
+        if (lv_obj_get_scroll_top(parent) > 0 || lv_obj_get_scroll_bottom(parent) > 0) {
+            return parent;
+        }
+    }
+    return nullptr;
+}
+
+// Swipes the list under a finger until `object` is on the glass. False when it will not come.
+bool bring_into_view(lv_obj_t* object) {
+    constexpr int kAttempts = 16;
+    for (int attempt = 0; attempt < kAttempts && !on_glass(object); ++attempt) {
+        lv_obj_t* const list = scroller_of(object);
+        if (list == nullptr) {
+            return false;
+        }
+        lv_area_t at;
+        lv_area_t box;
+        lv_obj_get_coords(object, &at);
+        lv_obj_get_coords(list, &box);
+        const int height = box.y2 - box.y1 + 1;
+        const bool below = at.y2 > box.y2;
+        const int wanted = below ? at.y2 - box.y2 + 8 : box.y1 - at.y1 + 8;
+        const int distance = std::clamp(wanted, 40, std::max(40, height - 60));
+        const int x = box.x1 + 6;
+        // Content follows the finger: a target below the glass wants the finger moved up.
+        const int from = below ? box.y2 - 20 : box.y1 + 20;
+        finger_swipe(x, from, below ? from - distance : from + distance);
+    }
+    return on_glass(object);
+}
+
+void set_up(const std::string& board, int width, int height, const std::string& scene,
+            lv_display_t*& disp) {
+    disp = open_display(width, height, disp);
+    if (!player::panel::screen_init(disp, width, height)) {
+        std::puts("{\"ok\":false,\"error\":\"the screen did not come up\"}");
+        std::exit(1);
+    }
+    g_sound = {};
+    set_room("5.1");
+    for (const iclforge::BoardVariant& variant : iclforge::known_variants()) {
+        if (board == variant.name) {
+            g_caps = variant.caps;
+        }
+    }
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    set_up_system_fixture();
+    g_settings = {iclforge::nowview::View::kSpeakers, 5};
+    g_board = {};
+    g_board.name = "hearth-4f2a91";
+    g_board.address = "192.168.1.50";
+    g_board.network = "HomeNet";
+    g_board.firmware = "0.11.0";
+    g_board.player = true;
+    g_board.stream = "bursts";
+    g_now_playing = false;
+    if (scene == "lyrics") {
+        hold(read_text(fs::path(PREVIEW_EXAMPLES_DIR) / "auld-lang-syne" / "auld-lang-syne.lrc"),
+             5'750);
+    }
+    g_now_us += 1'000'000;
+    pump(6);
+}
+
+std::string answer(const std::vector<std::string>& w, lv_display_t*& disp) {
+    g_events.clear();
+    const std::string& verb = w.empty() ? std::string() : w[0];
+    const auto number = [&](std::size_t at) {
+        return at < w.size() ? std::atoi(w[at].c_str()) : 0;
+    };
+    if (verb == "init" && w.size() == 5) {
+        // init BOARD WIDTH HEIGHT SCENE
+        bool known = false;
+        for (const iclforge::BoardVariant& variant : iclforge::known_variants()) {
+            known = known || w[1] == variant.name;
+        }
+        if (!known) {
+            return failed("no board variant is called " + w[1]);
+        }
+        set_up(w[1], number(2), number(3), w[4], disp);
+        return reply(true);
+    }
+    if (verb == "tap-at" && w.size() == 3) {
+        finger_tap(number(1), number(2));
+        return reply(true);
+    }
+    if (verb == "swipe" && w.size() == 5 && number(1) == number(3)) {
+        finger_swipe(number(1), number(2), number(4));
+        return reply(true);
+    }
+    if (verb == "tap" && (w.size() == 2 || w.size() == 3)) {
+        // tap LABEL [ROW]: the button that says LABEL, in the Preferences row that says ROW if one
+        // is named.
+        lv_obj_t* target = nullptr;
+        if (w.size() == 3) {
+            if (player::panel::prefs_root() == nullptr) {
+                return failed("no Preferences sheet is open to look for a row in");
+            }
+            target = find_row_button(player::panel::prefs_root(), w[2], w[1]);
+        } else {
+            target = find_button(w[1]);
+        }
+        if (target == nullptr) {
+            return failed("no button \"" + w[1] + "\" is shown" +
+                          (w.size() == 3 ? " in the row \"" + w[2] + "\"" : ""));
+        }
+        if (!bring_into_view(target)) {
+            return failed("the button \"" + w[1] + "\" cannot be brought onto the glass");
+        }
+        lv_area_t area;
+        lv_obj_get_coords(target, &area);
+        finger_tap((area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2);
+        pump(4);
+        return reply(true);
+    }
+    if (verb == "wait" && w.size() == 2) {
+        g_now_us += static_cast<std::int64_t>(number(1)) * 1000;
+        pump(6);
+        return reply(true);
+    }
+    if (verb == "shown" && (w.size() == 2 || w.size() == 3)) {
+        // shown TEXT [contains]
+        return reply(true,
+                     std::string("\"value\":") +
+                         (shows_text(lv_screen_active(), w[1], w.size() == 3 && w[2] == "contains")
+                              ? "true"
+                              : "false"));
+    }
+    if (verb == "prefs" && w.size() == 1) {
+        std::string body = iclforge::prefs::to_json(player::panel::preferences_backend());
+        while (!body.empty() && (body.back() == '\n' || body.back() == ' ')) {
+            body.pop_back();
+        }
+        return reply(true, "\"prefs\":" + body);
+    }
+    if (verb == "ui" && w.size() == 1) {
+        std::vector<lv_obj_t*> targets;
+        collect_touch_targets(lv_screen_active(), targets);
+        std::string list;
+        for (lv_obj_t* const target : targets) {
+            const Rect r = rect_of(target);
+            list += (list.empty() ? "" : ",") + std::string("{\"text\":") +
+                    json_string(button_text(target)) + ",\"rect\":[" + std::to_string(r.x1) + "," +
+                    std::to_string(r.y1) + "," + std::to_string(r.x2) + "," + std::to_string(r.y2) +
+                    "],\"on_glass\":" + (on_glass(target) ? "true" : "false") + "}";
+        }
+        return reply(true, "\"targets\":[" + list + "]");
+    }
+    if (verb == "shot" && w.size() == 2) {
+        write_bmp(w[1]);
+        return reply(true);
+    }
+    return failed("not a command: " + (w.empty() ? std::string("(empty)") : w[0]));
+}
+
+int drive() {
+    lv_init();
+    lv_tick_set_cb([]() -> std::uint32_t { return static_cast<std::uint32_t>(g_now_us / 1000); });
+    g_pointer_device = lv_indev_create();
+    lv_indev_set_type(g_pointer_device, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(g_pointer_device, &read_pointer);
+    lv_display_t* disp = nullptr;
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        const std::vector<std::string> w = words_of(line);
+        if (!w.empty() && w[0] == "quit") {
+            break;
+        }
+        if (w.empty() || (w[0] != "init" && disp == nullptr)) {
+            std::puts(w.empty() ? failed("an empty command").c_str()
+                                : failed("init comes first").c_str());
+        } else {
+            std::puts(answer(w, disp).c_str());
+        }
+        std::fflush(stdout);
+    }
+    return 0;
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "--drive") {
+        return drive();
+    }
     const fs::path out = argc > 1 ? fs::path(argv[1]) : fs::path("panel-preview");
     fs::create_directories(out);
     const fs::path examples = PREVIEW_EXAMPLES_DIR;

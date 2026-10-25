@@ -1,0 +1,20 @@
+# An ESP32-S3 (four 32-bit slots on one line) lists every layout and greys the ones it cannot carry, with the
+# reason beside them: a tap on a greyed one changes nothing, a layout it carries with a limit is taken. Preview
+# only: no board on the bench has these capabilities, so a run with --board refuses it at the profile.
+board s3-spi-320x240
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+expect shown "Speaker layout"
+expect pref speaker-layout = 2.0
+expect text "5.1 needs 6 slots"
+
+tap "5.1"
+expect pref speaker-layout = 2.0
+
+tap "2.1"
+expect pref speaker-layout = 2.1
+
+tap "2.0"
+expect pref speaker-layout = 2.0

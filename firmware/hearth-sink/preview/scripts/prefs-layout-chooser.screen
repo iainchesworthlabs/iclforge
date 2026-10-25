@@ -1,0 +1,21 @@
+# The speaker layout list on the kit, which carries every layout: a tap on one is taken at once while nothing
+# plays, and the list is long enough that the finger has to scroll it to reach the last.
+board p4-rev3-kit
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+expect shown "Speaker layout"
+expect pref speaker-layout = 2.0
+
+tap "7.1.4"
+expect pref speaker-layout = 7.1.4
+
+tap "9.1.6"
+expect pref speaker-layout = 9.1.6
+shot layout-9-1-6
+
+tap "2.0"
+expect pref speaker-layout = 2.0
+
+tap "Close"
