@@ -70,8 +70,8 @@ TEST_CASE("Reset preferences keeps what the board is, how it is joined and how i
     // in its room and paired.
     const std::set<std::string> kept = everything_else();
     for (const char* name :
-         {"name", "ssid", "password", "net_pref", "slot_bits", "second_line", "layout", "time_zone", "ntp_server",
-          "time_sync"}) {
+         {"name", "ssid", "password", "net_pref", "slot_bits", "second_line", "layout", "speaker_trim", "time_zone",
+          "ntp_server", "time_sync"}) {
         INFO("kept " << name);
         CHECK(kept.contains(name));
         CHECK(sk::reset_of(name) == sk::Reset::keep);
@@ -118,6 +118,7 @@ TEST_CASE("the sentences name what a reset changes and what it keeps, each thing
     CHECK(kept.find("DAC wiring") != std::string::npos);
     CHECK(kept.find("time zone") != std::string::npos);
     CHECK(kept.find("speaker layout") != std::string::npos);
+    CHECK(kept.find("per-speaker trims and delays") != std::string::npos);
     // A phrase two keys share (the SSID and the passphrase) is said once.
     CHECK(kept.find("Wi-Fi network") == kept.rfind("Wi-Fi network"));
     CHECK(kept.find("DAC wiring") == kept.rfind("DAC wiring"));

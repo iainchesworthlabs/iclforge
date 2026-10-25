@@ -905,6 +905,47 @@ test("the stand-in lists preferences with the registry's words", () => {
     expect(PREFERENCES_HPP).toContain('This board has no screen.');
 });
 
+test('the stand-in lists the sound preferences with the player, and greyed with the reason without one', async () => {
+    const stub = await startStub();
+    try {
+        let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        let by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        // The board has a player (the stand-in's default): the tone is a button at rest, the trim a sheet that says what is set.
+        expect(by['identify-speakers']).toMatchObject({
+            group: 'Sound',
+            kind: 'action',
+            route: '/identify',
+            value: 'run',
+            available: true,
+            reason: '',
+        });
+        expect(by['identify-speakers'].choices.map((c) => c.id)).toEqual(['run', 'running']);
+        expect(by['speaker-trim']).toMatchObject({ group: 'Sound', kind: 'sheet', route: '/trim', value: 'none set', available: true });
+        expect(by['speaker-trim'].choices).toBeUndefined();
+        // A trim made through its own route is counted; a tone running says so.
+        await fetch(`${stub.url}trim`, { method: 'PUT', body: 'L level=-1.5\nC distance=2.4\n' });
+        await fetch(`${stub.url}identify`, { method: 'POST', body: 'L loop\n' });
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        expect(by['speaker-trim'].value).toBe('2 speakers set');
+        expect(by['identify-speakers'].value).toBe('running');
+        // No player: both greyed, with the reason, and the sheet still has no choices.
+        stub.device.sound = null;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        for (const p of listing.preferences.filter((x) => x.group === 'Sound')) {
+            expect(p.available, p.id).toBe(false);
+            expect(p.reason, p.id).toBe('This build has no player, so it has no speakers to play a tone through.');
+        }
+        by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        expect(by['speaker-trim'].choices).toBeUndefined();
+        for (const choice of by['identify-speakers'].choices) {
+            expect(choice.available).toBe(false);
+        }
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in lists the preferences, greyed with the reason where the board has no screen', async () => {
     const stub = await startStub();
     try {
@@ -920,10 +961,13 @@ test('the stand-in lists the preferences, greyed with the reason where the board
             'night-schedule',
             'night-times',
             'night-idle',
+            'identify-speakers',
+            'speaker-trim',
             'time-zone',
         ]);
-        // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps.
-        for (const p of listing.preferences.filter((q) => q.id !== 'time-zone')) {
+        // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps, and
+        // the tone and the trim are the player's, which this one has.
+        for (const p of listing.preferences.filter((q) => q.group === 'Display')) {
             expect(p.available, p.id).toBe(false);
             expect(p.reason, p.id).toBe('This board has no screen.');
             for (const choice of p.choices ?? []) {

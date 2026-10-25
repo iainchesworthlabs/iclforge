@@ -3,9 +3,9 @@
 Task E1 of the Preferences programme (Preferences and Adjust for a board with a screen, started
 2026-10-25 and kept by its coordinator). The owner asked for
 two things under Preferences: *Identify speakers*, a test tone out of each output, and a
-*per-speaker level and distance trim*. This page is the design of the board's side of both: what
-was already there, what was decided, what it costs, and what is left to check on a board. The user
-page is [docs/hearth/sink-speakers.md](../docs/hearth/sink-speakers.md).
+*per-speaker level and distance trim*. This page is the design of both: the board's side (what
+was already there, what was decided, what it costs), [what is on the screen](#on-the-screen), and what
+is left to check on a board. The user page is [docs/hearth/sink-speakers.md](../docs/hearth/sink-speakers.md).
 
 ## What was already there
 
@@ -124,12 +124,62 @@ delay stay live beyond the fed ones, where before all of them did, which is also
 | The player's use of them | `firmware/esp-idf/iclforge/src/burst_player.cpp` |
 | The NVS key `speaker_trim` (a blob of the non-default roles, at most 154 bytes), the Kconfig default `CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM` | `firmware/hearth-sink/main/settings.{hpp,cpp}` |
 | The seam (`sendspin_sound_caps`, `sendspin_set_speaker_trim`, `sendspin_speaker_trim_status`, `sendspin_identify`, `sendspin_identify_status`) | `firmware/hearth-sink/main/sendspin.hpp` and `sendspin/{player,none}/` |
-| The routes `GET` and `PUT /trim`, `GET` and `POST /identify` | `firmware/esp-idf/iclforge/src/control.cpp`, wired in `hearth_sink.cpp` |
+| The routes `GET` and `PUT /trim`, `GET` and `POST /identify`: their words in `control.cpp`, their code in `sound.cpp` (the same code the screen goes through), wired in `hearth_sink.cpp` | `firmware/esp-idf/iclforge/src/control.cpp`, `firmware/hearth-sink/main/sound{,_routes}.{hpp,cpp}` |
 | The device page's *Levels and distances* section | `firmware/esp-idf/iclforge/ui/` |
+| The registry entries `identify-speakers` and `speaker-trim`, and the kind `sheet` | `libs/device/include/iclforge/preferences.hpp`, the firmware's side in `firmware/hearth-sink/main/preferences.cpp` |
+| The steps and words of an editor: `step_half_db`, `step_distance_cm`, `level_text`, `distance_text`, `summary_text`, the statements | `libs/render/include/iclforge/render/speaker_trim.hpp` |
+| The Speakers sheet | `firmware/hearth-sink/main/panel/lvgl/sound_sheet.{hpp,cpp}`, opened from `prefs_screen.cpp` |
 
 The route word list is in four places, as it always was: `control.cpp`'s `GET /api` text, the stand-in's
 copy of it and its route list in `apps/demos/wasm/tests/device-ui/stub.js` (the contract spec holds the
 stand-in to the firmware's strings and routes), and the page's request list in `contract.spec.js`.
+
+## On the screen
+
+*Identify speakers* and *Speaker levels and distances* are the two entries of the **Sound** group of Preferences
+(`libs/device/include/iclforge/preferences.hpp`, the contract of the programme's first task). Both are available where the build
+has a Sendspin player and say *This build has no player, so it has no speakers to play a tone through.* where it has not.
+
+- **Identify speakers** is an action. Its button says *Play each* and, while the tone plays, *Stop*: the entry's two choices are
+  `run` and `running`, and the value read is the one the board is in, so the button needs nothing but the registry to follow
+  the tone (the screen repaints once a second, at once after a tap). A press while it plays stops it. A song playing, or a play
+  from the web page, is said under the row (the entry's `inert` text), and a press the board refuses is refused in the same
+  words as `POST /identify`'s.
+- **Speaker levels and distances** is the new kind `sheet` (added at the end of `Kind`, as the header asks): a row that says what is
+  set (*none set*, *1 speaker set*, *3 speakers set*) and an *Edit* button that opens the Speakers sheet. Its setter takes the
+  words of `PUT /trim`, so the row, the route and the sheet are one path. A sheet has no choices to list.
+
+**The Speakers sheet** (`panel/lvgl/sound_sheet.cpp`) is a full-screen page over the Preferences list, built when it opens and
+again when the layout changes under it (a `PUT /layout` from the web page). It has:
+
+- the room, drawn by `room_plan.hpp` (read-only, as the lyric screen uses it) for the layout in force, only the speakers the
+  layout has at an output, with the speaker the tone is on lit from `GET /identify`'s `role` and the chosen one ringed; a tap on a
+  speaker chooses it and plays the tone through it. The room's height is as tall as the layout needs for no two shapes to be
+  closer than 6 px (a 5.1 room 220 px, a 7.1.4 room taller). A display narrower than 760 px has no room: the speakers are a row of
+  buttons in output order, which are the same touch targets;
+- for the chosen speaker, *Level* (- and + a half decibel, from -12 to +12 dB) and *Distance* (- and + a tenth of a metre, and
+  -1 m and +1 m; the first + on a speaker with no distance starts it at the farthest distance any speaker has, so that setting
+  it changes nothing until it is moved, and 3 m when none has one; a - from 0.1 m takes it away again);
+- *Play*, *Repeat* (the chosen speaker over and over until it is pressed again, so that a level can be set by ear), *Play each*,
+  *Stop* and *Reset* (the chosen speaker back to 0 dB and no distance);
+- what is really in force for the chosen speaker (*In force: -1.5 dB, 1.2 ms later*), and under the controls, why a control does
+  nothing: a song is playing; this board has no delay lines (the distance is greyed, the level is not); a Sendspin server is
+  setting the levels or the delays now; the speaker's delay is cut to what the lines hold.
+
+A refusal (*the nearest and the farthest speaker can be at most 6.86 m apart on this board*) is said in the page above the
+controls, in the accent, for six seconds. Every step is one statement to `PUT /trim`, so it is stored (NVS) and handed to the
+player exactly as the route does; a person tapping is at most three writes a second. **The tone stops when the sheet is
+left**: *Back*, the Preferences being closed, and the Preferences putting themselves away after a minute untouched each send
+`off`; and the player ends it of its own accord at once when a stream starts and after a minute whatever is asked.
+
+The same code serves the screen and the web page: `main/sound.cpp` holds `GET /trim`, `PUT /trim`, `GET /identify` and
+`POST /identify` (`hearth_sink.cpp` hands them to the control surface), and `sound_sheet()`, `sound_set_trim_text()` and
+`sound_identify_request()` for the panel. `sound.hpp` has no LVGL and no control surface in it, so that the preview tool supplies
+its own. **Trims survive Reset preferences**: the key is a `setup` row of `settings_keys.hpp` (what the room is, not what a person
+likes), and when the registry grows a reset flag the two entries say *keep*.
+
+The web page keeps its own *Levels and distances* section (a table with a field for each number) rather than rendering a generic
+Sound section from `GET /preferences`: the table is what the page needs and the listing now says what is set and the route.
 
 ## What it costs
 
@@ -218,7 +268,16 @@ A refusal is 400 for words the route does not read, 409 for what the board canno
   fade), `test_identify_request.cpp`, and the ramp and mask cases of `test_trim_delay.cpp`.
 - `apps/demos/wasm/tests/device-ui/sound.spec.js`: the page against the stand-in, and the stand-in's JSON
   against the headers that write it, key for key.
-- Firmware builds, no board: the P4X profile (`p4-rev3`) and the S3 profile (`s3-n16r8`), and the
+- `libs/device/tests/test_preferences.cpp`: the Sound entries against every known board (a reason wherever greyed, a default
+  where on), the button that says Stop while its tone plays and stops it when pressed, a board that refuses, a build with no
+  player, the sheet's summary and its text going to the board whole, and the listing's JSON.
+- `libs/render/tests/test_speaker_trim.cpp` (`[editor]`): the level's 49 stops, the distance's steps, seed, ends and "not set",
+  the words, and the statements the sheet sends being ones the table's own parser takes for every role.
+- `firmware/hearth-sink/preview` (the screen on a computer): the Preferences list with the Sound group and the sheet at 1024 by 600,
+  800 by 480, 480 by 320, 320 by 240 and 240 by 240: every touch target 48 px and 6 px apart, text not cut off, a tap on a speaker
+  playing it and lighting it, the light following the tone, the level and distance steps, a refusal said, Repeat, Play each, Stop,
+  Reset, a song playing, a layout changing under the sheet, no delay lines, a server's levels, and the tone going with the sheet.
+- Firmware builds, no board: the P4X profile (`p4-rev3`), the S3 profile (`s3-n16r8`) and the C6 (`c6-16mb`), and the
   no-player seam syntax-checked with the same flags.
 
 ## Left for the kit (a window the coordinator books)
@@ -233,10 +292,16 @@ A refusal is 400 for words the route does not read, 409 for what the board canno
 4. A tone refused while a stream plays; a stream started while a tone sounds ends it in the next
    block (look for the scope trace stopping, not fading); the page closed during a loop.
 5. `GET /hardware` and the free internal heap at boot against main's, S3 and P4X.
+6. On the kit's panel: *Identify speakers* in the list plays each speaker in turn and ends at the last; a tap on each speaker of
+   the sheet plays it and lights it, and the light is on the speaker you hear; *Repeat* while the level is stepped is heard to
+   change by half a decibel; *Back* and a stream starting each end a tone in the next block; a distance on two speakers is a delay on the
+   scope; the sheet is not slower to draw than the list (`prefs_build_us_max` in `GET :8081/panel`, which counts the list's build; the
+   sheet's own build is in the log line).
 
 ## Not done here
 
-The Preferences entries and editors: an *Identify speakers* action and a per-output grid for the trim
-wait for the preference registry of the programme's first task (prefs-core), and the on-screen room
-reuses `room_plan.hpp` of `libs/render` read-only, with the speaker being tested lit from
-`GET /identify`'s `output` and `role`.
+- Nothing is run on a board: no flash, no OTA, no bench lock.
+- The two entries do not say *kept by Reset preferences* in the registry, because the registry has no such field yet
+  (the System entries' branch adds `Pref::on_reset`); the keys table keeps the trims already, which a host test holds.
+- A held + or - that repeats: a step is a tap. The coarse button covers the distance, and the level has 48 stops.
+- The page's Sound section is not generated from `GET /preferences`.

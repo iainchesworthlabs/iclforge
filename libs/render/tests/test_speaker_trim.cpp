@@ -527,3 +527,137 @@ TEST_CASE("the report is JSON a page can read", "[render][speaker-trim]") {
     REQUIRE(without.find("\"delay\":{\"available\":false,\"min_m\":0.10,\"max_m\":10.00,\"max_span_m\":0.00,\"samples\":0,"
                          "\"reason\":\"this board has no memory for delay lines\"}") != std::string::npos);
 }
+
+TEST_CASE("the editor steps a level a half decibel and stops at the ends", "[speaker-trim][editor]") {
+    REQUIRE(*st::step_half_db(0, +1) == 1);
+    REQUIRE(*st::step_half_db(0, -1) == -1);
+    REQUIRE(*st::step_half_db(23, +1) == 24);
+    REQUIRE_FALSE(st::step_half_db(24, +1).has_value());
+    REQUIRE(*st::step_half_db(-23, -1) == -24);
+    REQUIRE_FALSE(st::step_half_db(-24, -1).has_value());
+    REQUIRE_FALSE(st::step_half_db(3, 0).has_value());
+    // Every stop a finger reaches is one the table takes, and the other way about.
+    SpeakerTrimTable table;
+    for (int half = -24; half <= 24; ++half) {
+        REQUIRE(table.set_level_db(*st::parse_role("L"), half * 0.5));
+    }
+    std::int8_t here = -24;
+    int stops = 1;
+    while (const auto next = st::step_half_db(here, +1)) {
+        here = *next;
+        ++stops;
+    }
+    REQUIRE(stops == 49);
+    REQUIRE(here == 24);
+}
+
+TEST_CASE("the editor steps a distance along its grid, from a seed, to nothing and back", "[speaker-trim][editor]") {
+    // Unset: up starts at the seed (held inside the table's range), down does nothing.
+    REQUIRE(*st::step_distance_cm(0, +1, 10, 300) == 300);
+    REQUIRE(*st::step_distance_cm(0, +1, 100, 5) == st::kDistanceMinCm);
+    REQUIRE(*st::step_distance_cm(0, +1, 100, 5000) == st::kDistanceMaxCm);
+    REQUIRE_FALSE(st::step_distance_cm(0, -1, 10, 300).has_value());
+    // On the grid.
+    REQUIRE(*st::step_distance_cm(300, +1, 10, 300) == 310);
+    REQUIRE(*st::step_distance_cm(300, -1, 10, 300) == 290);
+    REQUIRE(*st::step_distance_cm(300, +1, 100, 300) == 400);
+    REQUIRE(*st::step_distance_cm(300, -1, 100, 300) == 200);
+    // A step is the step, from wherever the distance is (a PUT stored 2.45 m, and 4.1 m less a metre is 3.1 m).
+    REQUIRE(*st::step_distance_cm(245, +1, 10, 300) == 255);
+    REQUIRE(*st::step_distance_cm(245, -1, 10, 300) == 235);
+    REQUIRE(*st::step_distance_cm(245, +1, 100, 300) == 345);
+    REQUIRE(*st::step_distance_cm(410, -1, 100, 300) == 310);
+    // The far end: held at 10 m, and nothing past it.
+    REQUIRE(*st::step_distance_cm(995, +1, 10, 300) == 1000);
+    REQUIRE(*st::step_distance_cm(950, +1, 100, 300) == 1000);
+    REQUIRE_FALSE(st::step_distance_cm(1000, +1, 10, 300).has_value());
+    // The near end: a step that would pass the nearest distance the table takes stops at it, and from it the speaker goes
+    // back to "not set".
+    REQUIRE(*st::step_distance_cm(20, -1, 10, 300) == 10);
+    REQUIRE(*st::step_distance_cm(10, -1, 10, 300) == 0);
+    REQUIRE(*st::step_distance_cm(100, -1, 100, 300) == 10);
+    REQUIRE(*st::step_distance_cm(50, -1, 100, 300) == 10);
+    REQUIRE(*st::step_distance_cm(10, -1, 100, 300) == 0);
+    // No direction and no step are no move.
+    REQUIRE_FALSE(st::step_distance_cm(300, 0, 10, 300).has_value());
+    REQUIRE_FALSE(st::step_distance_cm(300, +1, 0, 300).has_value());
+    // Every stop it reaches from the seed is one the table takes.
+    SpeakerTrimTable table;
+    const st::RoleCode role = *st::parse_role("C");
+    std::uint16_t cm = *st::step_distance_cm(0, +1, 10, 300);
+    int stops = 0;
+    for (;; ++stops) {
+        REQUIRE(table.set_distance_m(role, cm / 100.0));
+        const auto next = st::step_distance_cm(cm, +1, 10, 300);
+        if (!next) {
+            break;
+        }
+        cm = *next;
+    }
+    REQUIRE(cm == 1000);
+    REQUIRE(stops == 70);
+}
+
+TEST_CASE("the editor's words for a level, a distance and a table", "[speaker-trim][editor]") {
+    REQUIRE(st::level_text(0) == "0 dB");
+    REQUIRE(st::level_text(3) == "+1.5 dB");
+    REQUIRE(st::level_text(-3) == "-1.5 dB");
+    REQUIRE(st::level_text(2) == "+1 dB");
+    REQUIRE(st::level_text(-24) == "-12 dB");
+    REQUIRE(st::level_text(24) == "+12 dB");
+    REQUIRE(st::level_text(1) == "+0.5 dB");
+    REQUIRE(st::level_text(-1) == "-0.5 dB");
+
+    REQUIRE(st::distance_text(0) == "not set");
+    REQUIRE(st::distance_text(10) == "0.1 m");
+    REQUIRE(st::distance_text(240) == "2.4 m");
+    REQUIRE(st::distance_text(245) == "2.45 m");
+    REQUIRE(st::distance_text(305) == "3.05 m");
+    REQUIRE(st::distance_text(300) == "3 m");
+    REQUIRE(st::distance_text(1000) == "10 m");
+
+    SpeakerTrimTable table;
+    REQUIRE(st::summary_text(table) == "none set");
+    REQUIRE(table.set_count() == 0);
+    REQUIRE(table.set_level_db(*st::parse_role("L"), -1.0));
+    REQUIRE(st::summary_text(table) == "1 speaker set");
+    REQUIRE(table.set_distance_m(*st::parse_role("R"), 2.0));
+    REQUIRE(table.set_level_db(*st::parse_role("L"), -2.0));
+    REQUIRE(st::summary_text(table) == "2 speakers set");
+    // A speaker put back to the default is not counted.
+    table.clear(*st::parse_role("L"));
+    REQUIRE(st::summary_text(table) == "1 speaker set");
+    table.clear_all();
+    REQUIRE(st::summary_text(table) == "none set");
+}
+
+TEST_CASE("the editor's statements are ones the table's own parser takes, and say what they mean", "[speaker-trim][editor]") {
+    for (st::RoleCode role = 0; role < st::kRoles; ++role) {
+        INFO(st::role_name(role));
+        for (const std::int8_t half : {std::int8_t{-24}, std::int8_t{-3}, std::int8_t{0}, std::int8_t{1}, std::int8_t{24}}) {
+            SpeakerTrimTable table;
+            const auto result = table.apply_text(st::level_statement(role, half));
+            REQUIRE(result.ok);
+            REQUIRE(table.get(role).half_db == half);
+            REQUIRE(table.get(role).cm == 0);
+        }
+        for (const std::uint16_t cm : {std::uint16_t{10}, std::uint16_t{245}, std::uint16_t{1000}}) {
+            SpeakerTrimTable table;
+            REQUIRE(table.apply_text(st::distance_statement(role, cm)).ok);
+            REQUIRE(table.get(role).cm == cm);
+            REQUIRE(table.get(role).half_db == 0);
+            // "none" takes it away again.
+            REQUIRE(table.apply_text(st::distance_statement(role, 0)).ok);
+            REQUIRE(table.get(role).cm == 0);
+        }
+        SpeakerTrimTable table;
+        REQUIRE(table.apply_text(st::level_statement(role, 5) + ";" + st::distance_statement(role, 300)).ok);
+        REQUIRE_FALSE(table.neutral());
+        REQUIRE(table.apply_text(st::reset_statement(role)).ok);
+        REQUIRE(table.neutral());
+    }
+    REQUIRE(st::level_statement(*st::parse_role("Ls"), -3) == "Ls level=-1.5");
+    REQUIRE(st::distance_statement(*st::parse_role("LFE"), 240) == "LFE distance=2.40");
+    REQUIRE(st::distance_statement(*st::parse_role("S7"), 0) == "S7 distance=none");
+    REQUIRE(st::reset_statement(*st::parse_role("C")) == "C reset");
+}

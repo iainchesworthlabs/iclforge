@@ -21,6 +21,7 @@
 #include "fonts.hpp"
 #include "prefs_editors.hpp"
 #include "prefs_pages.hpp"
+#include "sound_sheet.hpp"
 
 namespace prefs = iclforge::prefs;
 
@@ -51,6 +52,7 @@ enum class Op : int {
     kConfirm = 6,  // the question before a change that breaks the music (Pref::confirm)
     kCancel = 7,
     kEditor = 8,   // a value chosen in an editor over the sheet (a pair of times, a place: prefs_editors.cpp)
+    kOpenSheet = 9,  // the Speakers sheet of the speaker trim (sound_sheet.cpp)
 };
 
 struct Row {
@@ -65,7 +67,7 @@ struct Row {
     lv_obj_t* minus = nullptr;
     lv_obj_t* plus = nullptr;
     lv_obj_t* value = nullptr;
-    // kAction, kInfo and kList: the button. kText: the button that holds the value and opens the keyboard.
+    // kAction, kInfo, kList and kSheet: the button. kText: the button that holds the value and opens the keyboard.
     lv_obj_t* action = nullptr;
     // kText with an editor: the value as a button, which opens it.
     lv_obj_t* edit = nullptr;
@@ -363,6 +365,10 @@ void paint_row(Row& row, const prefs::Entry& entry) {
     if (row.action != nullptr) {
         // Greyed by the board (it cannot) or by the moment (an update is under way): the reason is under the row.
         style_button(row.action, false, on && entry.inert.empty());
+        // An action whose choices say its state (Play each, Stop) shows the one it is in.
+        if (entry.pref->kind == prefs::Kind::kAction && !entry.choices.empty() && !entry.value_label.empty()) {
+            lv_label_set_text(lv_obj_get_child(row.action, 0), entry.value_label.c_str());
+        }
     }
     const std::string details = details_of(entry);
     if (row.details != nullptr) {
@@ -428,6 +434,11 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
         case prefs::Kind::kInfo:
         case prefs::Kind::kList:
             control_w = button_width(button_text);
+            break;
+        case prefs::Kind::kSheet:
+            // What is set, and the button that opens the sheet it is set on.
+            value_w = std::max(text_width(g.body.latin, "16 speakers set"), text_width(g.body.latin, entry.value));
+            control_w = value_w + gap + button_width("Edit");
             break;
     }
     const int label_w = text_width(g.body.latin, pref.label);
@@ -527,6 +538,14 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             row.action = make_button(controls, button_text, button_width(button_text), g.m.row_target, g.c.surface_up,
                                      g.c.text, &on_target, pack(Op::kOpen, index, 0), nullptr);
             break;
+        case prefs::Kind::kSheet:
+            row.value = make_label(controls, "", g.body.latin, g.c.muted);
+            lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_CLIP);
+            lv_obj_set_width(row.value, value_w);
+            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_RIGHT, 0);
+            row.action = make_button(controls, "Edit", button_width("Edit"), g.m.row_target, g.c.surface_up, g.c.text,
+                                     &on_target, pack(Op::kOpenSheet, index, 0), nullptr);
+            break;
     }
 
     row.details = make_paragraph(box, "", g.note.latin, g.c.muted, content_w);
@@ -609,6 +628,8 @@ void build_view() {
 }
 
 void take_down() {
+    // The Speakers sheet covers this one, and stops a test tone the sheet or the list started.
+    sound_sheet_close();
     // A page or an editor is a child of the sheet's root; it goes first, with whatever it has not yet written.
     pages_close();
     editor_close();
@@ -765,6 +786,16 @@ void on_target(lv_event_t* event) {
                 pages_open(*entry.pref, "");
             }
             return;
+        case Op::kOpenSheet:
+            // The sheet is built by its own update, outside this event; a board that cannot says why in the bar.
+            if (!entry.availability.available) {
+                g.status_text = entry.availability.reason;
+                g.status_ms = now_ms();
+                g.dirty = true;
+            } else {
+                sound_sheet_open();
+            }
+            return;
         case Op::kConfirm:
         case Op::kCancel:
             return;  // answered above
@@ -865,6 +896,7 @@ void prefs_update(std::uint32_t now) {
     }
     pages_update(now);
     editor_update(now);
+    sound_sheet_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }

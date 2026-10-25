@@ -574,6 +574,7 @@ function screenBoard() {
 // availability), and a board that lacks it lists the entry greyed, with the reason.
 const NO_SCREEN = 'This board has no screen.';
 const NO_CLOCK = 'This board keeps no time: it has no network to ask a time server on.';
+const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
 const ON_OFF = [
     ['on', 'On'],
     ['off', 'Off'],
@@ -691,6 +692,29 @@ const PREFERENCES = [
         choices: ON_OFF,
     },
     {
+        id: 'identify-speakers',
+        group: 'Sound',
+        label: 'Identify speakers',
+        kind: 'action',
+        apply: 'live',
+        route: '/identify',
+        needs: 'player',
+        choices: [
+            ['run', 'Play each'],
+            ['running', 'Stop'],
+        ],
+    },
+    {
+        id: 'speaker-trim',
+        group: 'Sound',
+        label: 'Speaker levels and distances',
+        kind: 'sheet',
+        apply: 'live',
+        route: '/trim',
+        needs: 'player',
+        choices: [],
+    },
+    {
         id: 'time-zone',
         group: 'Time',
         label: 'Time zone',
@@ -713,6 +737,8 @@ function unavailableReason(p, device) {
             return !screen ? NO_SCREEN : screen.dimmable ? '' : "This screen's backlight is not under the board's control.";
         case 'screenClock':
             return !screen ? NO_SCREEN : clock;
+        case 'player':
+            return device.sound ? '' : NO_PLAYER;
         default:
             return clock;
     }
@@ -742,6 +768,13 @@ function preferenceValue(p, device) {
             return screen ? (screen.night.idle ? 'on' : 'off') : '';
         case 'time-zone':
             return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
+        case 'identify-speakers':
+            return device.sound && device.sound.identify.active ? 'running' : 'run';
+        case 'speaker-trim': {
+            // libs/render's summary_text: how many speakers have a level or a distance set.
+            const set = device.sound ? device.sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
+            return set === 0 ? 'none set' : `${set} ${set === 1 ? 'speaker' : 'speakers'} set`;
+        }
         default:
             return '';
     }
