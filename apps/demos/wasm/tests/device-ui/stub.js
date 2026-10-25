@@ -72,6 +72,10 @@ const REPLIES = {
         'PUT  /firmware      body: an app image; flash mode, then a restart into it',
         'PUT  /firmware/mode body: flash, or normal (a restart)',
         'PUT  /firmware/rollback  the image before this one boots next',
+        'GET  /firmware/available  an update from GitHub releases: the state of the flow',
+        'POST /firmware/check  look for a newer release (the result is on /firmware/available)',
+        'PUT  /firmware/from-release  body: the version a check offered; install it',
+        'PUT  /firmware/channel  body: stable or beta',
         "GET  /firmware/coredump  the last crash's core dump, as it lies in flash",
         'DELETE /firmware/coredump  erase it',
         'POST /restart       restart into the image that runs now',
@@ -165,6 +169,8 @@ const REPLIES = {
     factoryResetFixed: 'this board cannot be reset to its factory state\n',
     factoryResetOk: 'erased; the board restarts with no name, network or pairings of its own\n',
     noFirmware: 'this board takes no firmware updates\n',
+    // A firmware built without updates from GitHub releases (CONFIG_ICLFORGE_FIRMWARE_PULL): firmware_pull_none.cpp.
+    noPull: 'this firmware cannot update itself from GitHub\n',
     noLog: 'this board keeps no log\n',
 };
 
@@ -255,6 +261,10 @@ const ROUTES = [
     'PUT /firmware',
     'PUT /firmware/mode',
     'PUT /firmware/rollback',
+    'GET /firmware/available',
+    'POST /firmware/check',
+    'PUT /firmware/from-release',
+    'PUT /firmware/channel',
     'GET /firmware/coredump',
     'DELETE /firmware/coredump',
     'POST /restart',
@@ -1154,6 +1164,47 @@ function firmwareTrial(fields) {
     };
 }
 
+// GET /firmware/available of a firmware without updates from GitHub releases, as render_status writes it
+// (libs/device/include/iclforge/firmware_update.hpp): every key always there.
+function updateNotBuilt(fw) {
+    return {
+        supported: false,
+        why: 'This firmware has no room for a secure connection.',
+        blocked: null,
+        state: 'idle',
+        channel: 'beta',
+        running: fw.running.version,
+        checked: null,
+        latest: null,
+        trust: { anchors: 0, source: 'build', fingerprints: [] },
+        signed_by: null,
+        error: null,
+        skipped: null,
+    };
+}
+
+// GET /firmware/available of a firmware that offers a release, as render_status writes it: what a check
+// found, whom it was signed by and the trust it was judged by. `over` changes a part (an error, say).
+function updateOffer(fw, over = {}) {
+    return {
+        ...updateNotBuilt(fw),
+        supported: true,
+        why: null,
+        state: 'available',
+        checked: 1792900000,
+        latest: {
+            version: 'v0.11.0',
+            released: '2026-11-05',
+            size: 1270624,
+            notes: 'https://github.com/iainchesworthlabs/iclforge/releases/tag/v0.11.0',
+            image: 'hearth-sink-esp32s3',
+        },
+        trust: { anchors: 1, source: 'build', fingerprints: ['5e3a91c0b27d44f8'] },
+        signed_by: 'Hearth Firmware Beta',
+        ...over,
+    };
+}
+
 // GET /firmware as render_firmware_status writes it, every key always there:
 // a board on the two-slot table (partitions.csv) running the image a USB
 // flash put in ota_0, with the other slot empty.
@@ -1980,6 +2031,18 @@ async function startStub() {
                 return restart(() => (fw.mode = 'normal'));
             case 'PUT /firmware/rollback':
                 return fw ? rollback(res) : send(res, 404, REPLIES.noFirmware);
+            // An update from GitHub releases (planning/esp32-ota.md, O10): a firmware built without it says
+            // so on GET /firmware/available (firmware_pull_none.cpp) and answers the rest 404. The model keeps
+            // the body firmware_update.hpp's render_status writes in `device.update` when a test gives it one.
+            case 'GET /firmware/available':
+                if (!fw) {
+                    return send(res, 404, REPLIES.noFirmware);
+                }
+                return send(res, 200, JSON.stringify(device.update ?? updateNotBuilt(fw)) + '\n', 'application/json');
+            case 'POST /firmware/check':
+            case 'PUT /firmware/from-release':
+            case 'PUT /firmware/channel':
+                return send(res, 404, fw ? REPLIES.noPull : REPLIES.noFirmware);
             case 'POST /restart':
                 if (!fw) {
                     return send(res, 404, REPLIES.noFirmware);
@@ -2164,6 +2227,8 @@ module.exports = {
     emptySlot,
     firmwareTrial,
     appImage,
+    updateNotBuilt,
+    updateOffer,
     REPLIES,
     FIRMWARE,
     FIRMWARE_PARTS,

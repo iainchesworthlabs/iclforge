@@ -247,6 +247,31 @@ in development: anyone on the network can update a board, as anyone with a USB
 cable can. [planning/esp32-ota.md](../../planning/esp32-ota.md) has the
 reasons, and what later phases add.
 
+### Updates from GitHub releases
+
+A board built with `sdkconfig.pull` (`CONFIG_ICLFORGE_FIRMWARE_PULL`) can look at GitHub for a newer
+release and install it, in addition to being pushed to
+([planning/esp32-ota.md](../../planning/esp32-ota.md), "Updates from GitHub releases (O10)"):
+
+- `GET /firmware/available` is the state of that flow: whether this board can pull and, if not, why;
+  what stops a check right now; the channel (`stable` or `beta`); the version a check found; the
+  trust anchors the board holds; who signed the list. `POST /firmware/check` starts a check, and
+  `PUT /firmware/from-release` with the offered version as its body installs it: the board enters
+  flash mode, downloads the image, checks it as an upload is checked, and restarts into it on trial.
+  `PUT /firmware/channel` chooses the channel.
+- What the board trusts is a small index of the channel (`hearth-update-<channel>.json`, with the SHA-256
+  of each image) and the signature over it (`hearth-update-<channel>.sig.json`: a certificate chain and
+  the signature). The signature has to chain to a **trust anchor built into the image**
+  (`CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS`, a PEM file of public certificates), the leaf has to be for
+  code signing with the channel's pinned name (`CONFIG_ICLFORGE_FIRMWARE_LEAF_STABLE`, `_BETA`), and
+  the index must not be older than one the board has accepted. A build with no anchor says so and pulls
+  nothing. The images carry no signature, and neither does one that is pushed: `PUT /firmware` takes
+  what it always took.
+- The connection is TLS against a certificate bundle of the three roots GitHub's hosts chain to
+  (`tls_roots.pem`), and needs the board to know the date.
+- Under QEMU, `tools/checks/run_pull_qemu.py` runs all of it against a loopback release signed by a
+  throwaway CA (`sdkconfig.ci-pull`).
+
 ### Without a cable
 
 A board updated over its network usually has no cable on it, so two things the

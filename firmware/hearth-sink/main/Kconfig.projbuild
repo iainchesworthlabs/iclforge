@@ -1,5 +1,13 @@
 menu "iclforge hearth sink"
 
+# THE TRUST ANCHORS OF UPDATES FROM GITHUB RELEASES (planning/esp32-ota.md, O10): the public certificates a
+# pulled update's signed index has to chain to. A PEM file, relative to the project; embedded in the image.
+# Empty embeds none, which is a build that cannot verify a pull and says so. A project that runs its own
+# releases points this at its own CA (and ICLFORGE_FIRMWARE_UPDATE_BASE_URL at its own repository).
+config ICLFORGE_EXAMPLE_TRUST_ANCHORS
+    string "Trust anchors for updates pulled from GitHub releases: a PEM file in the project"
+    default ""
+
 # Defaults chosen to be safe on an ESP32-S3-DevKitC-1 rather than to match any
 # particular DAC board: 5, 6 and 7 are ordinary GPIOs - not strapping pins
 # (0, 45, 46), not the USB pair (19, 20), not the console UART (43, 44) and not
