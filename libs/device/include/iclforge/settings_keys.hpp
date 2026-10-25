@@ -22,8 +22,8 @@
 // Every key the firmware stores is listed here with its class, so that a test (test_settings_keys.cpp)
 // can hold the list to what Reset preferences and the factory reset mean, and so that a setting added
 // later cannot arrive without someone saying which kind it is: settings.cpp takes its key names from
-// here, and the firmware reads the namespace at reset and says on the console about any key it finds
-// that this table does not list. A key's name is an NVS key: at most 15 characters.
+// here, and the host test fails on a key it spells that this table does not list. A key's name is an NVS
+// key: at most 15 characters.
 //
 // ADDING A SETTING: add its name below, add a row to kKeys with its class and the words the screen
 // uses for it (`what`), and, if it is a preference, a case in settings_reset_preferences() so the

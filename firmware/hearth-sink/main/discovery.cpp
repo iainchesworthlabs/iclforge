@@ -36,6 +36,17 @@ std::string hostname_from(const char* name) { return iclforge::devname::mdns_lab
 bool g_started = false;
 bool g_service_added = false;
 
+// The Sendspin service under `name`: its instance name and its `name` text.
+bool add_service(const char* name) {
+    const std::array<mdns_txt_item_t, 2> txt{{
+        {"path", kPath},
+        {"name", name},
+    }};
+    g_service_added = mdns_service_add(name, kService, kProtocol, kSendspinPort,
+                                       const_cast<mdns_txt_item_t*>(txt.data()), txt.size()) == ESP_OK;
+    return g_service_added;
+}
+
 }  // namespace
 
 void discovery_start() {
@@ -63,16 +74,10 @@ void discovery_start() {
         std::printf("mdns: %s.local; no Sendspin player in this build\n", host.c_str());
         return;
     }
-    const std::array<mdns_txt_item_t, 2> txt{{
-        {"path", kPath},
-        {"name", name},
-    }};
-    if (mdns_service_add(name, kService, kProtocol, kSendspinPort,
-                         const_cast<mdns_txt_item_t*>(txt.data()), txt.size()) != ESP_OK) {
+    if (!add_service(name)) {
         std::printf("warning: mdns could not advertise %s.%s\n", kService, kProtocol);
         return;
     }
-    g_service_added = true;
     std::printf("mdns: %s.local, %s.%s on %u, path %s\n", host.c_str(), kService, kProtocol,
                 static_cast<unsigned>(kSendspinPort), kPath);
 }
@@ -89,9 +94,12 @@ void discovery_rename() {
         std::printf("warning: mdns would not take the host name %s\n", host.c_str());
     }
     (void)mdns_instance_name_set(name);
+    // The service is withdrawn and added again under the new name, rather than renamed in place: the same two
+    // calls discovery_withdraw() and discovery_start() make, which the image links already, where renaming
+    // the instance and its text in place is another 1,250 bytes of the responder.
     if (g_service_added) {
-        if (mdns_service_instance_name_set(kService, kProtocol, name) != ESP_OK ||
-            mdns_service_txt_item_set(kService, kProtocol, "name", name) != ESP_OK) {
+        (void)mdns_service_remove(kService, kProtocol);
+        if (!add_service(name)) {
             std::printf("warning: mdns could not rename %s.%s\n", kService, kProtocol);
         }
     }

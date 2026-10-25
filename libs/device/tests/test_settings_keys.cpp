@@ -40,16 +40,13 @@ std::set<std::string> everything_else() {
     return out;
 }
 
+// ICLFORGE_REPO_ROOT is the repository's root, given by this binary's CMakeLists.txt; the file is empty when the
+// source tree is not there to read (a binary run away from its checkout).
 std::string read_file(const std::string& relative) {
-#ifdef ICLFORGE_REPO_ROOT
     std::ifstream in(std::string(ICLFORGE_REPO_ROOT) + "/" + relative, std::ios::binary);
     std::ostringstream text;
     text << in.rdbuf();
     return text.str();
-#else
-    (void)relative;
-    return {};
-#endif
 }
 
 }  // namespace
