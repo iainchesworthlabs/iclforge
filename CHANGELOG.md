@@ -4878,19 +4878,6 @@ The sections below contain the complete change list and fixes.
   server would reject. The 9.1.1 dialect still sends the finalize alone, and Hearth's server already
   accepts the init. A board takes the change when it is reflashed.
 
-**A stereo PCM play lit the left and the centre in the speakers view, not the left and the right**
-
-- **The sink's level meter read a PCM stream's channel n as output n.** A stereo track (what a server sends
-  for a track that is not coded) is placed by the renderer by location, the stream's R on the slot
-  named R, and that was always right: the audio was on L and R. The meter that shipped with
-  the integer unpacking of a PCM chunk (2026-10-11) took the levels from the chunk's samples and
-  put them on outputs 0 and 1, which in a Dolby-ordered room (`5.1`, `5.1.2`, `7.1.4`, `9.1.6`: L C R
-  ...) are L and C. `/status`, `/log` and the kit's speakers view showed the right channel on the
-  centre and nothing on the right. `LayoutRenderer::direct_outputs()` now says which output each
-  channel is a plain copy on, from the same slots `render_folded()` and the bed use, and the meter
-  measures the outputs when a channel is not a plain copy (a room without its R, a small speaker,
-  a slot nothing is patched from). The coded decodes were not involved.
-
 **The ESP32-C6 on a 4 MB module has room for its player again**
 
 - **The 4 MB table (`partitions_c6.csv`) has two 1.875 MiB application slots, not 1.75, and no

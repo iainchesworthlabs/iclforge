@@ -298,13 +298,10 @@ struct BurstPlayer::Impl {
     bool trim_neutral = true;
     // The levels of the PCM block being emitted, measured in integers while it was unpacked
     // (play_pcm()), for the meter to use in place of measuring the floats again. Null for anything
-    // else: a burst's blocks have no source of this kind. source_outputs[c] is the output channel c
-    // comes out of (LayoutRenderer::direct_outputs()): a channel's output is the one its speaker is
-    // patched to, which is not the channel's number.
+    // else: a burst's blocks have no source of this kind.
     const PcmLevel* source_levels = nullptr;
     std::size_t source_channels = 0;
     unsigned source_bits = 16;
-    std::array<int, 2> source_outputs{};
 
     // The meter.
     std::array<float, Playout::kMaxOutputs> window_peak{};
@@ -995,27 +992,27 @@ struct BurstPlayer::Impl {
     }
 
     // The block's levels from the integers its PCM source was unpacked from (play_pcm()), where the
-    // outputs carry that source and nothing else: unity gain, every source channel copied alone onto
-    // the output source_outputs names, no trim or delay, no identify tone (and, which the caller
-    // checks, no gain applied to the block). The same peak and mean square the floats would give,
-    // without a soft-float operation a sample. False when any of that does not hold, and the caller
-    // measures the floats.
+    // outputs carry that source and nothing else: unity gain, every source channel on the output of
+    // its own number, no trim or delay, no identify tone (and, which the caller checks, no gain
+    // applied to the block). The same peak and mean square the floats would give, without a
+    // soft-float operation a sample. False when any of that does not hold, and the caller measures
+    // the floats.
     [[nodiscard]] bool meter_from_source(std::size_t n) {
-        if (source_levels == nullptr || identifying || !trim_neutral) {
+        if (source_levels == nullptr || identifying || !trim_neutral ||
+            source_channels > outputs_open) {
             return false;
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            if (static_cast<std::size_t>(source_outputs[c]) >= outputs_open) {
+            if (routing.output_of(c) != static_cast<int>(c)) {
                 return false;
             }
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            const auto o = static_cast<std::size_t>(source_outputs[c]);
-            window_peak[o] =
-                std::max(window_peak[o], pcm_level_peak(source_levels[c], source_bits));
+            window_peak[c] =
+                std::max(window_peak[c], pcm_level_peak(source_levels[c], source_bits));
             const double sum = pcm_level_square_sum(source_levels[c], source_bits);
-            window_sum[o] += sum;
-            stream_sum[o] += sum;
+            window_sum[c] += sum;
+            stream_sum[c] += sum;
         }
         meter_commit(n);
         return true;
@@ -1507,14 +1504,9 @@ struct BurstPlayer::Impl {
             } else {
                 reached = renderer.render_reached(block, false, 1.0F, out);
             }
-            // The levels stand for the outputs only while the channels are the source's own, each a
-            // copy of itself on an output of the speaker it belongs to: not for a two-channel stream
-            // folded to one speaker, or a mono one given to two, and not for one panned between
-            // speakers or through bass management. Which output is the one the renderer's and the
-            // patch's answer, and the channel's number has nothing to do with it: in a Dolby-ordered
-            // room a stereo stream's R is on output 2 and output 1 is the centre.
-            if (used == channels &&
-                renderer.direct_outputs(routing, serving.fold.has_value(), channels, source_outputs)) {
+            // The levels stand for the outputs only while the channels are the source's own: not
+            // for a two-channel stream folded to one speaker, or a mono one given to two.
+            if (used == channels) {
                 source_levels = levels.data();
                 source_channels = channels;
                 source_bits = width == 2 ? 16U : 24U;
