@@ -19,8 +19,13 @@
 //      for the firmware (firmware/hearth-sink/main/preferences.cpp), over the settings_* functions
 //      (main/settings.hpp) and whatever acts on a change, and once for the tests (a fake that holds the values).
 //      A pure virtual means a firmware that forgot the setter does not compile;
-//   3. only when the control is not one of the five kinds (a layout list, a time-zone picker): an editor on the
-//      screen (panel/lvgl/prefs_screen.cpp). Never a bespoke button in lyric_screen.cpp.
+//   3. only when the control is not one of the five kinds (a layout list, a time-zone picker, read-only rows, a
+//      keyboard, a grid): the kind joins `Kind` (added at the END, never renumbered, with its name in kind_name()) and
+//      an editor draws it on the screen (panel/lvgl/prefs_screen.cpp, build_row()). Never a bespoke button in
+//      lyric_screen.cpp. The entry's value is still a word the Backend reads and sets: a list's summary, a pair of times
+//      as text, whatever the editor needs to hand over.
+// A field every entry must say (whether `Reset preferences` puts it back, how a change is confirmed) is added to Pref
+// with a default that a host test fails on, so that no entry can leave it out by accident.
 // The host tests walk every entry against every known board (board_variants.hpp): a default that is not
 // available where its entry is, an unavailable choice with no reason, a duplicate id, a stepper that cannot be
 // stepped, all fail there and not on a bench.
@@ -165,8 +170,9 @@ struct Pref {
     // A stepper's unit, said after a number that is not one of its stops ("7 min").
     const char* unit = "";
     // kChoice and kStepper: the choices, in the order they are shown (a stepper's, in the order it steps). kToggle:
-    // "on" and "off".
-    std::span<const ChoiceDef> choices;
+    // "on" and "off". Empty for the kinds with none (a text, an action): GCC's -Wmissing-field-initializers, which the
+    // CI flags turn into an error, wants a default for every member an entry may leave out.
+    std::span<const ChoiceDef> choices = {};
     // The whole entry; null is always available.
     AvailabilityFn availability = nullptr;
     InertFn inert = nullptr;

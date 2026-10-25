@@ -320,6 +320,8 @@ struct Screen {
     lv_obj_t* footer = nullptr;
     // The footer's chips beyond the name (the line and the delay) show only where they leave the buttons room.
     bool chips = false;
+    // The Adjust sheet's delay says "+50 ms" and not "Delay +50 ms" where the longer would not fit between its buttons.
+    bool short_delay = false;
     // What the no-lyrics screen follows (settings, read every frame), and what the player says is playing
     // (read five times a second while the speakers show).
     NowSettings now_set;
@@ -433,6 +435,13 @@ Screen g;
     char buffer[32];
     std::snprintf(buffer, sizeof buffer, "Delay %+d ms", static_cast<int>(ms));
     return buffer;
+}
+
+// The delay as the Adjust sheet says it between its buttons: the footer's words, or just the figure where the sheet
+// is too narrow for "Delay -1000 ms" and two buttons (a 240 pixel screen).
+[[nodiscard]] std::string sheet_delay_string(std::int32_t ms) {
+    const std::string full = delay_string(ms);
+    return g.short_delay ? full.substr(sizeof "Delay " - 1) : full;
 }
 
 // The text size step as the sheet says it. The idle screen draws no lyrics to resize, so without
@@ -651,7 +660,9 @@ void build_sheet() {
 
     lv_obj_t* controls = sheet_row(g.sheet, "Lyric delay", content_w);
     make_button(controls, "-", m.target, m.target, Button::kDelayLess, false);
-    g.sheet_delay = sheet_value(controls, delay_string(g.delay_ms), text_width(delay_string(-kDelayMaxMs), g.small) + 4);
+    g.short_delay = text_width(delay_string(-kDelayMaxMs), g.small) + 4 + 2 * (m.target + m.gap) > content_w;
+    g.sheet_delay =
+        sheet_value(controls, sheet_delay_string(g.delay_ms), text_width(sheet_delay_string(-kDelayMaxMs), g.small) + 4);
     make_button(controls, "+", m.target, m.target, Button::kDelayMore, false);
 
     controls = sheet_row(g.sheet, "Text size", content_w);
@@ -1438,7 +1449,7 @@ void update_header_and_footer(const Stage& stage) {
         g.delay_text = delay;
         lv_label_set_text(g.chip_delay, delay.c_str());
         if (g.sheet_delay != nullptr) {
-            lv_label_set_text(g.sheet_delay, delay.c_str());
+            lv_label_set_text(g.sheet_delay, sheet_delay_string(g.delay_ms).c_str());
         }
     }
     const char* const size = size_string(g.scale);
