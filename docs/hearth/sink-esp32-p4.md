@@ -199,7 +199,8 @@ a song with no lyrics and its dim time) and puts itself away after eight seconds
 Network, Time, Updates and System (a group with nothing in it is not drawn), with *Close* at the top right. It keeps the
 screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
 closes, so the lyric screen is as it was with it shut. Today it holds the two settings that were in Adjust: what the
-screen shows while a song has no lyrics, and when it dims. The technical settings (slot width, the second I2S line, the
+screen shows while a song has no lyrics, and when it dims; and, under Sound, the test tone through each speaker and the level
+and distance of each speaker ([the Speakers sheet](sink-speakers.md#setting-them)). The technical settings (slot width, the second I2S line, the
 time server) stay in the [developer view](#the-developer-view) and the routes.
 
 ![Preferences on the kit](screenshots/p4-panel-prefs.png)
@@ -214,7 +215,7 @@ product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an
 touch) for the host tests to walk.
 
 The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
-and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text or action),
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action or sheet: a row that says what is set and opens an editor of its own),
 whether a change applies live, at the next play or after a restart, the route that sets the same value, its choices,
 and **`availability(caps)`**, once for the entry and once for each choice: whether this board can do it and, if not,
 why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
@@ -234,6 +235,8 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Identify speakers: a button, *Play each*, that says *Stop* while its tone plays | `identify-speakers` | `/identify` | the build has a Sendspin player; a song playing says so under the row |
+| Speaker levels and distances: a sheet (kind `sheet`) with the room, a level and a distance for each speaker | `speaker-trim` | `/trim` | the build has a Sendspin player; the distance needs delay lines (PSRAM) |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the

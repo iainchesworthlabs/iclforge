@@ -31,6 +31,29 @@ A level above 0 dB can clip a loud passage: the sink clips at full scale and doe
 
 ## Setting them
 
+**On the sink's own screen**, a board with a touch panel (the P4X kit) has them under *Preferences*, in the group *Sound*:
+
+![Preferences with the Sound group, while the test tone plays: the button says Stop](screenshots/p4-panel-prefs-sound.png)
+
+*Identify speakers* has a *Play each* button that plays the tone through every speaker in turn, and says *Stop* while it
+plays. *Speaker levels and distances* says how many speakers are set and opens the *Speakers* sheet:
+
+![The Speakers sheet on the kit: the room, the left surround lit while its tone plays, and its level and distance](screenshots/p4-panel-speakers.png)
+
+The sheet draws the room as the layout in force has it. A tap on a speaker chooses it and plays the tone through it, and the
+speaker the tone is on is lit. For the chosen speaker, *Level* goes up and down half a decibel a tap and *Distance* a tenth of a
+metre, or a metre with *-1 m* and *+1 m* (the first *+* on a speaker with no distance starts it at the farthest distance the
+others have, so that nothing moves until you move it); *Repeat* plays the speaker over and over, so that a level can be set
+by ear; *Play each* and *Stop* do what they say; *Reset* puts the chosen speaker back to 0 dB and no distance. **The tone stops
+when you leave the sheet**, and when Preferences put themselves away. On a screen too narrow for a room the speakers are a row
+of buttons:
+
+![The Speakers sheet on a 480 by 320 screen](screenshots/p4-panel-speakers-small.png)
+
+When the board cannot do something the sheet says why under the controls: a song is playing, the board has no memory for delay
+lines (the distance is greyed, the level is not), or a Sendspin server is setting the levels. A level or a distance the board
+refuses (the nearest and the farthest speaker too far apart) is said above the controls.
+
 **On the sink's web page**, the section *Levels and distances* lists the speakers of the layout in
 force, with a level field, a distance field, the delay that comes to, and a *Play* button for the
 tone. A field is sent when you leave it. *Reset levels and distances* asks first.
@@ -115,7 +138,7 @@ the sink's is refused while a server's is on.
 
 ## Related pages
 
-- [An ESP32-P4 sink](sink-esp32-p4.md), [An ESP32-S3 sink](sink-esp32-s3.md) and
-  [An ESP32-C6 sink](sink-esp32-c6.md).
+- [An ESP32-P4 sink](sink-esp32-p4.md) (its screen and Preferences, [Adjust and Preferences](sink-esp32-p4.md#adjust-and-preferences)),
+  [An ESP32-S3 sink](sink-esp32-s3.md) and [An ESP32-C6 sink](sink-esp32-c6.md).
 - [planning/hearth-speaker-trim-identify.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-speaker-trim-identify.md)
   has the design, the memory, the cost and what is left to check on a board.
