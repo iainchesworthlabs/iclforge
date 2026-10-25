@@ -54,6 +54,30 @@ TEST_CASE("now_view: the stored numbers are the ones written down, and a number 
     CHECK_FALSE(nv::view_from_stored(5).has_value());
 }
 
+TEST_CASE("now_view: the two speakers styles, their words and their stored numbers", "[now_view]") {
+    CHECK(std::string(nv::speakers_style_name(nv::SpeakersStyle::kGlow)) == "glow");
+    CHECK(std::string(nv::speakers_style_name(nv::SpeakersStyle::kPulse)) == "pulse");
+    CHECK(nv::kDefaultSpeakersStyle == nv::SpeakersStyle::kGlow);
+    // What NVS holds is these numbers: a renumbering turns every board's screen into another one.
+    CHECK(static_cast<int>(nv::SpeakersStyle::kGlow) == 0);
+    CHECK(static_cast<int>(nv::SpeakersStyle::kPulse) == 1);
+    CHECK(nv::speakers_style_from_stored(0) == nv::SpeakersStyle::kGlow);
+    CHECK(nv::speakers_style_from_stored(1) == nv::SpeakersStyle::kPulse);
+    CHECK_FALSE(nv::speakers_style_from_stored(-1).has_value());
+    CHECK_FALSE(nv::speakers_style_from_stored(2).has_value());
+    for (const nv::SpeakersStyle style : {nv::SpeakersStyle::kGlow, nv::SpeakersStyle::kPulse}) {
+        const auto parsed = nv::parse_speakers_style(nv::speakers_style_name(style));
+        REQUIRE(parsed.has_value());
+        CHECK(*parsed == style);
+    }
+    CHECK(nv::parse_speakers_style("pulse\n") == nv::SpeakersStyle::kPulse);
+    CHECK(nv::parse_speakers_style("  glow\r\n") == nv::SpeakersStyle::kGlow);
+    CHECK_FALSE(nv::parse_speakers_style("Glow").has_value());
+    CHECK_FALSE(nv::parse_speakers_style("pulse now").has_value());
+    CHECK_FALSE(nv::parse_speakers_style("").has_value());
+    CHECK_FALSE(nv::parse_speakers_style("speakers").has_value());
+}
+
 TEST_CASE("now_view: dim-after is never or whole minutes up to four hours", "[now_view]") {
     CHECK(nv::parse_dim_after("never") == 0);
     CHECK(nv::parse_dim_after("never\n") == 0);

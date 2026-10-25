@@ -98,6 +98,20 @@ struct SendspinPlaying {
 };
 [[nodiscard]] SendspinPlaying sendspin_now_playing();
 
+// The levels alone, for a view that follows every 100 ms window (planning/p4x-speakers-options.md): the same
+// peak and RMS per output as sendspin_now_playing(), with the count of windows the player has closed, so that a
+// caller can tell a new window from the one it has. A lock and two short arrays, where sendspin_now_playing()
+// copies the player's whole status; fixed-size, so it allocates nothing.
+struct SendspinLevels {
+    // A stream is running and its first window has closed.
+    bool have = false;
+    std::uint32_t serial = 0;
+    std::size_t outputs = 0;
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> peak_db{};
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
+};
+[[nodiscard]] SendspinLevels sendspin_now_levels();
+
 // POST /pairing's actions: "reset", "cancel" or "forget". False for anything
 // else, or without a player.
 [[nodiscard]] bool sendspin_pairing(std::string_view action);

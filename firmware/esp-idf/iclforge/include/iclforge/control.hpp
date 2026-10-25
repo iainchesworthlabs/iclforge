@@ -293,6 +293,12 @@ struct ControlHandlers {
     std::function<bool(std::string_view view)> set_now_playing;
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
+    // GET and PUT /speakers-style: how that screen's speakers show a level, "glow" or "pulse"
+    // (iclforge/now_view.hpp, planning/p4x-speakers-options.md). Empty on a board with no screen, as the
+    // four above. set_speakers_style is handed one of the two words; false means it could not be stored.
+    // It acts at once, with no restart.
+    std::function<std::string()> speakers_style;
+    std::function<bool(std::string_view style)> set_speakers_style;
 
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
     // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, and GET /status's "time". A board that keeps

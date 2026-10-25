@@ -15,6 +15,7 @@
     | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built; the rule tested on the host and in the preview tool, and run on the kit with a stream and injected taps; a finger and the glass not yet looked at: [The dark view](#the-dark-view) |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Built; run on the kit: see [Stage 2](#stage-2-the-title-card-as-built) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
+| 4 | The speakers **follow every window and can pulse**: the screen reads each 100 ms level, judges it against the room's loudest, and a `speakers style` (`glow` / `pulse`) | Built and host-tested, the preview run; the kit A/B is to do: see [Stage 4](#stage-4-the-speakers-follow-the-sound) |
 
 ## What the board knows while a song plays
 
@@ -309,6 +310,36 @@ names a server is saying where the time comes from; the router's, a local server
 board that is turned `off` shows no time at all rather than an old one; the page budget went from 57,344 to
 65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 42 zones and cities (*UTC+10 Melbourne,
 Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and the 400 says why.
+
+## Stage 4: the speakers follow the sound
+
+The owner, 2026-10-25, asked for the speakers to be "a little more dynamic ... reacting", was shown seven options
+(rings, three bands, Atmos objects, a phantom image of where the sound is, waveform tiles, edge light, and the image
+with the objects: [planning/p4x-speakers-options.md](p4x-speakers-options.md)) and chose none: *"rather than a full
+redesign, the today visualisation would be more responsive to the audio, and perhaps a variant of the rings where
+the audio levels cause a growing/shrinking of the speaker circle (when it was filled in) but not excessively so."*
+So stage 4 is that, and nothing from the seven:
+
+- **The glow is more responsive.** The screen reads the levels itself every frame (`BurstPlayer::levels()`,
+  `sendspin_now_levels()`, `read_now_levels()`: a lock and two short arrays) and follows every window the player
+  closes; it read the status at 5 Hz and so saw every other one. A level is judged against the loudest the room has
+  lately been (`LevelCeiling`), so the same music shows the same at any volume. Six core steps over 30 dB, the
+  level falling 60 dB a second, 0.4 of a step of margin, two halo steps. Chosen over a synthetic groove
+  (`preview/speakers_options/tune.cpp`): 72% of 5 dB onsets show in the same window (3 to 26% before), 3 to 5% of
+  steady windows move a step; 18 / 56 / 82 / 101 thousand pixels a second at 2.0 / 5.1 / 7.1.4 / 9.1.6, where the
+  first design's host estimate was 45 and 81 thousand at 5.1 and 7.1.4 (and cost a burst 0.4% on the kit).
+- **A style, `glow` (the default) or `pulse`** (`GET` and `PUT /speakers-style`, NVS `np_style`, `SpeakersStyle` in
+  `now_view.hpp`): in `pulse` the filled circle is one of eight sizes between 88% and 112% of the plan's (`Pulse`,
+  `kPulseReach`), following the level over 18 dB with its own smoothing, three sizes a window at most, held until a
+  quarter size past an edge, and a speaker 18 dB or more under the room's loudest does not move. The halo is not
+  resized, which halves what a size change redraws. 33 / 96 / 129 / 166 thousand pixels a second in the same rooms.
+- **Not changed:** `LV_INV_BUF_SIZE` (LVGL redraws the whole screen when more than 32 separate rectangles are
+  invalid in a refresh). Measured with 32 and 128 the glow is identical in every room and the pulse differs only at
+  9.1.6 (166 against 144 thousand), so the compile definition is not worth carrying. It matters for any busier view:
+  the bands option flushed 5.5 million pixels a second in a 7.1.4 room with 32 and 0.27 million with 128.
+- **To do on the kit:** the A/B of `burst_us` (E-AC-3 5.1, stereo PCM, AC-4 5.1) with the old glow, the new glow and
+  the pulse, in alternating order, against the +0.4% the first design cost a 5.1 burst; and the owner's eye on the
+  glass.
 
 ## Open
 

@@ -12,6 +12,8 @@ void panel_set_view(iclforge::nowview::View /*view*/) {}
 
 void panel_set_dim_after(int /*minutes*/) {}
 
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle /*style*/) {}
+
 bool panel_start() { return false; }
 
 PanelStats panel_stats() { return {}; }

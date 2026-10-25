@@ -53,6 +53,7 @@ namespace {
 // and read by the panel's, every frame.
 std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
 std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
+std::atomic<int> g_speakers_style{static_cast<int>(iclforge::nowview::kDefaultSpeakersStyle)};
 
 }  // namespace
 }  // namespace player
@@ -214,6 +215,18 @@ bool read_now_playing(NowPlaying& out) {
     return true;
 }
 
+bool read_now_levels(NowLevels& out) {
+    const SendspinLevels levels = sendspin_now_levels();
+    if (!levels.have) {
+        return false;
+    }
+    out.serial = levels.serial;
+    out.outputs = levels.outputs;
+    out.peak_db = levels.peak_db;
+    out.rms_db = levels.rms_db;
+    return true;
+}
+
 bool read_now_title(NowTitle& out) {
     // The player calls the reader under its lock, so it copies and returns (now_copy_title copies the
     // strings only when the store's revision moved).
@@ -235,6 +248,7 @@ NowSettings read_now_settings() {
     NowSettings settings;
     settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
     settings.dim_after_minutes = g_dim_after_minutes.load();
+    settings.speakers_style = static_cast<iclforge::nowview::SpeakersStyle>(g_speakers_style.load());
     return settings;
 }
 
@@ -622,6 +636,8 @@ void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
 
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_speakers_style.store(static_cast<int>(style)); }
+
 bool panel_start() {
     if (g_started.exchange(true)) {
         return g_stats.running;
@@ -632,6 +648,7 @@ bool panel_start() {
     }
     g_now_view.store(static_cast<int>(settings().now_view));
     g_dim_after_minutes.store(settings().dim_after_minutes);
+    g_speakers_style.store(static_cast<int>(settings().speakers_style));
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {

@@ -50,6 +50,7 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
         'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
@@ -98,6 +99,8 @@ const REPLIES = {
     nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
     nowPlayingOk: 'ok; the screen follows at once\n',
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
+    speakersStyleBad: 'PUT /speakers-style wants glow or pulse\n',
+    speakersStyleRefused: 'that style could not be stored\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
     noClock: 'this board keeps no time\n',
@@ -178,6 +181,8 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /speakers-style',
+    'PUT /speakers-style',
     'GET /timezone',
     'PUT /timezone',
     'GET /ntp-server',
@@ -434,7 +439,7 @@ function cableNetwork(preference = 'auto') {
 // no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing and GET
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
 function screenBoard() {
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', speakersStyle: 'glow' };
 }
 
 // The time of a board that keeps it (firmware/hearth-sink/main/clock/sntp, every board with a network): in the
@@ -1121,6 +1126,22 @@ async function startStub() {
                 }
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
+            }
+            case 'GET /speakers-style':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.speakersStyle + '\n');
+            case 'PUT /speakers-style': {
+                const word = body.trim();
+                if (!['glow', 'pulse'].includes(word)) {
+                    return send(res, 400, REPLIES.speakersStyleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.speakersStyle = word;
+                return send(res, 200, REPLIES.nowPlayingOk);
             }
             case 'GET /timezone':
                 if (!device.time) {

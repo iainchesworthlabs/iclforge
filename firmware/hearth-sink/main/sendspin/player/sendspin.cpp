@@ -1038,6 +1038,23 @@ std::optional<iclforge::ControlSendspin> sendspin_status() {
     return s;
 }
 
+SendspinLevels sendspin_now_levels() {
+    SendspinLevels out;
+    const Running* const r = running();
+    if (r == nullptr) {
+        return out;
+    }
+    const iclforge::BurstPlayerLevels play = r->player->levels();
+    out.have = play.have;
+    out.serial = play.serial;
+    out.outputs = std::min(play.outputs, out.peak_db.size());
+    for (std::size_t o = 0; o < out.outputs; ++o) {
+        out.peak_db[o] = play.peak_db[o];
+        out.rms_db[o] = play.rms_db[o];
+    }
+    return out;
+}
+
 SendspinPlaying sendspin_now_playing() {
     SendspinPlaying out;
     const Running* const r = running();

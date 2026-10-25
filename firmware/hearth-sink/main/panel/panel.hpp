@@ -69,6 +69,8 @@ struct PanelStats {
 [[nodiscard]] bool panel_has_view(iclforge::nowview::View view);
 void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
+// How the speakers view shows a level (iclforge::nowview::SpeakersStyle, planning/p4x-speakers-options.md).
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
 
 // Starts the panel's task: once, from app_main, after the network and the Sendspin player. True when
 // a panel is running; false (having said why) when there is none or it did not come up.

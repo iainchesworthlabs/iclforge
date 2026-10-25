@@ -79,6 +79,8 @@ struct Settings {
     // build and acted on by the one with a panel (panel/lvgl).
     iclforge::nowview::View now_view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    // How the speakers view shows a level: glow or pulse (planning/p4x-speakers-options.md).
+    iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
     // The time (planning/p4x-now-playing.md, stage 3), on every board that has a network. The zone the time is
     // shown in, as a POSIX string (iclforge/wall_clock.hpp); empty when none is set, and the time is then UTC.
     // A board has no zone database, so this is the zone itself.
@@ -123,6 +125,7 @@ void settings_load();
 [[nodiscard]] bool settings_set_network_preference(NetworkPreference preference);
 [[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
 [[nodiscard]] bool settings_set_dim_after(int minutes);
+[[nodiscard]] bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style);
 // A POSIX time zone, or an empty string to take the zone away. Refused when the string is not one
 // (iclforge::wallclock::parse_time_zone); the C library's own reading of it is the caller's to check.
 [[nodiscard]] bool settings_set_time_zone(std::string_view zone);

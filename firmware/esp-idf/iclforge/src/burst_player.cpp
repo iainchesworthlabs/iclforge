@@ -1963,6 +1963,20 @@ BurstPlayerStatus BurstPlayer::status() const {
     return impl_->status;
 }
 
+BurstPlayerLevels BurstPlayer::levels() const {
+    BurstPlayerLevels out;
+    const std::lock_guard lock(impl_->status_mutex);
+    const BurstPlayerStatus& s = impl_->status;
+    out.have = s.have_levels && impl_->active.load();
+    out.serial = s.levels_serial;
+    out.outputs = std::min(s.outputs, out.peak_db.size());
+    for (std::size_t o = 0; o < out.outputs; ++o) {
+        out.peak_db[o] = s.peak_db[o];
+        out.rms_db[o] = s.rms_db[o];
+    }
+    return out;
+}
+
 bool BurstPlayer::active() const { return impl_->active.load(); }
 
 bool BurstPlayer::decodes_ac4() {

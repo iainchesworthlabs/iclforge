@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **The speakers follow the sound more closely, and can pulse.** The P4X's no-lyrics screen reads the level of every
+  100 ms window (it read every other one), judges it against the loudest the room has lately been (so the same music shows
+  the same at any volume), and moves in six steps that fall fast enough for a hit to show, for about 56,000 pixels a second
+  at 5.1 (the lyric screen's song filling is 192,000). A new `GET` and `PUT /speakers-style` (`glow`, the default, or
+  `pulse`: each speaker's filled circle grows and shrinks a little, 88% to 112%, with its level) is kept as `np_style`.
+  No new meter and no change to the audio path beyond `BurstPlayer::levels()`, a lock and two short arrays. The plan is
+  `planning/p4x-speakers-options.md`.
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded

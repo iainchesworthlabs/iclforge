@@ -198,6 +198,19 @@ struct BurstPlayerStatus {
     bool identifying = false;
 };
 
+// Just the levels of the last window that closed, for a screen that draws them every 100 ms: what the status
+// holds of them, with the count of windows closed so far (so that a reader knows whether it has seen this one),
+// and nothing else of the status. Fixed-size, so a copy never allocates.
+struct BurstPlayerLevels {
+    // A stream is running and its first window has closed.
+    bool have = false;
+    std::size_t outputs = 0;
+    // Windows closed since the player started: moves by one when a new window's levels are published.
+    std::uint32_t serial = 0;
+    std::array<float, Playout::kMaxOutputs> peak_db{};
+    std::array<float, Playout::kMaxOutputs> rms_db{};
+};
+
 class BurstPlayer {
    public:
     BurstPlayer(const BurstPlayerConfig& config, ScheduledSink& sink);
@@ -246,6 +259,8 @@ class BurstPlayer {
 
     // Safe from any task.
     [[nodiscard]] BurstPlayerStatus status() const;
+    // The levels alone, under the same lock: a lock and two short arrays, where status() copies the whole of it.
+    [[nodiscard]] BurstPlayerLevels levels() const;
     // Whether a stream is running.
     [[nodiscard]] bool active() const;
     // Whether this build decodes Opus (CONFIG_ICLFORGE_SENDSPIN_OPUS): a firmware lists the format

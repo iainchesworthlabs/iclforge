@@ -1,13 +1,20 @@
-// The speakers view and the title card. See now_screen.hpp and planning/p4x-now-playing.md.
+// The speakers view and the title card. See now_screen.hpp, planning/p4x-now-playing.md and
+// planning/p4x-speakers-options.md.
 //
 // A speaker is three objects: a halo (the peak, a few steps of faint accent behind it), a core (the RMS,
 // a few steps of accent, with the speaker's border) and its name inside. All of them are made when the
 // room is built and left alone while it stands; a level changes a step and the step changes one object's
-// opacity, which redraws that speaker's rectangle and nothing else.
+// opacity, which redraws that speaker's rectangle and nothing else. In the pulse style the core is also a few
+// sizes, a little smaller or larger than the plan draws it, and a size change redraws the core's rectangle.
+//
+// The levels are read here, every frame, straight from the player (read_now_levels) and followed when the
+// window is a new one: the player closes one every 100 ms, and the five-times-a-second read of the whole status
+// that the screen makes for the heading would miss every other one.
 
 #include "now_screen.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <string>
@@ -30,11 +37,17 @@ namespace rp = iclforge::render;
 // step is 55 %: the lyric screen's own sung words are 70 %, and this is a thing for a dim room.
 constexpr int kCoreOpaFloor = 28;
 constexpr int kCoreOpaTop = 140;
-constexpr int kHaloOpaStep = 14;
+constexpr int kHaloOpaStep = 21;  // two steps, to the same top (56) the three of 14 reached
 constexpr int kHaloOpaBase = 14;
 // How far the halo stands out of the speaker, each side.
 constexpr int kHaloReach = 12;
-constexpr std::uint64_t kUpdateEveryUs = 200'000;
+// Where a build has no window to follow (no player, or none closed yet), the 5 Hz copy of the status is what
+// the speakers show, and this is how often it is looked at.
+constexpr std::uint64_t kCopyEveryUs = 200'000;
+// The longest a gap between two windows is taken to be, seconds: a screen that was not updated for a while (a
+// dark cover over it) falls and settles by the whole of it, and no more is worth working out.
+constexpr float kLongestGapSeconds = 30.0F;
+constexpr float kWindowSeconds = 0.1F;
 
 struct Node {
     lv_obj_t* halo = nullptr;
@@ -42,14 +55,32 @@ struct Node {
     lv_obj_t* label = nullptr;
     std::size_t slot = 0;
     rp::Glow glow;
+    rp::Pulse pulse;
+    // Where the plan draws it: the centre and the size, pixels.
+    int cx = 0;
+    int cy = 0;
+    int w = 0;
+    int h = 0;
     // What is painted: -1 until the first update has painted anything.
     int core_step = -1;
     int halo_step = -1;
+    // The size step painted (a pulse size, or kPlanSize for the plan's own size).
+    int size_step = -1;
 };
+
+constexpr int kPlanSize = rp::kPulseSteps;
 
 struct View {
     LvVector<Node> nodes;
-    std::uint64_t updated_us = 0;
+    // The speakers' room's ceiling, and the window the screen last followed.
+    rp::LevelCeiling ceiling;
+    NowLevels levels;
+    bool have_serial = false;
+    std::uint32_t serial = 0;
+    // The last time the 5 Hz copy was looked at, and the style that is painted.
+    std::uint64_t copied_us = 0;
+    iclforge::nowview::SpeakersStyle shown_style = iclforge::nowview::kDefaultSpeakersStyle;
+    bool style_painted = false;
     NowStyle style;
 };
 
@@ -84,6 +115,12 @@ lv_font_t* clock_font = nullptr;
 
 lv_color_t color(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
+// An object of w x h centred on (cx, cy).
+void place(lv_obj_t* object, int cx, int cy, int w, int h) {
+    lv_obj_set_size(object, w, h);
+    lv_obj_set_pos(object, cx - w / 2, cy - h / 2);
+}
+
 lv_obj_t* make_shape(lv_obj_t* parent, const rp::PlanNode& node, int grow, int radius) {
     lv_obj_t* const object = lv_obj_create(parent);
     lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
@@ -107,6 +144,10 @@ bool now_build_speakers(lv_obj_t* parent, int width, int height, const NowPlayin
         return false;
     }
     g.style = style;
+    g.ceiling.reset();
+    g.have_serial = false;
+    g.copied_us = 0;
+    g.style_painted = false;
     const std::vector<rp::PlanNode> nodes =
         rp::plan_nodes(now.spots, rp::PlanArea{.width = width, .height = height});
     g.nodes.reserve(nodes.size());
@@ -120,6 +161,10 @@ bool now_build_speakers(lv_obj_t* parent, int width, int height, const NowPlayin
                                                                : 10;
         Node node;
         node.slot = slot;
+        node.cx = plan.x;
+        node.cy = plan.y;
+        node.w = plan.w;
+        node.h = plan.h;
         // The halo is a larger copy of the speaker's shape, behind it and invisible until the peak
         // asks for it.
         node.halo = make_shape(parent, plan, 2 * kHaloReach, plan.shape == rp::PlanShape::kEar ? LV_RADIUS_CIRCLE : radius + 8);
@@ -138,7 +183,6 @@ bool now_build_speakers(lv_obj_t* parent, int width, int height, const NowPlayin
         lv_obj_center(node.label);
         g.nodes.push_back(node);
     }
-    g.updated_us = 0;
     return !g.nodes.empty();
 }
 
@@ -146,32 +190,85 @@ void now_update_speakers(const NowPlaying& now, std::uint64_t now_us) {
     if (g.nodes.empty()) {
         return;
     }
-    if (g.updated_us != 0 && now_us - g.updated_us < kUpdateEveryUs) {
+    // The window to follow: the player's last, when it is a new one, by how many windows it has closed since the
+    // one the screen followed.
+    float seconds = kWindowSeconds;
+    bool fresh = false;
+    if (read_now_levels(g.levels)) {
+        if (!g.have_serial) {
+            g.have_serial = true;
+            g.serial = g.levels.serial;
+            fresh = true;
+        } else if (g.levels.serial != g.serial) {
+            const std::uint32_t windows = g.levels.serial - g.serial;
+            g.serial = g.levels.serial;
+            seconds = std::min(static_cast<float>(windows) * kWindowSeconds, kLongestGapSeconds);
+            fresh = true;
+        }
+    } else if (g.copied_us == 0 || now_us - g.copied_us >= kCopyEveryUs) {
+        // No window yet, or no player to ask: the levels the screen's own read copied, if any, at 5 Hz.
+        seconds = g.copied_us == 0 ? 0.2F : std::min(static_cast<float>(now_us - g.copied_us) / 1e6F, kLongestGapSeconds);
+        g.copied_us = now_us;
+        g.levels.outputs = std::min({now.rms_db.size(), now.peak_db.size(), g.levels.rms_db.size()});
+        for (std::size_t o = 0; o < g.levels.outputs; ++o) {
+            g.levels.rms_db[o] = now.rms_db[o];
+            g.levels.peak_db[o] = now.peak_db[o];
+        }
+        fresh = true;
+    }
+    const iclforge::nowview::SpeakersStyle style = read_now_settings().speakers_style;
+    const bool style_changed = !g.style_painted || style != g.shown_style;
+    if (!fresh && !style_changed) {
         return;
     }
-    const float seconds = g.updated_us == 0 ? 0.2F : static_cast<float>(now_us - g.updated_us) / 1e6F;
-    g.updated_us = now_us;
+    g.shown_style = style;
+    g.style_painted = true;
+    float loudest = rp::kGlowSilentDb;
+    for (const Node& node : g.nodes) {
+        if (node.slot < g.levels.outputs) {
+            loudest = std::max(loudest, g.levels.rms_db[node.slot]);
+        }
+    }
+    if (fresh) {
+        g.ceiling.feed(loudest, seconds);
+    }
     for (Node& node : g.nodes) {
-        const float rms = node.slot < now.rms_db.size() ? now.rms_db[node.slot] : -120.0F;
-        const float peak = node.slot < now.peak_db.size() ? now.peak_db[node.slot] : -120.0F;
-        const bool changed = node.glow.update(rms, peak, seconds);
-        if (!changed && node.core_step >= 0) {
-            continue;
+        const bool have = node.slot < g.levels.outputs;
+        const float rms = have ? g.levels.rms_db[node.slot] : -120.0F;
+        const float peak = have ? g.levels.peak_db[node.slot] : -120.0F;
+        bool changed = false;
+        if (fresh) {
+            changed = node.glow.update(rms, peak, seconds, g.ceiling.db());
+            node.pulse.update(rms, seconds, g.ceiling.db());
         }
-        const int core = node.glow.core();
-        const int halo = node.glow.halo();
-        if (core != node.core_step) {
-            node.core_step = core;
-            const bool live = node.glow.live();
-            const int opa = live ? kCoreOpaFloor + (kCoreOpaTop - kCoreOpaFloor) * (core - 1) / (rp::kGlowCoreSteps - 1) : 0;
-            lv_obj_set_style_bg_opa(node.core, static_cast<lv_opa_t>(opa), 0);
-            lv_obj_set_style_border_color(node.core, color(live ? g.style.accent : g.style.faint), 0);
-            lv_obj_set_style_border_opa(node.core, live ? 180 : LV_OPA_COVER, 0);
-            lv_obj_set_style_text_color(node.label, color(live ? g.style.text : g.style.faint), 0);
+        if (changed || node.core_step < 0) {
+            const int core = node.glow.core();
+            const int halo = node.glow.halo();
+            if (core != node.core_step) {
+                node.core_step = core;
+                const bool live = node.glow.live();
+                const int opa = live ? kCoreOpaFloor + (kCoreOpaTop - kCoreOpaFloor) * (core - 1) / (rp::kGlowCoreSteps - 1) : 0;
+                lv_obj_set_style_bg_opa(node.core, static_cast<lv_opa_t>(opa), 0);
+                lv_obj_set_style_border_color(node.core, color(live ? g.style.accent : g.style.faint), 0);
+                lv_obj_set_style_border_opa(node.core, live ? 180 : LV_OPA_COVER, 0);
+                lv_obj_set_style_text_color(node.label, color(live ? g.style.text : g.style.faint), 0);
+            }
+            if (halo != node.halo_step) {
+                node.halo_step = halo;
+                lv_obj_set_style_bg_opa(node.halo, static_cast<lv_opa_t>(halo == 0 ? 0 : kHaloOpaBase + kHaloOpaStep * halo), 0);
+            }
         }
-        if (halo != node.halo_step) {
-            node.halo_step = halo;
-            lv_obj_set_style_bg_opa(node.halo, static_cast<lv_opa_t>(halo == 0 ? 0 : kHaloOpaBase + kHaloOpaStep * halo), 0);
+        // The size: a pulse size in the pulse style, the plan's own in the glow style.
+        const int size_step = style == iclforge::nowview::SpeakersStyle::kPulse ? node.pulse.step() : kPlanSize;
+        if (size_step != node.size_step) {
+            node.size_step = size_step;
+            const float scale = style == iclforge::nowview::SpeakersStyle::kPulse ? node.pulse.scale() : 1.0F;
+            const int core_w = static_cast<int>(std::lround(static_cast<float>(node.w) * scale));
+            const int core_h = static_cast<int>(std::lround(static_cast<float>(node.h) * scale));
+            // Only the filled circle changes size: the halo stays where the plan puts it, so that a size change
+            // redraws the circle's rectangle and not the halo's, which is half as big again (and the ring of the
+            // halo around it is a few pixels wider when the circle is small and narrower when it is large).
+            place(node.core, node.cx, node.cy, core_w, core_h);
         }
     }
 }

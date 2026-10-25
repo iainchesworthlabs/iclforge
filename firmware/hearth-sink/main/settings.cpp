@@ -28,6 +28,7 @@ constexpr const char* kKeySecondLine = "second_line";
 constexpr const char* kKeyNetworkPreference = "net_pref";
 constexpr const char* kKeyNowView = "np_view";
 constexpr const char* kKeyDimAfter = "np_dim";
+constexpr const char* kKeySpeakersStyle = "np_style";
 constexpr const char* kKeyTimeZone = "time_zone";
 constexpr const char* kKeyNtpServer = "ntp_server";
 constexpr const char* kKeyTimeSync = "time_sync";
@@ -141,6 +142,7 @@ void settings_load() {
     g_settings.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     g_settings.now_view = iclforge::nowview::kDefaultView;
     g_settings.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    g_settings.speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
     g_settings.time_zone = {};
     g_settings.ntp_server = {};
     g_settings.time_sync = true;
@@ -203,6 +205,14 @@ void settings_load() {
                         g_settings.dim_after_minutes);
         }
     }
+    if (nvs_get_i32(handle, kKeySpeakersStyle, &stored) == ESP_OK) {
+        if (const auto style = iclforge::nowview::speakers_style_from_stored(stored)) {
+            g_settings.speakers_style = *style;
+        } else {
+            std::printf("settings: stored speakers style %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::speakers_style_name(g_settings.speakers_style));
+        }
+    }
     // A stored zone that is not one this build reads (a partition written by a later image) is said, and
     // the clock says UTC.
     read_string(handle, kKeyTimeZone, g_settings.time_zone);
@@ -226,12 +236,13 @@ void settings_load() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s\n",
+                "no-lyrics screen %s (%s), dims after %s, time zone %s, time server %s, time sync %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
+                iclforge::nowview::speakers_style_name(g_settings.speakers_style),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
@@ -306,6 +317,14 @@ bool settings_set_now_view(iclforge::nowview::View view) {
         return false;
     }
     g_settings.now_view = view;
+    return true;
+}
+
+bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style) {
+    if (!write_int(kKeySpeakersStyle, static_cast<std::int32_t>(style))) {
+        return false;
+    }
+    g_settings.speakers_style = style;
     return true;
 }
 

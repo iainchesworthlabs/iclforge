@@ -521,6 +521,38 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
     }
 });
 
+test('the stand-in answers /speakers-style as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        let reply = await fetch(`${stub.url}speakers-style`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        // One with a screen takes glow or pulse, in lower case, and glows out of the box.
+        stub.device.screen = screenBoard();
+        reply = await fetch(`${stub.url}speakers-style`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('glow\n');
+        for (const bad of ['Pulse', 'pulse now', 'speakers', '1', '']) {
+            reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.speakersStyleBad);
+        }
+        reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingOk);
+        expect(await (await fetch(`${stub.url}speakers-style`)).text()).toBe('pulse\n');
+        // The route is in the list GET /api says, in the words the firmware says it in.
+        const api = await (await fetch(`${stub.url}api`)).text();
+        expect(api).toContain('GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one');
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in answers /now-playing and /dim-after as the firmware does', async () => {
     const stub = await startStub();
     try {

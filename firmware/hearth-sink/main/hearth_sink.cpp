@@ -750,6 +750,15 @@ iclforge::ControlHandlers control_handlers() {
             player::panel_set_view(*view);
             return true;
         };
+        h.speakers_style = []() { return std::string(iclforge::nowview::speakers_style_name(player::settings().speakers_style)); };
+        h.set_speakers_style = [](std::string_view word) {
+            const auto style = iclforge::nowview::parse_speakers_style(word);
+            if (!style || !player::settings_set_speakers_style(*style)) {
+                return false;
+            }
+            player::panel_set_speakers_style(*style);
+            return true;
+        };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) {
             if (!player::settings_set_dim_after(minutes)) {
