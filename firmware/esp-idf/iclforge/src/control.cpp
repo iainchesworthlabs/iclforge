@@ -482,6 +482,9 @@ struct Control::Impl {
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
                          "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one\n"
                          "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one\n"
+                         "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off "
+                         "(22:00-07:00 on), on a board with a screen; PUT one, or on, or off\n"
+                         "GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; PUT one\n"
                          "GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; "
                          "change one through its own route\n"
                          "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one, or a name from /time-zones\n"
@@ -991,6 +994,64 @@ struct Control::Impl {
         return send_text(req, "200 OK", "ok; takes effect at once\n");
     }
 
+    static esp_err_t on_night_schedule_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.night) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        const std::string text = nowview::night_schedule_text(h.night()) + '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_night_schedule_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const nowview::NightSchedule current = h.night ? h.night() : nowview::NightSchedule{};
+        const std::optional<nowview::NightSchedule> night = nowview::parse_night_schedule(read_body(req), current);
+        if (!night) {
+            return send_text(req, "400 Bad Request",
+                             "PUT /night-schedule wants two times of day and a state, 22:00-07:00 on, or just on or off\n");
+        }
+        if (!h.set_night) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_night(*night)) {
+            return send_text(req, "409 Conflict", "that schedule could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
+    static esp_err_t on_night_idle_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.night) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        const std::string text = std::string(nowview::on_off_text(h.night().idle)) + '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_night_idle_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<bool> on = nowview::parse_on_off(read_body(req));
+        if (!on) {
+            return send_text(req, "400 Bad Request", "PUT /night-idle wants on or off\n");
+        }
+        if (!h.night || !h.set_night) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        nowview::NightSchedule night = h.night();
+        night.idle = *on;
+        if (!h.set_night(night)) {
+            return send_text(req, "409 Conflict", "that setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
     // The names PUT /timezone takes, one a line. Sent in pieces: the 8 KB of them is never one allocation, on a heap
     // that a decoder leaves little of.
     static esp_err_t on_time_zones_get(httpd_req_t* req) {
@@ -1372,6 +1433,10 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/brightness", .method = HTTP_PUT, .handler = &Impl::on_brightness_put},
         {.uri = "/clock-format", .method = HTTP_GET, .handler = &Impl::on_clock_format_get},
         {.uri = "/clock-format", .method = HTTP_PUT, .handler = &Impl::on_clock_format_put},
+        {.uri = "/night-schedule", .method = HTTP_GET, .handler = &Impl::on_night_schedule_get},
+        {.uri = "/night-schedule", .method = HTTP_PUT, .handler = &Impl::on_night_schedule_put},
+        {.uri = "/night-idle", .method = HTTP_GET, .handler = &Impl::on_night_idle_get},
+        {.uri = "/night-idle", .method = HTTP_PUT, .handler = &Impl::on_night_idle_put},
         {.uri = "/time-zones", .method = HTTP_GET, .handler = &Impl::on_time_zones_get},
         {.uri = "/preferences", .method = HTTP_GET, .handler = &Impl::on_preferences_get},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},

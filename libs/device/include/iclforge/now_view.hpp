@@ -250,6 +250,12 @@ inline constexpr int kNightStepMinutes = 15;
            in_night_window(night.from_min, night.to_min, *minute_of_day);
 }
 
+// Whether the idle screen (between songs, nothing held) is darkened as well: the schedule is in force and its
+// `idle` setting says the idle screen is covered. Off until the owner decides (planning/p4x-now-playing.md, "Open").
+[[nodiscard]] constexpr bool night_covers_idle(const NightSchedule& night, std::optional<int> minute_of_day) {
+    return night.idle && night_active(night, minute_of_day);
+}
+
 // "07:05": a time of day as GET /night-schedule writes it and PUT reads it, 00:00 to 23:59.
 [[nodiscard]] constexpr std::optional<int> parse_time_of_day(std::string_view text) {
     if (text.size() != 5 || text[2] != ':') {
@@ -313,6 +319,29 @@ inline constexpr int kNightStepMinutes = 15;
 // What GET /night-schedule reads back: always the times and the state, in the form PUT takes.
 [[nodiscard]] inline std::string night_schedule_text(const NightSchedule& night) {
     return time_of_day_text(night.from_min) + "-" + time_of_day_text(night.to_min) + (night.enabled ? " on" : " off");
+}
+
+// The schedule as one stored number, so that its two times and its state are written together and a power cut cannot
+// leave half of them: the from time in bits 0 to 10, the to time in bits 11 to 21, bit 22 on, bit 23 the idle
+// screen. Never renumber it: a board in the field has it under the name of settings_keys.hpp's `night`.
+[[nodiscard]] constexpr std::int32_t night_stored(const NightSchedule& night) {
+    return night.from_min | (night.to_min << 11) | (night.enabled ? 1 << 22 : 0) | (night.idle ? 1 << 23 : 0);
+}
+
+// A stored number as a schedule; nothing for one no build wrote (a bit above the idle bit, a time of day that is not).
+[[nodiscard]] constexpr std::optional<NightSchedule> night_from_stored(std::int64_t stored) {
+    if (stored < 0 || stored >= (std::int64_t{1} << 24)) {
+        return std::nullopt;
+    }
+    NightSchedule night;
+    night.from_min = static_cast<int>(stored & 0x7FF);
+    night.to_min = static_cast<int>((stored >> 11) & 0x7FF);
+    night.enabled = ((stored >> 22) & 1) != 0;
+    night.idle = ((stored >> 23) & 1) != 0;
+    if (!valid_minute_of_day(night.from_min) || !valid_minute_of_day(night.to_min)) {
+        return std::nullopt;
+    }
+    return night;
 }
 
 // `on` or `off`, with or without a line ending: what PUT /night-idle takes.

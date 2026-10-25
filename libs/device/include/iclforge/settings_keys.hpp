@@ -45,6 +45,7 @@ inline constexpr const char* kTimeZone = "time_zone";
 inline constexpr const char* kTimeZoneName = "tz_name";
 inline constexpr const char* kBrightness = "bright";
 inline constexpr const char* kClockFormat = "clock_fmt";
+inline constexpr const char* kNight = "night";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
@@ -92,6 +93,7 @@ inline constexpr std::array kKeys = {
     Key{kTimeZoneName, Kind::setup, "time zone"},
     Key{kBrightness, Kind::preference, "brightness"},
     Key{kClockFormat, Kind::preference, "clock format"},
+    Key{kNight, Kind::preference, "night schedule"},
 };
 
 [[nodiscard]] constexpr bool is_preference(Kind kind) { return kind == Kind::preference; }

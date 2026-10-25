@@ -308,6 +308,12 @@ struct ControlHandlers {
     std::function<bool(int percent)> set_brightness;
     std::function<wallclock::ClockFormat()> clock_format;
     std::function<bool(wallclock::ClockFormat format)> set_clock_format;
+    // The night schedule (iclforge/now_view.hpp): GET and PUT /night-schedule, the two times by the board's own time
+    // and whether it is on (`22:00-07:00 on`; PUT takes the same, or `on`, or `off`), and GET and PUT /night-idle, on or
+    // off, whether it also covers the idle screen. set_night is handed the whole schedule, already read over the one
+    // `night` returns. A board with no screen leaves both empty and the routes answer that it has none.
+    std::function<nowview::NightSchedule()> night;
+    std::function<bool(const nowview::NightSchedule& night)> set_night;
 
     // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
     // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, GET /time-zones and GET /status's "time". A board
