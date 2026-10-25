@@ -1,6 +1,7 @@
 // About, the read-only page of a board's Preferences, tested on the host - see iclforge/about_view.hpp's
 // own header comment.
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,16 @@ const Row* find(const std::vector<Row>& rows, const std::string& label) {
     return nullptr;
 }
 
+// The row with this label, which the test requires to be there.
+const Row& row_of(const std::vector<Row>& rows, const std::string& label) {
+    for (const Row& row : rows) {
+        if (row.label == label) {
+            return row;
+        }
+    }
+    throw std::out_of_range("no row labelled " + label);
+}
+
 }  // namespace
 
 TEST_CASE("the version is the tag and the commits since, without git's tails", "[aboutview]") {
@@ -78,23 +89,23 @@ TEST_CASE("About reads out the friendly subset in order", "[aboutview]") {
                                                "Web page", "Chip",         "Speaker layout", "Paired servers"};
     CHECK(labels == expected);
 
-    CHECK(find(rows, "Version")->value == "v0.10.0-beta.1-5228");
-    CHECK(find(rows, "Running from")->value == "ota_0");
-    CHECK(find(rows, "Name")->value == "Study \xC2\xB7 study.local");
-    CHECK(find(rows, "Cable")->value == "in use \xC2\xB7 192.168.1.163 \xC2\xB7 e8:f6:0a:e7:53:fb");
-    CHECK(find(rows, "Wi-Fi")->value == "192.168.1.251 \xC2\xB7 e8:f6:0a:e7:53:f9");
-    CHECK(find(rows, "Web page")->value == "http://192.168.1.163/");
-    CHECK(find(rows, "Chip")->value == "ESP32-P4 v3.2");
-    CHECK(find(rows, "Speaker layout")->value == "5.1.2 \xC2\xB7 16 outputs");
-    CHECK(find(rows, "Paired servers")->value == "2");
+    CHECK(row_of(rows, "Version").value == "v0.10.0-beta.1-5228");
+    CHECK(row_of(rows, "Running from").value == "ota_0");
+    CHECK(row_of(rows, "Name").value == "Study \xC2\xB7 study.local");
+    CHECK(row_of(rows, "Cable").value == "in use \xC2\xB7 192.168.1.163 \xC2\xB7 e8:f6:0a:e7:53:fb");
+    CHECK(row_of(rows, "Wi-Fi").value == "192.168.1.251 \xC2\xB7 e8:f6:0a:e7:53:f9");
+    CHECK(row_of(rows, "Web page").value == "http://192.168.1.163/");
+    CHECK(row_of(rows, "Chip").value == "ESP32-P4 v3.2");
+    CHECK(row_of(rows, "Speaker layout").value == "5.1.2 \xC2\xB7 16 outputs");
+    CHECK(row_of(rows, "Paired servers").value == "2");
 }
 
 TEST_CASE("the interface in use is the one the board says", "[aboutview]") {
     Facts f = kit();
     f.active = "wifi";
     const std::vector<Row> rows = about_rows(f);
-    CHECK(find(rows, "Cable")->value.find("in use") == std::string::npos);
-    CHECK(find(rows, "Wi-Fi")->value.find("in use") == 0);
+    CHECK(row_of(rows, "Cable").value.find("in use") == std::string::npos);
+    CHECK(row_of(rows, "Wi-Fi").value.find("in use") == 0);
 }
 
 TEST_CASE("a board with Wi-Fi alone has no cable row", "[aboutview]") {
@@ -105,7 +116,7 @@ TEST_CASE("a board with Wi-Fi alone has no cable row", "[aboutview]") {
     const std::vector<Row> rows = about_rows(f);
     CHECK(find(rows, "Cable") == nullptr);
     REQUIRE(find(rows, "Wi-Fi") != nullptr);
-    CHECK(find(rows, "Wi-Fi")->value.find("in use \xC2\xB7 192.168.1.251") == 0);
+    CHECK(row_of(rows, "Wi-Fi").value.find("in use \xC2\xB7 192.168.1.251") == 0);
 }
 
 TEST_CASE("a board that has no address yet says so, quietly", "[aboutview]") {
@@ -115,9 +126,9 @@ TEST_CASE("a board that has no address yet says so, quietly", "[aboutview]") {
     f.ethernet.address.clear();
     f.wifi.address.clear();
     const std::vector<Row> rows = about_rows(f);
-    CHECK(find(rows, "Web page")->value == "no address yet");
-    CHECK(find(rows, "Web page")->tone == Tone::muted);
-    CHECK(find(rows, "Cable")->tone == Tone::muted);
+    CHECK(row_of(rows, "Web page").value == "no address yet");
+    CHECK(row_of(rows, "Web page").tone == Tone::muted);
+    CHECK(row_of(rows, "Cable").tone == Tone::muted);
 }
 
 TEST_CASE("a build with no network says so", "[aboutview]") {
@@ -129,13 +140,13 @@ TEST_CASE("a build with no network says so", "[aboutview]") {
     const std::vector<Row> rows = about_rows(f);
     CHECK(find(rows, "Cable") == nullptr);
     CHECK(find(rows, "Wi-Fi") == nullptr);
-    CHECK(find(rows, "Network")->value == "none");
+    CHECK(row_of(rows, "Network").value == "none");
 }
 
 TEST_CASE("a build without a Sendspin player has no pairings to count", "[aboutview]") {
     Facts f = kit();
     f.player = false;
-    CHECK(find(about_rows(f), "Paired servers")->value == "no Sendspin player in this build");
+    CHECK(row_of(about_rows(f), "Paired servers").value == "no Sendspin player in this build");
     f.player = true;
     f.paired = 0;
     const std::vector<Row> rows = about_rows(f);
@@ -148,7 +159,7 @@ TEST_CASE("a build without a Sendspin player has no pairings to count", "[aboutv
 TEST_CASE("a non-port web page carries its port", "[aboutview]") {
     Facts f = kit();
     f.web_port = 8080;
-    CHECK(find(about_rows(f), "Web page")->value == "http://192.168.1.163:8080/");
+    CHECK(row_of(about_rows(f), "Web page").value == "http://192.168.1.163:8080/");
 }
 
 TEST_CASE("About never carries what the developer view never carries", "[aboutview]") {

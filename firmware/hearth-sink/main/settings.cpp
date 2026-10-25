@@ -107,23 +107,6 @@ bool write_int(const char* key, std::int32_t value) {
     return err == ESP_OK;
 }
 
-// A key in the namespace that iclforge/settings_keys.hpp does not list is one nobody has said the kind
-// of (a setting added without its row, or a partition written by a later image): said once at load, and
-// Reset preferences keeps it.
-void say_unlisted_keys(nvs_handle_t handle) {
-    nvs_iterator_t it = nullptr;
-    esp_err_t found = nvs_entry_find_in_handle(handle, NVS_TYPE_ANY, &it);
-    while (found == ESP_OK) {
-        nvs_entry_info_t info{};
-        if (nvs_entry_info(it, &info) == ESP_OK && sk::find(info.key) == nullptr) {
-            std::printf("settings: the stored key '%s' is not in iclforge/settings_keys.hpp; Reset preferences keeps it\n",
-                        info.key);
-        }
-        found = nvs_entry_next(&it);
-    }
-    nvs_release_iterator(it);
-}
-
 // The image's own answers for every field, so a board with nothing stored behaves
 // exactly as it did before there was anywhere to store anything. The
 // network is the exception: its Kconfig pair exists only in a build that
@@ -225,7 +208,6 @@ void load_all() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, sk::kLayout, g_settings.layout);
-    say_unlisted_keys(handle);
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
