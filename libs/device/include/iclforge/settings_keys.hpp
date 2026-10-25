@@ -26,8 +26,9 @@
 // key: at most 15 characters.
 //
 // ADDING A SETTING: add its name below, add a row to kKeys with its class and the words the screen
-// uses for it (`what`), and, if it is a preference, a case in settings_reset_preferences() so the
-// running board follows. Never rename or renumber a key that has been stored: a board in the field has
+// uses for it (`what`), and, if it is a preference, a registry entry (preferences.hpp) that says
+// `on_reset = kReset`, so Reset preferences puts it back through its own setter and the running board
+// follows. Never rename or renumber a key that has been stored: a board in the field has
 // it under that name.
 
 namespace iclforge::settingskeys {
@@ -49,6 +50,7 @@ inline constexpr const char* kNight = "night";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
+inline constexpr const char* kSpeakerTrim = "speaker_trim";
 inline constexpr const char* kDynamicRange = "dyn_range";
 
 // The longest an NVS key may be.
@@ -84,6 +86,7 @@ inline constexpr std::array kKeys = {
     Key{kSlotBits, Kind::setup, "DAC wiring"},
     Key{kSecondLine, Kind::setup, "DAC wiring"},
     Key{kLayout, Kind::setup, "speaker layout"},
+    Key{kSpeakerTrim, Kind::setup, "per-speaker trims and delays"},
     Key{kTimeZone, Kind::setup, "time zone"},
     Key{kNtpServer, Kind::technical, "time server"},
     Key{kTimeSync, Kind::technical, "time sync"},
@@ -153,6 +156,9 @@ inline std::string joined(const std::vector<std::string>& parts) {
 }
 
 }  // namespace detail
+
+// A list as a sentence's words: "a", "a and b", "a, b and c".
+[[nodiscard]] inline std::string joined(const std::vector<std::string>& parts) { return detail::joined(parts); }
 
 // "what the screen shows without lyrics and when the screen dims": what Reset preferences
 // changes, from the table, for the confirming step.

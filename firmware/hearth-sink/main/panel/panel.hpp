@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "iclforge/board_caps.hpp"
+#include "iclforge/dev_view.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/wall_clock.hpp"
 
@@ -92,6 +93,12 @@ void panel_set_night(const iclforge::nowview::NightSchedule& night);
 // size, whether a touch controller is reading and whether the backlight can be set. Fixed once the panel is up,
 // read without the panel's lock; a build with no panel, or one whose display did not come up, has none.
 [[nodiscard]] iclforge::DisplayCaps panel_display_caps();
+
+// The board as About and the network preference's confirming step read it: the network, the configuration and the
+// pairing count (iclforge::devview::Facts, read the way the developer view reads them: panel/lvgl/dev_info.cpp). Safe
+// from the panel's task and the control surface's; the network part is a call across SDIO on a board whose radio is a
+// companion chip, cached for two seconds. Empty in a build with no panel, which has no screen to show it on.
+[[nodiscard]] iclforge::devview::Facts panel_board_facts();
 
 // Starts the panel's task: once, from app_main, after the network and the Sendspin player. True when
 // a panel is running; false (having said why) when there is none or it did not come up.

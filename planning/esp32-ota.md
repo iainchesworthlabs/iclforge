@@ -1442,7 +1442,9 @@ The owner, once, with [the EJBCA guide](hearth-firmware-signing-ejbca.md):
    pinned does the same job and the board is unchanged.
 2. **Two profiles** copied from the Windows pair (`code signer`, `local code signing`) and narrowed to this one
    sub-CA, RSA 3072 only, two years, `CA:FALSE`, key usage `digitalSignature` only, extended key usage
-   `codeSigning` only, all critical, with no CRL, AIA, OCSP or alternative name (the board checks none).
+   `codeSigning` only (basic constraints and key usage critical, the extended key usage as the Windows profile has
+   it: the board and the tool check that code signing is present, never its criticality), with no CRL, AIA, OCSP or
+   alternative name (the board checks none).
 3. **Two leaves**, `Hearth Firmware Stable` and `Hearth Firmware Beta` (the names are the pins), each from a key
    and a certificate request made on the owner's machine, so a private key never reaches EJBCA. RSA 3072 with
    SHA-256 is what the existing profile issues, a board already carries RSA for TLS, and ECDSA P-256 would save
@@ -1459,12 +1461,13 @@ certificates and the screenshots the owner sends back.
 #### Publishing a release
 
 CI does it ([CI signing](#ci-signing)). A release run builds and packages the images (O8) and publishes the
-release. Then the `firmware-channels` workflow builds each channel's index from the release's manifest
+release. Then the `firmware-channels` workflow, which starts when the Release run has finished, builds each
+channel's index from the release's manifest
 (`package_firmware.py index`), signs it in that channel's GitHub environment (`sign_index.py sign`), uploads the
 pair to the `firmware-channels` release with the images already up and the index last, and downloads it back
 and verifies it as a board would. **The stable job waits for the owner's approval**; the beta job does not. A
 `workflow_dispatch` of the same workflow signs any release again, which is how a leaf renewal reaches the
-channels (for stable, dispatched against a tag). A person with a leaf key on their machine can do the same by hand with the
+channels. A person with a leaf key on their machine can do the same by hand with the
 same two commands, which is how a third party without CI publishes ([A third party's own channel](#a-third-partys-own-channel)).
 
 #### Replacing the anchor
@@ -1565,13 +1568,15 @@ signing. What it does not reuse: the Windows leaf itself (its secrets are organi
 with access could read a firmware key, and one key would do two jobs and both channels), and `signtool`, which is
 Authenticode and has nothing to do with an index file.
 
-**The workflow.** A new `firmware-channels.yml`, modelled on `manifest-bump.yml` (a `workflow_call` that
-`release.yml` calls as its last job, and a `workflow_dispatch` with `version_tag` and `dry_run`, default true, so
-it can be tried against any release that exists):
+**The workflow.** A new `firmware-channels.yml` that starts on `workflow_run` (the `Release` workflow has
+completed) and on `workflow_dispatch` (`version_tag` and `dry_run`, default true, so it can be tried against any
+release that exists). `release.yml` is not edited. A `workflow_run` workflow always runs the copy of the file on
+`main`, however the release run started (a tag push, or `release.yml`'s own `workflow_dispatch`, which pushes its
+tag only at the end), so `github.ref` is `refs/heads/main` in every run of it:
 
 | Job | Runs on | Needs the secret | Does |
 |---|---|---|---|
-| `index` | `ubuntu-latest`, `contents: read` | no | Downloads the release's `hearth-sink-manifest.json`; `package_firmware.py index` writes the unsigned `beta` index, and the `stable` one when the release is not a Pre-release; refuses an index older than the published one (a re-run of an old tag cannot move a channel back) |
+| `index` | `ubuntu-latest`, `contents: read` | no | Runs only when the Release run succeeded. Finds the release: the `v*` tag that points at the Release run's commit (none, as after a dry run of Release: it stops with a notice; two: it stops with an error naming them). Downloads the release's `hearth-sink-manifest.json`; `package_firmware.py index` writes the unsigned `beta` index, and the `stable` one when the release is not a Pre-release; refuses an index older than the published one (a re-run of an old tag cannot move a channel back). Writes a summary to the run's page: the tag, the versions, the `sequence` and the SHA-256 of each index |
 | `sign-beta` | `ubuntu-latest`, `contents: read`, **`environment: firmware-beta`** | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` | `sign_index.py sign` reads the PFX from the environment into memory (no file), signs, checks the leaf is a code-signing leaf with the pinned name and at least 60 days left (a warning under 60, a failure when expired), and verifies the result against the committed `firmware/keys/trust.pem` |
 | `sign-stable` | the same, **`environment: firmware-stable`** | the same names, the stable leaf's values | the same, for the `stable` index; skipped for a Pre-release |
 | `publish` | `ubuntu-latest`, `contents: write` | no | Makes the `firmware-channels` Pre-release if it is missing; uploads each pair with `--clobber`; downloads the pair back from the public URL with no token and runs `sign_index.py verify`; checks that every file the index names is downloadable. With `dry_run` it stops before the upload |
@@ -1581,24 +1586,29 @@ it can be tried against any release that exists):
 - **A switch.** The repository variable `PUBLISH_FIRMWARE_CHANNELS` (`false` by default) gates the real jobs, as
   `SIGN_WINDOWS` does. This matters: a workflow job that names an environment that does not exist *creates it*
   with no reviewer, so merging the workflow before the owner has set the environments up would run the stable
-  job unguarded. With the variable `false` nothing runs; the owner sets it to `true` last.
-- **It cannot hurt the release.** Like `manifest-bump`, its job in `release.yml` needs `github-release` and fails
-  after the release is published, never before; the stable job waiting for an approval holds up nothing else.
+  job unguarded. With the variable `false` nothing runs; the owner sets it to `true` last. (The owner set it on
+  2026-10-25, before the workflow exists: the first Release after the workflow reaches `main` signs for real, beta
+  unattended and stable after an approval. A `dry_run` dispatch needs no variable, so it can be tried first.)
+- **It cannot hurt the release.** It starts after the Release run has finished and is a run of its own, so it
+  cannot delay or fail the release, and the stable job waiting for an approval holds nothing up.
 - **The signing jobs stay small.** Python and `cryptography`, installed from a hash-locked requirements file,
   and `actions/checkout` and the artifact actions pinned by SHA as in every workflow here; no other third-party
   action sees the key. The tools run from `main`, not from the tag, so an old tag can be signed again with
-  today's tool.
-- **Why a separate reusable workflow:** it adds one job at the end of `release.yml` and a file nothing else
-  edits; see the conflicts below.
+  today's tool, and nothing from the tag runs: its manifest and images are read as data.
+- **Why a workflow of its own started by `workflow_run`:** (1) `release.yml` is not edited at all, so there is
+  nothing to conflict with #1621 and no job the release has to wait for; (2) the ref is always `main`, so the
+  environments can allow `main` only and what can read a key is a workflow file that has been merged; (3) it
+  works for both ways a release starts. A `workflow_call` job in `release.yml` (the pattern of
+  `manifest-bump.yml`) would have run with the release's own ref, a tag or, in a dispatch-started release,
+  `main`, and so would have needed tags allowed.
 
 **What the owner creates** (a session never runs `gh secret set`; these are in the GitHub web pages):
 
 | Where | What | Value |
 |---|---|---|
-| Settings, Environments | `firmware-beta` | Deployment branches and tags: `main` and `v*`. **No reviewer: it signs on its own.** Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
-| Settings, Environments | `firmware-stable` | Deployment branches and tags: **`v*` tags only**, not `main`. **Required reviewers: the owner, so every signing run waits for their approval.** *Prevent self-review* off (the owner starts the run by cutting the tag, and is also the one who approves it); *Allow administrators to bypass configured protection rules* off, if the page offers it, so that nobody skips the approval. The same two secret names, for the **stable** leaf |
-| Settings, Rules | A tag ruleset for `v*` | Only the owner may create a tag that matches. An environment secret is readable by a run on any ref the environment allows, and `v*` allows tags, so who can make a tag is who can read a beta key |
-| Settings, Secrets and variables, Actions, Variables | `PUBLISH_FIRMWARE_CHANNELS` | `true`, **last**, once the two environments and the tag ruleset exist |
+| Settings, Environments | `firmware-beta` | Deployment branches and tags: **`main` only**. **No reviewer: it signs on its own.** Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
+| Settings, Environments | `firmware-stable` | Deployment branches and tags: **`main` only**. **Required reviewers: the owner, so every signing run waits for their approval.** *Prevent self-review* off (the owner starts the release, and is also the one who approves its signing); *Allow administrators to bypass configured protection rules* off, if the page offers it, so that nobody skips the approval. The same two secret names, for the **stable** leaf |
+| Settings, Secrets and variables, Actions, Variables | `PUBLISH_FIRMWARE_CHANNELS` | `true`, **last**, once the two environments exist |
 | Not these | `WIN_TESTSIGN_PFX_*` | Never reused for firmware |
 
 **Decided by the owner, 2026-10-25: a stable signing run needs the owner's approval every time; a beta run signs
@@ -1608,23 +1618,26 @@ the owner would rely on, and the approval shows the owner which release is about
 human at every release" asked for, at the cost of one approval at each stable release (the job waits; the
 release is already out).
 
-- **Stable runs on `v*` tags only.** A stable release is a tag, so `main` has nothing to sign for stable, and
-  leaving it out means that even after an approval the stable key cannot be read by a workflow on a branch. Beta
-  keeps `main` and `v*` because signing a beta index again is dispatched from `main`. The cost:
-  signing a stable index again (a leaf renewal) is a dispatch against a tag, `gh workflow run --ref <tag>`, of a
-  tag cut after `firmware-channels.yml` exists; the first stable tag will be. The tag ruleset below is what
-  makes `v*` the owner's alone.
-- **What the owner checks when they approve:** the approval page names the run, its ref (the tag) and the
-  workflow, and they approve only the tag they cut and only for a run they expected. An approval nobody gives
-  expires after 30 days and the run fails; signing again is a dispatch.
-- **Both settings above matter.** With *Prevent self-review* on, the owner, who starts the run, could not
-  approve it and would lock themselves out; with administrators allowed to bypass, the approval is optional for
-  anyone with that role.
+- **Both environments allow `main` only, and there is no tag ruleset.** A run on `main` uses the workflow file as it
+  was merged, through the repository's own review; a tag can point at any commit that anyone with write access
+  pushes, with any workflow file in it, and an environment's secrets are readable by every ref it allows. So with
+  `main` only, what can read a key is what has been merged. (The first version of this section, PR #1652, limited
+  stable to `v*` tags and asked for a tag ruleset. The keys session found on 2026-10-25 that `release.yml` makes
+  that unworkable: its `workflow_dispatch` path pushes the release tag itself with `GITHUB_TOKEN`, which a ruleset
+  that restricts creating `v*` tags blocks, and a job it calls runs with `github.ref` = `main`, which a tags-only
+  environment refuses.)
+- **What the owner checks when they approve:** the `index` job has already written its summary (the release
+  tag, the versions, the `sequence`, the SHA-256 of the index) to the run's page, before the stable job waits.
+  They read it, then approve the pending deployment in the run, and only for a release they cut. An approval
+  nobody gives expires after 30 days and the run fails; signing again is a dispatch.
+- **Both settings above matter.** With *Prevent self-review* on, the owner, who started the release, may not be
+  allowed to approve its signing run and would lock themselves out; with administrators allowed to bypass,
+  the approval is optional for anyone with that role.
 
 **What would conflict with PR #1621 (the release prep), read on 2026-10-25.** #1621 changes `release.yml` in the
 `resolve-version` job (an added `REPO` variable and a `render_release_notes.py --check` call near line 97 to 150),
 `_static.yml`, `CHANGELOG.md`, `firmware/esp-idf/iclforge/idf_component.yml` and `tools/release`. The firmware
-workflow adds a job after `manifest-bump` at the end of `release.yml`, a new file, and tool files under
+workflow is a new file started by `workflow_run`, so `release.yml` is not edited, and its tool files are under
 `tools/hearth`: no textual overlap, so no conflict while they merge in either order. The one real interaction is
 `CHANGELOG.md`: #1621 turns `[Unreleased]` into the 0.11.0-beta.1 section, and its own notes say to merge it last,
 since anything added to `[Unreleased]` before then becomes part of that release's notes (already 541k characters
@@ -1850,7 +1863,8 @@ tag push) and the release prep (PR #1621) are not touched by them.
    non-exportable key. Each is tested against an independent verifier.
 3. `check_firmware_package.py`: the index agrees with the manifest (sizes, SHA-256, no image missing for
    a profile that publishes one), and every file name in it is one the release has.
-4. The `firmware-channels.yml` workflow and one job in `release.yml` ([CI signing](#ci-signing)).
+4. The `firmware-channels.yml` workflow, started by `workflow_run` ([CI signing](#ci-signing)); `release.yml`
+   is not edited.
 5. Docs: `docs/hearth/sink-firmware.md` (updating from the screen and the page), `docs/releasing.md` (the key
    ceremony, the environments, rollover, the recovery table), CHANGELOG (after #1621 has landed).
 
@@ -1868,7 +1882,7 @@ coordinator gives a window.
 |---|---|---|---|
 | **O10a, the index, the signature and a host-tested library** | `firmware_update.hpp` in `libs/device` (version compare, index and signature parse, image selection, the policy table, the state's JSON and words; no ESP-IDF); `package_firmware.py index`; `sign_index.py` (`sign`, `verify`, `selftest`) and a PowerShell fallback for a Windows-store key; `check_firmware_package.py`; `ota.py` untouched | Host: Catch2 cases for every rule and a version table, with a verifier result passed in. Python: a pair signed by `sign_index.py` with a throwaway CA and leaves made in the test (`selftest`) is checked by an independent verifier, for RSA 3072 and for ECDSA | No |
 | **O10b, the board's pull** | `firmware_pull.cpp` in the component beside `firmware.cpp` (the upload core takes chunks from either source), the chain and signature check with mbedTLS against the build's anchors, the four routes, Kconfig (`ICLFORGE_FIRMWARE_PULL`, `_UPDATE_BASE_URL`, `_UPDATE_CHANNEL`, `_TRUST_ANCHORS`, `_LEAF_STABLE`, `_LEAF_BETA`), the certificate bundle, the NVS keys, the four-place route word list, `stub.js` | Host: the policy and JSON from O10a. **QEMU:** a loopback HTTP server serves an index, its signature and an image, signed by the fixture CA; the base URL accepts `http://` only in `sdkconfig.ci-ota`, and the signature rules are not relaxed; a wrong anchor, a wrong leaf name, a tampered index, an old `sequence`, an expired leaf and a wrong image hash are each refused; a **push of an unsigned image still works**. TLS is not tested here (no clock) | Yes: the TLS handshake with the three real hosts, RAM and flash measured, on the S3, the C6 (16 MB) and the P4 or the kit; a real pull from a throwaway channel release signed by the owner's leaf |
-| **O10c, the workflow and the process** | `firmware-channels.yml` and one job in `release.yml` ([CI signing](#ci-signing)), in a PR of its own; `docs/releasing.md`: the key ceremony, the environments, rollover, recovery. The owner's EJBCA work, the environments and the public anchor in `firmware/keys/` | The linters the workflows already pass (actionlint, zizmor); a `dry_run` dispatch, which signs with a throwaway CA and publishes nothing; `ota.py --release latest` and `installer_site.py` ignore the channel release | No (the owner makes the keys, the environments and the variable) |
+| **O10c, the workflow and the process** | `firmware-channels.yml`, started by `workflow_run` (`release.yml` is not edited; [CI signing](#ci-signing)), in a PR of its own; `docs/releasing.md`: the key ceremony, the environments, rollover, recovery. The owner's EJBCA work, the environments and the public anchor in `firmware/keys/` | The linters the workflows already pass (actionlint, zizmor); a `dry_run` dispatch, which signs with a throwaway CA and publishes nothing; `ota.py --release latest` and `installer_site.py` ignore the channel release | No (the owner makes the keys, the environments and the variable) |
 | **O10d, Preferences and the page** | The four registry entries, `BoardCaps::update` and its variants, the `Backend` methods; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
 
 #### O10b as built
@@ -2408,15 +2422,16 @@ approves every stable signing run; beta signs on its own). 31, 32 and the rest o
     can refuse a push. Cost of (a): until the override exists a person who cannot build must be given an
     image. Cost of (b): a surface that can be set wrong (pulls fail until it is reset) and a presence
     design to get right before it earns anything. **Taken 2026-10-25: (a).**
-35. **Who signs, and when.** (a) **CI, in the release run, each channel's leaf as a secret of a GitHub
-    environment of its own, in a workflow of its own that `release.yml` calls last (the pattern of
-    `manifest-bump.yml`), behind a repository variable that keeps it off until the owner has set the
+35. **Who signs, and when.** (a) **CI, after the release run, each channel's leaf as a secret of a GitHub
+    environment of its own, in a workflow of its own that starts when the Release run has finished
+    (`workflow_run`, so it always runs from `main`; first drafted as a job `release.yml` calls, the pattern
+    of `manifest-bump.yml`), behind a repository variable that keeps it off until the owner has set the
     environments up**; (b) the owner, by hand, on their machine; (c) CI for beta and the owner for stable.
     **Recommend (a),** the owner's: "just let CI do the signing. We already do that for Windows signing."
     The Windows pattern is a PFX in a secret and `signtool`; this is the same shape with a different leaf and
     no `signtool`. Cost: a key in GitHub's secret store (two, one for each channel, apart from the Windows
-    one), so who can run a workflow on an allowed ref is who can read it (a tag ruleset and a reviewer on
-    stable narrow that); (b) is a click and a laptop at every release. **Taken 2026-10-25: (a).**
+    one), so who can run a workflow on an allowed ref is who can read it (environments that allow `main` only
+    and a reviewer on stable narrow that); (b) is a click and a laptop at every release. **Taken 2026-10-25: (a).**
 36. **Revocation, expiry and the clock.** (a) **no revocation list: `sequence` now; a leaf floor
     (`min_leaf_issued`) and an optional `expires`, from signed data, later; the anchor's dates ignored, the
     leaf's and the intermediate's judged against the clock when it is set, failing closed with a message;
@@ -2427,7 +2442,7 @@ approves every stable signing run; beta signs on its own). 31, 32 and the rest o
     sign for ever. **Lifetime taken 2026-10-25: one to two years is fine; the rest is a proposal.**
 37. **Who approves a signing run.** (a) **a required reviewer on `firmware-stable` (the owner), none on
     `firmware-beta`**; (b) none on either; (c) a reviewer on both. **Recommend (a); taken 2026-10-25: (a),
-    with stable limited to `v*` tags** ([CI signing](#ci-signing)). The beta leaf signs only
+    with both environments limited to `main`** ([CI signing](#ci-signing)). The beta leaf signs only
     what beta boards read, which are development kits that take unsigned pushes anyway; the stable leaf is the
     one someone who is not the owner relies on, and the click shows the owner which release is about to be
     signed. Cost: one approval at each stable release, with the release already out meanwhile. (b) signs

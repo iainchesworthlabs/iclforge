@@ -134,6 +134,15 @@ Settings image_defaults() {
     defaults.ntp_server = {};
     defaults.time_sync = true;
     defaults.layout = {};
+    // What the build starts with, when it says (a CI shape, a product's own room): the same statements PUT /trim
+    // takes. A string that is wrong is said and leaves every speaker at the default.
+    if (const std::string_view built_in = CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM; !built_in.empty()) {
+        if (const auto result = defaults.speaker_trim.apply_text(built_in); !result.ok) {
+            std::printf("settings: the build's speaker trim is not one this board reads (%s); every speaker at the default\n",
+                        result.error);
+            defaults.speaker_trim = {};
+        }
+    }
     defaults.dynamic_range = iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
                                  .value_or(iclforge::ac3::kDefaultDynamicRange);
     return defaults;
@@ -257,6 +266,16 @@ void load_all() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, sk::kLayout, g_settings.layout);
+    // A stored trim that is not one this build reads (a partition written by a later image, or damaged) is
+    // said, and the build's own stands: a speaker at the wrong level is worse than one at none.
+    {
+        std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+        std::size_t blob_length = blob.size();
+        if (nvs_get_blob(handle, sk::kSpeakerTrim, blob.data(), &blob_length) == ESP_OK &&
+            !g_settings.speaker_trim.from_blob(std::span<const std::uint8_t>(blob.data(), blob_length))) {
+            std::printf("settings: the stored speaker trim is not one this build reads; keeping the build's own\n");
+        }
+    }
     if (nvs_get_i32(handle, sk::kDynamicRange, &stored) == ESP_OK) {
         if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
             g_settings.dynamic_range = *range;
@@ -438,6 +457,25 @@ bool settings_set_layout(std::string_view layout) {
     return write_string(sk::kLayout, layout, g_settings.layout);
 }
 
+bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table) {
+    std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+    const std::size_t length = table.to_blob(blob);
+    nvs_handle_t handle = 0;
+    if (length == 0 || nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
+        std::printf("settings: could not open NVS to write %s\n", sk::kSpeakerTrim);
+        return false;
+    }
+    const esp_err_t err = nvs_set_blob(handle, sk::kSpeakerTrim, blob.data(), length);
+    if (err == ESP_OK) {
+        (void)nvs_commit(handle);
+        g_settings.speaker_trim = table;
+    } else {
+        std::printf("settings: NVS refused %s (%s)\n", sk::kSpeakerTrim, esp_err_to_name(err));
+    }
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
 bool settings_set_time_zone(std::string_view zone, std::string_view name) {
     if (!zone.empty() && !iclforge::wallclock::valid_time_zone(zone)) {
         std::printf("settings: '%.*s' is not a time zone this board reads\n", static_cast<int>(zone.size()),
@@ -516,66 +554,5 @@ bool settings_forget() {
     return true;
 }
 
-namespace {
-
-// A preference's field in memory back to the image's answer, so the running board follows without a
-// restart. A preference added to the table without a case here is erased from NVS all the same and
-// follows at the next start, which is said.
-void reset_in_memory(std::string_view key, const Settings& defaults) {
-    if (key == sk::kNowView) {
-        g_settings.now_view = defaults.now_view;
-    } else if (key == sk::kDimAfter) {
-        g_settings.dim_after_minutes = defaults.dim_after_minutes;
-    } else if (key == sk::kBrightness) {
-        g_settings.brightness_percent = defaults.brightness_percent;
-    } else if (key == sk::kClockFormat) {
-        g_settings.clock_format = defaults.clock_format;
-    } else if (key == sk::kNight) {
-        g_settings.night = defaults.night;
-    } else if (key == sk::kDynamicRange) {
-        g_settings.dynamic_range = defaults.dynamic_range;
-    } else {
-        std::printf("settings: '%.*s' is erased; the board follows at its next start\n", static_cast<int>(key.size()),
-                    key.data());
-    }
-}
-
-}  // namespace
-
-bool settings_reset_preferences() {
-    nvs_handle_t handle = 0;
-    if (nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
-        std::printf("settings: could not open NVS to reset the preferences\n");
-        return false;
-    }
-    bool ok = true;
-    for (const sk::Key& key : sk::kKeys) {
-        if (!sk::is_preference(key.kind)) {
-            continue;
-        }
-        // A key that was never written is already at its default.
-        const esp_err_t err = nvs_erase_key(handle, key.nvs);
-        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-            std::printf("settings: NVS refused to erase %s (%s)\n", key.nvs, esp_err_to_name(err));
-            ok = false;
-        }
-    }
-    const esp_err_t committed = nvs_commit(handle);
-    nvs_close(handle);
-    if (committed != ESP_OK) {
-        std::printf("settings: NVS refused the reset (%s)\n", esp_err_to_name(committed));
-        return false;
-    }
-    // The fields follow the keys, one at a time: the running board is reading them.
-    const Settings defaults = image_defaults();
-    for (const sk::Key& key : sk::kKeys) {
-        if (sk::is_preference(key.kind)) {
-            reset_in_memory(key.nvs, defaults);
-        }
-    }
-    std::printf("settings: preferences reset to the image's defaults; the name, the network, the wiring and the "
-                "pairings are kept\n");
-    return ok;
-}
 
 }  // namespace player

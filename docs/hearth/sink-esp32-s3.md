@@ -132,11 +132,14 @@ network the same way.
   board keeps, whether it asks a time server (on by default), its time zone and the server to ask
   ([the time of day](sink-esp32-p4.md#the-time-of-day)). A choice is sent as it is made; a name, a
   layout typed in full, a network, a zone or a server is sent with its button.
+- **Levels and distances:** a level and a distance for each speaker of the layout, and a test tone
+  out of each ([Speaker levels, distances and the test tone](sink-speakers.md)).
 - **Real time**, **Hardware** and **Counters:** how long each frame takes, what the board is -
   chip, memory, the sink's ceiling and the firmware - and the player's counters.
 
 The same routes answer without the page (`GET /api` lists them): `GET /status` for a script, and
-`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is. A
+`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is, and
+`GET` and `PUT /trim` and `POST /identify` for the speakers' levels and the test tone. A
 new name is advertised at once ([Name, restart and reset](#name-restart-and-reset)). The page and
 the routes have no password ([Security](#security)).
 
@@ -164,11 +167,16 @@ image is still on trial, when a restart would go back to the image before it. On
 resets the whole system, which a Wi-Fi link behind the companion chip needs
 ([An ESP32-P4 sink](sink-esp32-p4.md#name-restart-and-reset)).
 
-**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to the
-image's defaults, at once and with no restart: what the screen shows without lyrics, when it dims,
-and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and the choice
-between the cable and Wi-Fi, the DAC wiring, the speaker layout and the time zone (the room's, not a
-matter of taste), the time server and whether the board asks it, and the pairings.
+**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to their
+defaults, at once and with no restart: every entry of the board's preferences that says it is reset
+(what the screen shows without lyrics, when it dims, the brightness, the clock's hours and seconds and
+the night schedule; an entry added later says for itself),
+each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
+the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring, the
+speaker layout and the time zone (the room's, not a matter of taste), the time server and whether
+the board asks it, and the pairings. On a board with a
+screen the same thing is *Reset preferences* on the sheet
+([An ESP32-P4 sink](sink-esp32-p4.md#on-the-screen)).
 
 **Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
 (the board gets a new identity, so each server has to pair with it again, and has to remove it from
