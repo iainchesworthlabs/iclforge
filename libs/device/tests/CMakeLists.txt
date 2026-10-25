@@ -23,6 +23,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_now_view.cpp
     test_object_limit.cpp
     test_pairing_records.cpp
+    test_panel_follow.cpp
     test_pcm_unpack.cpp
     test_playout.cpp
     test_preferences.cpp
@@ -41,5 +42,6 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
 # iclforge::render is the judge of what a layout is in test_layout_options.cpp (its parser and slot
 # counts); the headers under test stay free of it.
 target_link_libraries(iclforge-device-tests PRIVATE iclforge::device iclforge::render)
-# test_settings_keys.cpp reads two sources of the firmware, to hold the table to what settings.cpp does.
+# test_settings_keys.cpp reads two sources of the firmware, to hold the table to what settings.cpp does, and
+# test_panel_follow.cpp reads the panel's, to hold its setters to taking no lock.
 target_compile_definitions(iclforge-device-tests PRIVATE "ICLFORGE_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")

@@ -319,6 +319,14 @@ tests' fake, and the firmware's implementation; only a control that is not one o
 it names one (`Pref::editor`: a pair of times, a place in a list) which `panel/lvgl/prefs_editors.cpp` draws. There are
 no bespoke buttons in `lyric_screen.cpp`.
 
+**A tap's setter runs on the panel's own task**, which holds the panel's lock (a `std::mutex`, not recursive) for the frame
+that reads the tap, so **no `panel_set_*` may take that lock** or touch the glass: a tap on Brightness - or + once hung the
+screen for good (the first run on the kit, 2026-10-26) because the brightness setter did both. What the screen follows is
+`iclforge::panelfollow::PanelFollow` (`libs/device/include/iclforge/panel_follow.hpp`): atomics only, the brightness only
+marks the backlight stale, and the panel's loop gives the glass the level in its next cycle (within a tenth of a second).
+`test_panel_follow.cpp` holds a lock across every setter, and reads `panel.cpp` to fail if a `panel_set_*` mentions a lock,
+a wait or the glass.
+
 #### A song with no lyrics
 
 Most of what is played has none. While a stream plays and the board holds no lyrics, the panel shows
