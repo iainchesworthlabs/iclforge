@@ -46,7 +46,7 @@ test('a board no server is connected to', async ({ page, stub }) => {
         await expect(page.locator(id)).toBeHidden();
     }
     await expect(page.locator('#ss-code')).toBeHidden();
-    await expect(page.getByRole('table')).toBeHidden();
+    await expect(page.locator('#ss-levels')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Forget every server' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel pairing' })).toBeHidden();
     await expect(page.getByRole('button', { name: 'Allow pairing again' })).toBeHidden();
@@ -101,7 +101,7 @@ test('PCM from a server of the older dialect, not paired, still settling', async
     await expect(page.locator('#ss-timing')).toHaveText('1.2 ms late, 4.5 ms at worst');
     await expect(page.locator('#ss-underruns')).toHaveText('3');
     await expect(page.locator('#ss-lost')).toHaveText('2 late, 1 with no room, 4 not valid');
-    await expect(cells(page.getByRole('table'), 1)).toHaveText(['2', '-7.5 dB', '']);
+    await expect(cells(page.locator('#ss-levels'), 1)).toHaveText(['2', '-7.5 dB', '']);
 });
 
 test('a link, role and dialect the page has no words for are left out', async ({ page, stub }) => {

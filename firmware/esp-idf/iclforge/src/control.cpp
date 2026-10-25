@@ -498,6 +498,10 @@ struct Control::Impl {
                          "GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)\n"
                          "GET  /ntp-server    the time server a person named, or none (the router's, then the pool); PUT one\n"
                          "GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one\n"
+                         "GET  /trim          each speaker's level and distance, as JSON, on a board with a Sendspin player\n"
+                         "PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset\n"
+                         "GET  /identify      the test tone: what it is doing and its limits, as JSON\n"
+                         "POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
                          "(Sendspin pairing)\n"
@@ -1040,6 +1044,27 @@ struct Control::Impl {
         return send_text(req, "200 OK", "ok; the screen follows at once\n");
     }
 
+    // A refusal a handler gave, said the way its kind says no.
+    static esp_err_t send_refusal(httpd_req_t* req, const ControlRefusal& refusal) {
+        std::string text = refusal.why;
+        text += '\n';
+        switch (refusal.kind) {
+            case ControlRefusal::Kind::kBadRequest:
+                return send_text(req, "400 Bad Request", text.c_str());
+            case ControlRefusal::Kind::kMissing:
+                return send_text(req, "404 Not Found", text.c_str());
+            case ControlRefusal::Kind::kConflict:
+                break;
+        }
+        return send_text(req, "409 Conflict", text.c_str());
+    }
+
+    static esp_err_t send_json_text(httpd_req_t* req, std::string json) {
+        json += '\n';
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_send(req, json.c_str(), static_cast<ssize_t>(json.size()));
+    }
+
     static esp_err_t on_brightness_get(httpd_req_t* req) {
         auto& h = self(req)->handlers;
         if (!h.brightness) {
@@ -1192,6 +1217,52 @@ struct Control::Impl {
         const std::string json = prefs::to_json(*h.preferences);
         httpd_resp_set_type(req, "application/json");
         return httpd_resp_send(req, json.c_str(), static_cast<ssize_t>(json.size()));
+    }
+
+    static esp_err_t on_trim_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        std::optional<std::string> json = h.trim ? h.trim() : std::nullopt;
+        if (!json) {
+            return send_text(req, "404 Not Found", "this board has no player to apply a speaker trim to\n");
+        }
+        return send_json_text(req, std::move(*json));
+    }
+
+    static esp_err_t on_trim_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        if (!h.set_trim) {
+            return send_text(req, "404 Not Found", "this board has no player to apply a speaker trim to\n");
+        }
+        if (const std::optional<ControlRefusal> refusal = h.set_trim(read_body(req))) {
+            return send_refusal(req, *refusal);
+        }
+        return send_text(req, "200 OK", "ok; in force at once\n");
+    }
+
+    static esp_err_t on_identify_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        std::optional<std::string> json = h.identify ? h.identify() : std::nullopt;
+        if (!json) {
+            return send_text(req, "404 Not Found", "this board has no player to play a test tone through\n");
+        }
+        return send_json_text(req, std::move(*json));
+    }
+
+    static esp_err_t on_identify_post(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        if (!h.set_identify) {
+            return send_text(req, "404 Not Found", "this board has no player to play a test tone through\n");
+        }
+        if (const std::optional<ControlRefusal> refusal = h.set_identify(read_body(req))) {
+            return send_refusal(req, *refusal);
+        }
+        return send_text(req, "200 OK", "ok\n");
     }
 
     static esp_err_t on_time_zone_get(httpd_req_t* req) {
@@ -1554,6 +1625,10 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/ntp-server", .method = HTTP_PUT, .handler = &Impl::on_ntp_server_put},
         {.uri = "/time-sync", .method = HTTP_GET, .handler = &Impl::on_time_sync_get},
         {.uri = "/time-sync", .method = HTTP_PUT, .handler = &Impl::on_time_sync_put},
+        {.uri = "/trim", .method = HTTP_GET, .handler = &Impl::on_trim_get},
+        {.uri = "/trim", .method = HTTP_PUT, .handler = &Impl::on_trim_put},
+        {.uri = "/identify", .method = HTTP_GET, .handler = &Impl::on_identify_get},
+        {.uri = "/identify", .method = HTTP_POST, .handler = &Impl::on_identify_post},
         {.uri = "/pairing", .method = HTTP_GET, .handler = &Impl::on_pairing_get},
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},

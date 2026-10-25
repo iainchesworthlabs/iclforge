@@ -245,3 +245,99 @@ TEST_CASE("process for some outputs trims those as process does and leaves the r
     CHECK_FALSE(stage.delayed());
     CHECK_FALSE(TrimDelay{}.delayed());
 }
+
+TEST_CASE("a ramped trim moves to its level over the next block, and a set one is there at once", "[render][trim-delay]") {
+    std::vector<float> storage;
+    TrimDelay stage;
+    REQUIRE(stage.configure(storage, 2, 0));
+    REQUIRE(stage.gain(0) == 1.0F);
+    REQUIRE(stage.gain(5) == 1.0F);  // an output it does not have
+
+    // set_trim_db: at once.
+    REQUIRE(stage.set_trim_db(0, -6.0));
+    REQUIRE(stage.ramp_trim_db(1, -6.0));
+    REQUIRE(stage.gain(0) == stage.gain(1));
+    REQUIRE(stage.gain(0) == Approx(0.501187).epsilon(1e-6));
+
+    std::vector<float> a(256, 1.0F);
+    std::vector<float> b(256, 1.0F);
+    const std::array<std::span<float>, 2> planes = {std::span<float>(a), std::span<float>(b)};
+    stage.process(planes);
+    for (std::size_t k = 0; k < 256; ++k) {
+        REQUIRE(a[k] == stage.gain(0));
+        // From unity to the level in a straight line, the last sample of the block the level itself.
+        REQUIRE(b[k] > stage.gain(1) - 1e-4F);
+        REQUIRE(b[k] < 1.0F);
+        if (k > 0) {
+            REQUIRE(b[k] < b[k - 1]);
+        }
+    }
+    REQUIRE(b[255] == Approx(stage.gain(1)).epsilon(1e-6));
+    // The next block is steady.
+    std::fill(a.begin(), a.end(), 1.0F);
+    std::fill(b.begin(), b.end(), 1.0F);
+    stage.process(planes);
+    for (std::size_t k = 0; k < 256; ++k) {
+        REQUIRE(b[k] == stage.gain(1));
+    }
+
+    // And back to unity: a ramp up, then nothing to do.
+    REQUIRE(stage.ramp_trim_db(1, 0.0));
+    std::fill(b.begin(), b.end(), 1.0F);
+    stage.process(planes);
+    REQUIRE(b[0] > stage.gain(0));
+    REQUIRE(b[255] == Approx(1.0F).epsilon(1e-6));
+    REQUIRE(stage.active());  // output 0 still has its trim
+    REQUIRE(stage.ramp_trim_db(0, 0.0));
+    REQUIRE(stage.active());  // a ramp has yet to run
+    std::fill(a.begin(), a.end(), 1.0F);
+    stage.process(planes);
+    REQUIRE_FALSE(stage.active());
+
+    // The refusals are set_trim_db's.
+    REQUIRE_FALSE(stage.ramp_trim_db(0, 12.5));
+    REQUIRE_FALSE(stage.ramp_trim_db(2, 0.0));
+    REQUIRE_FALSE(stage.ramp_trim_db(0, std::numeric_limits<double>::quiet_NaN()));
+}
+
+TEST_CASE("a new stream ends a ramp under way, and the delayed outputs are named", "[render][trim-delay]") {
+    std::vector<float> storage(TrimDelay::storage_floats(4, 16));
+    TrimDelay stage;
+    REQUIRE(stage.configure(storage, 4, 16));
+    REQUIRE(stage.delayed_outputs() == 0);
+    REQUIRE_FALSE(stage.delayed());
+    REQUIRE(stage.set_delay(1, 5));
+    REQUIRE(stage.set_delay(3, 16));
+    REQUIRE(stage.delayed_outputs() == 0b1010U);
+    REQUIRE(stage.delayed());
+    REQUIRE(stage.set_delay(1, 0));
+    REQUIRE(stage.delayed_outputs() == 0b1000U);
+
+    REQUIRE(stage.ramp_trim_db(0, -12.0));
+    stage.reset();
+    std::vector<float> a(64, 1.0F);
+    const std::array<std::span<float>, 1> planes = {std::span<float>(a)};
+    stage.process(planes);
+    for (const float sample : a) {
+        REQUIRE(sample == stage.gain(0));
+    }
+}
+
+TEST_CASE("a delayed output with nothing patched to it still plays out its line", "[render][trim-delay]") {
+    // process(out, only) with the delayed outputs added to `only`: the tail of a line is not cut off by a block
+    // in which the channel that fed it was silent.
+    std::vector<float> storage(TrimDelay::storage_floats(2, 8));
+    TrimDelay stage;
+    REQUIRE(stage.configure(storage, 2, 8));
+    REQUIRE(stage.set_delay(1, 4));
+    std::vector<float> a(8, 0.0F);
+    std::vector<float> b = {1, 2, 3, 4, 5, 6, 7, 8};
+    const std::array<std::span<float>, 2> first = {std::span<float>(a), std::span<float>(b)};
+    stage.process(first, 0b10U);
+    REQUIRE(b == std::vector<float>({0, 0, 0, 0, 1, 2, 3, 4}));
+    // The next block is silence: the line still holds 5 6 7 8.
+    std::vector<float> silent(8, 0.0F);
+    const std::array<std::span<float>, 2> second = {std::span<float>(a), std::span<float>(silent)};
+    stage.process(second, stage.delayed_outputs());
+    REQUIRE(silent == std::vector<float>({5, 6, 7, 8, 0, 0, 0, 0}));
+}
