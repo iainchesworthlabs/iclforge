@@ -22,6 +22,8 @@ const {
     playingSendspin,
     pairedServer,
     firmwareTrial,
+    updateNotBuilt,
+    updateOffer,
     cableNetwork,
     screenBoard,
     timeBoard,
@@ -40,6 +42,10 @@ const CONTROL = fs.readFileSync(path.join(COMPONENT, 'src/control.cpp'), 'utf8')
 const FIRMWARE_CPP = fs.readFileSync(path.join(COMPONENT, 'src/firmware.cpp'), 'utf8');
 const FIRMWARE_IMAGE = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_image.hpp'), 'utf8');
 const FIRMWARE_STATUS = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_status.hpp'), 'utf8');
+// What a firmware without updates from GitHub releases says (the routes are control.cpp's, and the reply
+// is this file's), and the body firmware_update.hpp writes for GET /firmware/available.
+const PULL_NONE = fs.readFileSync(path.join(COMPONENT, 'src/firmware_pull_none.cpp'), 'utf8');
+const FIRMWARE_UPDATE = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_update.hpp'), 'utf8');
 const SCRIPT = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.js'), 'utf8');
 const PAGE = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.html'), 'utf8');
 
@@ -83,8 +89,9 @@ function literals(source) {
 const STRINGS = literals(CONTROL);
 
 test("the stand-in answers with the firmware's reply texts", () => {
+    const strings = [...STRINGS, ...literals(PULL_NONE)];
     for (const [name, text] of Object.entries(REPLIES)) {
-        expect(STRINGS, `REPLIES.${name} is not a string in control.cpp`).toContain(text);
+        expect(strings, `REPLIES.${name} is not a string in control.cpp or firmware_pull_none.cpp`).toContain(text);
     }
 });
 
@@ -282,6 +289,50 @@ test("the stand-in writes GET /firmware's keys in the firmware's order", async (
         expect(Object.keys(body.last_update)).toEqual(firmware.last);
         expect(Object.keys(body.coredump)).toEqual(firmware.dump);
         expect(Object.keys(body.partitions[0])).toEqual(firmware.part);
+    } finally {
+        await stub.close();
+    }
+});
+
+test("the stand-in writes GET /firmware/available's keys in the firmware's order", async () => {
+    // render_status writes the body with a JsonObject named `object`, and the parts that are objects with one
+    // each: latest, trust and error. A part that does not apply is written with null() under the same key,
+    // so a key comes twice in a row there; a text that may be empty goes through text_or_null.
+    const start = FIRMWARE_UPDATE.indexOf('inline std::string render_status');
+    const render = FIRMWARE_UPDATE.slice(start, FIRMWARE_UPDATE.indexOf("out += '\\n';", start));
+    const keys = (name) =>
+        [
+            ...render.matchAll(
+                new RegExp(`\\b${name}\\.(?:text|number|null|key)\\("([a-z_0-9]+)"|text_or_null\\(${name}, "([a-z_0-9]+)"`, 'g'),
+            ),
+        ]
+            .map((m) => m[1] ?? m[2])
+            .filter((key, i, all) => key !== all[i - 1]);
+    const firmware = { body: keys('object'), latest: keys('latest'), trust: keys('trust'), error: keys('error') };
+    expect(firmware.body).toEqual(expect.arrayContaining(['supported', 'state', 'latest', 'trust', 'skipped']));
+    expect(firmware.latest.length).toBe(5);
+    const stub = await startStub();
+    try {
+        // A firmware without the update: every part that does not apply is null.
+        let body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.trust)).toEqual(firmware.trust);
+        expect(body.latest).toBeNull();
+        expect(body.error).toBeNull();
+        expect(body).toEqual(updateNotBuilt(stub.device.firmware));
+        // A release on offer, and then a check that failed.
+        stub.device.update = updateOffer(stub.device.firmware);
+        body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.latest)).toEqual(firmware.latest);
+        stub.device.update = updateOffer(stub.device.firmware, {
+            state: 'idle',
+            latest: null,
+            error: { code: 'untrusted', text: 'The update list was not signed by a key this firmware trusts.' },
+        });
+        body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.error)).toEqual(firmware.error);
     } finally {
         await stub.close();
     }

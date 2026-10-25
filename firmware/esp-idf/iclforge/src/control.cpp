@@ -21,6 +21,7 @@
 
 #include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/firmware.hpp"
+#include "iclforge/firmware_pull.hpp"
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
@@ -462,61 +463,78 @@ struct Control::Impl {
     }
 
     static esp_err_t on_api(httpd_req_t* req) {
-        return send_text(req, "200 OK",
-                         "iclforge player\n"
-                         "GET  /              a web page that shows and drives the player\n"
-                         "GET  /api           this list\n"
-                         "GET  /status        what is playing, as JSON\n"
-                         "GET  /hardware      what this board is - chip, revision, FPU, PSRAM, "
-                         "and this sink's own ceiling - as JSON, once at startup\n"
-                         "POST /play          body: a URL or path to play\n"
-                         "POST /stop\n"
-                         "POST /volume        body: 0.0 to 1.0\n"
-                         "GET  /layout        the output layout\n"
-                         "PUT  /layout        body: a name (5.1.4) or a speaker list; next play\n"
-                         "GET  /layout-options  the layouts to choose from, each supported, with limits or "
-                         "unavailable on this board and why, as JSON\n"
-                         "GET  /name          this board's name; PUT one to change it\n"
-                         "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
-                         "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
-                         "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
-                         "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one "
-                         "to change it\n"
-                         "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it\n"
-                         "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
-                         "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one\n"
-                         "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one\n"
-                         "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off "
-                         "(22:00-07:00 on), on a board with a screen; PUT one, or on, or off\n"
-                         "GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; PUT one\n"
-                         "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is "
-                         "kept; PUT one to change it (from the next stream)\n"
-                         "GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; "
-                         "change one through its own route\n"
-                         "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one, or a name from /time-zones\n"
-                         "GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)\n"
-                         "GET  /ntp-server    the time server a person named, or none (the router's, then the pool); PUT one\n"
-                         "GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one\n"
-                         "GET  /trim          each speaker's level and distance, as JSON, on a board with a Sendspin player\n"
-                         "PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset\n"
-                         "GET  /identify      the test tone: what it is doing and its limits, as JSON\n"
-                         "POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop\n"
-                         "GET  /pairing       the servers this board is paired with, as JSON\n"
-                         "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
-                         "(Sendspin pairing)\n"
-                         "GET  /firmware      both app slots, a trial, an upload and the last "
-                         "update, as JSON\n"
-                         "PUT  /firmware      body: an app image; flash mode, then a restart into it\n"
-                         "PUT  /firmware/mode body: flash, or normal (a restart)\n"
-                         "PUT  /firmware/rollback  the image before this one boots next\n"
-                         "GET  /firmware/coredump  the last crash's core dump, as it lies in flash\n"
-                         "DELETE /firmware/coredump  erase it\n"
-                         "POST /restart       restart into the image that runs now\n"
-                         "POST /reset-preferences  the screen's choices back to the defaults; the name, network, wiring "
-                         "and pairings stay\n"
-                         "POST /factory-reset body: erase everything; erases the name, network, pairings and every "
-                         "setting, then restarts\n"
-                         "GET  /log           recent console output; ?from=N for what came after byte N\n");
+        return send_text(
+            req, "200 OK",
+            "iclforge player\n"
+            "GET  /              a web page that shows and drives the player\n"
+            "GET  /api           this list\n"
+            "GET  /status        what is playing, as JSON\n"
+            "GET  /hardware      what this board is - chip, revision, FPU, PSRAM, "
+            "and this sink's own ceiling - as JSON, once at startup\n"
+            "POST /play          body: a URL or path to play\n"
+            "POST /stop\n"
+            "POST /volume        body: 0.0 to 1.0\n"
+            "GET  /layout        the output layout\n"
+            "PUT  /layout        body: a name (5.1.4) or a speaker list; next play\n"
+            "GET  /layout-options  the layouts to choose from, each supported, with limits or "
+            "unavailable on this board and why, as JSON\n"
+            "GET  /name          this board's name; PUT one to change it\n"
+            "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
+            "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
+            "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
+            "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; "
+            "PUT one "
+            "to change it\n"
+            "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT "
+            "one to change it\n"
+            "GET  /dim-after     never, or minutes until that screen dims, on a board with a "
+            "screen; PUT one\n"
+            "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, "
+            "on a board with a screen; PUT one\n"
+            "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a "
+            "board with a screen; PUT one\n"
+            "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, "
+            "and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off\n"
+            "GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; "
+            "PUT one\n"
+            "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's "
+            "dynamic range is kept; PUT one to change it (from the next stream)\n"
+            "GET  /preferences   every preference this board has, whether it can use it and why not, "
+            "as JSON; change one through its own route\n"
+            "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); "
+            "PUT one, or a name from /time-zones\n"
+            "GET  /time-zones    the names of the time zones PUT /timezone takes, one a line "
+            "(Australia/Melbourne)\n"
+            "GET  /ntp-server    the time server a person named, or none (the router's, then the "
+            "pool); PUT one\n"
+            "GET  /time-sync     on or off: whether the board keeps its time with a time server; "
+            "PUT one\n"
+            "GET  /trim          each speaker's level and distance, as JSON, on a board with a "
+            "Sendspin player\n"
+            "PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset\n"
+            "GET  /identify      the test tone: what it is doing and its limits, as JSON\n"
+            "POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop\n"
+            "GET  /pairing       the servers this board is paired with, as JSON\n"
+            "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
+            "(Sendspin pairing)\n"
+            "GET  /firmware      both app slots, a trial, an upload and the last "
+            "update, as JSON\n"
+            "PUT  /firmware      body: an app image; flash mode, then a restart into it\n"
+            "PUT  /firmware/mode body: flash, or normal (a restart)\n"
+            "PUT  /firmware/rollback  the image before this one boots next\n"
+            "GET  /firmware/available  an update from GitHub releases: the state of the flow\n"
+            "POST /firmware/check  look for a newer release (the result is on "
+            "/firmware/available)\n"
+            "PUT  /firmware/from-release  body: the version a check offered; install it\n"
+            "PUT  /firmware/channel  body: stable or beta\n"
+            "GET  /firmware/coredump  the last crash's core dump, as it lies in flash\n"
+            "DELETE /firmware/coredump  erase it\n"
+            "POST /restart       restart into the image that runs now\n"
+            "POST /reset-preferences  the screen's choices back to the defaults; the name, network, "
+            "wiring and pairings stay\n"
+            "POST /factory-reset body: erase everything; erases the name, network, pairings and every "
+            "setting, then restarts\n"
+            "GET  /log           recent console output; ?from=N for what came after byte N\n");
     }
 
     static esp_err_t on_status(httpd_req_t* req) {
@@ -1484,6 +1502,26 @@ struct Control::Impl {
         return firmware != nullptr ? firmware->on_upload(req) : no_firmware(req);
     }
 
+    static esp_err_t on_firmware_available(httpd_req_t* req) {
+        FirmwarePull* pull = self(req)->handlers.firmware_pull;
+        return pull != nullptr ? pull->on_available(req) : no_firmware(req);
+    }
+
+    static esp_err_t on_firmware_check(httpd_req_t* req) {
+        FirmwarePull* pull = self(req)->handlers.firmware_pull;
+        return pull != nullptr ? pull->on_check(req) : no_firmware(req);
+    }
+
+    static esp_err_t on_firmware_from_release(httpd_req_t* req) {
+        FirmwarePull* pull = self(req)->handlers.firmware_pull;
+        return pull != nullptr ? pull->on_from_release(req) : no_firmware(req);
+    }
+
+    static esp_err_t on_firmware_channel(httpd_req_t* req) {
+        FirmwarePull* pull = self(req)->handlers.firmware_pull;
+        return pull != nullptr ? pull->on_channel(req) : no_firmware(req);
+    }
+
     static esp_err_t on_firmware_mode(httpd_req_t* req) {
         Firmware* firmware = self(req)->handlers.firmware;
         return firmware != nullptr ? firmware->on_mode(req) : no_firmware(req);
@@ -1570,8 +1608,12 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/wiring", .method = HTTP_GET, .handler = &Impl::on_wiring_get},
         {.uri = "/wiring", .method = HTTP_PUT, .handler = &Impl::on_wiring_put},
         {.uri = "/network", .method = HTTP_PUT, .handler = &Impl::on_network_put},
-        {.uri = "/network-preference", .method = HTTP_GET, .handler = &Impl::on_network_preference_get},
-        {.uri = "/network-preference", .method = HTTP_PUT, .handler = &Impl::on_network_preference_put},
+        {.uri = "/network-preference",
+         .method = HTTP_GET,
+         .handler = &Impl::on_network_preference_get},
+        {.uri = "/network-preference",
+         .method = HTTP_PUT,
+         .handler = &Impl::on_network_preference_put},
         {.uri = "/now-playing", .method = HTTP_GET, .handler = &Impl::on_now_playing_get},
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
@@ -1602,6 +1644,12 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},
         {.uri = "/firmware", .method = HTTP_PUT, .handler = &Impl::on_firmware_put},
+        {.uri = "/firmware/available", .method = HTTP_GET, .handler = &Impl::on_firmware_available},
+        {.uri = "/firmware/check", .method = HTTP_POST, .handler = &Impl::on_firmware_check},
+        {.uri = "/firmware/from-release",
+         .method = HTTP_PUT,
+         .handler = &Impl::on_firmware_from_release},
+        {.uri = "/firmware/channel", .method = HTTP_PUT, .handler = &Impl::on_firmware_channel},
         {.uri = "/firmware/mode", .method = HTTP_PUT, .handler = &Impl::on_firmware_mode},
         {.uri = "/firmware/rollback", .method = HTTP_PUT, .handler = &Impl::on_firmware_rollback},
         {.uri = "/firmware/coredump", .method = HTTP_GET, .handler = &Impl::on_coredump_get},

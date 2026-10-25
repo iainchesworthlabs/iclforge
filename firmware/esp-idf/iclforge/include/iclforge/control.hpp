@@ -72,6 +72,7 @@
 namespace iclforge {
 
 class Firmware;
+class FirmwarePull;
 
 // GET /status's "sendspin" object, for a board that is a Sendspin player
 // (sendspin_host.hpp, burst_player.hpp). Plain values, so that the control
@@ -437,6 +438,10 @@ struct ControlHandlers {
     // leaves the routes answering that the board takes no updates. The owner
     // keeps it alive for as long as Control runs.
     Firmware* firmware = nullptr;
+    // The routes of an update from GitHub releases (firmware_pull.hpp, planning/esp32-ota.md, O10):
+    // GET /firmware/available, POST /firmware/check, PUT /firmware/from-release and PUT
+    // /firmware/channel. Null answers that the board takes no firmware updates.
+    FirmwarePull* firmware_pull = nullptr;
 };
 
 // What this board is - chip, revision, cores, FPU, PSRAM, and the sink ceiling the caller states - gathered from

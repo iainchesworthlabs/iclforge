@@ -1504,7 +1504,8 @@ What can go wrong, and what a person does. None needs a cable unless it says so.
 There is no revocation list. What stands in for one:
 
 - **`sequence`** is in every index and a board keeps the highest it has accepted for its channel. An older
-  index is refused. It is one `uint32` in NVS (`fw_seq`).
+  index is refused. It is one `uint32` per channel in NVS (`fw_seq_s` and `fw_seq_b`), so that following the
+  other channel for a while does not move the floor of this one.
 - **A leaf rollover** is a new leaf with the same name, made before the old one expires, and signs the next
   index. Nothing in any board changes.
 - **An anchor rollover** ships an image whose anchor file holds both the old and the new certificate (it
@@ -1773,9 +1774,12 @@ Firmware tab show it with no change.
 | `PUT /firmware/from-release` | Body: the version, as text, which must equal what the last check offered. Enters flash mode, downloads, checks, writes, restarts | `202` then a restart; `403` the `Host` is not the board's; `409` nothing offered (check again), on trial or already running; `412` no anchor, no clock or no pull in this build; `503` no memory |
 | `PUT /firmware/channel` | Body: `stable` or `beta`; stored | `200`; `400` |
 
-The error codes in `error.code` are `no_network`, `no_clock`, `tls`, `unreachable`, `bad_index`, `untrusted`
-(any of steps 2 to 5 of the check), `cert_expired`, `replayed` (a `sequence` below the board's), `no_image`,
-`no_memory`, `bad_image`, `bad_hash`.
+The error codes in `error.code` are `no_network`, `no_clock`, `tls`, `unreachable`, `bad_index`,
+`bad_sig_file`, `hash_mismatch` (the signature file is for another index), `untrusted`, `leaf_usage`,
+`weak_key`, `bad_signature`, `leaf_name` (steps 2 to 5 of the check, one code each), `cert_expired`,
+`cert_not_yet_valid`, `replayed` (a `sequence` below the board's), `no_image`, `no_memory`, `bad_image`,
+`bad_hash`, `unknown_version`, `older_security`, `write_failed`, `no_slot`, `on_trial`, `busy`,
+`nothing_offered`, `offer_stale` and `not_supported`. Each has a sentence in `firmware_update.hpp`.
 
 The board's routes are for a board whose network is its own (see [Routes](#routes)). `PUT` is used for the
 install, as for `PUT /firmware`, so that a page on another site cannot send it without a preflight, and
@@ -1880,6 +1884,35 @@ coordinator gives a window.
 | **O10b, the board's pull** | `firmware_pull.cpp` in the component beside `firmware.cpp` (the upload core takes chunks from either source), the chain and signature check with mbedTLS against the build's anchors, the four routes, Kconfig (`ICLFORGE_FIRMWARE_PULL`, `_UPDATE_BASE_URL`, `_UPDATE_CHANNEL`, `_TRUST_ANCHORS`, `_LEAF_STABLE`, `_LEAF_BETA`), the certificate bundle, the NVS keys, the four-place route word list, `stub.js` | Host: the policy and JSON from O10a. **QEMU:** a loopback HTTP server serves an index, its signature and an image, signed by the fixture CA; the base URL accepts `http://` only in `sdkconfig.ci-ota`, and the signature rules are not relaxed; a wrong anchor, a wrong leaf name, a tampered index, an old `sequence`, an expired leaf and a wrong image hash are each refused; a **push of an unsigned image still works**. TLS is not tested here (no clock) | Yes: the TLS handshake with the three real hosts, RAM and flash measured, on the S3, the C6 (16 MB) and the P4 or the kit; a real pull from a throwaway channel release signed by the owner's leaf |
 | **O10c, the workflow and the process** | `firmware-channels.yml`, started by `workflow_run` (`release.yml` is not edited; [CI signing](#ci-signing)), in a PR of its own; `docs/releasing.md`: the key ceremony, the environments, rollover, recovery. The owner's EJBCA work, the environments and the public anchor in `firmware/keys/` | The linters the workflows already pass (actionlint, zizmor); a `dry_run` dispatch, which signs with a throwaway CA and publishes nothing; `ota.py --release latest` and `installer_site.py` ignore the channel release | No (the owner makes the keys, the environments and the variable) |
 | **O10d, Preferences and the page** | The four registry entries, `BoardCaps::update` and its variants, the `Backend` methods; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
+
+#### O10b as built
+
+What the board's code does that the table above did not say, or says another way:
+
+- **The sequence floor is per channel** (`fw_seq_s`, `fw_seq_b`), and the channel is `fw_chan`.
+- **The skipped-version note is derived**, from the last update `Firmware` reports (a version that went back
+  after its trial), not stored: there is no NVS key for it.
+- **A pull that fails after it began leaves the board in flash mode**, as a push that fails does: a restart
+  leaves it (`PUT /firmware/mode normal`). A check never enters flash mode, and one that cannot run says why in
+  `blocked`.
+- **The trust anchors belong to the application, not the component.** `hearth_sink` embeds a PEM file as
+  `trust_anchors.pem`, from `ICLFORGE_EXAMPLE_TRUST_ANCHORS` or, for CI's throwaway CA, the CMake
+  variable `ICLFORGE_TRUST_ANCHORS_FILE`, and names its start symbol undefined at link time: the
+  code refers to the symbols weakly, so that a build without them links, and a weak reference does not take
+  an object out of an archive.
+- **The QEMU test** is `tools/checks/run_pull_qemu.py`, on a build with `sdkconfig.pull` and
+  `sdkconfig.ci-pull` (`ICLFORGE_FIRMWARE_PULL_TEST_HTTP`: an `http://` address and no date
+  judged; never for a board). It covers the refusals, the offer, a replay, a damaged and a wrong image, the
+  install and its trial, an up-to-date check, the unsigned push, both channels with an RSA, an ECDSA and a
+  PSS signature, and the `Host` check. An expired leaf and TLS itself are not tested there (QEMU's board
+  has no clock and the server is plain HTTP): they wait for a board. A non-self-signed sub-CA works as the
+  anchor, as the plan said it should.
+- **The PowerShell form that signs through the Windows store was not built**: CI cannot use a non-exportable
+  key, and the owner's keys are made on their own machine ([the process](#the-process)).
+- **Measured under QEMU** (an ESP32-S3, no PSRAM): the image grows by 31,968 bytes; the install task had
+  8,496 bytes of its 12 KiB stack spare; the least free internal heap while pulling was 148,396 bytes. None of
+  it is a board's number: the C6, the memory beside a playing stream and the time an RSA-3072 chain takes
+  are owed to a board window.
 
 ### Later hardening
 

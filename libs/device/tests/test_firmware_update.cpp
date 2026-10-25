@@ -444,11 +444,13 @@ TEST_CASE("what stops a check right now is said in the order that matters", "[fi
 
 TEST_CASE("every failure code has words", "[firmware-update]") {
     for (const char* code :
-         {"no_network",    "no_clock",      "tls",          "unreachable",        "bad_index",
-          "bad_sig_file",  "hash_mismatch", "untrusted",    "leaf_usage",         "weak_key",
-          "bad_signature", "leaf_name",     "cert_expired", "cert_not_yet_valid", "replayed",
-          "no_image",      "no_memory",     "bad_image",    "bad_hash",           "unknown_version",
-          "older_security"}) {
+         {"no_network",     "no_clock",           "tls",           "unreachable",
+          "bad_index",      "bad_sig_file",       "hash_mismatch", "untrusted",
+          "leaf_usage",     "weak_key",           "bad_signature", "leaf_name",
+          "cert_expired",   "cert_not_yet_valid", "replayed",      "no_image",
+          "no_memory",      "bad_image",          "bad_hash",      "unknown_version",
+          "older_security", "write_failed",       "no_slot",       "on_trial",
+          "busy",           "nothing_offered",    "offer_stale",   "not_supported"}) {
         INFO(code);
         const std::string text = error_text(code);
         CHECK_FALSE(text.empty());
