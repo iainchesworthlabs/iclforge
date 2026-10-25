@@ -416,8 +416,13 @@ TEST_CASE("what Reset preferences changes is worded from the registry, for the b
     REQUIRE(has(no_touch, "screen without lyrics"));
     REQUIRE_FALSE(has(no_touch, "dim after"));
     REQUIRE_FALSE(has(no_touch, "night schedule"));
-    REQUIRE(prefs::reset_labels(iclforge::variants::s3_n16r8()).empty());
-    const sa::Confirm none = sa::reset_preferences_confirm(prefs::reset_labels(iclforge::variants::s3_n16r8()));
+    // A board with a player and no screen has late night to put back, and nothing else.
+    REQUIRE(prefs::reset_labels(iclforge::variants::s3_n16r8()) == std::vector<std::string>{"late night"});
+    // One with neither a screen nor a player has nothing at all.
+    iclforge::BoardCaps bare = iclforge::variants::s3_n16r8();
+    bare.sendspin = false;
+    REQUIRE(prefs::reset_labels(bare).empty());
+    const sa::Confirm none = sa::reset_preferences_confirm(prefs::reset_labels(bare));
     REQUIRE(contains(none.lines[0], "nothing on this board"));
 }
 

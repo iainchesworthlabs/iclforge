@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cctype>
 #include <set>
 #include <string>
@@ -845,4 +846,100 @@ TEST_CASE("the listing carries the Sound group, after Display, with the kinds ac
     const std::size_t at = json.find("\"id\":\"speaker-trim\"");
     const std::size_t next = json.find("\"id\":", at + 1);
     REQUIRE(json.substr(at, next - at).find("\"choices\"") == std::string::npos);
+}
+
+TEST_CASE("late night is a choice of standard and late night, in the Sound group, applied from the next stream",
+          "[preferences][sound][late-night]") {
+    const prefs::Pref* const pref = prefs::find("late-night");
+    REQUIRE(pref != nullptr);
+    CHECK(pref->group == prefs::Group::kSound);
+    CHECK(pref->kind == prefs::Kind::kChoice);
+    CHECK(pref->apply == prefs::Apply::kNextPlay);
+    CHECK(std::string_view(pref->route) == "/dynamic-range");
+    CHECK(std::string_view(pref->default_word) == "standard");
+    // Chosen once and left: Reset preferences puts it back.
+    CHECK(pref->on_reset == prefs::OnReset::kReset);
+    REQUIRE(pref->choices.size() == 2);
+    CHECK(std::string_view(pref->choices[0].id) == "standard");
+    CHECK(std::string_view(pref->choices[1].id) == "late-night");
+    // The note says what it does not do: PCM carries nothing to compress.
+    CHECK(contains(pref->note, "PCM"));
+}
+
+TEST_CASE("late night starts on standard, goes to the board and reads back", "[preferences][sound][late-night]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& pref = *prefs::find("late-night");
+    prefs::Entry entry = prefs::resolve(pref, backend, backend.caps());
+    REQUIRE(entry.availability.available);
+    CHECK(entry.value == "standard");
+    CHECK(entry.value_label == "Standard");
+
+    REQUIRE(prefs::set_value(backend, pref, "late-night").ok);
+    CHECK(backend.late_night_);
+    entry = prefs::resolve(pref, backend, backend.caps());
+    CHECK(entry.value == "late-night");
+    CHECK(entry.value_label == "Late night");
+
+    REQUIRE(prefs::set_value(backend, pref, "standard").ok);
+    CHECK_FALSE(backend.late_night_);
+    CHECK(backend.sets == 2);
+}
+
+TEST_CASE("late night refuses a word that is not one of its two, and a board that cannot store it says so",
+          "[preferences][sound][late-night]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& pref = *prefs::find("late-night");
+    for (const char* word : {"Late-night", "late night", "wide", "on", ""}) {
+        INFO(word);
+        CHECK_FALSE(prefs::set_value(backend, pref, word).ok);
+    }
+    CHECK(backend.sets == 0);
+    backend.refuse_next = true;
+    CHECK_FALSE(prefs::set_value(backend, pref, "late-night").ok);
+    CHECK_FALSE(backend.late_night_);
+}
+
+TEST_CASE("late night is greyed on a build with no Sendspin player, says why, and the board is never asked",
+          "[preferences][sound][late-night]") {
+    BoardCaps caps = iclforge::variants::p4_rev3_kit();
+    caps.sendspin = false;
+    FakeBackend backend(caps);
+    const prefs::Pref& pref = *prefs::find("late-night");
+    const prefs::Entry entry = prefs::resolve(pref, backend, backend.caps());
+    REQUIRE_FALSE(entry.availability.available);
+    CHECK(contains(entry.availability.reason, "decodes no Dolby stream"));
+    for (const prefs::ChoiceState& choice : entry.choices) {
+        CHECK_FALSE(choice.availability.available);
+        CHECK(choice.availability.reason == entry.availability.reason);
+    }
+    const prefs::SetResult result = prefs::set_value(backend, pref, "late-night");
+    CHECK_FALSE(result.ok);
+    CHECK(contains(result.message, "decodes no Dolby stream"));
+    CHECK(backend.sets == 0);
+}
+
+TEST_CASE("Reset preferences puts late night back on standard through its own setter",
+          "[preferences][sound][late-night]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    REQUIRE(prefs::set_value(backend, *prefs::find("late-night"), "late-night").ok);
+    const int before = backend.sets;
+    const prefs::ResetReport report = prefs::reset_preferences(backend);
+    CHECK(report.failed.empty());
+    CHECK_FALSE(backend.late_night_);
+    CHECK(std::count(report.reset.begin(), report.reset.end(), "late-night") == 1);
+    CHECK(backend.sets > before);
+    // Already on standard, it is left alone: the board is not asked again.
+    const int after = backend.sets;
+    const prefs::ResetReport again = prefs::reset_preferences(backend);
+    CHECK(std::count(again.reset.begin(), again.reset.end(), "late-night") == 0);
+    CHECK(backend.sets == after);
+}
+
+TEST_CASE("the listing carries late night in the Sound group with its route and value", "[preferences][sound][late-night]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    backend.late_night_ = true;
+    const std::string json = prefs::to_json(backend);
+    REQUIRE(json_is_balanced(json));
+    REQUIRE(contains(json, "\"id\":\"late-night\",\"group\":\"Sound\",\"label\":\"Late night\",\"kind\":\"choice\""));
+    REQUIRE(contains(json, "\"apply\":\"next-play\",\"route\":\"/dynamic-range\",\"value\":\"late-night\",\"available\":true"));
 }

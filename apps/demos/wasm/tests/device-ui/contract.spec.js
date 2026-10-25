@@ -891,8 +891,10 @@ test("the stand-in lists preferences with the registry's words", () => {
         System: 'kSystem',
     };
     for (const p of PREFERENCES) {
-        const start = PREFERENCES_HPP.indexOf(`{.id = "${p.id}",`);
-        expect(start, `${p.id} is not a preference in preferences.hpp`).toBeGreaterThan(0);
+        // The entry, not a choice that shares its id (late night's choice of late-night): an entry names its group next.
+        const found = new RegExp(String.raw`\{\.id = "${p.id}",\s*\.group`).exec(PREFERENCES_HPP);
+        expect(found, `${p.id} is not a preference in preferences.hpp`).not.toBeNull();
+        const start = found.index;
         const entry = PREFERENCES_HPP.slice(start, PREFERENCES_HPP.indexOf('.set = ', start));
         expect(entry).toContain(`.group = Group::${groups[p.group]}`);
         expect(entry).toContain(`.label = "${p.label}"`);
@@ -932,7 +934,7 @@ test('the stand-in lists the sound preferences with the player, and greyed with 
         // No player: both greyed, with the reason, and the sheet still has no choices.
         stub.device.sound = null;
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
-        for (const p of listing.preferences.filter((x) => x.group === 'Sound')) {
+        for (const p of listing.preferences.filter((x) => x.group === 'Sound' && x.id !== 'late-night')) {
             expect(p.available, p.id).toBe(false);
             expect(p.reason, p.id).toBe('This build has no player, so it has no speakers to play a tone through.');
         }
@@ -941,6 +943,40 @@ test('the stand-in lists the sound preferences with the player, and greyed with 
         for (const choice of by['identify-speakers'].choices) {
             expect(choice.available).toBe(false);
         }
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in lists late night with the value its route holds, and greyed without a Dolby decoder', async () => {
+    const stub = await startStub();
+    try {
+        let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        let entry = listing.preferences.find((p) => p.id === 'late-night');
+        expect(entry).toMatchObject({
+            group: 'Sound',
+            label: 'Late night',
+            kind: 'choice',
+            apply: 'next-play',
+            route: '/dynamic-range',
+            value: 'standard',
+            available: true,
+            reason: '',
+        });
+        expect(entry.choices.map((c) => c.id)).toEqual(['standard', 'late-night']);
+        // A change made through its own route shows.
+        await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night\n' });
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences.find((p) => p.id === 'late-night').value).toBe('late-night');
+        // A board that decodes no Dolby stream has the entry greyed, with the registry's reason, and no value.
+        stub.device.dynamicRange = null;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        entry = listing.preferences.find((p) => p.id === 'late-night');
+        expect(entry).toMatchObject({ available: false, reason: 'This board decodes no Dolby stream: it has no Sendspin player.' });
+        for (const choice of entry.choices) {
+            expect(choice.available).toBe(false);
+        }
+        expect(PREFERENCES_HPP).toContain(entry.reason);
     } finally {
         await stub.close();
     }
@@ -963,6 +999,7 @@ test('the stand-in lists the preferences, greyed with the reason where the board
             'night-idle',
             'identify-speakers',
             'speaker-trim',
+            'late-night',
             'time-zone',
         ]);
         // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps, and

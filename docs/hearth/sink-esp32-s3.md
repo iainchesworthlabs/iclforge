@@ -304,7 +304,8 @@ distance, and the board has a setting that uses them: `GET` and `PUT /dynamic-ra
 It changes the next stream, not the one that is playing, and it is kept over a restart. It can only be as strong as
 the stream's own words: a stream that carries no `compr` word decodes exactly as it does in `standard`, and PCM from
 Music Assistant has no such words at all. On a stream with them, the loud-to-quiet distance of the test stream fell
-from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). Every board with a Sendspin player
+from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). A board with a screen offers the choice as *Late night* under *Preferences*, in the Sound group, greyed with the
+reason where the build has no player; *Reset preferences* puts it back on `standard`. Every board with a Sendspin player
 answers the route; a board with no AC-4 decoder (the C6) is sent PCM for AC-4 and so has nothing to compress there.
 What was measured, and what was not, is in `planning/hearth-late-night.md`.
 
