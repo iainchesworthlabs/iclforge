@@ -141,6 +141,11 @@ namespace player {
 // control surface does not offer to store one.
 [[nodiscard]] bool sink_second_line_possible();
 
+// The bits one line's TDM frame holds (I2S_LL_SLOT_FRAME_BIT_MAX: 128 on an ESP32-S3 and an ESP32-C6, 512 on an
+// ESP32-P4), which iclforge/sink_plan.hpp turns into slots; 0 for a sink with no TDM frame (capture, null), whose
+// sink_slots() is a fixed count. Read once, for the board's capability description (iclforge/board_caps.hpp).
+[[nodiscard]] int sink_frame_bit_max();
+
 // The slot width in force, in bits, and setting it.
 //
 // Which width a board wants is a property of the DACs it is wired to, not of

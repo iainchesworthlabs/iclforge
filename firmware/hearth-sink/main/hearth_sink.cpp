@@ -73,6 +73,7 @@
 #include "network.hpp"
 #include "provision.hpp"
 #include "panel/panel.hpp"
+#include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
 #include "system_control.hpp"
@@ -750,22 +751,12 @@ iclforge::ControlHandlers control_handlers() {
     if (player::panel_built()) {
         h.now_playing = []() { return std::string(iclforge::nowview::view_name(player::settings().now_view)); };
         h.set_now_playing = [](std::string_view word) {
+            // The preferences' backend refuses a view this build cannot draw, stores the rest and has the screen follow.
             const auto view = iclforge::nowview::parse_view(word);
-            // A view this build cannot draw is refused, and not stored for a later image to find.
-            if (!view || !player::panel_has_view(*view) || !player::settings_set_now_view(*view)) {
-                return false;
-            }
-            player::panel_set_view(*view);
-            return true;
+            return view.has_value() && player::preferences().set_now_view(*view);
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
-        h.set_dim_after = [](int minutes) {
-            if (!player::settings_set_dim_after(minutes)) {
-                return false;
-            }
-            player::panel_set_dim_after(minutes);
-            return true;
-        };
+        h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
     }
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
     // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
@@ -885,6 +876,7 @@ iclforge::ControlHandlers control_handlers() {
         h.pairings = []() { return player::sendspin_pairings(); };
         h.forget_server = [](std::string_view server_id) { return player::sendspin_forget_server(server_id); };
     }
+    h.preferences = &player::preferences();
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;
