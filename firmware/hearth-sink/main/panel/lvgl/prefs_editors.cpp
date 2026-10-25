@@ -268,7 +268,9 @@ void build_dialog() {
     lv_obj_set_flex_flow(scrim, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scrim, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    const int card_w = std::min(m.width - 2 * m.margin, std::max(320, m.width * 3 / 5));
+    // The whole width on a small display, and three quarters of a wide one: a line of the card is long enough not to be
+    // broken at the dots of an address.
+    const int card_w = m.width <= 520 ? m.width - 2 * m.margin : m.width * 3 / 4;
     const int max_h = m.height - 2 * m.gap;
     const int inner_w = card_w - 2 * m.margin;
     lv_obj_t* const card = prefs_box(scrim);
@@ -600,17 +602,30 @@ void fill_about(const std::vector<iclforge::aboutview::Row>& rows) {
     const iclforge::screen::Metrics& m = *ui.m;
     const int content_w = m.width - 2 * m.margin;
     lv_obj_clean(s.list);
+    // A label and its value side by side on a wide display, one over the other on a narrow one.
+    const bool side_by_side = m.width >= 480;
+    int label_w = 0;
+    for (const iclforge::aboutview::Row& row : rows) {
+        label_w = std::max(label_w, prefs_text_width(ui.note, row.label));
+    }
+    label_w += 2 * m.gap;
     for (const iclforge::aboutview::Row& row : rows) {
         lv_obj_t* const box = prefs_box(s.list);
         lv_obj_set_size(box, content_w - 8, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_flow(box, side_by_side ? LV_FLEX_FLOW_ROW : LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         lv_obj_set_style_pad_top(box, m.gap, 0);
         lv_obj_set_style_pad_bottom(box, m.gap, 0);
         lv_obj_set_style_border_side(box, LV_BORDER_SIDE_BOTTOM, 0);
         lv_obj_set_style_border_width(box, 1, 0);
         lv_obj_set_style_border_color(box, color(ui.c->faint), 0);
-        prefs_label(box, row.label, ui.note, ui.c->muted);
-        prefs_paragraph(box, row.value, ui.body, tone_color(ui, row.tone), content_w - 8);
+        lv_obj_t* const label = prefs_label(box, row.label, ui.note, ui.c->muted);
+        if (side_by_side) {
+            lv_obj_set_width(label, label_w);
+            // The note is smaller than the body: the label sits on the value's first line.
+            lv_obj_set_style_pad_top(label, (lv_font_get_line_height(ui.body) - lv_font_get_line_height(ui.note)) / 2, 0);
+        }
+        prefs_paragraph(box, row.value, ui.body, tone_color(ui, row.tone), side_by_side ? content_w - 8 - label_w : content_w - 8);
     }
 }
 
