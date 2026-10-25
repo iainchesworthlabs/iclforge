@@ -164,11 +164,14 @@ image is still on trial, when a restart would go back to the image before it. On
 resets the whole system, which a Wi-Fi link behind the companion chip needs
 ([An ESP32-P4 sink](sink-esp32-p4.md#name-restart-and-reset)).
 
-**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to the
-image's defaults, at once and with no restart: what the screen shows without lyrics, when it dims,
-the time zone, and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and
-the choice between the cable and Wi-Fi, the DAC wiring and the speaker layout, the time server and
-whether the board asks it, and the pairings.
+**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to their
+defaults, at once and with no restart: every entry of the board's preferences that says it is reset
+(today what the screen shows without lyrics and when it dims; an entry added later says for itself),
+each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
+the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring and the
+speaker layout, the time server and whether the board asks it, and the pairings. On a board with a
+screen the same thing is *Reset preferences* on the sheet
+([An ESP32-P4 sink](sink-esp32-p4.md#on-the-screen)).
 
 **Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
 (the board gets a new identity, so each server has to pair with it again, and has to remove it from
