@@ -19,6 +19,7 @@
 
 #include "board_info.hpp"
 #include "fonts.hpp"
+#include "prefs_editors.hpp"
 
 namespace prefs = iclforge::prefs;
 
@@ -39,7 +40,7 @@ struct Chain {
 };
 
 // What a touch target does, packed with its row and its index into the user data of its event.
-enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3 };
+enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3, kEdit = 4 };
 
 struct Row {
     std::size_t entry = 0;
@@ -53,6 +54,8 @@ struct Row {
     lv_obj_t* value = nullptr;
     // kAction: the button.
     lv_obj_t* action = nullptr;
+    // kText with an editor: the value as a button, which opens it.
+    lv_obj_t* edit = nullptr;
     // What was painted last: the row is repainted when this changes.
     std::string painted;
 };
@@ -206,6 +209,24 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
     return std::max(g.m.row_target, text_width(g.body.latin, text) + 2 * g.m.pad);
 }
 
+// What the editors are drawn with: this sheet's own sizes, colours and type, over this sheet.
+[[nodiscard]] EditorKit editor_kit() {
+    EditorKit kit;
+    kit.m = g.m;
+    kit.c = g.c;
+    kit.body = g.body.latin;
+    kit.note = g.note.latin;
+    kit.title = g.title;
+    kit.parent = g.root;
+    return kit;
+}
+
+// The widest a value that has an editor reads: a place with its country, or a pair of times.
+[[nodiscard]] int edit_button_width() {
+    const int widest = std::max(text_width(g.body.latin, "Melbourne (Australia)"), text_width(g.body.latin, "22:00 to 07:00"));
+    return widest + 2 * g.m.pad;
+}
+
 // --- what a row says -------------------------------------------------------------------------------
 
 // The lines under a row's control: why the whole entry is greyed, or its note; why another setting makes it moot; why
@@ -283,6 +304,10 @@ void paint_row(Row& row, const prefs::Entry& entry) {
         lv_label_set_text(row.value, entry.value_label.c_str());
         lv_obj_set_style_text_color(row.value, color(on ? g.c.text : g.c.faint), 0);
     }
+    if (row.edit != nullptr) {
+        lv_label_set_text(lv_obj_get_child(row.edit, 0), entry.value_label.c_str());
+        style_button(row.edit, false, on);
+    }
     if (row.minus != nullptr) {
         style_button(row.minus, false, on && prefs::step_target(entry, -1).has_value());
     }
@@ -342,7 +367,11 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             control_w = 2 * g.m.row_target + 2 * gap + value_w;
             break;
         case prefs::Kind::kText:
-            value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value), g.m.row_target));
+            if (pref.editor != prefs::Editor::kNone) {
+                value_w = std::min(content_w, edit_button_width());
+            } else {
+                value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value), g.m.row_target));
+            }
             control_w = value_w;
             break;
         case prefs::Kind::kAction:
@@ -399,6 +428,16 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
                                    pack(Op::kPlus, index, 0), nullptr);
             break;
         case prefs::Kind::kText:
+            if (pref.editor != prefs::Editor::kNone) {
+                // Chosen in an editor of its own (prefs_editors.cpp): the value is the button that opens it.
+                row.edit = make_button(controls, "", value_w, g.m.row_target, g.c.surface_up, g.c.text, &on_target,
+                                       pack(Op::kEdit, index, 0), nullptr);
+                lv_label_set_long_mode(lv_obj_get_child(row.edit, 0), LV_LABEL_LONG_MODE_DOTS);
+                lv_obj_set_width(lv_obj_get_child(row.edit, 0), value_w - 2 * g.m.gap);
+                lv_obj_set_style_text_align(lv_obj_get_child(row.edit, 0), LV_TEXT_ALIGN_CENTER, 0);
+                lv_obj_center(lv_obj_get_child(row.edit, 0));
+                break;
+            }
             row.value = make_label(controls, "", g.body.latin, g.c.text);
             lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_DOTS);
             lv_obj_set_size(row.value, value_w, lv_font_get_line_height(g.body.latin));
@@ -490,6 +529,8 @@ void build_view() {
 }
 
 void take_down() {
+    // An editor is a child of the sheet's root; it goes first, with whatever it has not yet written.
+    editor_close();
     if (g.root != nullptr) {
         lv_obj_delete(g.root);
     }
@@ -534,6 +575,12 @@ void on_target(lv_event_t* event) {
         case Op::kRun:
             word = "run";
             break;
+        case Op::kEdit:
+            // A greyed entry says why beside the control; a tap on it opens nothing.
+            if (entry.availability.available) {
+                (void)editor_open(editor_kit(), *entry.pref);
+            }
+            return;
     }
     const prefs::SetResult result = prefs::set_value(preferences_backend(), *entry.pref, word);
     g.status_text = result.ok ? std::string() : result.message;
@@ -626,6 +673,7 @@ void prefs_update(std::uint32_t now) {
         take_down();
         return;
     }
+    editor_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }

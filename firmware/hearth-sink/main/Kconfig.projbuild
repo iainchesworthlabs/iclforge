@@ -1144,8 +1144,9 @@ config ICLFORGE_EXAMPLE_NIGHT_SCHEDULE
         know the time is lit whatever this says.
 
 config ICLFORGE_EXAMPLE_NIGHT_IDLE
-    bool "Night schedule also darkens the idle screen"
-    default n
+    int "Night schedule also darkens the idle screen (0 or 1)"
+    default 0
+    range 0 1
     help
         Whether the night schedule covers the screen shown between songs as well as the one shown while a song
         with no lyrics plays. Off until the owner decides (planning/p4x-now-playing.md, "Open").

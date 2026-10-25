@@ -766,6 +766,7 @@ test('the stand-in lists the preferences, greyed with the reason where the board
             'clock-seconds',
             'night-schedule',
             'night-times',
+            'night-idle',
             'time-zone',
         ]);
         // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps.

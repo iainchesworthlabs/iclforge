@@ -378,6 +378,25 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
     return {};
 }
 
+[[nodiscard]] inline std::string get_night_idle(const Backend& backend) {
+    return nowview::on_off_text(backend.night().idle);
+}
+
+[[nodiscard]] inline bool set_night_idle(Backend& backend, std::string_view word) {
+    const std::optional<bool> on = nowview::parse_on_off(word);
+    if (!on) {
+        return false;
+    }
+    nowview::NightSchedule night = backend.night();
+    night.idle = *on;
+    return backend.set_night(night);
+}
+
+// The idle screen is darkened by the schedule only while the schedule is on.
+[[nodiscard]] inline std::string night_idle_inert(const Backend& backend) {
+    return backend.night().enabled ? std::string() : "Used while the night schedule is on.";
+}
+
 // The zone, as a route says it: its name where a person chose it by name, else its string, else `none`.
 [[nodiscard]] inline std::string get_time_zone(const Backend& backend) {
     const wallclock::ZoneChoice zone = backend.time_zone();
@@ -390,6 +409,15 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
 [[nodiscard]] inline bool set_time_zone(Backend& backend, std::string_view word) {
     const std::optional<wallclock::ZoneChoice> zone = wallclock::parse_zone_choice(word);
     return zone.has_value() && backend.set_time_zone(*zone);
+}
+
+// "22:00-07:00" as a person reads it on the button that opens the editor: "22:00 to 07:00".
+[[nodiscard]] inline std::string night_times_label(std::string_view value) {
+    const std::size_t dash = value.find('-');
+    if (dash == std::string_view::npos) {
+        return std::string(value);
+    }
+    return std::string(value.substr(0, dash)) + " to " + std::string(value.substr(dash + 1));
 }
 
 // What a person reads for a zone: "Melbourne (Australia)" for a name, "UTC" for none, a string as it is.
@@ -439,7 +467,7 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 8> kRegistry{{
+inline constexpr std::array<Pref, 9> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -528,7 +556,21 @@ inline constexpr std::array<Pref, 8> kRegistry{{
      .inert = &detail::night_inert,
      .get = &detail::get_night_times,
      .set = &detail::set_night_times,
-     .editor = Editor::kTimes},
+     .editor = Editor::kTimes,
+     .label_of = &detail::night_times_label},
+    {.id = "night-idle",
+     .group = Group::kDisplay,
+     .label = "Night covers idle screen",
+     .note = "Also go dark between songs, not only while a song with no lyrics plays.",
+     .kind = Kind::kToggle,
+     .apply = Apply::kLive,
+     .route = "/night-idle",
+     .default_word = "off",
+     .choices = detail::kOnOffChoices,
+     .availability = &detail::needs_screen_with_touch_and_clock,
+     .inert = &detail::night_idle_inert,
+     .get = &detail::get_night_idle,
+     .set = &detail::set_night_idle},
     {.id = "time-zone",
      .group = Group::kTime,
      .label = "Time zone",

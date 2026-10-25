@@ -602,6 +602,16 @@ const PREFERENCES = [
         choices: [],
     },
     {
+        id: 'night-idle',
+        group: 'Display',
+        label: 'Night covers idle screen',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/night-idle',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
         id: 'time-zone',
         group: 'Time',
         label: 'Time zone',
@@ -647,6 +657,8 @@ function preferenceValue(p, device) {
             return screen ? (screen.night.enabled ? 'on' : 'off') : '';
         case 'night-times':
             return screen ? `${screen.night.from}-${screen.night.to}` : '';
+        case 'night-idle':
+            return screen ? (screen.night.idle ? 'on' : 'off') : '';
         case 'time-zone':
             return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
         default:
@@ -677,7 +689,7 @@ function preferencesJson(device) {
             available: reason === '',
             reason,
         };
-        const note = p.id.startsWith('night-') && !reason ? nightNote(device) : '';
+        const note = p.id === 'night-idle' ? (!reason && !device.screen.night.enabled ? 'Used while the night schedule is on.' : '') : p.id.startsWith('night-') && !reason ? nightNote(device) : '';
         if (note) {
             entry.note = note;
         }

@@ -138,6 +138,7 @@ TEST_CASE("the defaults are the Kconfig defaults the settings start from", "[pre
     REQUIRE(std::string(prefs::find("night-schedule")->default_word) == nv::on_off_text(night.enabled));
     REQUIRE(std::string(prefs::find("night-times")->default_word) ==
             nv::time_of_day_text(night.from_min) + "-" + nv::time_of_day_text(night.to_min));
+    REQUIRE(std::string(prefs::find("night-idle")->default_word) == nv::on_off_text(night.idle));
     REQUIRE(std::string(prefs::find("time-zone")->default_word) == "none");
 }
 
@@ -503,6 +504,7 @@ TEST_CASE("the night schedule is a toggle and a pair of times, and setting one k
     REQUIRE(times.editor == prefs::Editor::kTimes);
     REQUIRE(prefs::resolve(toggle, backend, backend.caps()).value == "off");
     REQUIRE(prefs::resolve(times, backend, backend.caps()).value == "22:00-07:00");
+    REQUIRE(prefs::resolve(times, backend, backend.caps()).value_label == "22:00 to 07:00");
     // The times are set while the schedule is off, and it stays off.
     REQUIRE(prefs::set_value(backend, times, "23:30-06:15").ok);
     REQUIRE(backend.night_.from_min == 23 * 60 + 30);
@@ -527,7 +529,7 @@ TEST_CASE("the night schedule is a toggle and a pair of times, and setting one k
 }
 
 TEST_CASE("the night schedule needs a screen, a touch to light it and a clock to tell the time by", "[preferences]") {
-    for (const char* id : {"night-schedule", "night-times"}) {
+    for (const char* id : {"night-schedule", "night-times", "night-idle"}) {
         INFO(id);
         FakeBackend no_screen(iclforge::variants::c6_16mb());
         REQUIRE(contains(prefs::resolve(*prefs::find(id), no_screen, no_screen.caps()).availability.reason, "no screen"));
@@ -542,6 +544,29 @@ TEST_CASE("the night schedule needs a screen, a touch to light it and a clock to
         REQUIRE_FALSE(prefs::set_value(no_time, *prefs::find(id), "on").ok);
         REQUIRE(no_time.sets == 0);
     }
+}
+
+TEST_CASE("the idle screen's night setting is its own, and is moot while the schedule is off", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& idle = *prefs::find("night-idle");
+    REQUIRE(idle.kind == prefs::Kind::kToggle);
+    REQUIRE(std::string(idle.route) == "/night-idle");
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).value == "off");
+    REQUIRE(contains(prefs::resolve(idle, backend, backend.caps()).inert, "night schedule is on"));
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-times"), "23:00-06:00").ok);
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-schedule"), "on").ok);
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).inert.empty());
+    // Turning it on changes nothing else of the schedule, and turning the schedule off keeps it.
+    REQUIRE(prefs::set_value(backend, idle, "on").ok);
+    REQUIRE(backend.night_.idle);
+    REQUIRE(backend.night_.enabled);
+    REQUIRE(backend.night_.from_min == 23 * 60);
+    REQUIRE(backend.night_.to_min == 6 * 60);
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-schedule"), "off").ok);
+    REQUIRE(backend.night_.idle);
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).value == "on");
+    REQUIRE_FALSE(prefs::set_value(backend, idle, "maybe").ok);
+    REQUIRE(backend.night_.idle);
 }
 
 TEST_CASE("the night schedule is moot where the screen is dark already or says nothing, and says why", "[preferences]") {

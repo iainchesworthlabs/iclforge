@@ -128,7 +128,7 @@ Settings image_defaults() {
                                 .value_or(iclforge::wallclock::ClockFormat{});
     defaults.night = iclforge::nowview::parse_night_schedule(CONFIG_ICLFORGE_EXAMPLE_NIGHT_SCHEDULE, {})
                          .value_or(iclforge::nowview::NightSchedule{});
-    defaults.night.idle = CONFIG_ICLFORGE_EXAMPLE_NIGHT_IDLE;
+    defaults.night.idle = CONFIG_ICLFORGE_EXAMPLE_NIGHT_IDLE != 0;
     defaults.time_zone = {};
     defaults.time_zone_name = {};
     defaults.ntp_server = {};
