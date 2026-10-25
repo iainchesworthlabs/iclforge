@@ -93,7 +93,7 @@ it, and the other stacks this page spells are held to it too. The list, generate
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
 | `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
-| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
 | `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
 
 <!-- sink-profiles:end -->
@@ -628,7 +628,7 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 ```
 
 `sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,

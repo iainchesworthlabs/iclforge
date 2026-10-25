@@ -10,15 +10,10 @@
 # heap were free when the player started, and 31 ms later the next 6,144 bytes
 # the decoder asked for failed with 7,656 left. So the larger allocations go to
 # PSRAM: plain malloc, and with it every `new` the decoder makes, may use it
-# (SPIRAM_USE_MALLOC), and anything of 4 KB or more tries it first
+# (SPIRAM_USE_MALLOC), and anything of 16 KB or more tries it first
 # (SPIRAM_MALLOC_ALWAYSINTERNAL), which keeps the small, hot allocations in
 # internal SRAM. The WiFi and lwIP stacks try PSRAM first too, and the player
 # puts its ring there.
-#
-# The limit was 16 KB, and an E-AC-3 stream then took about 65 KB of internal heap in blocks
-# under it and left the board 247 to 543 bytes free at its tightest, with a largest block of
-# 1,536 (S3b, 2026-10-25, finding 27): a failed allocation aborts and reboots the board in the
-# stream. At 4 KB the blocks from 4 KB up try PSRAM first.
 #
 # A decoder with part of its state in PSRAM is slower in bursts, which the
 # default 21 ms DMA queue does not ride out: 484 of 12,000 blocks arrived to an
@@ -45,7 +40,7 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 # Not in the memory test at boot: it takes a second on 8 MB and says nothing
 # a player needs to know.
