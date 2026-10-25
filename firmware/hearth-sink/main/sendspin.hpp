@@ -9,7 +9,7 @@
 
 #include "panel/lyrics_reader.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/base/dynamic_range.hpp"
+#include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/now_view.hpp"
 
@@ -62,10 +62,10 @@ void sendspin_set_external(bool external);
 // set before the player has started, or while it starts, is kept for it.
 [[nodiscard]] bool sendspin_set_layout(const iclforge::render::OutputLayout& layout);
 
-// The listener's choice of dynamic range (iclforge/base/dynamic_range.hpp), from the next stream's
+// The listener's choice of dynamic range (iclforge/ac3/decoder/dynamic_range.hpp), from the next stream's
 // start. The player reads the stored one (settings().dynamic_range) as it starts, so this is for a
 // change made while it runs; the route stores the setting first.
-void sendspin_set_dynamic_range(iclforge::base::DynamicRange range);
+void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange range);
 
 // The board's name, slot width or wiring changed: what it tells servers in
 // its hello follows, and a server that was told otherwise connects again. A

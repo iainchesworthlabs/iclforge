@@ -967,7 +967,7 @@ bool sendspin_set_layout(const iclforge::render::OutputLayout& layout) {
     return true;
 }
 
-void sendspin_set_dynamic_range(iclforge::base::DynamicRange range) {
+void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange range) {
     if (const Running* const r = running()) {
         r->player->set_dynamic_range(range);
     }

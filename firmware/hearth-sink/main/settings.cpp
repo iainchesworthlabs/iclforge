@@ -147,8 +147,8 @@ void settings_load() {
     g_settings.time_sync = true;
     g_settings.layout = {};
     g_settings.dynamic_range =
-        iclforge::base::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
-            .value_or(iclforge::base::kDefaultDynamicRange);
+        iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
+            .value_or(iclforge::ac3::kDefaultDynamicRange);
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -226,12 +226,12 @@ void settings_load() {
     }
     read_string(handle, kKeyLayout, g_settings.layout);
     if (nvs_get_i32(handle, kKeyDynamicRange, &stored) == ESP_OK) {
-        if (const auto range = iclforge::base::dynamic_range_from_stored(stored)) {
+        if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
             g_settings.dynamic_range = *range;
         } else {
             std::printf("settings: stored dynamic range %ld is not one this build knows; keeping %s\n",
                         static_cast<long>(stored),
-                        iclforge::base::dynamic_range_name(g_settings.dynamic_range).data());
+                        iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
         }
     }
     nvs_close(handle);
@@ -249,7 +249,7 @@ void settings_load() {
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
                 iclforge::wallclock::time_sync_text(g_settings.time_sync),
-                iclforge::base::dynamic_range_name(g_settings.dynamic_range).data());
+                iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());
 }
 
 const Settings& settings() { return g_settings; }
@@ -366,7 +366,7 @@ bool settings_set_time_sync(bool on) {
     return true;
 }
 
-bool settings_set_dynamic_range(iclforge::base::DynamicRange range) {
+bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range) {
     if (!write_int(kKeyDynamicRange, static_cast<std::int32_t>(range))) {
         return false;
     }

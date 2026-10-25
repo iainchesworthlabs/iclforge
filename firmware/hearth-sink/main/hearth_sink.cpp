@@ -764,10 +764,10 @@ iclforge::ControlHandlers control_handlers() {
     // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
     if (player::sendspin_built()) {
         h.dynamic_range = []() {
-            return std::string(iclforge::base::dynamic_range_name(player::settings().dynamic_range));
+            return std::string(iclforge::ac3::dynamic_range_name(player::settings().dynamic_range));
         };
         h.set_dynamic_range = [](std::string_view word) {
-            const auto range = iclforge::base::parse_dynamic_range(word);
+            const auto range = iclforge::ac3::parse_dynamic_range(word);
             if (!range || !player::settings_set_dynamic_range(*range)) {
                 return false;
             }

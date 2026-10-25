@@ -112,7 +112,9 @@ iclforge::ac4::PresentationMetadata metadata_with(std::initializer_list<int> mod
     metadata.loudness.dialnorm_dbfs = dialnorm;
     iclforge::ac4::DrcInfo drc;
     for (const int id : mode_ids) {
-        drc.modes.push_back(iclforge::ac4::DrcModeInfo{.id = id});
+        iclforge::ac4::DrcModeInfo mode;
+        mode.id = id;
+        drc.modes.push_back(mode);
     }
     metadata.drc = drc;
     return metadata;

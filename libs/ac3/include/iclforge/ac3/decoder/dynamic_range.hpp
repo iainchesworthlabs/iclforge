@@ -33,7 +33,14 @@
 
 namespace iclforge::ac3 {
 
+// The choice itself is codec-neutral and lives in iclforge/base/dynamic_range.hpp; the names are
+// re-exported here, as iclforge/base/karaoke.hpp's are, so that the board's settings and routes (a
+// project the layering table lets use iclforge::ac3 and not iclforge::base) name the same type.
 using base::DynamicRange;
+using base::dynamic_range_from_stored;
+using base::dynamic_range_name;
+using base::kDefaultDynamicRange;
+using base::parse_dynamic_range;
 
 inline void apply_dynamic_range(DynamicRange range, DecoderConfig& config) {
     if (range != DynamicRange::kLateNight) {
