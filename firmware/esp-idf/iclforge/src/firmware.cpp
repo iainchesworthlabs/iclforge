@@ -1368,6 +1368,23 @@ bool Firmware::flash_mode() const {
     return impl_->flash_mode;
 }
 
+Firmware::Activity Firmware::activity() const {
+    Activity out;
+    if (impl_ == nullptr) {
+        return out;
+    }
+    const std::lock_guard lock(impl_->mutex);
+    out.on_trial = impl_->trial.has_value();
+    out.busy = impl_->busy;
+    out.flash_mode = impl_->flash_mode;
+    return out;
+}
+
+bool Firmware::host_allowed(httpd_req* req) const {
+    // A board that takes no updates has no names to check against; its other routes have no Host check.
+    return impl_ == nullptr || impl_->host_allowed(req);
+}
+
 void Firmware::restart(const char* why) {
     if (impl_ == nullptr) {
         std::printf("firmware: restarting %s\n", why);

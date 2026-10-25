@@ -19,6 +19,7 @@
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "discovery.hpp"
@@ -540,6 +541,28 @@ void station_adopt_built_in() {
     if (settings_set_network(CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID, CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD)) {
         std::printf("settings: stored the network this image was built with, so an image without one "
                     "still joins it\n");
+    }
+}
+
+void station_forget_driver_state() {
+    // ESP-IDF's driver keeps the station's SSID and passphrase in NVS itself, under its own namespace,
+    // each time it is given a network (WIFI_STORAGE_FLASH, the default): a copy beside the one in
+    // settings.hpp that a settings erase would leave. esp_wifi_restore() is the driver's own erase, and
+    // needs the driver to be up; the namespace is erased directly as well, for a board whose station
+    // never came up this run. On a chip whose radio is a companion's (the ESP32-P4) that namespace is the
+    // companion's and out of reach: only esp_wifi_restore() across the link can clear it.
+    if (g_driver) {
+        const esp_err_t restored = esp_wifi_restore();
+        if (restored != ESP_OK) {
+            std::printf("settings: the wifi driver would not restore its defaults (%s)\n", esp_err_to_name(restored));
+        }
+    }
+    nvs_handle_t handle = 0;
+    if (nvs_open("nvs.net80211", NVS_READWRITE, &handle) == ESP_OK) {
+        if (nvs_erase_all(handle) == ESP_OK) {
+            (void)nvs_commit(handle);
+        }
+        nvs_close(handle);
     }
 }
 

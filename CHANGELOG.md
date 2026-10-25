@@ -29,6 +29,12 @@ This release adds:
   clock) what it can do, so a choice the board cannot make is greyed with the reason and never hidden, and
   `GET /preferences` lists the same on every board; Adjust keeps only the lyric delay and the text size; both sheets
   take their sizes from the display and are checked at four screen sizes;
+- Hearth's network sinks say which speaker layouts a board can take and why not for the others: `GET /layout-options`
+  lists thirteen layouts, each supported, taken with a limit, or unavailable with the reason and the setting that
+  would help; `PUT /layout`, the Preferences list (Speaker layout, with a question before a change that breaks the
+  music that plays) and the device page all ask the same verdict over the board's capabilities, so a layout offered
+  is one the board takes. An ESP32-P4 below revision v3.0 now reports the two slots its chip can open, and refuses a
+  wider layout with that reason, where it used to accept one it could not play;
 - new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
   `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
   self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`
@@ -137,6 +143,30 @@ The sections below contain the complete change list and fixes.
   changes to ...") and changes it with the call `PUT /network-preference` makes, with no restart.
   `GET :8081/panel` says whether the view is open (`dev_view`).
   ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-developer-view), planning/karaoke-p4x-panel.md, D10.)
+
+**A Hearth board: a rename without a restart, and reset routes**
+
+- **`PUT /name` takes effect at once.** The mDNS host name, the instance name and the `_sendspin._tcp`
+  record change with no restart, and a Sendspin server hears the new name in the player's hello: at
+  once on an idle board, and when the stream has ended on one that is playing, so that a rename never
+  cuts the music. The pairings are untouched (a pairing is the server's key and the board's key, not
+  its name). A name is now 1 to 32 bytes of well-formed UTF-8 with no control character in it and no
+  space at either end (`409` otherwise, as for one that was too long), and the host name spells a
+  Latin letter with an accent as the letter ("Café" is `cafe.local`).
+  ([Name, restart and reset](docs/hearth/sink-esp32-s3.md#name-restart-and-reset).)
+- **`POST /reset-preferences`** puts the choices a person made once back to the image's defaults, at
+  once: what the screen shows without lyrics, when it dims, the time zone. It keeps the name, the Wi-Fi
+  network, the cable-or-Wi-Fi choice, the wiring, the layout, the time server and the pairings.
+  **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
+  name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
+  restarts the board as a new one. Both are listed in `GET /api`.
+- **Fixed with them:** `settings_forget()` kept the Wi-Fi network and the cable-or-Wi-Fi choice in
+  memory until the next restart, so a board that had just been told to forget them still used them.
+- In `libs/device`, and tested on the host: the rule for a name and the host name it answers to, with
+  the on-screen keyboard's keys (`device_name.hpp`); the NVS keys of the board's settings and which of
+  them a reset keeps (`settings_keys.hpp`); the words of the restart, the resets and the forgetting of
+  a paired server, with the button that is held for three seconds (`system_actions.hpp`); and the rows
+  of About (`about_view.hpp`).
 
 **The Forge GUI, Hearth and Crucible open where they were left**
 

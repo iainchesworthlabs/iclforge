@@ -676,6 +676,9 @@ void on_target(lv_event_t* event) {
         case Op::kRun:
             word = "run";
             break;
+        case Op::kConfirm:
+        case Op::kCancel:
+            return;  // answered above
     }
     apply_value(row, word);
 }
