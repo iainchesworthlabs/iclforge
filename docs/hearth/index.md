@@ -582,6 +582,8 @@ the build, the pairing, the screens and what has been run.
   and the lyric screen for a board with a panel.
 - [Sink firmware](sink-firmware.md) — install a published image, update over the network, and go
   back; or [install from the browser](sink-installer.md).
+- [Choosing the speaker layout of a sink](sink-layouts.md) — which layouts a board can take, and why
+  it cannot take the others.
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md) — decoder timing and memory measurements.
 - [AC-4](../concepts/ac4.md) and [AC-4 decoding and encoding](../library/ac4.md) — the format and
   the library's decoder.

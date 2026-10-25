@@ -286,6 +286,16 @@ and this sink has 2.` - and with the firmware's reply otherwise; an accepted one
 layout 5.1 from the next play.` The page still sends every layout and lets `OutputLayout::parse`
 decide ([decision 16](#decisions)); it counts slots only to explain an answer.
 
+### Which layouts the board can take
+
+Since 2026-10-25 the page does not count slots itself for the presets: `GET /layout-options` says,
+for each, whether the board supports it, takes it with a limit, or cannot take it, with the reason
+([decision 30](#decisions); [`p4x-layout-options.md`](p4x-layout-options.md) has the rules, the
+evidence and what a layout change does to a playing stream). A preset the board cannot take is
+greyed with the reason as its tooltip, and a closed **Why some layouts are unavailable or limited**
+under the field lists every reason. A firmware without the route leaves the presets to the page's
+own count, as before.
+
 ### What `/status` adds
 
 Five fields. All are additive: no existing field changes its name, type or meaning, and none
@@ -620,7 +630,7 @@ twice after a lost reply would restart. The design is for one or two viewers at 
 
 `max_uri_handlers` is the size of Control's route table, 9 when the page was built and 27 now
 (`std::size(routes)` in `control.cpp`), so a route added without a slot cannot go missing, and a
-registration that fails says so on the console. Since then `/hardware`, `/slot-width`, `/name`,
+registration that fails says so on the console. Since then `/hardware`, `/layout-options`, `/slot-width`, `/name`,
 `/wiring`, `/network`, `/pairing`, `/firmware`, `/firmware/mode`, `/firmware/rollback`,
 `/firmware/coredump`, `/restart` and `/log` have joined the table, and `curl http://<board>/api`
 lists them all. The page and its script
@@ -1214,3 +1224,20 @@ run as root, so Playwright can install Chromium's system libraries).
     Cost: two ways out of the page rather than one; nothing checks the upload against what
     left the browser; and three of the board's checks are made twice, first in the page and
     then on the board. **Taken, (a).**
+
+30. **Which layouts the board can take** ([Which layouts the board can take](#which-layouts-the-board-can-take)).
+    (a) **a route of its own, `GET /layout-options`, built from the same facts `/status` and
+    `/hardware` read, and the page greying what it says is unavailable**; (b) the same fields in
+    `GET /layout`; (c) the page keeping its own count of slots. **Recommend (a).**
+    - **Not in `GET /layout`.** That route answers a bare name that `tools/hearth` and the board
+      suite read; JSON there breaks them.
+    - **Not the page's count.** A slot count cannot say that a chip below v3.0 opens no TDM, that a
+      build decodes two channels, or that nobody has measured a play this wide; those are the
+      board's to state, and a second client (the screen's Preferences) needs the same answer.
+    - **The listing is never looser than `PUT /layout`**, which stays as it was: it takes a layout
+      with no more slots than the sink has now. The listing is stricter for a chip that cannot open
+      TDM, where the route cannot know.
+    - **Sent in chunks**: the list is some 3 KB and the server task has 6 KB of stack.
+
+    Cost: one more request when the sink's slots, slot width or wiring change, and 1.7 KB of the
+    page's budget (63,843 of 65,536 bytes).
