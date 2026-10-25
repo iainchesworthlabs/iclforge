@@ -299,7 +299,8 @@ std::string_view app_field(const char (&field)[N]) {
     return {field, static_cast<std::size_t>(std::find(field, field + N, '\0') - field)};
 }
 
-std::string build_hardware_json(const ControlHandlers& handlers, const HardwareFacts& facts) {
+std::string build_hardware_json(const ControlHandlers& handlers) {
+    const HardwareFacts facts = gather_hardware_facts(handlers);
     const HardwareReport report = describe_hardware(facts);
     // The firmware on the board, from the description the build stamps into
     // the image: the project's name, its version (PROJECT_VER, or `git
@@ -1254,9 +1255,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
     }
     impl_ = new Impl{};
     impl_->handlers = handlers;
-    const HardwareFacts hardware = gather_hardware_facts(handlers);
-    impl_->hardware_json = build_hardware_json(handlers, hardware);
-    impl_->tdm_blocked = tdm_blocked_clause(hardware);
+    impl_->hardware_json = build_hardware_json(handlers);
+    impl_->tdm_blocked = tdm_blocked_clause(gather_hardware_facts(handlers));
 
     // Copied into value-initialised httpd_uri_t below: the SDK's struct has
     // WebSocket members when a project turns WebSocket support on, as the
