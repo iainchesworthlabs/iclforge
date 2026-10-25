@@ -147,4 +147,10 @@ struct NetworkLink {
 // network built in.
 void network_adopt_built_in();
 
+// For the factory reset (settings_forget()): erases what the WiFi driver keeps of its own about the
+// network the board was given - ESP-IDF stores the SSID and passphrase in NVS each time it is handed
+// them - so that a board handed on does not carry the passphrase in a namespace nothing of ours clears.
+// Best effort, and a no-op on a build with no station. Does not drop the connection the board is on.
+void network_forget_driver_state();
+
 }  // namespace player
