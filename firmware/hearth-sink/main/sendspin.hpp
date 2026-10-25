@@ -66,6 +66,12 @@ void sendspin_set_external(bool external);
 // player that is starting takes the change up before it has started.
 void sendspin_board_changed();
 
+// The board was renamed. The hello a server was given says the old name, and giving it the new one
+// means telling its connection to go (client/goodbye restart) and be dialled again, which stops what it
+// is playing. So an idle board does that at once, as sendspin_board_changed() does, and one that is
+// playing a stream waits until the stream has ended, so that a rename never cuts the music.
+void sendspin_name_changed();
+
 // The board is going away, into flash mode or through a restart
 // (planning/esp32-ota.md): every server is told the board is restarting,
 // the player stops writing to the sink, and the server stops listening. The

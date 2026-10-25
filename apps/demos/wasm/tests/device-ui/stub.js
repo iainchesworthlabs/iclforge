@@ -63,6 +63,8 @@ const REPLIES = {
         "GET  /firmware/coredump  the last crash's core dump, as it lies in flash",
         'DELETE /firmware/coredump  erase it',
         'POST /restart       restart into the image that runs now',
+        "POST /reset-preferences  the screen's choices back to the defaults; the name, network, wiring and pairings stay",
+        'POST /factory-reset body: erase everything; erases the name, network, pairings and every setting, then restarts',
         'GET  /log           recent console output; ?from=N for what came after byte N',
         '',
     ].join('\n'),
@@ -80,7 +82,8 @@ const REPLIES = {
         'not a layout this player can play: check the name or the list, and that it has no more slots than the sink\n',
     layoutOk: 'ok; takes effect at the next play\n',
     nameEmpty: 'PUT /name wants a name\n',
-    nameRefused: 'not a name this player can hold: it is too long, or it could not be stored\n',
+    nameRefused:
+        'not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored\n',
     slotWidthBad: 'PUT /slot-width wants a number of bits\n',
     slotWidthRefused:
         "not a slot width this player's sink has: 16 or 32 on an I2S bus, and a sink with no hardware behind it keeps the one it was built for\n",
@@ -121,6 +124,13 @@ const REPLIES = {
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
     pairingUnknown: 'this board has no pairing with that server\n',
     pairingRefused: 'this board is not a Sendspin player\n',
+    resetPreferencesNone: 'this board keeps no preferences to reset\n',
+    resetPreferencesOk:
+        'ok; the preferences are back to the defaults, and the name, the network, the wiring and the pairings are kept\n',
+    factoryResetHost: "a factory reset is taken only on the board's own address or name\n",
+    factoryResetBad: 'POST /factory-reset wants the body: erase everything\n',
+    factoryResetFixed: 'this board cannot be reset to its factory state\n',
+    factoryResetOk: 'erased; the board restarts with no name, network or pairings of its own\n',
     noFirmware: 'this board takes no firmware updates\n',
     noLog: 'this board keeps no log\n',
 };
@@ -198,6 +208,8 @@ const ROUTES = [
     'GET /firmware/coredump',
     'DELETE /firmware/coredump',
     'POST /restart',
+    'POST /reset-preferences',
+    'POST /factory-reset',
     'GET /log',
 ];
 
@@ -724,6 +736,26 @@ function statusJson(d) {
     return '{' + fields.map(([k, v]) => JSON.stringify(k) + ':' + v).join(',') + '}\n';
 }
 
+// Whether a string is a name the firmware takes: libs/device's device_name.hpp check_name, rule for rule. 1 to 32
+// bytes of well-formed text (the stand-in sees U+FFFD where the bytes were not), with no control character, line
+// separator, bidirectional control, zero-width mark or byte order mark in it, and no space at either end.
+function validName(text) {
+    if (text.length === 0 || Buffer.byteLength(text, 'utf8') > 32) {
+        return false;
+    }
+    if (text.startsWith(' ') || text.endsWith(' ')) {
+        return false;
+    }
+    return !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\ufffd]/.test(text);
+}
+
+// What the board answers to by name: its mDNS host name (devname::mdns_label, for the ASCII the stand-in's names
+// have), and the two loopback names the stand-in itself is reached at.
+function hostNames(name) {
+    const label = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'hearth';
+    return ['127.0.0.1', 'localhost', label + '.local'];
+}
+
 async function startStub() {
     const device = {
         state: 'stopped',
@@ -1021,8 +1053,11 @@ async function startStub() {
             case 'GET /name':
                 return send(res, 200, device.name + '\n');
             case 'PUT /name': {
-                if (!body || body.length > 32) {
-                    return send(res, body ? 409 : 400, body ? REPLIES.nameRefused : REPLIES.nameEmpty);
+                if (!body) {
+                    return send(res, 400, REPLIES.nameEmpty);
+                }
+                if (!validName(body)) {
+                    return send(res, 409, REPLIES.nameRefused);
                 }
                 device.name = body;
                 return send(res, 200, REPLIES.ok);
@@ -1294,6 +1329,43 @@ async function startStub() {
                 }
                 send(res, 200, FIRMWARE.restarting);
                 return restart(() => (fw.mode = 'normal'));
+            // Reset preferences: the screen's choices and the time zone go back to the image's; the name, the
+            // network, the wiring and the pairings stay (libs/device's settings_keys.hpp). At once.
+            case 'POST /reset-preferences':
+                if (device.screen) {
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5' });
+                }
+                if (device.time) {
+                    device.time.zone = 'none';
+                }
+                return send(res, 200, REPLIES.resetPreferencesOk);
+            // The factory reset: only by the board's own address or name, and only for the words; then
+            // everything is erased and the board restarts, with a new identity and no network of its own.
+            case 'POST /factory-reset': {
+                const host = (headers.host || '').split(':')[0];
+                if (!hostNames(device.name).includes(host)) {
+                    return send(res, 403, REPLIES.factoryResetHost);
+                }
+                if (body !== 'erase everything') {
+                    return send(res, 400, REPLIES.factoryResetBad);
+                }
+                send(res, 200, REPLIES.factoryResetOk);
+                return restart(() => {
+                    Object.assign(device, { name: 'hearth-a1b2c3', ssid: '', password: '', layout: '2.0', pairings: [] });
+                    if (device.sendspin) {
+                        device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
+                    }
+                    if (device.screen) {
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5' });
+                    }
+                    if (device.time) {
+                        Object.assign(device.time, { zone: 'none', server: 'none', sync: 'on' });
+                    }
+                    if (fw) {
+                        fw.mode = 'normal';
+                    }
+                });
+            }
             // The last crash's core dump (O4): the bytes are the model's
             // `coredumpBytes`, and GET /firmware's `coredump` says there is one.
             case 'GET /firmware/coredump':
@@ -1425,6 +1497,8 @@ module.exports = {
     cableNetwork,
     screenBoard,
     timeBoard,
+    validName,
+    hostNames,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,
