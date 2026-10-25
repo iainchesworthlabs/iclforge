@@ -25,6 +25,7 @@ const {
     cableNetwork,
     screenBoard,
     timeBoard,
+    PREFERENCES,
     validTimeZone,
 } = require('./stub');
 
@@ -566,6 +567,61 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
         expect(reply.status).toBe(200);
         expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('30\n');
+    } finally {
+        await stub.close();
+    }
+});
+
+// The preferences registry (libs/device/include/iclforge/preferences.hpp), which GET /preferences lists.
+const PREFERENCES_HPP = fs.readFileSync(path.join(LIBS_DEVICE, 'preferences.hpp'), 'utf8');
+
+test("the stand-in lists preferences with the registry's words", () => {
+    const groups = {
+        Display: 'kDisplay',
+        Sound: 'kSound',
+        Network: 'kNetwork',
+        Time: 'kTime',
+        Updates: 'kUpdates',
+        System: 'kSystem',
+    };
+    for (const p of PREFERENCES) {
+        const start = PREFERENCES_HPP.indexOf(`{.id = "${p.id}",`);
+        expect(start, `${p.id} is not a preference in preferences.hpp`).toBeGreaterThan(0);
+        const entry = PREFERENCES_HPP.slice(start, PREFERENCES_HPP.indexOf('.set = ', start));
+        expect(entry).toContain(`.group = Group::${groups[p.group]}`);
+        expect(entry).toContain(`.label = "${p.label}"`);
+        expect(entry).toContain(`.kind = Kind::k${p.kind[0].toUpperCase()}${p.kind.slice(1)}`);
+        expect(entry).toContain(`.route = "${p.route}"`);
+        for (const [id, label] of p.choices) {
+            expect(PREFERENCES_HPP, `${p.id}'s choice ${id}`).toContain(`{.id = "${id}", .label = "${label}"`);
+        }
+    }
+    expect(PREFERENCES_HPP).toContain('This board has no screen.');
+});
+
+test('the stand-in lists the preferences, greyed with the reason where the board has no screen', async () => {
+    const stub = await startStub();
+    try {
+        let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.display).toBe('none');
+        expect(listing.preferences.map((p) => p.id)).toEqual(['now-view', 'dim-after']);
+        for (const p of listing.preferences) {
+            expect(p.available).toBe(false);
+            expect(p.reason).toBe('This board has no screen.');
+            for (const choice of p.choices) {
+                expect(choice.available).toBe(false);
+                expect(choice.reason).toBe('This board has no screen.');
+            }
+        }
+        // One with a screen has them on, with their values; a change made through the entry's own route shows.
+        stub.device.screen = screenBoard();
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.display).toBe('dsi');
+        expect(listing.preferences[0]).toMatchObject({ id: 'now-view', value: 'speakers', available: true, reason: '' });
+        expect(listing.preferences[1]).toMatchObject({ id: 'dim-after', value: '5', available: true, reason: '' });
+        await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        expect(listing.preferences[1].value).toBe('30');
     } finally {
         await stub.close();
     }

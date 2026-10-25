@@ -22,6 +22,12 @@ struct ScreenStats {
     std::uint32_t rebuild_us_max = 0;
     // The developer view (dev_screen.hpp) is open over the screen, and what its refreshes have cost.
     bool dev_view = false;
+    // The Preferences sheet (prefs_screen.hpp) is open over the screen, how many times it was built, and the
+    // longest a build and a refresh took, microseconds.
+    bool prefs_view = false;
+    std::uint32_t prefs_builds = 0;
+    std::uint32_t prefs_build_us_max = 0;
+    std::uint32_t prefs_refresh_us_max = 0;
     std::uint32_t dev_refreshes = 0;
     std::uint32_t dev_refresh_us_last = 0;
     std::uint32_t dev_refresh_us_max = 0;
@@ -39,5 +45,10 @@ bool screen_init(lv_display_t* disp, int width, int height);
 bool screen_update();
 
 [[nodiscard]] ScreenStats screen_stats();
+
+// For the preview tool (preview/), which checks that nothing on a sheet is clipped or too small to touch: the Adjust
+// sheet while it is shown, and the footer; null when there is none.
+[[nodiscard]] lv_obj_t* screen_sheet_object();
+[[nodiscard]] lv_obj_t* screen_footer_object();
 
 }  // namespace player::panel

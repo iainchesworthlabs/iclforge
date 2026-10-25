@@ -21,6 +21,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_pcm_unpack.cpp
     test_playout.cpp
     test_preferences.cpp
+    test_screen_metrics.cpp
     test_sink_plan.cpp
     test_tcp_arrivals.cpp
     test_title_card.cpp
