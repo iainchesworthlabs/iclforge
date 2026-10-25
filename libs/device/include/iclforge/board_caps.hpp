@@ -68,8 +68,14 @@ struct DisplayCaps {
     bool touch = false;
     // The backlight can be set to a level. Without it a dimmed screen is a black cover over a lit panel.
     bool backlight = false;
+    // Side buttons a person can press to drive the screen without touching it (a JetKVM Mini has one or two). No screen
+    // code reads this yet: there is no button-navigation model, and a board whose screen has no touch and no keys has
+    // no way to change a preference from the glass at all, which is what its greyed rows say.
+    int keys = 0;
 
     [[nodiscard]] constexpr bool present() const { return kind != DisplayKind::kNone && width > 0 && height > 0; }
+    // Something to touch or press: a screen a person can drive.
+    [[nodiscard]] constexpr bool operable() const { return present() && (touch || keys > 0); }
 };
 
 // --- the sink ---------------------------------------------------------------------------------------

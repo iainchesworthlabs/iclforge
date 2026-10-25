@@ -147,7 +147,7 @@ layout text changes.
 
 ![The speakers in a 5.1 room](../docs/hearth/screenshots/p4-panel-speakers-5-1.png)
 ![The speakers in a 7.1.4 room](../docs/hearth/screenshots/p4-panel-speakers-7-1-4.png)
-![The Adjust sheet with its third row](../docs/hearth/screenshots/p4-panel-controls.png)
+![Preferences, where the view and the dim time are now (they were Adjust's third row)](../docs/hearth/screenshots/p4-panel-prefs.png)
 ![The dark screen](../docs/hearth/screenshots/p4-panel-dimmed.png)
 
 ## The dark view
@@ -185,7 +185,7 @@ rule checked against `dimmed()` on every input it takes); the real screen code i
 which fails its run if the screen is not dark at the start, is not lit by a touch, is not lit at 28 s,
 is not dark at 32 s, or a second touch does not move it on (all pass); and a picture of the sheet:
 
-![The Adjust sheet with Dark chosen](../docs/hearth/screenshots/p4-panel-controls-dark.png)
+![Preferences with Dark chosen: the dim row says it is not used](../docs/hearth/screenshots/p4-panel-prefs-dark.png)
 
 **On the kit (2026-10-21, over the cable, the bench lock held).** The image of this change (`p4-rev3`,
 profile hash `ff9b27a6c4fd`, 2,562,880 bytes) was sent with `ota.py push` and accepted on its 30 s
