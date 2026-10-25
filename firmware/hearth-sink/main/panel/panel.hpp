@@ -86,6 +86,9 @@ void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
 // backlight cannot be dimmed (panel_display_caps().backlight), the brightness does nothing.
 void panel_set_brightness(int percent);
 void panel_set_clock_format(iclforge::wallclock::ClockFormat format);
+// The night schedule: go dark between two times by the board's own time, as the dark view does. Stored by the caller;
+// the screen follows at once. Without a panel it does nothing.
+void panel_set_night(const iclforge::nowview::NightSchedule& night);
 
 // The display the panel opened, as the board's capability description has it (iclforge/board_caps.hpp): its kind,
 // size, whether a touch controller is reading and whether the backlight can be set. Fixed once the panel is up,

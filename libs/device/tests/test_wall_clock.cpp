@@ -562,3 +562,15 @@ TEST_CASE("wall_clock: the time as GET /status writes it is to the second, with 
     CHECK(wc::local_text(wc::LocalTime{2027, 12, 31, 23, 59, 59, 5}) == "2027-12-31 23:59:59");
     CHECK(wc::local_text(wc::local_from_unix(wc::kProbeJanuary, 11 * 3600)) == "2026-01-15 23:00:00");
 }
+
+TEST_CASE("wall_clock: the minute of the day is nothing until the time is known", "[wall_clock]") {
+    wc::Reading reading;
+    CHECK_FALSE(wc::minute_of_day(reading).has_value());
+    reading.known = true;
+    reading.local = wc::LocalTime{2026, 10, 25, 0, 0, 0, 0};
+    CHECK(wc::minute_of_day(reading) == 0);
+    reading.local = wc::LocalTime{2026, 10, 25, 7, 5, 59, 0};
+    CHECK(wc::minute_of_day(reading) == 7 * 60 + 5);
+    reading.local = wc::LocalTime{2026, 10, 25, 23, 59, 59, 0};
+    CHECK(wc::minute_of_day(reading) == 23 * 60 + 59);
+}

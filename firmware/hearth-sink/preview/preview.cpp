@@ -32,6 +32,7 @@
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
 #include "panel/lvgl/now_screen.hpp"
+#include "panel/lvgl/prefs_editors.hpp"
 #include "panel/lvgl/prefs_screen.hpp"
 #include "panel/lyrics_reader.hpp"
 
@@ -76,6 +77,9 @@ std::uint16_t g_buffer_a[kMaxWidth * kBufferRows];
 std::uint16_t g_buffer_b[kMaxWidth * kBufferRows];
 // The board the preferences are drawn for (iclforge/board_variants.hpp): the kit, until a scenario says another.
 iclforge::BoardCaps g_caps = iclforge::variants::p4_rev3_kit();
+// What the preferences hold that the panel does not read back: the backlight's lit level, and the zone chosen.
+int g_brightness = 80;
+iclforge::wallclock::ZoneChoice g_zone;
 // The speaker layout the board holds (the preference of that name), as the text PUT /layout takes.
 std::string g_layout = "2.0";
 
@@ -271,11 +275,9 @@ bool shows_text(lv_obj_t* object, const std::string& text, bool contains = false
     return false;
 }
 
-// A tap on the middle of the button that says `text`, scrolled into view first if it is on a list.
-bool tap_button(const std::string& text) {
-    lv_obj_t* const button = find_button(text);
+// A tap on the middle of a button, scrolled into view first if it is on a list.
+bool tap_object(lv_obj_t* button) {
     if (button == nullptr) {
-        std::printf("  no button \"%s\" is shown\n", text.c_str());
         return false;
     }
     lv_obj_scroll_to_view_recursive(button, LV_ANIM_OFF);
@@ -284,6 +286,83 @@ bool tap_button(const std::string& text) {
     lv_obj_get_coords(button, &area);
     tap((area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2);
     return true;
+}
+
+// A tap on the middle of the button that says `text`, scrolled into view first if it is on a list.
+bool tap_button(const std::string& text) {
+    lv_obj_t* const button = find_button(text);
+    if (button == nullptr) {
+        std::printf("  no button \"%s\" is shown\n", text.c_str());
+        return false;
+    }
+    return tap_object(button);
+}
+
+// The label under `root` that is shown and says exactly `text`.
+lv_obj_t* find_label(lv_obj_t* root, const std::string& text) {
+    if (root == nullptr || lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) {
+        return nullptr;
+    }
+    if (lv_obj_check_type(root, &lv_label_class) && label_text(root) == text) {
+        return root;
+    }
+    const std::uint32_t count = lv_obj_get_child_count(root);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        if (lv_obj_t* const found = find_label(lv_obj_get_child(root, static_cast<std::int32_t>(i)), text)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+// The touch targets under `root` that say `text`, in the order they were made.
+std::vector<lv_obj_t*> find_buttons_in(lv_obj_t* root, const std::string& text) {
+    std::vector<lv_obj_t*> targets;
+    std::vector<lv_obj_t*> found;
+    if (root != nullptr) {
+        collect_touch_targets(root, targets);
+    }
+    for (lv_obj_t* const target : targets) {
+        if (button_text(target) == text) {
+            found.push_back(target);
+        }
+    }
+    return found;
+}
+
+// The way back up from a region's places: "Regions", or a chevron on a narrow bar.
+std::vector<lv_obj_t*> back_buttons(lv_obj_t* editor) {
+    std::vector<lv_obj_t*> found = find_buttons_in(editor, "Regions");
+    const std::vector<lv_obj_t*> chevron = find_buttons_in(editor, "<");
+    found.insert(found.end(), chevron.begin(), chevron.end());
+    return found;
+}
+
+// Scrolls the list that holds `label` until the label is at its top.
+void scroll_label_to_top(lv_obj_t* label) {
+    lv_obj_t* list = lv_obj_get_parent(label);
+    while (list != nullptr && !lv_obj_has_flag(list, LV_OBJ_FLAG_SCROLLABLE)) {
+        list = lv_obj_get_parent(list);
+    }
+    if (list == nullptr) {
+        return;
+    }
+    lv_obj_update_layout(list);
+    lv_area_t at;
+    lv_area_t in;
+    lv_obj_get_coords(label, &at);
+    lv_obj_get_coords(list, &in);
+    lv_obj_scroll_by(list, 0, -(at.y1 - in.y1 - 4), LV_ANIM_OFF);
+}
+
+// The button that says `text` in the row of the Preferences list that is labelled `row`.
+lv_obj_t* find_row_button(lv_obj_t* sheet, const std::string& row, const std::string& text) {
+    lv_obj_t* const label = find_label(sheet, row);
+    if (label == nullptr) {
+        return nullptr;
+    }
+    const std::vector<lv_obj_t*> found = find_buttons_in(lv_obj_get_parent(label), text);
+    return found.empty() ? nullptr : found.front();
 }
 
 // --- holding a sheet to what it promises ---------------------------------------------------------------------------
@@ -538,6 +617,187 @@ const char* const kHealthyLog =
     "I (31470) net: ethernet: link up, 100 Mb/s full duplex\n"
     "I (41480) panel: lyrics, 2290 refreshes, render 6100 us mean 21000 max, rebuild 3100 us max, 0 late\n";
 
+// The display and time preferences at one size (planning/p4x-preferences.md), driven by taps the way a person does:
+// the brightness steps, the clock's hours and seconds are chosen, the night schedule is a switch and a pair of times in
+// an editor of its own, and the time zone a region and then a city. Each editor is held to what the sheet is held to
+// (audit()). The sheet is open, for the kit. Returns the number of failures, having said each.
+int check_display_and_time(lv_obj_t* prefs, int width, int height, const fs::path& out, const std::string& size) {
+    namespace nv = iclforge::nowview;
+    int failures = 0;
+    const auto expect = [&](bool ok, const std::string& what) {
+        if (!ok) {
+            std::printf("  FAIL %s: %s\n", size.c_str(), what.c_str());
+            ++failures;
+        }
+    };
+    g_brightness = 80;
+    g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+    g_settings.night = {};
+    g_zone = {};
+    pump(4);
+    for (const char* shown : {"Brightness", "Clock hours", "Clock seconds", "Night schedule", "Night from and to",
+                              "Night covers idle screen", "Time zone", "TIME"}) {
+        expect(shows_text(prefs, shown), std::string("Preferences shows ") + shown);
+    }
+    expect(shows_text(prefs, "80%"), "the brightness starts at 80%");
+    expect(shows_text(prefs, "22:00 to 07:00"), "the night's times read as a pair");
+    expect(shows_text(prefs, "UTC"), "a board with no zone reads UTC");
+    if (lv_obj_t* const label = find_label(prefs, "Brightness")) {
+        scroll_label_to_top(label);
+        pump(2);
+        write_bmp(out / ("prefs-display-" + size + ".bmp"));
+    }
+
+    // The brightness: a stepper of ten stops.
+    expect(tap_object(find_row_button(prefs, "Brightness", "+")), "the brightness row has a + button");
+    expect(g_brightness == 90, "+ steps the brightness to 90%");
+    expect(tap_object(find_row_button(prefs, "Brightness", "-")), "the brightness row has a - button");
+    expect(tap_object(find_row_button(prefs, "Brightness", "-")), "and again");
+    expect(g_brightness == 70, "- steps it down to 70%");
+    pump(4);
+    expect(shows_text(prefs, "70%"), "and the row says so");
+    for (int i = 0; i < 8; ++i) {
+        (void)tap_object(find_row_button(prefs, "Brightness", "-"));
+    }
+    expect(g_brightness == 10, "it stops at 10%, where - has nowhere to go");
+    g_brightness = 80;
+
+    // The clock: 24 or 12 hours, and the seconds.
+    expect(tap_object(find_row_button(prefs, "Clock hours", "12 hour")), "the clock row has a 12 hour button");
+    expect(g_wall.format.twelve_hour && !g_wall.format.seconds, "a tap on 12 hour chooses the 12-hour clock");
+    expect(tap_object(find_row_button(prefs, "Clock seconds", "On")), "the seconds row has an On button");
+    expect(g_wall.format.twelve_hour && g_wall.format.seconds, "a tap on On adds the seconds and keeps the hours");
+    expect(tap_object(find_row_button(prefs, "Clock hours", "24 hour")), "the clock row has a 24 hour button");
+    expect(!g_wall.format.twelve_hour && g_wall.format.seconds, "a tap on 24 hour keeps the seconds");
+    expect(tap_object(find_row_button(prefs, "Clock seconds", "Off")), "the seconds row has an Off button");
+    expect(!g_wall.format.seconds, "a tap on Off takes the seconds away");
+
+    // The night schedule: a switch, and a pair of times in an editor.
+    expect(tap_object(find_row_button(prefs, "Night schedule", "On")), "the night schedule row has an On button");
+    expect(g_settings.night.enabled, "a tap on On switches the schedule on");
+    lv_obj_t* const times_button = find_row_button(prefs, "Night from and to", "22:00 to 07:00");
+    expect(tap_object(times_button), "the night times are a button that opens their editor");
+    pump(4);
+    lv_obj_t* const times = player::panel::editor_root();
+    expect(times != nullptr, "a tap on the times opens the editor");
+    if (times != nullptr) {
+        write_bmp(out / ("prefs-night-times-" + size + ".bmp"));
+        failures += audit(times, "night times editor " + size);
+        for (const char* shown : {"From", "To", "22:00", "07:00", "Done"}) {
+            expect(shows_text(times, shown), std::string("the times editor shows ") + shown);
+        }
+        // A bar this narrow keeps what it can of its title.
+        expect(width < 300 || shows_text(times, "Night times"), "and its title");
+        expect(shows_text(times, "Dark from 22:00 until 07:00, through midnight", true), "and says what it means");
+        const std::vector<lv_obj_t*> plus = find_buttons_in(times, "+");
+        const std::vector<lv_obj_t*> minus = find_buttons_in(times, "-");
+        expect(plus.size() == 2 && minus.size() == 2, "each time has a - and a +");
+        if (plus.size() == 2 && minus.size() == 2) {
+            (void)tap_object(plus[0]);
+            expect(shows_text(times, "22:15"), "+ on the first time steps a quarter of an hour");
+            expect(g_settings.night.from_min == 22 * 60, "and nothing is written until the steps stop");
+            g_now_us += 700'000;
+            pump(3);
+            expect(g_settings.night.from_min == 22 * 60 + 15, "a moment after the last step it is written");
+            expect(g_settings.night.enabled, "and the schedule stays on");
+            (void)tap_object(minus[1]);
+            g_now_us += 700'000;
+            pump(3);
+            expect(g_settings.night.to_min == 6 * 60 + 45, "- on the second time steps it back a quarter of an hour");
+            // A held button keeps stepping, and goes faster.
+            lv_area_t area;
+            lv_obj_get_coords(plus[1], &area);
+            g_pointer = {(area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2, true};
+            pump(45);
+            g_pointer.down = false;
+            pump(4);
+            g_now_us += 700'000;
+            pump(3);
+            const int held = g_settings.night.to_min;
+            std::printf("  held for 1.5 s, the end time went from 06:45 to %s\n", nv::time_of_day_text(held).c_str());
+            expect(held != 6 * 60 + 45 + 15, "a held button steps more than once");
+            expect(shows_text(times, nv::time_of_day_text(held)), "and the editor shows what was written");
+            // Equal times are said to mean no night at all.
+            g_settings.night.from_min = 6 * 60;
+            g_settings.night.to_min = 6 * 60;
+            g_now_us += 2'000'000;
+            pump(4);
+            expect(shows_text(times, "never dark", true), "the same time twice says the screen is never dark");
+            g_settings.night.from_min = 22 * 60;
+            g_settings.night.to_min = 7 * 60;
+            g_now_us += 2'000'000;
+            pump(4);
+        }
+        expect(tap_button("Done"), "the editor has a Done button");
+        pump(4);
+        expect(player::panel::editor_root() == nullptr, "Done puts the editor away");
+        expect(shows_text(prefs, "22:00 to 07:00"), "and the row says the times");
+    }
+    g_settings.night = {};
+
+    // The time zone: the regions, then the places in one, opening where the zone already is.
+    lv_obj_t* const zone_button = find_row_button(prefs, "Time zone", "UTC");
+    if (lv_obj_t* const label = find_label(prefs, "Time zone")) {
+        lv_obj_scroll_to_view_recursive(label, LV_ANIM_OFF);
+        pump(2);
+        write_bmp(out / ("prefs-time-" + size + ".bmp"));
+    }
+    expect(tap_object(zone_button), "the time zone is a button that opens its editor");
+    pump(4);
+    lv_obj_t* zone = player::panel::editor_root();
+    expect(zone != nullptr, "a tap on the zone opens the editor");
+    if (zone != nullptr) {
+        write_bmp(out / ("prefs-zone-regions-" + size + ".bmp"));
+        failures += audit(zone, "time zone regions " + size);
+        for (const char* shown : {"No zone (UTC)", "Australia", "America", "Europe", "Done", "Now: UTC"}) {
+            expect(shows_text(zone, shown), std::string("the regions list shows ") + shown);
+        }
+        expect(width < 300 || shows_text(zone, "Time zone"), "and its title");
+        expect(back_buttons(zone).empty(), "and has no way back up from the top");
+        expect(tap_object(find_buttons_in(zone, "Australia").empty() ? nullptr : find_buttons_in(zone, "Australia").front()),
+               "Australia is a region to open");
+        pump(4);
+        expect(shows_text(zone, "Melbourne"), "the places of Australia include Melbourne");
+        write_bmp(out / ("prefs-zone-cities-" + size + ".bmp"));
+        failures += audit(zone, "time zone places " + size);
+        expect(!back_buttons(zone).empty(), "and there is a way back to the regions");
+        const std::vector<lv_obj_t*> melbourne = find_buttons_in(zone, "Melbourne");
+        expect(!melbourne.empty() && tap_object(melbourne.front()), "Melbourne is a place to choose");
+        expect(g_zone.name == "Australia/Melbourne", "a tap on Melbourne chooses Australia/Melbourne");
+        expect(g_zone.posix == "AEST-10AEDT,M10.1.0,M4.1.0/3", "with the rule that name stands for");
+        pump(4);
+        expect(shows_text(zone, "Now: Melbourne (Australia)"), "and the editor says where the board is now");
+        const std::vector<lv_obj_t*> regions = back_buttons(zone);
+        expect(!regions.empty() && tap_object(regions.front()), "the way back goes up to the regions");
+        pump(4);
+        expect(shows_text(zone, "No zone (UTC)"), "to the list of regions");
+        // The longest list: the places of America, a screen of them at a time.
+        const std::vector<lv_obj_t*> america = find_buttons_in(zone, "America");
+        expect(!america.empty() && tap_object(america.front()), "America is a region to open");
+        pump(4);
+        failures += audit(zone, "time zone places, America " + size);
+        expect(shows_text(zone, "New York"), "and has New York");
+        expect(tap_button("Done"), "the zone editor has a Done button");
+        pump(4);
+        expect(player::panel::editor_root() == nullptr, "Done puts it away");
+        expect(shows_text(prefs, "Melbourne (Australia)"), "and the row says where the board is");
+        // Opened again it is where the zone is: the places in its region, and the board's own city among them.
+        expect(tap_object(find_row_button(prefs, "Time zone", "Melbourne (Australia)")), "the zone row opens it again");
+        pump(4);
+        zone = player::panel::editor_root();
+        expect(zone != nullptr && (width < 300 || shows_text(zone, "Australia")) && shows_text(zone, "Sydney"),
+               "at the places of the region the zone is in");
+        write_bmp(out / ("prefs-zone-reopened-" + size + ".bmp"));
+        expect(tap_button("Done"), "and has its Done");
+        pump(4);
+        // None again: No zone.
+        g_zone = {};
+    }
+    (void)width;
+    (void)height;
+    return failures;
+}
+
 // The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
 // board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
 // taps the way a person does. Returns the number of failures, having said each.
@@ -673,6 +933,9 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(g_settings.dim_after_minutes == 15, "and + steps back up");
         tap_button("-");
         pump(4);
+        failures += check_display_and_time(prefs, width, height, out, size);
+        lv_obj_scroll_to(scroller_of(prefs), 0, 0, LV_ANIM_OFF);
+        pump(4);
         // A list that is longer than the glass scrolls under a finger, and a control scrolled to is still a control.
         lv_obj_t* const list = scroller_of(prefs);
         expect(list != nullptr, "Preferences has a list that scrolls");
@@ -730,6 +993,57 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         tap(width / 2, height / 3);
         pump(6);
         g_now_playing = false;
+        g_settings = {nv::View::kSpeakers, 5};
+        hold(lrc, 5'750);
+        pump(6);
+    }
+
+    // The night schedule (planning/p4x-preferences.md): by the board's own time, the no-lyrics view goes dark as the dark
+    // view does, a touch lights it for 30 seconds, and a board that does not know the time is never dark by accident.
+    {
+        g_caps = iclforge::variants::p4_rev3_kit();
+        g_caps.display.width = width;
+        g_caps.display.height = height;
+        g_settings = {nv::View::kSpeakers, nv::kDimNever};
+        g_settings.night = {.enabled = true, .from_min = 22 * 60, .to_min = 7 * 60, .idle = false};
+        g_settings.minute_of_day = 12 * 60;
+        g_now_us += 40'000'000;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "at noon the night schedule leaves the speakers lit");
+        g_settings.minute_of_day = 23 * 60;
+        pump(6);
+        expect(player::panel::screen_stats().dimmed, "at 23:00 the speakers go dark");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "a touch lights them");
+        g_now_us += 20'000'000;
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "for 30 seconds");
+        g_now_us += 15'000'000;
+        pump(6);
+        expect(player::panel::screen_stats().dimmed, "and then they go dark again");
+        g_settings.minute_of_day = 7 * 60;
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "at 07:00 the night is over");
+        g_settings.minute_of_day = std::nullopt;
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "a board that does not know the time is lit");
+        // The idle screen, between songs: covered only when the schedule is told to cover it.
+        g_now_playing = false;
+        g_board.stream = "idle";
+        g_held = false;
+        g_settings.minute_of_day = 23 * 60;
+        g_now_us += 40'000'000;
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "the idle screen is lit at night by default");
+        g_settings.night.idle = true;
+        pump(6);
+        expect(player::panel::screen_stats().dimmed, "and dark when the night is told to cover it");
+        g_settings.minute_of_day = 12 * 60;
+        pump(6);
+        expect(!player::panel::screen_stats().dimmed, "but not by day");
+        g_board.stream = "bursts";
         g_settings = {nv::View::kSpeakers, 5};
         hold(lrc, 5'750);
         pump(6);
@@ -939,6 +1253,29 @@ class PreviewBackend final : public iclforge::prefs::Backend {
     [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return g_settings.speakers_style; }
     [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
         g_settings.speakers_style = style;
+        return true;
+    }
+    [[nodiscard]] int brightness() const override { return g_brightness; }
+    [[nodiscard]] bool set_brightness(int percent) override {
+        if (!g_caps.display.backlight) {
+            return false;
+        }
+        g_brightness = percent;
+        return true;
+    }
+    [[nodiscard]] iclforge::wallclock::ClockFormat clock_format() const override { return g_wall.format; }
+    [[nodiscard]] bool set_clock_format(iclforge::wallclock::ClockFormat format) override {
+        g_wall.format = format;
+        return true;
+    }
+    [[nodiscard]] iclforge::nowview::NightSchedule night() const override { return g_settings.night; }
+    [[nodiscard]] bool set_night(const iclforge::nowview::NightSchedule& night) override {
+        g_settings.night = night;
+        return true;
+    }
+    [[nodiscard]] iclforge::wallclock::ZoneChoice time_zone() const override { return g_zone; }
+    [[nodiscard]] bool set_time_zone(const iclforge::wallclock::ZoneChoice& zone) override {
+        g_zone = zone;
         return true;
     }
     [[nodiscard]] std::string layout() const override { return g_layout; }

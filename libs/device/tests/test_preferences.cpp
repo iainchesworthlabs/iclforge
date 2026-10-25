@@ -14,6 +14,7 @@
 
 namespace prefs = iclforge::prefs;
 namespace nv = iclforge::nowview;
+namespace wc = iclforge::wallclock;
 using iclforge::BoardCaps;
 using prefs::testing::FakeBackend;
 
@@ -130,6 +131,15 @@ TEST_CASE("the groups have their words, in order", "[preferences]") {
 TEST_CASE("the defaults are the Kconfig defaults the settings start from", "[preferences]") {
     REQUIRE(std::string(prefs::find("now-view")->default_word) == nv::view_name(nv::kDefaultView));
     REQUIRE(std::string(prefs::find("dim-after")->default_word) == nv::dim_after_text(nv::kDefaultDimMinutes));
+    REQUIRE(std::string(prefs::find("brightness")->default_word) == std::to_string(nv::kDefaultBrightness));
+    REQUIRE(std::string(prefs::find("clock-hours")->default_word) == "24");
+    REQUIRE(std::string(prefs::find("clock-seconds")->default_word) == "off");
+    const nv::NightSchedule night;
+    REQUIRE(std::string(prefs::find("night-schedule")->default_word) == nv::on_off_text(night.enabled));
+    REQUIRE(std::string(prefs::find("night-times")->default_word) ==
+            nv::time_of_day_text(night.from_min) + "-" + nv::time_of_day_text(night.to_min));
+    REQUIRE(std::string(prefs::find("night-idle")->default_word) == nv::on_off_text(night.idle));
+    REQUIRE(std::string(prefs::find("time-zone")->default_word) == "none");
     REQUIRE(std::string(prefs::find("speakers-style")->default_word) == nv::speakers_style_name(nv::kDefaultSpeakersStyle));
 }
 
@@ -206,11 +216,14 @@ TEST_CASE("each entry against each known board: a reason wherever it is greyed, 
                 any_choice_available |= choice.availability.available;
             }
             if (entry.availability.available) {
-                // Something to choose, and the board's starting point is one the board can make.
-                REQUIRE(any_choice_available);
-                const prefs::ChoiceState* const start = choice_of(entry, pref.default_word);
-                REQUIRE(start != nullptr);
-                REQUIRE(start->availability.available);
+                // Something to choose, and the board's starting point is one the board can make; a text has no
+                // choices (its editor or its route sets it).
+                if (!pref.choices.empty()) {
+                    REQUIRE(any_choice_available);
+                    const prefs::ChoiceState* const start = choice_of(entry, pref.default_word);
+                    REQUIRE(start != nullptr);
+                    REQUIRE(start->availability.available);
+                }
                 // The fake starts at the defaults, so the value read is the default.
                 REQUIRE(entry.value == pref.default_word);
                 REQUIRE_FALSE(entry.value_label.empty());
@@ -436,4 +449,263 @@ TEST_CASE("the listing escapes what it quotes", "[preferences]") {
     out.clear();
     prefs::detail::json_text(out, std::string("x\x01y"));
     REQUIRE(out == "\"x y\"");
+}
+
+TEST_CASE("brightness is a stepper of ten stops that steps and refuses what is not a brightness", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& brightness = *prefs::find("brightness");
+    REQUIRE(brightness.kind == prefs::Kind::kStepper);
+    REQUIRE(brightness.choices.size() == 10);
+    const auto entry = [&] { return prefs::resolve(brightness, backend, backend.caps()); };
+    REQUIRE(entry().value == "80");
+    REQUIRE(entry().value_label == "80%");
+    REQUIRE(*prefs::step_target(entry(), +1) == "90");
+    REQUIRE(*prefs::step_target(entry(), -1) == "70");
+    backend.brightness_ = 100;
+    REQUIRE_FALSE(prefs::step_target(entry(), +1).has_value());
+    backend.brightness_ = 10;
+    REQUIRE_FALSE(prefs::step_target(entry(), -1).has_value());
+    // A number a route stored between the stops is read as it is and stepped to the next stop either way.
+    backend.brightness_ = 55;
+    REQUIRE(entry().value_label == "55 %");
+    REQUIRE(*prefs::step_target(entry(), +1) == "60");
+    REQUIRE(*prefs::step_target(entry(), -1) == "50");
+    // The stops are exactly the ones the stepper in now_view.hpp walks.
+    for (int percent = nv::kBrightnessMin; percent < nv::kBrightnessMax; percent += nv::kBrightnessStep) {
+        backend.brightness_ = percent;
+        REQUIRE(*prefs::step_target(entry(), +1) == std::to_string(nv::brightness_stepped(percent, +1)));
+    }
+    REQUIRE(prefs::set_value(backend, brightness, "40").ok);
+    REQUIRE(backend.brightness_ == 40);
+    // Any whole number in range is taken, and one that is not a brightness is refused before it is stored.
+    REQUIRE(prefs::set_value(backend, brightness, "55").ok);
+    REQUIRE(backend.brightness_ == 55);
+    REQUIRE_FALSE(prefs::set_value(backend, brightness, "5").ok);
+    REQUIRE_FALSE(prefs::set_value(backend, brightness, "101").ok);
+    REQUIRE_FALSE(prefs::set_value(backend, brightness, "bright").ok);
+    REQUIRE(backend.brightness_ == 55);
+}
+
+TEST_CASE("brightness is greyed where the backlight is not the board's to set, with the reason", "[preferences]") {
+    for (const char* name : {"p4-rev3-frame-buffer", "c3-spi-320x240-no-touch", "c6-16mb"}) {
+        for (const auto& variant : iclforge::known_variants()) {
+            if (std::string(variant.name) != name) {
+                continue;
+            }
+            INFO(name);
+            FakeBackend backend(variant.caps);
+            const prefs::Entry entry = prefs::resolve(*prefs::find("brightness"), backend, backend.caps());
+            REQUIRE_FALSE(entry.availability.available);
+            REQUIRE((contains(entry.availability.reason, "backlight") || contains(entry.availability.reason, "no screen")));
+            const prefs::SetResult result = prefs::set_value(backend, *prefs::find("brightness"), "50");
+            REQUIRE_FALSE(result.ok);
+            REQUIRE(backend.sets == 0);
+        }
+    }
+}
+
+TEST_CASE("the clock's hours and seconds are two entries of one route and keep each other", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& hours = *prefs::find("clock-hours");
+    const prefs::Pref& seconds = *prefs::find("clock-seconds");
+    REQUIRE(std::string(hours.route) == std::string(seconds.route));
+    REQUIRE(prefs::set_value(backend, hours, "12").ok);
+    REQUIRE(backend.clock_.twelve_hour);
+    REQUIRE_FALSE(backend.clock_.seconds);
+    REQUIRE(prefs::set_value(backend, seconds, "on").ok);
+    REQUIRE(backend.clock_.twelve_hour);
+    REQUIRE(backend.clock_.seconds);
+    REQUIRE(prefs::set_value(backend, hours, "24").ok);
+    REQUIRE_FALSE(backend.clock_.twelve_hour);
+    REQUIRE(backend.clock_.seconds);
+    REQUIRE(prefs::resolve(hours, backend, backend.caps()).value == "24");
+    REQUIRE(prefs::resolve(seconds, backend, backend.caps()).value == "on");
+    REQUIRE_FALSE(prefs::set_value(backend, hours, "13").ok);
+    REQUIRE_FALSE(prefs::set_value(backend, seconds, "yes").ok);
+    // The route's own words say the same thing the two entries do.
+    REQUIRE(wc::clock_format_text(backend.clock_) == "24 seconds");
+}
+
+TEST_CASE("the clock's format is greyed on a board that keeps no time, and on one with no screen", "[preferences]") {
+    BoardCaps caps = iclforge::variants::p4_rev3_kit();
+    caps.wall_clock = false;
+    FakeBackend no_time(caps);
+    for (const char* id : {"clock-hours", "clock-seconds"}) {
+        const prefs::Entry entry = prefs::resolve(*prefs::find(id), no_time, caps);
+        INFO(id);
+        REQUIRE_FALSE(entry.availability.available);
+        REQUIRE(contains(entry.availability.reason, "keeps no time"));
+    }
+    FakeBackend no_screen(iclforge::variants::c6_16mb());
+    REQUIRE(contains(prefs::resolve(*prefs::find("clock-hours"), no_screen, no_screen.caps()).availability.reason, "no screen"));
+}
+
+TEST_CASE("the night schedule is a toggle and a pair of times, and setting one keeps the other", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& toggle = *prefs::find("night-schedule");
+    const prefs::Pref& times = *prefs::find("night-times");
+    REQUIRE(toggle.kind == prefs::Kind::kToggle);
+    REQUIRE(times.kind == prefs::Kind::kText);
+    REQUIRE(times.editor == prefs::Editor::kTimes);
+    REQUIRE(prefs::resolve(toggle, backend, backend.caps()).value == "off");
+    REQUIRE(prefs::resolve(times, backend, backend.caps()).value == "22:00-07:00");
+    REQUIRE(prefs::resolve(times, backend, backend.caps()).value_label == "22:00 to 07:00");
+    // The times are set while the schedule is off, and it stays off.
+    REQUIRE(prefs::set_value(backend, times, "23:30-06:15").ok);
+    REQUIRE(backend.night_.from_min == 23 * 60 + 30);
+    REQUIRE(backend.night_.to_min == 6 * 60 + 15);
+    REQUIRE_FALSE(backend.night_.enabled);
+    REQUIRE(prefs::set_value(backend, toggle, "on").ok);
+    REQUIRE(backend.night_.enabled);
+    REQUIRE(backend.night_.from_min == 23 * 60 + 30);
+    // ... and set again while it is on, it stays on.
+    REQUIRE(prefs::set_value(backend, times, "21:00-05:00").ok);
+    REQUIRE(backend.night_.enabled);
+    REQUIRE(prefs::resolve(times, backend, backend.caps()).value == "21:00-05:00");
+    // What is not two times of a day is refused, and nothing changes. The idle screen's setting is not here.
+    const nv::NightSchedule before = backend.night_;
+    for (const char* bad : {"25:00-07:00", "22:00", "22:00-07:00 off", "later", ""}) {
+        INFO(bad);
+        REQUIRE_FALSE(prefs::set_value(backend, times, bad).ok);
+    }
+    REQUIRE(backend.night_ == before);
+    REQUIRE_FALSE(prefs::set_value(backend, toggle, "maybe").ok);
+    REQUIRE_FALSE(backend.night_.idle);
+}
+
+TEST_CASE("the night schedule needs a screen, a touch to light it and a clock to tell the time by", "[preferences]") {
+    for (const char* id : {"night-schedule", "night-times", "night-idle"}) {
+        INFO(id);
+        FakeBackend no_screen(iclforge::variants::c6_16mb());
+        REQUIRE(contains(prefs::resolve(*prefs::find(id), no_screen, no_screen.caps()).availability.reason, "no screen"));
+
+        FakeBackend no_touch(iclforge::variants::c3_spi_320x240_no_touch());
+        REQUIRE(contains(prefs::resolve(*prefs::find(id), no_touch, no_touch.caps()).availability.reason, "no touch"));
+
+        BoardCaps caps = iclforge::variants::p4_rev3_kit();
+        caps.wall_clock = false;
+        FakeBackend no_time(caps);
+        REQUIRE(contains(prefs::resolve(*prefs::find(id), no_time, caps).availability.reason, "keeps no time"));
+        REQUIRE_FALSE(prefs::set_value(no_time, *prefs::find(id), "on").ok);
+        REQUIRE(no_time.sets == 0);
+    }
+}
+
+TEST_CASE("the idle screen's night setting is its own, and is moot while the schedule is off", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& idle = *prefs::find("night-idle");
+    REQUIRE(idle.kind == prefs::Kind::kToggle);
+    REQUIRE(std::string(idle.route) == "/night-idle");
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).value == "off");
+    REQUIRE(contains(prefs::resolve(idle, backend, backend.caps()).inert, "night schedule is on"));
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-times"), "23:00-06:00").ok);
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-schedule"), "on").ok);
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).inert.empty());
+    // Turning it on changes nothing else of the schedule, and turning the schedule off keeps it.
+    REQUIRE(prefs::set_value(backend, idle, "on").ok);
+    REQUIRE(backend.night_.idle);
+    REQUIRE(backend.night_.enabled);
+    REQUIRE(backend.night_.from_min == 23 * 60);
+    REQUIRE(backend.night_.to_min == 6 * 60);
+    REQUIRE(prefs::set_value(backend, *prefs::find("night-schedule"), "off").ok);
+    REQUIRE(backend.night_.idle);
+    REQUIRE(prefs::resolve(idle, backend, backend.caps()).value == "on");
+    REQUIRE_FALSE(prefs::set_value(backend, idle, "maybe").ok);
+    REQUIRE(backend.night_.idle);
+}
+
+TEST_CASE("the night schedule is moot where the screen is dark already or says nothing, and says why", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    for (const char* id : {"night-schedule", "night-times"}) {
+        INFO(id);
+        const prefs::Pref& pref = *prefs::find(id);
+        REQUIRE(prefs::resolve(pref, backend, backend.caps()).inert.empty());
+        backend.view_ = nv::View::kDark;
+        REQUIRE(contains(prefs::resolve(pref, backend, backend.caps()).inert, "dark already"));
+        backend.view_ = nv::View::kOff;
+        REQUIRE(contains(prefs::resolve(pref, backend, backend.caps()).inert, "Off"));
+        for (const nv::View view : {nv::View::kSpeakers, nv::View::kTitle, nv::View::kClock}) {
+            backend.view_ = view;
+            REQUIRE(prefs::resolve(pref, backend, backend.caps()).inert.empty());
+        }
+        // Moot, not impossible: still available.
+        backend.view_ = nv::View::kDark;
+        REQUIRE(prefs::resolve(pref, backend, backend.caps()).availability.available);
+        backend.view_ = nv::kDefaultView;
+    }
+}
+
+TEST_CASE("the time zone is chosen by name or by string, and read back as a person says it", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    const prefs::Pref& zone = *prefs::find("time-zone");
+    REQUIRE(zone.kind == prefs::Kind::kText);
+    REQUIRE(zone.editor == prefs::Editor::kZone);
+    REQUIRE(zone.group == prefs::Group::kTime);
+    prefs::Entry entry = prefs::resolve(zone, backend, backend.caps());
+    REQUIRE(entry.value == "none");
+    REQUIRE(entry.value_label == "UTC");
+    // By name: the string is stored with it, and the label has the region after the city.
+    REQUIRE(prefs::set_value(backend, zone, "Australia/Melbourne").ok);
+    REQUIRE(backend.zone_.name == "Australia/Melbourne");
+    REQUIRE(backend.zone_.posix == "AEST-10AEDT,M10.1.0,M4.1.0/3");
+    entry = prefs::resolve(zone, backend, backend.caps());
+    REQUIRE(entry.value == "Australia/Melbourne");
+    REQUIRE(entry.value_label == "Melbourne (Australia)");
+    // A city with a place between its region and itself says that place and not the region, and UTC is itself.
+    REQUIRE(prefs::detail::time_zone_label("America/Argentina/Buenos_Aires") == "Buenos Aires (Argentina)");
+    REQUIRE(prefs::detail::time_zone_label("UTC") == "UTC");
+    // By string: no name, and what was typed is what is shown.
+    REQUIRE(prefs::set_value(backend, zone, "JST-9").ok);
+    REQUIRE(backend.zone_.name.empty());
+    entry = prefs::resolve(zone, backend, backend.caps());
+    REQUIRE(entry.value == "JST-9");
+    REQUIRE(entry.value_label == "JST-9");
+    // None takes the zone away.
+    REQUIRE(prefs::set_value(backend, zone, "none").ok);
+    REQUIRE(backend.zone_.posix.empty());
+    REQUIRE(prefs::resolve(zone, backend, backend.caps()).value_label == "UTC");
+    // What is neither is refused, and nothing is stored.
+    const int sets = backend.sets;
+    for (const char* bad : {"Melbourne", "australia/melbourne", "AEST", ""}) {
+        INFO(bad);
+        REQUIRE_FALSE(prefs::set_value(backend, zone, bad).ok);
+    }
+    REQUIRE(backend.sets == sets);
+    // Every name in the table is a word the entry takes.
+    for (std::size_t i = 0; i < wc::time_zone_count(); ++i) {
+        REQUIRE(prefs::set_value(backend, zone, wc::time_zone_at(i).name).ok);
+        REQUIRE(prefs::resolve(zone, backend, backend.caps()).value == wc::time_zone_at(i).name);
+    }
+}
+
+TEST_CASE("the time zone is greyed on a board that keeps no time", "[preferences]") {
+    BoardCaps caps = iclforge::variants::p4_rev3_kit();
+    caps.wall_clock = false;
+    FakeBackend backend(caps);
+    const prefs::Entry entry = prefs::resolve(*prefs::find("time-zone"), backend, caps);
+    REQUIRE_FALSE(entry.availability.available);
+    REQUIRE(contains(entry.availability.reason, "keeps no time"));
+    REQUIRE_FALSE(prefs::set_value(backend, *prefs::find("time-zone"), "Australia/Melbourne").ok);
+    REQUIRE(backend.sets == 0);
+    // A board with no screen keeps its zone for its page and its status: the Time group does not need one.
+    FakeBackend no_screen(iclforge::variants::c6_16mb());
+    REQUIRE(prefs::resolve(*prefs::find("time-zone"), no_screen, no_screen.caps()).availability.available);
+}
+
+TEST_CASE("the listing carries the new entries with their routes, kinds and values", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    REQUIRE(prefs::set_value(backend, *prefs::find("time-zone"), "Australia/Melbourne").ok);
+    const std::string json = prefs::to_json(backend);
+    REQUIRE(json_is_balanced(json));
+    REQUIRE(contains(json, "\"id\":\"brightness\",\"group\":\"Display\",\"label\":\"Brightness\",\"kind\":\"stepper\""));
+    REQUIRE(contains(json, "\"route\":\"/brightness\",\"value\":\"80\",\"available\":true"));
+    REQUIRE(contains(json, "\"id\":\"clock-hours\""));
+    REQUIRE(contains(json, "\"route\":\"/clock-format\",\"value\":\"24\""));
+    REQUIRE(contains(json, "\"id\":\"night-times\",\"group\":\"Display\",\"label\":\"Night from and to\",\"kind\":\"text\""));
+    REQUIRE(contains(json, "\"value\":\"22:00-07:00\""));
+    REQUIRE(contains(json, "\"id\":\"time-zone\",\"group\":\"Time\",\"label\":\"Time zone\",\"kind\":\"text\""));
+    REQUIRE(contains(json, "\"route\":\"/timezone\",\"value\":\"Australia/Melbourne\",\"available\":true"));
+    // A text has no choices to list.
+    const std::size_t at = json.find("\"id\":\"time-zone\"");
+    REQUIRE(json.find("\"choices\"", at) == std::string::npos);
 }

@@ -61,6 +61,8 @@ std::atomic<int> g_speakers_style{static_cast<int>(iclforge::nowview::kDefaultSp
 // by the panel's: the lit level of the backlight, percent, and how the clock view writes the time (the stored
 // number of iclforge::wallclock::ClockFormat).
 std::atomic<int> g_brightness{iclforge::nowview::kDefaultBrightness};
+// The night schedule, as iclforge::nowview::night_stored writes it: one number, so the screen never reads half of it.
+std::atomic<std::int32_t> g_night{iclforge::nowview::night_stored(iclforge::nowview::NightSchedule{})};
 std::atomic<int> g_clock_format{0};
 // The level the screen last asked for, one of display.hpp's three (lit, the dim floor, off).
 std::atomic<int> g_backlight_request{panel::kBacklightNormalPercent};
@@ -269,6 +271,11 @@ NowSettings read_now_settings() {
     settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
     settings.dim_after_minutes = g_dim_after_minutes.load();
     settings.speakers_style = static_cast<iclforge::nowview::SpeakersStyle>(g_speakers_style.load());
+    settings.night = iclforge::nowview::night_from_stored(g_night.load()).value_or(iclforge::nowview::NightSchedule{});
+    // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
+    if (settings.night.enabled) {
+        settings.minute_of_day = iclforge::wallclock::minute_of_day(player::wall_clock_read());
+    }
     return settings;
 }
 
@@ -694,6 +701,10 @@ void panel_set_clock_format(iclforge::wallclock::ClockFormat format) {
     g_clock_format.store(iclforge::wallclock::clock_format_stored(format));
 }
 
+void panel_set_night(const iclforge::nowview::NightSchedule& night) {
+    g_night.store(iclforge::nowview::night_stored(night));
+}
+
 bool panel_start() {
     if (g_started.exchange(true)) {
         return g_stats.running;
@@ -707,6 +718,7 @@ bool panel_start() {
     g_speakers_style.store(static_cast<int>(settings().speakers_style));
     g_brightness.store(settings().brightness_percent);
     g_clock_format.store(iclforge::wallclock::clock_format_stored(settings().clock_format));
+    g_night.store(iclforge::nowview::night_stored(settings().night));
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {

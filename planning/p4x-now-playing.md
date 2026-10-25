@@ -15,7 +15,7 @@
     | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built; the rule tested on the host and in the preview tool, and run on the kit with a stream and injected taps; a finger and the glass not yet looked at: [The dark view](#the-dark-view) |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Built; run on the kit: see [Stage 2](#stage-2-the-title-card-as-built) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
-    | 4 | **Preferences** the owner picked on 2026-10-25: brightness, the clock's 12 or 24 hours, a night schedule, a time-zone picker | Brightness, the clock's format and the zone table are built (settings, routes, the screen, the web page); the night schedule's rule is built and host-tested, and its setting, routes and use by the screen, and the editors, follow the Preferences screen: [Stage 4](#stage-4-display-and-time-preferences) |
+    | 4 | **Preferences** the owner picked on 2026-10-25: brightness, the clock's 12 or 24 hours, a night schedule, a time-zone picker | Built: brightness, the clock's format, the zone table, and the night schedule (settings, routes, the screen's use of it, the Preferences rows and the editors for its times and for the zone), on every board that can; nothing run on a kit yet: [Stage 4](#stage-4-display-and-time-preferences) |
     | 5 | The speakers **follow every window and can pulse**: the screen reads each 100 ms level, judges it against the room's loudest, and a `speakers style` (`glow` / `pulse`) | Built and host-tested, the preview run; the kit A/B is to do: see [Stage 5](#stage-5-the-speakers-follow-the-sound) |
 
     **2026-10-25: the view and the dim time moved out of Adjust.** The owner asked for Adjust to be only
@@ -357,16 +357,25 @@ show, lit for 30 s by a touch, the cover swallowing the wake tap. The rule, and 
 | Daylight saving | kept by the wall clock. Melbourne's changeovers are tested at the real instants (2026-10-04 and 2026-04-05, and 2027 and 2028): the night the clocks go forward is eight real hours of dark and the night they go back ten, with no gap at the jump; a window that starts in the hour that does not exist begins at the jump, and one that starts in the hour lived twice is dark in both passes |
 | Night begins while a song plays | lit until nothing has touched the glass for 30 s, then dark |
 
-**What is built so far is the rule and its words**, not the setting: `parse_night_schedule` reads `22:00-07:00` (the
-times, and on), `on`, `off` (the times kept) or both (`22:00-07:00 off`) and `night_schedule_text` writes `22:00-07:00 on`,
-which are what `GET` and `PUT /night-schedule` will take and say. The setting (NVS and Kconfig), the routes and the
-screen's use of `dim_state()` go in with the Preferences screen, because the screen's drawing code (`lyric_screen.cpp`) is
-where they act. Days of the week are not in it.
+**The setting is one number.** `night` in NVS holds the two times and both switches (from in bits 0 to 10, to in
+bits 11 to 21, bit 22 on, bit 23 the idle screen: `nowview::night_stored`, host-tested for every state and for numbers no
+build wrote), so that a power cut cannot leave half a schedule; Kconfig `ICLFORGE_EXAMPLE_NIGHT_SCHEDULE`
+(`22:00-07:00 off`) and `ICLFORGE_EXAMPLE_NIGHT_IDLE` (0) are what a board has before anyone chooses. `parse_night_schedule`
+reads `22:00-07:00` (the times, and on), `on`, `off` (the times kept) or both (`22:00-07:00 off`) and `night_schedule_text`
+writes `22:00-07:00 on`: those are what `GET` and `PUT /night-schedule` say and take (a PUT with no screen is a 409, a body
+that is none of them a 400). Reset preferences returns it to the defaults; the time zone it is read in stays. The panel is
+handed the schedule and the board's local minute of the day in `NowSettings` (the minute is read only while the schedule
+is on, and is nothing until the clock has converged), and `lyric_screen.cpp` passes both to `dim_state()`: that is all
+the screen does for it, a line and a half. Days of the week are not in it.
 
 **The idle screen is a separate setting, and off.** Whether the night schedule also darkens the idle screen between
 two songs is the question [Open](#open) already asks about dimming, and the owner has not answered it. It will be
-its own setting (`night-idle`, `on` or `off`, default `off`; `NightSchedule::idle`), and `dark_state()` is the rule it would use;
-nothing is decided here.
+its own setting (`night-idle`, `on` or `off`, default `off`; `NightSchedule::idle`; `GET` and `PUT /night-idle`, and a
+switch of its own in Preferences, *Night covers idle screen*, which says *Used while the night schedule is on* while the
+schedule is off). With it on, the idle screen (nothing playing, nothing held) counts as showing while the night is in
+force, so `dark_state()` is its rule: dark from the moment the night begins, a tap lights it for 30 s
+(`night_covers_idle`, host-tested, and driven on the screen by the preview tool). Both are there to try; nothing is
+decided here.
 
 **The time-zone picker.** The board has no zone database, so a zone is still a POSIX string; what is new is a table
 of the zones people choose by region and city, each with the string its rules end in. It is generated, not written:
@@ -399,9 +408,25 @@ pieces: 8 KB is never one allocation), and `GET /status`'s `time` object has `zo
 offers the same list as a region and a city: it asks the board for the names, and no longer carries a list of 42
 zones of its own, so the page is 50 bytes smaller.
 
-**Not built, not decided.** The schedule's setting and screen (above). The idle screen under it. Days of the week. A zone
-typed on the screen (the web page and `PUT /timezone` have it). The editors, which wait for the Preferences screen.
-Nothing has been run on the kit.
+**The editors** (`panel/lvgl/prefs_editors.cpp`). A `kText` entry that wants one names it (`Pref::editor`), the sheet
+draws its value as a button, and a tap on it opens the editor over the sheet, with a *Done* of its own. **The times**: a
+row each for *From* and *To*, each a minus, the time and a plus; a tap steps a quarter of an hour round the clock
+(`night_time_stepped`, host-tested for every minute of the day), a held button steps ten times a second and after eight
+steps an hour at a time, and the pair is written half a second after the last step (a held button is one write). **The
+zone**: the regions of the table and *No zone (UTC)*, then the places in a region, opening at the region of the zone
+already chosen with that place in view; the title is the region, the way back a *Regions* button (a chevron on a bar
+narrower than 400 px), and a tap on a place chooses it. Both are drawn from the sheet's own metrics and held to its rules
+by the preview tool at 1024 by 600, 800 by 480, 480 by 320, 320 by 240 and 240 by 240 (every target 48 px or more,
+nothing cut off, the longest list, America's 144 places, scrolled); a typed zone stays the web page's and the route's.
+
+**What the night schedule and the editors cost** (images built here, each held to its profile by `sink_profile.py verify`):
+the P4X's grew 16,032 bytes (2,646,640 to 2,662,672: the editors, the six rows, the routes and the setting), the S3's 7,168
+and the C6's 7,280, which are boards with no panel and so none of the screen's code: the setting, the two routes, the
+registry's new rows and the backend. The 4 MB C6's slot (1,966,080 bytes, the same image as the 16 MB profile's) is left
+with 53,648 bytes free, where the zone table alone left 73,024.
+
+**Not built, not decided.** Days of the week. A zone typed on the screen. The idle screen under the night schedule is the
+owner's to decide. Nothing has been run on the kit.
 
 ## Stage 5: the speakers follow the sound
 
@@ -444,7 +469,7 @@ So stage 5 is that, and nothing from the seven:
   that there is a dark view: a listener who chose it may see the idle screen light up between two
   songs, if the server ends one stream before it starts the next. Whether it does has not been looked
   at on the kit. The night schedule asks the same question ([Stage 4](#stage-4-display-and-time-preferences)): it
-  will be its own setting, `night-idle`, off, until the owner says.
+  is its own setting, `night-idle`, off, until the owner says.
 - **Does a dark screen save the scan-out?** Stopping the DSI engine while the cover is up is the
   experiment; the kit's AC-4 5.1 glitches are the reason to try it.
 - **Brightness** was not a setting (plan D6) and is one now, on the Preferences screen and `PUT /brightness`

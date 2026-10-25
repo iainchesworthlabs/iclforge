@@ -90,6 +90,8 @@ struct Settings {
     // lit, percent, and how the clock view writes the time. Read by every build and acted on by the one with a panel.
     int brightness_percent = iclforge::nowview::kDefaultBrightness;
     iclforge::wallclock::ClockFormat clock_format;
+    // Go dark between two times by the board's own time (iclforge::nowview::NightSchedule).
+    iclforge::nowview::NightSchedule night;
     // The time (planning/p4x-now-playing.md, stage 3), on every board that has a network. The zone the time is
     // shown in, as a POSIX string (iclforge/wall_clock.hpp); empty when none is set, and the time is then UTC.
     // A board has no zone database, so this is the zone itself.
@@ -147,6 +149,7 @@ void settings_load();
 [[nodiscard]] bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style);
 [[nodiscard]] bool settings_set_brightness(int percent);
 [[nodiscard]] bool settings_set_clock_format(iclforge::wallclock::ClockFormat format);
+[[nodiscard]] bool settings_set_night(const iclforge::nowview::NightSchedule& night);
 // A POSIX time zone, or an empty string to take the zone away. Refused when the string is not one
 // (iclforge::wallclock::parse_time_zone); the C library's own reading of it is the caller's to check. `name` is the
 // table's name for it when the person chose it by name (iclforge::wallclock::parse_zone_choice), and is kept only

@@ -127,6 +127,9 @@ Settings image_defaults() {
     defaults.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
     defaults.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
                                 .value_or(iclforge::wallclock::ClockFormat{});
+    defaults.night = iclforge::nowview::parse_night_schedule(CONFIG_ICLFORGE_EXAMPLE_NIGHT_SCHEDULE, {})
+                         .value_or(iclforge::nowview::NightSchedule{});
+    defaults.night.idle = CONFIG_ICLFORGE_EXAMPLE_NIGHT_IDLE != 0;
     defaults.time_zone = {};
     defaults.time_zone_name = {};
     defaults.ntp_server = {};
@@ -224,6 +227,14 @@ void load_all() {
                         iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str());
         }
     }
+    if (nvs_get_i32(handle, sk::kNight, &stored) == ESP_OK) {
+        if (const auto night = iclforge::nowview::night_from_stored(stored)) {
+            g_settings.night = *night;
+        } else {
+            std::printf("settings: stored night schedule %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::night_schedule_text(g_settings.night).c_str());
+        }
+    }
     // A stored zone that is not one this build reads (a partition written by a later image) is said, and
     // the clock says UTC.
     read_string(handle, sk::kTimeZone, g_settings.time_zone);
@@ -268,7 +279,7 @@ void load_all() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, time zone %s%s%s, "
+                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
                 "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
@@ -278,6 +289,8 @@ void load_all() {
                 iclforge::nowview::speakers_style_name(g_settings.speakers_style),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
                 g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
+                iclforge::nowview::night_schedule_text(g_settings.night).c_str(),
+                g_settings.night.idle ? " (idle screen too)" : "",
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
                 g_settings.time_zone_name[0] != '\0' ? " = " : "", g_settings.time_zone_name.data(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
@@ -427,6 +440,18 @@ bool settings_set_clock_format(iclforge::wallclock::ClockFormat format) {
     return true;
 }
 
+bool settings_set_night(const iclforge::nowview::NightSchedule& night) {
+    if (!iclforge::nowview::night_from_stored(iclforge::nowview::night_stored(night))) {
+        std::printf("settings: %d and %d are not times of day\n", night.from_min, night.to_min);
+        return false;
+    }
+    if (!write_int(sk::kNight, iclforge::nowview::night_stored(night))) {
+        return false;
+    }
+    g_settings.night = night;
+    return true;
+}
+
 bool settings_set_layout(std::string_view layout) {
     return write_string(sk::kLayout, layout, g_settings.layout);
 }
@@ -525,6 +550,8 @@ void reset_in_memory(std::string_view key, const Settings& defaults) {
         g_settings.brightness_percent = defaults.brightness_percent;
     } else if (key == sk::kClockFormat) {
         g_settings.clock_format = defaults.clock_format;
+    } else if (key == sk::kNight) {
+        g_settings.night = defaults.night;
     } else if (key == sk::kDynamicRange) {
         g_settings.dynamic_range = defaults.dynamic_range;
     } else {

@@ -546,3 +546,69 @@ TEST_CASE("now_view: a PCM stream says the server decoded it", "[now_view]") {
     CHECK(pcm[1] == "PCM");
     CHECK(nv::stream_info_options({.codec = nv::Codec::kPcm}, 0, "")[0] == "PCM");
 }
+
+TEST_CASE("now_view: the night schedule's time editor steps a quarter of an hour round the clock", "[now_view]") {
+    CHECK(nv::kNightStepMinutes == 15);
+    CHECK(nv::night_time_stepped(22 * 60, +1) == 22 * 60 + 15);
+    CHECK(nv::night_time_stepped(22 * 60, -1) == 21 * 60 + 45);
+    CHECK(nv::night_time_stepped(22 * 60, +4) == 23 * 60);
+    CHECK(nv::night_time_stepped(23 * 60 + 45, +1) == 0);
+    CHECK(nv::night_time_stepped(0, -1) == 23 * 60 + 45);
+    CHECK(nv::night_time_stepped(0, 0) == 0);
+    // A time a route set between two steps lands on the next in the direction given.
+    CHECK(nv::night_time_stepped(7 * 60 + 5, +1) == 7 * 60 + 15);
+    CHECK(nv::night_time_stepped(7 * 60 + 5, -1) == 7 * 60);
+    CHECK(nv::night_time_stepped(7 * 60 + 14, -1) == 7 * 60);
+    // A whole round of the day is the day.
+    CHECK(nv::night_time_stepped(5 * 60, +96) == 5 * 60);
+    CHECK(nv::night_time_stepped(5 * 60, -96) == 5 * 60);
+    // Every minute of the day stays a minute of the day, however it is stepped.
+    for (int minute = 0; minute < nv::kMinutesPerDay; ++minute) {
+        CHECK(nv::valid_minute_of_day(nv::night_time_stepped(minute, +1)));
+        CHECK(nv::valid_minute_of_day(nv::night_time_stepped(minute, -1)));
+        CHECK(nv::night_time_stepped(minute, +1) % nv::kNightStepMinutes == 0);
+        CHECK(nv::night_time_stepped(minute, -1) % nv::kNightStepMinutes == 0);
+    }
+}
+
+TEST_CASE("now_view: the night schedule is stored as one number, and a number no build wrote is refused", "[now_view]") {
+    const nv::NightSchedule night{.enabled = true, .from_min = 22 * 60, .to_min = 7 * 60 + 15, .idle = false};
+    const std::int32_t stored = nv::night_stored(night);
+    CHECK(nv::night_from_stored(stored) == night);
+    // The layout is the one the key's comment names: from, then to, then the state, then the idle screen.
+    CHECK(stored == (22 * 60) + ((7 * 60 + 15) << 11) + (1 << 22));
+    // Every state of the two switches survives, at both ends of the day.
+    for (const bool enabled : {false, true}) {
+        for (const bool idle : {false, true}) {
+            for (const int from : {0, 1, 719, 1439}) {
+                for (const int to : {0, 1, 719, 1439}) {
+                    const nv::NightSchedule each{.enabled = enabled, .from_min = from, .to_min = to, .idle = idle};
+                    CHECK(nv::night_from_stored(nv::night_stored(each)) == each);
+                }
+            }
+        }
+    }
+    // The default a board starts with is off, from 22:00 to 07:00.
+    CHECK(nv::night_from_stored(nv::night_stored(nv::NightSchedule{})) == nv::NightSchedule{});
+    // A time of day that is not one, a bit above the idle bit, and a number below nothing.
+    CHECK_FALSE(nv::night_from_stored(1440).has_value());
+    CHECK_FALSE(nv::night_from_stored(1440 << 11).has_value());
+    CHECK_FALSE(nv::night_from_stored(std::int64_t{1} << 24).has_value());
+    CHECK_FALSE(nv::night_from_stored(-1).has_value());
+    CHECK_FALSE(nv::night_from_stored(std::int64_t{1} << 40).has_value());
+}
+
+TEST_CASE("now_view: the night schedule covers the idle screen only when it is told to, and only in force", "[now_view]") {
+    nv::NightSchedule night{.enabled = true, .from_min = 22 * 60, .to_min = 7 * 60, .idle = false};
+    // Off by default, in the window or not.
+    CHECK_FALSE(nv::night_covers_idle(night, 23 * 60));
+    night.idle = true;
+    CHECK(nv::night_covers_idle(night, 23 * 60));
+    CHECK(nv::night_covers_idle(night, 6 * 60 + 59));
+    CHECK_FALSE(nv::night_covers_idle(night, 7 * 60));
+    CHECK_FALSE(nv::night_covers_idle(night, 12 * 60));
+    // A clock that has not converged is never dark by accident; a schedule that is off covers nothing.
+    CHECK_FALSE(nv::night_covers_idle(night, std::nullopt));
+    night.enabled = false;
+    CHECK_FALSE(nv::night_covers_idle(night, 23 * 60));
+}
