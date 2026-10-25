@@ -25,6 +25,7 @@
 #include <string>
 #include <string_view>
 
+#include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/device_name.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/render/speaker_trim.hpp"
@@ -103,6 +104,12 @@ struct Settings {
     // the player applies it to every stream, after the decode and before the DAC. Read by every build, acted
     // on by the one with a Sendspin player.
     iclforge::render::speaker_trim::SpeakerTrimTable speaker_trim;
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/ac3/decoder/dynamic_range.hpp,
+    // planning/hearth-late-night.md): standard is the decode this board always made, late night is
+    // the stream's own compression on top of it. Read by every build and acted on by the one that
+    // decodes (the Sendspin player), at the start of the next stream. The image's own answer is
+    // CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE, standard unless a build says otherwise.
+    iclforge::ac3::DynamicRange dynamic_range = iclforge::ac3::kDefaultDynamicRange;
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -145,6 +152,9 @@ void settings_load();
 // The speaker trim, whole. Stored as the table's own compact form (SpeakerTrimTable::to_blob), so a role that is
 // not set costs nothing and the stored role numbers are never renumbered.
 [[nodiscard]] bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table);
+
+// Standard or late night. Refused only when NVS refuses the write.
+[[nodiscard]] bool settings_set_dynamic_range(iclforge::ac3::DynamicRange range);
 
 // The name a board has until someone names it: "hearth-" and the low three bytes of its MAC.
 [[nodiscard]] std::string settings_default_name();

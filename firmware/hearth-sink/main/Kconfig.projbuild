@@ -488,6 +488,22 @@ config ICLFORGE_EXAMPLE_DRC_MODE
         measured against; sdkconfig.ci-render uses it so the rendered levels
         can be compared with the probe's to the digit.
 
+config ICLFORGE_EXAMPLE_DYNAMIC_RANGE
+    int "Dynamic range a board starts with: standard (0) or late night (1)"
+    default 0
+    range 0 1
+    help
+        The listener's choice (PUT /dynamic-range, and a screen's Preferences
+        where the board has one), which NVS keeps; this is the value of a
+        board that has none stored. 0 leaves everything to the operating mode
+        above and to what a server sends: what a board did before the choice
+        existed. 1 is late night: line mode's level with the stream's own heavy
+        compression (compr) on top, which wins over a server's mode and
+        compression settings for as long as it is on. It changes only streams
+        whose encoder wrote the compression for it (compr words in AC-3 and
+        E-AC-3, DRC decoder modes in AC-4), and never the level dialogue is
+        heard at. planning/hearth-late-night.md has the measurements.
+
 config ICLFORGE_EXAMPLE_STEREO_FOLD
     int "Fold for a 2.0 layout: Lo/Ro (0) or Lt/Rt (1)"
     default 0
