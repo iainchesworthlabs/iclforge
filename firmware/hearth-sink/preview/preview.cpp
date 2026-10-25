@@ -1484,6 +1484,20 @@ int main(int argc, char** argv) {
          }},
         {"s16-clock-utc", [&] { g_wall = {.known = true, .local = {2026, 10, 20, 10, 47, 12, 2}, .zone_set = false}; }},
         {"s16-clock-waiting", [&] { g_wall = {}; }},
+        // The clock's format (a person's choice): 12 hours, with the AM or PM small beside the time; 24 hours with
+        // the seconds beside it; and 12 hours with both.
+        {"s16-clock-12h", [&] {
+             g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true, .format = {.twelve_hour = true}};
+         }},
+        {"s16-clock-seconds", [&] {
+             g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true, .format = {.seconds = true}};
+         }},
+        {"s16-clock-12h-seconds", [&] {
+             g_wall = {.known = true,
+                       .local = {2026, 10, 20, 9, 5, 7, 2},
+                       .zone_set = true,
+                       .format = {.twelve_hour = true, .seconds = true}};
+         }},
         {"s0-waiting", [&] {
              g_board.stream = "bursts";
              hold(auld, std::nullopt);
@@ -1643,6 +1657,44 @@ int main(int argc, char** argv) {
         g_now_us += 1'000'000;
         pump(6);
         g_settings.dim_after_minutes = 5;
+    }
+
+    // S16b: the clock's format. The seconds are small beside the time, so a second that passes redraws only
+    // them (a rectangle of about 9,600 pixels, not the digits' 300,000); and with no seconds a second redraws
+    // nothing, as before. Checked as well as drawn.
+    {
+        g_settings.view = iclforge::nowview::View::kClock;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_wall = {.known = true,
+                  .local = {2026, 10, 20, 21, 47, 12, 2},
+                  .zone_set = true,
+                  .format = {.twelve_hour = true, .seconds = true}};
+        g_now_us += 10'000'000;
+        pump(6);
+        const std::uint64_t before_second = g_flushed_pixels;
+        g_wall.local.second = 13;
+        g_now_us += 1'000'000;
+        pump(6);
+        const std::uint64_t by_a_second = g_flushed_pixels - before_second;
+        // Without the seconds, a second that passes is nothing (the format change itself is a repaint).
+        g_wall.format = {.twelve_hour = true};
+        g_now_us += 1'000'000;
+        pump(6);
+        const std::uint64_t before_quiet = g_flushed_pixels;
+        g_wall.local.second = 40;
+        g_now_us += 1'000'000;
+        pump(6);
+        const std::uint64_t by_a_quiet_second = g_flushed_pixels - before_quiet;
+        std::printf("%2d  %-26s a second with seconds shown flushed %llu px, one without %llu px\n", ++number,
+                    "s16-clock-format", static_cast<unsigned long long>(by_a_second),
+                    static_cast<unsigned long long>(by_a_quiet_second));
+        if (by_a_second == 0 || by_a_second > 40'000 || by_a_quiet_second != 0) {
+            return 3;
+        }
+        g_wall.format = {};
+        g_settings.view = iclforge::nowview::View::kSpeakers;
+        g_now_us += 1'000'000;
+        pump(6);
     }
 
     // S14b: the dark view. Dark from the moment a song with no lyrics begins, however long nothing has

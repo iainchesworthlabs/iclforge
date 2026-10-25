@@ -30,6 +30,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_sink_plan.cpp
     test_system_actions.cpp
     test_tcp_arrivals.cpp
+    test_time_zones.cpp
     test_title_card.cpp
     test_unit_hold.cpp
     test_wall_clock.cpp)

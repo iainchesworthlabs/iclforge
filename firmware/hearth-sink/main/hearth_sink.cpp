@@ -774,6 +774,24 @@ iclforge::ControlHandlers control_handlers() {
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
+        // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
+        // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
+        h.brightness = []() { return player::settings().brightness_percent; };
+        h.set_brightness = [](int percent) {
+            if (!player::panel_display_caps().backlight || !player::settings_set_brightness(percent)) {
+                return false;
+            }
+            player::panel_set_brightness(percent);
+            return true;
+        };
+        h.clock_format = []() { return player::settings().clock_format; };
+        h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
+            if (!player::settings_set_clock_format(format)) {
+                return false;
+            }
+            player::panel_set_clock_format(format);
+            return true;
+        };
     }
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
     // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
@@ -797,12 +815,12 @@ iclforge::ControlHandlers control_handlers() {
     // not left applied if it cannot be stored.
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
-        h.set_time_zone = [](std::string_view zone) {
+        h.set_time_zone = [](std::string_view zone, std::string_view name) {
             const std::string previous = player::settings().time_zone.data();
             if (!player::wall_clock_set_zone(zone)) {
                 return false;
             }
-            if (!player::settings_set_time_zone(zone)) {
+            if (!player::settings_set_time_zone(zone, name)) {
                 (void)player::wall_clock_set_zone(previous);
                 return false;
             }
@@ -835,6 +853,7 @@ iclforge::ControlHandlers control_handlers() {
                 time.local = iclforge::wallclock::local_text(reading.local);
             }
             time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
+            time.zone_name = iclforge::wallclock::zone_setting_text(player::settings().time_zone_name.data());
             time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
             time.servers = player::wall_clock_servers();
             time.answers = stats.syncs;
