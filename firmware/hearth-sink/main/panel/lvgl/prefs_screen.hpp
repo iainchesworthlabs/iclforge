@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "lvgl.h"
 
@@ -51,5 +52,30 @@ void prefs_open();
 // Once a frame, after the lyric screen's own work: builds the sheet when it was asked for, takes it down when it was
 // closed or left alone for a minute, and brings what it shows up to date with the board's settings.
 void prefs_update(std::uint32_t now_ms);
+
+// --- for the pages the sheet opens (prefs_editors.hpp) --------------------------------------------------------------
+// The sheet's tokens and pieces, so that a page the editors put over it is drawn in the same style and at the same size.
+struct PrefsUi {
+    const iclforge::screen::Metrics* m = nullptr;
+    const DevColours* c = nullptr;
+    const lv_font_t* body = nullptr;
+    const lv_font_t* note = nullptr;
+    const lv_font_t* heading = nullptr;
+    const lv_font_t* title = nullptr;
+};
+[[nodiscard]] PrefsUi prefs_ui();
+lv_obj_t* prefs_box(lv_obj_t* parent);
+lv_obj_t* prefs_label(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb);
+lv_obj_t* prefs_paragraph(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb, int width);
+// A touch target (kTouchTargetFlag) with `text` centred in it; its label is child 0.
+lv_obj_t* prefs_button(lv_obj_t* parent, const std::string& text, int width, int height, std::uint32_t bg, std::uint32_t fg,
+                       lv_event_cb_t callback, std::uintptr_t user_data, lv_obj_t** label_out);
+// Paints a button as the sheet's choices are: chosen (the accent), plain, or greyed.
+void prefs_style_button(lv_obj_t* button, bool chosen, bool available);
+[[nodiscard]] int prefs_text_width(const lv_font_t* font, const std::string& text);
+// What the sheet's bar says for a few seconds (a refusal, or the result of a change), and a request to bring the rows up
+// to date at the next frame.
+void prefs_say(const std::string& text);
+void prefs_changed();
 
 }  // namespace player::panel

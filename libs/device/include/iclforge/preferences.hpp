@@ -223,6 +223,9 @@ struct Pref {
     // The step before a change, and, for a change that cannot be undone, the held button after it (the factory reset).
     ConfirmFn confirm = nullptr;
     ConfirmFn then_hold = nullptr;
+    // What the button that runs or opens the entry says ("Restart", "View"): an action, an info entry and a list have
+    // one. Empty is "Run".
+    const char* button = "";
 };
 
 // --- the seed: what exists today ----------------------------------------------------------------------
@@ -490,7 +493,8 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .route = "/hardware",
      .get = &detail::get_nothing,
      .set = &detail::set_nothing,
-     .on_reset = OnReset::kKeep},
+     .on_reset = OnReset::kKeep,
+     .button = "View"},
     {.id = "paired-servers",
      .group = Group::kSystem,
      .label = "Paired servers",
@@ -501,7 +505,8 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .availability = &detail::needs_sendspin,
      .get = &detail::get_nothing,
      .set = &detail::set_paired_servers,
-     .on_reset = OnReset::kKeep},
+     .on_reset = OnReset::kKeep,
+     .button = "Manage"},
     {.id = "restart",
      .group = Group::kSystem,
      .label = "Restart",
@@ -513,7 +518,8 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_nothing,
      .set = &detail::set_restart,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::restart_confirm},
+     .confirm = &detail::restart_confirm,
+     .button = "Restart"},
     {.id = "reset-preferences",
      .group = Group::kSystem,
      .label = "Reset preferences",
@@ -525,7 +531,8 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .get = &detail::get_nothing,
      .set = &detail::set_reset_preferences,
      .on_reset = OnReset::kKeep,
-     .confirm = &detail::reset_preferences_confirm},
+     .confirm = &detail::reset_preferences_confirm,
+     .button = "Reset"},
     {.id = "factory-reset",
      .group = Group::kSystem,
      .label = "Factory reset",
@@ -538,7 +545,8 @@ inline constexpr std::array<Pref, 9> kRegistry{{
      .set = &detail::set_factory_reset,
      .on_reset = OnReset::kKeep,
      .confirm = &detail::factory_reset_confirm,
-     .then_hold = &detail::factory_reset_hold},
+     .then_hold = &detail::factory_reset_hold,
+     .button = "Erase"},
 }};
 
 [[nodiscard]] inline std::span<const Pref> registry() { return kRegistry; }

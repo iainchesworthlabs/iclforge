@@ -19,6 +19,7 @@
 
 #include "board_info.hpp"
 #include "fonts.hpp"
+#include "prefs_editors.hpp"
 
 namespace prefs = iclforge::prefs;
 
@@ -39,7 +40,7 @@ struct Chain {
 };
 
 // What a touch target does, packed with its row and its index into the user data of its event.
-enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3 };
+enum class Op : int { kChoose = 0, kMinus = 1, kPlus = 2, kRun = 3, kEdit = 4, kOpen = 5 };
 
 struct Row {
     std::size_t entry = 0;
@@ -51,7 +52,7 @@ struct Row {
     lv_obj_t* minus = nullptr;
     lv_obj_t* plus = nullptr;
     lv_obj_t* value = nullptr;
-    // kAction: the button.
+    // kAction, kInfo and kList: the button. kText: the button that holds the value and opens the keyboard.
     lv_obj_t* action = nullptr;
     // What was painted last: the row is repainted when this changes.
     std::string painted;
@@ -290,7 +291,8 @@ void paint_row(Row& row, const prefs::Entry& entry) {
         style_button(row.plus, false, on && prefs::step_target(entry, +1).has_value());
     }
     if (row.action != nullptr) {
-        style_button(row.action, false, on);
+        // Greyed by the board (it cannot) or by the moment (an update is under way): the reason is under the row.
+        style_button(row.action, false, on && entry.inert.empty());
     }
     const std::string details = details_of(entry);
     if (row.details != nullptr) {
@@ -322,7 +324,8 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
 
     // How wide the control is, to decide whether the label and the control share a line.
     int control_w = 0;
-    const std::string button_text = pref.kind == prefs::Kind::kAction && !entry.choices.empty()
+    const std::string button_text = pref.button[0] != '\0' ? std::string(pref.button)
+                                    : pref.kind == prefs::Kind::kAction && !entry.choices.empty()
                                         ? entry.choices.front().label
                                         : std::string("Run");
     int value_w = 0;
@@ -342,10 +345,13 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             control_w = 2 * g.m.row_target + 2 * gap + value_w;
             break;
         case prefs::Kind::kText:
-            value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value), g.m.row_target));
+            // The value is a button: a tap on it opens the keyboard.
+            value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value) + 2 * g.m.pad, g.m.row_target));
             control_w = value_w;
             break;
         case prefs::Kind::kAction:
+        case prefs::Kind::kInfo:
+        case prefs::Kind::kList:
             control_w = button_width(button_text);
             break;
     }
@@ -399,14 +405,20 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
                                    pack(Op::kPlus, index, 0), nullptr);
             break;
         case prefs::Kind::kText:
-            row.value = make_label(controls, "", g.body.latin, g.c.text);
+            row.action = make_button(controls, "", value_w, g.m.row_target, g.c.surface_up, g.c.text, &on_target,
+                                     pack(Op::kEdit, index, 0), &row.value);
             lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_DOTS);
-            lv_obj_set_size(row.value, value_w, lv_font_get_line_height(g.body.latin));
-            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_set_width(row.value, value_w - 2 * g.m.pad);
+            lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_CENTER, 0);
             break;
         case prefs::Kind::kAction:
             row.action = make_button(controls, button_text, button_width(button_text), g.m.row_target, g.c.surface_up,
                                      g.c.text, &on_target, pack(Op::kRun, index, 0), nullptr);
+            break;
+        case prefs::Kind::kInfo:
+        case prefs::Kind::kList:
+            row.action = make_button(controls, button_text, button_width(button_text), g.m.row_target, g.c.surface_up,
+                                     g.c.text, &on_target, pack(Op::kOpen, index, 0), nullptr);
             break;
     }
 
@@ -490,6 +502,7 @@ void build_view() {
 }
 
 void take_down() {
+    editors_close();
     if (g.root != nullptr) {
         lv_obj_delete(g.root);
     }
@@ -521,6 +534,11 @@ void on_target(lv_event_t* event) {
                 return;
             }
             word = entry.choices[index].id;
+            // A change that asks first (the switch between the cable and Wi-Fi) is made on the page that asks.
+            if (entry.pref->confirm != nullptr && word != entry.value) {
+                editors_open(*entry.pref, word);
+                return;
+            }
             break;
         case Op::kMinus:
         case Op::kPlus: {
@@ -532,8 +550,26 @@ void on_target(lv_event_t* event) {
             break;
         }
         case Op::kRun:
+            // An action that asks first is run from the page that asks; one the moment forbids says why under its row.
+            if (entry.pref->confirm != nullptr && entry.availability.available) {
+                if (entry.inert.empty()) {
+                    editors_open(*entry.pref, "run");
+                }
+                return;
+            }
             word = "run";
             break;
+        case Op::kEdit:
+        case Op::kOpen:
+            // A text is typed, a list or About is read, each on a page of its own.
+            if (!entry.availability.available) {
+                g.status_text = entry.availability.reason;
+                g.status_ms = now_ms();
+                g.dirty = true;
+            } else {
+                editors_open(*entry.pref, "");
+            }
+            return;
     }
     const prefs::SetResult result = prefs::set_value(preferences_backend(), *entry.pref, word);
     g.status_text = result.ok ? std::string() : result.message;
@@ -626,9 +662,41 @@ void prefs_update(std::uint32_t now) {
         take_down();
         return;
     }
+    editors_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }
 }
+
+// --- for the pages the sheet opens ---------------------------------------------------------------------------------
+
+PrefsUi prefs_ui() { return {&g.m, &g.c, g.body.latin, g.note.latin, g.heading, g.title}; }
+
+lv_obj_t* prefs_box(lv_obj_t* parent) { return make_box(parent); }
+
+lv_obj_t* prefs_label(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb) {
+    return make_label(parent, text, font, rgb);
+}
+
+lv_obj_t* prefs_paragraph(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb, int width) {
+    return make_paragraph(parent, text, font, rgb, width);
+}
+
+lv_obj_t* prefs_button(lv_obj_t* parent, const std::string& text, int width, int height, std::uint32_t bg, std::uint32_t fg,
+                       lv_event_cb_t callback, std::uintptr_t user_data, lv_obj_t** label_out) {
+    return make_button(parent, text, width, height, bg, fg, callback, user_data, label_out);
+}
+
+void prefs_style_button(lv_obj_t* button, bool chosen, bool available) { style_button(button, chosen, available); }
+
+int prefs_text_width(const lv_font_t* font, const std::string& text) { return text_width(font, text); }
+
+void prefs_say(const std::string& text) {
+    g.status_text = text;
+    g.status_ms = now_ms();
+    g.dirty = true;
+}
+
+void prefs_changed() { g.dirty = true; }
 
 }  // namespace player::panel

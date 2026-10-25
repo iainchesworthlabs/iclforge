@@ -632,6 +632,8 @@ iclforge::DisplayCaps panel_display_caps() {
     return caps;
 }
 
+iclforge::devview::Facts panel_board_facts() { return panel::gather_about_facts(); }
+
 void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
