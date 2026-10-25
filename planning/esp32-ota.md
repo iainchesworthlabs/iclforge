@@ -1241,7 +1241,7 @@ the network, the upload would pass through the chip being rewritten.
 
 **Status, 2026-10-25: designed, nothing built.** The owner decided most of it the same day:
 [decisions 23 to 30, 33, 34 and 35](#decisions) are taken (24, 25 and 28 as the owner reshaped them), and
-36's leaf lifetime; 31, 32, the rest of 36 and 37 wait. This section takes up the two things the plan put
+36's leaf lifetime and 37; 31, 32 and the rest of 36 wait. This section takes up the two things the plan put
 off: **pull** ([decision 3](#decisions): "pull can come later, for updates from a release server") and
 **signing**, which it makes a *process* around a certificate the owner already has, in place of the
 mechanism O7 designed ([Signing, later](#signing-later)). O8 and O9 are the published images and the guide,
@@ -1462,8 +1462,9 @@ CI does it ([CI signing](#ci-signing)). A release run builds and packages the im
 release. Then the `firmware-channels` workflow builds each channel's index from the release's manifest
 (`package_firmware.py index`), signs it in that channel's GitHub environment (`sign_index.py sign`), uploads the
 pair to the `firmware-channels` release with the images already up and the index last, and downloads it back
-and verifies it as a board would. A `workflow_dispatch` of the same workflow signs any release again, which is how
-a leaf renewal reaches the channels. A person with a leaf key on their machine can do the same by hand with the
+and verifies it as a board would. **The stable job waits for the owner's approval**; the beta job does not. A
+`workflow_dispatch` of the same workflow signs any release again, which is how a leaf renewal reaches the
+channels (for stable, dispatched against a tag). A person with a leaf key on their machine can do the same by hand with the
 same two commands, which is how a third party without CI publishes ([A third party's own channel](#a-third-partys-own-channel)).
 
 #### Replacing the anchor
@@ -1593,18 +1594,31 @@ it can be tried against any release that exists):
 
 | Where | What | Value |
 |---|---|---|
-| Settings, Environments | `firmware-beta` | Deployment branches and tags: `main` and `v*`. No reviewer (recommended: see below). Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
-| Settings, Environments | `firmware-stable` | The same, and **Required reviewers: the owner** (recommended). The same two secret names, for the **stable** leaf |
+| Settings, Environments | `firmware-beta` | Deployment branches and tags: `main` and `v*`. **No reviewer: it signs on its own.** Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
+| Settings, Environments | `firmware-stable` | Deployment branches and tags: **`v*` tags only**, not `main`. **Required reviewers: the owner, so every signing run waits for their approval.** *Prevent self-review* off (the owner starts the run by cutting the tag, and is also the one who approves it); *Allow administrators to bypass configured protection rules* off, if the page offers it, so that nobody skips the approval. The same two secret names, for the **stable** leaf |
 | Settings, Rules | A tag ruleset for `v*` | Only the owner may create a tag that matches. An environment secret is readable by a run on any ref the environment allows, and `v*` allows tags, so who can make a tag is who can read a beta key |
 | Settings, Secrets and variables, Actions, Variables | `PUBLISH_FIRMWARE_CHANNELS` | `true`, **last**, once the two environments and the tag ruleset exist |
 | Not these | `WIN_TESTSIGN_PFX_*` | Never reused for firmware |
 
-**The question for the owner: does stable need a reviewer, and does beta not?** Recommend **yes, and no.** The
-beta leaf signs only what beta boards read (the owner's development kits, which take unsigned pushes anyway), so
-a run that signs it is not worth a click. The stable leaf is the one a person who is not the owner would rely
-on, and a click that shows the owner which release is about to be signed is the gate "a human at every release"
-asked for, at the cost of one approval at each stable release (the job waits; the release is already out). If
-the owner wants no click at all, `firmware-stable` without a reviewer works the same and signs unattended.
+**Decided by the owner, 2026-10-25: a stable signing run needs the owner's approval every time; a beta run signs
+on its own.** The beta leaf signs only what beta boards read (the owner's development kits, which take unsigned
+pushes anyway), so a run that signs it is not worth a click. The stable leaf is the one a person who is not
+the owner would rely on, and the approval shows the owner which release is about to be signed: the gate "a
+human at every release" asked for, at the cost of one approval at each stable release (the job waits; the
+release is already out).
+
+- **Stable runs on `v*` tags only.** A stable release is a tag, so `main` has nothing to sign for stable, and
+  leaving it out means that even after an approval the stable key cannot be read by a workflow on a branch. Beta
+  keeps `main` and `v*` because signing a beta index again is dispatched from `main`. The cost:
+  signing a stable index again (a leaf renewal) is a dispatch against a tag, `gh workflow run --ref <tag>`, of a
+  tag cut after `firmware-channels.yml` exists; the first stable tag will be. The tag ruleset below is what
+  makes `v*` the owner's alone.
+- **What the owner checks when they approve:** the approval page names the run, its ref (the tag) and the
+  workflow, and they approve only the tag they cut and only for a run they expected. An approval nobody gives
+  expires after 30 days and the run fails; signing again is a dispatch.
+- **Both settings above matter.** With *Prevent self-review* on, the owner, who starts the run, could not
+  approve it and would lock themselves out; with administrators allowed to bypass, the approval is optional for
+  anyone with that role.
 
 **What would conflict with PR #1621 (the release prep), read on 2026-10-25.** #1621 changes `release.yml` in the
 `resolve-version` job (an added `REPO` variable and a `render_release_notes.py --check` call near line 97 to 150),
@@ -2036,7 +2050,7 @@ boards leave development, and if that is before O8, O8's images are published si
   own PR: O10a the index, the signature and a host-tested library; O10b the board's pull and its routes;
   O10c the process (the keys, the first signed channel release); O10d the Preferences entry and the page.
   Later hardening is listed, not scheduled. **Status: designed 2026-10-25;** the owner took decisions 23 to 30,
-  33, 34 and 35; 31, 32, most of 36 and 37 wait. **Exit:** a board on the desk checks,
+  33, 34, 35 and 37; 31, 32 and most of 36 wait. **Exit:** a board on the desk checks,
   installs a release signed by the owner's leaf from GitHub, passes its trial, and still takes an unsigned
   build sent by `PUT /firmware`.
 
@@ -2146,7 +2160,7 @@ Outcomes, 2026-09-30. Decisions 1, 3 to 8 and 10 to 21 were built as recommended
 (a) each time; decision 6 is a decision not to build something, and it stands. Decision 2 was
 taken as (c) while the boards are in development, and its (a) is O7, which is not built.
 Decision 9 was taken as (a), and the study is all of it that exists. Decision 22 is open: nothing
-pins `esp_hosted`. Decisions 23 to 37 are those of O10 (2026-10-25): the owner took 23 to 30, 33, 34, 35 and 36's lifetime, and the rest are proposals.
+pins `esp_hosted`. Decisions 23 to 37 are those of O10 (2026-10-25): the owner took 23 to 30, 33, 34, 35, 36's lifetime and 37, and the rest are proposals.
 
 1. **Update scheme.** (a) **two slots and a rollback bootloader**; (b) a small factory recovery
    app plus one update slot; (c) one slot and a staging area. **Recommend (a).** It is the only
@@ -2273,8 +2287,8 @@ pins `esp_hosted`. Decisions 23 to 37 are those of O10 (2026-10-25): the owner t
     ships, a new `esp_hosted` means a co-processor update as well.
 
 Taken by the owner on 2026-10-25: 23 (b), 26, 27, 29, 30 and 33 as recommended (26 for a pull only), 24 (a) and
-25 (a) with the owner's own CA (EJBCA), 28 (a), 34 (a) and 35 (a) (CI signs), and 36's lifetime. 31, 32, the rest
-of 36 and 37 are proposals.
+25 (a) with the owner's own CA (EJBCA), 28 (a), 34 (a) and 35 (a) (CI signs), 36's lifetime and 37 (a) (the owner
+approves every stable signing run; beta signs on its own). 31, 32 and the rest of 36 are proposals.
 
 23. **Where a board learns what the newest release is.** (a) GitHub's REST API; (b) **an update index, one
     small JSON file for each channel with a signature file beside it, published as assets of a long-lived
@@ -2379,9 +2393,9 @@ of 36 and 37 are proposals.
     (b) is machinery a board should not carry; (c) lets an expired leaf, or one made before a CA was rebuilt,
     sign for ever. **Lifetime taken 2026-10-25: one to two years is fine; the rest is a proposal.**
 37. **Who approves a signing run.** (a) **a required reviewer on `firmware-stable` (the owner), none on
-    `firmware-beta`**; (b) none on either; (c) a reviewer on both. **Recommend (a).** The beta leaf signs only
+    `firmware-beta`**; (b) none on either; (c) a reviewer on both. **Recommend (a); taken 2026-10-25: (a),
+    with stable limited to `v*` tags** ([CI signing](#ci-signing)). The beta leaf signs only
     what beta boards read, which are development kits that take unsigned pushes anyway; the stable leaf is the
     one someone who is not the owner relies on, and the click shows the owner which release is about to be
     signed. Cost: one approval at each stable release, with the release already out meanwhile. (b) signs
     unattended, and a hostile workflow on an allowed ref could read the stable key without a human seeing it.
-    A proposal.

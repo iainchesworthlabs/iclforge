@@ -420,8 +420,6 @@ void reset_in_memory(std::string_view key, const Settings& defaults) {
         g_settings.now_view = defaults.now_view;
     } else if (key == sk::kDimAfter) {
         g_settings.dim_after_minutes = defaults.dim_after_minutes;
-    } else if (key == sk::kTimeZone) {
-        g_settings.time_zone = defaults.time_zone;
     } else if (key == sk::kDynamicRange) {
         g_settings.dynamic_range = defaults.dynamic_range;
     } else {
