@@ -123,7 +123,7 @@ if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
                             "panel/lvgl/dev_screen.cpp" "panel/lvgl/dev_info.cpp"
                             "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
-                            "panel/lvgl/lv_memory.cpp")
+                            "panel/lvgl/prefs_screen.cpp" "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
         list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")
     else()
@@ -135,6 +135,8 @@ endif()
 
 idf_component_register(
     SRCS "hearth_sink.cpp"
+         "board_caps.cpp"
+         "preferences.cpp"
          "settings.cpp"
          "provision.cpp"
          "system_reset.cpp"
@@ -242,6 +244,6 @@ set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
 # recompiles this one file. Empty for a build that was not made as a profile.
 set(ICLFORGE_PROFILE "" CACHE STRING "the locked profile this image is, or empty")
 set(ICLFORGE_PROFILE_HASH "" CACHE STRING "a hash of that profile's locked values")
-set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(SOURCE "hearth_sink.cpp" "board_caps.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
     "ICLFORGE_PROFILE_ID=\"${ICLFORGE_PROFILE}\""
     "ICLFORGE_PROFILE_HASH_TEXT=\"${ICLFORGE_PROFILE_HASH}\"")
