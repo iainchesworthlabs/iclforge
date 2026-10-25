@@ -758,6 +758,24 @@ iclforge::ControlHandlers control_handlers() {
             player::panel_set_dim_after(minutes);
             return true;
         };
+        // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
+        // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
+        h.brightness = []() { return player::settings().brightness_percent; };
+        h.set_brightness = [](int percent) {
+            if (!player::panel_stats().dimmable || !player::settings_set_brightness(percent)) {
+                return false;
+            }
+            player::panel_set_brightness(percent);
+            return true;
+        };
+        h.clock_format = []() { return player::settings().clock_format; };
+        h.set_clock_format = [](iclforge::wallclock::ClockFormat format) {
+            if (!player::settings_set_clock_format(format)) {
+                return false;
+            }
+            player::panel_set_clock_format(format);
+            return true;
+        };
     }
     // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
     // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
@@ -765,12 +783,12 @@ iclforge::ControlHandlers control_handlers() {
     // not left applied if it cannot be stored.
     if (player::wall_clock_built()) {
         h.time_zone = []() { return iclforge::wallclock::zone_setting_text(player::settings().time_zone.data()); };
-        h.set_time_zone = [](std::string_view zone) {
+        h.set_time_zone = [](std::string_view zone, std::string_view name) {
             const std::string previous = player::settings().time_zone.data();
             if (!player::wall_clock_set_zone(zone)) {
                 return false;
             }
-            if (!player::settings_set_time_zone(zone)) {
+            if (!player::settings_set_time_zone(zone, name)) {
                 (void)player::wall_clock_set_zone(previous);
                 return false;
             }
@@ -803,6 +821,7 @@ iclforge::ControlHandlers control_handlers() {
                 time.local = iclforge::wallclock::local_text(reading.local);
             }
             time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
+            time.zone_name = iclforge::wallclock::zone_setting_text(player::settings().time_zone_name.data());
             time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
             time.servers = player::wall_clock_servers();
             time.answers = stats.syncs;

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <span>
+#include <string>
 
 #include "esp_err.h"
 #include "esp_mac.h"
@@ -29,6 +30,9 @@ constexpr const char* kKeyNetworkPreference = "net_pref";
 constexpr const char* kKeyNowView = "np_view";
 constexpr const char* kKeyDimAfter = "np_dim";
 constexpr const char* kKeyTimeZone = "time_zone";
+constexpr const char* kKeyTimeZoneName = "tz_name";
+constexpr const char* kKeyBrightness = "bright";
+constexpr const char* kKeyClockFormat = "clock_fmt";
 constexpr const char* kKeyNtpServer = "ntp_server";
 constexpr const char* kKeyTimeSync = "time_sync";
 constexpr const char* kKeyLayout = "layout";
@@ -141,7 +145,11 @@ void settings_load() {
     g_settings.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     g_settings.now_view = iclforge::nowview::kDefaultView;
     g_settings.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    g_settings.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
+    g_settings.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
+                                  .value_or(iclforge::wallclock::ClockFormat{});
     g_settings.time_zone = {};
+    g_settings.time_zone_name = {};
     g_settings.ntp_server = {};
     g_settings.time_sync = true;
     g_settings.layout = {};
@@ -203,6 +211,24 @@ void settings_load() {
                         g_settings.dim_after_minutes);
         }
     }
+    if (nvs_get_i32(handle, kKeyBrightness, &stored) == ESP_OK) {
+        if (const auto percent = iclforge::nowview::brightness_from_stored(stored)) {
+            g_settings.brightness_percent = *percent;
+        } else {
+            std::printf("settings: stored brightness %ld is not %d to %d percent; keeping %d\n",
+                        static_cast<long>(stored), iclforge::nowview::kBrightnessMin, iclforge::nowview::kBrightnessMax,
+                        g_settings.brightness_percent);
+        }
+    }
+    if (nvs_get_i32(handle, kKeyClockFormat, &stored) == ESP_OK) {
+        if (const auto format = iclforge::wallclock::clock_format_from_stored(stored)) {
+            g_settings.clock_format = *format;
+        } else {
+            std::printf("settings: stored clock format %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored),
+                        iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str());
+        }
+    }
     // A stored zone that is not one this build reads (a partition written by a later image) is said, and
     // the clock says UTC.
     read_string(handle, kKeyTimeZone, g_settings.time_zone);
@@ -210,6 +236,19 @@ void settings_load() {
         std::printf("settings: stored time zone '%s' is not one this build reads; the clock says UTC\n",
                     g_settings.time_zone.data());
         g_settings.time_zone[0] = '\0';
+    }
+    // The name the person chose it by: a name this build's table knows says the zone (so a release that changes a
+    // city's rules moves the boards that chose that city), and one it does not know is dropped.
+    read_string(handle, kKeyTimeZoneName, g_settings.time_zone_name);
+    {
+        const iclforge::wallclock::ZoneChoice zone =
+            iclforge::wallclock::reconcile_zone(g_settings.time_zone.data(), g_settings.time_zone_name.data());
+        if (!zone.name.empty() && zone.posix != g_settings.time_zone.data()) {
+            std::printf("settings: time zone %s is now %s (this build's rule for it; stored: '%s')\n",
+                        zone.name.c_str(), zone.posix.c_str(), g_settings.time_zone.data());
+        }
+        copy_into(g_settings.time_zone, zone.posix);
+        copy_into(g_settings.time_zone_name, zone.name);
     }
     read_string(handle, kKeyNtpServer, g_settings.ntp_server);
     if (g_settings.ntp_server[0] != '\0' && !iclforge::wallclock::valid_ntp_server(g_settings.ntp_server.data())) {
@@ -226,14 +265,17 @@ void settings_load() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, time zone %s, time server %s, time sync %s\n",
+                "no-lyrics screen %s, dims after %s, brightness %d, clock %s, time zone %s%s%s, "
+                "time server %s, time sync %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
+                g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
                 iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
+                g_settings.time_zone_name[0] != '\0' ? " = " : "", g_settings.time_zone_name.data(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
                 iclforge::wallclock::time_sync_text(g_settings.time_sync));
 }
@@ -321,18 +363,60 @@ bool settings_set_dim_after(int minutes) {
     return true;
 }
 
+bool settings_set_brightness(int percent) {
+    if (!iclforge::nowview::brightness_from_stored(percent)) {
+        std::printf("settings: %d percent is not a brightness (%d to %d)\n", percent,
+                    iclforge::nowview::kBrightnessMin, iclforge::nowview::kBrightnessMax);
+        return false;
+    }
+    if (!write_int(kKeyBrightness, percent)) {
+        return false;
+    }
+    g_settings.brightness_percent = percent;
+    return true;
+}
+
+bool settings_set_clock_format(iclforge::wallclock::ClockFormat format) {
+    if (!write_int(kKeyClockFormat, iclforge::wallclock::clock_format_stored(format))) {
+        return false;
+    }
+    g_settings.clock_format = format;
+    return true;
+}
+
 bool settings_set_layout(std::string_view layout) {
     return write_string(kKeyLayout, layout, g_settings.layout);
 }
 
-bool settings_set_time_zone(std::string_view zone) {
+bool settings_set_time_zone(std::string_view zone, std::string_view name) {
     if (!zone.empty() && !iclforge::wallclock::valid_time_zone(zone)) {
         std::printf("settings: '%.*s' is not a time zone this board reads\n", static_cast<int>(zone.size()),
                     zone.data());
         return false;
     }
+    // The name is kept only when the table says it stands for this string: anything else is a string somebody typed.
+    std::string_view kept;
+    if (!name.empty()) {
+        const auto named = iclforge::wallclock::find_time_zone(name);
+        if (named && named->posix == zone) {
+            kept = named->name;
+        } else {
+            std::printf("settings: '%.*s' is not the name of that time zone; keeping the string alone\n",
+                        static_cast<int>(name.size()), name.data());
+        }
+    }
+    const std::string previous_zone = g_settings.time_zone.data();
     // An empty string is stored as such, and read back as no zone: NVS keeps the key, the clock says UTC.
-    return write_string(kKeyTimeZone, zone, g_settings.time_zone);
+    if (!write_string(kKeyTimeZone, zone, g_settings.time_zone)) {
+        return false;
+    }
+    // The name is always written, empty for a typed string, so that an old name never stands for a new string. If it
+    // cannot be, the string goes back: the two must agree, and a boot reads the name's rule over the string.
+    if (!write_string(kKeyTimeZoneName, kept, g_settings.time_zone_name)) {
+        (void)write_string(kKeyTimeZone, previous_zone, g_settings.time_zone);
+        return false;
+    }
+    return true;
 }
 
 bool settings_set_ntp_server(std::string_view server) {

@@ -7,7 +7,7 @@
 // Standard library only, so that the host tests it (libs/device/tests/test_time_zones.cpp).
 //
 // What is stored is the string (`time_zone`, which the clock reads) and the name the person chose
-// (`time_zone_name`): the string alone cannot say which city was chosen, because 88 strings stand for 420 names
+// (`time_zone_name`): the string alone cannot say which city was chosen, because 89 strings stand for 420 names
 // (Melbourne, Sydney, Hobart and Canberra are one rule). A name that no longer agrees with the string is not
 // believed, and one the table knows is followed to the table's own rule, so that a firmware update that carries a
 // government's new daylight saving rules moves the boards that chose that city and no others.

@@ -291,13 +291,14 @@ bool display_open(Display& out) {
     lv_indev_set_display(pointer, g_disp);
 
     open_backlight();
-    display_set_backlight(kBacklightNormalPercent);
+    display_set_backlight(backlight_lit_percent());
 
     out.lv = g_disp;
     out.width = kWidth;
     out.height = kHeight;
     out.frame = static_cast<const std::uint16_t*>(g_frame);
     out.touch = touch;
+    out.backlight = g_backlight_ready;
     out.kind = "dsi";
     std::printf("panel: EK79007 %d by %d on MIPI DSI, touch %s\n", kWidth, kHeight,
                 touch ? "on" : "off");

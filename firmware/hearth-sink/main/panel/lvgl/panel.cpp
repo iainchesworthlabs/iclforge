@@ -54,6 +54,24 @@ namespace {
 std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
 std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
 
+// What a person chose for the screen (planning/p4x-preferences.md), set from the control surface's task and read
+// by the panel's: the lit level of the backlight, percent, and how the clock view writes the time (the stored
+// number of iclforge::wallclock::ClockFormat).
+std::atomic<int> g_brightness{iclforge::nowview::kDefaultBrightness};
+std::atomic<int> g_clock_format{0};
+// The level the screen last asked for, one of display.hpp's three (lit, the dim floor, off).
+std::atomic<int> g_backlight_request{panel::kBacklightNormalPercent};
+
+// The percent the glass is given for a level the screen asked for: the person's brightness for lit, the floor under
+// it for dimmed, nothing for off (iclforge::nowview::backlight_percent).
+int effective_backlight(int request) {
+    using iclforge::nowview::Dim;
+    const Dim dim = request <= panel::kBacklightOffPercent    ? Dim::kDark
+                    : request <= panel::kBacklightDimPercent ? Dim::kDimmed
+                                                              : Dim::kNone;
+    return iclforge::nowview::backlight_percent(dim, g_brightness.load());
+}
+
 }  // namespace
 }  // namespace player
 
@@ -238,9 +256,20 @@ NowSettings read_now_settings() {
     return settings;
 }
 
-iclforge::wallclock::Reading read_wall_clock() { return player::wall_clock_read(); }
+iclforge::wallclock::Reading read_wall_clock() {
+    iclforge::wallclock::Reading reading = player::wall_clock_read();
+    // How the person who owns the board wants it written is the panel's to know, not the clock's.
+    reading.format = iclforge::wallclock::clock_format_from_stored(g_clock_format.load())
+                         .value_or(iclforge::wallclock::ClockFormat{});
+    return reading;
+}
 
-void set_backlight(int percent) { display_set_backlight(percent); }
+void set_backlight(int percent) {
+    g_backlight_request.store(percent);
+    display_set_backlight(effective_backlight(percent));
+}
+
+int backlight_lit_percent() { return effective_backlight(kBacklightNormalPercent); }
 
 void choose_now_view(iclforge::nowview::View view) {
     // A tap is followed even where the store is refused (the console says so): the screen does what it
@@ -341,7 +370,7 @@ void run(void* /*arg*/) {
             const panel::ScreenStats screen = panel::screen_stats();
             g_stats.screen = screen.name;
             g_stats.dimmed = screen.dimmed;
-            g_stats.backlight = screen.backlight;
+            g_stats.backlight = effective_backlight(screen.backlight);
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
@@ -622,6 +651,20 @@ void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
 
+void panel_set_brightness(int percent) {
+    g_brightness.store(percent);
+    // At once: the glass is at the lit level or at the floor under it, and either moves with this. Asked again for the
+    // level the screen last asked for, under the lock the screen's own calls hold.
+    if (g_started.load()) {
+        const std::lock_guard lock(g_lock);
+        panel::set_backlight(g_backlight_request.load());
+    }
+}
+
+void panel_set_clock_format(iclforge::wallclock::ClockFormat format) {
+    g_clock_format.store(iclforge::wallclock::clock_format_stored(format));
+}
+
 bool panel_start() {
     if (g_started.exchange(true)) {
         return g_stats.running;
@@ -632,6 +675,8 @@ bool panel_start() {
     }
     g_now_view.store(static_cast<int>(settings().now_view));
     g_dim_after_minutes.store(settings().dim_after_minutes);
+    g_brightness.store(settings().brightness_percent);
+    g_clock_format.store(iclforge::wallclock::clock_format_stored(settings().clock_format));
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {
@@ -649,6 +694,7 @@ bool panel_start() {
     g_stats.width = g_display.width;
     g_stats.height = g_display.height;
     g_stats.touch = g_display.touch;
+    g_stats.dimmable = g_display.backlight;
     g_stats.screen = "idle";
 
     // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point.

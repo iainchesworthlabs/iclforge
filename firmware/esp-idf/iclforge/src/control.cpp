@@ -23,6 +23,7 @@
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
 
 // The web UI's two files. CMakeLists.txt embeds them (EMBED_FILES) and they stay
@@ -477,7 +478,10 @@ struct Control::Impl {
                          "to change it\n"
                          "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it\n"
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
-                         "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one\n"
+                         "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one\n"
+                         "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one\n"
+                         "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one, or a name from /time-zones\n"
+                         "GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)\n"
                          "GET  /ntp-server    the time server a person named, or none (the router's, then the pool); PUT one\n"
                          "GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
@@ -653,6 +657,7 @@ struct Control::Impl {
                     append_json_string(out, time->local);
                 }
                 append_string(out, "zone", time->zone);
+                append_string(out, "zone_name", time->zone_name);
                 append_string(out, "server", time->server);
                 append_string(out, "servers", time->servers);
                 append_number(out, "answers", time->answers);
@@ -920,6 +925,92 @@ struct Control::Impl {
         return send_text(req, "200 OK", "ok; takes effect at once\n");
     }
 
+    static esp_err_t on_brightness_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.brightness) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        const std::string text = std::to_string(h.brightness()) + '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_brightness_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<int> percent = nowview::parse_brightness(read_body(req));
+        if (!percent) {
+            return send_text(req, "400 Bad Request", "PUT /brightness wants a number of percent from 10 to 100\n");
+        }
+        if (!h.set_brightness) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_brightness(*percent)) {
+            return send_text(req, "409 Conflict",
+                             "that brightness could not be set: this screen has no backlight to dim, or the "
+                             "setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
+    static esp_err_t on_clock_format_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.clock_format) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        const std::string text = wallclock::clock_format_text(h.clock_format()) + '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_clock_format_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::optional<wallclock::ClockFormat> format = wallclock::parse_clock_format(read_body(req));
+        if (!format) {
+            return send_text(req, "400 Bad Request",
+                             "PUT /clock-format wants 24 or 12, and seconds after it when they are shown: 24, "
+                             "12 seconds\n");
+        }
+        if (!h.set_clock_format) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_clock_format(*format)) {
+            return send_text(req, "409 Conflict", "that format could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect at once\n");
+    }
+
+    // The names PUT /timezone takes, one a line. Sent in pieces: the 8 KB of them is never one allocation, on a heap
+    // that a decoder leaves little of.
+    static esp_err_t on_time_zones_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.time_zone) {
+            return send_text(req, "404 Not Found", "this board keeps no time\n");
+        }
+        httpd_resp_set_type(req, "text/plain");
+        char piece[512];
+        std::size_t used = 0;
+        for (std::size_t i = 0; i < wallclock::time_zone_count(); ++i) {
+            const std::string_view name = wallclock::time_zone_at(i).name;
+            if (used + name.size() + 1 > sizeof piece) {
+                if (httpd_resp_send_chunk(req, piece, static_cast<ssize_t>(used)) != ESP_OK) {
+                    return ESP_FAIL;
+                }
+                used = 0;
+            }
+            std::memcpy(piece + used, name.data(), name.size());
+            used += name.size();
+            piece[used++] = '\n';
+        }
+        if (used > 0 && httpd_resp_send_chunk(req, piece, static_cast<ssize_t>(used)) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        return httpd_resp_send_chunk(req, nullptr, 0);
+    }
+
     static esp_err_t on_time_zone_get(httpd_req_t* req) {
         auto& h = self(req)->handlers;
         if (!h.time_zone) {
@@ -935,18 +1026,19 @@ struct Control::Impl {
             return ESP_OK;
         }
         auto& h = self(req)->handlers;
-        // A POSIX zone string or `none`, read here so that a refusal says what was wrong with it; the owner
-        // is handed the one that parsed.
-        const std::optional<std::string> zone = wallclock::parse_zone_setting(read_body(req));
+        // A name from GET /time-zones, a POSIX zone string, or `none`, read here so that a refusal says what was wrong
+        // with it; the owner is handed the one that parsed, and the name a person chose it by.
+        const std::optional<wallclock::ZoneChoice> zone = wallclock::parse_zone_choice(read_body(req));
         if (!zone) {
             return send_text(req, "400 Bad Request",
-                             "PUT /timezone wants a POSIX time zone with its daylight saving rules, such as "
-                             "AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n");
+                             "PUT /timezone wants a name from /time-zones (Australia/Melbourne), a POSIX time "
+                             "zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the "
+                             "offset is hours WEST of UTC), or none\n");
         }
         if (!h.set_time_zone) {
             return send_text(req, "409 Conflict", "this board keeps no time\n");
         }
-        if (!h.set_time_zone(*zone)) {
+        if (!h.set_time_zone(zone->posix, zone->name)) {
             return send_text(req, "409 Conflict",
                              "that zone could not be taken: this board's C library reads it differently, or it "
                              "could not be stored\n");
@@ -1217,6 +1309,11 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/now-playing", .method = HTTP_PUT, .handler = &Impl::on_now_playing_put},
         {.uri = "/dim-after", .method = HTTP_GET, .handler = &Impl::on_dim_after_get},
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
+        {.uri = "/brightness", .method = HTTP_GET, .handler = &Impl::on_brightness_get},
+        {.uri = "/brightness", .method = HTTP_PUT, .handler = &Impl::on_brightness_put},
+        {.uri = "/clock-format", .method = HTTP_GET, .handler = &Impl::on_clock_format_get},
+        {.uri = "/clock-format", .method = HTTP_PUT, .handler = &Impl::on_clock_format_put},
+        {.uri = "/time-zones", .method = HTTP_GET, .handler = &Impl::on_time_zones_get},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
         {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},
         {.uri = "/ntp-server", .method = HTTP_GET, .handler = &Impl::on_ntp_server_get},

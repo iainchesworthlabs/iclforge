@@ -25,6 +25,7 @@
 #include <string_view>
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
 
 namespace player {
@@ -79,10 +80,18 @@ struct Settings {
     // build and acted on by the one with a panel (panel/lvgl).
     iclforge::nowview::View now_view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): the backlight when
+    // lit, percent, and how the clock view writes the time. Read by every build and acted on by the one with a panel.
+    int brightness_percent = iclforge::nowview::kDefaultBrightness;
+    iclforge::wallclock::ClockFormat clock_format;
     // The time (planning/p4x-now-playing.md, stage 3), on every board that has a network. The zone the time is
     // shown in, as a POSIX string (iclforge/wall_clock.hpp); empty when none is set, and the time is then UTC.
     // A board has no zone database, so this is the zone itself.
     std::array<char, iclforge::wallclock::kTimeZoneMaxBytes + 1> time_zone{};
+    // The name the person chose it by ("Australia/Melbourne"), or empty when they typed a string: the string alone
+    // cannot say which city was meant (89 strings stand for the 420 names of iclforge/time_zones.hpp). A name
+    // the build's table knows gives the string itself at boot (reconcile_zone), so the two never disagree here.
+    std::array<char, iclforge::wallclock::kTimeZoneNameMaxBytes + 1> time_zone_name{};
     // The time server a person named, a host name or an IPv4 address; empty when nobody has, and the board then
     // asks the one the router gave over DHCP and, behind it, pool.ntp.org.
     std::array<char, iclforge::wallclock::kNtpServerMaxBytes + 1> ntp_server{};
@@ -123,9 +132,13 @@ void settings_load();
 [[nodiscard]] bool settings_set_network_preference(NetworkPreference preference);
 [[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
 [[nodiscard]] bool settings_set_dim_after(int minutes);
+[[nodiscard]] bool settings_set_brightness(int percent);
+[[nodiscard]] bool settings_set_clock_format(iclforge::wallclock::ClockFormat format);
 // A POSIX time zone, or an empty string to take the zone away. Refused when the string is not one
-// (iclforge::wallclock::parse_time_zone); the C library's own reading of it is the caller's to check.
-[[nodiscard]] bool settings_set_time_zone(std::string_view zone);
+// (iclforge::wallclock::parse_time_zone); the C library's own reading of it is the caller's to check. `name` is the
+// table's name for it when the person chose it by name (iclforge::wallclock::parse_zone_choice), and is kept only
+// when the table says that name stands for this string; empty for a string they typed.
+[[nodiscard]] bool settings_set_time_zone(std::string_view zone, std::string_view name = {});
 // A time server (iclforge::wallclock::valid_ntp_server), or an empty string to go back to the router's and the
 // pool; and whether to ask one at all.
 [[nodiscard]] bool settings_set_ntp_server(std::string_view server);
