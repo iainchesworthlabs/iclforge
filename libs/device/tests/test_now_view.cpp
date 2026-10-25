@@ -522,3 +522,27 @@ TEST_CASE("now_view: a PCM stream says the server decoded it", "[now_view]") {
     CHECK(pcm[1] == "PCM");
     CHECK(nv::stream_info_options({.codec = nv::Codec::kPcm}, 0, "")[0] == "PCM");
 }
+
+TEST_CASE("now_view: the night schedule's time editor steps a quarter of an hour round the clock", "[now_view]") {
+    CHECK(nv::kNightStepMinutes == 15);
+    CHECK(nv::night_time_stepped(22 * 60, +1) == 22 * 60 + 15);
+    CHECK(nv::night_time_stepped(22 * 60, -1) == 21 * 60 + 45);
+    CHECK(nv::night_time_stepped(22 * 60, +4) == 23 * 60);
+    CHECK(nv::night_time_stepped(23 * 60 + 45, +1) == 0);
+    CHECK(nv::night_time_stepped(0, -1) == 23 * 60 + 45);
+    CHECK(nv::night_time_stepped(0, 0) == 0);
+    // A time a route set between two steps lands on the next in the direction given.
+    CHECK(nv::night_time_stepped(7 * 60 + 5, +1) == 7 * 60 + 15);
+    CHECK(nv::night_time_stepped(7 * 60 + 5, -1) == 7 * 60);
+    CHECK(nv::night_time_stepped(7 * 60 + 14, -1) == 7 * 60);
+    // A whole round of the day is the day.
+    CHECK(nv::night_time_stepped(5 * 60, +96) == 5 * 60);
+    CHECK(nv::night_time_stepped(5 * 60, -96) == 5 * 60);
+    // Every minute of the day stays a minute of the day, however it is stepped.
+    for (int minute = 0; minute < nv::kMinutesPerDay; ++minute) {
+        CHECK(nv::valid_minute_of_day(nv::night_time_stepped(minute, +1)));
+        CHECK(nv::valid_minute_of_day(nv::night_time_stepped(minute, -1)));
+        CHECK(nv::night_time_stepped(minute, +1) % nv::kNightStepMinutes == 0);
+        CHECK(nv::night_time_stepped(minute, -1) % nv::kNightStepMinutes == 0);
+    }
+}

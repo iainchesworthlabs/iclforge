@@ -217,6 +217,23 @@ struct NightSchedule {
 
 [[nodiscard]] constexpr bool valid_minute_of_day(int minute) { return minute >= 0 && minute < kMinutesPerDay; }
 
+// What one tap of the schedule's time editor moves a time by, and the move: `steps` of kNightStepMinutes, up or down,
+// round the clock (22:00 up four steps is 23:00, and 00:00 down one is 23:45). A time between two steps, which a
+// route can set, lands on the next one in the direction given.
+inline constexpr int kNightStepMinutes = 15;
+
+[[nodiscard]] constexpr int night_time_stepped(int minute, int steps) {
+    int at = minute < 0 ? 0 : minute % kMinutesPerDay;
+    for (; steps > 0; --steps) {
+        at = (at / kNightStepMinutes + 1) * kNightStepMinutes % kMinutesPerDay;
+    }
+    for (; steps < 0; ++steps) {
+        const int lower = at % kNightStepMinutes == 0 ? at - kNightStepMinutes : at / kNightStepMinutes * kNightStepMinutes;
+        at = (lower + kMinutesPerDay) % kMinutesPerDay;
+    }
+    return at;
+}
+
 // Whether `minute` is in [from, to), across midnight when to < from. Nothing is in an empty window (from == to).
 [[nodiscard]] constexpr bool in_night_window(int from_min, int to_min, int minute) {
     if (from_min == to_min) {

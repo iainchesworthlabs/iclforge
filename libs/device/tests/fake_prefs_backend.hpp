@@ -20,6 +20,10 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    int brightness_ = nowview::kDefaultBrightness;
+    wallclock::ClockFormat clock_;
+    nowview::NightSchedule night_;
+    wallclock::ZoneChoice zone_;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -38,6 +42,42 @@ class FakeBackend final : public Backend {
             return false;
         }
         dim_minutes_ = minutes;
+        return true;
+    }
+    [[nodiscard]] int brightness() const override { return brightness_; }
+    [[nodiscard]] bool set_brightness(int percent) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        brightness_ = percent;
+        return true;
+    }
+    [[nodiscard]] wallclock::ClockFormat clock_format() const override { return clock_; }
+    [[nodiscard]] bool set_clock_format(wallclock::ClockFormat format) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        clock_ = format;
+        return true;
+    }
+    [[nodiscard]] nowview::NightSchedule night() const override { return night_; }
+    [[nodiscard]] bool set_night(const nowview::NightSchedule& night) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        night_ = night;
+        return true;
+    }
+    [[nodiscard]] wallclock::ZoneChoice time_zone() const override { return zone_; }
+    [[nodiscard]] bool set_time_zone(const wallclock::ZoneChoice& zone) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        zone_ = zone;
         return true;
     }
 
