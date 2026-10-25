@@ -23,6 +23,8 @@ class FakeBackend final : public Backend {
     BoardCaps board_;
     nowview::View view_ = nowview::kDefaultView;
     int dim_minutes_ = nowview::kDefaultDimMinutes;
+    std::string layout_ = "2.0";
+    bool playing_ = false;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -43,6 +45,16 @@ class FakeBackend final : public Backend {
         dim_minutes_ = minutes;
         return true;
     }
+    [[nodiscard]] std::string layout() const override { return layout_; }
+    [[nodiscard]] bool set_layout(std::string_view layout) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        layout_ = std::string(layout);
+        return true;
+    }
+    [[nodiscard]] bool playing() const override { return playing_; }
 
     // Sound: the tone is running or not, something else may have the sink, and the trim is held as the words of PUT /trim
     // would leave it (the host test of the real table is libs/render's; this holds what the registry handed over).

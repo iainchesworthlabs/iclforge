@@ -171,6 +171,7 @@ nav:
       - Speaker levels and the test tone: hearth/sink-speakers.md
       - Sink firmware: hearth/sink-firmware.md
       - Install from the browser: hearth/sink-installer.md
+      - Choosing the speaker layout: hearth/sink-layouts.md
       - Design record: hearth/design/player-appliance.md
   - Platforms:
       - Which platform: platforms/index.md

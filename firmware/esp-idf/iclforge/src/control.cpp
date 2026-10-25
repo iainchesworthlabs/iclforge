@@ -21,6 +21,7 @@
 
 #include "iclforge/firmware.hpp"
 #include "iclforge/hardware_info.hpp"
+#include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/preferences.hpp"
@@ -277,7 +278,7 @@ HardwareFacts gather_hardware_facts(int sink_max_slots, int sink_max_slots_bits)
     // revision_notice_at above: a chip this old can only ever be running a
     // build lenient enough to accept it, so there is no build-flag case
     // where the limit does not apply.
-    facts.revision_hard_limit_below = 300;  // v3.0
+    facts.revision_hard_limit_below = kEsp32p4TdmClockRevision;  // v3.0, which the wide sink reads too
     facts.revision_hard_limit_cost =
         "This chip has no PLL clock source for I2S (hal/i2s_ll.h), and the APLL fallback's own "
         "125 MHz ceiling falls short of what a full-width TDM frame needs: TDM output cannot "
@@ -471,6 +472,8 @@ struct Control::Impl {
                          "POST /volume        body: 0.0 to 1.0\n"
                          "GET  /layout        the output layout\n"
                          "PUT  /layout        body: a name (5.1.4) or a speaker list; next play\n"
+                         "GET  /layout-options  the layouts to choose from, each supported, with limits or "
+                         "unavailable on this board and why, as JSON\n"
                          "GET  /name          this board's name; PUT one to change it\n"
                          "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
                          "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
@@ -743,12 +746,52 @@ struct Control::Impl {
         if (!h.set_layout) {
             return send_text(req, "409 Conflict", "this player's layout is fixed\n");
         }
-        if (!h.set_layout(body)) {
-            return send_text(req, "409 Conflict",
-                             "not a layout this player can play: check the name or the list, and "
-                             "that it has no more slots than the sink\n");
+        const ControlLayoutAnswer answer = h.set_layout(body);
+        if (!answer.accepted) {
+            // The reason the board cannot carry it, from the verdict GET /layout-options and the Preferences list
+            // give; the route's own words when the owner has none (text that is not a layout).
+            if (answer.message.empty()) {
+                return send_text(req, "409 Conflict",
+                                 "not a layout this player can play: check the name or the list, and "
+                                 "that it has no more slots than the sink\n");
+            }
+            return send_text(req, "409 Conflict", (answer.message + '\n').c_str());
         }
-        return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        if (answer.message.empty()) {
+            return send_text(req, "200 OK", "ok; takes effect at the next play\n");
+        }
+        // Taken, with a limit on it: said, so that a person is not told "ok" about a layout that plays narrower.
+        return send_text(req, "200 OK",
+                         ("ok; takes effect at the next play. Note: " + answer.message + '\n').c_str());
+    }
+
+    // GET /layout-options: every layout the chooser lists, each judged against this board's capabilities
+    // (iclforge/layout_options.hpp, the verdict PUT /layout and the Preferences list ask too). Read-only. Sent
+    // one option at a time: the whole list is some 3 KB, and the server's task has 6 KB of stack and no heap to
+    // spare on a small part.
+    static esp_err_t on_layout_options_get(httpd_req_t* req) {
+        const ControlHandlers& h = self(req)->handlers;
+        if (h.preferences == nullptr || !h.layout) {
+            return send_text(req, "404 Not Found", "this player has no layout to choose\n");
+        }
+        const BoardCaps caps = h.preferences->caps();
+        const std::string head = layout_options_head_json(caps, h.layout());
+        httpd_resp_set_type(req, "application/json");
+        if (httpd_resp_send_chunk(req, head.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        bool first = true;
+        for (const CatalogLayout& entry : kLayoutCatalog) {
+            const std::string item = layout_option_json(evaluate_layout(caps, entry.name, entry.slots), first);
+            if (httpd_resp_send_chunk(req, item.c_str(), HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+                return ESP_FAIL;
+            }
+            first = false;
+        }
+        if (httpd_resp_send_chunk(req, "]}\n", HTTPD_RESP_USE_STRLEN) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        return httpd_resp_send_chunk(req, nullptr, 0);
     }
 
     static esp_err_t on_name_get(httpd_req_t* req) {
@@ -1334,6 +1377,7 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/volume", .method = HTTP_POST, .handler = &Impl::on_volume},
         {.uri = "/layout", .method = HTTP_GET, .handler = &Impl::on_layout_get},
         {.uri = "/layout", .method = HTTP_PUT, .handler = &Impl::on_layout_put},
+        {.uri = "/layout-options", .method = HTTP_GET, .handler = &Impl::on_layout_options_get},
         {.uri = "/slot-width", .method = HTTP_GET, .handler = &Impl::on_slot_width_get},
         {.uri = "/slot-width", .method = HTTP_PUT, .handler = &Impl::on_slot_width_put},
         {.uri = "/name", .method = HTTP_GET, .handler = &Impl::on_name_get},

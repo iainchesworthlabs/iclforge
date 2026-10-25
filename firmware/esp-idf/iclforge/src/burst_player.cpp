@@ -306,6 +306,11 @@ struct BurstPlayer::Impl {
     // else: a burst's blocks have no source of this kind.
     const PcmLevel* source_levels = nullptr;
     std::size_t source_channels = 0;
+    // The output each source channel's level is for, or -1 where the level is not the output's own: the
+    // slot the renderer puts the channel on, and the output that slot is patched to (play_pcm()). A channel
+    // is not on the output of its own number: a stereo bed in a 5.1 room puts R on slot 2, which is C's
+    // number in the room's order.
+    std::array<int, 2> source_outputs{-1, -1};
     unsigned source_bits = 16;
 
     // The meter.
@@ -1066,26 +1071,27 @@ struct BurstPlayer::Impl {
     }
 
     // The block's levels from the integers its PCM source was unpacked from (play_pcm()), where the
-    // outputs carry that source and nothing else: unity gain, every source channel on the output of
-    // its own number, no trim or delay, no identify tone (and, which the caller checks, no gain
-    // applied to the block). The same peak and mean square the floats would give, without a
+    // outputs carry that source and nothing else: unity gain, every source channel on one output
+    // (source_outputs, which is where the renderer and the patch put it, not the channel's number), no
+    // trim or delay, no identify tone (and, which the caller checks, no gain applied to the block). The same peak and mean square the floats would give, without a
     // soft-float operation a sample. False when any of that does not hold, and the caller measures
     // the floats.
     [[nodiscard]] bool meter_from_source(std::size_t n) {
-        if (source_levels == nullptr || identifying || trim.active() || source_channels > outputs_open) {
+        if (source_levels == nullptr || identifying || trim.active()) {
             return false;
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            if (routing.output_of(c) != static_cast<int>(c)) {
+            if (source_outputs[c] < 0) {
                 return false;
             }
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            window_peak[c] =
-                std::max(window_peak[c], pcm_level_peak(source_levels[c], source_bits));
+            const std::size_t o = static_cast<std::size_t>(source_outputs[c]);
+            window_peak[o] =
+                std::max(window_peak[o], pcm_level_peak(source_levels[c], source_bits));
             const double sum = pcm_level_square_sum(source_levels[c], source_bits);
-            window_sum[c] += sum;
-            stream_sum[c] += sum;
+            window_sum[o] += sum;
+            stream_sum[o] += sum;
         }
         meter_commit(n);
         return true;
@@ -1583,12 +1589,30 @@ struct BurstPlayer::Impl {
                 source_levels = levels.data();
                 source_channels = channels;
                 source_bits = width == 2 ? 16U : 24U;
+                for (std::size_t c = 0; c < source_outputs.size(); ++c) {
+                    source_outputs[c] = c < channels ? output_of_slot_only(serving.fold ? renderer.folded_slot(c, channels)
+                                                                                     : renderer.unity_slot(c))
+                                                     : -1;
+                }
             }
             emit(n, reached);
             source_levels = nullptr;
             done += n;
         }
         count_time(started);
+    }
+
+    // The output a slot is patched to, when the slot's samples are all that output carries; else -1.
+    [[nodiscard]] int output_of_slot_only(int slot) const {
+        if (slot < 0) {
+            return -1;
+        }
+        const int output = routing.output_of(static_cast<std::size_t>(slot));
+        if (output < 0 || static_cast<std::size_t>(output) >= outputs_open ||
+            routing.channel_of(static_cast<std::size_t>(output)) != slot) {
+            return -1;
+        }
+        return output;
     }
 
     // The identify tone with nothing playing: blocks of it straight to the
