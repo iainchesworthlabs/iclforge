@@ -705,6 +705,39 @@ test('the stand-in answers /brightness and /clock-format as the firmware does', 
     }
 });
 
+test('the stand-in answers /dynamic-range as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board that decodes no Dolby stream has nothing to choose.
+        stub.device.dynamicRange = null;
+        let reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noDynamicRange);
+        // One that does starts on standard and takes the two words, with or without a line ending.
+        stub.device.dynamicRange = 'standard';
+        reply = await fetch(`${stub.url}dynamic-range`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('standard\n');
+        for (const bad of ['late night', 'Late-night', 'wide', '']) {
+            reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.dynamicRangeBad);
+        }
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'late-night\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.dynamicRangeOk);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('late-night\n');
+        reply = await fetch(`${stub.url}dynamic-range`, { method: 'PUT', body: 'standard' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}dynamic-range`)).text()).toBe('standard\n');
+    } finally {
+        await stub.close();
+    }
+});
+
 // The preferences registry (libs/device/include/iclforge/preferences.hpp), which GET /preferences lists.
 const PREFERENCES_HPP = fs.readFileSync(path.join(LIBS_DEVICE, 'preferences.hpp'), 'utf8');
 

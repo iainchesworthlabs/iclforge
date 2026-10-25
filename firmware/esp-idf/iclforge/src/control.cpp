@@ -19,6 +19,7 @@
 #include "esp_http_server.h"
 #include "esp_psram.h"
 
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/firmware.hpp"
 #include "iclforge/hardware_info.hpp"
 #include "iclforge/layout_options.hpp"
@@ -485,6 +486,8 @@ struct Control::Impl {
                          "GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one\n"
                          "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one\n"
                          "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one\n"
+                         "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is "
+                         "kept; PUT one to change it (from the next stream)\n"
                          "GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; "
                          "change one through its own route\n"
                          "GET  /timezone      the POSIX time zone the board's time is shown in, or none (UTC); PUT one, or a name from /time-zones\n"
@@ -945,6 +948,35 @@ struct Control::Impl {
                              "that view is not in this build, or the setting could not be stored\n");
         }
         return send_text(req, "200 OK", "ok; the screen follows at once\n");
+    }
+
+    static esp_err_t on_dynamic_range_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.dynamic_range) {
+            return send_text(req, "404 Not Found", "this board decodes no Dolby stream, so it has no dynamic range to choose\n");
+        }
+        std::string text = h.dynamic_range();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_dynamic_range_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::string body = read_body(req);
+        const std::optional<base::DynamicRange> range = base::parse_dynamic_range(body);
+        if (!range) {
+            return send_text(req, "400 Bad Request", "PUT /dynamic-range wants standard or late-night\n");
+        }
+        if (!h.set_dynamic_range) {
+            return send_text(req, "409 Conflict", "this board decodes no Dolby stream, so it has no dynamic range to choose\n");
+        }
+        if (!h.set_dynamic_range(base::dynamic_range_name(*range))) {
+            return send_text(req, "409 Conflict", "that setting could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; takes effect from the next stream\n");
     }
 
     static esp_err_t on_dim_after_get(httpd_req_t* req) {
@@ -1417,6 +1449,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/clock-format", .method = HTTP_GET, .handler = &Impl::on_clock_format_get},
         {.uri = "/clock-format", .method = HTTP_PUT, .handler = &Impl::on_clock_format_put},
         {.uri = "/time-zones", .method = HTTP_GET, .handler = &Impl::on_time_zones_get},
+        {.uri = "/dynamic-range", .method = HTTP_GET, .handler = &Impl::on_dynamic_range_get},
+        {.uri = "/dynamic-range", .method = HTTP_PUT, .handler = &Impl::on_dynamic_range_put},
         {.uri = "/preferences", .method = HTTP_GET, .handler = &Impl::on_preferences_get},
         {.uri = "/timezone", .method = HTTP_GET, .handler = &Impl::on_time_zone_get},
         {.uri = "/timezone", .method = HTTP_PUT, .handler = &Impl::on_time_zone_put},
