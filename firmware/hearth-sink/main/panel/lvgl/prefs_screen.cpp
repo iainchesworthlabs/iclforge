@@ -345,8 +345,9 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             control_w = 2 * g.m.row_target + 2 * gap + value_w;
             break;
         case prefs::Kind::kText:
-            // The value is a button: a tap on it opens the keyboard.
-            value_w = std::min(content_w / 2, std::max(text_width(g.body.latin, entry.value) + 2 * g.m.pad, g.m.row_target));
+            // The value is a button: a tap on it opens the keyboard. Where it and the label do not fit on one line it
+            // goes on the next, with the whole width, so a name is not cut to half a narrow display.
+            value_w = std::min(content_w, std::max(text_width(g.body.latin, entry.value) + 2 * g.m.pad, g.m.row_target));
             control_w = value_w;
             break;
         case prefs::Kind::kAction:

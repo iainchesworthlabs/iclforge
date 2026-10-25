@@ -682,9 +682,9 @@ void fill_servers() {
         lv_obj_set_size(words, text_w, LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(words, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_style_pad_row(words, m.gap / 2, 0);
-        lv_obj_t* const title = prefs_label(words, row.title, ui.body, tone_color(ui, row.tone));
-        lv_label_set_long_mode(title, LV_LABEL_LONG_MODE_DOTS);
-        lv_obj_set_size(title, text_w, lv_font_get_line_height(ui.body));
+        // The server's name wraps rather than ending in dots: a person chooses what to forget by it, and on a narrow
+        // display "Hearth on STUDIO-PC" and "Hearth on STUDIO-PC-2" would look alike in dots.
+        prefs_paragraph(words, row.title, ui.body, tone_color(ui, row.tone), text_w);
         prefs_paragraph(words, row.detail, ui.note, row.playing_now ? ui.c->accent : ui.c->muted, text_w);
         make_button(ui, line, "Forget", button_w, m.row_target, Op::kForget, i);
     }

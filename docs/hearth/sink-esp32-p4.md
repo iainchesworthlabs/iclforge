@@ -198,9 +198,11 @@ a song with no lyrics and its dim time) and puts itself away after eight seconds
 **Preferences** is a full-screen, scrollable list of everything that is chosen once and left, grouped Display, Sound,
 Network, Time, Updates and System (a group with nothing in it is not drawn), with *Close* at the top right. It keeps the
 screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
-closes, so the lyric screen is as it was with it shut. Today it holds the two settings that were in Adjust: what the
-screen shows while a song has no lyrics, and when it dims. The technical settings (slot width, the second I2S line, the
-time server) stay in the [developer view](#the-developer-view) and the routes.
+closes, so the lyric screen is as it was with it shut. It holds the two settings that were in Adjust (what the screen
+shows while a song has no lyrics, and when it dims) and the Network and System groups: wired or Wi-Fi, the player's name,
+About, the paired servers, Restart, Reset preferences and Factory reset
+([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time server) stay in the
+[developer view](#the-developer-view) and the routes.
 
 ![Preferences on the kit](screenshots/p4-panel-prefs.png)
 
@@ -214,10 +216,11 @@ product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an
 touch) for the host tests to walk.
 
 The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
-and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text or action),
-whether a change applies live, at the next play or after a restart, the route that sets the same value, its choices,
-and **`availability(caps)`**, once for the entry and once for each choice: whether this board can do it and, if not,
-why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action, info
+or list), whether a change applies live, at the next play or after a restart, the route that sets the same value, its
+choices, what **Reset preferences** does with it (`on_reset`: put back to its default word, or keep; an entry that says
+neither fails a host test), and **`availability(caps)`**, once for the entry and once for each choice: whether this board
+can do it and, if not, why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
 functions (`main/preferences.cpp`), so the screen, the routes and the host tests go through the same code.
 
 **A preference the board cannot support is shown, greyed, with the reason, and never hidden.** On a board whose screen
@@ -234,6 +237,13 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Wired or Wi-Fi: automatic, cable, Wi-Fi | `network-preference` | `/network-preference` | the board has both a cable and Wi-Fi |
+| Name of this player | `name` | `/name` | always |
+| About | `about` | `/hardware` | always |
+| Paired servers | `paired-servers` | `/pairing` | the board runs the Sendspin player |
+| Restart | `restart` | `/restart` | not while an update is under way, nor while the new image is on trial |
+| Reset preferences | `reset-preferences` | `/reset-preferences` | not while an update is under way |
+| Factory reset | `factory-reset` | `/factory-reset` | as Restart |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
