@@ -674,7 +674,7 @@ mark after each handler, then reverted.
 
 | Item | Budget | Measured |
 |---|---|---|
-| Flash: the page and its script together, as stored | 65,536 bytes ([decision 22](#decisions)); 57,344 before the Time section, 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 61,830 (22,708 + 39,122); 55,926 before the Time section; 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
+| Flash: the page and its script together, as stored | 81,920 bytes ([decision 22](#decisions)); 65,536 before the layout chooser, 57,344 before the Time section, 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 61,830 (22,708 + 39,122); 55,926 before the Time section; 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
 | Internal heap held once the server is up: two more route registrations and handler slots | 256 bytes | 76, from the `heap:` line: 290,428 free against the base's 290,504 |
 | Internal heap held while a browser has the page open | - | 376, the keep-alive connection |
 | Internal heap at the peak of one `GET /status` | 3,072 bytes | 4,700 to 7,700 from the page's keep-alive connection; 5,100 from `curl`, a new connection each time |
@@ -853,7 +853,7 @@ below 98% of statements, lines and functions and 90% of branches. The suite reac
 and 94.8 when the page was first built, on 2026-09-11. The branch that loads the page again is
 run by the tests but not counted: a page's coverage is what its last load ran.
 
-**Budget.** A host test sums the two files, fails above 65,536 bytes, and fails on a carriage
+**Budget.** A host test sums the two files, fails above 81,920 bytes, and fails on a carriage
 return.
 
 **On the target.** A step in the ESP32 job, after the HTTP step and without changing it, boots the
@@ -1144,6 +1144,25 @@ run as root, so Playwright can install Chromium's system libraries).
     sends them and fills them from `GET /status`'s `time`. The tightest slot is the C6's on the 4 MB
     table, which was already 6,128 bytes over on main (1,840,112 bytes in a 1,835,008-byte slot) before this.
 
+    **Raised again 2026-10-25: 81,920 bytes (80 KiB).** The owner: "we can increase the device web page
+    size if required". The layout chooser took the page to 63,776 bytes (the list of reasons under the layout
+    field, the route's script, less the page's own slot count), and the Preferences work that follows it (a
+    per-speaker trim, a zone picker) will add more. The ceiling is raised with room for those rather than to
+    fit one change. Built on 2026-10-25 from this branch (prefs-core's Preferences work merged in), each image
+    against its slot:
+
+    | Image | Size | Its slot | Free |
+    |---|---|---|---|
+    | S3 board (`s3-n16r8`) | 1,604,960 bytes | 4 MiB | 62% |
+    | C6 on the 4 MB table (`c6-4mb`), the tightest | 1,889,504 bytes | 1,966,080 bytes (the table's 1.875 MiB) | 76,576 bytes (3.9%) |
+    | P4X kit (`p4-rev3`) | 2,629,056 bytes | 4 MiB | 37% |
+
+    The C6 is what a ceiling of this size is held to: a page at the new ceiling, 18,144 bytes larger than
+    today's, leaves it 58,432 bytes of 1,966,080. The page's ceiling is not a size the page has; the budget
+    test fails above it. The S3's and the P4's app budgets in `profiles.json` (1,600,000 and 2,600,000) are
+    about 5% over what those builds measured earlier and were already exceeded on `main` before this change;
+    they are raised by their own change, not here.
+
 23. **The output layout's control.** (a) **the named layouts as a segmented control, those wider
     than the sink disabled, above the field**; (b) the field with its suggestion list, as before;
     (c) the segmented control alone. **Recommend (a).** A `<datalist>` shows its suggestions only
@@ -1235,7 +1254,7 @@ run as root, so Playwright can install Chromium's system libraries).
     - **Sent in chunks**: the list is some 3 KB and the server task has 6 KB of stack.
 
     Cost: one more request when the sink's slots, slot width or wiring change, and 1.7 KB of the
-    page's budget (63,843 of 65,536 bytes).
+    page's budget (63,776 of 81,920 bytes).
 
 31. **The sink reports what the chip reaches** (revises decision 21; [Which layouts the board can take](#which-layouts-the-board-can-take)).
     Decision 21 kept `sink_max_slots` a pure wiring fact (32 on an ESP32-P4 below v3.0) with a notice
