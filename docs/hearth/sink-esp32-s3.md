@@ -169,9 +169,9 @@ resets the whole system, which a Wi-Fi link behind the companion chip needs
 
 **Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to the
 image's defaults, at once and with no restart: what the screen shows without lyrics, when it dims,
-the time zone, and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and
-the choice between the cable and Wi-Fi, the DAC wiring and the speaker layout, the time server and
-whether the board asks it, and the pairings.
+and the rest of the board's preferences. **It keeps** the name, the Wi-Fi network and the choice
+between the cable and Wi-Fi, the DAC wiring, the speaker layout and the time zone (the room's, not a
+matter of taste), the time server and whether the board asks it, and the pairings.
 
 **Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
 (the board gets a new identity, so each server has to pair with it again, and has to remove it from
