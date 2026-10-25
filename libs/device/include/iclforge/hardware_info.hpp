@@ -143,6 +143,26 @@ namespace detail {
 
 }  // namespace detail
 
+// The ESP32-P4 chip revision (esp_chip_info_t's MXX: major * 100 + minor) from which its I2S has a PLL clock
+// source, and so can open a TDM frame at all. Below it only standard 1-2 channel I2S works
+// (docs/platforms/bare-metal/esp32-p4.md). One number for the two readers that must agree: the wide sink, which
+// reports the slots it can open, and GET /hardware's revision_hard_limit_below.
+inline constexpr int kEsp32p4TdmClockRevision = 300;  // v3.0
+
+// The chip below its hard limit (revision_hard_limit_below: today an ESP32-P4 under v3.0, whose I2S has
+// no clock for TDM) as one clause for layout_options.hpp to put its reason after: "This chip (v1.3)
+// has no clock for multi-channel output". Empty when the chip clears the limit or the build states none.
+[[nodiscard]] inline std::string tdm_blocked_clause(const HardwareFacts& facts) {
+    if (facts.revision_hard_limit_below == 0 || facts.revision_hard_limit_cost.empty()) {
+        return {};
+    }
+    if (facts.revision_major * 100 + facts.revision_minor >= facts.revision_hard_limit_below) {
+        return {};
+    }
+    return "This chip (v" + detail::describe_revision(facts.revision_major, facts.revision_minor) +
+           ") has no clock for multi-channel output";
+}
+
 // Pure: every sentence comes only from `facts`, so a wrong one is a wrong
 // INPUT (control.cpp's gathering) or a wrong RULE (here), never a
 // board-only bug.

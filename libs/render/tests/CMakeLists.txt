@@ -7,6 +7,7 @@ iclforge_add_test_binary(iclforge-render-tests PROJECT render SOURCES
     test_identify.cpp
     test_identify_request.cpp
     test_identify_sequence.cpp
+    test_pcm_slots.cpp
     test_room_plan.cpp
     test_routing.cpp
     test_serving.cpp
