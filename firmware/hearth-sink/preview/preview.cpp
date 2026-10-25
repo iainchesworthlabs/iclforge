@@ -586,6 +586,11 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
     pump(6);
     write_bmp(out / ("footer-" + size + ".bmp"));
     failures += audit(player::panel::screen_footer_object(), "footer " + size);
+    // A screen wide enough for the kit's columns still says where in the song it is and the delay, beside the buttons.
+    if (width >= 960) {
+        expect(shows_text(player::panel::screen_footer_object(), "Line ", true), "the footer says which line is being sung");
+        expect(shows_text(player::panel::screen_footer_object(), "Delay +0 ms"), "and the lyric delay");
+    }
 
     // Adjust: the lyric delay and the text size, and nothing else.
     expect(tap_button("Adjust"), "the footer has an Adjust button");
@@ -609,11 +614,12 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         }
         tap_button("+");
         pump(2);
-        expect(shows_text(sheet, "Delay +50 ms"), "+ adds 50 ms to the lyric delay");
+        // "Delay +50 ms", or "+50 ms" on a screen too narrow for the longer between the two buttons.
+        expect(shows_text(sheet, "+50 ms", true), "+ adds 50 ms to the lyric delay");
         tap_button("-");
         tap_button("-");
         pump(2);
-        expect(shows_text(sheet, "Delay -50 ms"), "- takes 50 ms off the lyric delay");
+        expect(shows_text(sheet, "-50 ms", true), "- takes 50 ms off the lyric delay");
         tap_button("+");
         tap_button("Larger");
         pump(2);
@@ -1417,7 +1423,10 @@ int main(int argc, char** argv) {
     // fingertip or sticking out of its sheet, a choice that does nothing, fails the run.
     std::puts("Adjust and Preferences at each display size:");
     int failures = 0;
-    for (const auto& [width, height] : {std::pair{1024, 600}, std::pair{800, 480}, std::pair{480, 320}, std::pair{320, 240}}) {
+    // 240 by 240 is the first square one (a JetKVM Mini's); its board has no touch, which every size's second pass
+    // (a board whose screen has none) draws and checks as well.
+    for (const auto& [width, height] :
+         {std::pair{1024, 600}, std::pair{800, 480}, std::pair{480, 320}, std::pair{320, 240}, std::pair{240, 240}}) {
         failures += check_sheets(width, height, out, auld, disp);
     }
     if (failures != 0) {

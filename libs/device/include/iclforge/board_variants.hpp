@@ -157,6 +157,31 @@ namespace variants {
     return caps;
 }
 
+// A JetKVM Mini with an ESP32-P4X (planning/jetkvm-mini.md): a square 240 by 240 IPS panel with NO touch and one or two
+// side buttons, no audio output at all, and one network interface - the Ethernet port of the Mini, or the Wi-Fi of the
+// Mini W. The first board whose screen is square, whose rows cannot be tapped, and whose sink has no slots.
+[[nodiscard]] inline BoardCaps p4x_jetkvm_mini_240() {
+    BoardCaps caps;
+    caps.hardware = chip("esp32p4", "ESP32-P4", 3, 2, 2, true, 400, 32U * 1024 * 1024, 0);
+    caps.hardware.sink_max_slots_bits = 0;
+    caps.profile = "p4x-jetkvm-mini-240";
+    caps.display = {.kind = DisplayKind::kSpi, .width = 240, .height = 240, .touch = false, .backlight = true, .keys = 2};
+    caps.sink = {};
+    caps.network = {.ethernet = true};
+    caps.wall_clock = true;
+    caps.sendspin = true;
+    caps.max_objects = 12;
+    caps.firmware_slots = true;
+    return caps;
+}
+
+[[nodiscard]] inline BoardCaps p4x_jetkvm_mini_w_240() {
+    BoardCaps caps = p4x_jetkvm_mini_240();
+    caps.profile = "p4x-jetkvm-mini-w-240";
+    caps.network = {.wifi = true};
+    return caps;
+}
+
 }  // namespace variants
 
 // All of them, in a fixed order. A variant added here is checked by every test that walks the list.
@@ -171,6 +196,8 @@ namespace variants {
         {"c3-spi-320x240-no-touch", variants::c3_spi_320x240_no_touch()},
         {"s3-parallel-480x320", variants::s3_parallel_480x320()},
         {"p4-dsi-800x480", variants::p4_dsi_800x480()},
+        {"p4x-jetkvm-mini-240", variants::p4x_jetkvm_mini_240()},
+        {"p4x-jetkvm-mini-w-240", variants::p4x_jetkvm_mini_w_240()},
     };
 }
 

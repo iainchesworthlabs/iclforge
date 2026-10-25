@@ -19,8 +19,13 @@
 //      for the firmware (firmware/hearth-sink/main/preferences.cpp), over the settings_* functions
 //      (main/settings.hpp) and whatever acts on a change, and once for the tests (a fake that holds the values).
 //      A pure virtual means a firmware that forgot the setter does not compile;
-//   3. only when the control is not one of the five kinds (a layout list, a time-zone picker): an editor on the
-//      screen (panel/lvgl/prefs_screen.cpp). Never a bespoke button in lyric_screen.cpp.
+//   3. only when the control is not one of the five kinds (a layout list, a time-zone picker, read-only rows, a
+//      keyboard, a grid): the kind joins `Kind` (added at the END, never renumbered, with its name in kind_name()) and
+//      an editor draws it on the screen (panel/lvgl/prefs_screen.cpp, build_row()). Never a bespoke button in
+//      lyric_screen.cpp. The entry's value is still a word the Backend reads and sets: a list's summary, a pair of times
+//      as text, whatever the editor needs to hand over.
+// A field every entry must say (whether `Reset preferences` puts it back, how a change is confirmed) is added to Pref
+// with a default that a host test fails on, so that no entry can leave it out by accident.
 // The host tests walk every entry against every known board (board_variants.hpp): a default that is not
 // available where its entry is, an unavailable choice with no reason, a duplicate id, a stepper that cannot be
 // stepped, all fail there and not on a bench.
@@ -180,8 +185,9 @@ struct Pref {
     // A stepper's unit, said after a number that is not one of its stops ("7 min").
     const char* unit = "";
     // kChoice and kStepper: the choices, in the order they are shown (a stepper's, in the order it steps). kToggle:
-    // "on" and "off".
-    std::span<const ChoiceDef> choices;
+    // "on" and "off". Empty for the kinds with none (a text, an action): GCC's -Wmissing-field-initializers, which the
+    // CI flags turn into an error, wants a default for every member an entry may leave out.
+    std::span<const ChoiceDef> choices = {};
     // The whole entry; null is always available.
     AvailabilityFn availability = nullptr;
     InertFn inert = nullptr;
@@ -550,17 +556,31 @@ inline void json_text(std::string& out, std::string_view text) {
     out += '"';
 }
 
-inline void json_member(std::string& out, const char* key, std::string_view text) {
-    json_text(out, key);
-    out += ':';
-    json_text(out, text);
-}
+// An object being written into `out`: a comma before every member but the first. (text() and flag() are not overloads
+// of one name: a `const char*` converts to bool before it converts to a string_view.)
+struct JsonObject {
+    std::string& out;
+    bool first = true;
 
-// Not an overload of json_member: a `const char*` converts to bool before it converts to a string_view.
-inline void json_flag(std::string& out, const char* key, bool value) {
-    json_text(out, key);
-    out += value ? ":true" : ":false";
-}
+    explicit JsonObject(std::string& to) : out(to) { out += '{'; }
+    void key(const char* name) {
+        if (!first) {
+            out += ',';
+        }
+        first = false;
+        json_text(out, name);
+        out += ':';
+    }
+    void text(const char* name, std::string_view value) {
+        key(name);
+        json_text(out, value);
+    }
+    void flag(const char* name, bool value) {
+        key(name);
+        out += value ? "true" : "false";
+    }
+    void close() { out += '}'; }
+};
 
 }  // namespace detail
 
@@ -568,62 +588,68 @@ inline void json_flag(std::string& out, const char* key, bool value) {
 // sets it, the value, whether it is available and why not, a note when another setting makes it inert, and, for the
 // kinds with choices, each choice with the same. Read-only: a change goes through the entry's own route.
 [[nodiscard]] inline std::string to_json(const Backend& backend) {
+    // Written straight from the registry and the board, with no Entry built: this is in every build, a board with no
+    // screen as well, and the flash it takes is the C6's headroom.
     const BoardCaps caps = backend.caps();
-    std::string out = "{";
-    detail::json_member(out, "profile", caps.profile);
-    out += ',';
-    detail::json_member(out, "display", display_kind_name(caps.display.kind));
-    out += ",\"preferences\":[";
+    std::string out;
+    detail::JsonObject top(out);
+    top.text("profile", caps.profile);
+    top.text("display", display_kind_name(caps.display.kind));
+    top.key("preferences");
+    out += '[';
     bool first = true;
     for (const Group group : kGroups) {
         for (const Pref& pref : kRegistry) {
             if (pref.group != group) {
                 continue;
             }
-            const Entry entry = resolve(pref, backend, caps);
-            out += first ? "{" : ",{";
-            first = false;
-            detail::json_member(out, "id", pref.id);
-            out += ',';
-            detail::json_member(out, "group", group_name(pref.group));
-            out += ',';
-            detail::json_member(out, "label", pref.label);
-            out += ',';
-            detail::json_member(out, "kind", kind_name(pref.kind));
-            out += ',';
-            detail::json_member(out, "apply", apply_name(pref.apply));
-            out += ',';
-            detail::json_member(out, "route", pref.route);
-            out += ',';
-            detail::json_member(out, "value", entry.value);
-            out += ',';
-            detail::json_flag(out, "available", entry.availability.available);
-            out += ',';
-            detail::json_member(out, "reason", entry.availability.reason);
-            if (!entry.inert.empty()) {
+            if (!first) {
                 out += ',';
-                detail::json_member(out, "note", entry.inert);
             }
-            if (!entry.choices.empty()) {
-                out += ",\"choices\":[";
-                for (std::size_t i = 0; i < entry.choices.size(); ++i) {
-                    const ChoiceState& choice = entry.choices[i];
-                    out += i == 0 ? "{" : ",{";
-                    detail::json_member(out, "id", choice.id);
-                    out += ',';
-                    detail::json_member(out, "label", choice.label);
-                    out += ',';
-                    detail::json_flag(out, "available", choice.availability.available);
-                    out += ',';
-                    detail::json_member(out, "reason", choice.availability.reason);
-                    out += '}';
+            first = false;
+            const Availability whole = availability_of(pref, caps);
+            detail::JsonObject entry(out);
+            entry.text("id", pref.id);
+            entry.text("group", group_name(pref.group));
+            entry.text("label", pref.label);
+            entry.text("kind", kind_name(pref.kind));
+            entry.text("apply", apply_name(pref.apply));
+            entry.text("route", pref.route);
+            entry.text("value", pref.get != nullptr ? pref.get(backend) : std::string());
+            entry.flag("available", whole.available);
+            entry.text("reason", whole.reason);
+            if (pref.inert != nullptr) {
+                if (const std::string note = pref.inert(backend); !note.empty()) {
+                    entry.text("note", note);
+                }
+            }
+            if (!pref.choices.empty()) {
+                entry.key("choices");
+                out += '[';
+                for (std::size_t i = 0; i < pref.choices.size(); ++i) {
+                    const ChoiceDef& choice = pref.choices[i];
+                    if (i != 0) {
+                        out += ',';
+                    }
+                    // An unavailable entry greys every choice with its own reason.
+                    const Availability one = !whole.available || choice.availability == nullptr
+                                                 ? whole
+                                                 : choice.availability(caps);
+                    detail::JsonObject item(out);
+                    item.text("id", choice.id);
+                    item.text("label", choice.label);
+                    item.flag("available", one.available);
+                    item.text("reason", one.reason);
+                    item.close();
                 }
                 out += ']';
             }
-            out += '}';
+            entry.close();
         }
     }
-    out += "]}\n";
+    out += ']';
+    top.close();
+    out += '\n';
     return out;
 }
 

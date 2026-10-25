@@ -110,6 +110,13 @@ TEST_CASE("the sink's most slots is the figure GET /hardware reports, on every b
     for (const auto& variant : known_variants()) {
         INFO(variant.name);
         const BoardCaps& caps = variant.caps;
+        if (caps.sink.frame_bit_max == 0 && caps.sink.fixed_slots == 0) {
+            // A board with no audio output (a JetKVM Mini): no slots at any setting, and GET /hardware says none.
+            REQUIRE(caps.sink.slots() == 0);
+            REQUIRE(caps.sink.slots_most() == 0);
+            REQUIRE(caps.hardware.sink_max_slots == 0);
+            continue;
+        }
         REQUIRE(caps.hardware.sink_max_slots_bits == 16);
         REQUIRE(caps.sink.slots_most() == caps.hardware.sink_max_slots);
         if (!caps.sink.tdm_usable) {
@@ -150,6 +157,30 @@ TEST_CASE("the P4X kit is the one board with a real screen today", "[board_caps]
         }
     }
     REQUIRE(real_screens == 1);
+}
+
+TEST_CASE("a JetKVM Mini is a square screen with no touch, side buttons, no audio output and one network", "[board_caps]") {
+    for (const BoardCaps& mini : {variants::p4x_jetkvm_mini_240(), variants::p4x_jetkvm_mini_w_240()}) {
+        INFO(mini.profile);
+        REQUIRE(mini.display.present());
+        REQUIRE(mini.display.width == 240);
+        REQUIRE(mini.display.height == 240);
+        REQUIRE_FALSE(mini.display.touch);
+        REQUIRE(mini.display.keys == 2);
+        // Something to press, so a person can drive it, though not by touch.
+        REQUIRE(mini.display.operable());
+        REQUIRE(mini.sink.slots_most() == 0);
+        REQUIRE_FALSE(mini.network.choice());
+        REQUIRE(mini.network.any());
+    }
+    REQUIRE(variants::p4x_jetkvm_mini_240().network.ethernet);
+    REQUIRE_FALSE(variants::p4x_jetkvm_mini_240().network.wifi);
+    REQUIRE(variants::p4x_jetkvm_mini_w_240().network.wifi);
+    REQUIRE_FALSE(variants::p4x_jetkvm_mini_w_240().network.ethernet);
+    // The kit's panel can be touched; a screen with neither touch nor keys cannot be driven at all.
+    REQUIRE(variants::p4_rev3_kit().display.operable());
+    REQUIRE_FALSE(variants::c3_spi_320x240_no_touch().display.operable());
+    REQUIRE_FALSE(variants::s3_n16r8().display.operable());
 }
 
 TEST_CASE("the object cap is the build's, and the P4 places a dozen", "[board_caps]") {

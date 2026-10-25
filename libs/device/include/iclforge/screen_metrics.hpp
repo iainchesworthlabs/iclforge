@@ -52,19 +52,27 @@ struct Metrics {
 // By the display's shorter side, so that a portrait panel is drawn like its landscape twin.
 [[nodiscard]] constexpr Metrics metrics_for(int width, int height) {
     const int shorter = std::min(width, height);
-    Metrics m;
-    m.width = width;
-    m.height = height;
-    if (shorter >= 560) {  // 1024 by 600: the P4X kit
-        m = {width, height, 32, 12, 72, 64, 24, 20, 32, 24, 64, 64, 48, 160, 64, 56};
-    } else if (shorter >= 440) {  // 800 by 480
-        m = {width, height, 24, 10, 64, 56, 22, 18, 28, 20, 56, 60, 48, 140, 60, 52};
-    } else if (shorter >= 300) {  // 480 by 320
-        m = {width, height, 16, 8, 56, 52, 18, 15, 24, 14, 48, 56, 48, 110, 56, 48};
-    } else {  // 320 by 240 and smaller
-        m = {width, height, 10, 6, 48, 48, 16, 13, 20, 10, 40, 56, 48, 84, 56, 48};
+    // The kit's 1024 by 600 panel: the sizes of docs/hearth/design/sink-screen-tokens.json, which
+    // tools/checks/sink_screen_tokens.py holds this block to (margin, header, footer, type, and the 72 px target).
+    if (shorter >= 560) {
+        return {.width = width, .height = height, .margin = 32, .gap = 12, .target = 72, .row_target = 64, .text = 24,
+                .note = 20, .title = 32, .pad = 24, .header = 64, .footer = 64, .footer_button = 48,
+                .footer_button_width = 160, .bar = 64, .bar_button = 56};
     }
-    return m;
+    if (shorter >= 440) {  // 800 by 480
+        return {.width = width, .height = height, .margin = 24, .gap = 10, .target = 64, .row_target = 56, .text = 22,
+                .note = 18, .title = 28, .pad = 20, .header = 56, .footer = 60, .footer_button = 48,
+                .footer_button_width = 140, .bar = 60, .bar_button = 52};
+    }
+    if (shorter >= 300) {  // 480 by 320
+        return {.width = width, .height = height, .margin = 16, .gap = 8, .target = 56, .row_target = 52, .text = 18,
+                .note = 15, .title = 24, .pad = 14, .header = 48, .footer = 56, .footer_button = 48,
+                .footer_button_width = 110, .bar = 56, .bar_button = 48};
+    }
+    // 320 by 240 and smaller.
+    return {.width = width, .height = height, .margin = 10, .gap = 6, .target = 48, .row_target = 48, .text = 16,
+            .note = 13, .title = 20, .pad = 10, .header = 40, .footer = 56, .footer_button = 48,
+            .footer_button_width = 84, .bar = 56, .bar_button = 48};
 }
 
 }  // namespace iclforge::screen
