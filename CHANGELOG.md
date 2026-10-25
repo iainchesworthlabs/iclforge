@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
+  stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
+  let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
+  internal heap: a board that had played the Atmos demo read 7 to 14 KB free while it played PCM, where the same image after a
+  boot reads 70 KB, and Wi-Fi's receive buffers are made from what is left. A PCM stream now lets the AC-3 and E-AC-3 decoders
+  go on a part with PSRAM, which makes them again for the next coded stream as it does after a boot (`iclforge/decoder_keep.hpp`);
+  the ESP32-C6, which has none, keeps them as before.
 - **Changed: a P4 sink takes a TCP window of 23,040 bytes, not lwIP's 5,760.** A window caps a stream at its size over the round-trip time and, at four segments, leaves a lost one only the retransmission timer to repair it. With five boards streaming PCM on one 2.4 GHz channel the round trip rose from 10-15 ms to 32-50 ms: a server saw 0.8-2 s stalls on a P4 and skipped 26 % of its stream as late, while the board counted three underruns. The S3 and C6 profiles keep the small window for now (their internal heap has less to spare).
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
@@ -108,6 +115,30 @@ The sections below contain the complete change list and fixes.
   on the board; with none the time is UTC, and the clock says so) and `GET` and `PUT /time-sync` (`on` or `off`) set it,
   `GET /status` has a `time` object, and the board's own web page has a Time section with the same three settings and the
   time it keeps. QEMU's network and a build with no network keep no time, and those routes answer 404.
+
+**Display and time preferences: brightness, the clock's format, and 420 time zones by name**
+
+- **Brightness is a setting.** `GET` and `PUT /brightness` (10 to 100 percent, 80 by default) set the level of a board
+  screen's backlight while it is lit, at once and kept over a restart; the dimmed screen stays under it (the floor is
+  4 percent, and never above the brightness) and the dark view is off. A glass with no backlight to dim refuses it.
+- **The clock view can be in 12 hours and can show the seconds.** `GET` and `PUT /clock-format` take `24`, `12`,
+  `24 seconds` and `12 seconds`. The seconds and the AM or PM are small beside the digits, so a second redraws about
+  9,600 pixels and not the digits'.
+- **The time zone can be chosen by name.** The board carries 420 zones by region and city (IANA tzdata 2026e, Australia
+  complete, 11,578 bytes of flash), written by `tools/hearth/gen_time_zones.py`, which holds every one to tzdata's own
+  offsets to 2036. `PUT /timezone Australia/Melbourne` stores the zone and the name (`GET /time-zones` lists the names,
+  `GET /status`'s `time` object has `zone_name`), and the board's web page offers a region and a city. A POSIX string is
+  taken as before. The night schedule's rule (`dim_state()` with a window of times and the board's local minute, held to
+  Melbourne's daylight saving changeovers) is built and host-tested.
+- **A night schedule.** `GET` and `PUT /night-schedule` (`22:00-07:00 on`) make a board with a screen and a clock go dark
+  between two times by its own time, as the dark view does: a touch lights it for 30 seconds, and a board that does not
+  know the time is lit. Off until switched on; kept as one NVS number and returned by Reset preferences. Whether it
+  darkens the idle screen between songs too is a switch of its own, `GET` and `PUT /night-idle`, off.
+- **The Preferences screen has them all.** Brightness, the clock's hours and seconds, the night schedule, its two times
+  and the time zone are rows, and the two that are not a few buttons open an editor over the sheet: the pair of times
+  steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
+  place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
+  down to 240 by 240. The routes now go through the same backend as the screen.
 
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
