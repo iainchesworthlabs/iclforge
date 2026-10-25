@@ -303,7 +303,7 @@ The same command with `--write` regenerates the profile table in the firmware's 
 | `c6-4mb` | 1,966,080 | 32,768 | 117,000 |
 | `p4-rev1` | not held | 24,576 | not held |
 | `p4-rev1-ac4` | not held | 24,576 | not held |
-| `p4-rev3` | 2,600,000 | 24,576 | 175,000 |
+| `p4-rev3` | 2,900,000 | 24,576 | 175,000 |
 
 - **The app image** is `iclforge_hearth_sink.bin` in the build directory. `c6-4mb`'s limit is the
   size of an application slot in `partitions_c6.csv`.

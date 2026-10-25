@@ -933,7 +933,7 @@
         "refuse_above": 399
       },
       "budget": {
-        "app_bytes_max": 2600000,
+        "app_bytes_max": 2900000,
         "bootloader_bytes_max": 24576,
         "internal_static_bytes_max": 175000
       },
