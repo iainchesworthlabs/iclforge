@@ -132,11 +132,14 @@ network the same way.
   board keeps, whether it asks a time server (on by default), its time zone and the server to ask
   ([the time of day](sink-esp32-p4.md#the-time-of-day)). A choice is sent as it is made; a name, a
   layout typed in full, a network, a zone or a server is sent with its button.
+- **Levels and distances:** a level and a distance for each speaker of the layout, and a test tone
+  out of each ([Speaker levels, distances and the test tone](sink-speakers.md)).
 - **Real time**, **Hardware** and **Counters:** how long each frame takes, what the board is -
   chip, memory, the sink's ceiling and the firmware - and the player's counters.
 
 The same routes answer without the page (`GET /api` lists them): `GET /status` for a script, and
-`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is. A
+`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is, and
+`GET` and `PUT /trim` and `POST /identify` for the speakers' levels and the test tone. A
 new name is advertised at once ([Name, restart and reset](#name-restart-and-reset)). The page and
 the routes have no password ([Security](#security)).
 

@@ -123,6 +123,7 @@ Settings image_defaults() {
     defaults.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
     defaults.now_view = iclforge::nowview::kDefaultView;
     defaults.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    defaults.speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
     defaults.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
     defaults.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
                                 .value_or(iclforge::wallclock::ClockFormat{});
@@ -134,6 +135,15 @@ Settings image_defaults() {
     defaults.ntp_server = {};
     defaults.time_sync = true;
     defaults.layout = {};
+    // What the build starts with, when it says (a CI shape, a product's own room): the same statements PUT /trim
+    // takes. A string that is wrong is said and leaves every speaker at the default.
+    if (const std::string_view built_in = CONFIG_ICLFORGE_EXAMPLE_SPEAKER_TRIM; !built_in.empty()) {
+        if (const auto result = defaults.speaker_trim.apply_text(built_in); !result.ok) {
+            std::printf("settings: the build's speaker trim is not one this board reads (%s); every speaker at the default\n",
+                        result.error);
+            defaults.speaker_trim = {};
+        }
+    }
     defaults.dynamic_range = iclforge::ac3::dynamic_range_from_stored(CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE)
                                  .value_or(iclforge::ac3::kDefaultDynamicRange);
     return defaults;
@@ -200,6 +210,14 @@ void load_all() {
                         g_settings.dim_after_minutes);
         }
     }
+    if (nvs_get_i32(handle, sk::kSpeakersStyle, &stored) == ESP_OK) {
+        if (const auto style = iclforge::nowview::speakers_style_from_stored(stored)) {
+            g_settings.speakers_style = *style;
+        } else {
+            std::printf("settings: stored speakers style %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::speakers_style_name(g_settings.speakers_style));
+        }
+    }
     if (nvs_get_i32(handle, sk::kBrightness, &stored) == ESP_OK) {
         if (const auto percent = iclforge::nowview::brightness_from_stored(stored)) {
             g_settings.brightness_percent = *percent;
@@ -257,6 +275,16 @@ void load_all() {
         g_settings.time_sync = stored != 0;
     }
     read_string(handle, sk::kLayout, g_settings.layout);
+    // A stored trim that is not one this build reads (a partition written by a later image, or damaged) is
+    // said, and the build's own stands: a speaker at the wrong level is worse than one at none.
+    {
+        std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+        std::size_t blob_length = blob.size();
+        if (nvs_get_blob(handle, sk::kSpeakerTrim, blob.data(), &blob_length) == ESP_OK &&
+            !g_settings.speaker_trim.from_blob(std::span<const std::uint8_t>(blob.data(), blob_length))) {
+            std::printf("settings: the stored speaker trim is not one this build reads; keeping the build's own\n");
+        }
+    }
     if (nvs_get_i32(handle, sk::kDynamicRange, &stored) == ESP_OK) {
         if (const auto range = iclforge::ac3::dynamic_range_from_stored(stored)) {
             g_settings.dynamic_range = *range;
@@ -270,13 +298,14 @@ void load_all() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s, dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
+                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
                 "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
                 network_preference_name(g_settings.network_preference),
                 iclforge::nowview::view_name(g_settings.now_view),
+                iclforge::nowview::speakers_style_name(g_settings.speakers_style),
                 iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str(),
                 g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
                 iclforge::nowview::night_schedule_text(g_settings.night).c_str(),
@@ -389,6 +418,14 @@ bool settings_set_now_view(iclforge::nowview::View view) {
     return true;
 }
 
+bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style) {
+    if (!write_int(sk::kSpeakersStyle, static_cast<std::int32_t>(style))) {
+        return false;
+    }
+    g_settings.speakers_style = style;
+    return true;
+}
+
 bool settings_set_dim_after(int minutes) {
     if (minutes < iclforge::nowview::kDimNever || minutes > iclforge::nowview::kDimMaxMinutes) {
         std::printf("settings: %d minutes is not a time to dim after\n", minutes);
@@ -436,6 +473,25 @@ bool settings_set_night(const iclforge::nowview::NightSchedule& night) {
 
 bool settings_set_layout(std::string_view layout) {
     return write_string(sk::kLayout, layout, g_settings.layout);
+}
+
+bool settings_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table) {
+    std::array<std::uint8_t, iclforge::render::speaker_trim::SpeakerTrimTable::kBlobBytes> blob{};
+    const std::size_t length = table.to_blob(blob);
+    nvs_handle_t handle = 0;
+    if (length == 0 || nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) {
+        std::printf("settings: could not open NVS to write %s\n", sk::kSpeakerTrim);
+        return false;
+    }
+    const esp_err_t err = nvs_set_blob(handle, sk::kSpeakerTrim, blob.data(), length);
+    if (err == ESP_OK) {
+        (void)nvs_commit(handle);
+        g_settings.speaker_trim = table;
+    } else {
+        std::printf("settings: NVS refused %s (%s)\n", sk::kSpeakerTrim, esp_err_to_name(err));
+    }
+    nvs_close(handle);
+    return err == ESP_OK;
 }
 
 bool settings_set_time_zone(std::string_view zone, std::string_view name) {

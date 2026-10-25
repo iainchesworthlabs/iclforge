@@ -84,8 +84,10 @@ inline constexpr std::array<Group, 6> kGroups{Group::kDisplay, Group::kSound, Gr
 // choices, "on" and "off". kText: a value typed in (read-only on a screen until an editor is written for it).
 // kAction: does something when pressed (a check, a restart); its setter is handed "run". kInfo: rows to be read, nothing to
 // set (About). kList: a list of things, each with an action of its own (the paired servers, each with Forget); the
-// entry's setter is handed "forget " and the item's id.
-enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kInfo, kList };
+// entry's setter is handed "forget " and the item's id. kSheet: a row that says what is set ("3 speakers set") and opens
+// an editor of its own on the screen (the per-speaker level and distance); its value is the summary, and its setter takes
+// the board's own text form of the whole (the body of a PUT on its route).
+enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kInfo, kList, kSheet };
 
 [[nodiscard]] constexpr const char* kind_name(Kind kind) {
     switch (kind) {
@@ -101,6 +103,8 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kIn
             return "info";
         case Kind::kList:
             return "list";
+        case Kind::kSheet:
+            return "sheet";
         case Kind::kChoice:
             break;
     }
@@ -159,6 +163,9 @@ class Backend {
     [[nodiscard]] virtual bool set_now_view(nowview::View view) = 0;
     [[nodiscard]] virtual int dim_after_minutes() const = 0;
     [[nodiscard]] virtual bool set_dim_after_minutes(int minutes) = 0;
+    // How the speakers view shows a level: a glow, or a glow that also makes each speaker's circle grow and shrink a little.
+    [[nodiscard]] virtual nowview::SpeakersStyle speakers_style() const = 0;
+    [[nodiscard]] virtual bool set_speakers_style(nowview::SpeakersStyle style) = 0;
 
     // Display: the backlight's lit level in percent (nowview::kBrightnessMin to kBrightnessMax), how the clock view
     // writes the time, and the night schedule (when the screen goes dark by the board's own time).
@@ -182,6 +189,20 @@ class Backend {
 
     // Whether a stream is playing now: what an entry with a `confirm` asks about before it breaks the playback.
     [[nodiscard]] virtual bool playing() const = 0;
+
+    // Sound: the test tone through the speakers one after another (identify_each), and the level and distance kept for
+    // each speaker. The tone is the board's own, played through the output stage the music plays through; it is refused
+    // while something else has the sink, and it stops of its own accord after a minute at most (planning/
+    // hearth-speaker-trim-identify.md). A trim is read and written as the words of PUT /trim ("L level=-1.5
+    // distance=2.4"): the tone and the numbers are applied by the Sendspin player, which this library knows nothing of.
+    [[nodiscard]] virtual bool identify_running() const = 0;
+    // Why the tone cannot start now ("A song is playing."), or empty when it can.
+    [[nodiscard]] virtual std::string identify_blocked() const = 0;
+    // Start the tone at every speaker in turn, once; or stop it. False when the board refused.
+    [[nodiscard]] virtual bool identify_each(bool start) = 0;
+    // "none set", "1 speaker set", "3 speakers set".
+    [[nodiscard]] virtual std::string speaker_trim_summary() const = 0;
+    [[nodiscard]] virtual bool set_speaker_trim_text(std::string_view statements) = 0;
 
     // Network: which of its networks a board with a cable and Wi-Fi uses, as the word PUT /network-preference takes
     // ("auto", "ethernet", "wifi"). The setter returns at once and the change is made on a task of its own, as
@@ -342,6 +363,11 @@ inline constexpr std::array<ChoiceDef, 5> kNowViewChoices{{
     {.id = "clock", .label = "Clock", .availability = &needs_clock},
     {.id = "dark", .label = "Dark", .availability = &needs_touch},
     {.id = "off", .label = "Off"},
+}};
+
+inline constexpr std::array<ChoiceDef, 2> kSpeakersStyleChoices{{
+    {.id = "glow", .label = "Glow"},
+    {.id = "pulse", .label = "Pulse"},
 }};
 
 // A stepper walks its stops in order: from a little to a lot, and "never" at the end, where the effect has gone.
@@ -536,6 +562,26 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
     return minutes.has_value() && backend.set_dim_after_minutes(*minutes);
 }
 
+[[nodiscard]] inline std::string get_speakers_style(const Backend& backend) {
+    return nowview::speakers_style_name(backend.speakers_style());
+}
+
+[[nodiscard]] inline bool set_speakers_style(Backend& backend, std::string_view word) {
+    const std::optional<nowview::SpeakersStyle> style = nowview::parse_speakers_style(word);
+    return style.has_value() && backend.set_speakers_style(*style);
+}
+
+// The speakers are what the Speakers, Title and Dark views show (the Title view stands on them until a server says a
+// title); the Clock view and the old sentence draw none.
+[[nodiscard]] inline std::string speakers_style_inert(const Backend& backend) {
+    const nowview::View view = backend.now_view();
+    if (view == nowview::View::kClock || view == nowview::View::kOff) {
+        return std::string("Not used by the ") + (view == nowview::View::kClock ? "Clock" : "Off") +
+               " view: it draws no speakers.";
+    }
+    return {};
+}
+
 // The Dark view is dark from the moment a song with no lyrics begins: it has no time to dim after.
 [[nodiscard]] inline std::string dim_after_inert(const Backend& backend) {
     if (backend.now_view() != nowview::View::kDark) {
@@ -696,7 +742,43 @@ inline constexpr std::array<ChoiceDef, 3> kNetworkChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 17> kRegistry{{
+namespace detail {
+
+// The test tone and the trims are the Sendspin player's: they are applied in the stage the music plays through.
+[[nodiscard]] inline Availability needs_player(const BoardCaps& caps) {
+    return caps.sendspin ? Availability::yes()
+                         : Availability::no("This build has no player, so it has no speakers to play a tone through.");
+}
+
+// "run" is the button at rest, "running" the same button saying Stop: the tone ends of its own accord, so the state
+// is read from the board each time the screen looks.
+inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
+    {.id = "run", .label = "Play each"},
+    {.id = "running", .label = "Stop"},
+}};
+
+[[nodiscard]] inline std::string get_identify(const Backend& backend) {
+    return backend.identify_running() ? "running" : "run";
+}
+
+// Pressed while it plays, the button is Stop: the board is told what the person sees.
+[[nodiscard]] inline bool set_identify(Backend& backend, std::string_view /*word*/) {
+    return backend.identify_each(!backend.identify_running());
+}
+
+[[nodiscard]] inline std::string identify_inert(const Backend& backend) {
+    return backend.identify_running() ? std::string() : backend.identify_blocked();
+}
+
+[[nodiscard]] inline std::string get_speaker_trim(const Backend& backend) { return backend.speaker_trim_summary(); }
+
+[[nodiscard]] inline bool set_speaker_trim(Backend& backend, std::string_view statements) {
+    return backend.set_speaker_trim_text(statements);
+}
+
+}  // namespace detail
+
+inline constexpr std::array<Pref, 20> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -724,6 +806,20 @@ inline constexpr std::array<Pref, 17> kRegistry{{
      .inert = &detail::dim_after_inert,
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after,
+     .on_reset = OnReset::kReset},
+    {.id = "speakers-style",
+     .group = Group::kDisplay,
+     .label = "Speakers style",
+     .note = "How the speakers show the sound: a glow, or a glow with the circle growing and shrinking too.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/speakers-style",
+     .default_word = "glow",
+     .choices = detail::kSpeakersStyleChoices,
+     .availability = &detail::needs_screen,
+     .inert = &detail::speakers_style_inert,
+     .get = &detail::get_speakers_style,
+     .set = &detail::set_speakers_style,
      .on_reset = OnReset::kReset},
     {.id = "brightness",
      .group = Group::kDisplay,
@@ -837,6 +933,31 @@ inline constexpr std::array<Pref, 17> kRegistry{{
      .on_reset = OnReset::kKeep,
      .editor = Editor::kList,
      .confirm = "Changing the speakers makes the music drop out for a moment."},
+    {.id = "identify-speakers",
+     .group = Group::kSound,
+     .label = "Identify speakers",
+     .note = "Plays a quiet test tone through each speaker in turn, so that you can hear which is which.",
+     .kind = Kind::kAction,
+     .apply = Apply::kLive,
+     .route = "/identify",
+     .default_word = "run",
+     .choices = detail::kIdentifyChoices,
+     .availability = &detail::needs_player,
+     .inert = &detail::identify_inert,
+     .get = &detail::get_identify,
+     .set = &detail::set_identify,
+     .on_reset = OnReset::kKeep},
+    {.id = "speaker-trim",
+     .group = Group::kSound,
+     .label = "Speaker levels and distances",
+     .note = "Make a speaker louder or quieter, and say how far each one is from where you sit.",
+     .kind = Kind::kSheet,
+     .apply = Apply::kLive,
+     .route = "/trim",
+     .availability = &detail::needs_player,
+     .get = &detail::get_speaker_trim,
+     .set = &detail::set_speaker_trim,
+     .on_reset = OnReset::kKeep},
     // --- Network
     // A board with a cable and Wi-Fi uses one of them, or whichever is linked. The control is the developer view's,
     // with its confirming step. Kept by Reset preferences: a reset must not change how the board is joined.

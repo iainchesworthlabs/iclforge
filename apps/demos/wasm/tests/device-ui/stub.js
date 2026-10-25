@@ -51,6 +51,7 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
         'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
         'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
         "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off",
@@ -61,12 +62,20 @@ const REPLIES = {
         'GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
+        "GET  /trim          each speaker's level and distance, as JSON, on a board with a Sendspin player",
+        'PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset',
+        'GET  /identify      the test tone: what it is doing and its limits, as JSON',
+        'POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
         'PUT  /firmware      body: an app image; flash mode, then a restart into it',
         'PUT  /firmware/mode body: flash, or normal (a restart)',
         'PUT  /firmware/rollback  the image before this one boots next',
+        'GET  /firmware/available  an update from GitHub releases: the state of the flow',
+        'POST /firmware/check  look for a newer release (the result is on /firmware/available)',
+        'PUT  /firmware/from-release  body: the version a check offered; install it',
+        'PUT  /firmware/channel  body: stable or beta',
         "GET  /firmware/coredump  the last crash's core dump, as it lies in flash",
         'DELETE /firmware/coredump  erase it',
         'POST /restart       restart into the image that runs now',
@@ -111,6 +120,8 @@ const REPLIES = {
     nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
     nowPlayingOk: 'ok; the screen follows at once\n',
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
+    speakersStyleBad: 'PUT /speakers-style wants glow or pulse\n',
+    speakersStyleRefused: 'that style could not be stored\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
     noDynamicRange: 'this board decodes no Dolby stream, so it has no dynamic range to choose\n',
@@ -142,6 +153,9 @@ const REPLIES = {
     timeSyncBad: 'PUT /time-sync wants on or off\n',
     timeSyncRefused: 'that setting could not be stored\n',
     timeSyncOk: 'ok; takes effect at once\n',
+    noTrim: 'this board has no player to apply a speaker trim to\n',
+    trimOk: 'ok; in force at once\n',
+    noTone: 'this board has no player to play a test tone through\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
@@ -155,6 +169,8 @@ const REPLIES = {
     factoryResetFixed: 'this board cannot be reset to its factory state\n',
     factoryResetOk: 'erased; the board restarts with no name, network or pairings of its own\n',
     noFirmware: 'this board takes no firmware updates\n',
+    // A firmware built without updates from GitHub releases (CONFIG_ICLFORGE_FIRMWARE_PULL): firmware_pull_none.cpp.
+    noPull: 'this firmware cannot update itself from GitHub\n',
     noLog: 'this board keeps no log\n',
 };
 
@@ -215,6 +231,8 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /speakers-style',
+    'PUT /speakers-style',
     'GET /brightness',
     'PUT /brightness',
     'GET /clock-format',
@@ -233,12 +251,20 @@ const ROUTES = [
     'PUT /ntp-server',
     'GET /time-sync',
     'PUT /time-sync',
+    'GET /trim',
+    'PUT /trim',
+    'GET /identify',
+    'POST /identify',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
     'PUT /firmware',
     'PUT /firmware/mode',
     'PUT /firmware/rollback',
+    'GET /firmware/available',
+    'POST /firmware/check',
+    'PUT /firmware/from-release',
+    'PUT /firmware/channel',
     'GET /firmware/coredump',
     'DELETE /firmware/coredump',
     'POST /restart',
@@ -539,7 +565,7 @@ function parseNight(body, current) {
 
 function screenBoard() {
     // `dimmable` is a glass whose backlight can be dimmed; a frame buffer with no panel behind it has none.
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', speakersStyle: 'glow', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
 }
 
 // The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
@@ -548,6 +574,7 @@ function screenBoard() {
 // availability), and a board that lacks it lists the entry greyed, with the reason.
 const NO_SCREEN = 'This board has no screen.';
 const NO_CLOCK = 'This board keeps no time: it has no network to ask a time server on.';
+const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
 const ON_OFF = [
     ['on', 'On'],
     ['off', 'Off'],
@@ -586,6 +613,19 @@ const PREFERENCES = [
             ['120', '2 hours'],
             ['240', '4 hours'],
             ['never', 'Never'],
+        ],
+    },
+    {
+        id: 'speakers-style',
+        group: 'Display',
+        label: 'Speakers style',
+        kind: 'choice',
+        apply: 'live',
+        route: '/speakers-style',
+        needs: 'screen',
+        choices: [
+            ['glow', 'Glow'],
+            ['pulse', 'Pulse'],
         ],
     },
     {
@@ -652,6 +692,29 @@ const PREFERENCES = [
         choices: ON_OFF,
     },
     {
+        id: 'identify-speakers',
+        group: 'Sound',
+        label: 'Identify speakers',
+        kind: 'action',
+        apply: 'live',
+        route: '/identify',
+        needs: 'player',
+        choices: [
+            ['run', 'Play each'],
+            ['running', 'Stop'],
+        ],
+    },
+    {
+        id: 'speaker-trim',
+        group: 'Sound',
+        label: 'Speaker levels and distances',
+        kind: 'sheet',
+        apply: 'live',
+        route: '/trim',
+        needs: 'player',
+        choices: [],
+    },
+    {
         id: 'time-zone',
         group: 'Time',
         label: 'Time zone',
@@ -674,6 +737,8 @@ function unavailableReason(p, device) {
             return !screen ? NO_SCREEN : screen.dimmable ? '' : "This screen's backlight is not under the board's control.";
         case 'screenClock':
             return !screen ? NO_SCREEN : clock;
+        case 'player':
+            return device.sound ? '' : NO_PLAYER;
         default:
             return clock;
     }
@@ -687,6 +752,8 @@ function preferenceValue(p, device) {
             return screen ? screen.view : '';
         case 'dim-after':
             return screen ? screen.dimAfter : '';
+        case 'speakers-style':
+            return screen ? screen.speakersStyle : '';
         case 'brightness':
             return screen ? String(screen.brightness) : '';
         case 'clock-hours':
@@ -701,6 +768,13 @@ function preferenceValue(p, device) {
             return screen ? (screen.night.idle ? 'on' : 'off') : '';
         case 'time-zone':
             return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
+        case 'identify-speakers':
+            return device.sound && device.sound.identify.active ? 'running' : 'run';
+        case 'speaker-trim': {
+            // libs/render's summary_text: how many speakers have a level or a distance set.
+            const set = device.sound ? device.sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
+            return set === 0 ? 'none set' : `${set} ${set === 1 ? 'speaker' : 'speakers'} set`;
+        }
         default:
             return '';
     }
@@ -761,6 +835,191 @@ function timeBoard() {
         answers: 1,
         zoneRefused: false,
     };
+}
+
+// The sound of a board with a Sendspin player (libs/render's speaker_trim.hpp and identify_request.hpp, hearth_sink.cpp's
+// handlers): the speakers the layout in force has at an output, with the level (dB) and distance (m, 0 for none)
+// the listener set, what the build can do about a delay, and the board's own test tone. `refuse` is the reason a
+// tone is refused ('playing', 'busy', 'server'), or '' for none.
+const ROLE_LABELS = {
+    L: 'Front left',
+    C: 'Centre',
+    R: 'Front right',
+    Ls: 'Left surround',
+    Rs: 'Right surround',
+    LFE: 'Subwoofer',
+    Lrs: 'Left rear surround',
+    Rrs: 'Right rear surround',
+};
+const ROLE_ALIASES = { fl: 'L', fr: 'R', sl: 'Ls', sr: 'Rs', bl: 'Lrs', br: 'Rrs', sub: 'LFE' };
+function soundBoard(fields) {
+    const roles = ['L', 'C', 'R', 'Ls', 'Rs', 'LFE'];
+    return {
+        layout: '5.1',
+        speakers: roles.map((role, output) => ({ role, output, level: 0, distance: 0 })),
+        delay: { available: true, reason: '', maxSpan: 6.86, samples: 960 },
+        serverLevel: false,
+        serverDelay: false,
+        identify: { active: false, output: -1, role: '', remaining: 0, refuse: '' },
+        ...fields,
+    };
+}
+
+// Whether a role is one the stand-in's labels know, in any case, or by a plain alias.
+function soundRole(word) {
+    const lower = word.toLowerCase();
+    const known = Object.keys(ROLE_LABELS).find((r) => r.toLowerCase() === lower);
+    return known || ROLE_ALIASES[lower] || null;
+}
+
+// GET /trim as trim_json writes it: the same keys in the same order, a level to a place, a distance to two.
+function trimJson(sound) {
+    const metres = (cm) => cm.toFixed(2);
+    const farthest = Math.max(0, ...sound.speakers.map((x) => x.distance));
+    const rows = sound.speakers.map((x) => {
+        const extra = x.distance > 0 && sound.delay.available ? farthest - x.distance : 0;
+        const samples = sound.serverDelay ? 0 : Math.min(sound.delay.samples, Math.round((extra * 100 * 48000) / 34300));
+        return (
+            `{"role":${JSON.stringify(x.role)},"label":${JSON.stringify(ROLE_LABELS[x.role] || x.role)},` +
+            `"output":${x.output},"level_db":${x.level.toFixed(1)},"distance_m":${metres(x.distance)},` +
+            `"applied_level_db":${x.level.toFixed(1)},"delay_samples":${samples},` +
+            `"delay_ms":${((samples * 1000) / 48000).toFixed(2)},"clamped":false}`
+        );
+    });
+    const d = sound.delay;
+    return (
+        `{"layout":${JSON.stringify(sound.layout)},` +
+        '"level":{"available":true,"min_db":-12.0,"max_db":12.0,"step_db":0.5},' +
+        `"delay":{"available":${d.available},"min_m":0.10,"max_m":10.00,"max_span_m":${d.available ? d.maxSpan.toFixed(2) : '0.00'},` +
+        `"samples":${d.available ? d.samples : 0},"reason":${JSON.stringify(d.available ? '' : d.reason)}},` +
+        `"server_level":${sound.serverLevel},"server_delay":${sound.serverDelay},"farthest_m":${metres(farthest)},` +
+        `"speakers":[${rows.join(',')}]}`
+    );
+}
+
+// PUT /trim's statements (SpeakerTrimTable::apply_text), all or nothing: nothing when taken, or {code, why}.
+function applyTrim(sound, body) {
+    const next = sound.speakers.map((x) => ({ ...x }));
+    let statements = 0;
+    for (const raw of body.split(/[\n;]/)) {
+        const statement = raw.trim();
+        if (statement === '') {
+            continue;
+        }
+        statements += 1;
+        const words = statement.split(/[ ,\t]+/).filter((w) => w !== '');
+        if (words.length === 1 && words[0].toLowerCase() === 'reset') {
+            next.forEach((x) => {
+                x.level = 0;
+                x.distance = 0;
+            });
+            continue;
+        }
+        const role = soundRole(words[0]);
+        if (!role || words.length < 2 || words.length > 6) {
+            return { code: 400, why: 'PUT /trim: a speaker wants reset, level=<dB> or distance=<m>' };
+        }
+        const row = next.find((x) => x.role === role);
+        for (const word of words.slice(1)) {
+            const [key, value] = word.split('=');
+            if (word.toLowerCase() === 'reset') {
+                if (row) {
+                    row.level = 0;
+                    row.distance = 0;
+                }
+            } else if (key.toLowerCase() === 'level') {
+                const db = Number(value.replace(/db$/i, ''));
+                if (!/^[+-]?[0-9]+(\.[0-9]+)?(db)?$/i.test(value) || db < -12 || db > 12 || Math.abs(db * 2 - Math.round(db * 2)) > 0.002) {
+                    return { code: 400, why: 'PUT /trim: a level is -12 to 12 dB, in steps of 0.5' };
+                }
+                if (row) {
+                    row.level = db;
+                }
+            } else if (key.toLowerCase() === 'distance') {
+                const metres = value.toLowerCase() === 'none' ? 0 : Number(value.replace(/m$/i, ''));
+                if (!/^(none|[0-9]+(\.[0-9]+)?m?)$/i.test(value) || (metres !== 0 && (metres < 0.1 || metres > 10))) {
+                    return { code: 400, why: 'PUT /trim: a distance is 0.1 to 10 metres, or none' };
+                }
+                if (row) {
+                    row.distance = metres;
+                }
+            } else {
+                return { code: 400, why: 'PUT /trim: a speaker wants reset, level=<dB> or distance=<m>' };
+            }
+        }
+    }
+    if (statements === 0) {
+        return { code: 400, why: 'PUT /trim: an empty body: say reset, or a speaker and a level or distance' };
+    }
+    if (!sound.delay.available && next.some((x, i) => x.distance !== sound.speakers[i].distance)) {
+        return { code: 409, why: `a distance is a delay, and ${sound.delay.reason}` };
+    }
+    // The delay lines hold only so much: the span of the set distances may not grow past it.
+    const span = (speakers) => {
+        const cm = speakers.map((x) => Math.round(x.distance * 100)).filter((c) => c > 0);
+        return cm.length > 1 ? Math.max(...cm) - Math.min(...cm) : 0;
+    };
+    const most = Math.round(sound.delay.maxSpan * 100);
+    if (span(next) > most && span(next) > span(sound.speakers)) {
+        return {
+            code: 409,
+            why: `the nearest and the farthest speaker can be at most ${sound.delay.maxSpan.toFixed(2)} m apart on this board (its delay lines hold ${Math.round((sound.delay.samples * 1000) / 48000)} ms)`,
+        };
+    }
+    sound.speakers = next;
+    return null;
+}
+
+// GET /identify as identify_json writes it.
+function identifyJson(sound) {
+    const i = sound.identify;
+    return (
+        `{"available":true,"reason":"","active":${i.active},"output":${i.output},"role":${JSON.stringify(i.role)},` +
+        `"label":${JSON.stringify(ROLE_LABELS[i.role] || '')},"remaining_ms":${i.remaining},"level_db":-30.0,` +
+        '"max_level_db":-24.0,"tone_ms":1500,"gap_ms":500,"total_ms":60000,' +
+        `"speakers":[${sound.speakers.map((x) => JSON.stringify(x.role)).join(',')}]}`
+    );
+}
+
+const IDENTIFY_REFUSALS = {
+    playing: 'a stream is playing; the tone would play over it',
+    busy: 'something else has the speakers: a play from this page, or an update',
+    server: "a server's identify tone is on",
+};
+
+// POST /identify: off, all, a speaker, or a speaker and loop. Nothing when taken, or {code, why}.
+function applyIdentify(sound, body) {
+    const words = body.trim().split(/[ \t,]+/).filter((w) => w !== '');
+    const bad = { code: 400, why: 'POST /identify wants off, all, a speaker such as L, Ls or LFE, or a speaker and loop' };
+    const i = sound.identify;
+    let role = null;
+    if (words.length === 1 && words[0].toLowerCase() === 'off') {
+        i.active = false;
+        i.output = -1;
+        i.role = '';
+        i.remaining = 0;
+        return null;
+    }
+    if (words.length === 1 && words[0].toLowerCase() === 'all') {
+        role = sound.speakers[0].role;
+    } else if (words.length === 1 || (words.length === 2 && words[1].toLowerCase() === 'loop')) {
+        role = soundRole(words[0]);
+    }
+    if (!role) {
+        return bad;
+    }
+    if (i.refuse) {
+        return { code: 409, why: IDENTIFY_REFUSALS[i.refuse] };
+    }
+    const row = sound.speakers.find((x) => x.role === role);
+    if (!row) {
+        return { code: 409, why: 'the layout in force has no such speaker' };
+    }
+    i.active = true;
+    i.output = row.output;
+    i.role = role;
+    i.remaining = 60000;
+    return null;
 }
 
 // The time zones the firmware offers by name: the rows of libs/device's time_zone_data.hpp, which tools/hearth/
@@ -938,6 +1197,47 @@ function firmwareTrial(fields) {
     };
 }
 
+// GET /firmware/available of a firmware without updates from GitHub releases, as render_status writes it
+// (libs/device/include/iclforge/firmware_update.hpp): every key always there.
+function updateNotBuilt(fw) {
+    return {
+        supported: false,
+        why: 'This firmware has no room for a secure connection.',
+        blocked: null,
+        state: 'idle',
+        channel: 'beta',
+        running: fw.running.version,
+        checked: null,
+        latest: null,
+        trust: { anchors: 0, source: 'build', fingerprints: [] },
+        signed_by: null,
+        error: null,
+        skipped: null,
+    };
+}
+
+// GET /firmware/available of a firmware that offers a release, as render_status writes it: what a check
+// found, whom it was signed by and the trust it was judged by. `over` changes a part (an error, say).
+function updateOffer(fw, over = {}) {
+    return {
+        ...updateNotBuilt(fw),
+        supported: true,
+        why: null,
+        state: 'available',
+        checked: 1792900000,
+        latest: {
+            version: 'v0.11.0',
+            released: '2026-11-05',
+            size: 1270624,
+            notes: 'https://github.com/iainchesworthlabs/iclforge/releases/tag/v0.11.0',
+            image: 'hearth-sink-esp32s3',
+        },
+        trust: { anchors: 1, source: 'build', fingerprints: ['5e3a91c0b27d44f8'] },
+        signed_by: 'Hearth Firmware Beta',
+        ...over,
+    };
+}
+
 // GET /firmware as render_firmware_status writes it, every key always there:
 // a board on the two-slot table (partitions.csv) running the image a USB
 // flash put in ota_0, with the other slot empty.
@@ -1096,6 +1396,9 @@ async function startStub() {
         // What the board says about its time (timeBoard); undefined for a firmware that keeps none (no
         // network, or QEMU's), whose /status has no "time" key and whose time routes answer 404.
         time: timeBoard(),
+        // The sound of a board with a Sendspin player (soundBoard); null for a firmware with no player, whose
+        // /trim and /identify answer 404.
+        sound: soundBoard(),
         hardware: defaultHardware(),
         // GET /firmware's body (defaultFirmware), or undefined for a firmware
         // that takes no updates.
@@ -1467,6 +1770,22 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /speakers-style':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.speakersStyle + '\n');
+            case 'PUT /speakers-style': {
+                const word = body.trim();
+                if (!['glow', 'pulse'].includes(word)) {
+                    return send(res, 400, REPLIES.speakersStyleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.speakersStyle = word;
+                return send(res, 200, REPLIES.nowPlayingOk);
+            }
             case 'GET /brightness':
                 if (!device.screen) {
                     return send(res, 404, REPLIES.noScreen);
@@ -1614,6 +1933,30 @@ async function startStub() {
                 device.time.synced = word === 'on' && device.time.synced;
                 return send(res, 200, REPLIES.timeSyncOk);
             }
+            case 'GET /trim':
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTrim);
+                }
+                return send(res, 200, trimJson(device.sound) + '\n', 'application/json');
+            case 'PUT /trim': {
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTrim);
+                }
+                const refused = applyTrim(device.sound, body);
+                return refused ? send(res, refused.code, refused.why + '\n') : send(res, 200, REPLIES.trimOk);
+            }
+            case 'GET /identify':
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTone);
+                }
+                return send(res, 200, identifyJson(device.sound) + '\n', 'application/json');
+            case 'POST /identify': {
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTone);
+                }
+                const refused = applyIdentify(device.sound, body);
+                return refused ? send(res, refused.code, refused.why + '\n') : send(res, 200, REPLIES.ok);
+            }
             case 'GET /pairing':
                 if (!device.sendspin) {
                     return send(res, 404, REPLIES.pairingRefused);
@@ -1721,6 +2064,18 @@ async function startStub() {
                 return restart(() => (fw.mode = 'normal'));
             case 'PUT /firmware/rollback':
                 return fw ? rollback(res) : send(res, 404, REPLIES.noFirmware);
+            // An update from GitHub releases (planning/esp32-ota.md, O10): a firmware built without it says
+            // so on GET /firmware/available (firmware_pull_none.cpp) and answers the rest 404. The model keeps
+            // the body firmware_update.hpp's render_status writes in `device.update` when a test gives it one.
+            case 'GET /firmware/available':
+                if (!fw) {
+                    return send(res, 404, REPLIES.noFirmware);
+                }
+                return send(res, 200, JSON.stringify(device.update ?? updateNotBuilt(fw)) + '\n', 'application/json');
+            case 'POST /firmware/check':
+            case 'PUT /firmware/from-release':
+            case 'PUT /firmware/channel':
+                return send(res, 404, fw ? REPLIES.noPull : REPLIES.noFirmware);
             case 'POST /restart':
                 if (!fw) {
                     return send(res, 404, REPLIES.noFirmware);
@@ -1734,7 +2089,7 @@ async function startStub() {
             // pairings and the time zone stay (libs/device's settings_keys.hpp). At once.
             case 'POST /reset-preferences':
                 if (device.screen) {
-                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                 }
                 return send(res, 200, REPLIES.resetPreferencesOk);
             // The factory reset: only by the board's own address or name, and only for the words; then
@@ -1754,7 +2109,7 @@ async function startStub() {
                         device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
                     }
                     if (device.screen) {
-                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', brightness: 80, clockFormat: '24', night: nightDefault() });
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
                     }
                     if (device.time) {
                         Object.assign(device.time, { zone: 'none', zoneName: 'none', server: 'none', sync: 'on' });
@@ -1895,6 +2250,7 @@ module.exports = {
     cableNetwork,
     screenBoard,
     timeBoard,
+    soundBoard,
     PREFERENCES,
     validName,
     hostNames,
@@ -1904,6 +2260,8 @@ module.exports = {
     emptySlot,
     firmwareTrial,
     appImage,
+    updateNotBuilt,
+    updateOffer,
     REPLIES,
     FIRMWARE,
     FIRMWARE_PARTS,

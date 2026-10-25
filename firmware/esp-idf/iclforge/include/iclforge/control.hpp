@@ -55,7 +55,8 @@
 // And the board's own settings, which ControlHandlers lists: GET and PUT
 // /name, /slot-width and /wiring, PUT /network, GET and PUT /network-preference on
 // a board with a cable and a station, and GET and PUT /now-playing,
-// /dim-after, /brightness and /clock-format on a board with a screen.
+// /dim-after, /brightness and /clock-format on a board with a screen, and GET and PUT /trim and GET and POST /identify on a
+// board with a Sendspin player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
 //
 // And updates over the network, which Control hands to the owner's Firmware
 // (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
@@ -71,6 +72,7 @@
 namespace iclforge {
 
 class Firmware;
+class FirmwarePull;
 
 // GET /status's "sendspin" object, for a board that is a Sendspin player
 // (sendspin_host.hpp, burst_player.hpp). Plain values, so that the control
@@ -228,6 +230,14 @@ struct ControlNetwork {
     std::optional<Interface> ethernet;
 };
 
+// Why a handler refused a request that a route can only pass on: the words to say, and which of the three
+// ways to say no it is (400 the request is wrong, 409 the board cannot now, 404 there is nothing here).
+struct ControlRefusal {
+    enum class Kind : std::uint8_t { kBadRequest, kConflict, kMissing };
+    Kind kind = Kind::kConflict;
+    std::string why;
+};
+
 struct ControlHandlers {
     // GET /hardware's "profile" and "profile_hash": which locked build configuration this image
     // was built as, and a hash of what that configuration locks (firmware/hearth-sink/
@@ -308,6 +318,12 @@ struct ControlHandlers {
     std::function<bool(std::string_view view)> set_now_playing;
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
+    // GET and PUT /speakers-style: how that screen's speakers show a level, "glow" or "pulse"
+    // (iclforge/now_view.hpp, planning/p4x-speakers-options.md). Empty on a board with no screen, as the
+    // four above. set_speakers_style is handed one of the two words; false means it could not be stored.
+    // It acts at once, with no restart.
+    std::function<std::string()> speakers_style;
+    std::function<bool(std::string_view style)> set_speakers_style;
 
     // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
     // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter
@@ -350,6 +366,20 @@ struct ControlHandlers {
     std::function<bool(bool on)> set_time_sync;
     // GET /status's "time": see ControlTime.
     std::function<std::optional<ControlTime>()> time;
+
+    // GET and PUT /trim: the listener's level (+-12 dB) and distance (0.1 to 10 m) for each speaker of the layout
+    // in force (iclforge/render/speaker_trim.hpp), as JSON, and a body of statements that changes them
+    // ("L level=-1.5 distance=2.4; reset"). `trim` is nothing, and the route answers 404, on a board with no
+    // player to apply it. set_trim answers nothing when the table was taken, stored and put in force at once,
+    // and why not otherwise. A board whose build holds no delay lines takes levels and says distance is
+    // unavailable (the JSON's "delay" object).
+    std::function<std::optional<std::string>()> trim;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_trim;
+    // GET and POST /identify: what the board's own test tone is doing, as JSON, and a request for it: off, all,
+    // a speaker's name, or a name and "loop" (iclforge/render/identify_request.hpp). Refused while a stream
+    // plays; stops at once when one begins; ends by its own limits in any case.
+    std::function<std::optional<std::string>()> identify;
+    std::function<std::optional<ControlRefusal>(std::string_view body)> set_identify;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.
@@ -414,6 +444,10 @@ struct ControlHandlers {
     // leaves the routes answering that the board takes no updates. The owner
     // keeps it alive for as long as Control runs.
     Firmware* firmware = nullptr;
+    // The routes of an update from GitHub releases (firmware_pull.hpp, planning/esp32-ota.md, O10):
+    // GET /firmware/available, POST /firmware/check, PUT /firmware/from-release and PUT
+    // /firmware/channel. Null answers that the board takes no firmware updates.
+    FirmwarePull* firmware_pull = nullptr;
 };
 
 // What this board is - chip, revision, cores, FPU, PSRAM, and the sink ceiling the caller states - gathered from

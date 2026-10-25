@@ -289,7 +289,13 @@ def issue(
 class ThrowawayPki:
     """A root, a sub-CA under it (path length 0) and a code-signing leaf for each channel."""
 
-    def __init__(self, kind: str = "rsa", bits: int = 2048, now: dt.datetime | None = None) -> None:
+    def __init__(
+        self,
+        kind: str = "rsa",
+        bits: int = 2048,
+        now: dt.datetime | None = None,
+        leaf_kinds: dict[str, str] | None = None,
+    ) -> None:
         _crypto()
         self.kind = kind
         now = now or dt.datetime.now(dt.timezone.utc)
@@ -317,7 +323,7 @@ class ThrowawayPki:
         )
         self.leaves: dict[str, tuple[Any, Any]] = {}
         for channel, name in LEAF_NAMES.items():
-            leaf_key = new_key(kind, bits)
+            leaf_key = new_key((leaf_kinds or {}).get(channel, kind), bits)
             leaf = issue(
                 name,
                 leaf_key,
@@ -382,9 +388,10 @@ def sample_index(channel: str, sequence: int = 1793000000) -> bytes:
     return (json.dumps(document, separators=(",", ":")) + "\n").encode("ascii")
 
 
-def selftest(out: Path, kind: str = "rsa", bits: int = 2048) -> None:
+def selftest(out: Path, kind: str = "rsa", bits: int = 2048, mixed: bool = False) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    pki = ThrowawayPki(kind, bits)
+    # mixed: an RSA CA and beta leaf and an ECDSA stable leaf, so that one board test uses both.
+    pki = ThrowawayPki(kind, bits, leaf_kinds={"stable": "ecdsa", "beta": "rsa"} if mixed else None)
     (out / "anchor.pem").write_text(pki.anchor_pem(), "ascii")
     (out / "root.pem").write_text(pki.root_pem(), "ascii")
     for channel in ("stable", "beta"):
@@ -461,12 +468,15 @@ def main(argv: list[str] | None = None) -> int:
     test.add_argument("--out", type=Path, required=True)
     test.add_argument("--kind", choices=("rsa", "ecdsa"), default="rsa")
     test.add_argument("--bits", type=int, default=2048)
+    test.add_argument(
+        "--mixed", action="store_true", help="an RSA CA, an RSA beta leaf and an ECDSA stable leaf"
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "verify":
             return verifier.main(args.rest)
         if args.command == "selftest":
-            selftest(args.out, args.kind, args.bits)
+            selftest(args.out, args.kind, args.bits, args.mixed)
             return 0
         key, leaf, others = _leaf_from_args(args)
         now = verifier.parse_time(args.now) if args.now else None

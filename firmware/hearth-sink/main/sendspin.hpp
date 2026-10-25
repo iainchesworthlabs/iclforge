@@ -8,7 +8,9 @@
 #include <string_view>
 
 #include "panel/lyrics_reader.hpp"
+#include "iclforge/render/identify_request.hpp"
 #include "iclforge/render/layout.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/now_view.hpp"
@@ -88,6 +90,67 @@ void sendspin_leave();
 // GET /status's "sendspin" object, or nothing without a player.
 [[nodiscard]] std::optional<iclforge::ControlSendspin> sendspin_status();
 
+// --- The listener's sound: a level and distance for each speaker, and the identify tone ---------------
+// (planning/p4x-preferences.md, iclforge/render/speaker_trim.hpp). Both are applied by the player in the same
+// output stage as the music, after the decode and before the DAC, so they cover PCM, AC-3, E-AC-3, AC-4 and
+// objects alike. Without a player (sendspin/none/) there is nothing to apply them to.
+
+// What this build can do about them, which does not change while the board runs: for the screen, which greys what
+// the board cannot do and says why, and for GET /trim and GET /identify.
+struct SoundCaps {
+    // A player to apply a trim and play a tone through.
+    bool player = false;
+    // Level is always possible with a player; delay needs the build's delay lines (CONFIG_ICLFORGE_EXAMPLE_
+    // SENDSPIN_MAX_DELAY_MS), which a board without PSRAM does not have room for. max_span_m is how far apart the
+    // nearest and the farthest speaker can be set; delay_reason says why it is 0.
+    iclforge::render::speaker_trim::TrimCaps trim;
+    // Why there is no identify tone, when there is none.
+    const char* identify_reason = "this build has no Sendspin player to play a tone through";
+};
+[[nodiscard]] SoundCaps sendspin_sound_caps();
+
+// The table in settings() is the player's from here (the caller has stored it): in force at the next chunk of a
+// stream that plays, and at once otherwise. One set before the player has started is picked up by its start.
+void sendspin_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table);
+
+// What is in force at each output now, as the player last said it, for GET /trim and the screen's editor. Nothing
+// without a player running.
+struct SpeakerTrimStatus {
+    // The layout in force, as text.
+    std::array<char, iclforge::render::OutputLayout::kTextBytes> layout{};
+    // A server's settings stand for the levels, or the delays, in force: the table is not what plays.
+    bool server_level = false;
+    bool server_delay = false;
+    // The distance the delays are counted from, in centimetres; 0 when no speaker has one.
+    std::uint16_t farthest_cm = 0;
+    // The speakers the layout has at an output, in output order.
+    struct Row {
+        iclforge::render::speaker_trim::RoleCode role = iclforge::render::speaker_trim::kNoRole;
+        std::uint8_t output = 0;
+        float applied_level_db = 0.0F;
+        std::uint32_t applied_delay_samples = 0;
+        bool delay_clamped = false;
+    };
+    std::array<Row, iclforge::render::speaker_trim::kOutputs> rows{};
+    std::size_t count = 0;
+};
+[[nodiscard]] std::optional<SpeakerTrimStatus> sendspin_speaker_trim_status();
+
+// The board's own identify tone (iclforge/render/identify_request.hpp). Refused while a stream plays or something
+// else has the sink; stopped at once by a play's start, by flash mode, and by kOff; ended by its own limits
+// otherwise, whatever is asked. Never leaves the sink in any state but the one it found.
+[[nodiscard]] iclforge::render::IdentifyOutcome sendspin_identify(const iclforge::render::IdentifyRequest& request);
+
+// Where the tone is, for GET /identify and the screen's room: running, the output it is on now (-1 between two
+// speakers) and that output's speaker, the milliseconds left of its limit. All at rest without a player.
+struct IdentifyStatus {
+    bool active = false;
+    int output = -1;
+    iclforge::render::speaker_trim::RoleCode role = iclforge::render::speaker_trim::kNoRole;
+    std::uint32_t remaining_ms = 0;
+};
+[[nodiscard]] IdentifyStatus sendspin_identify_status();
+
 // What a screen draws while a stream plays (planning/p4x-now-playing.md): the layout in force, the
 // last 100 ms of each output's level, and what the decoder found. One read of the player's own status,
 // with no JSON and none of the server's state, so that a panel can ask five times a second.
@@ -109,6 +172,20 @@ struct SendspinPlaying {
     std::uint64_t coded_bytes = 0;
 };
 [[nodiscard]] SendspinPlaying sendspin_now_playing();
+
+// The levels alone, for a view that follows every 100 ms window (planning/p4x-speakers-options.md): the same
+// peak and RMS per output as sendspin_now_playing(), with the count of windows the player has closed, so that a
+// caller can tell a new window from the one it has. A lock and two short arrays, where sendspin_now_playing()
+// copies the player's whole status; fixed-size, so it allocates nothing.
+struct SendspinLevels {
+    // A stream is running and its first window has closed.
+    bool have = false;
+    std::uint32_t serial = 0;
+    std::size_t outputs = 0;
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> peak_db{};
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
+};
+[[nodiscard]] SendspinLevels sendspin_now_levels();
 
 // POST /pairing's actions: "reset", "cancel" or "forget". False for anything
 // else, or without a player.

@@ -200,7 +200,8 @@ Network, Time, Updates and System (a group with nothing in it is not drawn), wit
 screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
 closes, so the lyric screen is as it was with it shut. It holds what the screen shows while a song has no lyrics and
 when it dims (the two settings that were in Adjust), the screen's **brightness**, how the clock view writes the time,
-the **night schedule** and the **time zone**, then the Network and System groups: wired or
+the **night schedule** and the **time zone**, then the Sound group (the test tone through each speaker, and the level and distance of each speaker on [the Speakers sheet](sink-speakers.md#setting-them)),
+then the Network and System groups: wired or
 Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset
 ([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time
 server) stay in the [developer view](#the-developer-view) and the routes.
@@ -241,8 +242,8 @@ product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an
 touch) for the host tests to walk.
 
 The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
-and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action, info
-or list), whether a change applies live, at the next play or after a restart, the route that sets the same value, its
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action, info,
+list or sheet: a row that says what is set and opens an editor of its own), whether a change applies live, at the next play or after a restart, the route that sets the same value, its
 choices, what **Reset preferences** does with it (`on_reset`: put back to its default word, or keep; an entry that says
 neither fails a host test), and **`availability(caps)`**, once for the entry and once for each choice: whether this board
 can do it and, if not, why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
@@ -262,6 +263,7 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Speakers style: glow, pulse | `speakers-style` | `/speakers-style` | the board has a screen (it is greyed, with the reason, while the screen is set to the clock or off, which draw no speakers) |
 | Brightness: 10% to 100% in tens | `brightness` | `/brightness` | the board has a screen whose backlight it controls |
 | Clock hours: 24 or 12 | `clock-hours` | `/clock-format` | the board has a screen and keeps the time |
 | Clock seconds: on or off | `clock-seconds` | `/clock-format` | the board has a screen and keeps the time |
@@ -276,6 +278,8 @@ greyed, and a default that is never a choice the board cannot make.
 | Restart | `restart` | `/restart` | not while an update is under way, nor while the new image is on trial |
 | Reset preferences | `reset-preferences` | `/reset-preferences` | not while an update is under way |
 | Factory reset | `factory-reset` | `/factory-reset` | as Restart |
+| Identify speakers: a button, *Play each*, that says *Stop* while its tone plays | `identify-speakers` | `/identify` | the build has a Sendspin player; a song playing says so under the row |
+| Speaker levels and distances: a sheet (kind `sheet`) with the room, a level and a distance for each speaker | `speaker-trim` | `/trim` | the build has a Sendspin player; the distance needs delay lines (PSRAM) |
 
 **`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
 entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
@@ -325,14 +329,46 @@ what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*, *PCM t
 
 ![The speakers in a 7.1.4 room](screenshots/p4-panel-speakers-7-1-4.png)
 
-It is meant to be left on for hours in a dim room: the glow moves in a few steps, slowly (it rises
-at once and falls at 14 dB a second), and is never brighter than the accent at 55%. **After five
+It is meant to be left on for hours in a dim room: the glow moves in a few steps, and is never brighter
+than the accent at 55%. **After five
 minutes with nothing touched** (the time is a Preference, or `PUT /dim-after`: `never`, or whole minutes
 from 1 to 240) the backlight goes to 4% and a black screen with one line is over everything; any tap
 brings the speakers back, and the tap does not also press what is under it. Only this screen dims:
 the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
+
+**How the speakers follow the sound** (the plan is [planning/p4x-speakers-options.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-speakers-options.md)).
+The screen reads the level of every 100 ms window the player measures (a lock and two short arrays,
+`BurstPlayer::levels()`; the heading and the title are still read five times a second), where it once read
+every other one. A level is judged against **the loudest the room has lately been** (it rises at once and
+falls 2 dB a second, and is never lower than -48 dB of full scale), so that the same music shows the same at
+any volume: the player's volume is applied before the meter, and against full scale the glow would shrink with
+the knob. The core of a speaker is six steps over 30 dB (6 dB a step) and the halo, from the peak, two. The
+level rises at once and falls at 60 dB a second, so a hit is a step down in the window after the next, and a
+step changes only when the level is 0.4 of a step past its edge (0.7 for the halo), so that a level on a
+boundary does not flicker. A speaker with nothing on it is still a hollow outline. These are the constants of
+`libs/render/include/iclforge/render/room_plan.hpp`, chosen over a synthetic groove in 2.0, 5.1 and 7.1.4
+(`firmware/hearth-sink/preview/speakers_options/tune.cpp`): 72% of the onsets of 5 dB or more showed as a step
+up in the same window (the 5 Hz glow before it: 3 to 26%), 3 to 5% of steady windows moved a step, and the
+view flushed 18 000 pixels a second at 2.0, 56 000 at 5.1, 82 000 at 7.1.4 and 101 000 at 9.1.6 (the lyric
+screen's song filling: 192 000). The pixels are what the view costs; what they cost a stream on the kit (the
+first design, at about 45 000 a second at 5.1, cost a burst 0.4%, below) is still to be measured for these
+constants.
+
+**The speakers' style.** `glow` (the default) is the above. `pulse` makes the filled circle of each speaker
+grow and shrink with its level, a little: eight sizes between 88% and 112% of the plan's, moved by at most
+three in a window, held until the level is a quarter size past an edge, and a speaker 18 dB or more under the
+room's loudest (or silent) stays at its smallest and does not move. The halo is not resized, so a size change
+redraws the circle's rectangle and nothing else. It needs no meter and no seam the glow does not have. It is
+set in Preferences (Display) or with `PUT /speakers-style`; the value is kept on the
+board as `np_style` (0 glow, 1 pulse; never renumbered).
+
+![The speakers in the pulse style, 5.1: the louder a speaker, the larger its circle](screenshots/p4-panel-speakers-pulse-5-1.png)
+![The speakers in the pulse style, 2.0](screenshots/p4-panel-speakers-pulse-2-0.png)
+
+Both styles stay: the owner, 2026-10-25, saw the glow, as it was and as it became, beside the pulse at plus and
+minus 12% (the bound is `kPulseReach`), and kept both as a choice, with the glow the default.
 
 Which screen shows is the owner's: `speakers` (the default), `title`, `clock` ([below](#the-clock)),
 `dark`, or `off`, which is the old sentence. The plan, with how each was chosen and built, is
@@ -411,6 +447,7 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 |---|---|---|
 | `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
+| `GET` and `PUT /speakers-style` | `glow` or `pulse` | `glow` |
 | `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |
 | `GET` and `PUT /clock-format` | `24`, `12`, `24 seconds` or `12 seconds` | `24` |
 | `GET` and `PUT /night-schedule` | two times and a state: `22:00-07:00 on`; `PUT` also takes just the times (and switches it on), or `on`, or `off` | `22:00-07:00 off` |

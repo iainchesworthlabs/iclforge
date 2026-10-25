@@ -1,5 +1,13 @@
 menu "iclforge hearth sink"
 
+# THE TRUST ANCHORS OF UPDATES FROM GITHUB RELEASES (planning/esp32-ota.md, O10): the public certificates a
+# pulled update's signed index has to chain to. A PEM file, relative to the project; embedded in the image.
+# Empty embeds none, which is a build that cannot verify a pull and says so. A project that runs its own
+# releases points this at its own CA (and ICLFORGE_FIRMWARE_UPDATE_BASE_URL at its own repository).
+config ICLFORGE_EXAMPLE_TRUST_ANCHORS
+    string "Trust anchors for updates pulled from GitHub releases: a PEM file in the project"
+    default ""
+
 # Defaults chosen to be safe on an ESP32-S3-DevKitC-1 rather than to match any
 # particular DAC board: 5, 6 and 7 are ordinary GPIOs - not strapping pins
 # (0, 45, 46), not the USB pair (19, 20), not the console UART (43, 44) and not
@@ -791,12 +799,27 @@ config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
         spare.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
-    int "Longest per-output delay a server can set, milliseconds (0 = none)"
+    int "Longest per-output delay, milliseconds (0 = none)"
     default 20
     range 0 100
     help
-        The delay lines are one buffer per output of this length: sixteen
-        outputs of 20 ms is about 61 KB, in PSRAM when the part has it.
+        The most one speaker can be delayed against another, by a server's settings
+        or by the listener's own distances (Preferences, PUT /trim). The delay lines
+        are one buffer per output of this length: sixteen outputs of 20 ms is about
+        61 KB, in PSRAM when the part has it. 20 ms is 6.86 m of sound's travel, the
+        most the nearest and the farthest speaker can be apart; 30 ms would be 10.3 m.
+        A build with less holds a shorter span and says so (GET /trim), and a build
+        with 0 has levels only.
+
+config ICLFORGE_EXAMPLE_SPEAKER_TRIM
+    string "The listener's level and distance for each speaker, as a build starts with them"
+    default ""
+    help
+        What a board has before anyone sets anything: a PUT /trim body on one line,
+        statements separated by semicolons - "L level=-1.5 distance=2.4; R level=-1.5
+        distance=2.4". Empty is every speaker at 0 dB with no distance, which is
+        what a stream plays through unchanged. What a person sets over the control
+        surface or on the screen is kept in NVS and replaces this whole.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
     int "Widest syncframe decoded: full-bandwidth channels plus LFE (0 = no limit)"

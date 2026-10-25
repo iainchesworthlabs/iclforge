@@ -247,6 +247,31 @@ in development: anyone on the network can update a board, as anyone with a USB
 cable can. [planning/esp32-ota.md](../../planning/esp32-ota.md) has the
 reasons, and what later phases add.
 
+### Updates from GitHub releases
+
+A board built with `sdkconfig.pull` (`CONFIG_ICLFORGE_FIRMWARE_PULL`) can look at GitHub for a newer
+release and install it, in addition to being pushed to
+([planning/esp32-ota.md](../../planning/esp32-ota.md), "Updates from GitHub releases (O10)"):
+
+- `GET /firmware/available` is the state of that flow: whether this board can pull and, if not, why;
+  what stops a check right now; the channel (`stable` or `beta`); the version a check found; the
+  trust anchors the board holds; who signed the list. `POST /firmware/check` starts a check, and
+  `PUT /firmware/from-release` with the offered version as its body installs it: the board enters
+  flash mode, downloads the image, checks it as an upload is checked, and restarts into it on trial.
+  `PUT /firmware/channel` chooses the channel.
+- What the board trusts is a small index of the channel (`hearth-update-<channel>.json`, with the SHA-256
+  of each image) and the signature over it (`hearth-update-<channel>.sig.json`: a certificate chain and
+  the signature). The signature has to chain to a **trust anchor built into the image**
+  (`CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS`, a PEM file of public certificates), the leaf has to be for
+  code signing with the channel's pinned name (`CONFIG_ICLFORGE_FIRMWARE_LEAF_STABLE`, `_BETA`), and
+  the index must not be older than one the board has accepted. A build with no anchor says so and pulls
+  nothing. The images carry no signature, and neither does one that is pushed: `PUT /firmware` takes
+  what it always took.
+- The connection is TLS against a certificate bundle of the three roots GitHub's hosts chain to
+  (`tls_roots.pem`), and needs the board to know the date.
+- Under QEMU, `tools/checks/run_pull_qemu.py` runs all of it against a loopback release signed by a
+  throwaway CA (`sdkconfig.ci-pull`).
+
 ### Without a cable
 
 A board updated over its network usually has no cable on it, so two things the
@@ -534,6 +559,8 @@ configurations set 80; the default is 0, none), the component's
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
 | `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
 | `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
+| `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it; [planning](../../planning/p4x-speakers-options.md)); `404` on a board with none |
+| `PUT /speakers-style` | body: `glow` or `pulse`. Stored (`np_style`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
 | `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants ([planning](../../planning/hearth-late-night.md)); `404` on a board with none |
 | `PUT /dynamic-range` | body: `standard` or `late-night`. Stored (NVS key `dyn_range`, kept over a restart; `CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE` is a board's first answer), and followed from the next stream's start. `late-night` is line mode's level with the stream's `compr` words (AC-3, E-AC-3) or speaker DRC mode (AC-4) on top, and wins over a server's decoder mode; it changes nothing in a stream that carries neither. `400` for any other word, `409` where there is no player. `POST /play` plays as the build says |
 | `GET /preferences` | every preference this board has, as JSON, on every board: its id, group, label, kind, how a change applies, the route that sets it, its value, whether the board can use it and why not, and each choice the same way. Read-only: a change goes through the entry's own route. The board's capability description decides what is available ([the Preferences sheet](../../docs/hearth/sink-esp32-p4.md#adjust-and-preferences)) |

@@ -22,6 +22,8 @@ const {
     playingSendspin,
     pairedServer,
     firmwareTrial,
+    updateNotBuilt,
+    updateOffer,
     cableNetwork,
     screenBoard,
     timeBoard,
@@ -40,6 +42,10 @@ const CONTROL = fs.readFileSync(path.join(COMPONENT, 'src/control.cpp'), 'utf8')
 const FIRMWARE_CPP = fs.readFileSync(path.join(COMPONENT, 'src/firmware.cpp'), 'utf8');
 const FIRMWARE_IMAGE = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_image.hpp'), 'utf8');
 const FIRMWARE_STATUS = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_status.hpp'), 'utf8');
+// What a firmware without updates from GitHub releases says (the routes are control.cpp's, and the reply
+// is this file's), and the body firmware_update.hpp writes for GET /firmware/available.
+const PULL_NONE = fs.readFileSync(path.join(COMPONENT, 'src/firmware_pull_none.cpp'), 'utf8');
+const FIRMWARE_UPDATE = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_update.hpp'), 'utf8');
 const SCRIPT = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.js'), 'utf8');
 const PAGE = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.html'), 'utf8');
 
@@ -83,8 +89,9 @@ function literals(source) {
 const STRINGS = literals(CONTROL);
 
 test("the stand-in answers with the firmware's reply texts", () => {
+    const strings = [...STRINGS, ...literals(PULL_NONE)];
     for (const [name, text] of Object.entries(REPLIES)) {
-        expect(STRINGS, `REPLIES.${name} is not a string in control.cpp`).toContain(text);
+        expect(strings, `REPLIES.${name} is not a string in control.cpp or firmware_pull_none.cpp`).toContain(text);
     }
 });
 
@@ -144,6 +151,8 @@ test('every request the page makes is to a route the firmware registers', () => 
         'GET /pairing',
         'GET /status',
         'GET /time-zones',
+        'GET /trim',
+        'POST /identify',
         'POST /pairing',
         'POST /restart',
         'PUT /firmware',
@@ -155,6 +164,7 @@ test('every request the page makes is to a route the firmware registers', () => 
         'PUT /slot-width',
         'PUT /time-sync',
         'PUT /timezone',
+        'PUT /trim',
         'PUT /wiring',
     ]);
     for (const route of made) {
@@ -279,6 +289,50 @@ test("the stand-in writes GET /firmware's keys in the firmware's order", async (
         expect(Object.keys(body.last_update)).toEqual(firmware.last);
         expect(Object.keys(body.coredump)).toEqual(firmware.dump);
         expect(Object.keys(body.partitions[0])).toEqual(firmware.part);
+    } finally {
+        await stub.close();
+    }
+});
+
+test("the stand-in writes GET /firmware/available's keys in the firmware's order", async () => {
+    // render_status writes the body with a JsonObject named `object`, and the parts that are objects with one
+    // each: latest, trust and error. A part that does not apply is written with null() under the same key,
+    // so a key comes twice in a row there; a text that may be empty goes through text_or_null.
+    const start = FIRMWARE_UPDATE.indexOf('inline std::string render_status');
+    const render = FIRMWARE_UPDATE.slice(start, FIRMWARE_UPDATE.indexOf("out += '\\n';", start));
+    const keys = (name) =>
+        [
+            ...render.matchAll(
+                new RegExp(`\\b${name}\\.(?:text|number|null|key)\\("([a-z_0-9]+)"|text_or_null\\(${name}, "([a-z_0-9]+)"`, 'g'),
+            ),
+        ]
+            .map((m) => m[1] ?? m[2])
+            .filter((key, i, all) => key !== all[i - 1]);
+    const firmware = { body: keys('object'), latest: keys('latest'), trust: keys('trust'), error: keys('error') };
+    expect(firmware.body).toEqual(expect.arrayContaining(['supported', 'state', 'latest', 'trust', 'skipped']));
+    expect(firmware.latest.length).toBe(5);
+    const stub = await startStub();
+    try {
+        // A firmware without the update: every part that does not apply is null.
+        let body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.trust)).toEqual(firmware.trust);
+        expect(body.latest).toBeNull();
+        expect(body.error).toBeNull();
+        expect(body).toEqual(updateNotBuilt(stub.device.firmware));
+        // A release on offer, and then a check that failed.
+        stub.device.update = updateOffer(stub.device.firmware);
+        body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.latest)).toEqual(firmware.latest);
+        stub.device.update = updateOffer(stub.device.firmware, {
+            state: 'idle',
+            latest: null,
+            error: { code: 'untrusted', text: 'The update list was not signed by a key this firmware trusts.' },
+        });
+        body = JSON.parse(await (await fetch(`${stub.url}firmware/available`)).text());
+        expect(Object.keys(body)).toEqual(firmware.body);
+        expect(Object.keys(body.error)).toEqual(firmware.error);
     } finally {
         await stub.close();
     }
@@ -600,6 +654,38 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
     }
 });
 
+test('the stand-in answers /speakers-style as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        let reply = await fetch(`${stub.url}speakers-style`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        // One with a screen takes glow or pulse, in lower case, and glows out of the box.
+        stub.device.screen = screenBoard();
+        reply = await fetch(`${stub.url}speakers-style`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('glow\n');
+        for (const bad of ['Pulse', 'pulse now', 'speakers', '1', '']) {
+            reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.speakersStyleBad);
+        }
+        reply = await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingOk);
+        expect(await (await fetch(`${stub.url}speakers-style`)).text()).toBe('pulse\n');
+        // The route is in the list GET /api says, in the words the firmware says it in.
+        const api = await (await fetch(`${stub.url}api`)).text();
+        expect(api).toContain('GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one');
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in answers /now-playing and /dim-after as the firmware does', async () => {
     const stub = await startStub();
     try {
@@ -819,6 +905,47 @@ test("the stand-in lists preferences with the registry's words", () => {
     expect(PREFERENCES_HPP).toContain('This board has no screen.');
 });
 
+test('the stand-in lists the sound preferences with the player, and greyed with the reason without one', async () => {
+    const stub = await startStub();
+    try {
+        let listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        let by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        // The board has a player (the stand-in's default): the tone is a button at rest, the trim a sheet that says what is set.
+        expect(by['identify-speakers']).toMatchObject({
+            group: 'Sound',
+            kind: 'action',
+            route: '/identify',
+            value: 'run',
+            available: true,
+            reason: '',
+        });
+        expect(by['identify-speakers'].choices.map((c) => c.id)).toEqual(['run', 'running']);
+        expect(by['speaker-trim']).toMatchObject({ group: 'Sound', kind: 'sheet', route: '/trim', value: 'none set', available: true });
+        expect(by['speaker-trim'].choices).toBeUndefined();
+        // A trim made through its own route is counted; a tone running says so.
+        await fetch(`${stub.url}trim`, { method: 'PUT', body: 'L level=-1.5\nC distance=2.4\n' });
+        await fetch(`${stub.url}identify`, { method: 'POST', body: 'L loop\n' });
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        expect(by['speaker-trim'].value).toBe('2 speakers set');
+        expect(by['identify-speakers'].value).toBe('running');
+        // No player: both greyed, with the reason, and the sheet still has no choices.
+        stub.device.sound = null;
+        listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
+        for (const p of listing.preferences.filter((x) => x.group === 'Sound')) {
+            expect(p.available, p.id).toBe(false);
+            expect(p.reason, p.id).toBe('This build has no player, so it has no speakers to play a tone through.');
+        }
+        by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
+        expect(by['speaker-trim'].choices).toBeUndefined();
+        for (const choice of by['identify-speakers'].choices) {
+            expect(choice.available).toBe(false);
+        }
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in lists the preferences, greyed with the reason where the board has no screen', async () => {
     const stub = await startStub();
     try {
@@ -827,16 +954,20 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         expect(listing.preferences.map((p) => p.id)).toEqual([
             'now-view',
             'dim-after',
+            'speakers-style',
             'brightness',
             'clock-hours',
             'clock-seconds',
             'night-schedule',
             'night-times',
             'night-idle',
+            'identify-speakers',
+            'speaker-trim',
             'time-zone',
         ]);
-        // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps.
-        for (const p of listing.preferences.filter((q) => q.id !== 'time-zone')) {
+        // The screen's entries are greyed, each with the reason; the time zone is the clock's, which this board keeps, and
+        // the tone and the trim are the player's, which this one has.
+        for (const p of listing.preferences.filter((q) => q.group === 'Display')) {
             expect(p.available, p.id).toBe(false);
             expect(p.reason, p.id).toBe('This board has no screen.');
             for (const choice of p.choices ?? []) {
@@ -851,7 +982,8 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         expect(listing.display).toBe('dsi');
         expect(listing.preferences[0]).toMatchObject({ id: 'now-view', value: 'speakers', available: true, reason: '' });
         expect(listing.preferences[1]).toMatchObject({ id: 'dim-after', value: '5', available: true, reason: '' });
-        expect(listing.preferences.slice(2, 7).map((p) => [p.id, p.value, p.available])).toEqual([
+        expect(listing.preferences.slice(2, 8).map((p) => [p.id, p.value, p.available])).toEqual([
+            ['speakers-style', 'glow', true],
             ['brightness', '80', true],
             ['clock-hours', '24', true],
             ['clock-seconds', 'off', true],
@@ -859,12 +991,14 @@ test('the stand-in lists the preferences, greyed with the reason where the board
             ['night-times', '22:00-07:00', true],
         ]);
         await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
+        await fetch(`${stub.url}speakers-style`, { method: 'PUT', body: 'pulse\n' });
         await fetch(`${stub.url}clock-format`, { method: 'PUT', body: '12 seconds' });
         await fetch(`${stub.url}night-schedule`, { method: 'PUT', body: '23:30-06:15' });
         await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Australia/Melbourne' });
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
         const by = Object.fromEntries(listing.preferences.map((p) => [p.id, p]));
         expect(by['dim-after'].value).toBe('30');
+        expect(by['speakers-style'].value).toBe('pulse');
         expect(by['clock-hours'].value).toBe('12');
         expect(by['clock-seconds'].value).toBe('on');
         expect(by['night-schedule'].value).toBe('on');
@@ -873,12 +1007,12 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         // A glass whose backlight cannot be dimmed greys the brightness with its reason, and only that.
         stub.device.screen.dimmable = false;
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
-        expect(listing.preferences[2]).toMatchObject({
+        expect(listing.preferences[3]).toMatchObject({
             id: 'brightness',
             available: false,
             reason: "This screen's backlight is not under the board's control.",
         });
-        expect(listing.preferences[3].available).toBe(true);
+        expect(listing.preferences[4].available).toBe(true);
         // The night schedule says why it is moot where the screen without lyrics is dark already, or off.
         stub.device.screen.view = 'dark';
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
@@ -969,6 +1103,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         Object.assign(stub.device.screen, {
             view: 'clock',
             dimAfter: '30',
+            speakersStyle: 'pulse',
             brightness: 40,
             clockFormat: '12 seconds',
             night: { enabled: true, from: '23:00', to: '06:00', idle: true },
@@ -982,6 +1117,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         // What a person chose is back; what the board is stays.
         expect(stub.device.screen.view).toBe('speakers');
         expect(stub.device.screen.dimAfter).toBe('5');
+        expect(stub.device.screen.speakersStyle).toBe('glow');
         expect(stub.device.screen.brightness).toBe(80);
         expect(stub.device.screen.clockFormat).toBe('24');
         expect(stub.device.screen.night).toEqual({ enabled: false, from: '22:00', to: '07:00', idle: false });

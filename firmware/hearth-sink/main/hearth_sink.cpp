@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -63,6 +64,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/firmware.hpp"
+#include "iclforge/firmware_pull.hpp"
 #include "iclforge/layout_options.hpp"
 #include "iclforge/log.hpp"
 #include "iclforge/player.hpp"
@@ -79,6 +81,8 @@
 #include "preferences.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "sound.hpp"
+#include "sound_routes.hpp"
 #include "system_control.hpp"
 #include "system_reset.hpp"
 #include "wall_clock.hpp"
@@ -102,7 +106,7 @@ const void* thread_token() noexcept {
 
 namespace {
 
-constexpr std::uint32_t kSampleRate = 48000;
+constexpr std::uint32_t kSampleRate = player::kSinkSampleRate;
 constexpr std::uint64_t kFrameDurationUs = 32000;  // §5.3.2: 1,536 samples at 48 kHz
 constexpr std::size_t kMaxSlots = iclforge::render::OutputLayout::kMaxSlots;
 
@@ -256,6 +260,15 @@ int g_sink_channels_open = 0;
 // app_main's task, which owns the player, and the firmware's task waits for
 // it on g_flash_mode_done. g_control_started is one of the trial's conditions.
 iclforge::Firmware g_firmware;
+iclforge::FirmwarePull g_firmware_pull;
+
+// The trust anchors main/CMakeLists.txt embeds in a build that pulls updates from GitHub releases.
+// Weak, so that a build without them (and the code that reads them) links; a null start says there
+// are none.
+extern "C" const char g_trust_anchors_start[] asm("_binary_trust_anchors_pem_start")
+    __attribute__((weak));
+extern "C" const char g_trust_anchors_end[] asm("_binary_trust_anchors_pem_end")
+    __attribute__((weak));
 SemaphoreHandle_t g_flash_mode_done = nullptr;
 std::atomic<bool> g_control_started{false};
 
@@ -674,6 +687,14 @@ iclforge::ControlHandlers control_handlers() {
     // The same call the screen's keyboard makes (preferences.cpp): what a rename changes is
     // iclforge/device_name.hpp's to say.
     h.set_name = [](std::string_view text) { return player::preferences().set_name(text); };
+    // The listener's sound (planning/p4x-preferences.md): a level and distance for each speaker, and a test tone out
+    // of each, where a Sendspin player is there to apply them. The others answer that they have none.
+    if (player::sendspin_sound_caps().player) {
+        h.trim = player::sound_trim_json;
+        h.set_trim = player::sound_set_trim;
+        h.identify = player::sound_identify_json;
+        h.set_identify = player::sound_identify;
+    }
     // On a part with one I2S controller (an ESP32-C6), and on a sink that
     // drives one line only, there is no second line to wire: /status leaves
     // the wiring out, so the page offers no choice about it, and PUT /wiring
@@ -752,6 +773,15 @@ iclforge::ControlHandlers control_handlers() {
             // The preferences' backend refuses a view this build cannot draw, stores the rest and has the screen follow.
             const auto view = iclforge::nowview::parse_view(word);
             return view.has_value() && player::preferences().set_now_view(*view);
+        };
+        h.speakers_style = []() { return std::string(iclforge::nowview::speakers_style_name(player::settings().speakers_style)); };
+        h.set_speakers_style = [](std::string_view word) {
+            const auto style = iclforge::nowview::parse_speakers_style(word);
+            if (!style || !player::settings_set_speakers_style(*style)) {
+                return false;
+            }
+            player::panel_set_speakers_style(*style);
+            return true;
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
@@ -887,6 +917,7 @@ iclforge::ControlHandlers control_handlers() {
     h.reset_preferences = []() { return player::system_reset_preferences(); };
     h.factory_reset = []() { return player::system_factory_reset(); };
     h.firmware = &g_firmware;
+    h.firmware_pull = &g_firmware_pull;
     return h;
 }
 
@@ -928,6 +959,53 @@ iclforge::FirmwareHooks firmware_hooks() {
     return hooks;
 }
 
+// Whether this board has PSRAM, from the heap: esp_psram's own functions are not in the link of a
+// target with no PSRAM bus at all (the ESP32-C6).
+bool has_psram() {
+    return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+}
+
+// What only this board knows about an update from GitHub releases (iclforge::PullHooks).
+iclforge::PullHooks pull_hooks() {
+    iclforge::PullHooks hooks;
+    hooks.network_up = [] { return player::network_ready(); };
+    // The time of day, once a time server has answered: never a time the board made up.
+    hooks.clock_unix = []() -> std::optional<std::int64_t> {
+        if (!player::wall_clock_read().known) {
+            return std::nullopt;
+        }
+        return static_cast<std::int64_t>(std::time(nullptr));
+    };
+    hooks.time_sync_on = [] { return player::settings().time_sync; };
+    // A TLS session is tens of KB: with PSRAM the allocations that large go there, and without it
+    // (the ESP32-C6) they do not fit beside a playing stream (planning/esp32-ota.md, "TLS on the
+    // board").
+    hooks.room_beside_stream = [] {
+        return has_psram() || !(g_player != nullptr || player::sendspin_playing());
+    };
+    return hooks;
+}
+
+iclforge::PullConfig pull_config() {
+    iclforge::PullConfig config;
+    config.base_url = CONFIG_ICLFORGE_FIRMWARE_UPDATE_BASE_URL;
+    config.default_channel = CONFIG_ICLFORGE_FIRMWARE_UPDATE_CHANNEL;
+    config.leaf_stable = CONFIG_ICLFORGE_FIRMWARE_LEAF_STABLE;
+    config.leaf_beta = CONFIG_ICLFORGE_FIRMWARE_LEAF_BETA;
+    const char* anchors_start = g_trust_anchors_start;
+    const char* anchors_end = g_trust_anchors_end;
+    if (anchors_start != nullptr && anchors_end > anchors_start) {
+        config.anchors_pem =
+            std::string_view(anchors_start, static_cast<std::size_t>(anchors_end - anchors_start));
+    }
+    config.has_clock = player::wall_clock_built();
+    config.psram = has_psram();
+    // CI's loopback test only: no clock to judge dates by, and an http:// address.
+    config.allow_http = CONFIG_ICLFORGE_FIRMWARE_PULL_TEST_HTTP != 0;
+    config.judge_dates = CONFIG_ICLFORGE_FIRMWARE_PULL_TEST_HTTP == 0;
+    return config;
+}
+
 iclforge::FirmwareConfig firmware_config() {
     iclforge::FirmwareConfig config;
     config.trial.hold_ms = static_cast<std::uint32_t>(CONFIG_ICLFORGE_FIRMWARE_TRIAL_HOLD_S) * 1000U;
@@ -942,6 +1020,14 @@ iclforge::FirmwareConfig firmware_config() {
 }  // namespace
 
 namespace player {
+
+// A play from the control surface (POST /play) holds the player; the test tone does not play over it.
+bool control_play_active() {
+    xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+    const bool playing = g_player != nullptr;
+    xSemaphoreGive(g_player_mutex);
+    return playing;
+}
 
 std::string layout_text() {
     xSemaphoreTake(g_player_mutex, portMAX_DELAY);
@@ -1205,6 +1291,7 @@ extern "C" void app_main() {
     // starts its clock here (iclforge/firmware.hpp).
     g_flash_mode_done = xSemaphoreCreateBinary();
     (void)g_firmware.start(firmware_hooks(), firmware_config());
+    (void)g_firmware_pull.start(g_firmware, pull_hooks(), pull_config());
 
     // The network, if this build has one, before anything plays: a sink is
     // found before it is played to, so the control surface has to answer and

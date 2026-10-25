@@ -30,7 +30,21 @@ void sendspin_leave() {}
 
 std::optional<iclforge::ControlSendspin> sendspin_status() { return std::nullopt; }
 
+SoundCaps sendspin_sound_caps() { return {}; }
+
+void sendspin_set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& /*table*/) {}
+
+std::optional<SpeakerTrimStatus> sendspin_speaker_trim_status() { return std::nullopt; }
+
+iclforge::render::IdentifyOutcome sendspin_identify(const iclforge::render::IdentifyRequest& /*request*/) {
+    return iclforge::render::IdentifyOutcome::kNoPlayer;
+}
+
+IdentifyStatus sendspin_identify_status() { return {}; }
+
 SendspinPlaying sendspin_now_playing() { return {}; }
+
+SendspinLevels sendspin_now_levels() { return {}; }
 
 bool sendspin_pairing(std::string_view /*action*/) { return false; }
 

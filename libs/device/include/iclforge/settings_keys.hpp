@@ -42,6 +42,7 @@ inline constexpr const char* kSecondLine = "second_line";
 inline constexpr const char* kNetworkPreference = "net_pref";
 inline constexpr const char* kNowView = "np_view";
 inline constexpr const char* kDimAfter = "np_dim";
+inline constexpr const char* kSpeakersStyle = "np_style";
 inline constexpr const char* kTimeZone = "time_zone";
 inline constexpr const char* kTimeZoneName = "tz_name";
 inline constexpr const char* kBrightness = "bright";
@@ -50,6 +51,7 @@ inline constexpr const char* kNight = "night";
 inline constexpr const char* kNtpServer = "ntp_server";
 inline constexpr const char* kTimeSync = "time_sync";
 inline constexpr const char* kLayout = "layout";
+inline constexpr const char* kSpeakerTrim = "speaker_trim";
 inline constexpr const char* kDynamicRange = "dyn_range";
 
 // The longest an NVS key may be.
@@ -85,11 +87,13 @@ inline constexpr std::array kKeys = {
     Key{kSlotBits, Kind::setup, "DAC wiring"},
     Key{kSecondLine, Kind::setup, "DAC wiring"},
     Key{kLayout, Kind::setup, "speaker layout"},
+    Key{kSpeakerTrim, Kind::setup, "per-speaker trims and delays"},
     Key{kTimeZone, Kind::setup, "time zone"},
     Key{kNtpServer, Kind::technical, "time server"},
     Key{kTimeSync, Kind::technical, "time sync"},
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
+    Key{kSpeakersStyle, Kind::preference, "speakers style"},
     // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
     // Reset preferences keeps the time zone).
     Key{kTimeZoneName, Kind::setup, "time zone"},

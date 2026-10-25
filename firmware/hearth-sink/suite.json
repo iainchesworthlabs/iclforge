@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR.",
+  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR. A row that names a layout needs the board to carry it: the suite asks the board (GET /layout-options, the same verdict PUT /layout applies) and plays the row where it does; where the board cannot carry the layout the row is its refusal (PUT /layout answers 409 with the board's own reason, and that is the pass; the default, if_unavailable refuse) or is left out with the reason stated (if_unavailable skip). A layout carried with a limit is played and the limit is noted.",
   "frame_us": 32000,
   "tolerance": {
     "relative": 0.05,

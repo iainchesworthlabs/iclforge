@@ -16,6 +16,13 @@ See [README.md](README.md) for the project overview and
   locked in `s3-n16r8`). On an S3 the same stream now leaves 70 KB or more, PCM reads 93 KB free where it read 69, and the boot
   figure rises 14 KB; the decode of an E-AC-3 stream takes about 14 % longer (17.9 against 15.7 ms of the 32 ms a chunk lasts).
   `s3-n16r8-ac4`, the P4 and the C6 profiles are unchanged: the AC-4 S3 profile's board suite hung at its first play with the lower limit.
+- **The speakers follow the sound more closely, and can pulse.** The P4X's no-lyrics screen reads the level of every
+  100 ms window (it read every other one), judges it against the loudest the room has lately been (so the same music shows
+  the same at any volume), and moves in six steps that fall fast enough for a hit to show, for about 56,000 pixels a second
+  at 5.1 (the lyric screen's song filling is 192,000). A new `GET` and `PUT /speakers-style` (`glow`, the default, or
+  `pulse`: each speaker's filled circle grows and shrinks a little, 88% to 112%, with its level) is kept as `np_style`.
+  No new meter and no change to the audio path beyond `BurstPlayer::levels()`, a lock and two short arrays. The plan is
+  `planning/p4x-speakers-options.md`.
 - **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
   stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
   let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
