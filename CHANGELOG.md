@@ -198,8 +198,10 @@ The sections below contain the complete change list and fixes.
   space at either end (`409` otherwise, as for one that was too long), and the host name spells a
   Latin letter with an accent as the letter ("Café" is `cafe.local`).
   ([Name, restart and reset](docs/hearth/sink-esp32-s3.md#name-restart-and-reset).)
-- **`POST /reset-preferences`** puts the choices a person made once back to the image's defaults, at
-  once: what the screen shows without lyrics and when it dims. It keeps the name, the Wi-Fi network, the
+- **`POST /reset-preferences`** puts the choices a person made once back to their defaults, at once:
+  every entry of the preferences registry that says it is reset (what the screen shows without lyrics,
+  when it dims, the brightness, the clock's hours and seconds and the night schedule), each through its
+  own setter. It keeps the name, the Wi-Fi network, the
   cable-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
   **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
   name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
@@ -211,6 +213,19 @@ The sections below contain the complete change list and fixes.
   them a reset keeps (`settings_keys.hpp`); the words of the restart, the resets and the forgetting of
   a paired server, with the button that is held for three seconds (`system_actions.hpp`); and the rows
   of About (`about_view.hpp`).
+
+**The System group of the ESP32-P4X's Preferences sheet**
+
+- **Wired or Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset**
+  are entries of the preferences registry and pages of the sheet, at the size of the display they are on (the
+  preview checks 1024 by 600, 800 by 480, 480 by 320 and 320 by 240). The switch between the cable and Wi-Fi
+  asks first in the developer view's words. The name is typed on a keyboard that offers only what the name's rule
+  accepts and the fonts can draw (the Latin subset, accents included), counted in bytes. About is the friendly
+  subset of the developer view. The paired servers are listed with a Forget on each, the one that plays included,
+  with a warning that the music stops. The factory reset asks twice: what is lost and whether the board stays
+  reachable (a cable plugged in, or no network and Improv over USB to bring it back), and then a button held for
+  three seconds. A board that cannot make a choice shows it greyed, with the reason.
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#on-the-screen).)
 
 **The Forge GUI, Hearth and Crucible open where they were left**
 

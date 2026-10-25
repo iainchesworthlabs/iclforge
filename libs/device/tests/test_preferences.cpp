@@ -82,6 +82,14 @@ TEST_CASE("every entry is well formed", "[preferences]") {
         REQUIRE(pref.get != nullptr);
         REQUIRE(pref.set != nullptr);
         REQUIRE(prefs::find(pref.id) == &pref);
+        // Every entry says whether Reset preferences touches it, and only a value with a default can be reset.
+        REQUIRE(pref.on_reset != prefs::OnReset::kUnset);
+        if (pref.on_reset == prefs::OnReset::kReset) {
+            REQUIRE(pref.default_word[0] != '\0');
+            // A choice, a stepper, a toggle, or a text whose default is a word its setter takes (the night's times).
+            REQUIRE((pref.kind == prefs::Kind::kChoice || pref.kind == prefs::Kind::kStepper ||
+                     pref.kind == prefs::Kind::kToggle || pref.kind == prefs::Kind::kText));
+        }
 
         if (pref.kind == prefs::Kind::kChoice || pref.kind == prefs::Kind::kStepper ||
             pref.kind == prefs::Kind::kToggle) {
@@ -171,17 +179,20 @@ TEST_CASE("each entry against each known board: a reason wherever it is greyed, 
                 any_choice_available |= choice.availability.available;
             }
             if (entry.availability.available) {
-                // Something to choose, and the board's starting point is one the board can make; a text has no
-                // choices (its editor or its route sets it).
+                // Something to choose, and the board's starting point is one the board can make. An entry that is not a
+                // choice among words (a name, an action, a list, About, a place or a pair of times chosen in an editor)
+                // has no choices to check.
                 if (!pref.choices.empty()) {
                     REQUIRE(any_choice_available);
                     const prefs::ChoiceState* const start = choice_of(entry, pref.default_word);
                     REQUIRE(start != nullptr);
                     REQUIRE(start->availability.available);
                 }
-                // The fake starts at the defaults, so the value read is the default.
-                REQUIRE(entry.value == pref.default_word);
-                REQUIRE_FALSE(entry.value_label.empty());
+                // The fake starts at the defaults, so a value that has a default reads as it.
+                if (pref.default_word[0] != '\0') {
+                    REQUIRE(entry.value == pref.default_word);
+                    REQUIRE_FALSE(entry.value_label.empty());
+                }
             }
         }
     }

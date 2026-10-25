@@ -671,18 +671,9 @@ iclforge::ControlHandlers control_handlers() {
     h.layout = []() { return player::layout_text(); };
     h.set_layout = accept_layout;
     h.name = []() { return std::string(player::settings().name.data()); };
-    h.set_name = [](std::string_view text) {
-        if (!player::settings_set_name(text)) {
-            return false;
-        }
-        // What a rename changes (iclforge/device_name.hpp): the mDNS host name and the Sendspin service's
-        // instance and `name` now, with no restart; what a server lists the board as comes from its hello,
-        // which follows now, or when the stream that plays has ended. The web page, the screen's footer and
-        // Improv read the setting when they next draw.
-        player::discovery_rename();
-        player::sendspin_name_changed();
-        return true;
-    };
+    // The same call the screen's keyboard makes (preferences.cpp): what a rename changes is
+    // iclforge/device_name.hpp's to say.
+    h.set_name = [](std::string_view text) { return player::preferences().set_name(text); };
     // On a part with one I2S controller (an ESP32-C6), and on a sink that
     // drives one line only, there is no second line to wire: /status leaves
     // the wiring out, so the page offers no choice about it, and PUT /wiring
@@ -1003,21 +994,6 @@ std::optional<std::string> refusal(iclforge::sysactions::Action action) {
     return availability.reason;
 }
 
-// What the settings that were just reset or erased drive, told the new values: the screen's view and dim
-// time, the clock's zone. A preference added to the registry that a subsystem acts on adds its line here.
-void apply_preferences_now() {
-    if (panel_built()) {
-        if (panel_has_view(settings().now_view)) {
-            panel_set_view(settings().now_view);
-        }
-        panel_set_dim_after(settings().dim_after_minutes);
-    }
-    if (wall_clock_built()) {
-        (void)wall_clock_set_zone(settings().time_zone.data());
-    }
-    sendspin_set_dynamic_range(settings().dynamic_range);
-}
-
 }  // namespace
 
 iclforge::sysactions::Situation system_situation() {
@@ -1062,9 +1038,9 @@ std::optional<std::string> system_reset_preferences() {
     if (const auto why = refusal(iclforge::sysactions::Action::reset_preferences)) {
         return why;
     }
-    const bool all = settings_reset_preferences();
-    apply_preferences_now();
-    if (!all) {
+    // From the registry: every entry that says it is reset goes back to its default through its own setter, so that the
+    // screen, the clock and the rest follow as they follow a change.
+    if (!iclforge::prefs::reset_preferences(preferences()).ok()) {
         return std::string("Some preferences could not be reset; the rest were.");
     }
     return std::nullopt;
@@ -1084,7 +1060,6 @@ std::optional<std::string> system_factory_reset() {
     if (!settings_forget()) {
         return std::string("The settings could not be erased (the flash refused); the paired servers already were.");
     }
-    apply_preferences_now();
     // The WiFi driver's own copy of the network is erased once the answer has gone out over it.
     schedule_restart("after a factory reset", true);
     return std::nullopt;

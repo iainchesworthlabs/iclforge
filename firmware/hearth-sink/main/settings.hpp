@@ -173,10 +173,5 @@ void settings_load();
 // network is network_forget_driver_state()).
 [[nodiscard]] bool settings_forget();
 
-// Reset preferences: the keys iclforge/settings_keys.hpp lists as preferences are erased and their fields
-// go back to the image's defaults, at once. The name, the network, the wiring, the layout and the
-// technical settings stay, and so do the pairings. False if NVS refused any erase; the preferences that
-// could be reset are.
-[[nodiscard]] bool settings_reset_preferences();
 
 }  // namespace player

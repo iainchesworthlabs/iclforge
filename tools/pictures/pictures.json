@@ -135,6 +135,10 @@
     "93643abc4": {
       "commit": "93643abc4d9f91bf07741efec8cc9b9f77c214c4",
       "what": "the tree panel_preview was built from: the Preferences editors (the night schedule's times, the time zone) and the rows for brightness, the clock and the night schedule, 2026-10-25"
+    },
+    "3a65c6632": {
+      "commit": "3a65c6632909e3ead3601c7977f133cddacfcf8d",
+      "what": "the tree panel_preview was built from: the System group of the Preferences sheet beside the Speaker layout list (the switch of network, the name's keyboard, About, the paired servers, Restart, Reset preferences and the factory reset), 2026-10-25"
     }
   },
   "pictures": [
@@ -1313,6 +1317,66 @@
       "program": "panel_preview (firmware/hearth-sink/preview)",
       "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`; Adjust and Preferences are its adjust-, prefs-, prefs-greyed- and prefs-dark- BMPs at 1024x600, and prefs-320x240 at the smallest size it checks. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
       "build": "54afe292e"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-system.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is prefs-system-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-network.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-network-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-name.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-name-typed-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-servers.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-servers-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-forget.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-forget-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-about.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-about-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-factory.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-factory-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-hold.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-hold-half-1024x600, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-name-small.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-name-typed-480x320, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-prefs-factory-small.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen (this one is system-factory-320x240, reached by taps on the Preferences sheet: the System group's scenarios are the system-* and prefs-system-* pictures, at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240), converted to PNG. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "3a65c6632"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-clock-12h-seconds.png",
