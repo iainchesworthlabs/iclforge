@@ -14,6 +14,7 @@
 #include "iclforge/render/float_biquad.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/pcm_block.hpp"
+#include "iclforge/render/routing.hpp"
 #include "iclforge/render/spatial.hpp"
 
 // From what the decoder rendered to what the speakers want, one 256-sample
@@ -297,6 +298,7 @@ class LayoutRenderer {
                 }
             }
         }
+        find_direct_slots();
     }
 
     // The objects of the unit about to be rendered, as describe_objects sees
@@ -469,19 +471,9 @@ class LayoutRenderer {
         }
         std::size_t next_speaker = 0;
         for (std::size_t ch = 0; ch < block.channels.size(); ++ch) {
-            int slot = -1;
-            if (block.channels.size() == 2) {
-                slot = layout_.index_of(ch == 0 ? Location::kLeft : Location::kRight);
-            }
+            const int slot = folded_slot(block.channels.size(), ch, slots, next_speaker);
             if (slot < 0) {
-                while (next_speaker < slots &&
-                       layout_.slot(next_speaker).kind != Speaker::Kind::kSpeaker) {
-                    ++next_speaker;
-                }
-                if (next_speaker >= slots) {
-                    break;
-                }
-                slot = static_cast<int>(next_speaker++);
+                break;
             }
             const std::span<const float> src = block.channels[ch];
             float* const dst = out[static_cast<std::size_t>(slot)].data();
@@ -496,7 +488,96 @@ class LayoutRenderer {
         }
     }
 
+    // The output each of a source's `channels` channels comes out of, for a caller that measured the
+    // channels as they arrived and would rather not measure the outputs again (the ESP32 player's
+    // integer meter, on a part without a floating-point unit). Written to outputs[0..channels-1], and
+    // true, only when every channel is a plain copy of itself, at unity gain and alone, onto a
+    // speaker's slot that `routing` patches to an output: the bed set_bed() was given rendered without
+    // objects at a gain of 1 (`folded` false), or the block render_folded() places (`folded` true).
+    // False otherwise - a channel panned between speakers because the room lacks its own, two
+    // channels onto one slot, a slot with bass management on it (a ":small" speaker, whose bass goes
+    // to the LFE feed), an LFE, or a slot nothing is patched from - and the caller measures the
+    // outputs.
+    //
+    // A channel's slot is the slot of its LOCATION, which is not its number: in a Dolby-ordered room
+    // (L C R Ls Rs ...) a stereo source's second channel, the R, is slot 2 and not slot 1, and slot 1
+    // is the centre.
+    [[nodiscard]] bool direct_outputs(const Routing& routing, bool folded, std::size_t channels,
+                                      std::span<int> outputs) const {
+        if (has_small_ || channels == 0 || channels > outputs.size() || channels > kMaxCoded ||
+            (!folded && channels != bed_channels_)) {
+            return false;
+        }
+        std::uint32_t taken = 0;
+        std::size_t next_speaker = 0;
+        for (std::size_t c = 0; c < channels; ++c) {
+            const int slot = folded ? folded_slot(channels, c, layout_.slots(), next_speaker)
+                                    : bed_direct_[c];
+            if (slot < 0 || layout_.slot(static_cast<std::size_t>(slot)).kind != Speaker::Kind::kSpeaker ||
+                ((taken >> static_cast<unsigned>(slot)) & 1U) != 0) {
+                return false;
+            }
+            taken |= std::uint32_t{1} << static_cast<unsigned>(slot);
+            const int output = routing.output_of(static_cast<std::size_t>(slot));
+            if (output == Routing::kUnassigned) {
+                return false;
+            }
+            outputs[c] = output;
+        }
+        return true;
+    }
+
    private:
+    // The slot render_folded() copies channel `ch` of a block of `channels` to, or -1 when the
+    // `slots` it may write have no speaker left for it. A pair goes by name - L to the slot named L,
+    // R to the slot named R - and anything else, or a pair the room does not name, to the speakers in
+    // slot order; `next_speaker` is where that order has got to.
+    [[nodiscard]] int folded_slot(std::size_t channels, std::size_t ch, std::size_t slots,
+                                  std::size_t& next_speaker) const {
+        if (channels == 2) {
+            const int named = layout_.index_of(ch == 0 ? Location::kLeft : Location::kRight);
+            if (named >= 0) {
+                return named;
+            }
+        }
+        while (next_speaker < slots && layout_.slot(next_speaker).kind != Speaker::Kind::kSpeaker) {
+            ++next_speaker;
+        }
+        return next_speaker < slots ? static_cast<int>(next_speaker++) : -1;
+    }
+
+    // bed_direct_, from the gains set_bed() has just worked out: a coded channel is direct when it
+    // has unit gain into one speaker's slot, none anywhere else, and no other channel has any into
+    // that slot. Nothing is direct in a room with bass management, which filters what it plays.
+    void find_direct_slots() {
+        bed_direct_.fill(-1);
+        if (has_small_) {
+            return;
+        }
+        for (std::size_t c = 0; c < bed_channels_; ++c) {
+            int only = -1;
+            bool spread = false;
+            for (std::size_t slot = 0; slot < layout_.slots() && !spread; ++slot) {
+                if (bed_gains_[c][slot] == 0.0F) {
+                    continue;
+                }
+                spread = only >= 0 || bed_gains_[c][slot] != 1.0F ||
+                         layout_.slot(slot).kind != Speaker::Kind::kSpeaker;
+                only = static_cast<int>(slot);
+            }
+            if (spread || only < 0) {
+                continue;
+            }
+            bool alone = true;
+            for (std::size_t other = 0; other < bed_channels_; ++other) {
+                alone = alone && (other == c || bed_gains_[other][static_cast<std::size_t>(only)] == 0.0F);
+            }
+            if (alone) {
+                bed_direct_[c] = static_cast<std::int8_t>(only);
+            }
+        }
+    }
+
     // The unit-power gains of one object over the layout's speakers
     // (`gains` is sized to targets_ and overwritten, sum of squares 1).
     //
@@ -749,6 +830,8 @@ class LayoutRenderer {
     iclforge::base::Layout coded_{};
     std::size_t bed_channels_ = 0;
     std::array<std::array<float, kMaxSlots>, kMaxCoded> bed_gains_{};
+    // Per coded channel, the one slot it is copied to alone at unit gain, or -1 (direct_outputs()).
+    std::array<std::int8_t, kMaxCoded> bed_direct_{};
     std::array<std::array<float, kMaxSlots>, kMaxObjects> object_gains_{};
     std::size_t object_count_ = 0;
     // The slots the bed's gains and the objects' gains reach, and the ones bass management always
