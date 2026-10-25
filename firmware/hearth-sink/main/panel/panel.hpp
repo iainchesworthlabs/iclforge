@@ -4,6 +4,7 @@
 
 #include "iclforge/board_caps.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/wall_clock.hpp"
 
 // The board's screen (planning/karaoke-p4x-panel.md): the lyrics of the item playing, drawn with the
 // colour moving as the sound does, and, when nothing is playing, what the board is and what it waits
@@ -34,7 +35,8 @@ struct PanelStats {
     const char* screen = "";
     // The no-lyrics screen has dimmed, or is dark (planning/p4x-now-playing.md): a black cover is up.
     bool dimmed = false;
-    // The backlight, percent: lit, the dimmed floor (4), or off (0) in the dark view.
+    // The backlight the glass is given, percent: the person's brightness (80 unless they set it) while lit, the dimmed
+    // floor (4, and never above the brightness) or off (0) in the dark view.
     int backlight = 80;
     // Updates of the picture that LVGL made, and the pixels they covered.
     std::uint32_t refreshes = 0;
@@ -77,6 +79,13 @@ void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
 // How the speakers view shows a level (iclforge::nowview::SpeakersStyle, planning/p4x-speakers-options.md).
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+
+// What a person chose for the screen (planning/p4x-preferences.md), followed at once: the backlight's lit level,
+// percent from iclforge::nowview::kBrightnessMin to kBrightnessMax (the dimmed floor stays under it), and how the
+// clock view writes the time. Stored by the caller (settings.hpp). Without a panel, or with a glass whose
+// backlight cannot be dimmed (panel_display_caps().backlight), the brightness does nothing.
+void panel_set_brightness(int percent);
+void panel_set_clock_format(iclforge::wallclock::ClockFormat format);
 
 // The display the panel opened, as the board's capability description has it (iclforge/board_caps.hpp): its kind,
 // size, whether a touch controller is reading and whether the backlight can be set. Fixed once the panel is up,

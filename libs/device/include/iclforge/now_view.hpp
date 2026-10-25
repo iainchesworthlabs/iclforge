@@ -165,25 +165,225 @@ inline constexpr std::uint32_t kDarkAwakeMs = 30'000;
 enum class Dim : std::uint8_t {
     kNone,    // lit
     kDimmed,  // the speakers view, left alone for the dim time: a black cover, the backlight at its floor
-    kDark,    // the dark view, not touched lately: a black cover, the backlight off
+    kDark,    // the dark view (or the night schedule), not touched lately: a black cover, the backlight off
 };
 
+// --- brightness -------------------------------------------------------------------------------------------------
+
+// The backlight's lit level, percent, a person's choice (PUT /brightness): from 10, below which a screen in a lit room
+// cannot be read, to 100, and a stepper moves it by kBrightnessStep. The dim floor and off are not set by it.
+inline constexpr int kBrightnessMin = 10;
+inline constexpr int kBrightnessMax = 100;
+inline constexpr int kBrightnessStep = 10;
+inline constexpr int kDefaultBrightness = 80;
+
+// The lowest the backlight goes when the no-lyrics screen dims: low enough to be a light in a dark room and no
+// more, high enough that the one line it keeps can still be read at arm's length. Never above the lit level.
+inline constexpr int kDimFloorPercent = 4;
+
+// A whole number from kBrightnessMin to kBrightnessMax (any, not only the stepper's), with or without a line ending.
+[[nodiscard]] constexpr std::optional<int> parse_brightness(std::string_view text) {
+    text = detail::trimmed(text);
+    if (text.empty() || text.size() > 3) {
+        return std::nullopt;
+    }
+    int percent = 0;
+    for (const char c : text) {
+        if (c < '0' || c > '9') {
+            return std::nullopt;
+        }
+        percent = percent * 10 + (c - '0');
+    }
+    if (percent < kBrightnessMin || percent > kBrightnessMax) {
+        return std::nullopt;
+    }
+    return percent;
+}
+
+// A stored number, or nothing for one outside the range (a partition written by another build).
+[[nodiscard]] constexpr std::optional<int> brightness_from_stored(std::int32_t value) {
+    if (value < kBrightnessMin || value > kBrightnessMax) {
+        return std::nullopt;
+    }
+    return static_cast<int>(value);
+}
+
+// The stepper: one step up (`steps` > 0) or down (< 0) to the multiple of kBrightnessStep beyond `percent`, so that
+// 85 goes to 90 and to 80 and never past either end; a value a route set between two steps lands on the next one in
+// the direction pressed.
+[[nodiscard]] constexpr int brightness_stepped(int percent, int steps) {
+    for (; steps > 0; --steps) {
+        percent = (percent / kBrightnessStep + 1) * kBrightnessStep;
+    }
+    for (; steps < 0; ++steps) {
+        percent = percent % kBrightnessStep == 0 ? percent - kBrightnessStep : percent / kBrightnessStep * kBrightnessStep;
+    }
+    return percent < kBrightnessMin ? kBrightnessMin : percent > kBrightnessMax ? kBrightnessMax : percent;
+}
+
+// The backlight for what the screen is doing: the lit level, the dim floor (never above the lit level, so a screen
+// set as low as the floor does not light up when it dims) or off.
+[[nodiscard]] constexpr int backlight_percent(Dim dim, int lit_percent) {
+    switch (dim) {
+        case Dim::kDimmed:
+            return kDimFloorPercent < lit_percent ? kDimFloorPercent : lit_percent;
+        case Dim::kDark:
+            return 0;
+        case Dim::kNone:
+            break;
+    }
+    return lit_percent;
+}
+
+// --- the night schedule -------------------------------------------------------------------------------------------
+
+inline constexpr int kMinutesPerDay = 24 * 60;
+inline constexpr int kDefaultNightFrom = 22 * 60;
+inline constexpr int kDefaultNightTo = 7 * 60;
+
+// Go dark between two times of day, by the board's own local time (the zone it was given and the time a time
+// server told it). From and to are minutes after midnight; a window that ends before it starts crosses midnight
+// (22:00 to 07:00), and one that ends where it starts is empty, which is never dark: a person who wanted the whole
+// day would pick the dark view. `idle` says that the idle screen, between songs, is covered too: not decided by
+// the owner (planning/p4x-now-playing.md, "Open"), so it is a separate setting and off.
+struct NightSchedule {
+    bool enabled = false;
+    int from_min = kDefaultNightFrom;
+    int to_min = kDefaultNightTo;
+    bool idle = false;
+
+    friend constexpr bool operator==(const NightSchedule&, const NightSchedule&) = default;
+};
+
+[[nodiscard]] constexpr bool valid_minute_of_day(int minute) { return minute >= 0 && minute < kMinutesPerDay; }
+
+// Whether `minute` is in [from, to), across midnight when to < from. Nothing is in an empty window (from == to).
+[[nodiscard]] constexpr bool in_night_window(int from_min, int to_min, int minute) {
+    if (from_min == to_min) {
+        return false;
+    }
+    return from_min < to_min ? minute >= from_min && minute < to_min : minute >= from_min || minute < to_min;
+}
+
+// Whether the night schedule is in force: it is on, the board knows the time (`minute_of_day` is nothing until a
+// time server has answered, and a board that does not know the time is never dark by accident), and the time is in
+// the window.
+[[nodiscard]] constexpr bool night_active(const NightSchedule& night, std::optional<int> minute_of_day) {
+    return night.enabled && minute_of_day && valid_minute_of_day(*minute_of_day) &&
+           in_night_window(night.from_min, night.to_min, *minute_of_day);
+}
+
+// "07:05": a time of day as GET /night-schedule writes it and PUT reads it, 00:00 to 23:59.
+[[nodiscard]] constexpr std::optional<int> parse_time_of_day(std::string_view text) {
+    if (text.size() != 5 || text[2] != ':') {
+        return std::nullopt;
+    }
+    for (const std::size_t i : {std::size_t{0}, std::size_t{1}, std::size_t{3}, std::size_t{4}}) {
+        if (text[i] < '0' || text[i] > '9') {
+            return std::nullopt;
+        }
+    }
+    const int hour = (text[0] - '0') * 10 + (text[1] - '0');
+    const int minute = (text[3] - '0') * 10 + (text[4] - '0');
+    if (hour > 23 || minute > 59) {
+        return std::nullopt;
+    }
+    return hour * 60 + minute;
+}
+
+[[nodiscard]] inline std::string time_of_day_text(int minute) {
+    std::string out(5, '0');
+    out[0] = static_cast<char>('0' + minute / 60 / 10 % 10);
+    out[1] = static_cast<char>('0' + minute / 60 % 10);
+    out[2] = ':';
+    out[3] = static_cast<char>('0' + minute % 60 / 10);
+    out[4] = static_cast<char>('0' + minute % 10);
+    return out;
+}
+
+// What PUT /night-schedule takes, applied to the schedule the board has: `22:00-07:00` (the two times, and on),
+// `on` or `off` (the times kept), or both: `22:00-07:00 off`. Nothing for a body that is none of these. The
+// idle screen's own setting is not in it.
+[[nodiscard]] constexpr std::optional<NightSchedule> parse_night_schedule(std::string_view body, NightSchedule current) {
+    body = detail::trimmed(body);
+    if (body == "on" || body == "off") {
+        current.enabled = body == "on";
+        return current;
+    }
+    // `HH:MM-HH:MM` is 11 characters; ` on` and ` off` follow it, and nothing else does.
+    if (body.size() < 11) {
+        return std::nullopt;
+    }
+    const std::optional<int> from = parse_time_of_day(body.substr(0, 5));
+    const std::optional<int> to = parse_time_of_day(body.substr(6, 5));
+    if (!from || !to || body[5] != '-') {
+        return std::nullopt;
+    }
+    current.from_min = *from;
+    current.to_min = *to;
+    const std::string_view rest = body.substr(11);
+    if (rest.empty() || rest == " on") {
+        current.enabled = true;
+        return current;
+    }
+    if (rest == " off") {
+        current.enabled = false;
+        return current;
+    }
+    return std::nullopt;
+}
+
+// What GET /night-schedule reads back: always the times and the state, in the form PUT takes.
+[[nodiscard]] inline std::string night_schedule_text(const NightSchedule& night) {
+    return time_of_day_text(night.from_min) + "-" + time_of_day_text(night.to_min) + (night.enabled ? " on" : " off");
+}
+
+// `on` or `off`, with or without a line ending: what PUT /night-idle takes.
+[[nodiscard]] constexpr std::optional<bool> parse_on_off(std::string_view text) {
+    text = detail::trimmed(text);
+    if (text == "on") {
+        return true;
+    }
+    if (text == "off") {
+        return false;
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] constexpr const char* on_off_text(bool on) { return on ? "on" : "off"; }
+
+// --- what the screen does ----------------------------------------------------------------------------------------
+
+// The dark view's rule on its own: dark from the moment the screen begins to show, whatever touched the glass
+// before; a touch after that lights it, for kDarkAwakeMs from the last touch. `inactive_ms` is the time since
+// anything touched the glass and `showing_ms` the time since the screen began to show.
+[[nodiscard]] constexpr Dim dark_state(std::uint32_t inactive_ms, std::uint32_t showing_ms) {
+    const bool touched_since_it_began = inactive_ms < showing_ms;
+    return touched_since_it_began && inactive_ms < kDarkAwakeMs ? Dim::kNone : Dim::kDark;
+}
+
 // What the screen does now. `showing` is that the no-lyrics view is what the panel is on (the speakers
-// built, or the dark view chosen while a song has no lyrics); `inactive_ms` is the time since anything
-// touched the glass, and `showing_ms` the time since the view began to show.
+// built, or the dark view chosen while a song has no lyrics, or the night schedule in force); `inactive_ms` is
+// the time since anything touched the glass, and `showing_ms` the time since the view began to show.
 //
 // The speakers view dims after `minutes` of both. The dark view is dark from the moment it begins to
 // show, whatever touched the glass before; a touch after that lights it, for kDarkAwakeMs from the last
 // touch. A song that begins on a panel nobody has touched for hours is dark at once in the dark view and
 // is not dimmed at once in the speakers view, which counts from the song too.
+//
+// The night schedule makes any view the dark view while it is in force (`night` and the board's local minute of
+// the day, which is nothing until the clock has converged, and then the schedule is not in force and the screen
+// is lit as it would be without one). It begins, like the dark view, from when the view began to show: a song
+// that starts at 23:00 is dark at once, and one that is playing at 22:00 goes dark once nothing has touched the
+// glass for kDarkAwakeMs.
 [[nodiscard]] constexpr Dim dim_state(View view, bool showing, int minutes, std::uint32_t inactive_ms,
-                                      std::uint32_t showing_ms) {
+                                      std::uint32_t showing_ms, const NightSchedule& night = {},
+                                      std::optional<int> minute_of_day = std::nullopt) {
     if (!showing) {
         return Dim::kNone;
     }
-    if (view == View::kDark) {
-        const bool touched_since_it_began = inactive_ms < showing_ms;
-        return touched_since_it_began && inactive_ms < kDarkAwakeMs ? Dim::kNone : Dim::kDark;
+    if (view == View::kDark || night_active(night, minute_of_day)) {
+        return dark_state(inactive_ms, showing_ms);
     }
     const std::uint32_t quiet = inactive_ms < showing_ms ? inactive_ms : showing_ms;
     return dimmed(true, minutes, quiet) ? Dim::kDimmed : Dim::kNone;

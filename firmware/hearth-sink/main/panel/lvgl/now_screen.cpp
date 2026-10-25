@@ -97,9 +97,16 @@ constexpr lv_opa_t kClockDateOpa = 150;
 // How wide each of the three labels is: the widest time ("00:00" in the 200 px face is about 560 px) with room,
 // and no wider, so that a minute's redraw is the width of the digits and not of the screen.
 constexpr int kClockLabelWidth = 720;
+// The small text beside the time (":59 PM"): its room, the space between it and the digits, and how far it stands above
+// the digits' label's bottom edge, which is below their baseline by the face's descent.
+constexpr int kClockSuffixWidth = 200;
+constexpr int kClockSuffixGap = 14;
+constexpr int kClockSuffixLift = 44;
 
 struct Clock {
     lv_obj_t* time = nullptr;
+    // What goes small beside the time (the seconds, AM or PM): hidden while the format has none.
+    lv_obj_t* suffix = nullptr;
     lv_obj_t* date = nullptr;
     lv_obj_t* note = nullptr;
     // What the labels were set from: nothing at all (known false) until a reading with a time arrives.
@@ -418,6 +425,14 @@ bool now_build_clock(lv_obj_t* parent, int width, int height, const NowStyle& st
         return label;
     };
     ck.time = make(clock_font, style.muted, kClockTimeOpa);
+    // What is small beside the digits (the seconds, AM or PM) is a label of its own that the column does not lay out:
+    // it floats at the right of the digits (placed in now_update_clock) and is hidden while there is nothing to say,
+    // so that a clock with neither stays where it was, and a second that passes redraws this label alone.
+    ck.suffix = make(style.date, style.muted, kClockTimeOpa);
+    lv_obj_add_flag(ck.suffix, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_add_flag(ck.suffix, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_width(ck.suffix, kClockSuffixWidth);
+    lv_obj_set_style_text_align(ck.suffix, LV_TEXT_ALIGN_LEFT, 0);
     ck.date = make(style.date, style.muted, kClockDateOpa);
     ck.note = make(style.label, style.muted, LV_OPA_COVER);
     lv_obj_set_style_margin_top(ck.note, 28, 0);
@@ -437,13 +452,15 @@ void now_update_clock(const iclforge::wallclock::Reading& reading) {
     if (ck.time == nullptr) {
         return;
     }
-    // The same to the minute, in the same zone: nothing to look at. A reading has no seconds in it that the
-    // view shows, so this is the whole of a quiet minute.
+    // The same to the minute (to the second when the seconds are shown), in the same zone and the same format:
+    // nothing to look at. With no seconds shown this is the whole of a quiet minute.
     const iclforge::wallclock::LocalTime& at = reading.local;
     const iclforge::wallclock::LocalTime& was = ck.shown.local;
     if (ck.painted && reading.known == ck.shown.known && reading.zone_set == ck.shown.zone_set &&
+        reading.format == ck.shown.format &&
         (!reading.known || (at.year == was.year && at.month == was.month && at.day == was.day &&
-                            at.hour == was.hour && at.minute == was.minute))) {
+                            at.hour == was.hour && at.minute == was.minute &&
+                            (!reading.format.seconds || at.second == was.second)))) {
         return;
     }
     ck.shown = reading;
@@ -452,6 +469,20 @@ void now_update_clock(const iclforge::wallclock::Reading& reading) {
     // Only the label whose words changed is set, so only its rectangle is redrawn.
     if (face.time != ck.face.time) {
         lv_label_set_text(ck.time, face.time.c_str());
+    }
+    if (face.suffix != ck.face.suffix || (!face.suffix.empty() && face.time != ck.face.time)) {
+        lv_label_set_text(ck.suffix, face.suffix.c_str());
+        if (face.suffix.empty()) {
+            lv_obj_add_flag(ck.suffix, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            // At the right of the digits wherever their width puts that edge (the label is wider than they are, and
+            // centres them), its bottom a little above the label's own.
+            lv_point_t digits;
+            lv_text_get_size(&digits, face.time.c_str(), clock_font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            lv_obj_align_to(ck.suffix, ck.time, LV_ALIGN_OUT_RIGHT_BOTTOM,
+                            kClockSuffixGap - (lv_obj_get_width(ck.time) - digits.x) / 2, -kClockSuffixLift);
+            lv_obj_remove_flag(ck.suffix, LV_OBJ_FLAG_HIDDEN);
+        }
     }
     if (face.date != ck.face.date) {
         lv_label_set_text(ck.date, face.date.c_str());
@@ -465,6 +496,7 @@ void now_update_clock(const iclforge::wallclock::Reading& reading) {
 void now_forget() {
     g.nodes.clear();
     ck.time = nullptr;
+    ck.suffix = nullptr;
     ck.date = nullptr;
     ck.note = nullptr;
     ck.painted = false;

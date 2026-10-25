@@ -4,9 +4,9 @@
 # the unit hold, the DAC queue model, the sink's mode and slot-count planner, the playout model, the
 # Wi-Fi provisioning protocol (Improv), the Sendspin player's pairing records, the console's log
 # ring, the TCP arrival log, the firmware image header, status and trial rules, the hardware
-# report, the panel's no-lyrics screen (its setting, its dimming and its wording), the P4X
-# panel's clock view (a POSIX time zone, and what the clock says) and its developer view (its triple tap,
-# its rows and its log lines).
+# report, the panel's no-lyrics screen (its setting, its dimming, its brightness, its night schedule and its
+# wording), the P4X panel's clock view (a POSIX time zone and the table of 420 zones by name, the clock's format, and
+# what the clock says) and its developer view (its triple tap, its rows and its log lines).
 # Header-only and standard library only: none of them includes anything from ESP-IDF, which
 # is what lets libs/device/tests run them on every host, and is worth keeping true.
 #

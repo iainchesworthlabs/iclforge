@@ -143,6 +143,7 @@ test('every request the page makes is to a route the firmware registers', () => 
         'GET /layout-options',
         'GET /pairing',
         'GET /status',
+        'GET /time-zones',
         'POST /pairing',
         'POST /restart',
         'PUT /firmware',
@@ -410,7 +411,7 @@ const ZONES_REFUSED = [
     'AEST',
     '-10',
     'None',
-    'Australia/Sydney',
+    'australia/sydney',
     'AE-10',
     '<>-10',
     'AEST-25',
@@ -449,18 +450,27 @@ const SERVERS_REFUSED = [
     `${'a'.repeat(64)}`,
 ];
 
-test("every zone the page offers is one the firmware takes", async () => {
-    const listed = SCRIPT.match(/const ZONES = \(([\s\S]*?)\)\s*\.split/);
-    expect(listed, 'the page has its list of zones').not.toBeNull();
-    const zones = [...listed[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]).join('').split(';').map((z) => z.split('|'));
-    expect(zones.length).toBeGreaterThan(30);
+// The zones the board offers by name are libs/device's time_zone_data.hpp, written by tools/hearth/gen_time_zones.py;
+// the stand-in serves that file's rows, and the page offers what GET /time-zones sends.
+const ZONE_DATA = fs.readFileSync(path.join(LIBS_DEVICE, 'time_zone_data.hpp'), 'utf8');
+const ZONE_ROWS = [...ZONE_DATA.matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
+
+test('every zone the board offers by name is a string the stand-in takes, and the list is sorted', () => {
+    expect(ZONE_ROWS.length).toBeGreaterThan(400);
+    expect(ZONE_ROWS.length).toBe(Number(ZONE_DATA.match(/(\d+) zones/)[1]));
     // The stand-in's own check, not a request to it: PUT /timezone answers 200 for exactly the zones validTimeZone
-    // takes (the next test drives the route), and what the page's script holds is a file's text that should not
-    // be sent anywhere, not even to a loopback stand-in.
-    for (const [label, zone] of zones) {
-        expect(validTimeZone(zone), `${label}: ${zone}`).toBe(true);
+    // takes (the next tests drive the route); libs/device/tests/test_time_zones.cpp holds the grammar itself to the same
+    // rows, so that the stand-in's copy of it cannot drift from the board's.
+    for (const [name, zone] of ZONE_ROWS) {
+        expect(validTimeZone(zone), `${name}: ${zone}`).toBe(true);
+        expect(validTimeZone(name), `${name} must not read as a POSIX string`).toBe(false);
     }
-    expect(new Set(zones.map((z) => z[1])).size, 'a zone listed twice').toBe(zones.length);
+    const names = ZONE_ROWS.map((z) => z[0]);
+    expect(new Set(names).size, 'a zone listed twice').toBe(names.length);
+    expect([...names].sort()).toEqual(names);
+    for (const name of ['Australia/Melbourne', 'Australia/Sydney', 'Australia/Perth', 'America/New_York', 'Europe/London', 'UTC']) {
+        expect(names).toContain(name);
+    }
 });
 
 test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware does', async () => {
@@ -470,13 +480,18 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         // what does not is refused first, as the routes read the body before they ask whether there is a clock.
         stub.device.time = undefined;
         for (const [route, good, bad] of [
-            ['timezone', 'JST-9', 'Sydney'],
+            ['timezone', 'Australia/Melbourne', 'Sydney'],
             ['ntp-server', 'pool.ntp.org', 'pool.ntp.org:123'],
             ['time-sync', 'off', 'maybe'],
         ]) {
             let reply = await fetch(`${stub.url}${route}`);
             expect(reply.status).toBe(404);
             expect(await reply.text()).toBe(REPLIES.noClock);
+            if (route === 'timezone') {
+                reply = await fetch(`${stub.url}time-zones`);
+                expect(reply.status).toBe(404);
+                expect(await reply.text()).toBe(REPLIES.noClock);
+            }
             reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
             expect(reply.status).toBe(409);
             expect(await reply.text()).toBe(REPLIES.noClock);
@@ -490,7 +505,7 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
         expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('on\n');
 
-        // The zone: a POSIX string or `none`.
+        // The zone: a POSIX string, a name from GET /time-zones, or `none`.
         let reply;
         for (const zone of ZONES_TAKEN) {
             reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: `${zone}\n` });
@@ -516,6 +531,36 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         expect(await reply.text()).toBe(REPLIES.timeZoneRefused);
         expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
         stub.device.time.zoneRefused = false;
+
+        // A name is stored with its string, and says so in GET /status's time (zone_name); a string has none.
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Australia/Melbourne\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.timeZoneOk);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('AEST-10AEDT,M10.1.0,M4.1.0/3\n');
+        let time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone).toBe('AEST-10AEDT,M10.1.0,M4.1.0/3');
+        expect(time.zone_name).toBe('Australia/Melbourne');
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'AEST-10AEDT,M10.1.0,M4.1.0/3' });
+        expect(reply.status).toBe(200);
+        time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone_name, 'a string somebody typed has no name').toBe('none');
+        for (const bad of ['australia/melbourne', 'Australia/Melburne', 'Melbourne', 'Australia/Melbourne extra']) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: bad });
+            expect(reply.status, bad).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+        }
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Pacific/Auckland' });
+        expect(reply.status).toBe(200);
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'none' });
+        expect(reply.status).toBe(200);
+        time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone).toBe('none');
+        expect(time.zone_name).toBe('none');
+
+        // The names a board offers, one a line, in the table's order.
+        reply = await fetch(`${stub.url}time-zones`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(ZONE_ROWS.map((z) => z[0] + '\n').join(''));
 
         // The server: a host name or an IPv4 address, or `none` for the router's and then the pool.
         for (const server of SERVERS_TAKEN) {
@@ -632,6 +677,61 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
         expect(reply.status).toBe(200);
         expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('30\n');
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /brightness and /clock-format as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        for (const [route, good] of [
+            ['brightness', '50'],
+            ['clock-format', '12'],
+        ]) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+        }
+        stub.device.screen = screenBoard();
+
+        // The brightness: a whole number of percent from 10 to 100, 80 to begin with.
+        expect(await (await fetch(`${stub.url}brightness`)).text()).toBe('80\n');
+        for (const bad of ['', '9', '101', '0', '-50', '80%', 'bright', '1000', '50 50']) {
+            const reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.brightnessBad);
+        }
+        for (const good of ['10', '55', '100', ' 70\r\n']) {
+            const reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: good });
+            expect(reply.status, good).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.brightnessOk);
+            expect(await (await fetch(`${stub.url}brightness`)).text()).toBe(`${good.trim()}\n`);
+        }
+        // A glass with no backlight to dim (a frame buffer with no panel behind it) refuses it, and keeps the last.
+        stub.device.screen.dimmable = false;
+        let reply = await fetch(`${stub.url}brightness`, { method: 'PUT', body: '30' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.brightnessRefused);
+        expect(await (await fetch(`${stub.url}brightness`)).text()).toBe('70\n');
+
+        // The clock format: 24 or 12 hours, then " seconds" when they are shown.
+        expect(await (await fetch(`${stub.url}clock-format`)).text()).toBe('24\n');
+        for (const bad of ['', '13', '24h', '12 second', '12  seconds', 'seconds', '12 Seconds', 'twelve']) {
+            reply = await fetch(`${stub.url}clock-format`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.clockFormatBad);
+        }
+        for (const good of ['12', '12 seconds', '24 seconds', '24']) {
+            reply = await fetch(`${stub.url}clock-format`, { method: 'PUT', body: `${good}\n` });
+            expect(reply.status, good).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.clockFormatOk);
+            expect(await (await fetch(`${stub.url}clock-format`)).text()).toBe(`${good}\n`);
+        }
     } finally {
         await stub.close();
     }

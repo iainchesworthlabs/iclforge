@@ -1,11 +1,11 @@
 # The speakers view: options for something more dynamic
 
-!!! note "Status as of 2026-10-25: the owner chose none of these; stage 4 of p4x-now-playing.md was built instead"
+!!! note "Status as of 2026-10-25: the owner chose none of these; stage 5 of p4x-now-playing.md was built instead"
     **Outcome.** The owner saw the seven options below and chose none of them: *"rather than a full redesign, the
     today visualisation would be more responsive to the audio, and perhaps a variant of the rings where the audio
     levels cause a growing/shrinking of the speaker circle (when it was filled in) but not excessively so. None of
     the designs you showed really inspire me."* What was built is a more responsive glow, and a `pulse` style:
-    [Stage 4](p4x-now-playing.md#stage-4-the-speakers-follow-the-sound). The three findings below (the 5 Hz read,
+    [Stage 5](p4x-now-playing.md#stage-5-the-speakers-follow-the-sound). The three findings below (the 5 Hz read,
     the volume, the 32-rectangle line) were used. The recommendation at the end is the one that was not taken, kept
     as the record; the pictures of the seven are not in the repository (the three overviews are).
 

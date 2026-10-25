@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "iclforge/now_view.hpp"
@@ -166,6 +167,255 @@ TEST_CASE("now_view: the speakers view dims as it always did, and the dark view 
                   nv::dimmed(true, 5, quiet));
         }
     }
+}
+
+TEST_CASE("now_view: brightness is a whole number from 10 to 100, and nothing else is", "[now_view]") {
+    CHECK(nv::parse_brightness("80") == 80);
+    CHECK(nv::parse_brightness(" 100\r\n") == 100);
+    CHECK(nv::parse_brightness("10") == 10);
+    CHECK(nv::parse_brightness("55") == 55);  // a route takes any; the stepper's steps are for fingers
+    CHECK_FALSE(nv::parse_brightness("9").has_value());
+    CHECK_FALSE(nv::parse_brightness("101").has_value());
+    CHECK_FALSE(nv::parse_brightness("0").has_value());
+    CHECK_FALSE(nv::parse_brightness("").has_value());
+    CHECK_FALSE(nv::parse_brightness("80%").has_value());
+    CHECK_FALSE(nv::parse_brightness("-80").has_value());
+    CHECK_FALSE(nv::parse_brightness("1000").has_value());
+    CHECK_FALSE(nv::parse_brightness("eighty").has_value());
+    // What was stored before is the default, and a number outside the range is not believed.
+    CHECK(nv::kDefaultBrightness == 80);
+    CHECK(nv::brightness_from_stored(10) == 10);
+    CHECK(nv::brightness_from_stored(100) == 100);
+    CHECK_FALSE(nv::brightness_from_stored(9).has_value());
+    CHECK_FALSE(nv::brightness_from_stored(101).has_value());
+    CHECK_FALSE(nv::brightness_from_stored(-1).has_value());
+}
+
+TEST_CASE("now_view: the brightness stepper moves to the next step and stops at the ends", "[now_view]") {
+    CHECK(nv::brightness_stepped(80, +1) == 90);
+    CHECK(nv::brightness_stepped(80, -1) == 70);
+    CHECK(nv::brightness_stepped(100, +1) == 100);
+    CHECK(nv::brightness_stepped(10, -1) == 10);
+    CHECK(nv::brightness_stepped(90, +1) == 100);
+    CHECK(nv::brightness_stepped(20, -1) == 10);
+    // A value a route set between two steps lands on the next one in the direction pressed.
+    CHECK(nv::brightness_stepped(85, +1) == 90);
+    CHECK(nv::brightness_stepped(85, -1) == 80);
+    CHECK(nv::brightness_stepped(11, -1) == 10);
+    CHECK(nv::brightness_stepped(99, +1) == 100);
+    // Several steps at once, and none.
+    CHECK(nv::brightness_stepped(40, +3) == 70);
+    CHECK(nv::brightness_stepped(40, -5) == 10);
+    CHECK(nv::brightness_stepped(40, 0) == 40);
+    // Every value in the range reaches both ends by stepping, never leaving the range.
+    for (int percent = nv::kBrightnessMin; percent <= nv::kBrightnessMax; ++percent) {
+        int up = percent;
+        int down = percent;
+        for (int i = 0; i < 12; ++i) {
+            up = nv::brightness_stepped(up, +1);
+            down = nv::brightness_stepped(down, -1);
+            CHECK(up >= nv::kBrightnessMin);
+            CHECK(up <= nv::kBrightnessMax);
+            CHECK(down >= nv::kBrightnessMin);
+            CHECK(down <= nv::kBrightnessMax);
+        }
+        CHECK(up == nv::kBrightnessMax);
+        CHECK(down == nv::kBrightnessMin);
+    }
+}
+
+TEST_CASE("now_view: the backlight is the lit level, the dim floor under it, or off", "[now_view]") {
+    using nv::Dim;
+    CHECK(nv::backlight_percent(Dim::kNone, 80) == 80);
+    CHECK(nv::backlight_percent(Dim::kNone, 10) == 10);
+    CHECK(nv::backlight_percent(Dim::kDimmed, 80) == nv::kDimFloorPercent);
+    CHECK(nv::kDimFloorPercent == 4);
+    CHECK(nv::backlight_percent(Dim::kDark, 80) == 0);
+    CHECK(nv::backlight_percent(Dim::kDark, 100) == 0);
+    // The floor is never above the lit level: a screen set as low as it goes does not light up when it dims.
+    CHECK(nv::kBrightnessMin > nv::kDimFloorPercent);
+    CHECK(nv::backlight_percent(Dim::kDimmed, 3) == 3);
+    CHECK(nv::backlight_percent(Dim::kDimmed, 4) == 4);
+    CHECK(nv::backlight_percent(Dim::kDimmed, 5) == 4);
+    for (int lit = nv::kBrightnessMin; lit <= nv::kBrightnessMax; ++lit) {
+        CHECK(nv::backlight_percent(Dim::kDimmed, lit) <= nv::backlight_percent(Dim::kNone, lit));
+        CHECK(nv::backlight_percent(Dim::kDark, lit) == 0);
+    }
+}
+
+TEST_CASE("now_view: a night window is from the first time up to the second, across midnight when it ends before it begins",
+          "[now_view]") {
+    constexpr int kEvening = 22 * 60;
+    constexpr int kMorning = 7 * 60;
+    // 22:00 to 07:00: in from the first minute of 22:00 to the last of 06:59, out at 07:00.
+    CHECK(nv::in_night_window(kEvening, kMorning, kEvening));
+    CHECK(nv::in_night_window(kEvening, kMorning, 23 * 60 + 59));
+    CHECK(nv::in_night_window(kEvening, kMorning, 0));
+    CHECK(nv::in_night_window(kEvening, kMorning, 3 * 60));
+    CHECK(nv::in_night_window(kEvening, kMorning, kMorning - 1));
+    CHECK_FALSE(nv::in_night_window(kEvening, kMorning, kMorning));
+    CHECK_FALSE(nv::in_night_window(kEvening, kMorning, 12 * 60));
+    CHECK_FALSE(nv::in_night_window(kEvening, kMorning, kEvening - 1));
+    // A window inside one day.
+    CHECK(nv::in_night_window(13 * 60, 15 * 60, 13 * 60));
+    CHECK(nv::in_night_window(13 * 60, 15 * 60, 14 * 60 + 59));
+    CHECK_FALSE(nv::in_night_window(13 * 60, 15 * 60, 15 * 60));
+    CHECK_FALSE(nv::in_night_window(13 * 60, 15 * 60, 12 * 60 + 59));
+    // From midnight, to midnight.
+    CHECK(nv::in_night_window(0, 6 * 60, 0));
+    CHECK(nv::in_night_window(22 * 60, 0, 23 * 60 + 59));
+    CHECK_FALSE(nv::in_night_window(22 * 60, 0, 0));
+    // The same time twice is an empty window, not a whole day: never dark.
+    for (const int minute : {0, 6 * 60, 12 * 60, 22 * 60, 23 * 60 + 59}) {
+        CHECK_FALSE(nv::in_night_window(22 * 60, 22 * 60, minute));
+        CHECK_FALSE(nv::in_night_window(0, 0, minute));
+    }
+}
+
+TEST_CASE("now_view: the night schedule is in force only when it is on, the time is known and the time is inside it",
+          "[now_view]") {
+    nv::NightSchedule night;
+    night.enabled = true;
+    night.from_min = 22 * 60;
+    night.to_min = 7 * 60;
+    CHECK(nv::night_active(night, 23 * 60));
+    CHECK(nv::night_active(night, 6 * 60 + 59));
+    CHECK_FALSE(nv::night_active(night, 7 * 60));
+    CHECK_FALSE(nv::night_active(night, 12 * 60));
+    // A clock that has not converged is not a time: the schedule is not in force, and the screen stays lit.
+    CHECK_FALSE(nv::night_active(night, std::nullopt));
+    // And a minute that is not one of a day is not a time either.
+    CHECK_FALSE(nv::night_active(night, -1));
+    CHECK_FALSE(nv::night_active(night, nv::kMinutesPerDay));
+    // Off, the times are kept and nothing is in force.
+    night.enabled = false;
+    CHECK_FALSE(nv::night_active(night, 23 * 60));
+    // The default is off, 22:00 to 07:00, and the idle screen not covered.
+    const nv::NightSchedule defaults;
+    CHECK_FALSE(defaults.enabled);
+    CHECK(defaults.from_min == 22 * 60);
+    CHECK(defaults.to_min == 7 * 60);
+    CHECK_FALSE(defaults.idle);
+}
+
+TEST_CASE("now_view: PUT /night-schedule takes two times, on, off, or both, and reads back as it was set", "[now_view]") {
+    const nv::NightSchedule off;
+    // Two times set them and turn the schedule on.
+    const auto set = nv::parse_night_schedule("23:30-06:15", off);
+    REQUIRE(set.has_value());
+    CHECK(set->enabled);
+    CHECK(set->from_min == 23 * 60 + 30);
+    CHECK(set->to_min == 6 * 60 + 15);
+    CHECK_FALSE(set->idle);
+    // `off` keeps the times, `on` brings the schedule back with them.
+    const auto stopped = nv::parse_night_schedule("off\n", *set);
+    REQUIRE(stopped.has_value());
+    CHECK_FALSE(stopped->enabled);
+    CHECK(stopped->from_min == 23 * 60 + 30);
+    const auto resumed = nv::parse_night_schedule("on", *stopped);
+    REQUIRE(resumed.has_value());
+    CHECK(resumed->enabled);
+    CHECK(resumed->to_min == 6 * 60 + 15);
+    // Both: the times and the state.
+    const auto kept_off = nv::parse_night_schedule("21:00-05:00 off", off);
+    REQUIRE(kept_off.has_value());
+    CHECK_FALSE(kept_off->enabled);
+    CHECK(kept_off->from_min == 21 * 60);
+    CHECK(kept_off->to_min == 5 * 60);
+    CHECK(nv::parse_night_schedule("21:00-05:00 on", off)->enabled);
+    // Whatever the idle setting was stays.
+    nv::NightSchedule idle_too = off;
+    idle_too.idle = true;
+    CHECK(nv::parse_night_schedule("21:00-05:00", idle_too)->idle);
+    // Equal times are a schedule that is never in force, and are taken: the editor passes through them.
+    CHECK(nv::parse_night_schedule("22:00-22:00", off).has_value());
+    // The end of the day is 23:59, and 24:00 is not a time.
+    CHECK(nv::parse_night_schedule("00:00-23:59", off).has_value());
+    for (const char* bad : {"", "22:00", "22:00-", "-07:00", "24:00-07:00", "22:60-07:00", "22:00-07:60", "2:00-07:00",
+                            "22:00 07:00", "22:00-07:00 maybe", "22:00-07:00 on off", "ON", "night", "22.00-07.00",
+                            "22:00-07:000", "22:00-07:00  on"}) {
+        CHECK_FALSE(nv::parse_night_schedule(bad, off).has_value());
+    }
+    // GET reads it back in the form PUT takes.
+    CHECK(nv::night_schedule_text(*set) == "23:30-06:15 on");
+    CHECK(nv::night_schedule_text(*stopped) == "23:30-06:15 off");
+    CHECK(nv::night_schedule_text(off) == "22:00-07:00 off");
+    for (const int from : {0, 1, 59, 60, 22 * 60, 1439}) {
+        for (const int to : {0, 7 * 60, 1439}) {
+            nv::NightSchedule night;
+            night.enabled = from % 2 == 0;
+            night.from_min = from;
+            night.to_min = to;
+            const auto again = nv::parse_night_schedule(nv::night_schedule_text(night), nv::NightSchedule{});
+            REQUIRE(again.has_value());
+            CHECK(*again == night);
+        }
+    }
+    CHECK(nv::time_of_day_text(5) == "00:05");
+    CHECK(nv::time_of_day_text(1439) == "23:59");
+    CHECK(nv::parse_time_of_day("07:05") == 7 * 60 + 5);
+    CHECK_FALSE(nv::parse_time_of_day("7:05").has_value());
+    CHECK_FALSE(nv::parse_time_of_day("07:5").has_value());
+    CHECK_FALSE(nv::parse_time_of_day("07-05").has_value());
+}
+
+TEST_CASE("now_view: PUT /night-idle takes on or off", "[now_view]") {
+    CHECK(nv::parse_on_off("on") == true);
+    CHECK(nv::parse_on_off("off\r\n") == false);
+    CHECK_FALSE(nv::parse_on_off("On").has_value());
+    CHECK_FALSE(nv::parse_on_off("1").has_value());
+    CHECK_FALSE(nv::parse_on_off("").has_value());
+    CHECK(std::string(nv::on_off_text(true)) == "on");
+    CHECK(std::string(nv::on_off_text(false)) == "off");
+}
+
+TEST_CASE("now_view: the night schedule makes any view the dark view while it is in force", "[now_view]") {
+    using nv::Dim;
+    constexpr std::uint32_t kSecond = 1000;
+    constexpr std::uint32_t kMinute = 60'000;
+    nv::NightSchedule night;
+    night.enabled = true;  // 22:00 to 07:00
+    const std::optional<int> at_23 = 23 * 60;
+    const std::optional<int> at_noon = 12 * 60;
+    for (const nv::View view : {nv::View::kSpeakers, nv::View::kTitle, nv::View::kClock, nv::View::kOff}) {
+        // A song that begins at 23:00 on a panel nobody has touched for hours is dark at once.
+        CHECK(nv::dim_state(view, true, 5, 3'600 * kSecond, 0, night, at_23) == Dim::kDark);
+        CHECK(nv::dim_state(view, true, 5, 3'600 * kSecond, 10 * kSecond, night, at_23) == Dim::kDark);
+        // A tap lights it for kDarkAwakeMs from the last touch, and not a millisecond longer.
+        CHECK(nv::dim_state(view, true, 5, 2 * kSecond, 10 * kMinute, night, at_23) == Dim::kNone);
+        CHECK(nv::dim_state(view, true, 5, nv::kDarkAwakeMs - 1, 10 * kMinute, night, at_23) == Dim::kNone);
+        CHECK(nv::dim_state(view, true, 5, nv::kDarkAwakeMs, 10 * kMinute, night, at_23) == Dim::kDark);
+        // The dim time means nothing at night, as in the dark view, even never.
+        CHECK(nv::dim_state(view, true, nv::kDimNever, 3'600 * kSecond, 10 * kSecond, night, at_23) == Dim::kDark);
+        // A touch just before the song began is not a touch of this song.
+        CHECK(nv::dim_state(view, true, 5, 4 * kSecond, 2 * kSecond, night, at_23) == Dim::kDark);
+        // Outside the window the screen is what it is without a schedule.
+        CHECK(nv::dim_state(view, true, 5, 3'600 * kSecond, 10 * kSecond, night, at_noon) ==
+              nv::dim_state(view, true, 5, 3'600 * kSecond, 10 * kSecond));
+        // Not on the no-lyrics screen at all: lit, schedule or no.
+        CHECK(nv::dim_state(view, false, 5, 3'600 * kSecond, 3'600 * kSecond, night, at_23) == Dim::kNone);
+    }
+    // Night begins while a song is playing and the screen has been lit by a touch a minute ago: lit until nothing
+    // has touched it for 30 s, then dark; the next touch lights it again.
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 20 * kSecond, 30 * kMinute, night, at_23) == Dim::kNone);
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 31 * kSecond, 30 * kMinute, night, at_23) == Dim::kDark);
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 1 * kSecond, 30 * kMinute, night, at_23) == Dim::kNone);
+    // A clock that has not converged: the schedule is not in force, and a screen that was lit stays lit.
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 3'600 * kSecond, 10 * kSecond, night, std::nullopt) == Dim::kNone);
+    CHECK(nv::dim_state(nv::View::kClock, true, 5, 3'600 * kSecond, 10 * kSecond, night, std::nullopt) == Dim::kNone);
+    // Off, or an empty window: never dark.
+    nv::NightSchedule off = night;
+    off.enabled = false;
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 3'600 * kSecond, 10 * kSecond, off, at_23) == Dim::kNone);
+    nv::NightSchedule empty = night;
+    empty.to_min = empty.from_min;
+    CHECK(nv::dim_state(nv::View::kSpeakers, true, 5, 3'600 * kSecond, 10 * kSecond, empty, at_23) == Dim::kNone);
+    // The dark view stays dark with the schedule off, in any minute, as it was.
+    CHECK(nv::dim_state(nv::View::kDark, true, 5, 3'600 * kSecond, 10 * kSecond, off, at_noon) == Dim::kDark);
+    CHECK(nv::dim_state(nv::View::kDark, true, 5, 3'600 * kSecond, 10 * kSecond, off, std::nullopt) == Dim::kDark);
+    // dark_state is the rule on its own, which the idle screen can use when its time comes.
+    CHECK(nv::dark_state(3'600 * kSecond, 0) == Dim::kDark);
+    CHECK(nv::dark_state(2 * kSecond, 10 * kSecond) == Dim::kNone);
 }
 
 TEST_CASE("now_view: a stream is named for its codec and the layout it was coded in", "[now_view]") {
