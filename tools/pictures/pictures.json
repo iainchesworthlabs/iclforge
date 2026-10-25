@@ -120,26 +120,6 @@
       "commit": "2d6d4bf3f5f006284c6f2e325310c3049e59c8fb",
       "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
     },
-    "2b81e5aa8": {
-      "commit": "2b81e5aa825ccc65f6c1e3a61c0cec71b2a04167",
-      "what": "the tree panel_preview was built from: the commit that added the no-lyrics screen (the speakers, the dimmed screen and the taller Adjust sheet), 2026-10-21"
-    },
-    "2f6266176": {
-      "commit": "2f626617685f16b951b9c342154ff2cde8a28a46",
-      "what": "the tree panel_preview was built from: the commit that added the title card (the sink lists metadata@v1, the card and the speakers header with a title, the Title choice in Adjust), 2026-10-21"
-    },
-    "ab3eb0e28": {
-      "commit": "ab3eb0e2839135c6b060081addc38f71039ba12a",
-      "what": "the tree panel_preview was built from: the merge of the clock view with the dark view (the clock, the Adjust sheet with its Clock and Dark buttons, and the sheet), 2026-10-21"
-    },
-    "ef4caae2c": {
-      "commit": "ef4caae2c602bfe483f63af0e719d50ffcd580c6",
-      "what": "the tree panel_preview was built from: the merge of main (the dark view and the clock view) into the title card branch, so the Adjust sheet shows Speakers, Title, Clock, Dark and Off, 2026-10-21"
-    },
-    "03422fa0d": {
-      "commit": "03422fa0d41bcd5fce9f99efda84199061473937",
-      "what": "the tree panel_preview was built from: the stream details in the footer (decoded on this board, bitrate, server), 2026-10-24"
-    },
     "8cb778bfe": {
       "commit": "8cb778bfea00e093daaa8e2558aec7dbdda026bf",
       "what": "the tree panel_preview was built from: the Speaker layout list in Preferences, each layout with its reason beside it, and the question asked while a stream plays, 2026-10-25"
