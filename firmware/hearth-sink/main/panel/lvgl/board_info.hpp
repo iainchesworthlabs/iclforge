@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -67,6 +69,18 @@ struct NowPlaying {
 // Fills `out` from the player, called five times a second. False when no stream is playing.
 [[nodiscard]] bool read_now_playing(NowPlaying& out);
 
+// The levels of the last 100 ms window alone, which the speakers view reads itself every frame and follows when
+// the window is a new one (planning/p4x-speakers-options.md): a lock and two short arrays, no heap. `serial`
+// moves by one for each window the player closes, so that the view knows how long it has been since the last.
+// False when no stream is playing or no window has closed yet.
+struct NowLevels {
+    std::uint32_t serial = 0;
+    std::size_t outputs = 0;
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> peak_db{};
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
+};
+[[nodiscard]] bool read_now_levels(NowLevels& out);
+
 // What the server says is playing (metadata@v1), for the title card and the speakers' header
 // (planning/p4x-now-playing.md, stage 2): the player's store copied in place five times a second, the
 // strings only when the store's own revision moved, into containers that keep their capacity.
@@ -96,6 +110,7 @@ bool read_now_title(NowTitle& out);
 struct NowSettings {
     iclforge::nowview::View view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
     // The night schedule, and the board's local minute of the day while the schedule is on and the time is known
     // (nothing otherwise: a board that does not know the time is never dark by accident).
     iclforge::nowview::NightSchedule night;

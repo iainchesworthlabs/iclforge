@@ -152,6 +152,64 @@ TEST_CASE("the defaults are the Kconfig defaults the settings start from", "[pre
             nv::time_of_day_text(night.from_min) + "-" + nv::time_of_day_text(night.to_min));
     REQUIRE(std::string(prefs::find("night-idle")->default_word) == nv::on_off_text(night.idle));
     REQUIRE(std::string(prefs::find("time-zone")->default_word) == "none");
+    REQUIRE(std::string(prefs::find("speakers-style")->default_word) == nv::speakers_style_name(nv::kDefaultSpeakersStyle));
+}
+
+TEST_CASE("the speakers style: glow or pulse, on a board with a screen, set by word and followed by the route",
+          "[preferences]") {
+    const prefs::Pref& style = *prefs::find("speakers-style");
+    REQUIRE(style.group == prefs::Group::kDisplay);
+    REQUIRE(std::string(style.route) == "/speakers-style");
+    REQUIRE(style.choices.size() == 2);
+    // The choices are the words the route takes, in the order the screen shows them.
+    REQUIRE(std::string(style.choices[0].id) == nv::speakers_style_name(nv::SpeakersStyle::kGlow));
+    REQUIRE(std::string(style.choices[1].id) == nv::speakers_style_name(nv::SpeakersStyle::kPulse));
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        const prefs::Entry entry = prefs::resolve(style, backend, variant.caps);
+        // A screen is what it needs and nothing else (no touch, no clock, no objects).
+        REQUIRE(entry.availability.available == variant.caps.has_screen());
+        if (entry.availability.available) {
+            REQUIRE(entry.value == "glow");
+            REQUIRE(prefs::set_value(backend, style, "pulse").ok);
+            REQUIRE(backend.style_ == nv::SpeakersStyle::kPulse);
+            REQUIRE(prefs::resolve(style, backend, variant.caps).value == "pulse");
+            REQUIRE_FALSE(prefs::set_value(backend, style, "Pulse").ok);
+            REQUIRE_FALSE(prefs::set_value(backend, style, "speakers").ok);
+            backend.refuse_next = true;
+            REQUIRE_FALSE(prefs::set_value(backend, style, "glow").ok);
+            REQUIRE(backend.style_ == nv::SpeakersStyle::kPulse);
+        }
+    }
+}
+
+TEST_CASE("the speakers style is inert where the screen draws no speakers", "[preferences]") {
+    const prefs::Pref& style = *prefs::find("speakers-style");
+    FakeBackend backend(iclforge::known_variants().front().caps);
+    for (const nv::View view : {nv::View::kSpeakers, nv::View::kTitle, nv::View::kDark}) {
+        backend.view_ = view;
+        REQUIRE(style.inert(backend).empty());
+    }
+    for (const nv::View view : {nv::View::kClock, nv::View::kOff}) {
+        backend.view_ = view;
+        const std::string why = style.inert(backend);
+        REQUIRE_FALSE(why.empty());
+        REQUIRE(why.back() == '.');
+    }
+}
+
+TEST_CASE("Reset preferences puts the speakers style back to glow, on a board with a screen only", "[preferences]") {
+    REQUIRE(prefs::find("speakers-style")->on_reset == prefs::OnReset::kReset);
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        backend.style_ = nv::SpeakersStyle::kPulse;
+        const prefs::ResetReport report = prefs::reset_preferences(backend);
+        const bool listed = std::find(report.reset.begin(), report.reset.end(), "speakers-style") != report.reset.end();
+        REQUIRE(listed == variant.caps.has_screen());
+        REQUIRE(backend.style_ == (variant.caps.has_screen() ? nv::SpeakersStyle::kGlow : nv::SpeakersStyle::kPulse));
+    }
 }
 
 TEST_CASE("each entry against each known board: a reason wherever it is greyed, a default wherever it is on",

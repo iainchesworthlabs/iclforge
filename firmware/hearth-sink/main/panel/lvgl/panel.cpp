@@ -55,6 +55,7 @@ namespace {
 // and read by the panel's, every frame.
 std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
 std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
+std::atomic<int> g_speakers_style{static_cast<int>(iclforge::nowview::kDefaultSpeakersStyle)};
 
 // What a person chose for the screen (planning/p4x-preferences.md), set from the control surface's task and read
 // by the panel's: the lit level of the backlight, percent, and how the clock view writes the time (the stored
@@ -236,6 +237,18 @@ bool read_now_playing(NowPlaying& out) {
     return true;
 }
 
+bool read_now_levels(NowLevels& out) {
+    const SendspinLevels levels = sendspin_now_levels();
+    if (!levels.have) {
+        return false;
+    }
+    out.serial = levels.serial;
+    out.outputs = levels.outputs;
+    out.peak_db = levels.peak_db;
+    out.rms_db = levels.rms_db;
+    return true;
+}
+
 bool read_now_title(NowTitle& out) {
     // The player calls the reader under its lock, so it copies and returns (now_copy_title copies the
     // strings only when the store's revision moved).
@@ -257,6 +270,7 @@ NowSettings read_now_settings() {
     NowSettings settings;
     settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
     settings.dim_after_minutes = g_dim_after_minutes.load();
+    settings.speakers_style = static_cast<iclforge::nowview::SpeakersStyle>(g_speakers_style.load());
     settings.night = iclforge::nowview::night_from_stored(g_night.load()).value_or(iclforge::nowview::NightSchedule{});
     // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
     if (settings.night.enabled) {
@@ -674,6 +688,7 @@ void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast
 
 void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
 
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_speakers_style.store(static_cast<int>(style)); }
 void panel_set_brightness(int percent) {
     g_brightness.store(percent);
     // At once: the glass is at the lit level or at the floor under it, and either moves with this. Asked again for the
@@ -702,6 +717,7 @@ bool panel_start() {
     }
     g_now_view.store(static_cast<int>(settings().now_view));
     g_dim_after_minutes.store(settings().dim_after_minutes);
+    g_speakers_style.store(static_cast<int>(settings().speakers_style));
     g_brightness.store(settings().brightness_percent);
     g_clock_format.store(iclforge::wallclock::clock_format_stored(settings().clock_format));
     g_night.store(iclforge::nowview::night_stored(settings().night));

@@ -318,6 +318,12 @@ struct ControlHandlers {
     std::function<bool(std::string_view view)> set_now_playing;
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
+    // GET and PUT /speakers-style: how that screen's speakers show a level, "glow" or "pulse"
+    // (iclforge/now_view.hpp, planning/p4x-speakers-options.md). Empty on a board with no screen, as the
+    // four above. set_speakers_style is handed one of the two words; false means it could not be stored.
+    // It acts at once, with no restart.
+    std::function<std::string()> speakers_style;
+    std::function<bool(std::string_view style)> set_speakers_style;
 
     // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
     // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter

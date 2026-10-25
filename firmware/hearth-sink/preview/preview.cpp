@@ -1864,6 +1864,21 @@ bool read_now_playing(NowPlaying& out) {
     return true;
 }
 
+// What the speakers view reads from the player every frame: the scenario's levels, as a new window every 100 ms of
+// the preview's clock.
+bool read_now_levels(NowLevels& out) {
+    if (!g_now_playing || g_now.rms_db.empty()) {
+        return false;
+    }
+    out.serial = static_cast<std::uint32_t>(g_now_us / 100'000);
+    out.outputs = std::min({g_now.rms_db.size(), g_now.peak_db.size(), out.rms_db.size()});
+    for (std::size_t o = 0; o < out.outputs; ++o) {
+        out.rms_db[o] = g_now.rms_db[o];
+        out.peak_db[o] = g_now.peak_db[o];
+    }
+    return true;
+}
+
 bool read_now_title(NowTitle& out) {
     now_copy_title(out, g_title_held && g_title.known() ? &g_title : nullptr, g_title_position);
     return true;
@@ -1898,6 +1913,11 @@ class PreviewBackend final : public iclforge::prefs::Backend {
     [[nodiscard]] int dim_after_minutes() const override { return g_settings.dim_after_minutes; }
     [[nodiscard]] bool set_dim_after_minutes(int minutes) override {
         g_settings.dim_after_minutes = minutes;
+        return true;
+    }
+    [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return g_settings.speakers_style; }
+    [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
+        g_settings.speakers_style = style;
         return true;
     }
 
@@ -2238,6 +2258,20 @@ int main(int argc, char** argv) {
         {"s10-script-undrawable", [&] { hold(mixed, 4'000); }},
         {"s11-notes-dropped", [&] { hold(mixed, 1'200); }},
         {"s12-cyrillic-greek", [&] { hold(cyrillic_greek, 3'500); }},
+        // The pulse style (planning/p4x-speakers-options.md): the filled circle grows and shrinks a little with its
+        // level, here in the same rooms as the glow above; the style is put back to glow after the scenarios.
+        {"s18-speakers-2-0-pulse", [&] {
+             g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kPulse;
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo);
+             say_no_title();
+         }, 10'000'000},
+        {"s18-speakers-5-1-pulse", [&] { play_room("5.1", kDolbyFiveOne, kFiveOne); }, 10'000'000},
+        {"s18-speakers-7-1-4-pulse", [&] {
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true,
+                                 .objects = 15},
+                       kSevenOneFour);
+         }, 10'000'000},
     };
 
     int number = 0;
@@ -2249,6 +2283,8 @@ int main(int argc, char** argv) {
         const player::panel::ScreenStats stats = player::panel::screen_stats();
         std::printf("%2d  %-26s screen %-9s rebuilds %u\n", ++number, scenario.name, stats.name, stats.rebuilds);
     }
+
+    g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kGlow;
 
     // S14: the speakers dimmed after six minutes of nothing touched, and a touch waking them. Checked
     // as well as drawn: a screen that stayed dark, or a backlight that stayed down, is a failure.

@@ -26,6 +26,7 @@ class FakeBackend final : public Backend {
     wallclock::ZoneChoice zone_;
     std::string layout_ = "2.0";
     bool playing_ = false;
+    nowview::SpeakersStyle style_ = nowview::kDefaultSpeakersStyle;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -92,6 +93,15 @@ class FakeBackend final : public Backend {
         return true;
     }
     [[nodiscard]] bool playing() const override { return playing_; }
+    [[nodiscard]] nowview::SpeakersStyle speakers_style() const override { return style_; }
+    [[nodiscard]] bool set_speakers_style(nowview::SpeakersStyle style) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        style_ = style;
+        return true;
+    }
 
     // Sound: the tone is running or not, something else may have the sink, and the trim is held as the words of PUT /trim
     // would leave it (the host test of the real table is libs/render's; this holds what the registry handed over).

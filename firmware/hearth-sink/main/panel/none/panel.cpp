@@ -12,6 +12,7 @@ void panel_set_view(iclforge::nowview::View /*view*/) {}
 
 void panel_set_dim_after(int /*minutes*/) {}
 
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle /*style*/) {}
 void panel_set_brightness(int /*percent*/) {}
 
 void panel_set_clock_format(iclforge::wallclock::ClockFormat /*format*/) {}

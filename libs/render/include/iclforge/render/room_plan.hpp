@@ -200,33 +200,92 @@ namespace detail {
 }
 
 // How an output's measured level shows: a glow in a few steps, not a fade. The board measures every
-// 100 ms; a screen that followed each window would redraw every speaker five or ten times a second
-// (a continuous fade redrew 1.7 Mpx a second in a 7.1.4 room, nine times the lyric screen's fill), and
-// a glow that jumps with every window is the thing a dim room least wants. So the level is smoothed
-// (it rises at once and falls slowly), quantised, and given a margin before it changes step, and an
-// update that changes no step draws nothing.
-inline constexpr int kGlowCoreSteps = 5;  // 1 (faintly lit) to 5 (as loud as it shows); 0 is silent
-inline constexpr int kGlowHaloSteps = 3;  // 0 (none) to 3, from the peak
+// 100 ms; a screen that followed each window with a continuous fade redrew 1.7 Mpx a second in a 7.1.4 room
+// (nine times the lyric screen's fill), and a glow that jumps with every window is the thing a dim room least
+// wants. So the level is smoothed (it rises at once and falls at a rate that lets a beat show), put on a few
+// steps, and given a margin before it changes step, and an update that changes no step draws nothing.
+//
+// A level is judged against the loudest the room has lately been (LevelCeiling), not against full scale. The
+// player's volume is applied before the meter, so against full scale the glow shrinks with the volume knob;
+// against the programme's own loudest the same music shows the same at any volume
+// (planning/p4x-speakers-options.md). Silence is still absolute: an output with nothing on it is hollow.
+inline constexpr int kGlowCoreSteps = 6;  // 1 (faintly lit) to 6 (as loud as it shows); 0 is silent
+inline constexpr int kGlowHaloSteps = 2;  // 0 (none) to 2, from the peak
 inline constexpr float kGlowSilentDb = -80.0F;
-inline constexpr float kGlowRmsFloorDb = -62.0F;
-inline constexpr float kGlowRmsTopDb = -14.0F;
-inline constexpr float kGlowPeakFloorDb = -50.0F;
-inline constexpr float kGlowPeakTopDb = -8.0F;
-inline constexpr float kGlowRmsFallDbPerSecond = 14.0F;
-inline constexpr float kGlowPeakFallDbPerSecond = 30.0F;
+// The core's steps span this many dB under 2 dB below the ceiling (a step is 6 dB); the halo's span the same, a
+// peak being about 6 dB over its RMS.
+inline constexpr float kGlowSpanDb = 30.0F;
+inline constexpr float kGlowTopBelowCeilingDb = 2.0F;
+inline constexpr float kGlowPeakAboveRmsDb = 6.0F;
+// How fast the smoothed level falls: 60 dB a second is 6 dB a window, so a hit that is gone by the next window
+// is a step down in the next but one, where the 14 dB a second it had before held the glow up between beats. The
+// halo, the peak, falls more slowly and changes less readily, being the bigger and so the dearer redraw.
+inline constexpr float kGlowRmsFallDbPerSecond = 60.0F;
+inline constexpr float kGlowPeakFallDbPerSecond = 20.0F;
+// How far past the edge of a step a level has to go (in steps) before the step changes. Chosen with
+// firmware/hearth-sink/preview/speakers_options/tune.cpp over a synthetic groove in 2.0, 5.1 and 7.1.4: 72% of
+// onsets of 5 dB or more showed as a step up in the same window (the 5 Hz glow before: 3 to 26%), 3 to 5% of steady
+// windows moved a step, and a 5.1 room flushed about 70,000 pixels a second (the lyric screen's song filling: 192,000).
+inline constexpr float kGlowCoreMargin = 0.40F;
+inline constexpr float kGlowHaloMargin = 0.70F;
+
+// The loudest the room has lately been, in dB of full scale: the loudest RMS of any output, held, falling at
+// kCeilingFallDbPerSecond, and never below kCeilingFloorDb (a very quiet passage is not turned up to look loud).
+inline constexpr float kCeilingFloorDb = -48.0F;
+inline constexpr float kCeilingFallDbPerSecond = 2.0F;
+
+class LevelCeiling {
+   public:
+    // The loudest RMS of any output in the window that closed `seconds` after the last one.
+    void feed(float loudest_db, float seconds) {
+        seconds = std::max(seconds, 0.0F);
+        ceiling_ = std::max({loudest_db, ceiling_ - kCeilingFallDbPerSecond * seconds, kCeilingFloorDb});
+    }
+    [[nodiscard]] float db() const { return ceiling_; }
+    void reset() { ceiling_ = kCeilingFloorDb; }
+
+   private:
+    float ceiling_ = kCeilingFloorDb;
+};
+
+namespace detail {
+
+[[nodiscard]] inline float level_unit(float db, float floor_db, float top_db) {
+    return std::clamp((db - floor_db) / (top_db - floor_db), 0.0F, 1.0F);
+}
+
+// The step the position is on, staying where it is until the position is `margin` of a step past the edge,
+// so that a level sitting on a boundary does not flicker between two.
+[[nodiscard]] inline int level_hold(int current, float position, float margin = 0.25F) {
+    if (current >= 0 && position > static_cast<float>(current) - 0.5F - margin &&
+        position < static_cast<float>(current) + 0.5F + margin) {
+        return current;
+    }
+    return static_cast<int>(std::lround(position));
+}
+
+}  // namespace detail
 
 class Glow {
    public:
-    // One measure of the last 100 ms, in dB of full scale (-120 and below are silence), and the seconds
-    // since the last call. True when a step changed, which is when something has to be redrawn.
-    bool update(float rms_db, float peak_db, float seconds) {
+    // One measure of the last 100 ms, in dB of full scale (-120 and below are silence), the seconds since the
+    // last call, and the room's ceiling (LevelCeiling::db()). True when a step changed, which is when something
+    // has to be redrawn.
+    bool update(float rms_db, float peak_db, float seconds, float ceiling_db) {
         seconds = std::max(seconds, 0.0F);
         rms_ = std::max(rms_db, rms_ - kGlowRmsFallDbPerSecond * seconds);
         peak_ = std::max(peak_db, peak_ - kGlowPeakFallDbPerSecond * seconds);
+        const float rms_top = ceiling_db - kGlowTopBelowCeilingDb;
+        const float peak_top = rms_top + kGlowPeakAboveRmsDb;
         const int core = rms_ > kGlowSilentDb
-                             ? 1 + hold(core_ - 1, unit(rms_, kGlowRmsFloorDb, kGlowRmsTopDb) * (kGlowCoreSteps - 1))
+                             ? 1 + detail::level_hold(core_ - 1,
+                                                      detail::level_unit(rms_, rms_top - kGlowSpanDb, rms_top) * (kGlowCoreSteps - 1),
+                                                      kGlowCoreMargin)
                              : 0;
-        const int halo = rms_ > kGlowSilentDb ? hold(halo_, unit(peak_, kGlowPeakFloorDb, kGlowPeakTopDb) * kGlowHaloSteps) : 0;
+        const int halo = rms_ > kGlowSilentDb
+                             ? detail::level_hold(halo_, detail::level_unit(peak_, peak_top - kGlowSpanDb, peak_top) * kGlowHaloSteps,
+                                                  kGlowHaloMargin)
+                             : 0;
         const bool changed = core != core_ || halo != halo_;
         core_ = core;
         halo_ = halo;
@@ -242,24 +301,64 @@ class Glow {
     [[nodiscard]] float rms_db() const { return rms_; }
 
    private:
-    [[nodiscard]] static float unit(float db, float floor_db, float top_db) {
-        return std::clamp((db - floor_db) / (top_db - floor_db), 0.0F, 1.0F);
-    }
-    // The step the position is on, staying where it is until the position is a quarter of a step past
-    // the edge, so that a level sitting on a boundary does not flicker between two.
-    [[nodiscard]] static int hold(int current, float position) {
-        constexpr float kMargin = 0.25F;
-        if (current >= 0 && position > static_cast<float>(current) - 0.5F - kMargin &&
-            position < static_cast<float>(current) + 0.5F + kMargin) {
-            return current;
-        }
-        return static_cast<int>(std::lround(position));
-    }
-
     float rms_ = -120.0F;
     float peak_ = -120.0F;
     int core_ = -1;
     int halo_ = -1;
+};
+
+// The "pulse" style: the filled circle of a speaker grows and shrinks with its level, a little. At its quietest
+// a speaker is kPulseReach smaller than the plan draws it and at its loudest kPulseReach larger, in
+// kPulseSteps sizes. Never jumpy: the level it follows is smoothed (it rises over a few windows and falls over
+// more), a speaker never moves more than kPulseMaxStepsPerWindow sizes in a window, a size is held until the
+// level is a quarter of a step past its edge, and a speaker with next to nothing on it stays at its smallest
+// and does not move at all.
+inline constexpr int kPulseSteps = 8;  // sizes 0 (smallest) to 7 (largest)
+inline constexpr float kPulseReach = 0.12F;
+inline constexpr int kPulseMaxStepsPerWindow = 3;
+// The size follows the level over this many dB under the glow's top (narrower than the glow's, so that a beat of
+// 8 dB is half the range and shows).
+inline constexpr float kPulseSpanDb = 18.0F;
+// The level (0 to 1 over that span) below which a speaker is at its smallest and stays.
+inline constexpr float kPulseQuiet = 0.12F;
+// Time constants of the smoothed level, seconds: it takes a few windows to rise and about a quarter of a
+// second to fall.
+inline constexpr float kPulseRiseSeconds = 0.08F;
+inline constexpr float kPulseFallSeconds = 0.25F;
+
+class Pulse {
+   public:
+    // As Glow::update: the RMS of the last window, the seconds since the last call and the room's ceiling.
+    // True when the size changed.
+    bool update(float rms_db, float seconds, float ceiling_db) {
+        seconds = std::max(seconds, 0.0F);
+        const float top = ceiling_db - kGlowTopBelowCeilingDb;
+        float target = rms_db > kGlowSilentDb ? detail::level_unit(rms_db, top - kPulseSpanDb, top) : 0.0F;
+        if (target < kPulseQuiet) {
+            target = 0.0F;
+        }
+        const float tau = target > level_ ? kPulseRiseSeconds : kPulseFallSeconds;
+        level_ += (target - level_) * (1.0F - std::exp(-seconds / tau));
+        const float wanted = level_ < kPulseQuiet ? 0.0F : level_ * static_cast<float>(kPulseSteps - 1);
+        int next = detail::level_hold(step_, wanted);
+        next = std::clamp(next, step_ - kPulseMaxStepsPerWindow, step_ + kPulseMaxStepsPerWindow);
+        next = std::clamp(next, 0, kPulseSteps - 1);
+        const bool changed = next != step_;
+        step_ = next;
+        return changed;
+    }
+
+    // 0 (smallest) to kPulseSteps - 1.
+    [[nodiscard]] int step() const { return step_; }
+    // What to multiply the plan's size by: 1 - kPulseReach to 1 + kPulseReach.
+    [[nodiscard]] float scale() const {
+        return 1.0F - kPulseReach + 2.0F * kPulseReach * static_cast<float>(step_) / static_cast<float>(kPulseSteps - 1);
+    }
+    [[nodiscard]] float level() const { return level_; }
+
+   private:
+    float level_ = 0.0F;
+    int step_ = 0;
 };
 
 }  // namespace iclforge::render

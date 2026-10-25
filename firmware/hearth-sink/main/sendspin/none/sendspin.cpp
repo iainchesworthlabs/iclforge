@@ -44,6 +44,8 @@ IdentifyStatus sendspin_identify_status() { return {}; }
 
 SendspinPlaying sendspin_now_playing() { return {}; }
 
+SendspinLevels sendspin_now_levels() { return {}; }
+
 bool sendspin_pairing(std::string_view /*action*/) { return false; }
 
 std::optional<iclforge::ControlPairings> sendspin_pairings() { return std::nullopt; }
