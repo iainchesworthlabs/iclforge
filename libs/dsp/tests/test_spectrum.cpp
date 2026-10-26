@@ -166,6 +166,37 @@ TEST_CASE("white noise rises a decibel a band, averaged over many frames, in bot
     }
 }
 
+TEST_CASE("the transform in the analyzer's own buffers is the library's, bit for bit, at both lengths", "[spectrum]") {
+    // detail::forward_in repeats stockham_forward's passes with its work buffers given (the panel's stack cannot hold the library's): a
+    // change to the library's glue that the copy does not follow shows here, as a different bit.
+    const auto check = [](auto length) {
+        constexpr std::size_t kP = decltype(length)::value;
+        iclforge::dsp::fft::StockhamTables<kP, float> tables;
+        Noise noise;
+        std::array<float, kP> re{};
+        std::array<float, kP> im{};
+        for (std::size_t n = 0; n < kP; ++n) {
+            re[n] = noise.next();
+            im[n] = noise.next();
+        }
+        auto lib_re = re;
+        auto lib_im = im;
+        iclforge::dsp::fft::stockham_forward<kP, float, float>(tables, std::span<float, kP>(lib_re), std::span<float, kP>(lib_im));
+        auto own_re = re;
+        auto own_im = im;
+        std::array<float, kP> work_re{};
+        std::array<float, kP> work_im{};
+        sp::detail::forward_in<kP>(tables, std::span<float, kP>(own_re), std::span<float, kP>(own_im), std::span<float, kP>(work_re),
+                                   std::span<float, kP>(work_im));
+        REQUIRE(own_re == lib_re);
+        REQUIRE(own_im == lib_im);
+    };
+    check(std::integral_constant<std::size_t, sp::kLowFrame / 2>{});
+    check(std::integral_constant<std::size_t, sp::kHighFrame / 2>{});
+    // The odd number of passes (the copy back) and the even one are both among them: 1,024 and 512 are five passes each, 256 is four.
+    check(std::integral_constant<std::size_t, 256>{});
+}
+
 TEST_CASE("the power average follows a step by its time constant, and starts at the first level", "[spectrum]") {
     sp::PowerAverage avg;
     Levels loud{};
