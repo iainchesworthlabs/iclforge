@@ -33,20 +33,27 @@ A level above 0 dB can clip a loud passage: the sink clips at full scale and doe
 
 **On the sink's own screen**, a board with a touch panel (the P4X kit) has them under *Preferences*, in the group *Sound*:
 
-![Preferences with the Sound group, while the test tone plays: the button says Stop](screenshots/p4-panel-prefs-sound.png)
+![Preferences, scrolled to the Sound group: Identify speakers and Speaker levels and distances](screenshots/p4-panel-prefs-sound.png)
 
-*Identify speakers* has a *Play each* button that plays the tone through every speaker in turn, and says *Stop* while it
-plays. *Speaker levels and distances* says how many speakers are set and opens the *Speakers* sheet:
+*Identify speakers* and *Speaker levels and distances* open the same view, the *Speakers* sheet. *Identify* opens it and plays
+the test tone through every speaker in turn, once; *Edit* opens it as it is.
 
-![The Speakers sheet on the kit: the room, the left surround lit while its tone plays, and its level and distance](screenshots/p4-panel-speakers.png)
+![The Speakers sheet on the kit, in a 9.1.6 room: every speaker has its ID, the one the tone is on is lit, and the buttons are at the foot](screenshots/p4-panel-speakers.png)
 
-The sheet draws the room as the layout in force has it. A tap on a speaker chooses it and plays the tone through it, and the
-speaker the tone is on is lit. For the chosen speaker, *Level* goes up and down half a decibel a tap and *Distance* a tenth of a
-metre, or a metre with *-1 m* and *+1 m* (the first *+* on a speaker with no distance starts it at the farthest distance the
-others have, so that nothing moves until you move it); *Repeat* plays the speaker over and over, so that a level can be set
-by ear; *Play each* and *Stop* do what they say; *Reset* puts the chosen speaker back to 0 dB and no distance. **The tone stops
-when you leave the sheet**, and when Preferences put themselves away. On a screen too narrow for a room the speakers are a row
-of buttons:
+The sheet draws the room as the layout in force has it, with **every speaker's ID on it** (`L`, `C`, `R`, `Ls`, `Rs`, `LFE`,
+and the rest of a larger room's, the height speakers among them), and **the speaker the tone is on is lit** as each sounds:
+which one you hear is the one you see. A tap on a speaker chooses it (it is ringed) and plays the tone through it. For the
+chosen speaker, *Level* goes up and down half a decibel a tap and *Distance* a tenth of a metre, or a metre with *-1 m* and
+*+1 m* (the first *+* on a speaker with no distance starts it at the farthest distance the others have, so that nothing moves
+until you move it); the line above them says what is in force at it.
+
+**The five buttons are a bar at the foot of the sheet that is always on the screen**: *Play* (the chosen speaker once), *Repeat*
+(it over and over, so that a level can be set by ear), *Play each* (every speaker in turn), *Stop* and *Reset* (the chosen
+speaker back to 0 dB and no distance). *Stop* ends the tone and leaves the controls; it is not the only thing on the screen. The
+room and the chosen speaker scroll between that bar and the title's where they are more than the screen holds (a 9.1.6 room, a
+small display), and the bar does not move. **The tone stops when you leave the sheet**, and when Preferences put themselves away.
+On a screen too narrow for a room the speakers are a row of buttons, and a display too narrow for five buttons on a line wraps
+them onto two with shorter words (*Loop* and *All*):
 
 ![The Speakers sheet on a 480 by 320 screen](screenshots/p4-panel-speakers-small.png)
 

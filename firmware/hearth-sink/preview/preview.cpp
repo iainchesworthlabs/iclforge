@@ -1325,7 +1325,15 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
         expect(shows_text(prefs, shown), std::string("Preferences shows ") + shown);
     }
     expect(shows_text(prefs, "lights the one you should hear", true), "the Identify row says what it does");
-    write_bmp(out / ("prefs-sound-" + size + ".bmp"));
+    {
+        // The Sound group is some way down the list: scrolled to, for the picture of it.
+        const std::vector<lv_obj_t*> identify = buttons_in(prefs, "Identify");
+        if (!identify.empty()) {
+            lv_obj_scroll_to_view_recursive(identify.front(), LV_ANIM_OFF);
+        }
+        pump(2);
+        write_bmp(out / ("prefs-sound-" + size + ".bmp"));
+    }
 
     // A song is playing: the board says so under the row, the tone does not start, and the sheet is there to say why.
     g_sound.tone_blocked = "A song is playing: the test tone waits until it stops.";
