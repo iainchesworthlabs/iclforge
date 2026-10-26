@@ -185,7 +185,7 @@ TEST_CASE("the network section says which interface is in use and where each one
     const Page page = describe(healthy());
     const Section& net = page.network;
     REQUIRE(net.rows.size() == 6);
-    CHECK(net.rows[0].cells[0].key == "Ethernet");
+    CHECK(net.rows[0].cells[0].key == "Wired");
     CHECK(net.rows[0].cells[0].value == "in use \xC2\xB7 up 100 Mb/s full duplex");
     CHECK(net.rows[1].cells[0].value == "192.168.1.163 \xC2\xB7 e8:f6:0a:e7:53:fb");
     CHECK(net.rows[2].cells[0].key == "Wi-Fi");
@@ -196,7 +196,7 @@ TEST_CASE("the network section says which interface is in use and where each one
     CHECK(find(net, "Web page")->value == "http://192.168.1.163/");
 }
 
-TEST_CASE("a cable pulled out reads as no cable, and the radio is in use", "[device][dev_view]") {
+TEST_CASE("a cable pulled out reads as no link, and the radio is in use", "[device][dev_view]") {
     Facts f = healthy();
     f.active = "wifi";
     f.ethernet.link = false;
@@ -204,7 +204,7 @@ TEST_CASE("a cable pulled out reads as no cable, and the radio is in use", "[dev
     f.ethernet.speed_mbps.reset();
     f.web_address = "192.168.1.251";
     const Section net = describe(f).network;
-    CHECK(net.rows[0].cells[0].value == "no cable");
+    CHECK(net.rows[0].cells[0].value == "no link");
     CHECK(net.rows[0].cells[0].tone == Tone::muted);
     CHECK(net.rows[1].cells[0].value == "no address \xC2\xB7 e8:f6:0a:e7:53:fb");
     CHECK(net.rows[2].cells[0].value == "in use \xC2\xB7 HomeNet \xC2\xB7 -52 dBm");
@@ -260,7 +260,7 @@ TEST_CASE("a build with no second interface shows one row for the network", "[de
     f.name = "hearth-aabbcc";
     const Section net = describe(f).network;
     CHECK(find(net, "Network")->value == "10.0.2.15");
-    CHECK(find(net, "Ethernet") == nullptr);
+    CHECK(find(net, "Wired") == nullptr);
     f.web_address.clear();
     CHECK(find(describe(f).network, "Network")->tone == Tone::attention);
     CHECK(web_url(f) == "no address yet");
@@ -415,20 +415,20 @@ TEST_CASE("the preference words round-trip", "[device][dev_view]") {
 TEST_CASE("the confirming step names what is about to be switched off", "[device][dev_view]") {
     Facts f = healthy();
     Confirm c = confirm_text(f, Preference::automatic);
-    CHECK(c.headline == "Use auto?");
+    CHECK(c.headline == "Use automatic?");
     CHECK_FALSE(c.blocked);
 
     c = confirm_text(f, Preference::wifi);
     CHECK(c.headline == "Use Wi-Fi only?");
-    CHECK(c.detail.starts_with("The cable is switched off."));
+    CHECK(c.detail.starts_with("Wired is switched off."));
     // On the cable now: the page the person is reading from moves.
-    CHECK(c.detail.find("The board is on the cable now") != std::string::npos);
+    CHECK(c.detail.find("The board is on wired now") != std::string::npos);
     CHECK(c.detail.find("192.168.1.251") != std::string::npos);
     CHECK_FALSE(c.blocked);
 
     f.active = "wifi";
     c = confirm_text(f, Preference::ethernet);
-    CHECK(c.headline == "Use the cable only?");
+    CHECK(c.headline == "Use wired only?");
     CHECK(c.detail.find("The board is on Wi-Fi now") != std::string::npos);
     CHECK(c.detail.find("192.168.1.163") != std::string::npos);
 
@@ -445,7 +445,7 @@ TEST_CASE("a change the board would refuse is blocked before it is asked", "[dev
     Confirm c = confirm_text(f, Preference::ethernet);
     CHECK(c.blocked);
     CHECK(c.tone == Tone::attention);
-    CHECK(c.detail.find("No cable is linked") != std::string::npos);
+    CHECK(c.detail.find("Wired has no link") != std::string::npos);
 
     // No Wi-Fi network is stored: the board answers PUT with a refusal.
     f = healthy();
@@ -480,7 +480,7 @@ TEST_CASE("an interface the current pin has switched off can be pinned to: the b
     f.ethernet.address.clear();
     c = confirm_text(f, Preference::ethernet);
     CHECK_FALSE(c.blocked);
-    CHECK(c.detail.find("The cable is brought up first") != std::string::npos);
+    CHECK(c.detail.find("Wired is brought up first") != std::string::npos);
 
     // A station that is on and has not joined yet: the board keeps the cable if it cannot.
     f = healthy();
@@ -488,14 +488,14 @@ TEST_CASE("an interface the current pin has switched off can be pinned to: the b
     f.wifi.address.clear();
     c = confirm_text(f, Preference::wifi);
     CHECK_FALSE(c.blocked);
-    CHECK(c.detail.find("keeps the cable") != std::string::npos);
+    CHECK(c.detail.find("keeps wired") != std::string::npos);
 }
 
 TEST_CASE("a change in progress is described", "[device][dev_view]") {
     CHECK(net_change_text(NetChange::idle, "wifi").empty());
     CHECK(net_change_text(NetChange::working, "wifi") == "Switching to Wi-Fi...");
-    CHECK(net_change_text(NetChange::working, "ethernet") == "Switching to the cable...");
-    CHECK(net_change_text(NetChange::working, "auto") == "Switching to auto...");
+    CHECK(net_change_text(NetChange::working, "ethernet") == "Switching to wired...");
+    CHECK(net_change_text(NetChange::working, "auto") == "Switching to automatic...");
     CHECK(net_change_text(NetChange::done, "wifi") == "Done.");
     CHECK(net_change_text(NetChange::refused, "wifi") == "The board refused the change.");
 }

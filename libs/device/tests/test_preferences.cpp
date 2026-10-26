@@ -687,12 +687,25 @@ TEST_CASE("the time zone is chosen by name or by string, and read back as a pers
     // A city with a place between its region and itself says that place and not the region, and UTC is itself.
     REQUIRE(prefs::detail::time_zone_label("America/Argentina/Buenos_Aires") == "Buenos Aires (Argentina)");
     REQUIRE(prefs::detail::time_zone_label("UTC") == "UTC");
-    // By string: no name, and what was typed is what is shown.
+    // By string: no name stored, the string is the word the route reads back, and a person reads the place the table
+    // holds for it (Tokyo's string), never the string.
     REQUIRE(prefs::set_value(backend, zone, "JST-9").ok);
     REQUIRE(backend.zone_.name.empty());
     entry = prefs::resolve(zone, backend, backend.caps());
     REQUIRE(entry.value == "JST-9");
-    REQUIRE(entry.value_label == "JST-9");
+    REQUIRE(entry.value_label == "Tokyo (Asia)");
+    // A zone set through a page that kept only the string (Melbourne's rule): the place, as if it had been picked.
+    REQUIRE(prefs::set_value(backend, zone, "AEST-10AEDT,M10.1.0,M4.1.0/3").ok);
+    REQUIRE(backend.zone_.name.empty());
+    entry = prefs::resolve(zone, backend, backend.caps());
+    REQUIRE(entry.value == "AEST-10AEDT,M10.1.0,M4.1.0/3");
+    REQUIRE(entry.value_label == "Melbourne (Australia)");
+    // A string in no table: its offset, and that it is the person's own. Never the string.
+    REQUIRE(prefs::set_value(backend, zone, "ZZZ-9:45").ok);
+    entry = prefs::resolve(zone, backend, backend.caps());
+    REQUIRE(entry.value == "ZZZ-9:45");
+    REQUIRE(entry.value_label == "UTC+09:45 (custom)");
+    REQUIRE(entry.value_label.find("ZZZ") == std::string::npos);
     // None takes the zone away.
     REQUIRE(prefs::set_value(backend, zone, "none").ok);
     REQUIRE(backend.zone_.posix.empty());

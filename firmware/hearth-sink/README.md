@@ -540,7 +540,7 @@ configurations set 80; the default is 0, none), the component's
 | --- | --- |
 | `GET /` | a web page that shows what the player is doing and drives it through the routes below and nothing else (below); its script is `GET /ui.js` |
 | `GET /api` | these routes, as text - what `GET /` answered before the page |
-| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: the interface in use, the access point's SSID and signal, and the board's address; on a board with a cable as well, the `preference` and how each interface stands under `interfaces`) |
+| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: the interface in use, the access point's SSID and signal, and the board's address; on a board with a wired network as well, the `preference` and how each interface stands under `interfaces`) |
 | `GET /hardware` | what the board is, as JSON: `target`, `chip` and `revision`, `cores`, `fpu`, `cpu_freq_mhz`, `psram_bytes`, the sink's `sink_max_slots` and the firmware's `project`, `version` and `idf_version`. Read once at start-up, since none of it changes while the board runs |
 | `POST /play` | body: a URL for the `http` source, a path for `fatfs` or `sd`. `202 Accepted` — the location is handed to the task that owns the player, and `/status` says how the open went. `409` from `partition`, which has one thing in it. |
 | `POST /stop` | |
@@ -553,7 +553,7 @@ configurations set 80; the default is 0, none), the component's
 | `GET /wiring` | `1` if a second I2S line is wired, `0` if not; `404` where there can be no second line - the ESP32-C6, the P4's `i2s_wide`, `capture` and `null` - and `/status` then has no `second_line` |
 | `PUT /wiring` | body: `1` or `0`. Moves the sink's ceiling with it - two lines carry twice one line's slots - and takes effect at the next play. `409` while a play is running, and where there can be no second line. |
 | `PUT /network` | body: an SSID, a newline, then the passphrase. Stored for the next boot; the station stays on the network it is already associated with. Improv over the serial port is the other way in, and the one a board with no network at all needs. |
-| `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a cable and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
+| `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a wired network and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
 | `PUT /network-preference` | body: `auto`, `ethernet` or `wifi`. Stored, and acted on at once with no restart. `400` for any other word, `409` where there is nothing to choose between, or where `wifi` has no network stored to join. A change to one interface is undone if that interface does not come up |
 | `GET /now-playing` | `speakers`, `title`, `clock`, `off` or `dark`, as text, on a board with a panel: what the screen shows while a song has no lyrics ([planning](../../planning/p4x-now-playing.md)); `dark` is the backlight off until a touch lights the speakers for 30 s; `404` on a board with none |
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
@@ -777,33 +777,33 @@ second of audio; the next play was clean (630 of 630 bursts, nothing late).
 
 ### Ethernet
 
-A board with an EMAC and a PHY has a cable as well as the station
+A board with an EMAC and a PHY has a wired network as well as the station
 (`CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET`, the ESP32-P4 only; the pins are
 `CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the ESP32-P4X-Function-EV-Board's
 IP101GR). The code is three files under `main/net/`: `wired/ethernet.cpp` is
-the cable (MAC, PHY, DHCP, the board's name as its host name), `wifi/station.cpp`
+wired (MAC, PHY, DHCP, the board's name as its host name), `wifi/station.cpp`
 is the station that every board with Wi-Fi shares, and `dual/network.cpp`
 chooses between them, so `network.hpp`'s functions answer for the pair. A board
 without a PHY builds `wifi/network.cpp`, a thin adapter over the same station,
 and is unchanged.
 
-- **auto** (the default): both are up when the cable is in and a network is
-  stored. The cable has route priority 200 and the station 100, so the board
-  uses the cable while it holds an address, falls back to the station at once
+- **auto** (the default): both are up when the Ethernet cable is in and a network is
+  stored. Wired has route priority 200 and the station 100, so the board
+  uses wired while it holds an address, falls back to the station at once
   when the cable is pulled (the station has been joined all along) and returns
-  to the cable when it is put back, with no restart. A board with the cable in
-  and no Wi-Fi network stored comes up on the cable alone.
+  to wired when it is put back, with no restart. A board with the cable in
+  and no Wi-Fi network stored comes up on wired alone.
 - **ethernet** and **wifi** pin the board to one interface and switch the other
   off (the radio idle, or the EMAC stopped). Stored in NVS (`net_pref`), set by
   `PUT /network-preference`, and kept only once the interface they name holds an
   address: a pin that cannot be met is not kept and the other interface stays on.
 - `network_ready()`, the address, the panel's idle line and mDNS follow the
   interface in use; Improv asks about the station alone
-  (`network_wifi_ready()`, `network_wifi_up()`), so a board on the cable still
+  (`network_wifi_ready()`, `network_wifi_up()`), so a board on wired still
   offers its Wi-Fi form.
 - `GET /status` says the interface in use and, under `network.interfaces`, how
   each stands (link, address, MAC; the Wi-Fi's SSID, signal and whether a network
-  is stored; the cable's speed and duplex). Never the passphrase.
+  is stored; the wired speed and duplex). Never the passphrase.
 
 ### Pairing
 

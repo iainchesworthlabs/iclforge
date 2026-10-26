@@ -164,6 +164,12 @@ The sections below contain the complete change list and fixes.
   steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
   place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
   down to 240 by 240. The routes now go through the same backend as the screen.
+- **The time zone is read as a place, never as its POSIX string.** A board whose zone was set through the page before it had
+  a picker showed `AEST-10AEDT,M10.1.0,M4.1.0/3` on the Preferences screen. A zone is now read as the place it is (the name
+  chosen; else the table's place for the exact string, the most populous where several share it, so that string is
+  *Melbourne (Australia)*; else its offset, *UTC+09:45 (custom)*), on the Preferences row, in the picker, and on the board's
+  page, whose `GET /status` has `zone_place` and `zone_label` beside the `zone` that tools read. Display only: nothing is
+  stored from the guess.
 - **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
   which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
   `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`
@@ -173,38 +179,38 @@ The sections below contain the complete change list and fixes.
 
 - **The `p4-rev3` Hearth sink uses the kit's RJ45 port as well as its Wi-Fi.** The chip's EMAC and the
   board's IP101GR (RMII; the pins are `CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the board's) take
-  an address by DHCP under the board's name, and everything that answers on Wi-Fi answers on the
-  cable: the page and the control surface on port 80, `GET /log`, `PUT /firmware`, mDNS
+  an address by DHCP under the board's name, and everything that answers on Wi-Fi answers on
+  wired: the page and the control surface on port 80, `GET /log`, `PUT /firmware`, mDNS
   (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`, now with an address for each interface),
   the Sendspin player and its pairing, and the idle screen, which names the interface in use. So the
-  kit can sit on a PoE splitter with no USB cable: a board with the cable in and no Wi-Fi network
-  stored comes up on the cable alone, and an image is updated over it like any other (`ota.py push`
-  to the cable's address; the update, its rollback and the rollback of a bad image were tried on the
-  kit, over the cable as well). By default the cable is used while it holds an address (its route
+  kit can sit on a PoE splitter with no USB cable: a board with the Ethernet cable in and no Wi-Fi network
+  stored comes up on wired alone, and an image is updated over it like any other (`ota.py push`
+  to the wired address; the update, its rollback and the rollback of a bad image were tried on the
+  kit, over wired as well). By default wired is used while it holds an address (its route
   priority is 200 against the station's 100; ESP-IDF's own number for Ethernet, 50, would have
-  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: a
-  cable pulled and put back four times moved the board to Wi-Fi within half a second and back to the
-  cable in 4 to 5 s. A PoE splitter itself is not yet tried.
+  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: the
+  Ethernet cable pulled and put back four times moved the board to Wi-Fi within half a second and back to
+  wired in 4 to 5 s. A PoE splitter itself is not yet tried.
 - **A stored network preference: `auto`, `ethernet` or `wifi`**, `GET` and `PUT /network-preference`
   (text, like `/name`) and `network.preference` in `GET /status`. `ethernet` and `wifi` pin the board to
   one interface and switch the other off, and a change is kept only once the interface it names holds
   an address, so a pin cannot cut a board off from the network it was asked over. `GET /status`'s
   `network` object keeps its four fields (the interface in use) and adds `interfaces`: each one's
-  link, address, MAC and, for the Wi-Fi, its SSID, signal and whether a network is stored; for the
-  cable, its speed and duplex. A diagnostics view or a control for the preference reads those and
-  nothing else. Improv asks about the Wi-Fi station alone, so a board on the cable still offers its
-  Wi-Fi form and joins the network it is given while the cable stays in use.
+  link, address, MAC and, for the Wi-Fi, its SSID, signal and whether a network is stored; for
+  wired, its speed and duplex. A diagnostics view or a control for the preference reads those and
+  nothing else. Improv asks about the Wi-Fi station alone, so a board on wired still offers its
+  Wi-Fi form and joins the network it is given while wired stays in use.
 - **The profile locks it.** `p4-rev3` locks `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y`, its hash
   moves, and its baseline is recorded again on the kit. The other profiles are unchanged. The Wi-Fi
   station is now its own file (`net/wifi/station.cpp`) that a board with the station alone builds
   through a thin adapter, the same code as before.
-  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-cable-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#wired-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
 
 **The ESP32-P4X panel's developer view**
 
 - **Three taps on the board's name in the footer open a screen of developer information; a tap
   closes it.** On the `p4-rev3` panel image only (it needs the touch screen), with the lyric and idle
-  screens as they were when it is shut. It shows the network (the interface in use, and for the cable
+  screens as they were when it is shut. It shows the network (the interface in use, and for wired
   and the radio the link, the address, the MAC, the SSID and the signal; the board's name, its mDNS
   name and the page's address), the configuration (profile and hash, firmware and slot, chip revision,
   clocks, output layout, uptime and reset reason, a stored core dump), the stream (the server, the
@@ -212,8 +218,8 @@ The sections below contain the complete change list and fixes.
   board's performance (both heaps, the panel's render time, the touch counters) and the console's last
   five lines, once a second (every two while a stream plays), with what is wrong in the accent colour. It never shows the Wi-Fi
   passphrase or the Sendspin pairing token.
-- **A control for the network preference, Auto, Ethernet or Wi-Fi**, which asks before it acts
-  ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address
+- **A control for the network preference, Automatic, Wired or Wi-Fi**, which asks before it acts
+  ("Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address
   changes to ...") and changes it with the call `PUT /network-preference` makes, with no restart.
   `GET :8081/panel` says whether the view is open (`dev_view`).
   ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-developer-view), planning/karaoke-p4x-panel.md, D10.)
@@ -232,11 +238,11 @@ The sections below contain the complete change list and fixes.
   every entry of the preferences registry that says it is reset (what the screen shows without lyrics,
   when it dims, the brightness, the clock's hours and seconds and the night schedule), each through its
   own setter. It keeps the name, the Wi-Fi network, the
-  cable-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
+  wired-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
   **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
   name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
   restarts the board as a new one. Both are listed in `GET /api`.
-- **Fixed with them:** `settings_forget()` kept the Wi-Fi network and the cable-or-Wi-Fi choice in
+- **Fixed with them:** `settings_forget()` kept the Wi-Fi network and the wired-or-Wi-Fi choice in
   memory until the next restart, so a board that had just been told to forget them still used them.
 - In `libs/device`, and tested on the host: the rule for a name and the host name it answers to, with
   the on-screen keyboard's keys (`device_name.hpp`); the NVS keys of the board's settings and which of
@@ -248,14 +254,24 @@ The sections below contain the complete change list and fixes.
 
 - **Wired or Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset**
   are entries of the preferences registry and pages of the sheet, at the size of the display they are on (the
-  preview checks 1024 by 600, 800 by 480, 480 by 320 and 320 by 240). The switch between the cable and Wi-Fi
+  preview checks 1024 by 600, 800 by 480, 480 by 320 and 320 by 240). The switch between wired and Wi-Fi
   asks first in the developer view's words. The name is typed on a keyboard that offers only what the name's rule
   accepts and the fonts can draw (the Latin subset, accents included), counted in bytes. About is the friendly
   subset of the developer view. The paired servers are listed with a Forget on each, the one that plays included,
   with a warning that the music stops. The factory reset asks twice: what is lost and whether the board stays
-  reachable (a cable plugged in, or no network and Improv over USB to bring it back), and then a button held for
+  reachable (a wired network with a link, or no network and Improv over USB to bring it back), and then a button held for
   three seconds. A board that cannot make a choice shows it greyed, with the reason.
   ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#on-the-screen).)
+
+**The choice of network reads Automatic, Wired or Wi-Fi everywhere**
+
+- **One word for the board's Ethernet port: "wired".** The Preferences row, its confirming card and
+  its result text, About, the developer view (its rows, its three buttons, its confirming step and the
+  "Switching to..." line), the idle screen, the device web page, the route listing (`GET /api`) and the
+  documentation said "cable" in some places, "Ethernet" in others and "auto" in a third; they say
+  "Wired", "Automatic" and "Wi-Fi" now, and "wired or Wi-Fi" in a sentence. The words a route takes
+  (`auto`, `ethernet`, `wifi`) are unchanged. A USB cable and the Ethernet cable a person plugs in are
+  still cables.
 
 **The Forge GUI, Hearth and Crucible open where they were left**
 

@@ -48,7 +48,7 @@ const REPLIES = {
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
-        'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
+        'GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
         'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
@@ -1043,7 +1043,56 @@ function applyIdentify(sound, body) {
 // The time zones the firmware offers by name: the rows of libs/device's time_zone_data.hpp, which tools/hearth/
 // gen_time_zones.py writes, read here so that the stand-in's list is the board's and cannot drift from it.
 const ZONE_DATA = path.resolve(__dirname, '../../../../../libs/device/include/iclforge/time_zone_data.hpp');
-const ZONE_TABLE = [...fs.readFileSync(ZONE_DATA, 'utf8').matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
+const ZONE_TEXT = fs.readFileSync(ZONE_DATA, 'utf8');
+const ZONE_TABLE = [...ZONE_TEXT.matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
+// The place each shared string means (data::kPreferred, as indices into the table).
+const ZONE_PREFERRED = /kPreferred\[\] = \{([^}]*)\}/.exec(ZONE_TEXT)[1].match(/[0-9]+/g).map(Number);
+
+// What a person reads for a zone, as libs/device's time_zones.hpp has it (zone_place, zone_display, zone_readable): the
+// place by its name, else by its string (the preferred place of a shared one), else its offset. Never the string.
+function zonePlace(posix, name) {
+    const named = ZONE_TABLE.find((z) => z[0] === name);
+    if (named) {
+        return named[0];
+    }
+    if (!posix || posix === 'none') {
+        return null;
+    }
+    const preferred = ZONE_PREFERRED.map((i) => ZONE_TABLE[i]).find((z) => z[1] === posix);
+    return (preferred ?? ZONE_TABLE.find((z) => z[1] === posix))?.[0] ?? null;
+}
+
+function zoneDisplay(name) {
+    const first = name.indexOf('/');
+    if (first < 0) {
+        return name;
+    }
+    const last = name.lastIndexOf('/');
+    let city = name.slice(last + 1).replaceAll('_', ' ');
+    if (last !== first) {
+        city += ` (${name.slice(first + 1, last).replaceAll('_', ' ').replaceAll('/', ',')})`;
+    }
+    return city.includes(' (') ? city : `${city} (${name.slice(0, first)})`;
+}
+
+function zoneReadable(posix, name) {
+    const place = zonePlace(posix, name);
+    if (place) {
+        return zoneDisplay(place);
+    }
+    if (!posix || posix === 'none') {
+        return 'UTC';
+    }
+    const m = /^(?:<[^>]*>|[A-Za-z]+)([+-]?)([0-9]{1,3})(?::([0-9]{2}))?(?::[0-9]{2})?(.*)$/.exec(posix);
+    if (!m) {
+        return 'a zone this board does not read';
+    }
+    const west = (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
+    const east = -west;
+    const hours = String(Math.trunc(Math.abs(east) / 60)).padStart(2, '0');
+    const minutes = String(Math.abs(east) % 60).padStart(2, '0');
+    return `UTC${east < 0 ? '-' : '+'}${hours}:${minutes} (custom${m[4] ? ', with daylight saving' : ''})`;
+}
 
 // Whether a string is a time server the firmware takes: libs/device's wall_clock.hpp valid_ntp_server, rule for
 // rule: an IPv4 address (four parts, no leading zero) or a host name (RFC 1123 labels, the last not all digits),
@@ -1315,6 +1364,8 @@ function timeStatus(t) {
         local: t.synced ? t.local : null,
         zone: t.zone,
         zone_name: t.zoneName,
+        zone_place: zonePlace(t.zone, t.zoneName === 'none' ? '' : t.zoneName) ?? 'none',
+        zone_label: zoneReadable(t.zone, t.zoneName === 'none' ? '' : t.zoneName),
         server: t.server,
         servers: t.servers,
         answers: t.answers,

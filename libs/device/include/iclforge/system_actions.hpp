@@ -136,13 +136,13 @@ namespace detail {
     const bool reachable_on_cable = situation.has_cable && situation.cable_link;
     if (reachable_on_cable) {
         confirm.lines.push_back(
-            "The cable stays in use: the player asks your router for an address again, so look for it there. "
-            "Give it a Wi-Fi network again from its web page, or leave it on the cable.");
+            "The wired network stays in use: the player asks your router for an address again, so look for it there. "
+            "Give it a Wi-Fi network again from its web page, or leave it on wired.");
     } else if (situation.network_built_in) {
         confirm.lines.push_back("This image carries a Wi-Fi network of its own, which the player falls back to.");
     } else {
         confirm.lines.push_back(
-            std::string(situation.has_cable ? "No cable is plugged in. " : "This player has Wi-Fi only. ") +
+            std::string(situation.has_cable ? "The wired network has no link. " : "This player has Wi-Fi only. ") +
             "After the reset it has NO network, and nothing on your network can reach it.");
         confirm.lines.push_back(
             "To put it back on Wi-Fi, connect it to a computer with a USB cable, open improv-wifi.com in "

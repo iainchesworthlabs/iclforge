@@ -594,10 +594,43 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         let time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
         expect(time.zone).toBe('AEST-10AEDT,M10.1.0,M4.1.0/3');
         expect(time.zone_name).toBe('Australia/Melbourne');
+        // What a person reads is the place (zone_label), and the place the table holds for the zone (zone_place): never the
+        // string, which only tools read.
+        expect(time.zone_place).toBe('Australia/Melbourne');
+        expect(time.zone_label).toBe('Melbourne (Australia)');
         reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'AEST-10AEDT,M10.1.0,M4.1.0/3' });
         expect(reply.status).toBe(200);
         time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
         expect(time.zone_name, 'a string somebody typed has no name').toBe('none');
+        // ... but the table has a place for it (the most populous of those that share it), which is what is read.
+        expect(time.zone_place).toBe('Australia/Melbourne');
+        expect(time.zone_label).toBe('Melbourne (Australia)');
+        // A name that is chosen is the one that is read, whatever the string alone would say.
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'Australia/Sydney' });
+        expect(reply.status).toBe(200);
+        time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(time.zone_label).toBe('Sydney (Australia)');
+        // A string in no table is read as its offset, and as the person's own.
+        for (const [custom, label] of [
+            ['ZZZ-9:45', 'UTC+09:45 (custom)'],
+            ['<-0330>3:30', 'UTC-03:30 (custom)'],
+            ['CUT-9:30CUD,M10.1.0,M4.1.0/3', 'UTC+09:30 (custom, with daylight saving)'],
+        ]) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: custom });
+            expect(reply.status, custom).toBe(200);
+            time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+            expect(time.zone, custom).toBe(custom);
+            expect(time.zone_place, custom).toBe('none');
+            expect(time.zone_label, custom).toBe(label);
+        }
+        // The string the board keeps is never in what a person reads, for any string the table holds.
+        for (const posix of new Set(ZONE_ROWS.map((z) => z[1]))) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: posix });
+            expect(reply.status, posix).toBe(200);
+            time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+            expect(time.zone_label, posix).not.toContain(posix);
+            expect(ZONE_ROWS.map((z) => z[0]), posix).toContain(time.zone_place);
+        }
         for (const bad of ['australia/melbourne', 'Australia/Melburne', 'Melbourne', 'Australia/Melbourne extra']) {
             reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: bad });
             expect(reply.status, bad).toBe(400);
@@ -610,6 +643,8 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
         time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
         expect(time.zone).toBe('none');
         expect(time.zone_name).toBe('none');
+        expect(time.zone_place).toBe('none');
+        expect(time.zone_label).toBe('UTC');
 
         // The names a board offers, one a line, in the table's order.
         reply = await fetch(`${stub.url}time-zones`);

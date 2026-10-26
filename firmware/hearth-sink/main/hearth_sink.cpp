@@ -848,6 +848,11 @@ iclforge::ControlHandlers control_handlers() {
             }
             time.zone = iclforge::wallclock::zone_setting_text(player::settings().time_zone.data());
             time.zone_name = iclforge::wallclock::zone_setting_text(player::settings().time_zone_name.data());
+            const auto place = iclforge::wallclock::zone_place(player::settings().time_zone.data(),
+                                                               player::settings().time_zone_name.data());
+            time.zone_place = place ? std::string(place->name) : std::string(iclforge::wallclock::kNoZone);
+            time.zone_label = iclforge::wallclock::zone_readable(player::settings().time_zone.data(),
+                                                                 player::settings().time_zone_name.data());
             time.server = iclforge::wallclock::ntp_server_setting_text(player::settings().ntp_server.data());
             time.servers = player::wall_clock_servers();
             time.answers = stats.syncs;

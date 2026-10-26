@@ -355,7 +355,7 @@ inline std::string join(std::initializer_list<std::string_view> parts, std::stri
         return net.configured ? "not joined" : "no network stored";
     }
     if (!net.link) {
-        return "no cable";
+        return "no link";
     }
     std::string out = "up";
     if (net.speed_mbps) {
@@ -430,7 +430,7 @@ inline constexpr int kWeakSignalDbm = -75;
         const Tone address_tone = in.address.empty() ? Tone::muted : Tone::text;
         net.rows.push_back(one("", address_text(in), address_tone));
     };
-    interface_rows("Ethernet", "ethernet", facts.ethernet, false);
+    interface_rows("Wired", "ethernet", facts.ethernet, false);
     interface_rows("Wi-Fi", "wifi", facts.wifi, true);
     if (!facts.ethernet.present && !facts.wifi.present) {
         net.rows.push_back(one("Network", facts.web_address.empty() ? "none" : facts.web_address,
@@ -575,41 +575,41 @@ struct Confirm {
 [[nodiscard]] inline Confirm confirm_text(const Facts& facts, Preference target) {
     Confirm confirm;
     const auto where_now = [&](const NetInterface& to) {
-        return " The board is " + std::string(facts.active == "ethernet" ? "on the cable" : "on Wi-Fi") +
+        return " The board is " + std::string(facts.active == "ethernet" ? "on wired" : "on Wi-Fi") +
                " now: this page's address changes" + (to.address.empty() ? "." : " to " + to.address + ".");
     };
     switch (target) {
         case Preference::automatic:
-            confirm.headline = "Use auto?";
-            confirm.detail = "The cable when it is linked, Wi-Fi when it is not. Both stay on.";
+            confirm.headline = "Use automatic?";
+            confirm.detail = "Wired when it is linked, Wi-Fi when it is not. Both stay on.";
             return confirm;
         // The board keeps a pin only once the interface it names holds an address, and brings it up
         // itself if it is off now (a pin to the other one switches it off): so an interface that is
         // off is not a reason to refuse, and a switched-on one with nothing to answer it is.
         case Preference::ethernet:
-            confirm.headline = "Use the cable only?";
+            confirm.headline = "Use wired only?";
             confirm.detail = "Wi-Fi is switched off.";
             if (facts.ethernet.enabled && !facts.ethernet.link) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
-                confirm.detail = "No cable is linked, so the board would be cut off: it refuses.";
+                confirm.detail = "Wired has no link, so the board would be cut off: it refuses.";
             } else if (!facts.ethernet.enabled) {
-                confirm.detail += " The cable is brought up first, and Wi-Fi stays on until it holds an address.";
+                confirm.detail += " Wired is brought up first, and Wi-Fi stays on until it holds an address.";
             } else if (facts.active != "ethernet") {
                 confirm.detail += where_now(facts.ethernet);
             }
             return confirm;
         case Preference::wifi:
             confirm.headline = "Use Wi-Fi only?";
-            confirm.detail = "The cable is switched off.";
+            confirm.detail = "Wired is switched off.";
             if (!facts.wifi.configured) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
                 confirm.detail = "No Wi-Fi network is stored, so the board would be cut off: it refuses.";
             } else if (!facts.wifi.enabled) {
-                confirm.detail += " Wi-Fi is joined first, and the cable stays on until it holds an address.";
+                confirm.detail += " Wi-Fi is joined first, and wired stays on until it holds an address.";
             } else if (facts.wifi.address.empty()) {
-                confirm.detail += " Wi-Fi has no address yet: if it cannot join, the board keeps the cable.";
+                confirm.detail += " Wi-Fi has no address yet: if it cannot join, the board keeps wired.";
             } else if (facts.active != "wifi") {
                 confirm.detail += where_now(facts.wifi);
             }
@@ -622,7 +622,7 @@ struct Confirm {
 [[nodiscard]] inline std::string net_change_text(NetChange state, std::string_view word) {
     switch (state) {
         case NetChange::working:
-            return "Switching to " + std::string(word == "wifi" ? "Wi-Fi" : word == "ethernet" ? "the cable" : "auto") + "...";
+            return "Switching to " + std::string(word == "wifi" ? "Wi-Fi" : word == "ethernet" ? "wired" : "automatic") + "...";
         case NetChange::done:
             return "Done.";
         case NetChange::refused:

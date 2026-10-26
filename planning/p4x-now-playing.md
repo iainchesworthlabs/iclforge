@@ -282,7 +282,7 @@ clock view reads it.
 **As built** (all in [The time of day](../docs/hearth/sink-esp32-p4.md#the-time-of-day) in the sink's page):
 
 - **The facility** (`firmware/hearth-sink/main/wall_clock.hpp`, a seam like the network beside it):
-  `clock/sntp/` for every build with a Wi-Fi station or a cable (all the hardware: S3, C6, the P4 boards,
+  `clock/sntp/` for every build with a Wi-Fi station or a wired network (all the hardware: S3, C6, the P4 boards,
   the P4X) and `clock/none/` for a build with no network and for QEMU's, which has no time server to ask and
   must not make CI depend on one. lwIP's SNTP client, started when the board holds an address (the address
   event, and a one-second upkeep as well), an hour apart after the first answer.
@@ -407,6 +407,16 @@ rules moves the boards that chose that city and no others. `GET /time-zones` lis
 pieces: 8 KB is never one allocation), and `GET /status`'s `time` object has `zone_name`. The device web page
 offers the same list as a region and a city: it asks the board for the names, and no longer carries a list of 42
 zones of its own, so the page is 50 bytes smaller.
+
+**The string is never shown** (owner, 2026-10-26: a board set through the page before the picker showed
+`AEST-10AEDT,M10.1.0,M4.1.0/3` on the Preferences screen, and once picked read *Melbourne (Australia)*). A zone is read as
+its place (`wallclock::zone_readable`): the name chosen, else the table's place for the exact string (for a string several
+places share, the most populous, written down by the generator as `PREFERRED`: Melbourne for the Australian east coast,
+Berlin for central Europe, New York for the American east), else its offset (*UTC+09:45 (custom)*, with *with daylight
+saving* when the rule has one). The lookup is display only and nothing is stored from it, so Reset preferences still
+keeps what it kept. The Preferences row, the picker's *Now* line and the place it is marked at, `GET /status`'s `time`
+(`zone_place`, `zone_label`) and the device page all read it; `GET /timezone` and `zone` keep the string for tools. The
+page's field for a zone not in the list is never filled in.
 
 **The editors** (`panel/lvgl/prefs_editors.cpp`). A `kText` entry that wants one names it (`Pref::editor`), the sheet
 draws its value as a button, and a tap on it opens the editor over the sheet, with a *Done* of its own. **The times**: a
