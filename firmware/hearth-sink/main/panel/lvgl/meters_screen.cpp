@@ -234,7 +234,7 @@ struct Meter {
     }
 };
 
-// What the analysis needs and the view keeps while it shows: 55 KB of tables and scratch and the 16 KB the ring is read into, in LVGL's heap
+// What the analysis needs and the view keeps while it shows: 63 KB of tables and scratch (the transform's work buffers among them: the panel's stack has no room for them) and the 16 KB the ring is read into, in LVGL's heap
 // (PSRAM on the firmware), given back when the stage is cleared.
 struct Heavy {
     dsp::Analyzer analyzer;

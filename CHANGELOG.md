@@ -27,7 +27,7 @@ See [README.md](README.md) for the project overview and
   the room's channels as the size of the screen and the number of outputs ask: the pair on a small screen or a 2.0 room, the surround sum on a middle one, every output in
   groups on a large one. It is drawn from the player's tap, twenty times a second, only where a bar or a tick moved; a board without a screen of 240 by 240 or without
   the Sendspin player shows the choice greyed with the reason. All of it is compiled only into an image with a panel (the C6 and S3 images grow by the registry's one choice).
-  `LV_INV_BUF_SIZE` is 256 for the sink (the meters invalidate many separate rectangles a frame, and above 32 LVGL redraws the whole glass), and the panel task's stack is 32 KB, in PSRAM.
+  `LV_INV_BUF_SIZE` is 256 for the sink (the meters invalidate many separate rectangles a frame, and above 32 LVGL redraws the whole glass).
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
