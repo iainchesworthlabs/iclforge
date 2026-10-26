@@ -56,6 +56,12 @@ target_include_directories(meters_options PRIVATE ${INCLUDES})
 target_compile_definitions(meters_options PRIVATE "PREVIEW_FONT_DIR=\"${MAIN}/panel/fonts\"")
 target_link_libraries(meters_options PRIVATE lvgl)
 
+add_executable(meters_adaptive adaptive.cpp "${REPO}/libs/render/src/spatial.cpp")
+target_compile_features(meters_adaptive PRIVATE cxx_std_23)
+target_include_directories(meters_adaptive PRIVATE ${INCLUDES})
+target_compile_definitions(meters_adaptive PRIVATE "PREVIEW_FONT_DIR=\"${MAIN}/panel/fonts\"")
+target_link_libraries(meters_adaptive PRIVATE lvgl)
+
 add_executable(meters_tune tune.cpp "${REPO}/libs/render/src/spatial.cpp")
 target_compile_features(meters_tune PRIVATE cxx_std_23)
 target_include_directories(meters_tune PRIVATE ${INCLUDES})

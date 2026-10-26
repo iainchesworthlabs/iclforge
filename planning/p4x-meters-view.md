@@ -1,6 +1,6 @@
 # The Meters view: an instrument display for the no-lyrics screen
 
-!!! note "Status as of 2026-10-25: stage 1, options and costs; nothing is built into the firmware, and the owner has not picked"
+!!! note "Status as of 2026-10-26: stage 1, round 2 (an adaptive layout); nothing is built into the firmware, and the owner has not picked"
     The owner, who turned down all seven speakers options, gave a reference instead: the displays of RME's audio
     interfaces (the ADI-2/4 Pro SE and the Fireface UCX II), *"another screen preference would be something like this"*.
     This page is the prototype of that as a new choice of what the screen shows without lyrics, **Meters**: what it
@@ -10,6 +10,112 @@
     `meters_options/spectrum.hpp` (the code the board would run). **Not run on a board.** Pictures:
     `planning/p4x-meters-options/overview-1024x600.png`, `overview-480x320.png` and `overview-240x240.png` (A, B and C side by side,
     a row a room); the measurements are `measure-inv32.csv`, `measure-inv128.csv` and `measure-inv256.csv` beside them.
+
+    **Round 2 (2026-10-26).** The owner saw round 1 (*"a good start but not quite there"*) and asked for an **adaptive layout
+    system** instead of one design: the representation chosen from the display's size class and the number of outputs of
+    the room. [Round 2](#round-2-an-adaptive-layout) is that rule, with a picture of every cell. Round 1's A is now the
+    `pair`, its B the `flat` and `grid`, and its C is dropped (it is three analyses and is in neither reference).
+
+## Round 2: an adaptive layout
+
+The 31-band spectrum of the main mix is the same under every representation and always on top; what changes is **how the channels
+under it are shown**, which has to survive a 240 x 240 screen with two meters and a 1024 x 600 one with sixteen. The prototype is
+`firmware/hearth-sink/preview/meters_options/adaptive.cpp`; every picture below is from it, through LVGL's software renderer, over
+the same made-up groove (2.0 and a stereo PCM stream, 5.1, 7.1.4 with flying objects, 5.1 played on a 9.1.6 room), and **none of it has
+run on a board**. The audio path is the one tap of round 1: a mono mix of the rendered outputs. Everything new reads the per-output
+peaks that already exist (every 50 ms), so it adds nothing to the audio path.
+
+### The representations
+
+| Name | What it shows |
+|---|---|
+| `pair` | A **stereo L/R master**: the room's own L and R in a 2.0 room, **the stereo downmix of the room** (L + 0.5 C + 0.5 Ls, powers) in a bigger one, two horizontal bars with a peak tick and the numeric peak, and a status line. |
+| `none` | No meters: a line of text (the layout, the rate, the held peak). |
+| `sum` | The **surround sum**: six bars, **L C R LFE Ls Rs**, whatever the room is: an output is folded into the master channel nearest its azimuth (a 7.1.4 room's rear speakers and heights go to the side they are on), the level the power sum of its members' peaks. |
+| `top4`, `top6`, `top8` | A **fixed number of bars bound to the loudest active channels**, the name under each changing when its binding does (rules below). |
+| `mx` | A **micro matrix laid out like the room**: one square for each output, on a top-down map (front at the top, the ear-level speakers on an ellipse by azimuth, the heights on an inner one, a ceiling speaker in the middle, the LFE behind), its colour the level (dark, green by -18 dB, amber by -6, red at full scale), its name inside when it fits. |
+| `mxg` | The same squares in a **plain grid** of n. |
+| `flat` | A bar for **every output**, in the room's order. |
+| `grid` | A bar for every output, **grouped in space**: Front (with wides) / Surround / Rear / Height / LFE, a gap and a caption between groups, the numeric peak above each bar. |
+| `focus` | **One channel larger**: its name, its meter and its number at the left, **its own spectrum** above, the other channels small beside it with the chosen one on a plate. A tap on a channel anywhere else focuses it; a tap on the plate returns. While it is focused the tap that feeds the spectrum is the one output's, not the sum (**no second analysis**: the same ring, the same 101 kflops, a different input). |
+
+### The rule
+
+It reads two things from the board's capabilities, never its name: **`display.width`** (the size class) and **the number of connected outputs**.
+
+| Size class | 2.0 | 5.1 | 7.1.4 | 9.1.6 |
+|---|---|---|---|---|
+| **L**: width at least 800 (1024 x 600 stage 1024 x 472, 800 x 480) | `pair` | `grid` | `grid` | `grid` |
+| **M**: 400 to 799 (480 x 320, stage 480 x 216) | `pair` | `sum` | `sum` | `sum` |
+| **S**: under 400 (240 x 240, stage 240 x 144) | `pair` | `pair` | `pair` | `pair` |
+
+Every cell has a still in the shared notes folder (`meters-view-options-2/cells/`, and all of them in `cells-overview.png`); the cell of a room with two outputs
+is a pair everywhere because there is nothing to fold. At **L** the spectrum is stacked on top and the grouped multi-channel meters
+at the bottom (the owner's *"that's probably how we'd do it"*): 6, 12 or 16 bars with their names and numbers. At **M** the six masters are what fits,
+the heights folded into their sides so the spatial spread is still visible. At **S** two thin bars under the spectrum.
+
+**Why these, from the pictures:**
+
+- **S, `pair` or `none`?** `pair` reads better. Two 8 px bars take 20 px under the spectrum where the line of text of `none` takes 17, so the spectrum is 3 px shorter, and
+  two thin bars are **not** the chaotic texture the owner expects of more than two; they give the left/right balance and the **clip warning** (amber, red)
+  that a number alone does not, and the stereo downmix stays honest in a bigger room. `none` is calmer and cheaper (0.11 to 0.13 Mpx/s against 0.16 to 0.17, 41 objects against 53), and
+  is the choice for a person who wants only the spectrum; both are in `overview-240x240-pair-or-none.png`.
+- **M, `sum`, `top6`, `mx` or `mxg`?** `sum` is the one that reads: six fixed names, six bars, the same at 5.1 and 9.1.6 (a 5.1 room's six are all
+  real channels). `top6` works but the names move (7 to 35 changes a minute, below) and a person has to read them each time. `mxg` (12 or 16 coloured squares
+  with names in them) reads well and is the cheapest (0.19 to 0.31 Mpx/s against 0.31 to 0.48). `mx` as a room map is **too small at 480**: squares of 14 to 20 px with no names. It is a good
+  second choice for a person who wants the spatial picture and the least drawing.
+- **L, `grid`, `top8`, `mx`?** `grid` shows every output with its name and its number in its place in space, which is what a room of 12 or 16 has to say;
+  `top4` and `top8` show the channels that matter now but not the ones that are quiet (a quiet height speaker is information too); `mx` is **half the pixels**
+  (0.8 to 1.0 Mpx/s against 1.2 to 1.8) and shows the room, but a colour is harder to read to a decibel than a bar with a number.
+- **`focus`** is worth having at every size above S: the tap on a bar is the only way to see one channel's spectrum, and it costs no more than a spectrum.
+
+### Keeping the top-N bars still
+
+A label that changes is a flicker unless it is rare. The rule (`Binder` in `adaptive.cpp`): the choice is made on each channel's **envelope** (a peak that falls 24 dB a second); a slot **keeps its channel for at least a second**;
+a channel that is not bound **takes the place of the weakest bound one only after it has been louder by 6 dB for 0.4 s**; a bound channel **silent (under -50 dB) for two seconds** frees its slot and the bar says "-"; a label
+changes **only** at a rebinding and the new bar starts from its channel's level with its hold cleared. Changes of a binding in a minute of the groove (`measure-adaptive-inv256.csv`):
+
+| Room | top4 with the rule | top4 without | top8 with | top8 without |
+|---|---|---|---|---|
+| 5.1 | 7 | 417 | 6 | 6 |
+| 7.1.4 (objects moving) | 20 | 830 | 34 | 1,291 |
+| 9.1.6 (a 5.1 stream) | 17 | 931 | 34 | 1,611 |
+
+Without it the bars rebind 14 to 27 times a second (a top-N that is just the loudest N of each step); with it, once in two to ten seconds. `top6` on the 480 screen is 0 to 35 a minute.
+
+### What the pictures cost
+
+Pixels LVGL flushed, a minute of each, 20 updates a second, `LV_INV_BUF_SIZE` 256 (the exact part of what a view costs; the speakers view is 0.02 to 0.17 Mpx/s):
+
+| Representation | 1024 x 600 | 480 x 320 | 240 x 240 | Objects at 1024 | Heap at 1024 |
+|---|---|---|---|---|---|
+| `pair` | 1.8 to 2.0 Mpx/s | 0.48 to 0.52 | 0.16 to 0.17 | 116 | 37 to 51 KB |
+| `none` | | | 0.11 to 0.13 | | |
+| `sum` | 1.3 to 1.9 | 0.31 to 0.48 | | 140 | 44 to 47 KB |
+| `grid` | 1.2 to 1.8 | | | 114 to 220 | 57 to 87 KB |
+| `flat` | 1.4 to 2.0 | | | 112 to 210 | 35 to 66 KB |
+| `top4` / `top8` / `top6` | 1.4 to 1.6 / 1.4 to 2.1 / | 0.33 to 0.47 (top6) | | 112 to 154 | 35 to 49 KB |
+| `mx` | **0.8 to 1.0** | 0.19 to 0.24 | | 127 to 155 | 45 to 53 KB |
+| `mxg` | 0.85 to 1.2 | 0.19 to 0.31 | | 127 to 155 | 39 to 51 KB |
+| `focus` | 1.1 to 1.35 | 0.27 to 0.36 | | 115 to 199 | 46 to 62 KB |
+
+The zone-coloured spectrum (below) has the same pixels as the red one and **62 more objects** (three rectangles a bar: 178 against 116 for `pair`; 55 KB).
+
+**The added work of the new parts** (one step of 50 ms, this computer; the P4 is 20 to 40 times slower at transcendental floats, which still leaves them far under 0.1% of the step):
+the surround sum of 16 outputs into 6 channels 0.63 us, the stereo downmix 0.80 us, the top-N selection 0.2 us, the colours of 16 squares 0.26 us. **They read the per-output peaks that exist already, so the audio path
+stays the one tap**; with `focus` that tap is one output's instead of the sum, which is cheaper. Round 1's other costs stand: the analysis 101 kflops a step, the LVGL work on the P4 unmeasured,
+`LV_INV_BUF_SIZE` 256, the 16 KB ring.
+
+### The spectrum's colour
+
+Two stills put the owner's open question side by side: the accent red (every other picture) against **green, amber and red zones in the bars** (green under -30 dB, amber to -15, red above, the colours of the meters): `1024x600_5-1_pair-z` and
+`480x320_5-1_sum-z` (and `overview-1024x600-c-focus-and-zone-colours.png`, `overview-480x320-b-pair-focus-zone-colours.png`). The range (-60 to 0 dB) and the rate (20 or 10 updates a second; 10 halves every figure above) are as drawn; both are still the owner's.
+
+### Recommendation (round 2)
+
+**The rule above**: `pair` on the small screen, `sum` on the middle one, `grid` on the large one (`pair` in a 2.0 room everywhere), the spectrum always on top, and **`focus` on a tap** at M and L. Keep **`mx`** as the second choice
+for a room of 12 or more at L and M (it is half the pixels), and **`top4`/`top8` only if a screen is ever too small for the six masters**: its labels move and its rule has to be explained. The price is round 1's: **1.2 to 2.0 Mpx/s at L**, LVGL's CPU on the P4 (the thing to measure first on the kit),
+`LV_INV_BUF_SIZE` 256.
 
 ## What the references show
 
@@ -138,7 +244,7 @@ speakers view's tuning follows that serial, so the window cannot simply be halve
 3. **The range:** -60 to 0 dB as drawn; the ADI-2 also offers -80 to -20, which could be a setting.
 4. **The rate:** 20 updates a second as drawn, or 10 (half the pixels and half the LVGL work, steppier meters).
 
-## Recommendation
+## Recommendation of round 1 (superseded by the rule above)
 
 **One Meters view that picks its own layout: A when the room has two outputs, B when it has more**, and A alone at 240 x 240. It is the ADI-2's picture for a stereo stream and the Fireface's
 for a room, from **one analysis** (1.4 to 3.7% of a core, estimated), one 16 KB ring and a tap that costs the audio path a few percent of what its meter already does. **Not C:**
