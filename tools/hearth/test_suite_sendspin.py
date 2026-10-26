@@ -209,6 +209,14 @@ class Command(unittest.TestCase):
         self.assertEqual(argv[argv.index("--seconds") + 1], "20")
         self.assertNotIn("--seconds", self.argv())
 
+    def test_a_tone_is_played_as_pcm_for_so_long_and_names_no_file(self) -> None:
+        argv = self.argv(seconds=90, tone=True)
+        self.assertIn("--pcm", argv)
+        self.assertIn("--tone", argv)
+        self.assertEqual(argv[argv.index("--seconds") + 1], "90")
+        self.assertNotIn("--play", argv)
+        self.assertNotIn("--pcm", self.argv())
+
     def test_a_board_that_holds_the_record_is_not_asked_to_pair_and_the_board_is_not_polled(
         self,
     ) -> None:

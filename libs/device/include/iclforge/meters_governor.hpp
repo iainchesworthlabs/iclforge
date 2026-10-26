@@ -49,7 +49,9 @@ struct GovernorStats {
 
 class RateGovernor {
    public:
-    explicit RateGovernor(const GovernorLimits& limits = {}) noexcept : limits_(limits), dwell_us_(limits.dwell_us) {}
+    // Not explicit: a member of an aggregate is made from `{}`, which an explicit constructor does not allow.
+    RateGovernor() noexcept : RateGovernor(GovernorLimits{}) {}
+    explicit RateGovernor(const GovernorLimits& limits) noexcept : limits_(limits), dwell_us_(limits.dwell_us) {}
 
     // The step to the next update, in microseconds.
     [[nodiscard]] std::int64_t step_us() const noexcept { return slow_ ? kSlowStepUs : kFastStepUs; }

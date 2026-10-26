@@ -182,6 +182,7 @@ def command(
     use_code: bool = True,
     poll_status: bool = False,
     seconds: int | None = None,
+    tone: bool = False,
 ) -> list[str]:
     argv = [
         str(testserver),
@@ -197,9 +198,12 @@ def command(
         f"ws://{host}:{port}/sendspin",
         "--label",
         label,
-        "--play",
-        str(programme),
     ]
+    if tone:
+        # two tones, as PCM over player@v1, for `seconds`: the stereo PCM path beside the coded one
+        argv += ["--pcm", "--tone"]
+    else:
+        argv += ["--play", str(programme)]
     if seconds:
         # a three-frame file is not a stream: the server plays it over and over for this long
         argv += ["--seconds", str(seconds)]
@@ -261,6 +265,7 @@ def run_row(
     connect_s: int = 60,
     log_wait_s: float = 8.0,
     seconds: int | None = None,
+    tone: bool = False,
 ) -> SendspinRun:
     """One programme sent to the board by the test server, and what came of it. The server's exit
     status and report, and the board's own totals line from its log, are what it returns."""
@@ -279,6 +284,7 @@ def run_row(
             connect_s,
             use_code=use_code,
             seconds=seconds,
+            tone=tone,
         )  # fmt: skip
         stop = threading.Event()
         relay = threading.Thread(
@@ -457,6 +463,7 @@ def play_row(
     relay_every: float = 0.4,
     log_wait_s: float = 8.0,
     seconds: int | None = None,
+    tone: bool = False,
 ) -> SendspinRun:
     """One row: by the record where the board holds the suite's, by a code where it does not. A
     record the board does not take (the server's own copy was lost) is forgotten and the row is
@@ -468,6 +475,7 @@ def play_row(
         "relay_every": relay_every,
         "log_wait_s": log_wait_s,
         "seconds": seconds,
+        "tone": tone,
     }
     held = ours_in(pairing_ids(board.pairing()))
     run = run_row(
