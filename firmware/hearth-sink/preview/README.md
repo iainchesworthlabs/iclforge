@@ -42,6 +42,12 @@ program's output converted to PNG.
 responsive glow and the pulse style drawn over a synthetic groove in 2.0, 5.1, 7.1.4 and 9.1.6 as stills and frame
 sequences, with the pixels each flushes counted, and `speakers_tune`, which chooses the glow's constants without LVGL.
 
+`meters_options/` is a project of its own for the Meters view (planning/p4x-meters-view.md): `meters_options` draws the first round's
+three variants and `meters_adaptive` the rule that picks a representation from the display's size and the room's outputs (every size
+class in every room, as stills and frame sequences, with the pixels each flushes counted at three sizes of LVGL's invalid-area table), and
+`meters_tune` holds the spectrum analysis (`iclforge/dsp/spectrum.hpp`, the code a board runs) to a sine, to noise and to one long FFT and
+prices it. They run on the made-up groove of `speakers_options/scene.hpp`.
+
 ## Scripted taps
 
 `panel_preview --drive` is the same screen code with a **virtual pointer** and no scenarios of its own: it reads a command a
