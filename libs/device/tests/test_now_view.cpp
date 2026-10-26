@@ -32,6 +32,8 @@ TEST_CASE("now_view: a view is read with or without a line ending, and nothing e
     CHECK(nv::parse_view("speakers\n") == nv::View::kSpeakers);
     CHECK(nv::parse_view("  off\r\n") == nv::View::kOff);
     CHECK(nv::parse_view("dark\n") == nv::View::kDark);
+    CHECK(nv::parse_view("meters\n") == nv::View::kMeters);
+    CHECK_FALSE(nv::parse_view("Meters").has_value());
     CHECK_FALSE(nv::parse_view("Dark").has_value());
     CHECK_FALSE(nv::parse_view("dark screen").has_value());
     CHECK_FALSE(nv::parse_view("").has_value());
@@ -48,11 +50,14 @@ TEST_CASE("now_view: the stored numbers are the ones written down, and a number 
     CHECK(static_cast<int>(nv::View::kClock) == 2);
     CHECK(static_cast<int>(nv::View::kOff) == 3);
     CHECK(static_cast<int>(nv::View::kDark) == 4);
+    CHECK(static_cast<int>(nv::View::kMeters) == 5);
     CHECK(nv::view_from_stored(0) == nv::View::kSpeakers);
     CHECK(nv::view_from_stored(3) == nv::View::kOff);
     CHECK(nv::view_from_stored(4) == nv::View::kDark);
+    CHECK(nv::view_from_stored(5) == nv::View::kMeters);
+    CHECK(std::string(nv::view_name(nv::View::kMeters)) == "meters");
     CHECK_FALSE(nv::view_from_stored(-1).has_value());
-    CHECK_FALSE(nv::view_from_stored(5).has_value());
+    CHECK_FALSE(nv::view_from_stored(6).has_value());
 }
 
 TEST_CASE("now_view: the two speakers styles, their words and their stored numbers", "[now_view]") {

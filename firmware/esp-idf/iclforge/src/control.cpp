@@ -485,7 +485,7 @@ struct Control::Impl {
             "GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; "
             "PUT one "
             "to change it\n"
-            "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT "
+            "GET  /now-playing   speakers, title, clock, meters, off or dark on a board with a screen; PUT "
             "one to change it\n"
             "GET  /dim-after     never, or minutes until that screen dims, on a board with a "
             "screen; PUT one\n"
@@ -966,7 +966,7 @@ struct Control::Impl {
         auto& h = self(req)->handlers;
         const std::string body = read_body(req);
         if (!nowview::parse_view(body)) {
-            return send_text(req, "400 Bad Request", "PUT /now-playing wants speakers, title, clock, off or dark\n");
+            return send_text(req, "400 Bad Request", "PUT /now-playing wants speakers, title, clock, meters, off or dark\n");
         }
         if (!h.set_now_playing) {
             return send_text(req, "409 Conflict", "this board has no screen\n");

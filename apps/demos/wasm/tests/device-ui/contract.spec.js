@@ -752,6 +752,16 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         expect(reply.status).toBe(200);
         expect(await reply.text()).toBe(REPLIES.nowPlayingOk);
         expect(await (await fetch(`${stub.url}now-playing`)).text()).toBe('off\n');
+        // The Meters view is a word the route knows (the 400's sentence names it), and a build that has not got the screen for it refuses it
+        // as it does the title card; one that has takes it.
+        expect(REPLIES.nowPlayingBad).toContain('meters');
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'meters' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingRefused);
+        stub.device.screen.views.push('meters');
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'meters\n' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}now-playing`)).text()).toBe('meters\n');
         // And a time to dim after: never, or minutes from 1 to 240.
         expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('5\n');
         for (const bad of ['soon', '0', '241', '-5', '5 min', '']) {

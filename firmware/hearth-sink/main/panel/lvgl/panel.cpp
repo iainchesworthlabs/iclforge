@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -47,6 +48,7 @@
 #include "dev_info.hpp"
 #include "display.hpp"
 #include "lyric_screen.hpp"
+#include "meters_screen.hpp"
 #include "now_screen.hpp"
 
 namespace player {
@@ -287,6 +289,21 @@ int backlight_lit_percent() { return effective_backlight(kBacklightNormalPercent
 iclforge::prefs::Backend& preferences_backend() { return player::preferences(); }
 
 std::int64_t time_us() { return esp_timer_get_time(); }
+
+iclforge::meters::MeterTap& meters_tap() {
+    // Made the first time the Meters view is built, in LVGL's heap (PSRAM: 32 KB of ring), and handed to the player once: it is asked for blocks
+    // only while the view shows (MeterTap::set_wanted).
+    static iclforge::meters::MeterTap* const tap = [] {
+        void* const memory = lv_malloc(sizeof(iclforge::meters::MeterTap));
+        if (memory == nullptr) {
+            std::abort();
+        }
+        auto* const made = new (memory) iclforge::meters::MeterTap(+[]() noexcept -> std::uint64_t { return static_cast<std::uint64_t>(esp_timer_get_time()); });
+        sendspin_set_block_tap(made);
+        return made;
+    }();
+    return *tap;
+}
 
 int demo_mode() { return g_demo.load(); }
 

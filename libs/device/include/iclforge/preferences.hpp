@@ -362,10 +362,22 @@ namespace detail {
     return screen.available ? needs_clock(caps) : screen;
 }
 
-inline constexpr std::array<ChoiceDef, 5> kNowViewChoices{{
+// The Meters view draws a spectrum and the room's levels from what the Sendspin player plays, on a screen of at least 240 by 240.
+[[nodiscard]] inline Availability needs_meters(const BoardCaps& caps) {
+    if (!caps.has_screen()) {
+        return Availability::no("This board has no screen.");
+    }
+    if (caps.display.width < 240 || caps.display.height < 240) {
+        return Availability::no("The meters need a screen of at least 240 by 240.");
+    }
+    return caps.sendspin ? Availability::yes() : Availability::no("This build has no Sendspin player, so there is nothing to meter.");
+}
+
+inline constexpr std::array<ChoiceDef, 6> kNowViewChoices{{
     {.id = "speakers", .label = "Speakers"},
     {.id = "title", .label = "Title"},
     {.id = "clock", .label = "Clock", .availability = &needs_clock},
+    {.id = "meters", .label = "Meters", .availability = &needs_meters},
     {.id = "dark", .label = "Dark", .availability = &needs_touch},
     {.id = "off", .label = "Off"},
 }};
@@ -484,6 +496,7 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
         case nowview::View::kSpeakers:
         case nowview::View::kTitle:
         case nowview::View::kClock:
+        case nowview::View::kMeters:
             break;
     }
     return {};
@@ -566,11 +579,11 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
 }
 
 // The speakers are what the Speakers, Title and Dark views show (the Title view stands on them until a server says a
-// title); the Clock view and the old sentence draw none.
+// title); the Clock view, the Meters view and the old sentence draw none.
 [[nodiscard]] inline std::string speakers_style_inert(const Backend& backend) {
     const nowview::View view = backend.now_view();
-    if (view == nowview::View::kClock || view == nowview::View::kOff) {
-        return std::string("Not used by the ") + (view == nowview::View::kClock ? "Clock" : "Off") +
+    if (view == nowview::View::kClock || view == nowview::View::kOff || view == nowview::View::kMeters) {
+        return std::string("Not used by the ") + (view == nowview::View::kClock ? "Clock" : view == nowview::View::kMeters ? "Meters" : "Off") +
                " view: it draws no speakers.";
     }
     return {};

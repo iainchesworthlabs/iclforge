@@ -49,7 +49,7 @@ const REPLIES = {
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
         'GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; PUT one to change it',
-        'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
+        'GET  /now-playing   speakers, title, clock, meters, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
         'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
         'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
@@ -116,7 +116,7 @@ const REPLIES = {
         'that preference could not be set: wifi needs a WiFi network stored, and the board may be busy joining one\n',
     networkPreferenceOk: 'ok; takes effect in a moment, and is not kept if the interface it names does not come up\n',
     noScreen: 'this board has no screen\n',
-    nowPlayingBad: 'PUT /now-playing wants speakers, title, clock, off or dark\n',
+    nowPlayingBad: 'PUT /now-playing wants speakers, title, clock, meters, off or dark\n',
     nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
     nowPlayingOk: 'ok; the screen follows at once\n',
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
@@ -593,6 +593,7 @@ const PREFERENCES = [
             ['speakers', 'Speakers'],
             ['title', 'Title'],
             ['clock', 'Clock'],
+            ['meters', 'Meters'],
             ['dark', 'Dark'],
             ['off', 'Off'],
         ],
@@ -1809,7 +1810,7 @@ async function startStub() {
                 return send(res, 200, device.screen.view + '\n');
             case 'PUT /now-playing': {
                 const word = body.trim();
-                if (!['speakers', 'title', 'clock', 'off'].includes(word)) {
+                if (!['speakers', 'title', 'clock', 'meters', 'dark', 'off'].includes(word)) {
                     return send(res, 400, REPLIES.nowPlayingBad);
                 }
                 if (!device.screen) {

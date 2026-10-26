@@ -386,9 +386,40 @@ TEST_CASE("a stepper skips the stops its board cannot take", "[preferences]") {
     REQUIRE(*prefs::step_target(entry, -1) == "1");
 }
 
+TEST_CASE("the Meters choice needs a screen of 240 by 240 and the Sendspin player, and says why it is greyed", "[preferences]") {
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        const prefs::Entry view = prefs::resolve(*prefs::find("now-view"), backend, variant.caps);
+        const prefs::ChoiceState* const meters = choice_of(view, "meters");
+        REQUIRE(meters != nullptr);
+        const bool big_enough = variant.caps.display.width >= 240 && variant.caps.display.height >= 240;
+        if (!variant.caps.has_screen()) {
+            // No screen: the whole entry is greyed, and the choice with it.
+            REQUIRE_FALSE(meters->availability.available);
+            continue;
+        }
+        REQUIRE(meters->availability.available == (big_enough && variant.caps.sendspin));
+        if (!big_enough) {
+            REQUIRE(contains(meters->availability.reason, "240 by 240"));
+        } else if (!variant.caps.sendspin) {
+            REQUIRE(contains(meters->availability.reason, "Sendspin"));
+        }
+        // The rest of the views are as they were.
+        REQUIRE(choice_of(view, "speakers")->availability.available);
+    }
+    // The kit shows it, and the speakers style has nothing to do while it does.
+    FakeBackend kit(iclforge::variants::p4_rev3_kit());
+    REQUIRE(prefs::set_value(kit, *prefs::find("now-view"), "meters").ok);
+    REQUIRE(kit.view_ == nv::View::kMeters);
+    const std::string why = prefs::find("speakers-style")->inert(kit);
+    REQUIRE(contains(why, "Meters"));
+    REQUIRE(why.back() == '.');
+}
+
 TEST_CASE("setting a choice goes to the board and reads back", "[preferences]") {
     FakeBackend backend(iclforge::variants::p4_rev3_kit());
-    for (const auto* id : {"clock", "dark", "title", "off", "speakers"}) {
+    for (const auto* id : {"clock", "dark", "title", "off", "speakers", "meters"}) {
         const prefs::SetResult result = prefs::set_value(backend, *prefs::find("now-view"), id);
         INFO(id);
         REQUIRE(result.ok);

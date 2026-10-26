@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 
+#include "iclforge/meters_tap.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/preferences.hpp"
 #include "iclforge/render/room_plan.hpp"
@@ -128,6 +129,10 @@ void set_backlight(int percent);
 // The preferences' side of this board (iclforge/preferences.hpp): what the Preferences sheet reads and sets, stored
 // (settings.hpp) and followed at once, as PUT /now-playing, PUT /dim-after and the rest do.
 [[nodiscard]] iclforge::prefs::Backend& preferences_backend();
+
+// The player's output as the Meters view takes it (iclforge/meters_tap.hpp): a mono mix in a ring and each output's peak over 50 ms. The firmware's is made
+// the first time it is asked for, in LVGL's heap, and handed to the player (sendspin_set_block_tap); the screen asks for blocks while it shows.
+[[nodiscard]] iclforge::meters::MeterTap& meters_tap();
 
 // A monotonic clock, microseconds.
 [[nodiscard]] std::int64_t time_us();

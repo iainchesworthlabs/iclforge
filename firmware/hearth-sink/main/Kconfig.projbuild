@@ -1066,8 +1066,11 @@ config ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY
 
 config ICLFORGE_EXAMPLE_PANEL_STACK_BYTES
     int "Stack of the panel's task, bytes (PSRAM)"
-    default 16384
+    default 32768
     range 8192 65536
+    help
+        The Meters view's analysis runs here and keeps 8 KB of a transform's scratch on the stack
+        (iclforge/dsp/spectrum.hpp), with LVGL's own drawing under it.
 
 config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
     int "Rows of the partial render buffers (two, PSRAM)"
