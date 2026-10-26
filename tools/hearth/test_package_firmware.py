@@ -138,6 +138,21 @@ class Package(unittest.TestCase):
             packager.package(build, "hearth-sink-esp32s3", self.out)
         self.assertFalse(self.out.exists())
 
+    def test_a_build_that_serves_its_screen_over_http_is_refused(self) -> None:
+        build = fixture.make_build(
+            self.root / "p4", target="esp32p4", min_rev=301, max_rev=399, capture_port="8081"
+        )
+        with self.assertRaisesRegex(packager.PackageError, "serves its screen on port 8081"):
+            packager.package(build, "hearth-sink-esp32p4-rev3", self.out)
+        self.assertFalse(self.out.exists())
+
+    def test_a_build_with_the_screen_server_off_is_packaged(self) -> None:
+        build = fixture.make_build(
+            self.root / "p4", target="esp32p4", min_rev=301, max_rev=399, capture_port="0"
+        )
+        fragment = packager.package(build, "hearth-sink-esp32p4-rev3", self.out)
+        self.assertEqual(fragment["name"], "hearth-sink-esp32p4-rev3")
+
     def test_an_image_for_another_chip_than_the_build_is_refused(self) -> None:
         app = fixture.app_image(fixture.CHIP_IDS["esp32c6"], "v0.11.0")
         build = fixture.make_build(self.root / "s3", app=app)

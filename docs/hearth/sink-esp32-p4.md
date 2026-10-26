@@ -997,7 +997,12 @@ clipped, a control is smaller than a fingertip or sticks out of its sheet, a tap
 answers one.
 
 **On a P4 with no panel** (`sdkconfig.panel-null`): LVGL draws into a frame buffer in PSRAM, and a
-second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 for none) serves it:
+second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 for none) serves it.
+**That server has no authentication** (anyone on the network can read the screen and press its buttons), so
+**a released image does not start it**: the port is 0 in the release profiles (`p4-rev3` locks it) and in the
+Kconfig default, and `package_firmware.py` refuses a build with any other. An image that is run on a bench
+turns it on with the `panel-capture` overlay (`sink_profile.py defaults p4-rev3 --overlay panel-capture`), and
+`panel-null` has it on because that build exists to be read back:
 
 | Request | Answer |
 |---|---|

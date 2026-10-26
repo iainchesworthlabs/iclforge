@@ -184,6 +184,7 @@ someone saying where it lives on every board.
 | A fragment of the profile itself | any key it declares, once, in the profile's order | a locked key a later fragment resets without saying so |
 | `wifi-credentials` (the board's network) | `ICLFORGE_EXAMPLE_WIFI_*` | anything else; the packager already refuses an image with these |
 | `measure` (stage timers, `ICLFORGE_EXAMPLE_AC4_PCM_HASH`, report cadence) | observation keys | placement, sizes, caches, features |
+| `panel-capture` (the screen's read-back and touch server on 8081, which has no authentication) | `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT` | everything else; a release profile locks it at 0 and the packager refuses an image with it on |
 | `qemu-net` (the release shape on QEMU's Ethernet; [below](#2-a-qemu-twin-of-the-release-shape)) | network, sink and source choice, PSRAM mode and `-m` | stacks, rings, caches, features |
 | `ci-*` shapes (today's `sdkconfig.ci*`) | anything: they are tests of code, and are not profiles | they must not be named as a board's image |
 | A scratch overlay (someone's measurement) | whatever it declares | it cannot produce a baseline, and its image reports `+scratch` in its profile id |

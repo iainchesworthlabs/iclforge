@@ -221,6 +221,48 @@ class TheFile(unittest.TestCase):
         names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
         self.assertEqual(names[-1], "sdkconfig.measure")
 
+    def test_a_published_image_does_not_serve_its_screen_over_http(self) -> None:
+        """The screen's read-back and touch server has no authentication: anyone on the network
+        reads the picture and presses the buttons. A profile that names a published image has the
+        port at 0 in what its fragments ask for and in what it locks, so that the image the
+        release builds is the one with no server; a bench that wants it builds with the
+        `panel-capture` overlay, which a release does not."""
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"
+        checked = []
+        for ident, spec in self.data["profiles"].items():
+            if not spec.get("image"):
+                continue
+            checked.append(ident)
+            self.assertEqual(sp.requested(self.data, ident).get(key, "0"), "0", ident)
+            self.assertEqual(spec.get("locked", {}).get(key, "0"), "0", ident)
+        self.assertIn("p4-rev3", checked)
+        self.assertEqual(self.data["profiles"]["p4-rev3"]["locked"][key], "0")
+
+    def test_the_kconfig_default_of_the_screen_server_is_off(self) -> None:
+        text = (sp.PROJECT / "main" / "Kconfig.projbuild").read_text("utf-8")
+        match = re.search(
+            r"^config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT\b.*?^\s+default (\d+)$",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match, "the symbol is not in main/Kconfig.projbuild")
+        self.assertEqual(match.group(1), "0")
+
+    def test_the_panel_capture_overlay_turns_on_the_server_and_nothing_else(self) -> None:
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"
+        spec = self.data["overlays"]["panel-capture"]
+        self.assertEqual(spec.get("fragment"), "panel-capture")
+        asked = sp.parse_config((sp.PROJECT / "sdkconfig.panel-capture").read_text("utf-8"))
+        self.assertEqual(asked, {key: "8081"})
+        self.assertEqual(
+            sp.touched(self.data, ("panel-capture",)), ["ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"]
+        )
+        # Given after the profile's own fragments, so that it wins over the profile's 0.
+        names = sp.fragment_names(self.data, "p4-rev3", ("panel-capture",))
+        self.assertEqual(names[-1], "sdkconfig.panel-capture")
+        self.assertEqual(sp.requested(self.data, "p4-rev3")[key], "0")
+        self.assertEqual(sp.requested(self.data, "p4-rev3", ("panel-capture",))[key], "8081")
+
     def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_the_kit_as_its_board(
         self,
     ) -> None:
