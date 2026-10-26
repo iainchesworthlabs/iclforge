@@ -22,6 +22,7 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/messages.hpp"
+#include "iclforge/block_tap.hpp"
 #include "iclforge/playout.hpp"
 
 // The Sendspin player's audio (planning/hearth-reference-player.md, B3): what
@@ -317,6 +318,11 @@ class BurstPlayer {
     // The player's volume, 0 to 100, and mute: (volume / 100)^1.5, ramped over
     // a block.
     void set_volume(int volume, bool muted);
+
+    // A tap that sees each block of rendered output after the trims and the volume are applied, while it wants to (the Meters view's mix,
+    // iclforge/meters_tap.hpp). Not owned: it outlives the player or is set to null first. With none, or one that does not want blocks, the
+    // path is one pointer load a block.
+    void set_block_tap(BlockTap* tap);
 
     // Something else is about to use the sink: the player drops what it
     // holds and stops writing, and this returns once it has (or after two

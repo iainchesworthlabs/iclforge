@@ -22,6 +22,8 @@ bool sendspin_set_layout(const iclforge::render::OutputLayout& /*layout*/) { ret
 
 void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange /*range*/) {}
 
+void sendspin_set_block_tap(iclforge::BlockTap* /*tap*/) {}
+
 void sendspin_board_changed() {}
 
 void sendspin_name_changed() {}
