@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: the analysis and the rules of a Meters view for the Hearth sink's no-lyrics screen, host-tested and not yet drawn.** An instrument display
+  after the owner's reference, the displays of RME's audio interfaces: a third-octave spectrum of the main mix (31 bands, 20 Hz to 20 kHz, from the newest
+  171 ms of a 48 kHz mono mix, in float32 through the family's FFT, 100 kflops a pass, in `iclforge/dsp/spectrum.hpp`: 0 dB for a full-scale sine, a decibel
+  a band for white noise, the same as one 8,192-point FFT below 800 Hz) and, under it, a representation of the channels chosen from the display's width and
+  the number of outputs (`iclforge/meters_view.hpp`: a stereo master on the small screen, the surround sum on the middle one, every output grouped in
+  space on the large one). The plan, the prototype and the pictures are `planning/p4x-meters-view.md` and `firmware/hearth-sink/preview/meters_options/`.
+  Nothing is wired to a screen or a player yet.
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
