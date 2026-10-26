@@ -421,7 +421,7 @@ frames about to be played to a `BlockTap` (`iclforge/block_tap.hpp`), one pointe
 one is not slow), averages the power over 80 ms, and lets the bars fall at 30 dB a second (meters 24). It does this twenty times a
 second whatever the frame rate, and only a bar or a tick whose pixel moved is redrawn. When the screen is dimmed or another view is
 chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
-tables (about 55 KB, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
+tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
 How fast it runs on the kit, and the protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 
