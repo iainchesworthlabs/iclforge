@@ -1559,13 +1559,15 @@ async function startStub() {
     // each file, firmware/esp-idf/iclforge/tools/gzip_asset.py): a browser decodes it, so the page is what it was.
     const file = (res, name, type) => {
         closing(res);
+        const body = zlib.gzipSync(fs.readFileSync(path.join(UI_DIR, name)), { level: 9 });
         res.writeHead(200, {
             'Content-Type': type,
             'Content-Encoding': 'gzip',
+            'Content-Length': body.length,
             'Cache-Control': 'no-cache',
             'Content-Security-Policy': POLICY,
         });
-        res.end(zlib.gzipSync(fs.readFileSync(path.join(UI_DIR, name)), { level: 9 }));
+        res.end(body);
     };
 
     // A play moves on at each poll, the way a player on its own tasks would
