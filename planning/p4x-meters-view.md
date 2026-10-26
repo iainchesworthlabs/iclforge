@@ -269,7 +269,7 @@ mean since the count began, the largest, and how many.
 | `panel.internal_free`, `internal_free_min`, `internal_largest` | the same for internal RAM, which the decoder and the network share |
 | `meters.showing`, `representation`, `outputs`, `width`, `height` | the Meters view is up now; `pair`, `sum` or `grid`; the outputs of the room; the stage it was built for |
 | `meters.opens`, `open_ms` | times it has been opened since boot, and how long this opening has lasted. **Everything below is since the opening** (and is the last opening's after it is closed) |
-| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the render before it |
+| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the refreshes since the last update (none if no pixel moved: a steady tone is a still picture) |
 | `meters.updates`, `late`, `dropped`, `falls`, `rises` | updates run; those that started more than 15 ms later than the panel's loop could have started them (one 30 fps frame is allowed for); whole steps that went by with none; twenty-to-ten falls and rises |
 | `meters.analysis_us` | the tap read, the transform, the power average and the ballistics |
 | `meters.widgets_us` | setting the bars, ticks and labels that moved (LVGL only invalidates; nothing is drawn yet) |
@@ -286,7 +286,7 @@ rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `wi
 The owner's rule: 20 Hz if possible, else 10 Hz. `iclforge/meters_governor.hpp` (host-tested) is "if possible":
 
 - **Cannot keep up** is judged over the last 20 updates (a second at 20 Hz), never on one: the **average cost** of an update
-  (analysis + widgets + the render before it) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
+  (analysis + widgets + the refreshes since the last update) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
   could have started them**, or a whole step missed. The allowance for lateness is one frame of the panel's loop (33 ms at 30 fps), because a 30 fps
   loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault.
 - **It rises again** only after **10 s** at ten, with the average cost **under 45 % of a fast step (22.5 ms)** and not one late or missed update in
@@ -375,7 +375,7 @@ Each run writes `<row>.samples.json` (a sample a second: the stream's counters a
 | **burst** | the Meters view's mean `burst_us` is at most the speakers view's (glow) plus the larger of 15 % and 250 us |
 | **tap** | the tap costs the audio path at most 150 us a burst up to 8 outputs, 500 us above; and not one history read torn |
 | **rate** | **20 Hz if possible, else a steady 10 Hz** (the owner, 2026-10-26), and the report says which cell holds which. A cell holds 20 Hz if it ran at 20 with no fall. It holds a steady 10 Hz if it fell (or could not hold 20), no more than 1 % of its steps went by with no update, and an update costs at most half of the 100 ms step. Anything else fails: the glass would show a few updates a second |
-| **cost** | an update's mean cost (analysis + widgets + the render before it) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
+| **cost** | an update's mean cost (analysis + widgets + the refreshes since the last update) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
 | **dropped** | at most 1 % of the steps went by with no update (the same 1 % as a steady 10 Hz) |
 | **stack** | the panel task's stack had at least 4 KiB free at its least |
 | **internal** | the internal heap's low point under the Meters view is within 8 KiB of the speakers view's |

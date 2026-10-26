@@ -302,6 +302,8 @@ struct State {
     std::uint64_t last_us = 0;
     std::int64_t due_us = 0;  // when the next update is due (0: the next frame's)
     std::uint32_t analyses = 0;  // updates that read the ring: every other one runs the low half of the analysis at twenty a second
+    // The time LVGL took to refresh since the last update: an update that moved no pixel asks for no refresh, and the one before it is not charged again.
+    std::uint64_t render_since_us = 0;
     // What the view costs (iclforge/panel_stats.hpp), and the rate it holds (iclforge/meters_governor.hpp).
     mv::RateGovernor governor;
     ps::MetersStats stats;
@@ -637,6 +639,7 @@ ps::MetersStats now_meters_stats() { return g.built ? snapshot() : g_last; }
 void now_meters_refresh(std::uint32_t took_us) {
     if (g.built) {
         g.stats.render.add(took_us);
+        g.render_since_us += took_us;
     }
 }
 
@@ -732,6 +735,7 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     if (dimmed) {
         g.last_us = 0;
         g.due_us = 0;
+        g.render_since_us = 0;
         g.governor.restart_window();
         return false;
     }
@@ -775,8 +779,10 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     g.stats.analysis.add(t1 - t0);
     g.stats.widgets.add(t2 - t1);
 
-    // What this update cost the task: its own work, and the refresh the one before it asked for (the one this asks for comes after).
-    const std::int64_t cost = static_cast<std::int64_t>(t2 - t0) + static_cast<std::int64_t>(g.stats.render.last_us);
+    // What this update cost the task: its own work, and the refreshes since the last update, which it asked for (the one this asks for comes after).
+    // None if it moved no pixel: a steady tone is a still picture, and the last refresh's time is not charged to it again.
+    const std::int64_t cost = static_cast<std::int64_t>(t2 - t0) + static_cast<std::int64_t>(g.render_since_us);
+    g.render_since_us = 0;
     const std::int64_t next = g.governor.record(now, cost, late, missed);
     g.due_us = next != step || g.due_us == 0 ? now + next : g.due_us + next * (1 + missed);
     return !g.governor.slow();
