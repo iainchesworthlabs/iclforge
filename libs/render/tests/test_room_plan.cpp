@@ -179,14 +179,15 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
 
 TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, inside it, with no two speakers on each other",
           "[room_plan]") {
-    // The panes the layout sheet draws a room in: the kit's right-hand pane, a medium screen's strip, a 240-pixel
-    // screen's square.
+    // The panes the layout sheet draws a room in: the kit's right-hand pane, an 800 by 480's, a 480 by 320's, and the
+    // strip at the top of a 240-pixel screen.
     struct Pane {
         int width;
         int height;
     };
     std::size_t checked = 0;
-    for (const Pane pane : {Pane{400, 360}, Pane{300, 200}, Pane{200, 120}, Pane{640, 560}}) {
+    for (const Pane pane : {Pane{345, 424}, Pane{400, 360}, Pane{270, 300}, Pane{300, 200}, Pane{161, 170}, Pane{220, 100},
+                            Pane{640, 560}}) {
         for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
             for (const int lfe : {0, 1, 2}) {
                 for (const int height : {0, 2, 4, 6}) {
@@ -220,20 +221,19 @@ TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, ins
     CHECK(checked >= 80);
 }
 
-TEST_CASE("plan_nodes_fit: the room keeps its shape at any size, and an empty pane is an empty room", "[room_plan]") {
+TEST_CASE("plan_nodes_fit: a bigger pane has bigger speakers, and an empty pane is an empty room", "[room_plan]") {
     const auto layout = OutputLayout::parse("5.1");
     REQUIRE(layout.has_value());
     const std::vector<PlanSpot> spots = iclforge::render::plan_spots(*layout);
-    const std::vector<PlanNode> big = iclforge::render::plan_nodes_fit(spots, 640, 560);
-    const std::vector<PlanNode> small = iclforge::render::plan_nodes_fit(spots, 320, 280);
+    const std::vector<PlanNode> big = iclforge::render::plan_nodes_fit(spots, 400, 360);
+    const std::vector<PlanNode> small = iclforge::render::plan_nodes_fit(spots, 200, 180);
     REQUIRE(big.size() == small.size());
     for (std::size_t i = 0; i < big.size(); ++i) {
         INFO(spots[i].name);
-        // Half the size: half the place and half the speaker, give or take a rounded pixel.
-        CHECK(std::abs(small[i].x * 2 - big[i].x) <= 2);
-        CHECK(std::abs(small[i].y * 2 - big[i].y) <= 2);
-        CHECK(std::abs(small[i].w * 2 - big[i].w) <= 2);
+        CHECK(big[i].w > small[i].w);
     }
+    // The screen's own area and style are what they were: 58-pixel speakers.
+    CHECK(planned("5.1").at("C").w == iclforge::render::kPlanEarSize);
     for (const PlanNode& node : iclforge::render::plan_nodes_fit(spots, 0, 100)) {
         CHECK(node.shape == PlanShape::kNone);
     }

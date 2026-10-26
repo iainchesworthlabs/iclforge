@@ -82,6 +82,21 @@ inline constexpr int kPlanHeightSize = 48;
 inline constexpr int kPlanLfeWidth = 84;
 inline constexpr int kPlanLfeHeight = 50;
 
+// The sizes plan_nodes() lays a room out in: the margins the speakers keep from the edge of the area, the speakers' own
+// sizes, how far apart two must be and the step by which two that touch are pushed apart. The defaults are the screen's
+// (1024 pixels wide, speakers of 58); plan_style_for() is the same room in a pane.
+struct PlanStyle {
+    int margin_x = 170;
+    int margin_y = 62;
+    int ear = kPlanEarSize;
+    int height = kPlanHeightSize;
+    int lfe_width = kPlanLfeWidth;
+    int lfe_height = kPlanLfeHeight;
+    int lfe_pitch = 110;
+    int gap = 6;
+    int step = 4;
+};
+
 namespace detail {
 
 [[nodiscard]] inline bool plan_overlap(const PlanNode& a, const PlanNode& b, int gap) {
@@ -92,11 +107,12 @@ namespace detail {
 
 // One node a slot, in slot order. Nodes that would touch are pushed apart (a 9.1.6 room has a ceiling
 // speaker over the listener and a front height next to the centre), and every node stays inside the area.
-[[nodiscard]] inline std::vector<PlanNode> plan_nodes(std::span<const PlanSpot> spots, PlanArea area = {}) {
+[[nodiscard]] inline std::vector<PlanNode> plan_nodes(std::span<const PlanSpot> spots, PlanArea area = {},
+                                                       PlanStyle style = {}) {
     constexpr double kDegrees = 3.14159265358979323846 / 180.0;
     std::vector<PlanNode> nodes(spots.size());
-    const int margin_x = 170;
-    const int margin_y = 62;
+    const int margin_x = style.margin_x;
+    const int margin_y = style.margin_y;
     const int left = margin_x;
     const int right = std::max(left + 1, area.width - margin_x);
     const int top = margin_y;
@@ -138,7 +154,7 @@ namespace detail {
         for (const std::size_t i : placed) {
             const bool height = spots[i].elevation_deg >= 30.0;
             nodes[i].shape = height ? PlanShape::kHeight : PlanShape::kEar;
-            nodes[i].w = nodes[i].h = height ? kPlanHeightSize : kPlanEarSize;
+            nodes[i].w = nodes[i].h = height ? style.height : style.ear;
             nodes[i].x = static_cast<int>(std::lround(mid_x + (u[i] - centre_u) * sx));
             nodes[i].y = static_cast<int>(std::lround(mid_y + (v[i] - centre_v) * sy));
         }
@@ -150,7 +166,7 @@ namespace detail {
                 for (std::size_t b = a + 1; b < placed.size(); ++b) {
                     PlanNode& first = nodes[placed[a]];
                     PlanNode& second = nodes[placed[b]];
-                    if (!detail::plan_overlap(first, second, 6)) {
+                    if (!detail::plan_overlap(first, second, style.gap)) {
                         continue;
                     }
                     double dx = second.x - first.x;
@@ -163,10 +179,10 @@ namespace detail {
                         dx /= length;
                         dy /= length;
                     }
-                    first.x -= static_cast<int>(std::lround(dx * 4.0));
-                    first.y -= static_cast<int>(std::lround(dy * 4.0));
-                    second.x += static_cast<int>(std::lround(dx * 4.0));
-                    second.y += static_cast<int>(std::lround(dy * 4.0));
+                    first.x -= static_cast<int>(std::lround(dx * style.step));
+                    first.y -= static_cast<int>(std::lround(dy * style.step));
+                    second.x += static_cast<int>(std::lround(dx * style.step));
+                    second.y += static_cast<int>(std::lround(dy * style.step));
                     moved = true;
                 }
             }
@@ -190,28 +206,41 @@ namespace detail {
             continue;
         }
         nodes[i].shape = PlanShape::kLfe;
-        nodes[i].w = kPlanLfeWidth;
-        nodes[i].h = kPlanLfeHeight;
-        nodes[i].x = area.width / 2 + static_cast<int>(std::lround((lfe_seen - (lfe_total - 1) / 2.0) * 110.0));
-        nodes[i].y = area.height - kPlanLfeHeight;
+        nodes[i].w = style.lfe_width;
+        nodes[i].h = style.lfe_height;
+        nodes[i].x = area.width / 2 +
+                     static_cast<int>(std::lround((lfe_seen - (lfe_total - 1) / 2.0) * style.lfe_pitch));
+        nodes[i].y = area.height - style.lfe_height;
         ++lfe_seen;
     }
     return nodes;
 }
 
-// The room that plan_nodes() lays out at kPlanFitReference, scaled by the one factor that makes it fit `width` by
-// `height` and centred in it, so that a pane a quarter of the screen draws the same room as the whole screen does
-// (plan_nodes() keeps a margin of 170 and 62 pixels and sizes of 48 to 84, which are the screen's and leave a small
-// area nothing). Every node stays inside the area. The shapes shrink with the room; below about 30 pixels a node is too
-// small to carry its name, which is the caller's to leave off (PlanNode::w says).
-inline constexpr PlanArea kPlanFitReference{640, 560};
+// The same room in a pane of `width` by `height` pixels: speakers of a size that suits the pane (the screen's 58 pixels in a
+// pane the screen's size, a third of that in a quarter of it), the margins and gaps to match, and the low-frequency feeds in
+// a strip of their own under the room, so that the rear surrounds of a 7.2 or 9.2 layout never sit on them. Every node stays
+// inside the pane. A speaker under about 24 pixels is too small to carry its name, which is the caller's to leave off
+// (PlanNode::w says).
+[[nodiscard]] inline PlanStyle plan_style_for(int width, int height) {
+    PlanStyle style;
+    const int ear = std::clamp(std::min(width / 8, height / 9), 8, kPlanEarSize);
+    style.ear = ear;
+    style.height = std::max(6, ear * 5 / 6);
+    style.lfe_width = ear * 3 / 2;
+    style.lfe_height = std::max(6, ear * 5 / 6);
+    style.margin_x = ear / 2 + 3;
+    style.margin_y = ear / 2 + 3;
+    style.lfe_pitch = style.lfe_width + ear / 3 + 2;
+    style.gap = std::max(1, ear / 10);
+    style.step = std::max(1, ear / 14);
+    return style;
+}
 
 [[nodiscard]] inline std::vector<PlanNode> plan_nodes_fit(std::span<const PlanSpot> spots, int width, int height) {
     if (width <= 0 || height <= 0) {
         return std::vector<PlanNode>(spots.size());
     }
-    // The low-frequency feeds go in a strip of their own under the room: in a room this narrow the rear surrounds of a
-    // 7.2 or 9.2 layout would otherwise sit where the two feeds are drawn.
+    const PlanStyle style = plan_style_for(width, height);
     std::vector<PlanSpot> ring(spots.begin(), spots.end());
     int feeds = 0;
     for (PlanSpot& spot : ring) {
@@ -220,33 +249,20 @@ inline constexpr PlanArea kPlanFitReference{640, 560};
             ++feeds;
         }
     }
-    const int strip = feeds > 0 ? kPlanLfeHeight + 12 : 0;
-    std::vector<PlanNode> nodes = plan_nodes(ring, PlanArea{kPlanFitReference.width, kPlanFitReference.height - strip});
+    const int strip = feeds > 0 ? style.lfe_height + style.gap + 2 : 0;
+    std::vector<PlanNode> nodes = plan_nodes(ring, PlanArea{width, std::max(1, height - strip)}, style);
     int placed = 0;
     for (std::size_t i = 0; i < spots.size(); ++i) {
         if (!(spots[i].lfe && spots[i].connected)) {
             continue;
         }
         nodes[i].shape = PlanShape::kLfe;
-        nodes[i].w = kPlanLfeWidth;
-        nodes[i].h = kPlanLfeHeight;
-        nodes[i].x = kPlanFitReference.width / 2 +
-                     static_cast<int>(std::lround((placed - (feeds - 1) / 2.0) * 110.0));
-        nodes[i].y = kPlanFitReference.height - kPlanLfeHeight / 2 - 4;
+        nodes[i].w = style.lfe_width;
+        nodes[i].h = style.lfe_height;
+        nodes[i].x = std::clamp(width / 2 + static_cast<int>(std::lround((placed - (feeds - 1) / 2.0) * style.lfe_pitch)),
+                                nodes[i].w / 2, width - nodes[i].w / 2);
+        nodes[i].y = height - style.lfe_height / 2 - 1;
         ++placed;
-    }
-    const double scale = std::min(static_cast<double>(width) / kPlanFitReference.width,
-                                  static_cast<double>(height) / kPlanFitReference.height);
-    const double offset_x = (width - kPlanFitReference.width * scale) / 2.0;
-    const double offset_y = (height - kPlanFitReference.height * scale) / 2.0;
-    for (PlanNode& node : nodes) {
-        if (node.shape == PlanShape::kNone) {
-            continue;
-        }
-        node.w = std::max(2, static_cast<int>(std::lround(node.w * scale)));
-        node.h = std::max(2, static_cast<int>(std::lround(node.h * scale)));
-        node.x = std::clamp(static_cast<int>(std::lround(offset_x + node.x * scale)), node.w / 2, width - node.w / 2);
-        node.y = std::clamp(static_cast<int>(std::lround(offset_y + node.y * scale)), node.h / 2, height - node.h / 2);
     }
     return nodes;
 }
