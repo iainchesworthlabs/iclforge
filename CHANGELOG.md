@@ -28,6 +28,14 @@ See [README.md](README.md) for the project overview and
   groups on a large one. It is drawn from the player's tap, twenty times a second, only where a bar or a tick moved; a board without a screen of 240 by 240 or without
   the Sendspin player shows the choice greyed with the reason. All of it is compiled only into an image with a panel (the C6 and S3 images grow by the registry's one choice).
   `LV_INV_BUF_SIZE` is 256 for the sink (the meters invalidate many separate rectangles a frame, and above 32 LVGL redraws the whole glass).
+- **Added: `GET /panel-stats`, a rate governor for the Meters view, and the kit protocol that measures them (4 of 5).** On port 80, where the capture port is
+  off in a release image, a board with a screen says what its panel costs: LVGL's refresh times, the panel task's stack, the PSRAM and internal heap now and at
+  their lowest, and the Meters view's rate, its analysis, widgets and render times, its late and missed updates and the player tap's cost to the audio path
+  (`iclforge/panel_stats.hpp`; the developer view's PERFORMANCE section shows them too). The view updates 20 times a second and drops to 10 when the panel's task
+  cannot keep up, judged over the last second and not on one update, and returns after 10 s with the cost well under (`iclforge/meters_governor.hpp`). The
+  analysis's transform now works in buffers the analyzer owns, not 8 KB of the panel task's stack (held bit for bit to the library's by test).
+  `tools/hearth/panel_measure.py` runs the protocol of `planning/p4x-meters-view.md` on a booked board unattended (rows, schedule, criteria, report) and
+  compares the speakers view with the image before it. **Nothing here has run on a board.**
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
