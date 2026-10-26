@@ -1,13 +1,14 @@
 # The Meters view: an instrument display for the no-lyrics screen
 
-!!! note "Status as of 2026-10-26: decided and built, tested on the host; not run on a board"
+!!! note "Status as of 2026-10-26: decided, built, and run once on the kit: the audio is fine and the drawing is too slow"
     **Decided by the owner, 2026-10-26:** the adaptive rule (the pair on a small screen or in a 2.0 room, the surround sum on a middle one, every output
     in groups on a large one; a tap on a channel to focus it is not built yet); the spectrum in green, amber and red zones; a range of -60 to 0 dB (no
     -80 to -20 setting); 20 updates a second if the panel's task can keep up and 10 if not; and *measuring and characterising the performance is
     definitely required*. **Built** in five PRs: the analysis and the rules (#1682), the player's tap (#1683), the screen, the choice and the route
     (#1685), `GET /panel-stats` with the rate governor and the kit protocol (#1686), and the preview's checks at every size and room with the pictures
-    (5 of 5). The kit has not run it: [Measuring it](#measuring-it) and the [kit protocol](#kit-protocol) are what does, and what
-    [What it costs](#what-it-costs) calls an estimate stays one until it has.
+    (5 of 5). **The first kit run (2026-10-26) is in [Kit results](#kit-results-2026-10-26):** the stream is whole in every row and the Meters view costs the decode
+    task 0.4 to 0.8 ms a burst, but an update costs 130 to 440 ms on music (against a 50 ms step), so the view falls to 10 updates a second and still does not keep up;
+    the estimates of [What it costs](#what-it-costs) for the drawing were 40 to 140 times too low. [Measuring it](#measuring-it) and the [kit protocol](#kit-protocol) are what measured it.
 
     The page below is the study that led to it, as it was written. The pictures of the built view are in `docs/hearth/sink-esp32-p4.md`.
 
@@ -187,7 +188,7 @@ AC-4 decoder already runs there in `float`. Nothing is `double`.
 
 ## What it costs
 
-Measured on this computer unless it says estimate. **No part of this has been run on a board.**
+Measured on this computer unless it says estimate. **The kit's own numbers are under [Kit results](#kit-results-2026-10-26); where they differ from an estimate below, they are right.**
 
 **Pixels LVGL draws** (`meters_options measure`, a minute of each, the exact part of what a view costs; 20 updates a second; with `LV_INV_BUF_SIZE` 256):
 
@@ -391,6 +392,30 @@ screen on the large one, and one custom-drawn widget for the spectrum in place o
 **What the kit replaces.** The P4's cost for the analysis (101 kflops at 0.15 to 0.4 flops a cycle: 0.7 to 1.9 ms, 1.4 to 3.7 % of a core) and for
 LVGL (5 to 8 times the host's) are assumptions; `analysis_us` and `widgets_us` and `render_us` are those numbers measured, and **the first thing to
 read** is `meters.analysis_us.mean` in the `eac3-5.1-on-9.1.6` row.
+
+### Kit results, 2026-10-26
+
+The first run of the protocol, on the kit (`P4X`, 1024 by 600, 400 MHz, over its Ethernet address), booked 18:07 to 19:03 local. Images: **I0** `eadb09da8` (main before #1642, the speakers view as it was), **I2** `e4a61acea` with `sdkconfig.ac4`, **I1** `e4a61acea` (main `d1ff66ee2` and the five Meters PRs), release-like `p4-rev3`. Each row is 390 s (60 s segments, the first 10 s of each not counted, then 20 open and close cycles); the numbers are the segments' means, in microseconds unless a unit says otherwise. The raw samples, the reports and the settings found and put back are in the session's notes folder (`meters-kit-window-2026-10-26`).
+
+**The view as built does not keep up on music at this size: it is 2.6 to 8.7 times over its 50 ms step and falls to 10 updates a second, where it is still 1.3 to 4.4 times over that step. It does not hurt the audio.**
+
+| Row (room, what the screen draws) | Burst, speakers view | Burst, Meters view | Tap, a burst | Analysis, mean (max) | Widgets, mean (max) | Render, mean (max) | An update costs | Rate held |
+|---|---|---|---|---|---|---|---|---|
+| stereo PCM, two tones (2.0, `pair`) | 272 | 320 to 338 | 368 | 5,000 (18,000) | 160 (23,000) | build only | 5,400 to 5,800 | **20 Hz** |
+| E-AC-3 5.1 (5.1, `grid` of 6) | 4,055 | 4,445 to 4,588 | 679 | 5,400 (17,000) | 43,600 (69,000) | 81,000 (229,000) | 129,000 to 131,000 | 10 Hz, 1 fall |
+| E-AC-3 5.1 on a 9.1.6 room (`grid` of 16) | 4,646 | 5,072 to 5,234 | 692 | 5,300 (10,000) | 59,400 (79,000) | 105,000 (366,000) | 165,000 to 173,000 | 10 Hz, 1 fall |
+| E-AC-3 JOC, 7.1.4 (`grid` of 12) | 21,751 | 22,357 to 22,577 | 858 | 9,600 (24,000) | 137,000 (179,000) | 288,000 (598,000) | 432,000 to 437,000 | 10 Hz, 1 fall |
+| AC-4 5.1 (5.1, `grid` of 6; image I2) | 25,940 | 26,527 to 26,760 | 691 | 7,900 (28,000) | 76,000 (118,000) | 150,000 (459,000) | 231,000 to 237,000 | 10 Hz, 1 fall |
+
+- **The audio is whole in every row with music** in both views: no underrun, late or dropped burst, resync or invalid burst, sync error unchanged (the largest 85 to 250 us either way). The Meters view costs the decode task **0.4 to 0.8 ms more per burst** (9 to 13 % in the two E-AC-3 rows, 3 % on the JOC and AC-4 rows), inside the allowance. The one finding in the audio: **the first opening of the view on the stereo PCM stream cost one underrun and one resync** (`meters-a`; the second opening, and every other row, had none). It needs repeating before it is a finding about the view and not the first build.
+- **The tap costs 370 us a burst for 2 outputs and 680 to 860 us for 6 to 16** (the plan estimated 0.1 to 0.5 ms with 16 live outputs): the criterion (150 us up to 8 outputs, 500 above) failed in every row. It is 1 to 3 % of the 32 ms a burst lasts; the cost is in the player's decode task and is wall time, which an interrupt or another task adds to.
+- **The analysis is 3 to 14 times the plan's estimate** (0.7 to 1.9 ms estimated, 5 to 10 ms measured, up to 28 ms at its worst): its tables and scratch are 63 KB in the PSRAM, shared with the decoder.
+- **The drawing is what does not keep up.** A music spectrum moves all 31 bars every update; as 3 rectangles and a tick each, with the channels' bars, that is 100 to 200 small invalid areas a refresh, and **LVGL's refresh takes 80 to 290 ms on the P4 where the speakers view's takes 2 to 8 ms** (the same refresh took 1 to 3 ms on the host). The widgets (setting sizes and positions) take 44 to 137 ms: the host's cost is about 1 ms, and the plan's 5 to 8 times that was **44 to 137 times**. The pair under a spectrum that hardly moves (the two tones) costs 5.4 to 5.8 ms and holds 20 Hz: it is the number of bars that move, not the pixels, and the grid's cost rises with its bars (6, 12, 16) as the stream's does.
+- **The governor did its job**: every music row fell to 10 Hz once, within a window, and stayed there; but a step is 100 ms, an update costs 130 to 440 ms, and 200 to 560 steps went by without one in each 60 s segment, so what the screen shows is 2 to 8 updates a second.
+- **Memory is not the problem**: 20 open and close cycles lost at most 2.4 KB of PSRAM in any row (the JOC row gained 55 KB); the panel task's stack never had fewer than 10,880 bytes free (8,968 before); the internal heap's low point is the same under both views. `GET /panel-stats` and the developer view work on the board and say what is above.
+- **The speakers view as it was against as it is** (I0 against I1): the glow's mean burst is within -2.2 to +1.6 % in three rows and +6.6 % (16 us) on the stereo PCM tones, all inside the allowance (5 % or 100 us); the pulse is reported at +2.9 to +29 % (0.6 ms on the heaviest row), and its refresh costs 2.0 to 6.8 ms, as the glow's does.
+
+What this changes: the levers the plan listed, in the order it gave them, are now needed and are not enough in the first form: **10 updates a second is already automatic and is not enough**. The cost is the number of small invalid areas and objects, not the pixels (1.3 to 1.8 million a second), so the next step is **one custom-drawn object for the spectrum and one for each group of bars**, which makes an update two or three invalid areas and a handful of draw calls instead of 100 to 200; then the tap's loop (its second pass over the outputs' floats, which the level meter already reads once) and the analysis' placement (its tables in the PSRAM). The kit protocol runs unchanged on the result.
 
 ## Questions for the owner (answered 2026-10-26)
 
