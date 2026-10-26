@@ -337,6 +337,9 @@ struct BurstPlayer::Impl {
     std::atomic<float> target_gain{1.0F};
     float gain = 1.0F;
 
+    // What the screen has asked to see of the output (BurstPlayer::set_block_tap); read once a block.
+    std::atomic<BlockTap*> block_tap{nullptr};
+
     // Burst timing.
     std::uint64_t decode_us_total = 0;
     std::uint64_t sink_us_total = 0;
@@ -1019,6 +1022,7 @@ struct BurstPlayer::Impl {
             tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
         }
         const bool scaled = apply_gain(out, n, live);
+        tap_block(out, n, live);
         if (scaled || !meter_from_source(n)) {
             meter(out, n, live);
         }
@@ -1040,6 +1044,14 @@ struct BurstPlayer::Impl {
             return false;
         }
         return layout.slot(static_cast<std::size_t>(channel)).kind == iclforge::render::Speaker::Kind::kLfe;
+    }
+
+    // The block as it is about to be heard, to whatever is looking at it (iclforge/block_tap.hpp): nothing when nothing is.
+    void tap_block(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live) {
+        BlockTap* const tap = block_tap.load(std::memory_order_acquire);
+        if (tap != nullptr && tap->wants_blocks()) {
+            tap->block(out, n, live);
+        }
     }
 
     // True when the block was scaled: a block at unity is left as it is, and costs nothing. Only the
@@ -1678,6 +1690,7 @@ struct BurstPlayer::Impl {
             tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
         }
         apply_gain(out, kBlock);
+        tap_block(out, kBlock, ~std::uint32_t{0});
         meter(out, kBlock);
         for (std::size_t o = 0; o < outputs_open; ++o) {
             output_views[o] = outputs[o];
@@ -2156,6 +2169,8 @@ IdentifyOutcome BurstPlayer::identify_local(const IdentifyRequest& request) {
     im.pending_local_identify = request;
     return IdentifyOutcome::kStarted;
 }
+
+void BurstPlayer::set_block_tap(BlockTap* tap) { impl_->block_tap.store(tap, std::memory_order_release); }
 
 void BurstPlayer::set_volume(int volume, bool muted) {
     const float linear = static_cast<float>(std::clamp(volume, 0, 100)) / 100.0F;
