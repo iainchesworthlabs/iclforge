@@ -148,9 +148,9 @@
       "commit": "68882a60f34bbe037a9536a2b6f64f00bef0f14f",
       "what": "the tree panel_preview was built from: the choice of network read as Automatic, Wired and Wi-Fi in the developer view, About, the confirming steps and the idle screen, 2026-10-26"
     },
-    "1a73f31bb": {
-      "commit": "1a73f31bbc600a7010608ff48c57ce1753b78e23",
-      "what": "the tree panel_preview was built from: the Speaker layout sheet (quick picks, build yours, the room beside the buttons, a footer that stays on the glass), 2026-10-26"
+    "3a06cdad6": {
+      "commit": "3a06cdad62c2ab5bc353eb1066eea562a6c78e7b",
+      "what": "the tree panel_preview was built from: the Speaker layout sheet with High and In the ceiling for the heights (quick picks, build yours, the room beside the buttons, a footer that stays on the glass), 2026-10-26"
     }
   },
   "pictures": [
@@ -674,31 +674,31 @@
       "path": "docs/hearth/screenshots/p4-panel-layout-quick-kit.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
       "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The kit (sixteen 32-bit slots, a chip that clocks them) with 7.1.4 in force opens Preferences, Speaker layout, Change: Quick picks. It writes layout-quick-kit-1024x600.bmp.",
-      "build": "1a73f31bb"
+      "build": "3a06cdad6"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-layout-build-kit.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
-      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The same kit, Build yours at the widest the grammar has: nine around you, one subwoofer, six up-firing heights. It writes layout-worst-kit-1024x600.bmp.",
-      "build": "1a73f31bb"
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The same kit, Build yours at the widest the grammar has: nine around you, one subwoofer, six heights in the ceiling. It writes layout-worst-kit-1024x600.bmp.",
+      "build": "3a06cdad6"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-layout-unavailable-s3.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
       "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. An ESP32-S3 board whose sink carries four 32-bit slots on one line, with 2.0 in force: a touch on the greyed 5.1. It writes layout-unavailable-s3-1024x600.bmp.",
-      "build": "1a73f31bb"
+      "build": "3a06cdad6"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-layout-small.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
-      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The kit's worst case (9.1.6 up-firing) on a 480 by 320 display. It writes layout-worst-kit-480x320.bmp.",
-      "build": "1a73f31bb"
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The kit's worst case (9.1.6 in the ceiling) on a 480 by 320 display. It writes layout-worst-kit-480x320.bmp.",
+      "build": "3a06cdad6"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-prefs-layout-confirm.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
       "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The S3 board of the picture above with a 5.1 stream playing: Apply on 1.0 asks first. It writes layout-confirm-1024x600.bmp.",
-      "build": "1a73f31bb"
+      "build": "3a06cdad6"
     },
     {
       "path": "docs/karaoke/screenshots/hearth-karaoke-page.png",
