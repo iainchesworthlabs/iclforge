@@ -118,7 +118,6 @@ std::vector<float> mono_mix(const scene::Scene& s, std::size_t outputs) {
     return mix;
 }
 
-template <std::size_t HighFrame>
 void against_reference_with(const char* label, float tau) {
     struct Room {
         const char* layout;
@@ -130,7 +129,7 @@ void against_reference_with(const char* label, float tau) {
         const auto parsed = rp::OutputLayout::parse(room.layout);
         const auto spots = rp::plan_spots(*parsed);
         scene::Scene s(spots, room.content);
-        meters::AnalyzerOf<HighFrame> a;
+        meters::Analyzer a;
         meters::Reference r;
         meters::PowerAverage avg_a;
         meters::PowerAverage avg_r;
@@ -174,45 +173,35 @@ void against_reference_with(const char* label, float tau) {
 
 void against_reference() {
     std::printf("--- the two-rate analysis against the 8192-point reference over the scene\n");
-    against_reference_with<1024>("high frame 1024 (21 ms)", 0.001F);
-    against_reference_with<1024>("high frame 1024 (21 ms)", 0.1F);
-    against_reference_with<2048>("high frame 2048 (43 ms)", 0.1F);
-    against_reference_with<1024>("high frame 1024 (21 ms)", 0.2F);
+    against_reference_with("high frame 1024 (21 ms)", 0.001F);
+    against_reference_with("high frame 1024 (21 ms)", 0.1F);
+    against_reference_with("high frame 1024 (21 ms)", 0.2F);
 }
 
 void timing() {
     std::printf("--- cost of one analysis on this computer (MSVC, /O2, one core; the board is another machine)\n");
-    meters::Analyzer a;
-    meters::Reference r;
+    // The shipped classes on a ready history of 16-bit samples, as the board calls them (the prototype's wrappers also convert a float ring).
+    const auto a = std::make_unique<iclforge::dsp::spectrum::Analyzer>();
+    const auto r = std::make_unique<iclforge::dsp::spectrum::Reference>();
     std::mt19937 rng(3);
     std::uniform_real_distribution<float> uni(-0.5F, 0.5F);
-    std::vector<float> x(meters::kRingLength);
-    for (float& v : x) {
-        v = uni(rng);
+    std::array<std::int16_t, meters::kRingLength> x{};
+    for (std::int16_t& v : x) {
+        v = static_cast<std::int16_t>(std::lround(uni(rng) * 32767.0F));
     }
-    a.push(x);
-    r.push(x);
     std::array<float, meters::kBands> d{};
     constexpr int kRuns = 2000;
     auto t0 = std::chrono::steady_clock::now();
     for (int i = 0; i < kRuns; ++i) {
-        a.analyze(d);
+        a->analyze(x, d);
     }
     const double two_rate = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / kRuns;
     t0 = std::chrono::steady_clock::now();
     for (int i = 0; i < kRuns; ++i) {
-        r.analyze(d);
+        r->analyze(x, d);
     }
     const double single = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / kRuns;
-    meters::AnalyzerOf<2048> wide;
-    wide.push(x);
-    t0 = std::chrono::steady_clock::now();
-    for (int i = 0; i < kRuns; ++i) {
-        wide.analyze(d);
-    }
-    const double two_rate_wide = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / kRuns;
-    std::printf("two-rate (2048 at 12 kHz + 1024 at 48 kHz): %.1f us    (2048 + 2048): %.1f us    one 8192-point: %.1f us    ratio %.2f / %.2f\n", two_rate,
-                two_rate_wide, single, single / two_rate, single / two_rate_wide);
+    std::printf("two-rate (2048 at 12 kHz + 1024 at 48 kHz): %.1f us    one 8192-point: %.1f us    ratio %.2f\n", two_rate, single, single / two_rate);
     // Operations, by the passes: a radix-4 butterfly is 3 complex products (18 flops) and 8 complex sums (16): 34; a radix-2 one 10.
     const auto complex_fft = [](std::size_t n) {
         double flops = 0.0;
@@ -228,10 +217,9 @@ void timing() {
         return complex_fft(frame / 2) + 12.0 * half + 2.0 * static_cast<double>(frame) + 3.0 * half +
                (decimate > 1 ? static_cast<double>(frame * decimate) : 0.0);
     };
-    std::printf("operations a pass: low 2048 at 12 kHz %.0f k, high 1024 %.0f k, high 2048 %.0f k, 8192 single %.0f k flops\n", frame_flops(2048, 4) / 1e3,
-                frame_flops(1024, 1) / 1e3, frame_flops(2048, 1) / 1e3, frame_flops(8192, 1) / 1e3);
-    std::printf("two-rate total %.0f k flops (1024 high), %.0f k (2048 high)\n", (frame_flops(2048, 4) + frame_flops(1024, 1)) / 1e3,
-                (frame_flops(2048, 4) + frame_flops(2048, 1)) / 1e3);
+    std::printf("operations a pass: low 2048 at 12 kHz %.0f k, high 1024 %.0f k, 8192 single %.0f k flops\n", frame_flops(2048, 4) / 1e3,
+                frame_flops(1024, 1) / 1e3, frame_flops(8192, 1) / 1e3);
+    std::printf("two-rate total %.0f k flops\n", (frame_flops(2048, 4) + frame_flops(1024, 1)) / 1e3);
 }
 
 }  // namespace

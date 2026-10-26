@@ -7,7 +7,7 @@
     looks like at 1024 x 600, 480 x 320 and 240 x 240, where its spectrum would come from, and what each part costs.
     Everything here was drawn by the firmware-style views of `firmware/hearth-sink/preview/meters_options/` through LVGL's
     software renderer, over the made-up music of `preview/speakers_options/scene.hpp`, with the analysis of
-    `meters_options/spectrum.hpp` (the code the board would run). **Not run on a board.** Pictures:
+    `libs/dsp/include/iclforge/dsp/spectrum.hpp` (the code the board runs, held to the calibrations of this page by `libs/dsp/tests/test_spectrum.cpp`). **Not run on a board.** Pictures:
     `planning/p4x-meters-options/overview-1024x600.png`, `overview-480x320.png` and `overview-240x240.png` (A, B and C side by side,
     a row a room); the measurements are `measure-inv32.csv`, `measure-inv128.csv` and `measure-inv256.csv` beside them.
 
@@ -152,7 +152,7 @@ The board is the one decoding, so it already holds the samples; the work is to m
    sum is shifted down by half of log2 of the outputs, rounded up (an even divide by 2 for stereo, by 4 for 5.1 to 9.1.6), so that a
    room does not clip it. **That is all the audio path does**, and only while the Meters view is on the glass and a stream
    plays (a flag the screen sets; a board without a screen never sets it and the code is not in its image).
-2. **On the panel side, every 50 ms, a two-rate analysis** (`meters_options/spectrum.hpp`), the family's own FFT
+2. **On the panel side, every 50 ms, a two-rate analysis** (`iclforge/dsp/spectrum.hpp`), the family's own FFT
    (`iclforge/dsp/detail/fft_stockham.hpp`, the passes AC-4 and the MDCT run on the P4) in `float`:
     - for the **17 bands from 20 Hz to 800 Hz**, the last 171 ms with four samples summed to one (a 12 kHz stream) and a 2,048-point real FFT: 5.9 Hz a bin;
     - for the **14 bands from 1 kHz**, the last 21 ms at 48 kHz and a 1,024-point real FFT: 47 Hz a bin.
