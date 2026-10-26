@@ -83,7 +83,7 @@ inline constexpr std::array kKeys = {
     Key{kName, Kind::identity, "name"},
     Key{kSsid, Kind::network, "Wi-Fi network"},
     Key{kPassword, Kind::network, "Wi-Fi network"},
-    Key{kNetworkPreference, Kind::network, "cable or Wi-Fi choice"},
+    Key{kNetworkPreference, Kind::network, "wired or Wi-Fi choice"},
     Key{kSlotBits, Kind::setup, "DAC wiring"},
     Key{kSecondLine, Kind::setup, "DAC wiring"},
     Key{kLayout, Kind::setup, "speaker layout"},

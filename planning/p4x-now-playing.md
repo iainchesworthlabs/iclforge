@@ -282,7 +282,7 @@ clock view reads it.
 **As built** (all in [The time of day](../docs/hearth/sink-esp32-p4.md#the-time-of-day) in the sink's page):
 
 - **The facility** (`firmware/hearth-sink/main/wall_clock.hpp`, a seam like the network beside it):
-  `clock/sntp/` for every build with a Wi-Fi station or a cable (all the hardware: S3, C6, the P4 boards,
+  `clock/sntp/` for every build with a Wi-Fi station or a wired network (all the hardware: S3, C6, the P4 boards,
   the P4X) and `clock/none/` for a build with no network and for QEMU's, which has no time server to ask and
   must not make CI depend on one. lwIP's SNTP client, started when the board holds an address (the address
   event, and a one-second upkeep as well), an hour apart after the first answer.

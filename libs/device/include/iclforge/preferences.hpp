@@ -646,7 +646,7 @@ namespace detail {
         return Availability::no("This board has Wi-Fi only, so there is nothing to choose between.");
     }
     if (caps.network.ethernet) {
-        return Availability::no("This board has a cable only, so there is nothing to choose between.");
+        return Availability::no("This board is wired only, so there is nothing to choose between.");
     }
     return Availability::no("This board has no network.");
 }
@@ -658,7 +658,7 @@ namespace detail {
 
 inline constexpr std::array<ChoiceDef, 3> kNetworkChoices{{
     {.id = "auto", .label = "Automatic"},
-    {.id = "ethernet", .label = "Cable"},
+    {.id = "ethernet", .label = "Wired"},
     {.id = "wifi", .label = "Wi-Fi"},
 }};
 
@@ -1008,7 +1008,7 @@ inline constexpr std::array<Pref, 21> kRegistry{{
     {.id = "network-preference",
      .group = Group::kNetwork,
      .label = "Wired or Wi-Fi",
-     .note = "Which network the player uses when it has both: the cable, Wi-Fi, or whichever is linked.",
+     .note = "Which network the player uses when it has both: wired, Wi-Fi, or whichever is linked.",
      .kind = Kind::kChoice,
      .apply = Apply::kLive,
      .route = "/network-preference",

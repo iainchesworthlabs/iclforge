@@ -48,7 +48,7 @@ const REPLIES = {
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
-        'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
+        'GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
         'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',

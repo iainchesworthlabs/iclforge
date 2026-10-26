@@ -21,7 +21,7 @@
   // The Sendspin player's words for what /status reports of it.
   const LINK = { 'long-term': 'Paired, encrypted', pairing: 'Pairing, encrypted', sentinel: 'Encrypted, not paired' };
   const PLAYING = { bursts: 'Bursts, decoded here', pcm: 'PCM', idle: 'Nothing' };
-  const KINDS = { wifi: 'Wi-Fi', ethernet: 'Ethernet' }; // /status's network.kind
+  const KINDS = { wifi: 'Wi-Fi', ethernet: 'Wired' }; // /status's network.kind
   // GET /firmware's words (iclforge/firmware_status.hpp): a slot's state, and
   // an upload's stage.
   const SLOT = { valid: 'accepted', trial: 'on trial', new: 'written, not started yet', invalid: 'failed its trial', aborted: 'stopped during its trial' };

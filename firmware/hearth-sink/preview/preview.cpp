@@ -763,7 +763,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     expect(tap_button("Wi-Fi"), "the network row has a Wi-Fi button");
     pump(6);
     expect(page() != nullptr, "a switch of network asks first");
-    expect(says("Use Wi-Fi only?") && says("The cable is switched off."), "and says what it does");
+    expect(says("Use Wi-Fi only?") && says("Wired is switched off."), "and says what it does");
     expect(says("192.168.1.251"), "and where the page will be");
     if (page() != nullptr) {
         write_bmp(out / ("system-network-" + size + ".bmp"));
@@ -779,9 +779,9 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     }
     // A switch the board is certain to refuse says so, and cannot be made.
     g_system.facts.ethernet.link = false;
-    tap_button("Cable");
+    tap_button("Wired");
     pump(6);
-    expect(says("No cable is linked"), "a switch to a cable that is not linked says so");
+    expect(says("Wired has no link"), "a switch to wired when it has no link says so");
     tap_button("Switch");
     pump(4);
     expect(g_system.network_preference == "wifi", "and cannot be made");
@@ -927,7 +927,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     // Factory reset: what is lost, then a button that is held.
     expect(tap_button("Erase"), "the sheet has an Erase button");
     pump(6);
-    expect(says("Erase everything?") && says("The cable stays in use"), "the factory reset says what is lost, and that the cable stays");
+    expect(says("Erase everything?") && says("The wired network stays in use"), "the factory reset says what is lost, and that wired stays");
     if (page() != nullptr) {
         write_bmp(out / ("system-factory-" + size + ".bmp"));
         failures += audit(page(), "factory reset " + size);
@@ -955,7 +955,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     g_system.factory_resets = 0;
     tap_button("Erase");
     pump(6);
-    expect(says("No cable is plugged in.") && says("improv-wifi.com"), "a board with no cable in says what will bring it back");
+    expect(says("The wired network has no link.") && says("improv-wifi.com"), "a board with no wired link says what will bring it back");
     if (page() != nullptr) {
         write_bmp(out / ("system-factory-stranded-" + size + ".bmp"));
         failures += audit(page(), "factory reset, no cable " + size);
@@ -1722,7 +1722,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         failures += audit(greyed, "preferences, no touch " + size);
         expect(find_button("Dark") != nullptr, "the Dark choice is shown, greyed, not hidden");
         expect(shows_text(greyed, "no touch", true), "and the reason is on the sheet");
-        expect(find_button("Cable") != nullptr, "the choice of network is shown on a board that has one network");
+        expect(find_button("Wired") != nullptr, "the choice of network is shown on a board that has one network");
         expect(shows_text(greyed, "Wi-Fi only, so there is nothing to choose between", true), "greyed, with the reason");
         tap_button("Dark");
         pump(4);
