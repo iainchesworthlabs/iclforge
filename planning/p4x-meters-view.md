@@ -237,6 +237,56 @@ speakers view's tuning follows that serial, so the window cannot simply be halve
 - **`LV_INV_BUF_SIZE` 256** in the panel build.
 - A touch on the Meters view clears the peak holds (an ADI-2 does the same); the dim and dark rules of the no-lyrics screen apply to it unchanged.
 
+## Measuring it
+
+The owner's requirement (2026-10-26): *measuring and characterising the performance is definitely required*. So the view is built to be measured on
+the board over port 80 (the capture port is off in a release image), and its rate is a decision the board takes from what it measures.
+
+### What the board reports: `GET /panel-stats`
+
+JSON, on a board with a screen (`404 this board has no screen` on one without, `404 the screen is not running` before the panel is up). The
+shape and the text are `libs/device/include/iclforge/panel_stats.hpp`, held by a host test and by the device-ui contract spec, which reads the
+header and holds the stand-in's keys to its order. Durations are microseconds. A `timing` object is `{"last", "mean", "max", "n"}`: the last, the
+mean since the count began, the largest, and how many.
+
+| Object and key | What it is |
+|---|---|
+| `panel.width`, `panel.height`, `panel.refreshes` | the glass, and how many times LVGL has drawn since the panel started |
+| `panel.refresh_us` | every LVGL refresh, whichever view: from the refresh's start to its end, **the flush to the panel included** (so it holds a wait for the display as well as work) |
+| `panel.task_stack_free_min` | the panel task's stack never had fewer bytes than this free (16,384 bytes; 8,968 free on the kit before the Meters view) |
+| `panel.psram_free`, `psram_free_min`, `psram_largest` | the PSRAM, which is also LVGL's heap and the panel task's stack: now, the least since the board started, and the largest block |
+| `panel.internal_free`, `internal_free_min`, `internal_largest` | the same for internal RAM, which the decoder and the network share |
+| `meters.showing`, `representation`, `outputs`, `width`, `height` | the Meters view is up now; `pair`, `sum` or `grid`; the outputs of the room; the stage it was built for |
+| `meters.opens`, `open_ms` | times it has been opened since boot, and how long this opening has lasted. **Everything below is since the opening** (and is the last opening's after it is closed) |
+| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the render before it |
+| `meters.updates`, `late`, `dropped`, `falls`, `rises` | updates run; those that started more than 15 ms later than the panel's loop could have started them (one 30 fps frame is allowed for); whole steps that went by with none; twenty-to-ten falls and rises |
+| `meters.analysis_us` | the tap read, the transform, the power average and the ballistics |
+| `meters.widgets_us` | setting the bars, ticks and labels that moved (LVGL only invalidates; nothing is drawn yet) |
+| `meters.render_us` | LVGL's refreshes while the view shows |
+| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; reads the screen made and the ones the writer overran or that came before enough was written |
+
+The developer view (three taps on the footer's name) shows the same figures in its PERFORMANCE section once the Meters view has been opened: the
+rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `widgets`, `render`), and `late`, `dropped` and the tap's cost.
+`GET /status` carries the stream's own counters (`sendspin.underruns`, `late`, `dropped`, `resyncs`, `burst_us`, `worst_burst_us`, `error_us`,
+`decode_stack_free`), which are what the audio path's side of every comparison is read from.
+
+### The rate: 20 updates a second, 10 when the panel task cannot keep up
+
+The owner's rule: 20 Hz if possible, else 10 Hz. `iclforge/meters_governor.hpp` (host-tested) is "if possible":
+
+- **Cannot keep up** is judged over the last 20 updates (a second at 20 Hz), never on one: the **average cost** of an update
+  (analysis + widgets + the render before it) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
+  could have started them**, or a whole step missed. The allowance for lateness is one frame of the panel's loop (33 ms at 30 fps), because a 30 fps
+  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault.
+- **It rises again** only after **10 s** at ten, with the average cost **under 45 % of a fast step (22.5 ms)** and not one late or missed update in
+  the window. The gap between 70 and 45 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
+  a minute at twenty a second puts it back.
+- At ten a second the panel's loop goes back to its resting beat of 100 ms (`filling` false), which is exactly the step: a view at 10 Hz costs the
+  task nothing between updates. At twenty it asks for the panel's frame rate (30 fps) and keeps its own beat inside it (due times 50 ms apart), which
+  a 30 fps loop serves at 67, 33, 67 ... ms: twenty a second on average.
+- The limits are one struct (`GovernorLimits`): the numbers are the plan's guesses until the kit has measured the real costs, and a measurement
+  changes numbers, not code.
+
 ## Questions for the owner
 
 1. **Which?** The recommendation is below; B's bars are what the speakers view cannot give (how loud each output is, the exact number), and A is the picture on the ADI-2.
