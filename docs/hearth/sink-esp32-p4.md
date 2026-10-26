@@ -503,7 +503,7 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
 | `GET` and `PUT /speakers-style` | `glow` or `pulse` | `glow` |
 | `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |

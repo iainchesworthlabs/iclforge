@@ -290,8 +290,6 @@ iclforge::prefs::Backend& preferences_backend() { return player::preferences(); 
 
 std::int64_t time_us() { return esp_timer_get_time(); }
 
-int panel_frame_us() { return 1'000'000 / std::max(kFps, 1); }
-
 iclforge::meters::MeterTap& meters_tap() {
     // Made the first time the Meters view is built, in LVGL's heap (PSRAM: 32 KB of ring), and handed to the player once: it is asked for blocks
     // only while the view shows (MeterTap::set_wanted).
@@ -797,6 +795,9 @@ std::optional<std::string> panel_stats_text() {
 }  // namespace player
 
 namespace player::panel {
+
+// The time between the loop's frames while it draws: the panel's frame rate (kFps, above).
+int panel_frame_us() { return 1'000'000 / std::max(kFps, 1); }
 
 // What the developer view shows (dev_info.hpp). It is called from the panel's task, which holds
 // g_lock for the frame, so the counters are read as they stand and not through panel_stats().
