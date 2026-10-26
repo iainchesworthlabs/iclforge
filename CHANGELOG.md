@@ -10,6 +10,13 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: the analysis and the rules of a Meters view for the Hearth sink's no-lyrics screen, host-tested and not yet drawn.** An instrument display
+  after the owner's reference, the displays of RME's audio interfaces: a third-octave spectrum of the main mix (31 bands, 20 Hz to 20 kHz, from the newest
+  171 ms of a 48 kHz mono mix, in float32 through the family's FFT, 100 kflops a pass, in `iclforge/dsp/spectrum.hpp`: 0 dB for a full-scale sine, a decibel
+  a band for white noise, the same as one 8,192-point FFT below 800 Hz) and, under it, a representation of the channels chosen from the display's width and
+  the number of outputs (`iclforge/meters_view.hpp`: a stereo master on the small screen, the surround sum on the middle one, every output grouped in
+  space on the large one). The plan, the prototype and the pictures are `planning/p4x-meters-view.md` and `firmware/hearth-sink/preview/meters_options/`.
+  Nothing is wired to a screen or a player yet.
 - **Added: the Sendspin player can show a screen each block of its output (`BlockTap`), for the Meters view.** `BurstPlayer::set_block_tap()` takes a tap that is
   called once a block (256 frames) while it wants to be, after the speakers' trims and the volume, so that it sees what is heard; with none, or one that does not
   want blocks, the path is one pointer load, so an image with no screen pays for an interface and not a feature. `MeterTap` (`iclforge/meters_tap.hpp`) is the
