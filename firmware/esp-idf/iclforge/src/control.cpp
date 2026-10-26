@@ -699,6 +699,8 @@ struct Control::Impl {
                 }
                 append_string(out, "zone", time->zone);
                 append_string(out, "zone_name", time->zone_name);
+                append_string(out, "zone_place", time->zone_place);
+                append_string(out, "zone_label", time->zone_label);
                 append_string(out, "server", time->server);
                 append_string(out, "servers", time->servers);
                 append_number(out, "answers", time->answers);

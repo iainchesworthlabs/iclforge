@@ -164,6 +164,12 @@ The sections below contain the complete change list and fixes.
   steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
   place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
   down to 240 by 240. The routes now go through the same backend as the screen.
+- **The time zone is read as a place, never as its POSIX string.** A board whose zone was set through the page before it had
+  a picker showed `AEST-10AEDT,M10.1.0,M4.1.0/3` on the Preferences screen. A zone is now read as the place it is (the name
+  chosen; else the table's place for the exact string, the most populous where several share it, so that string is
+  *Melbourne (Australia)*; else its offset, *UTC+09:45 (custom)*), on the Preferences row, in the picker, and on the board's
+  page, whose `GET /status` has `zone_place` and `zone_label` beside the `zone` that tools read. Display only: nothing is
+  stored from the guess.
 - **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
   which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
   `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`

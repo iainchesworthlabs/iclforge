@@ -640,7 +640,7 @@ All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`, a
 chose) and take effect at once, with no restart. **They are on the board's own web page too**, in a Time section
 of Settings: the time the board keeps and how it got it, a checkbox for whether to ask a time server, a region and a
 city (the page asks the board for its list of zones) with a field for any other zone, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
-object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `server`, `servers`, `answers`), and the console
+object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `zone_place`, `zone_label`, `server`, `servers`, `answers`), and the console
 says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
 pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
 it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
@@ -659,6 +659,21 @@ board's C library would give its own for, differently from the next one's), is r
 that says so; one the grammar accepts is then read by the board's own C library, on a day in January
 and a day in July, and refused with a 409 if the library did not read it as written (a library that
 cannot parse a string falls back to UTC without saying so). With none set the time is UTC.
+
+**A screen or a page never shows the string.** It is the board's way of keeping a zone and the routes' way of reporting
+it (`GET /timezone`, `GET /status`'s `zone` and the Preferences entry's `value`, for tools); a person reads the place
+(`iclforge::wallclock::zone_readable`, host tested). The name they chose is the place. A zone set with a string and no
+name (through the page before it had a picker, or by hand) is read as **the place the table holds for the string**: an
+exact match, and where several places share it (Melbourne, Sydney, Hobart and Canberra are one) the most populous, which
+`tools/hearth/gen_time_zones.py` writes down as `PREFERRED` (51 strings are shared; the table says which place
+each means, in 102 bytes of flash), so a board set to `AEST-10AEDT,M10.1.0,M4.1.0/3` reads *Melbourne (Australia)* on the
+Preferences row, in the picker (which opens at Australia with Melbourne marked) and on the page, though no name was stored.
+A zone in no table reads as its offset and as the person's own: *UTC+09:45 (custom)*, *UTC+09:30 (custom, with daylight
+saving)*. The guess is display only and is not stored: it would turn a guess at which of four cities was meant into a
+choice. `GET /status`'s `time` has the place (`zone_place`: a name in the table, or `none`) and the words
+(`zone_label`: *Melbourne (Australia)*, *UTC*, *UTC+09:45 (custom)*), which the page shows in *Now* and under the time zone.
+The page's field for a zone not in the list is never filled in with the board's string; Save with nothing typed asks
+for a choice and sends nothing (UTC is Other, then UTC).
 
 The grammar and the words (`libs/device/include/iclforge/wall_clock.hpp`) are held to the letter by
 the host tests (`test_wall_clock.cpp`: the zones and the servers taken and the ones refused, the offsets,

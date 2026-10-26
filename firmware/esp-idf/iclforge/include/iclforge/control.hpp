@@ -178,6 +178,11 @@ struct ControlTime {
     // "Australia/Melbourne"), or "none" when they typed a string or set none, and the server a person named, or "none".
     std::string zone;
     std::string zone_name;
+    // The place in the table the zone is (the name chosen, or the table's place for a string set with none), or "none"
+    // for a zone in no table; and what a person reads for the zone ("Melbourne (Australia)", "UTC",
+    // "UTC+10:00 (custom)", never the string: iclforge::wallclock::zone_readable). A page shows these, not `zone`.
+    std::string zone_place;
+    std::string zone_label;
     std::string server;
     // The servers lwIP is set to ask, as text, and how many answers there have been since boot.
     std::string servers;
