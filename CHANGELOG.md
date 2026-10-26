@@ -61,7 +61,8 @@ See [README.md](README.md) for the project overview and
   now judges the rate as the owner asked, **20 Hz if possible, else a steady 10 Hz**, and says which cell holds which, and names faults that are only in the first, cold opening
   of the view. The governor does not judge the first two seconds of a view (its first draw and the cold code), rises under 60 % of a fast step and takes the resting 100 ms of its loop as the
   allowance at ten a second; an update is charged the refreshes since the last one and not the last refresh (a still picture costs nothing). The representations and the zone colours are unchanged.
-  **The first kit run of the canvas drawing** (planning/p4x-meters-view.md): a 5.1 stream holds 20 updates a second, a 9.1.6 room holds them once warm, and a JOC 7.1.4 stream does not hold a steady 10.
+  **Measured on the kit** (planning/p4x-meters-view.md, "Kit results, second run"): an update costs 11 to 29 ms where it cost 130 to 440, and **a stereo, 5.1, 9.1.6, JOC 7.1.4 and AC-4 5.1 stream each hold 20 updates a second** with no fall to ten, in the first opening of the
+  view and the second; the audio is whole in every music row. Open: the JOC row misses 1.7 % of its steps and an update takes 59 % of the step, and the player's tap costs 330 to 720 us a burst (more than the plan's guess of 150 to 500).
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,

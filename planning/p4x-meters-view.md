@@ -453,8 +453,45 @@ for each invalid area it flushes and each flush is a DSI transfer of its own (1 
 - **Not changed**: the representations, the zone colours, the governor (20 to 10 Hz) and the protocol. A **lighter mode** (fewer bars, a smaller matrix) is deliberately not built: it is added only if the
   reworked view cannot hold a steady 10 Hz on a 9.1.6 room or a JOC 7.1.4 stream on the kit, so that the glass never shows two to eight updates a second.
 
-**Not yet measured on the board.** The host's figures say what changed (areas an update, rows redrawn), not what the P4 makes of it; the kit run is the same protocol, with the cold first opening against the
-second kept apart, and the answer it gives is *which cell holds 20 Hz and which a steady 10 Hz*.
+**Measured on the board twice, below** (the first form of it, one rectangle for a chart, and the planned cells): **every row holds 20 Hz**. No lighter mode was built.
+
+### Kit results, 2026-10-26, second run: the canvas drawing
+
+Booked 20:44 to 21:27 local. Images: **I1c** `eb9677196` (the canvas drawing with `plan_cells`, the governor's grace and its 60 % rise, `p4-rev3`) and **I2c** (the same with `sdkconfig.ac4`),
+both put on by OTA, **over the kit's Ethernet address**; the protocol of *Kit protocol* above, five rows, no I0 (the comparison with the speakers view as it was stays that of the first run). The raw samples and
+reports are in the session's notes folder (`meters-kit-window-2026-10-26/i1c-canvas-planner-eb9677196`, `i2c-ac4-canvas-planner-eb9677196`; `i1b-canvas-a37bf4281` is the first form of the drawing, over the Wi-Fi address by mistake: its
+PCM row has underruns in both views and is not used here). Times are the two Meters segments' means, in milliseconds unless a unit says otherwise.
+
+**Every cell holds 20 updates a second with no fall to ten, in the first (cold) opening of the view and the second. The first run's 130 to 440 ms an update is 11 to 29 ms. The audio is whole.** What still fails is the plan's own tap limit in
+every row, and in the JOC row the cost and the steps missed, by a little.
+
+| Row (room, what the screen draws) | Burst, speakers view (us) | Burst, Meters view (us) | Rate held | An update costs (analysis + widgets + render) | Steps with no update | Tap, a burst (pass + pack, us) |
+|---|---|---|---|---|---|---|
+| stereo PCM, two tones (2.0, `pair`) | 247 | 290 to 305 | **20 Hz** | 1.7 to 2.3 (1.9 + 0.1 + 4 refreshes in 60 s: a still picture) | 0.8 % | 329 (112 + 174) |
+| E-AC-3 5.1 (5.1, `grid` of 6) | 4,037 | 4,413 to 4,542 | **20 Hz** | 11.3 to 12.5 (1.8 + 2.2 + 7.4) | 0.3 % | 573 (352 + 210) |
+| E-AC-3 5.1 on a 9.1.6 room (`grid` of 16) | 4,620 | 4,995 to 5,125 | **20 Hz** | 11.7 to 12.9 (1.9 + 2.3 + 7.7) | 0.4 % | 578 (356 + 211) |
+| E-AC-3 JOC, 7.1.4 (`grid` of 12) | 21,552 | 22,287 to 22,569 | **20 Hz** | 23.8 to 29.3 (3.3 + 4.8 + 16.5) | **1.7 %** | 723 (487 + 217) |
+| AC-4 5.1 (5.1, `grid` of 6; image I2c) | 25,937 | 26,495 to 26,688 | **20 Hz** | 14.1 to 16.2 (4.8 + 3.3 + 8.6) | 0.8 % | 584 (356 + 219) |
+
+Against the first run (the drawing as 100 to 200 objects): an update in the 5.1 room 129 to 131 -> 11 to 12; 9.1.6 165 to 173 -> 12 to 13; JOC 432 to 437 -> 24 to 29; AC-4 231 to 237 -> 14 to 16; the widgets 44 to 137 -> 2 to 5; the render
+81 to 288 -> 7 to 17 (a refresh 7.4 ms in the 5.1 room, by the preview's count for 38,000 pixels in six areas, where the first form's one rectangle cost 21 ms for 124,000 in four, and 16.5 ms against 47 ms under a JOC stream); the analysis 5.4 to 9.6 -> 1.8 to 4.8.
+
+- **The criteria**: *rate*, *stack*, *internal*, *leak*, *sync* and *burst* pass in every row; *cost* (at most 50 % of the step) and *dropped* (at most 1 %) pass in all but the JOC row (59 % and 1.7 %: 40 steps of 2,300 with no update, 13 and 11 updates late; the cell
+  is the closest to the limit because the decoder takes 22 of the 32 ms of a burst and shares the PSRAM, and the view's render goes from 7 ms in the 5.1 room to 16.5; the governor's own limit of 70 % (35 ms) is 6 ms away); *tap* fails everywhere (below).
+- **The tap costs the audio path 329 to 723 us a burst, 1 to 2.3 % of one**, against a limit of 150 us up to 8 outputs and 500 above, which was a guess. The sub-timers say where: the pass over the outputs 112 us (2 outputs), 352 (6),
+  356 (a 5.1 stream on 16 slots), 487 (12 outputs under JOC), 40 to 60 us an output, and the pack into the ring 170 to 220 us whatever the room; a clock read is 1.1 us. The first run's 370 to 860 us at -Os became 330 to 720 at -O2: the loops are what is left.
+  The audio does not mind it: no underrun, late or dropped burst, resync or invalid burst in any music row, the burst grows 2 to 12 % in the music rows (17 to 23 % in the PCM row, 43 to 58 us), and the largest sync error is within 1 ms of the speakers view's in every row.
+- **The stereo PCM row's stream is unclean in every segment, the speakers view's too**: 6 underruns and 6 resyncs in `speakers-glow`, before the Meters view had been shown once, then 1, 1 and 3 (and one overrun history read). It is not the view; the
+  first run's one underrun at the first opening of the view is the same thing seen once. Not explained: the dev Music Assistant was paired and connected this time and was not in the first run. To repeat with it disconnected before it is called a stream problem.
+- **The first, cold opening no longer falls to ten.** In the first form it fell in the first second of the 9.1.6 and JOC rows (the first draw of the stage, 110 ms, and the code cold from the flash missed ten steps) and could not rise; the governor does not judge the first
+  two seconds, and rises under 60 % of a fast step. A rise is still never seen on the kit, because nothing falls.
+- **Memory is not the problem**: 20 openings and closings lost at most 2.1 KB of PSRAM in the 5.1, 9.1.6 and PCM rows (the JOC and AC-4 rows gained 230 and 455 KB, the decoder's own allocation); the panel task's stack never had fewer than 10,812 bytes free; the
+  internal heap's low point is the same under both views in each row.
+- **The planner's cost model** (8,000 pixels an area) was set from the first form's 21 ms for 124,000 pixels in 4.3 areas (the preview's counts), about 135 ns a pixel and 1 ms an area if the pixel cost held; the second form's 7.4 ms for 38,000 pixels in 5.9 areas says 70 ns a
+  pixel and 0.8 ms an area, so a pixel is cheaper than assumed and an area dearer than a tenth of a refresh: the constant is in the right place (the plan is two or three cells of several hundred pixels' width) and a measured one would change a number in `meters_draw.hpp`, not code.
+
+What this leaves: the JOC row's two marginal criteria and the tap's cost are the open items; the ways to move them are in the order of effort the tap's two loops (a few hundred us for the audio path, not the glass), the draw buffers' rows (`ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS`, 40:
+smaller buffers stay in the cache and the render of every view gets cheaper; not tried), and a lighter mode (fewer bars), which the owner's rule asks for only if a room cannot hold 10 Hz: none of the five rooms comes near it now.
 
 ## Questions for the owner (answered 2026-10-26)
 
