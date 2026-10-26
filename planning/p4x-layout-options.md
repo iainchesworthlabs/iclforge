@@ -1,7 +1,7 @@
 # Choosing the speaker layout: what a board can carry, and what a change does
 
 **Status, 2026-10-25: built and host-tested; no board was used.** The verdict, `GET /layout-options`, the
-device page, the Speaker layout preference with its list on the screen, and the root-cause fix for a chip
+device page, the Speaker layout preference (a list on the screen then, [a sheet since](p4x-layout-builder.md)), and the root-cause fix for a chip
 that cannot open TDM are in one pull request; the board suite's capability-aware rows are in the next
 (`board_suite.py`). The kit and board check (a legal `PUT /layout`, an illegal one, the listing, a layout
 change on a playing stream) is booked later by the coordinator.
@@ -134,12 +134,15 @@ The four copies of the route list were kept in step: `GET /api` in `control.cpp`
 ## On the screen
 
 Preferences, group Sound, **Speaker layout** (`iclforge/preferences.hpp`, entry `speaker-layout`, route `/layout`).
-It is drawn as a list (`Editor::kList`, new): one line a layout, a button with the layout and its sentence beside it. A
-layout the board cannot carry is a greyed button with the reason; one it carries with a limit is a live button with the
-limit; a tap on a greyed one does nothing. While a stream plays, a tap asks first (`Pref::confirm`, new): "Changing
-the speakers makes the music drop out for a moment. Change to 5.1?" with Change and Cancel; with nothing playing the
-change is made at the tap. Stills, drawn by the preview tool at 1024x600 and 480x320 (an S3 that carries four slots,
-the question, and the kit that carries all of them): `docs/hearth/screenshots/p4-panel-prefs-layout-*.png`.
+**2026-10-25** it was drawn as a list (`Editor::kList`): one line a layout, a button with the layout and its sentence
+beside it. **2026-10-26** the owner, on the kit: "it's a big long vertical list. I'm surprised it isn't a horizontal
+list, or some better grouping", and asked for a way to say what the room has instead. The row is now the layout in
+force and a Change button (`Editor::kBuilder`), and Change opens a sheet with quick picks in two groups and a
+Build yours (around you, subwoofers, heights, how the heights are mounted), over the same verdict:
+[p4x-layout-builder.md](p4x-layout-builder.md). What stayed: a layout the board cannot carry is greyed with the
+reason; one it carries with a limit is available and says so; while a stream plays Apply asks first
+(`Pref::confirm`): "Changing the speakers makes the music drop out for a moment. Change to 5.1?" with Change and
+Cancel; with nothing playing the change is made at Apply.
 
 ## What a layout change does to a playing stream
 
