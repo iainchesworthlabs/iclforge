@@ -32,7 +32,8 @@ live in the library because it is made of FreeRTOS:
   `/firmware/coredump`, `POST /restart`, and the console's recent output at `GET /log`) go
   through the same server. `GET /` is a web page for the routes, and the only client they need:
   the state, the stream, the layout, the volume and the decode's timing, and the four actions,
-  from two files in [`ui/`](ui) sent from flash as they are
+  from two files in [`ui/`](ui), gzipped at build time (22 KB of the 69 KB they are as written) and sent from
+  flash with `Content-Encoding: gzip`
   ([`planning/esp32-device-ui.md`](../../../planning/esp32-device-ui.md)). `GET /api` lists the
   routes.
 - **`iclforge/interleave.hpp`**: planar float to interleaved 16-bit or 24-in-32 with slot padding,
