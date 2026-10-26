@@ -94,6 +94,10 @@ class Scene {
    public:
     Scene(std::vector<iclforge::render::PlanSpot> spots, Content content) : spots_(std::move(spots)), content_(content) {}
 
+    // The samples of each output in the window `next()` last made: what the board's renderer would have put out
+    // (the meters-view prototype takes its spectrum from them).
+    [[nodiscard]] const std::array<std::array<float, kWindow>, kMaxOut>& outputs() const { return outputs_; }
+
     // The window after the last one.
     Window next() {
         Window win;
