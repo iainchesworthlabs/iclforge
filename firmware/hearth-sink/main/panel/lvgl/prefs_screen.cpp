@@ -12,13 +12,16 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "iclforge/layout_builder.hpp"
 #include "iclforge/preferences.hpp"
 
 #include "board_info.hpp"
 #include "fonts.hpp"
+#include "layout_sheet.hpp"
 #include "prefs_editors.hpp"
 #include "prefs_pages.hpp"
 #include "sound_sheet.hpp"
@@ -52,7 +55,8 @@ enum class Op : int {
     kConfirm = 6,  // the question before a change that breaks the music (Pref::confirm)
     kCancel = 7,
     kEditor = 8,   // a value chosen in an editor over the sheet (a pair of times, a place: prefs_editors.cpp)
-    kOpenSheet = 9,  // the Speakers sheet of the speaker trim (sound_sheet.cpp)
+    kOpenSheet = 9,    // the Speakers sheet of the speaker trim (sound_sheet.cpp)
+    kOpenLayout = 10,  // the Speaker layout sheet (layout_sheet.cpp)
 };
 
 struct Row {
@@ -61,13 +65,11 @@ struct Row {
     lv_obj_t* details = nullptr;
     // kChoice and kToggle: one button a choice.
     std::vector<lv_obj_t*> choices;
-    // An entry drawn as a list (Editor::kList): beside each choice, its note or the reason it is greyed.
-    std::vector<lv_obj_t*> notes;
     // kStepper: - value +. kText: the value.
     lv_obj_t* minus = nullptr;
     lv_obj_t* plus = nullptr;
     lv_obj_t* value = nullptr;
-    // kAction, kInfo, kList and kSheet: the button. kText: the button that holds the value and opens the keyboard.
+    // kAction, kInfo, kList, kSheet and a layout (Editor::kBuilder): the button. kText: the button that holds the value and opens the keyboard.
     lv_obj_t* action = nullptr;
     // kText with an editor: the value as a button, which opens it.
     lv_obj_t* edit = nullptr;
@@ -263,14 +265,15 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
         if (!entry.inert.empty()) {
             lines.push_back(entry.inert);
         }
-        if (entry.pref->editor == prefs::Editor::kList) {
-            // The reasons are beside their choices. What is in use is said here when it is none of the choices (a list
-            // of speakers a person wrote).
-            bool listed = false;
-            for (const prefs::ChoiceState& choice : entry.choices) {
-                listed = listed || choice.id == entry.value;
-            }
-            if (!listed && !entry.value.empty()) {
+        if (entry.pref->editor == prefs::Editor::kBuilder) {
+            // The reasons are on the sheet the row opens. What is in use is said in words here, or, for a list of
+            // speakers a person wrote, as it was written.
+            const std::optional<iclforge::LayoutPick> pick = iclforge::pick_of(entry.value);
+            if (pick) {
+                std::string words = iclforge::pick_words(*pick) + ".";
+                words[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(words[0])));
+                lines.push_back(words);
+            } else if (!entry.value.empty()) {
                 lines.push_back("In use: " + entry.value);
             }
         } else {
@@ -299,10 +302,6 @@ lv_obj_t* make_button(lv_obj_t* parent, const std::string& text, int width, int 
                       details_of(entry) + "|";
     for (const prefs::ChoiceState& choice : entry.choices) {
         key += choice.availability.available ? '1' : '0';
-        // A note that changes while the choice stays available (a limit that gains a sentence) is a repaint too.
-        if (entry.pref->editor == prefs::Editor::kList) {
-            key += choice.availability.reason + "|";
-        }
     }
     key += prefs::step_target(entry, -1) ? 'l' : '-';
     key += prefs::step_target(entry, +1) ? 'm' : '-';
@@ -337,19 +336,10 @@ void paint_row(Row& row, const prefs::Entry& entry) {
     for (std::size_t i = 0; i < row.choices.size() && i < entry.choices.size(); ++i) {
         style_button(row.choices[i], entry.value == entry.choices[i].id, entry.choices[i].availability.available);
     }
-    for (std::size_t i = 0; i < row.notes.size() && i < entry.choices.size(); ++i) {
-        // Beside a choice: why it is greyed, or the limit it is taken with. Quiet type either way; the button says
-        // which it is.
-        lv_label_set_text(row.notes[i], entry.choices[i].availability.reason.c_str());
-        lv_obj_set_style_text_color(row.notes[i], color(on ? g.c.muted : g.c.faint), 0);
-        if (entry.choices[i].availability.reason.empty()) {
-            lv_obj_add_flag(row.notes[i], LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_remove_flag(row.notes[i], LV_OBJ_FLAG_HIDDEN);
-        }
-    }
     if (row.value != nullptr) {
-        lv_label_set_text(row.value, entry.value_label.c_str());
+        // A layout reads as the word the board holds ("7.1.4"); the other values as their label.
+        lv_label_set_text(row.value,
+                          (entry.pref->editor == prefs::Editor::kBuilder ? entry.value : entry.value_label).c_str());
         lv_obj_set_style_text_color(row.value, color(on ? g.c.text : g.c.faint), 0);
     }
     if (row.edit != nullptr) {
@@ -401,9 +391,16 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
                                         ? entry.choices.front().label
                                         : std::string("Run");
     int value_w = 0;
+    // A layout is chosen on a sheet of its own: the row has the value and the button that opens it.
+    const bool as_builder = pref.kind == prefs::Kind::kChoice && pref.editor == prefs::Editor::kBuilder;
     switch (pref.kind) {
         case prefs::Kind::kChoice:
         case prefs::Kind::kToggle:
+            if (as_builder) {
+                value_w = text_width(g.body.latin, "9.1.6:upfiring");
+                control_w = value_w + gap + button_width("Change");
+                break;
+            }
             for (const prefs::ChoiceState& choice : entry.choices) {
                 control_w += button_width(choice.label) + gap;
             }
@@ -438,9 +435,7 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
             break;
     }
     const int label_w = text_width(g.body.latin, pref.label);
-    // A list of choices (Editor::kList) is a column under its label, a choice a line with its note beside it.
-    const bool as_list = pref.kind == prefs::Kind::kChoice && pref.editor == prefs::Editor::kList;
-    const bool one_line = !as_list && label_w + 2 * gap + control_w <= content_w;
+    const bool one_line = label_w + 2 * gap + control_w <= content_w;
 
     lv_obj_t* const box = make_box(parent);
     lv_obj_set_size(box, content_w, LV_SIZE_CONTENT);
@@ -464,7 +459,7 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
 
     lv_obj_t* const controls = make_box(top);
     lv_obj_set_size(controls, one_line ? control_w : content_w, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(controls, as_list ? LV_FLEX_FLOW_COLUMN : LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_column(controls, gap, 0);
     lv_obj_set_style_pad_row(controls, gap, 0);
     lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -472,23 +467,13 @@ void build_row(lv_obj_t* parent, std::size_t index, int content_w) {
     switch (pref.kind) {
         case prefs::Kind::kChoice:
         case prefs::Kind::kToggle:
-            if (as_list) {
-                int button_w = 0;
-                for (const prefs::ChoiceState& choice : entry.choices) {
-                    button_w = std::max(button_w, button_width(choice.label));
-                }
-                const int note_w = std::max(content_w - button_w - gap, 2 * g.m.target);
-                for (std::size_t i = 0; i < entry.choices.size(); ++i) {
-                    lv_obj_t* const line = make_box(controls);
-                    lv_obj_set_size(line, content_w, LV_SIZE_CONTENT);
-                    lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
-                    lv_obj_set_style_pad_column(line, gap, 0);
-                    lv_obj_set_flex_align(line, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-                    row.choices.push_back(make_button(line, entry.choices[i].label, button_w, g.m.row_target,
-                                                      g.c.surface_up, g.c.text, &on_target,
-                                                      pack(Op::kChoose, index, i), nullptr));
-                    row.notes.push_back(make_paragraph(line, "", g.note.latin, g.c.muted, note_w));
-                }
+            if (as_builder) {
+                row.value = make_label(controls, "", g.body.latin, g.c.text);
+                lv_label_set_long_mode(row.value, LV_LABEL_LONG_MODE_CLIP);
+                lv_obj_set_width(row.value, value_w);
+                lv_obj_set_style_text_align(row.value, LV_TEXT_ALIGN_RIGHT, 0);
+                row.action = make_button(controls, "Change", button_width("Change"), g.m.row_target, g.c.surface_up,
+                                         g.c.text, &on_target, pack(Op::kOpenLayout, index, 0), nullptr);
                 break;
             }
             for (std::size_t i = 0; i < entry.choices.size(); ++i) {
@@ -626,6 +611,7 @@ void build_view() {
 void take_down() {
     // The Speakers sheet covers this one, and stops a test tone the sheet or the list started.
     sound_sheet_close();
+    layout_sheet_close();
     // A page or an editor is a child of the sheet's root; it goes first, with whatever it has not yet written.
     pages_close();
     editor_close();
@@ -799,6 +785,16 @@ void on_target(lv_event_t* event) {
                 sound_sheet_open();
             }
             return;
+        case Op::kOpenLayout:
+            // The sheet is built by its own update, outside this event; a board with no output says why in the bar.
+            if (!entry.availability.available) {
+                g.status_text = entry.availability.reason;
+                g.status_ms = now_ms();
+                g.dirty = true;
+            } else {
+                layout_sheet_open();
+            }
+            return;
         case Op::kConfirm:
         case Op::kCancel:
             return;  // answered above
@@ -900,6 +896,7 @@ void prefs_update(std::uint32_t now) {
     pages_update(now);
     editor_update(now);
     sound_sheet_update(now);
+    layout_sheet_update(now);
     if (g.dirty || now - g.refreshed_ms >= kRefreshMs) {
         refresh(now);
     }

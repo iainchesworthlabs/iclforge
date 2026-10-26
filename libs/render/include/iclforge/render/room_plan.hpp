@@ -81,6 +81,25 @@ inline constexpr int kPlanEarSize = 58;
 inline constexpr int kPlanHeightSize = 48;
 inline constexpr int kPlanLfeWidth = 84;
 inline constexpr int kPlanLfeHeight = 50;
+// A speaker at or above this elevation is overhead, and where there are several they are fanned on a ring of this size
+// (in units of the room's radius) instead of piled on the listener.
+inline constexpr double kPlanOverheadDeg = 80.0;
+inline constexpr double kPlanOverheadRing = 0.3;
+
+// The sizes plan_nodes() lays a room out in: the margins the speakers keep from the edge of the area, the speakers' own
+// sizes, how far apart two must be and the step by which two that touch are pushed apart. The defaults are the screen's
+// (1024 pixels wide, speakers of 58); plan_style_for() is the same room in a pane.
+struct PlanStyle {
+    int margin_x = 170;
+    int margin_y = 62;
+    int ear = kPlanEarSize;
+    int height = kPlanHeightSize;
+    int lfe_width = kPlanLfeWidth;
+    int lfe_height = kPlanLfeHeight;
+    int lfe_pitch = 110;
+    int gap = 6;
+    int step = 4;
+};
 
 namespace detail {
 
@@ -92,11 +111,12 @@ namespace detail {
 
 // One node a slot, in slot order. Nodes that would touch are pushed apart (a 9.1.6 room has a ceiling
 // speaker over the listener and a front height next to the centre), and every node stays inside the area.
-[[nodiscard]] inline std::vector<PlanNode> plan_nodes(std::span<const PlanSpot> spots, PlanArea area = {}) {
+[[nodiscard]] inline std::vector<PlanNode> plan_nodes(std::span<const PlanSpot> spots, PlanArea area = {},
+                                                       PlanStyle style = {}) {
     constexpr double kDegrees = 3.14159265358979323846 / 180.0;
     std::vector<PlanNode> nodes(spots.size());
-    const int margin_x = 170;
-    const int margin_y = 62;
+    const int margin_x = style.margin_x;
+    const int margin_y = style.margin_y;
     const int left = margin_x;
     const int right = std::max(left + 1, area.width - margin_x);
     const int top = margin_y;
@@ -109,11 +129,21 @@ namespace detail {
     double max_u = -1e9;
     double min_v = 1e9;
     double max_v = -1e9;
+    // Two or more speakers straight overhead (a layout with its heights in the ceiling) have no direction from above: all
+    // would land on the listener. They are drawn on a small ring of their own, each in the direction its azimuth names. One
+    // overhead speaker (the top surround of a 9.1.6) stays over the listener, where it always was.
+    int overhead = 0;
+    for (const PlanSpot& spot : spots) {
+        overhead += spot.connected && !spot.lfe && spot.elevation_deg >= kPlanOverheadDeg ? 1 : 0;
+    }
     for (std::size_t i = 0; i < spots.size(); ++i) {
         if (!spots[i].connected || spots[i].lfe) {
             continue;
         }
-        const double ring = std::cos(spots[i].elevation_deg * kDegrees);
+        double ring = std::cos(spots[i].elevation_deg * kDegrees);
+        if (overhead >= 2 && spots[i].elevation_deg >= kPlanOverheadDeg) {
+            ring = std::max(ring, kPlanOverheadRing);
+        }
         u[i] = -std::sin(spots[i].azimuth_deg * kDegrees) * ring;
         v[i] = -std::cos(spots[i].azimuth_deg * kDegrees) * ring;
         placed.push_back(i);
@@ -138,7 +168,7 @@ namespace detail {
         for (const std::size_t i : placed) {
             const bool height = spots[i].elevation_deg >= 30.0;
             nodes[i].shape = height ? PlanShape::kHeight : PlanShape::kEar;
-            nodes[i].w = nodes[i].h = height ? kPlanHeightSize : kPlanEarSize;
+            nodes[i].w = nodes[i].h = height ? style.height : style.ear;
             nodes[i].x = static_cast<int>(std::lround(mid_x + (u[i] - centre_u) * sx));
             nodes[i].y = static_cast<int>(std::lround(mid_y + (v[i] - centre_v) * sy));
         }
@@ -150,7 +180,7 @@ namespace detail {
                 for (std::size_t b = a + 1; b < placed.size(); ++b) {
                     PlanNode& first = nodes[placed[a]];
                     PlanNode& second = nodes[placed[b]];
-                    if (!detail::plan_overlap(first, second, 6)) {
+                    if (!detail::plan_overlap(first, second, style.gap)) {
                         continue;
                     }
                     double dx = second.x - first.x;
@@ -163,10 +193,10 @@ namespace detail {
                         dx /= length;
                         dy /= length;
                     }
-                    first.x -= static_cast<int>(std::lround(dx * 4.0));
-                    first.y -= static_cast<int>(std::lround(dy * 4.0));
-                    second.x += static_cast<int>(std::lround(dx * 4.0));
-                    second.y += static_cast<int>(std::lround(dy * 4.0));
+                    first.x -= static_cast<int>(std::lround(dx * style.step));
+                    first.y -= static_cast<int>(std::lround(dy * style.step));
+                    second.x += static_cast<int>(std::lround(dx * style.step));
+                    second.y += static_cast<int>(std::lround(dy * style.step));
                     moved = true;
                 }
             }
@@ -190,11 +220,63 @@ namespace detail {
             continue;
         }
         nodes[i].shape = PlanShape::kLfe;
-        nodes[i].w = kPlanLfeWidth;
-        nodes[i].h = kPlanLfeHeight;
-        nodes[i].x = area.width / 2 + static_cast<int>(std::lround((lfe_seen - (lfe_total - 1) / 2.0) * 110.0));
-        nodes[i].y = area.height - kPlanLfeHeight;
+        nodes[i].w = style.lfe_width;
+        nodes[i].h = style.lfe_height;
+        nodes[i].x = area.width / 2 +
+                     static_cast<int>(std::lround((lfe_seen - (lfe_total - 1) / 2.0) * style.lfe_pitch));
+        nodes[i].y = area.height - style.lfe_height;
         ++lfe_seen;
+    }
+    return nodes;
+}
+
+// The same room in a pane of `width` by `height` pixels: speakers of a size that suits the pane (the screen's 58 pixels in a
+// pane the screen's size, a third of that in a quarter of it), the margins and gaps to match, and the low-frequency feeds in
+// a strip of their own under the room, so that the rear surrounds of a 7.2 or 9.2 layout never sit on them. Every node stays
+// inside the pane. A speaker under about 24 pixels is too small to carry its name, which is the caller's to leave off
+// (PlanNode::w says).
+[[nodiscard]] inline PlanStyle plan_style_for(int width, int height) {
+    PlanStyle style;
+    const int ear = std::clamp(std::min(width / 8, height / 9), 8, kPlanEarSize);
+    style.ear = ear;
+    style.height = std::max(6, ear * 5 / 6);
+    style.lfe_width = ear * 3 / 2;
+    style.lfe_height = std::max(6, ear * 5 / 6);
+    style.margin_x = ear / 2 + 3;
+    style.margin_y = ear / 2 + 3;
+    style.lfe_pitch = style.lfe_width + ear / 3 + 2;
+    style.gap = std::max(1, ear / 10);
+    style.step = std::max(1, ear / 14);
+    return style;
+}
+
+[[nodiscard]] inline std::vector<PlanNode> plan_nodes_fit(std::span<const PlanSpot> spots, int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return std::vector<PlanNode>(spots.size());
+    }
+    const PlanStyle style = plan_style_for(width, height);
+    std::vector<PlanSpot> ring(spots.begin(), spots.end());
+    int feeds = 0;
+    for (PlanSpot& spot : ring) {
+        if (spot.lfe && spot.connected) {
+            spot.connected = false;
+            ++feeds;
+        }
+    }
+    const int strip = feeds > 0 ? style.lfe_height + style.gap + 2 : 0;
+    std::vector<PlanNode> nodes = plan_nodes(ring, PlanArea{width, std::max(1, height - strip)}, style);
+    int placed = 0;
+    for (std::size_t i = 0; i < spots.size(); ++i) {
+        if (!(spots[i].lfe && spots[i].connected)) {
+            continue;
+        }
+        nodes[i].shape = PlanShape::kLfe;
+        nodes[i].w = style.lfe_width;
+        nodes[i].h = style.lfe_height;
+        nodes[i].x = std::clamp(width / 2 + static_cast<int>(std::lround((placed - (feeds - 1) / 2.0) * style.lfe_pitch)),
+                                nodes[i].w / 2, width - nodes[i].w / 2);
+        nodes[i].y = height - style.lfe_height / 2 - 1;
+        ++placed;
     }
     return nodes;
 }

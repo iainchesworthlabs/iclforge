@@ -18,6 +18,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_hardware_info.cpp
     test_improv.cpp
     test_interleave.cpp
+    test_layout_builder.cpp
     test_layout_options.cpp
     test_log_ring.cpp
     test_meters_view.cpp
