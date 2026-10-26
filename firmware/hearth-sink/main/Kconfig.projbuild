@@ -1079,14 +1079,22 @@ config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
 
 config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT
     int "Port that serves the picture as a BMP at /panel.bmp (0 = none)"
-    default 8081
+    default 0
     range 0 65535
     help
         A second, tiny HTTP server for development: GET /panel.bmp is what is
         on the glass (or in the frame buffer, with no glass), GET /panel is
-        the drawing statistics as JSON and POST /panel/tap?x=..&y=.. is a tap
-        (a touch with no touch controller). It is how a design is checked
-        before the panel is here. Set 0 for a release image.
+        the drawing statistics as JSON, POST /panel/tap?x=..&y=.. is a tap
+        (a touch with no touch controller) and POST /panel/demo?mode=.. plays
+        a demo song. It has no authentication: anyone on the network can read
+        the screen and press its buttons. It is how a design is checked before
+        the panel is here, and what the screen tests drive a board by.
+
+        0, the default, starts no server. A release image has 0
+        (profiles.json locks it, and package_firmware.py refuses an image
+        built with any other). 8081 comes from the panel-capture overlay
+        (sdkconfig.panel-capture) for an image that is run on a bench, and
+        from sdkconfig.panel-null, which exists to be read back.
 
 config ICLFORGE_EXAMPLE_PANEL_BACKLIGHT_GPIO
     int "Backlight PWM GPIO (-1 = none)"

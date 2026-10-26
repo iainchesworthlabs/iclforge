@@ -142,6 +142,7 @@
       ]
     },
     "p4-rev3": {
+      "baseline_accepted": {"profile_hash": "d3a19fc4876d", "why": "PANEL_CAPTURE_PORT 8081 -> 0: the release image no longer starts the screen's unauthenticated read-back and touch server (its task, its sockets and its stack), so no figure the baseline holds can get worse; the boot heap can only grow. Not re-recorded: no board run was available with this change. Owed: board_suite.py run --record on the kit with this definition's image (the owner's rule, 2026-10-12, asks a changed locked value to be re-recorded)."},
       "note": "The owner's kit (P4X, chip v3.2), first played and baselined 2026-10-20. Its HTTP rows are the release profiles' two 2.0 streams, plus the row only a v3.x chip can play: a 5.1 stream rendered onto 9.1.6, which is sixteen 32-bit TDM slots, the full 512-bit frame of the ES9080 pair (a 24.576 MHz bit clock, from the 160 MHz PLL the older silicon has no I2S source for). The row fails if the sink opens for fewer slots. The Sendspin rows wait for a test server on the bench.",
       "plays": [
         {

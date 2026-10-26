@@ -1181,6 +1181,12 @@ curl -X POST "http://<board>:8081/panel/demo?mode=2"   # a song loops on the scr
 curl -o screen.bmp http://<board>:8081/panel.bmp
 ```
 
+That port-8081 server has no authentication, so the release profile `p4-rev3` (the image with the glass)
+does not start it. A kit that is run on a bench gets it from the `panel-capture` overlay
+(`SDKCONFIG_DEFAULTS="$(python tools/hearth/sink_profile.py defaults p4-rev3 --overlay panel-capture)"`), which
+`sink_profile.py verify p4-rev3 --overlay panel-capture` holds to the profile and
+`package_firmware.py` refuses to publish.
+
 `preview/` draws the same `lyric_screen.cpp` on a computer, in seconds. The screens, the pins, the
 fonts and what drawing costs are in [An ESP32-P4 sink](../../docs/hearth/sink-esp32-p4.md) and
 [planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md).

@@ -32,6 +32,17 @@ See [README.md](README.md) for the project overview and
   the ESP32-C6, which has none, keeps them as before.
 - **Fixed: an S3 or C6 sink came back from every update or restart at 2.0 and 32-bit slots.** `PUT /slot-width` changed the sink but stored nothing, so the width went back to the image's 32 at boot; a line holds 4 slots at 32-bit and 8 at 16-bit, so the stored layout (`PUT /layout` was always stored) no longer fitted, and boot kept 2.0. The width is now stored when it is set and applied at boot before the stored layout is judged, so a 5.1.2 at 16-bit stays through an update. A board set to 16-bit before this build is still at 32-bit after the first update to it, and needs the width set once more. (The P4X's wide sink, with 16 slots at either width, kept its layout all along.)
 - **Changed: a P4 sink takes a TCP window of 23,040 bytes, not lwIP's 5,760.** A window caps a stream at its size over the round-trip time and, at four segments, leaves a lost one only the retransmission timer to repair it. With five boards streaming PCM on one 2.4 GHz channel the round trip rose from 10-15 ms to 32-50 ms: a server saw 0.8-2 s stalls on a P4 and skipped 26 % of its stream as late, while the board counted three underruns. The S3 and C6 profiles keep the small window for now (their internal heap has less to spare).
+- **Fixed: the P4X image served its screen to anyone on the network.** `hearth-sink-esp32p4-rev3` started a second
+  HTTP server on port 8081 (`CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`) that answers with no authentication:
+  `GET /panel.bmp` is the screen as a picture, `GET /panel` its drawing state, and `POST /panel/tap?x=..&y=..` presses a
+  button on it (the Preferences sheets included) and `POST /panel/demo` starts a demo song. It was a development tool
+  that the profile had locked on, and its own help said a release image should have 0. The release profile, the panel
+  fragment and the Kconfig default now have 0 (no server), and `package_firmware.py` refuses to package a build with any
+  other port. The screen tests and the bench get the server from a new `panel-capture` overlay
+  (`sink_profile.py defaults p4-rev3 --overlay panel-capture`), and the `panel-null` development build keeps it. The control
+  surface on port 80 is still open to the network, as the device UI plan records; this closes the second door and not
+  that one. `p4-rev3`'s hash moves (`ff9b27a6c4fd` to `d3a19fc4876d`); its board-suite baseline is kept under the old one
+  (`baseline_accepted`) until it is re-recorded on the kit.
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
   (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C

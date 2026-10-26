@@ -27,7 +27,9 @@ names) and writes into DIR:
 <version> is the version the image itself carries (esp_app_desc_t), so the
 file names and the image agree. An image with a Wi-Fi network built into it
 is refused: a published image gets its network from Improv or the board's
-page, and keeps it in NVS.
+page, and keeps it in NVS. So is an image whose screen is served over HTTP
+(CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT other than 0): that server has no
+authentication and is a bench's tool.
 
 `manifest` merges every <name>.json in DIR into hearth-sink-manifest.json,
 which ota.py push --release reads to choose an image for each board, and
@@ -249,6 +251,13 @@ def package(
         raise PackageError(
             "this build has a Wi-Fi network built into its image "
             "(CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID or _PASSWORD); a published image must not"
+        )
+    capture_port = sdkconfig.get("CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT", "0")
+    if capture_port != "0":
+        raise PackageError(
+            f"this build serves its screen on port {capture_port} "
+            "(CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT): that HTTP server reads the picture and "
+            "presses the buttons for anyone on the network, so a published image must not have it"
         )
 
     app_path = build / str(description.get("app_bin", ""))

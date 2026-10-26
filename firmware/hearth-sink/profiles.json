@@ -59,6 +59,13 @@
       "note": "observation only: the PCM hash an AC-4 play carries; no placement, size or cache. sdkconfig.measure sets ICLFORGE_EXAMPLE_AC4_PCM_HASH and nothing else; the report cadence is declared for a scratch build to change",
       "fragment": "measure"
     },
+    "panel-capture": {
+      "touches": [
+        "ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"
+      ],
+      "note": "the screen's read-back and touch server (HTTP on 8081, no authentication) on, for an image that is run on a bench: tools/hearth/screen_script.py drives a board's screen by it. A release profile locks the port at 0 and package_firmware.py refuses an image built with this overlay; sdkconfig.panel-capture sets that key and nothing else",
+      "fragment": "panel-capture"
+    },
     "qemu-net": {
       "touches": [
         "ICLFORGE_EXAMPLE_NETWORK_*",
@@ -1002,7 +1009,7 @@
         "CONFIG_ICLFORGE_EXAMPLE_I2S_WS_GPIO": "21",
         "CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET": "y",
         "CONFIG_ICLFORGE_EXAMPLE_NETWORK_WIFI": "y",
-        "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT": "8081",
+        "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT": "0",
         "CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI": "y",
         "CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES": "16384",
         "CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES": "0",

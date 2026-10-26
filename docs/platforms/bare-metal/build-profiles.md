@@ -281,6 +281,7 @@ overlay touches.
 |---|---|---|
 | `wifi-credentials` | a file of the board's network, given last (`defaults --wifi FILE`) | A build for a bench board. The packager refuses to publish an image with a network built in |
 | `measure` | `sdkconfig.measure` | Turns on the PCM hash an AC-4 play prints, so a board's output can be compared with the host's |
+| `panel-capture` | `sdkconfig.panel-capture` | The P4 profile with a screen, with its read-back and touch server on 8081 (no authentication), for a bench; a release image has it off and the packager refuses one with it on |
 | `qemu-net` | `sdkconfig.qemu-net` | The S3 release profile under QEMU: Ethernet for Wi-Fi, the capture sink for I2S, quad PSRAM for octal, the console on UART0 |
 
 `other_stacks` lists fragment lists that appear in the documentation and in fragment headers and

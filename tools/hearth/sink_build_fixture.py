@@ -103,6 +103,7 @@ def make_build(
     flash_size: str = "16MB",
     psram: bool = True,
     wifi_ssid: str = "",
+    capture_port: str | None = None,
     min_rev: int = 0,
     max_rev: int = 99,
     app: bytes | None = None,
@@ -152,7 +153,12 @@ def make_build(
         f'CONFIG_ESPTOOLPY_FLASHSIZE="{flash_size}"\n'
         + ("CONFIG_SPIRAM=y\n" if psram else "# CONFIG_SPIRAM is not set\n")
         + f'CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID="{wifi_ssid}"\n'
-        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD=""\n',
+        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD=""\n'
+        + (
+            ""
+            if capture_port is None
+            else f"CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT={capture_port}\n"
+        ),
         "utf-8",
     )
     (build / "project_description.json").write_text(

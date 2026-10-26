@@ -6,7 +6,8 @@
 # RUN 2026-10-20 on the kit (planning/karaoke-p4x-panel.md, "First run on the kit"): the bus, the
 # EK79007 and the GT911 start, the screen is as designed and a tap reaches every button of the
 # controls sheet. The touch layer's orientation is Kconfig (CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_*,
-# the defaults being this board's). The read-back route is left on while the panel is brought up
-# (set the port to 0 for a release image).
+# the defaults being this board's). The read-back and touch server (an HTTP server with no
+# authentication) is off: this is the release image's fragment. An image that is run on a bench turns
+# it on with the panel-capture overlay (sdkconfig.panel-capture).
 CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI=y
-CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=8081
+CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=0

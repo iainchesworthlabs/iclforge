@@ -1,0 +1,13 @@
+# The screen's read-back and touch server (main/panel/lvgl/panel.cpp) on, for an image that is run on
+# a bench (planning/esp32-platform-profiles.md, "panel-capture"): GET :8081/panel.bmp, GET :8081/panel,
+# POST :8081/panel/tap and POST :8081/panel/demo, which is what tools/hearth/screen_script.py drives a
+# board's screen by and what the screenshots of a board come from. Given after the profile's own
+# fragments:
+#
+#   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults p4-rev3 --overlay panel-capture)"
+#
+# The server has no authentication: anyone on the network can read the screen and press its buttons.
+# A release image has the port at 0, which profiles.json locks, and package_firmware.py refuses an
+# image built with this overlay. Nothing else is set here, and a key added to this file is a key to
+# declare.
+CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=8081
