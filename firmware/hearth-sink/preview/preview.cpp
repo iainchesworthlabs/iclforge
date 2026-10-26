@@ -1330,6 +1330,11 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
         const std::vector<lv_obj_t*> identify = buttons_in(prefs, "Identify");
         if (!identify.empty()) {
             lv_obj_scroll_to_view_recursive(identify.front(), LV_ANIM_OFF);
+            // ... and a half screen further, so that the row is in the middle and what follows it is in the picture too.
+            lv_obj_t* const list = find_scroller(prefs);
+            if (list != nullptr) {
+                lv_obj_scroll_by(list, 0, -(height / 2), LV_ANIM_OFF);
+            }
         }
         pump(2);
         write_bmp(out / ("prefs-sound-" + size + ".bmp"));
