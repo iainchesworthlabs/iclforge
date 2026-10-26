@@ -10,6 +10,11 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: the Sendspin player can show a screen each block of its output (`BlockTap`), for the Meters view.** `BurstPlayer::set_block_tap()` takes a tap that is
+  called once a block (256 frames) while it wants to be, after the speakers' trims and the volume, so that it sees what is heard; with none, or one that does not
+  want blocks, the path is one pointer load, so an image with no screen pays for an interface and not a feature. `MeterTap` (`iclforge/meters_tap.hpp`) is the
+  Meters view's: a mono mix of the live outputs in a lock-free ring of 16-bit samples (32 KB) and each output's peak over 50 ms, with the time, blocks, frames and
+  torn reads it costs counted. Nothing sets a tap yet.
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
