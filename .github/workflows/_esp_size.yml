@@ -17,6 +17,14 @@
 # fourteen: the gate takes no longer. To hold another profile to its budget the same way, add it
 # to the list below.
 #
+# A change must also leave room for the next one: `verify --app-headroom` fails an image with fewer
+# than that many bytes under the slot, 10,240 (10 KiB) for the 4 MB C6. The changes that cost the
+# image most lately were 25.6, 18.3, 9.0 and 8.1 KB, so a change that leaves less than 10 KiB is
+# the last one that fits, and the next feature is red with no lead time. To clear it, make room (a
+# smaller table, a Kconfig switch, the compiler's size flags) or ask for the slot to be moved in
+# partitions_c6.csv; do not lower the number below what the changes that land cost. Unlike the
+# profile guard this does not honour ESP32_PROFILE_GUARD=warn: a slot is not a soft limit.
+#
 # Called from pr-gate.yml, for a change the planner marks `esp_size`, in a pull request and in the
 # merge queue. ci-status reads its result and fails closed when the plan asked for it.
 #
@@ -49,16 +57,13 @@ jobs:
 
       - name: Build the 4 MB C6 profile and hold its image to its slot
         shell: bash
-        env:
-          ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh" > /dev/null
           profile="$GITHUB_WORKSPACE/tools/hearth/sink_profile.py"
-          guard=()
-          if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
-          # Profiles that are built and held to their budget, one id a line: id, then the IDF target.
-          while IFS=' ' read -r id target; do
+          # Profiles that are built and held to their budget, one a line: id, the IDF target, and the
+          # bytes a change must leave free under the budget.
+          while IFS=' ' read -r id target headroom; do
             dir="$RUNNER_TEMP/size-$id"
             echo "::group::$id ($target)"
             defaults="$(python3 "$profile" defaults "$id")"
@@ -71,8 +76,8 @@ jobs:
               idf.py -B "$dir" size --format json2 > "$dir/size.json"
             )
             python3 "$profile" verify "$id" --build-dir "$dir" --size-json "$dir/size.json" \
-              --github "${guard[@]}"
+              --app-headroom "$headroom" --github
             echo "::endgroup::"
           done <<'PROFILES'
-          c6-4mb esp32c6
+          c6-4mb esp32c6 10240
           PROFILES

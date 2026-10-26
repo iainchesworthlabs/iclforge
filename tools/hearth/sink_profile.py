@@ -471,6 +471,7 @@ def verify(
     build: Path,
     overlays: tuple[str, ...] = (),
     size_json: Path | None = None,
+    app_headroom: int = 0,
 ) -> list[Finding]:
     spec = profile(data, ident)
     findings: list[Finding] = []
@@ -568,6 +569,17 @@ def verify(
                     "budget",
                     f"the app image is {size:,} bytes, over the profile's "
                     f"{budget['app_bytes_max']:,}",
+                )
+            )
+        elif size > budget["app_bytes_max"] - app_headroom:
+            # Under the budget but with less room than the caller asks a change to leave: the
+            # next change that adds a feature would be the one that fails, with no lead time.
+            findings.append(
+                Finding(
+                    "budget",
+                    f"the app image is {size:,} bytes, {budget['app_bytes_max'] - size:,} under "
+                    f"the profile's {budget['app_bytes_max']:,}: a change must leave "
+                    f"{app_headroom:,} free",
                 )
             )
     boot = build / "bootloader" / "bootloader.bin"
@@ -788,6 +800,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="report findings as warnings and exit 0 (the repository's ESP32_PROFILE_GUARD=warn)",
     )
+    check.add_argument(
+        "--app-headroom",
+        type=int,
+        default=0,
+        metavar="BYTES",
+        help="also fail an app image with fewer than this many bytes left under its budget",
+    )
 
     expect = commands.add_parser(
         "expect-console",
@@ -836,7 +855,12 @@ def main(argv: list[str] | None = None) -> int:
             print(defaults_string(data, args.profile, tuple(args.overlay), args.wifi))
         elif args.command == "verify":
             findings = verify(
-                data, args.profile, args.build_dir, tuple(args.overlay), args.size_json
+                data,
+                args.profile,
+                args.build_dir,
+                tuple(args.overlay),
+                args.size_json,
+                args.app_headroom,
             )
             _report(findings, args.profile, args.github, "warning" if args.warn_only else "error")
             if findings and not args.warn_only:
