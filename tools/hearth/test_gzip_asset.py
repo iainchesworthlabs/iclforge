@@ -46,10 +46,11 @@ class GzipAsset(unittest.TestCase):
         source.touch()  # a later modification time must not reach the output
         second = self.write(source, "b.gz")
         self.assertEqual(first, second)
-        # No modification time and no file name in the header; "unknown" as the operating system.
+        # No modification time and no file name in the header; "unknown" as the operating system, on
+        # every platform (Python's own gzip module writes the platform's).
         self.assertEqual(first[:4], b"\x1f\x8b\x08\x00")
         self.assertEqual(first[4:8], b"\x00\x00\x00\x00")
-        self.assertEqual(first[9], 255)
+        self.assertEqual(first[8:10], b"\x02\xff")
 
     def test_the_real_page_is_a_third_of_its_size(self) -> None:
         total = 0
