@@ -208,8 +208,9 @@ class Conservative(unittest.TestCase):
         self.assertEqual(gate.plan([])["esp"], "true")
 
     def test_the_esp32_image_is_planned_for_what_is_compiled_into_it(self):
-        # What the profiles are configured from, and the libraries the sinks link: a header-only change to
-        # libs/device (the zone table, the preferences' registry) is 12 KB of a 4 MB C6's image.
+        # What the profiles are configured from, and the libraries the sinks link: a header-only
+        # change to libs/device (the zone table, the preferences' registry) is 12 KB of a 4 MB
+        # C6's image.
         for path in (
             "firmware/hearth-sink/main/hearth_sink.cpp",
             "firmware/esp-idf/iclforge/ui/iclforge_ui.js",

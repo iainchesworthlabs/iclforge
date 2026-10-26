@@ -87,10 +87,16 @@ ESP_PREFIXES = (
     ".github/workflows/_profiles.yml",
 )
 
-# What can change the size of an ESP32 sink's image: the above, and the libraries (and the build files and vendored
-# code under them) that the sinks compile in, whatever `esp` makes of them. A library's own tests and fuzzers are not in
-# the image (LIBRARY_CONSUMERS).
-ESP_IMAGE_PREFIXES = (*ESP_PREFIXES, "libs/", "cmake/", "external/", ".github/workflows/_esp_size.yml")
+# What can change the size of an ESP32 sink's image: the above, and the libraries (and the build
+# files and vendored code under them) that the sinks compile in, whatever `esp` makes of them. A
+# library's own tests and fuzzers are not in the image (LIBRARY_CONSUMERS).
+ESP_IMAGE_PREFIXES = (
+    *ESP_PREFIXES,
+    "libs/",
+    "cmake/",
+    "external/",
+    ".github/workflows/_esp_size.yml",
+)
 
 # The projects whose change can alter how fast the encoder runs or how much it allocates:
 # the libraries and the vendored code that was inside the sendspin library. Tests, apps and
