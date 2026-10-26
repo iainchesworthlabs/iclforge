@@ -384,9 +384,13 @@ class Judgement(unittest.TestCase):
         ten = meters(rate=10, cost=49_000, falls=1, outputs=16)
         self.assertTrue(self.verdicts(pm.ROWS[2], full_run(meter=ten))["cost"]["ok"])
 
-    def test_a_dropped_step_fails(self) -> None:
-        self.assertFalse(
+    def test_a_dropped_step_is_allowed_to_a_hundredth_of_them_and_no_more(self) -> None:
+        # Two segments of 1,000 updates each.
+        self.assertTrue(
             self.verdicts(pm.ROWS[1], full_run(meter=meters(dropped=2)))["dropped"]["ok"]
+        )
+        self.assertFalse(
+            self.verdicts(pm.ROWS[1], full_run(meter=meters(dropped=60)))["dropped"]["ok"]
         )
 
     def test_a_panel_stack_nearly_used_up_fails(self) -> None:
@@ -447,7 +451,7 @@ class Report(unittest.TestCase):
         self.assertIn("All criteria that could be judged pass.", text)
 
     def test_a_failure_is_named_in_the_verdict(self) -> None:
-        result = pm.analyse(pm.ROWS[1], full_run(meter=meters(dropped=3)), PLAN)
+        result = pm.analyse(pm.ROWS[1], full_run(meter=meters(dropped=60)), PLAN)
         text = pm.render({"label": "x", "rows": [result]})
         self.assertIn("**FAIL**", text)
         self.assertIn("Failed: eac3-5.1 dropped.", text)

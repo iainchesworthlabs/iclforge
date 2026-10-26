@@ -274,7 +274,7 @@ mean since the count began, the largest, and how many.
 | `meters.analysis_us` | the tap read, the transform, the power average and the ballistics |
 | `meters.widgets_us` | setting the bars, ticks and labels that moved (LVGL only invalidates; nothing is drawn yet) |
 | `meters.render_us` | LVGL's refreshes while the view shows |
-| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; reads the screen made and the ones the writer overran or that came before enough was written |
+| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; the same split into the pass over the outputs and the pack into the ring (every sixteenth block is timed in parts), and one clock read; reads the screen made and the ones the writer overran or that came before enough was written |
 
 The developer view (three taps on the footer's name) shows the same figures in its PERFORMANCE section once the Meters view has been opened: the
 rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `widgets`, `render`), and `late`, `dropped` and the tap's cost.
@@ -374,14 +374,19 @@ Each run writes `<row>.samples.json` (a sample a second: the stream's counters a
 | **stream** | no underrun, late or dropped burst, resync or invalid burst in **any** segment, whichever view shows |
 | **burst** | the Meters view's mean `burst_us` is at most the speakers view's (glow) plus the larger of 15 % and 250 us |
 | **tap** | the tap costs the audio path at most 150 us a burst up to 8 outputs, 500 us above; and not one history read torn |
-| **rate** | a room of up to 6 outputs holds 20 Hz with no fall; a larger room is *reported* (it may fall to 10 Hz, which is the rule working) |
+| **rate** | **20 Hz if possible, else a steady 10 Hz** (the owner, 2026-10-26), and the report says which cell holds which. A cell holds 20 Hz if it ran at 20 with no fall. It holds a steady 10 Hz if it fell (or could not hold 20), no more than 1 % of its steps went by with no update, and an update costs at most half of the 100 ms step. Anything else fails: the glass would show a few updates a second |
 | **cost** | an update's mean cost (analysis + widgets + the render before it) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
-| **dropped** | no whole step went by with no update |
+| **dropped** | at most 1 % of the steps went by with no update (the same 1 % as a steady 10 Hz) |
 | **stack** | the panel task's stack had at least 4 KiB free at its least |
 | **internal** | the internal heap's low point under the Meters view is within 8 KiB of the speakers view's |
 | **leak** | PSRAM free after the 20th return to the speakers view is within 16 KiB of its value after the first |
 | **sync** | the largest sync error (`error_us`) under the Meters view is within 1 ms of the speakers view's |
 | **as it was** (`compare`) | the glow's mean burst against I0's speakers view is within 5 % or 100 us; the pulse is reported |
+
+The *as it was* difference is **not only the speakers view's style**. I1 also has the Meters tap in the player (one pointer load per block while no view
+wants it) and the responsive-levels read the speakers view makes of the player (`read_now_levels`), and an earlier window measured Glow against Pulse within
+1 %, so when a burst differs between I0 and I1 the style is not where to look first. The *stream* criterion's first-opening finding below is a second thing to
+repeat: the first, cold opening of the Meters view against the second (`meters-a` against `meters-b`), which the report now names when every fault is in the first.
 
 **After.** Collect the three `report.md`s and the comparison into the plan page as **Kit results** (the date, the commits, the tables), replace the
 estimates under *What it costs* by the measured costs and say which numbers moved, and set the governor's limits (`GovernorLimits`) to what the kit
@@ -416,6 +421,33 @@ The first run of the protocol, on the kit (`P4X`, 1024 by 600, 400 MHz, over its
 - **The speakers view as it was against as it is** (I0 against I1): the glow's mean burst is within -2.2 to +1.6 % in three rows and +6.6 % (16 us) on the stereo PCM tones, all inside the allowance (5 % or 100 us); the pulse is reported at +2.9 to +29 % (0.6 ms on the heaviest row), and its refresh costs 2.0 to 6.8 ms, as the glow's does.
 
 What this changes: the levers the plan listed, in the order it gave them, are now needed and are not enough in the first form: **10 updates a second is already automatic and is not enough**. The cost is the number of small invalid areas and objects, not the pixels (1.3 to 1.8 million a second), so the next step is **one custom-drawn object for the spectrum and one for each group of bars**, which makes an update two or three invalid areas and a handful of draw calls instead of 100 to 200; then the tap's loop (its second pass over the outputs' floats, which the level meter already reads once) and the analysis' placement (its tables in the PSRAM). The kit protocol runs unchanged on the result.
+
+### The rework: one canvas a chart (2026-10-26)
+
+What the speakers view's drawing does that the Meters view's did not: it has **a few objects** (at most 16 circles), changes an opacity only **in quantised steps and
+only when a step changes**, runs at about 10 Hz and **never changes a geometry**, so a refresh is a few small invalid areas. The Meters view had a rectangle for
+each part of each bar (three and a tick a bar, 100 to 200 objects), every one with a geometry that moved every update; LVGL then walks the whole object tree once
+for each invalid area it flushes and each flush is a DSI transfer of its own (1 to 1.5 ms on the P4 whatever its size).
+
+- **The spectrum plot is one object**, an RGB565 canvas (`lv_canvas`, a draw buffer in the PSRAM), and so are **the channel bars** (every group, one canvas) and **the pair of
+  meters** (one canvas). `iclforge/meters_draw.hpp` is the pure drawing (the zones, the peak ticks, the faint line, the troughs) into any 16-bit buffer, host-tested; an update works out
+  which rows of a bar changed (`rows_touched`), draws only those, and invalidates the one rectangle they make, so **an update is two to six invalid areas** (the panel preview counts the
+  flushes an update makes: **58 to 118 before, 4.3 to 5.7 now at 1024 by 600**, 2 to 3 below that), at the price of somewhat more pixels in them (a bar's rows, not its three
+  rectangles; the preview's bound is 7 million a second at 1024 by 600). A test redraws
+  a bar by random walk, incrementally and from scratch, and holds the two bit for bit.
+- **The numbers** under the bars (the dB figures) are text and change at **4 Hz**, not every update.
+- **The analysis is cheaper**: the spectrum's power average, the band levels, the downmix and the ballistics work in `float` (the P4 has no double unit: a `pow`, `log10` or `exp`
+  in double is software, microseconds each; they are `exp2f`/`log2f` now), and the low half of the bands (the 2048-point transform at 12 kHz) is analysed **every other update**, the high half
+  every update; the halves are held equal to the whole by test, and a slowed view (the governor at 10 Hz) analyses both every update.
+- **-O2** for `meters_screen.cpp` and `panel.cpp` (the player's tap is header-only and runs in panel.cpp's translation unit); the project's -Os does not inline or unroll.
+- **The refresh means are exact** (`panel.refresh_us` was a mean of means).
+- **The tap's cost is measured in parts**: every sixteenth block times its pass over the outputs, its pack into the ring and its clock reads (`tap.us_pass_per_burst`, `us_pack_per_burst`,
+  `us_per_clock_read`); the kit showed 370 to 860 us a burst for about 45 ns a sample, the same as the level meter's own pass, and the parts say where it goes.
+- **Not changed**: the representations, the zone colours, the governor (20 to 10 Hz) and the protocol. A **lighter mode** (fewer bars, a smaller matrix) is deliberately not built: it is added only if the
+  reworked view cannot hold a steady 10 Hz on a 9.1.6 room or a JOC 7.1.4 stream on the kit, so that the glass never shows two to eight updates a second.
+
+**Not yet measured on the board.** The host's figures say what changed (areas an update, rows redrawn), not what the P4 makes of it; the kit run is the same protocol, with the cold first opening against the
+second kept apart, and the answer it gives is *which cell holds 20 Hz and which a steady 10 Hz*.
 
 ## Questions for the owner (answered 2026-10-26)
 

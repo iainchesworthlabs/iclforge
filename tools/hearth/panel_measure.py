@@ -424,8 +424,12 @@ def judge_row(
             f"an update costs {cost / 1000:.1f} ms on average, {100 * cost / step:.0f} % of the "
             f"{step // 1000} ms step (at most {100 * COST_FRACTION_OF_STEP:.0f} %)",
         )
-        misses = sum(figures[n]["meters"]["dropped"] for n in meter_names)
-        add("dropped", misses == 0, f"{misses} whole steps went by with no update")
+        add(
+            "dropped",
+            missed_share <= STEADY_TEN_MISSED_FRACTION,
+            f"{missed} whole steps went by with no update ({100 * missed_share:.1f} % of the "
+            f"steps; at most {100 * STEADY_TEN_MISSED_FRACTION:.0f} %)",
+        )
     else:
         add("rate", None, "the Meters view showing")
 
