@@ -23,6 +23,8 @@ bool panel_start() { return false; }
 
 PanelStats panel_stats() { return {}; }
 
+std::optional<std::string> panel_stats_text() { return std::nullopt; }
+
 iclforge::DisplayCaps panel_display_caps() { return {}; }
 
 iclforge::devview::Facts panel_board_facts() { return {}; }

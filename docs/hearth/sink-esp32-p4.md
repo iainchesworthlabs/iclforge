@@ -425,6 +425,17 @@ tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in 
 How fast it runs on the kit, and the protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 
+**What the Meters view costs, and the rate it holds.** `GET /panel-stats` (port 80, on a board with a screen) says what the panel
+costs: LVGL's refreshes (the start of one to its end, the flush to the glass included), the panel task's stack never-free minimum, the
+PSRAM and internal heap now and at their lowest, and, once the view has been opened, the Meters view's own figures since it opened: the rate it
+holds, how long an update's analysis, widgets and render take (last, mean, largest), the updates that were late or missed, and what the player's
+tap costs the audio path for a burst of 1,536 frames. The developer view shows the same in its PERFORMANCE section. The view runs at **twenty updates
+a second when the panel's task can keep up and ten when it cannot** (`iclforge/meters_governor.hpp`): over the last 20 updates, an average cost
+above 70 % of the 50 ms step, or 4 updates started more than 15 ms later than the loop could have started them, drops it to ten; it returns to
+twenty only after 10 s at ten with the cost under 45 % and nothing late, so that it does not flip. How each room holds up on the kit, and the
+protocol that measures it, are in
+([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
+
 **The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
 and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
 *Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With

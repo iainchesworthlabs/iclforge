@@ -268,6 +268,18 @@ struct Facts {
     unsigned long touch_reads = 0;
     unsigned long touch_failures = 0;
     unsigned long touch_points = 0;
+    // The Meters view, once it has been opened (planning/p4x-meters-view.md; GET /panel-stats has every figure): the rate it holds, the shape
+    // it takes ("grid 12": the representation and the outputs), the means of what an update costs, and what it missed.
+    unsigned long meters_opens = 0;
+    bool meters_showing = false;
+    int meters_rate_hz = 0;
+    std::string meters_shape;
+    unsigned long meters_analysis_us = 0;
+    unsigned long meters_widgets_us = 0;
+    unsigned long meters_render_us = 0;
+    unsigned long meters_late = 0;
+    unsigned long meters_dropped = 0;
+    unsigned long meters_tap_us = 0;  // what the audio path pays for a burst of 1,536 frames
 };
 
 // --- the rows --------------------------------------------------------------------------------------
@@ -530,6 +542,20 @@ inline constexpr int kWeakSignalDbm = -75;
     perf.rows.push_back(one("Touch", join({grouped(facts.touch_reads) + " reads", std::to_string(facts.touch_failures) + " failed",
                                            grouped(facts.touch_points) + " touches"}),
                             facts.touch_failures > 0 ? Tone::attention : Tone::text));
+    if (facts.meters_opens > 0) {
+        // Ten a second is the governor's answer to a task that could not keep up: worth a look while the view shows.
+        const bool slow = facts.meters_showing && facts.meters_rate_hz < 20;
+        perf.rows.push_back(one("Meters", join({std::to_string(facts.meters_rate_hz) + " Hz", facts.meters_shape,
+                                                facts.meters_showing ? "showing" : "closed"}),
+                                slow ? Tone::attention : (facts.meters_showing ? Tone::text : Tone::muted)));
+        const auto us = [](unsigned long v) { return micros_text(static_cast<long long>(v)); };
+        perf.rows.push_back(one("Update", join({"analysis " + us(facts.meters_analysis_us), "widgets " + us(facts.meters_widgets_us),
+                                                "render " + us(facts.meters_render_us)}),
+                                facts.meters_showing ? Tone::text : Tone::muted));
+        perf.rows.push_back(one("Missed", join({std::to_string(facts.meters_late) + " late", std::to_string(facts.meters_dropped) + " dropped",
+                                                "tap " + us(facts.meters_tap_us) + "/burst"}),
+                                facts.meters_dropped > 0 ? Tone::attention : (facts.meters_showing ? Tone::text : Tone::muted)));
+    }
     return page;
 }
 

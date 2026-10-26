@@ -134,6 +134,10 @@ void set_backlight(int percent);
 // the first time it is asked for, in LVGL's heap, and handed to the player (sendspin_set_block_tap); the screen asks for blocks while it shows.
 [[nodiscard]] iclforge::meters::MeterTap& meters_tap();
 
+// The time between the panel task's frames while it draws (microseconds): what a view that updates on its own beat may be late by without
+// anyone having held the task (CONFIG_ICLFORGE_EXAMPLE_PANEL_FPS; the preview's own).
+[[nodiscard]] int panel_frame_us();
+
 // A monotonic clock, microseconds.
 [[nodiscard]] std::int64_t time_us();
 

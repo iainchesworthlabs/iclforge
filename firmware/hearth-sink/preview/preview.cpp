@@ -2512,6 +2512,8 @@ iclforge::prefs::Backend& preferences_backend() {
 
 std::int64_t time_us() { return g_now_us; }
 
+int panel_frame_us() { return 33'333; }
+
 iclforge::meters::MeterTap& meters_tap() {
     // The scenarios that show the Meters view write into it (a tap the preview feeds itself); nothing plays here.
     static iclforge::meters::MeterTap tap;

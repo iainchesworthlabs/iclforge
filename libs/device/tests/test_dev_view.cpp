@@ -402,6 +402,38 @@ TEST_CASE("the performance section watches the heap and the panel's own cost", "
     CHECK(find(perf, "Touch")->tone == Tone::attention);
 }
 
+TEST_CASE("the performance section shows the Meters view's rate and costs once it has been opened", "[device][dev_view]") {
+    Facts f = healthy();
+    CHECK(find(describe(f).performance, "Meters") == nullptr);
+    f.meters_opens = 2;
+    f.meters_showing = true;
+    f.meters_rate_hz = 20;
+    f.meters_shape = "grid 12";
+    f.meters_analysis_us = 8200;
+    f.meters_widgets_us = 1100;
+    f.meters_render_us = 12000;
+    f.meters_late = 3;
+    f.meters_tap_us = 21;
+    Section perf = describe(f).performance;
+    CHECK(find(perf, "Meters")->value == "20 Hz \xC2\xB7 grid 12 \xC2\xB7 showing");
+    CHECK(find(perf, "Meters")->tone == Tone::text);
+    CHECK(find(perf, "Update")->value == "analysis 8.2 ms \xC2\xB7 widgets 1.1 ms \xC2\xB7 render 12.0 ms");
+    CHECK(find(perf, "Missed")->value == "3 late \xC2\xB7 0 dropped \xC2\xB7 tap 21 us/burst");
+    CHECK(find(perf, "Missed")->tone == Tone::text);
+    // The governor's ten a second, and a dropped step, are worth a look; a closed view's figures are quiet.
+    f.meters_rate_hz = 10;
+    f.meters_dropped = 1;
+    perf = describe(f).performance;
+    CHECK(find(perf, "Meters")->tone == Tone::attention);
+    CHECK(find(perf, "Missed")->tone == Tone::attention);
+    f.meters_showing = false;
+    f.meters_dropped = 0;
+    perf = describe(f).performance;
+    CHECK(find(perf, "Meters")->value == "10 Hz \xC2\xB7 grid 12 \xC2\xB7 closed");
+    CHECK(find(perf, "Meters")->tone == Tone::muted);
+    CHECK(find(perf, "Update")->tone == Tone::muted);
+}
+
 TEST_CASE("the preference words round-trip", "[device][dev_view]") {
     for (const Preference p : {Preference::automatic, Preference::ethernet, Preference::wifi}) {
         const auto parsed = parse_preference(preference_word(p));

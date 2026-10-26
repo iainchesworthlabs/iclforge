@@ -183,6 +183,10 @@ TEST_CASE("the tap counts and times what it does", "[meters-tap]") {
     REQUIRE(stats.us_max_block == 3);
     // A burst of 1,536 frames is six blocks of 256: 18 us on that clock.
     REQUIRE(std::fabs(stats.us_per_burst() - 18.0) < 1e-9);
+    // A view that opens reads its own longest block, not the board's.
+    tap->reset_max();
+    REQUIRE(tap->stats().us_max_block == 0);
+    REQUIRE(tap->stats().blocks == 12);
     // Reads: too early (a short read), then enough, counted.
     std::array<std::int16_t, mt::kTapHistory> history{};
     REQUIRE_FALSE(tap->read_history(history));

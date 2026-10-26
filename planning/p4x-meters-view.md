@@ -237,6 +237,151 @@ speakers view's tuning follows that serial, so the window cannot simply be halve
 - **`LV_INV_BUF_SIZE` 256** in the panel build.
 - A touch on the Meters view clears the peak holds (an ADI-2 does the same); the dim and dark rules of the no-lyrics screen apply to it unchanged.
 
+## Measuring it
+
+The owner's requirement (2026-10-26): *measuring and characterising the performance is definitely required*. So the view is built to be measured on
+the board over port 80 (the capture port is off in a release image), and its rate is a decision the board takes from what it measures.
+
+### What the board reports: `GET /panel-stats`
+
+JSON, on a board with a screen (`404 this board has no screen` on one without, `404 the screen is not running` before the panel is up). The
+shape and the text are `libs/device/include/iclforge/panel_stats.hpp`, held by a host test and by the device-ui contract spec, which reads the
+header and holds the stand-in's keys to its order. Durations are microseconds. A `timing` object is `{"last", "mean", "max", "n"}`: the last, the
+mean since the count began, the largest, and how many.
+
+| Object and key | What it is |
+|---|---|
+| `panel.width`, `panel.height`, `panel.refreshes` | the glass, and how many times LVGL has drawn since the panel started |
+| `panel.refresh_us` | every LVGL refresh, whichever view: from the refresh's start to its end, **the flush to the panel included** (so it holds a wait for the display as well as work) |
+| `panel.task_stack_free_min` | the panel task's stack never had fewer bytes than this free (16,384 bytes; 8,968 free on the kit before the Meters view) |
+| `panel.psram_free`, `psram_free_min`, `psram_largest` | the PSRAM, which is also LVGL's heap and the panel task's stack: now, the least since the board started, and the largest block |
+| `panel.internal_free`, `internal_free_min`, `internal_largest` | the same for internal RAM, which the decoder and the network share |
+| `meters.showing`, `representation`, `outputs`, `width`, `height` | the Meters view is up now; `pair`, `sum` or `grid`; the outputs of the room; the stage it was built for |
+| `meters.opens`, `open_ms` | times it has been opened since boot, and how long this opening has lasted. **Everything below is since the opening** (and is the last opening's after it is closed) |
+| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the render before it |
+| `meters.updates`, `late`, `dropped`, `falls`, `rises` | updates run; those that started more than 15 ms later than the panel's loop could have started them (one 30 fps frame is allowed for); whole steps that went by with none; twenty-to-ten falls and rises |
+| `meters.analysis_us` | the tap read, the transform, the power average and the ballistics |
+| `meters.widgets_us` | setting the bars, ticks and labels that moved (LVGL only invalidates; nothing is drawn yet) |
+| `meters.render_us` | LVGL's refreshes while the view shows |
+| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; reads the screen made and the ones the writer overran or that came before enough was written |
+
+The developer view (three taps on the footer's name) shows the same figures in its PERFORMANCE section once the Meters view has been opened: the
+rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `widgets`, `render`), and `late`, `dropped` and the tap's cost.
+`GET /status` carries the stream's own counters (`sendspin.underruns`, `late`, `dropped`, `resyncs`, `burst_us`, `worst_burst_us`, `error_us`,
+`decode_stack_free`), which are what the audio path's side of every comparison is read from.
+
+### The rate: 20 updates a second, 10 when the panel task cannot keep up
+
+The owner's rule: 20 Hz if possible, else 10 Hz. `iclforge/meters_governor.hpp` (host-tested) is "if possible":
+
+- **Cannot keep up** is judged over the last 20 updates (a second at 20 Hz), never on one: the **average cost** of an update
+  (analysis + widgets + the render before it) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
+  could have started them**, or a whole step missed. The allowance for lateness is one frame of the panel's loop (33 ms at 30 fps), because a 30 fps
+  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault.
+- **It rises again** only after **10 s** at ten, with the average cost **under 45 % of a fast step (22.5 ms)** and not one late or missed update in
+  the window. The gap between 70 and 45 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
+  a minute at twenty a second puts it back.
+- At ten a second the panel's loop goes back to its resting beat of 100 ms (`filling` false), which is exactly the step: a view at 10 Hz costs the
+  task nothing between updates. At twenty it asks for the panel's frame rate (30 fps) and keeps its own beat inside it (due times 50 ms apart), which
+  a 30 fps loop serves at 67, 33, 67 ... ms: twenty a second on average.
+- The limits are one struct (`GovernorLimits`): the numbers are the plan's guesses until the kit has measured the real costs, and a measurement
+  changes numbers, not code.
+
+### Kit protocol
+
+What a session does with the kit, in order, unattended; about **an hour and a quarter of the kit and three flashes**. The program is
+`tools/hearth/panel_measure.py` (`plan`, `run`, `report`, `compare`; stdlib only; tested on the host against a scripted board). **It
+flashes nothing, and it puts back every setting it changes** (the screen's view and speakers style, the layout, the time to dim, the night
+schedule), also when a row fails; it forgets only its own pairing record.
+
+**Before.** The coordinator books the window: the kit's lock (`P4X`, `python tools/hearth/bench.py lock`) and a heads-up to the screen-family
+coordinator (`D:\ac3bld\BOARD-LOCKS.md`, rule 5); a peer that is building or testing near the board is asked to wait. The owner's Music Assistant
+holds the kit while it is paired: the test server displaces it for each play and it reconnects afterwards. Nothing else plays on the kit.
+
+**Three images**, all `p4-rev3` for the kit (`P4X`, 192.168.1.251, COM7), built with the bench's wrapper and put on it by OTA (the kit takes OTA, and a
+restart keeps its C6 link):
+
+| Image | What | Build |
+|---|---|---|
+| **I0** "as it was" | the speakers view before the Glow and Pulse styles: `main` at `eadb09da8`, the commit before #1642 | `python tools/hearth/bench_flash.py build --tag mv-i0 --worktree <a checkout of eadb09da8> --wifi p4-rev3` |
+| **I1** "now" | `main` with the Meters PRs: the speakers view (Glow by default, Pulse by `PUT /speakers-style`) and the Meters view | `python tools/hearth/bench_flash.py build --tag mv-i1 --wifi p4-rev3` |
+| **I2** "AC-4" | I1 with `sdkconfig.ac4`: AC-4 is a build option on the P4 and the locked profile has none, so this is a bench build and is **not held to the profile**. Built and proved on the host side on 2026-10-26: **3,799,936 bytes** in the 4 MB app partition (395,392 free) | the recipe below |
+
+**I2's recipe** (the bench's build wrapper takes a locked profile and its named overlays, and AC-4 is neither): the profile's own
+`SDKCONFIG_DEFAULTS`, then `sdkconfig.ac4`, then the bench's Wi-Fi fragment, in a build directory of its own, from a checkout of the commit under test:
+
+```
+set IDF_TOOLS_PATH=D:\esp\tools && D:\esp\esp-idf\export.bat
+python tools/hearth/sink_profile.py defaults p4-rev3
+:: prints sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi
+idf.py -C firmware/hearth-sink -B D:\esp\build\iclforge\mv-i2-p4-rev3 -DSDKCONFIG=D:\esp\build\iclforge\mv-i2-p4-rev3\sdkconfig ^
+  -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=<each file above as firmware/hearth-sink/<file>>;firmware/hearth-sink/sdkconfig.ac4;D:/esp/build/ac3forge/wifi_credentials.sdkconfig" build
+```
+
+Delete the build directory's `sdkconfig` first if it exists (an old one overrides a changed default). The image is not a profile's, so `sink_profile.py verify`
+does not apply to it and `bench_flash.py ota` is given its `--build-dir`.
+
+Put an image on with `python tools/hearth/bench_flash.py ota --build-dir D:\esp\build\iclforge\mv-i1-p4-rev3 --session <id> P4X`, then confirm with
+`bench_flash.py verify`. Record each image's commit and size in the report's label.
+
+**The rows** (the stream is sent over Sendspin by `hearth-testserver`, the way the product plays and the only path the tap listens to):
+
+| Row | Stream | Room | The screen draws | Image |
+|---|---|---|---|---|
+| `pcm-2.0` | two tones, 48 kHz stereo PCM (`--pcm --tone`) | 2.0 | `pair` | I1 (I0) |
+| `eac3-5.1` | `testdata/external-baseline/eac3-51-256/ffmpeg.ec3`, looped | 5.1 | `grid` of 6 | I1 (I0) |
+| `eac3-5.1-on-9.1.6` | the same on a 16-slot room (`PUT /layout 9.1.6`) | 9.1.6 | `grid` of 16: the heaviest | I1 (I0) |
+| `joc-7.1.4` | an E-AC-3 JOC (Atmos) file given with `--atmos` (`D:\ac3bld\atmos768.ec3`, 768 kb/s) | 7.1.4 | `grid` of 12 | I1 (I0) |
+| `ac4-5.1` | `testdata/external-baseline/ac4-51-music-192/dee.ac4`, looped | 5.1 | `grid` of 6 | I2 |
+
+The kit's glass is 1024 by 600, so **only `pair` (a 2.0 room) and `grid` can be measured on it; `sum` (400 to 799 px) and the small `pair` need a
+smaller screen, and are bounded by the grid** (six bars against twelve or sixteen, on a stage a fifth the size). The preview's host figures
+(`What it costs`) say how much cheaper they are; the kit cannot say it. A 7.1.4 stream of a form the board's decoder does not carry (AC-4 7.1.4,
+`ac4-514-tones-768`) is a second AC-4 row to add if the first passes.
+
+**The schedule of one row** (`panel_measure.py plan` prints it; every segment 60 s with the first 10 s not counted): *settle* 10 s on the speakers
+view; **`speakers-glow`**; **`meters-a`**; **`speakers-pulse`**; **`meters-b`** (the Meters view a second time is the repeatability);
+then 20 cycles of the Meters view 3 s and the speakers view 3 s (the **leak** test, with the stream playing). 390 s a row with a margin, about 33
+minutes for the five. I0 is run with `--views speakers` (no Meters view, no cycles) over the first four rows, 150 s each.
+
+**Commands.** Take the lock, put I0 on, run; put I1 on, run; put I2 on, run:
+
+```
+python tools/hearth/panel_measure.py run --board P4X --session <id> --label "I0 eadb09da8" --views speakers --rows pcm-2.0 eac3-5.1 eac3-5.1-on-9.1.6 joc-7.1.4 --atmos D:\ac3bld\atmos768.ec3 --out D:\ac3bld\panel-measure\<date>-i0
+python tools/hearth/panel_measure.py run --board P4X --session <id> --label "I1 <sha>" --rows pcm-2.0 eac3-5.1 eac3-5.1-on-9.1.6 joc-7.1.4 --atmos D:\ac3bld\atmos768.ec3 --out D:\ac3bld\panel-measure\<date>-i1
+python tools/hearth/panel_measure.py run --board P4X --session <id> --label "I2 <sha> ac4" --rows ac4-5.1 --out D:\ac3bld\panel-measure\<date>-i2
+python tools/hearth/panel_measure.py compare D:\ac3bld\panel-measure\<date>-i0 D:\ac3bld\panel-measure\<date>-i1
+```
+
+Each run writes `<row>.samples.json` (a sample a second: the stream's counters and the whole of `GET /panel-stats`), `results.json` and
+`report.md`. The exit status is 1 if any criterion failed or a row could not be measured.
+
+**What is measured and the pass criteria.** These are fixed here, before a measurement, and are one number each in `panel_measure.py`:
+
+| Criterion | Pass if |
+|---|---|
+| **stream** | no underrun, late or dropped burst, resync or invalid burst in **any** segment, whichever view shows |
+| **burst** | the Meters view's mean `burst_us` is at most the speakers view's (glow) plus the larger of 15 % and 250 us |
+| **tap** | the tap costs the audio path at most 150 us a burst up to 8 outputs, 500 us above; and not one history read torn |
+| **rate** | a room of up to 6 outputs holds 20 Hz with no fall; a larger room is *reported* (it may fall to 10 Hz, which is the rule working) |
+| **cost** | an update's mean cost (analysis + widgets + the render before it) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
+| **dropped** | no whole step went by with no update |
+| **stack** | the panel task's stack had at least 4 KiB free at its least |
+| **internal** | the internal heap's low point under the Meters view is within 8 KiB of the speakers view's |
+| **leak** | PSRAM free after the 20th return to the speakers view is within 16 KiB of its value after the first |
+| **sync** | the largest sync error (`error_us`) under the Meters view is within 1 ms of the speakers view's |
+| **as it was** (`compare`) | the glow's mean burst against I0's speakers view is within 5 % or 100 us; the pulse is reported |
+
+**After.** Collect the three `report.md`s and the comparison into the plan page as **Kit results** (the date, the commits, the tables), replace the
+estimates under *What it costs* by the measured costs and say which numbers moved, and set the governor's limits (`GovernorLimits`) to what the kit
+shows (the 70 % and 45 % thresholds and the 15 ms allowance are the plan's guesses). A failed criterion is a finding with its samples attached, not a
+reason to loosen a number; the levers, in the order the plan gives them, are 10 updates a second (already automatic), the 15 bars of the 480-px
+screen on the large one, and one custom-drawn widget for the spectrum in place of 62 objects.
+
+**What the kit replaces.** The P4's cost for the analysis (101 kflops at 0.15 to 0.4 flops a cycle: 0.7 to 1.9 ms, 1.4 to 3.7 % of a core) and for
+LVGL (5 to 8 times the host's) are assumptions; `analysis_us` and `widgets_us` and `render_us` are those numbers measured, and **the first thing to
+read** is `meters.analysis_us.mean` in the `eac3-5.1-on-9.1.6` row.
+
 ## Questions for the owner
 
 1. **Which?** The recommendation is below; B's bars are what the speakers view cannot give (how loud each output is, the exact number), and A is the picture on the ADI-2.

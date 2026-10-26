@@ -66,6 +66,7 @@ const REPLIES = {
         'PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset',
         'GET  /identify      the test tone: what it is doing and its limits, as JSON',
         'POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop',
+        'GET  /panel-stats   what the panel and the Meters view cost, as JSON, on a board with a screen',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
@@ -253,6 +254,7 @@ const ROUTES = [
     'PUT /time-sync',
     'GET /trim',
     'PUT /trim',
+    'GET /panel-stats',
     'GET /identify',
     'POST /identify',
     'GET /pairing',
@@ -316,6 +318,50 @@ function speakersOf(text) {
 function slotsOf(text) {
     const speakers = speakersOf(text);
     return speakers ? speakers.length : 0;
+}
+
+// GET /panel-stats (iclforge/panel_stats.hpp): the keys in the order panel_stats_json writes them. The figures are those of a Meters view
+// on the kit's panel at 1024 by 600 with 7.1.4 playing, made up: nothing measured here.
+function timingStats(last, mean, max, n) {
+    return { last, mean, max, n };
+}
+
+function panelStats() {
+    return {
+        panel: {
+            width: 1024,
+            height: 600,
+            refreshes: 4120,
+            refresh_us: timingStats(11800, 12400.5, 31200, 4120),
+            task_stack_free_min: 14000,
+            psram_free: 27500000,
+            psram_free_min: 27100000,
+            psram_largest: 26000000,
+            internal_free: 98000,
+            internal_free_min: 61000,
+            internal_largest: 52000,
+        },
+        meters: {
+            showing: true,
+            representation: 'grid',
+            outputs: 12,
+            width: 1024,
+            height: 600,
+            opens: 2,
+            open_ms: 61000,
+            rate_hz: 20,
+            mean_cost_us: 21500,
+            updates: 1190,
+            late: 3,
+            dropped: 0,
+            falls: 0,
+            rises: 0,
+            analysis_us: timingStats(8200, 8100.2, 9900, 1190),
+            widgets_us: timingStats(1100, 1250.7, 3400, 1190),
+            render_us: timingStats(11800, 12400.5, 31200, 1190),
+            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, reads: 1190, torn: 0, short_reads: 0 },
+        },
+    };
 }
 
 // GET /layout-options (iclforge/layout_options.hpp): the layouts the chooser lists, each judged against
@@ -1803,6 +1849,11 @@ async function startStub() {
                 device.network = cableNetwork(body);
                 return send(res, 200, REPLIES.networkPreferenceOk);
             }
+            case 'GET /panel-stats':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, JSON.stringify(panelStats()) + '\n', 'application/json');
             case 'GET /now-playing':
                 if (!device.screen) {
                     return send(res, 404, REPLIES.noScreen);

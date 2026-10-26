@@ -344,6 +344,7 @@ void on_refresh_ready(lv_event_t* /*event*/) {
     g_stats.render_us_last = took;
     g_stats.render_us_max = std::max(g_stats.render_us_max, took);
     g_stats.render_us_mean = static_cast<std::uint32_t>(g_render_total_us / g_stats.refreshes);
+    panel::now_meters_refresh(took);
 }
 
 void on_flush_start(lv_event_t* event) {
@@ -772,9 +773,31 @@ PanelStats panel_stats() {
     return g_stats;
 }
 
+std::optional<std::string> panel_stats_text() {
+    PanelStats snapshot;
+    iclforge::panelstats::MetersStats meters;
+    {
+        // The panel's task holds g_lock for the frame and reads the counters as they stand; any other task takes it, which also keeps the Meters
+        // view's figures from changing under the copy.
+        std::optional<std::lock_guard<std::mutex>> guard;
+        if (xTaskGetCurrentTaskHandle() != g_task) {
+            guard.emplace(g_lock);
+        }
+        snapshot = g_stats;
+        meters = panel::now_meters_stats();
+    }
+    if (!snapshot.running) {
+        return std::nullopt;
+    }
+    return panel::panel_stats_report(snapshot, meters);
+}
+
 }  // namespace player
 
 namespace player::panel {
+
+// The time between the loop's frames while it draws: the panel's frame rate (kFps, above).
+int panel_frame_us() { return 1'000'000 / std::max(kFps, 1); }
 
 // What the developer view shows (dev_info.hpp). It is called from the panel's task, which holds
 // g_lock for the frame, so the counters are read as they stand and not through panel_stats().

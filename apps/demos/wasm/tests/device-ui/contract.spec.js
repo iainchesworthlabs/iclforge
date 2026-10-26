@@ -391,6 +391,55 @@ test("the stand-in writes GET /layout-options' keys in the firmware's order", as
     }
 });
 
+test("the stand-in answers GET /panel-stats with the keys panel_stats.hpp writes, in its order", async () => {
+    // panel_stats_json writes the panel's object and then the Meters view's; the timings (timing) are four keys each; the tap's are the
+    // last object of meters_json. The keys in the order the source writes them.
+    const STATS = fs.readFileSync(path.join(LIBS_DEVICE, 'panel_stats.hpp'), 'utf8');
+    const between = (from, to) => STATS.slice(STATS.indexOf(from), STATS.indexOf(to));
+    const keysOf = (text) =>
+        [...text.matchAll(/(?:\b(?:number|signed_number|fixed1|timing|key)\(out, "([a-z_]+)"|\\"([a-z_]+)\\":)/g)].map((m) => m[1] || m[2]);
+    // timing() writes the four after the name its caller gives, which is not a literal and so is not among them.
+    const timingKeys = keysOf(between('inline void timing(', 'representation_name'));
+    expect(timingKeys).toEqual(['last', 'mean', 'max', 'n']);
+    const panelSource = keysOf(between('inline std::string panel_stats_json', '}  // namespace iclforge::panelstats'));
+    const meterSource = keysOf(between('inline std::string meters_json', 'inline std::string panel_stats_json'));
+    const stub = await startStub();
+    try {
+        stub.device.screen = screenBoard();
+        const body = JSON.parse(await (await fetch(`${stub.url}panel-stats`)).text());
+        expect(Object.keys(body)).toEqual(['panel', 'meters']);
+        const { panel, meters } = body;
+        // The source's "panel" and "meters" are the object names; every key after them up to the next object is that object's.
+        expect(panelSource.slice(0, 1)).toEqual(['panel']);
+        expect(panelSource.slice(1, panelSource.indexOf('meters'))).toEqual(Object.keys(panel));
+        for (const name of ['refresh_us']) {
+            expect(Object.keys(panel[name])).toEqual(timingKeys);
+        }
+        for (const name of ['analysis_us', 'widgets_us', 'render_us']) {
+            expect(Object.keys(meters[name])).toEqual(timingKeys);
+        }
+        expect(meterSource).toEqual([...Object.keys(meters), ...Object.keys(meters.tap)]);
+        expect(CONTROL).toContain('h.panel_stats()');
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers GET /panel-stats with a refusal on a board with no screen, and lists the route', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to measure; the route is listed all the same, as every board's.
+        const reply = await fetch(`${stub.url}panel-stats`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        const api = await (await fetch(`${stub.url}api`)).text();
+        expect(api).toContain('GET  /panel-stats   what the panel and the Meters view cost, as JSON, on a board with a screen');
+        expect(CONTROL).toContain('GET  /panel-stats   what the panel and the Meters view cost, as JSON, on a board with a screen');
+    } finally {
+        await stub.close();
+    }
+});
+
 test("the stand-in writes a cable board's network interfaces in the firmware's order", () => {
     // append_interface writes both interfaces' keys: the shared ones, then the station's own
     // (configured, ssid, rssi_dbm) or else the cable's (speed_mbps, full_duplex). on_status
