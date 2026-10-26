@@ -10,6 +10,14 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
+  layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
+  you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the
+  heights are on the wall, in the ceiling or up-firing), with the room the layout makes drawn beside the buttons, its name
+  in a footer that stays on the glass with Apply, and the verdict's own sentence for anything this board cannot carry. The
+  sheet is checked from 1024 by 600 down to 240 by 240, including that every control can be reached by scrolling to it.
+  Heights in the ceiling are put straight overhead; on the wall and up-firing are played the same way, and the sheet says so.
+  `PUT /layout`, `GET /layout-options` and the device page are unchanged. The plan is `planning/p4x-layout-builder.md`.
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,

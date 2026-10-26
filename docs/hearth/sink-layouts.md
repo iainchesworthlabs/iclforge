@@ -61,19 +61,42 @@ below against the layout parser and the board's own rule.
 
 ## On the screen
 
-A board with a screen has **Speaker layout** in Preferences, under Sound. Every layout is a line: the layout
-as a button, and beside it, for a layout the board cannot carry, why not, and for one it carries with a limit,
-the limit. A greyed layout does nothing when touched. The board's own screen size sets the layout of the
-list; these are the same list at two sizes, on an ESP32-S3 whose sink carries four slots.
+A board with a screen has **Speaker layout** in Preferences, under Sound: the layout in force, in words, and a
+**Change** button. Change opens one sheet with two ways in to the same choice.
 
-![Speaker layout in Preferences on a 1024 by 600 screen: 1.0, 2.0 (chosen) and 2.1 available, 5.0 and 5.1 greyed with what they need](screenshots/p4-panel-prefs-layout-s3.png)
+**Quick picks** are the layouts a home has, in two groups: *Around you* (`1.0` to `9.1`) and *With heights*
+(`5.1.2` to `9.1.6`). A layout the board cannot carry is greyed, and touching it says why in the card above the
+buttons. **Build yours** is how many speakers are around you, how many subwoofers, how many heights, and how the
+heights are mounted: on the wall, in the ceiling or up-firing. The room the layout makes is drawn beside the
+buttons and changes as they are pressed; the footer names the layout in words and holds **Apply**, and Cancel
+is in the bar, so neither is ever off the screen. Only the buttons scroll.
 
-![The same list on a 480 by 320 screen](screenshots/p4-panel-prefs-layout-s3-small.png)
+![The Speaker layout sheet on the P4X kit's 1024 by 600 screen, Quick picks: 7.1.4 chosen and in use, its room drawn beside the buttons](screenshots/p4-panel-layout-quick-kit.png)
 
-While music plays, choosing another layout asks first, because the sink is opened again and the audio
-breaks up for a moment. With nothing playing the change is made at the touch.
+![Build yours on the kit, at the widest the grammar has: nine around you, one subwoofer and six up-firing heights, the room of sixteen speakers beside them](screenshots/p4-panel-layout-build-kit.png)
+
+What the board plays differently is only the ceiling: heights **in the ceiling** are put straight overhead, and
+heights **on the wall** and **up-firing** are played the same way (the renderer has one upper tier), so the
+sheet says so under the buttons. Bass-managed small speakers are not offered here, because the name has no
+spelling for them; a speaker list still sets them, through the route and the web page.
+
+The same sheet on an ESP32-S3 whose sink carries four slots: what the board carries is said at the head, the
+layouts it cannot carry are greyed, and a touch on one gives the verdict's sentence.
+
+![On an ESP32-S3 that carries four slots, a touch on the greyed 5.1: it needs 6 slots, the output carries 4, and 16-bit slots would carry 8](screenshots/p4-panel-layout-unavailable-s3.png)
+
+The sheet is the same code at every size the product is drawn at; on a smaller display the room moves to the end
+of what scrolls.
+
+![The sheet on a 480 by 320 screen](screenshots/p4-panel-layout-small.png)
+
+While music plays, Apply asks first, because the sink is opened again and the audio breaks up for a moment. With
+nothing playing the change is made at the touch.
 
 ![The question asked while a stream plays: Changing the speakers makes the music drop out for a moment. Change to 1.0? Change or Cancel](screenshots/p4-panel-prefs-layout-confirm.png)
+
+How it was designed, and what the board can honestly tell apart, is in
+[planning/p4x-layout-builder.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-layout-builder.md).
 
 ## Changing the layout
 
