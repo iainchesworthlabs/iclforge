@@ -261,7 +261,7 @@ greyed, and a default that is never a choice the board cannot make.
 
 | Preference | Id | Route | Available when |
 |---|---|---|---|
-| Screen without lyrics: speakers, title, clock, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *dark* needs touch |
+| Screen without lyrics: speakers, title, clock, meters, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *meters* a screen of at least 240 x 240 and the Sendspin player, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
 | Speakers style: glow, pulse | `speakers-style` | `/speakers-style` | the board has a screen (it is greyed, with the reason, while the screen is set to the clock or off, which draw no speakers) |
 | Brightness: 10% to 100% in tens | `brightness` | `/brightness` | the board has a screen whose backlight it controls |
@@ -394,6 +394,37 @@ lyric screens have them, where the server gave a progress and the board's clock 
 ![The title card](screenshots/p4-panel-title-card.png)
 ![A long title, cut at two rows](screenshots/p4-panel-title-card-long.png)
 
+**The Meters view.** A choice of the screen without lyrics (`meters`, stored as `np_view` 5, never renumbered; Preferences,
+Display, *Screen without lyrics*, or `PUT /now-playing`): an instrument rather than a picture of the room. The top of the screen is a
+third-octave spectrum of the main mix (31 bands from 20 Hz to 20 kHz, 0 dB a full-scale sine, 60 dB of range) with a dB scale, a
+peak tick that holds one second and then falls, and the colours of a level meter: green, then amber from -30 dB and red from -15 dB.
+Under it are the room's channels, drawn the way the size of the screen and the number of outputs ask for
+(`iclforge/meters_view.hpp`, `representation_for`):
+
+| Screen width | A 2.0 room | More than two outputs |
+| --- | --- | --- |
+| under 400 px | the pair, L and R, with a peak tick each | the pair (the stereo downmix of the room) |
+| 400 to 799 px | the pair | one meter for each of L, C, R, LFE, Ls, Rs (the surround sum) |
+| 800 px and wider | the pair | every output, in groups: Front, Surround, Rear, Height, LFE |
+
+The bars are green, amber from -18 dB and red from -6 dB, with a peak tick that holds 1.5 s. The spectrum has one bar a band on the
+wide screen, two bands a bar on the middle one and three (an octave) on the small one. **The Meters view needs a screen of at
+least 240 by 240 and the Sendspin player**, because the player is where the sound is: on a board without either, the choice is shown
+greyed with the reason and `PUT /now-playing` answers 409. While Meters shows, *Speakers style* does nothing (the glow and pulse
+are the speakers' view) and is greyed too.
+
+What it draws comes from the player, not the glass: after the output stage has set its gain, `BurstPlayer` hands each block of the
+frames about to be played to a `BlockTap` (`iclforge/block_tap.hpp`), one pointer read when nothing is listening. `MeterTap`
+(`iclforge/meters_tap.hpp`) keeps a mono mix of the outputs in a ring of 340 ms and, for each output, the largest sample in each
+50 ms; the screen takes the mix, analyses it (`iclforge/dsp/spectrum.hpp`: a 2048-point transform of the signal at 12 kHz for the
+17 bands up to 800 Hz and a 1024-point one at 48 kHz above it, so that a low band is not smeared over a fifth of a second and a high
+one is not slow), averages the power over 80 ms, and lets the bars fall at 30 dB a second (meters 24). It does this twenty times a
+second whatever the frame rate, and only a bar or a tick whose pixel moved is redrawn. When the screen is dimmed or another view is
+chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
+tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
+How fast it runs on the kit, and the protocol that measures it, are in
+([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
+
 **The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
 and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
 *Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With
@@ -454,7 +485,7 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
 | `GET` and `PUT /speakers-style` | `glow` or `pulse` | `glow` |
 | `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |

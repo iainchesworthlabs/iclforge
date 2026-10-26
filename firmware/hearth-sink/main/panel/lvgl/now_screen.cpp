@@ -26,6 +26,7 @@
 
 #include "fonts.hpp"
 #include "lv_alloc.hpp"
+#include "meters_screen.hpp"
 
 namespace player::panel {
 
@@ -494,6 +495,7 @@ void now_update_clock(const iclforge::wallclock::Reading& reading) {
 }
 
 void now_forget() {
+    now_forget_meters();
     g.nodes.clear();
     ck.time = nullptr;
     ck.suffix = nullptr;

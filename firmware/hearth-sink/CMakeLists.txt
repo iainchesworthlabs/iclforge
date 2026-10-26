@@ -47,6 +47,14 @@ idf_component_get_property(iclforge_dir iclforge COMPONENT_DIR)
 target_compile_options(${lwip_lib} PRIVATE "-I${iclforge_dir}/lwip_hooks")
 target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"iclforge_lwip_hooks.h\"")
 
+# LVGL keeps the rectangles that are invalid in a refresh in a table of 32 and redraws the whole screen when a refresh has more. The Meters view's spectrum
+# changes sixty in a step: 11.5 million pixels a second with 32 on the 1024 x 600 stage, 1.2 to 2.1 with 256 (planning/p4x-meters-view.md). Only a panel
+# build has LVGL; the table is 16 bytes a rectangle (4 KB).
+if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+    idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
+    target_compile_definitions(${lvgl_lib} PRIVATE LV_INV_BUF_SIZE=256)
+endif()
+
 # The audio, into the partition named in partitions.csv. Done here rather than
 # through a separate esptool invocation so `idf.py flash` puts everything the
 # application needs on the part in one step - a demo whose second half has to be

@@ -24,6 +24,7 @@ enum class View : std::uint8_t {
     kClock = 2,     // the time (needs a clock the board has to be given)
     kOff = 3,       // the screen this replaced: one sentence
     kDark = 4,      // nothing lit: the backlight off while a song has no lyrics, a touch lights the speakers for a while
+    kMeters = 5,    // an instrument: a spectrum of the main mix, and meters of the room's channels (planning/p4x-meters-view.md)
 };
 
 inline constexpr View kDefaultView = View::kSpeakers;
@@ -38,6 +39,8 @@ inline constexpr View kDefaultView = View::kSpeakers;
             return "off";
         case View::kDark:
             return "dark";
+        case View::kMeters:
+            return "meters";
         case View::kSpeakers:
             break;
     }
@@ -58,10 +61,10 @@ namespace detail {
 
 }  // namespace detail
 
-// One of the five words, with or without a line ending after it.
+// One of the six words, with or without a line ending after it.
 [[nodiscard]] constexpr std::optional<View> parse_view(std::string_view text) {
     text = detail::trimmed(text);
-    for (const View view : {View::kSpeakers, View::kTitle, View::kClock, View::kOff, View::kDark}) {
+    for (const View view : {View::kSpeakers, View::kTitle, View::kClock, View::kOff, View::kDark, View::kMeters}) {
         if (text == view_name(view)) {
             return view;
         }
@@ -71,7 +74,7 @@ namespace detail {
 
 // A stored number, or nothing for one this build does not know (a partition written by another build).
 [[nodiscard]] constexpr std::optional<View> view_from_stored(std::int32_t value) {
-    if (value >= static_cast<std::int32_t>(View::kSpeakers) && value <= static_cast<std::int32_t>(View::kDark)) {
+    if (value >= static_cast<std::int32_t>(View::kSpeakers) && value <= static_cast<std::int32_t>(View::kMeters)) {
         return static_cast<View>(value);
     }
     return std::nullopt;

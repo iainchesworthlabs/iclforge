@@ -18,6 +18,8 @@
 
 #include "lvgl.h"
 
+#include "meter_groove.hpp"
+
 #include "iclforge/board_variants.hpp"
 #include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
@@ -66,6 +68,8 @@ std::string g_log;
 // The no-lyrics screen's data: what the player says is playing, and what the settings say to show.
 player::panel::NowPlaying g_now;
 bool g_now_playing = false;
+// What the Meters view hears (meter_groove.hpp), written into the tap by pump().
+preview::MeterGroove g_groove;
 player::panel::NowSettings g_settings;
 int g_backlight = 80;
 // What the server says is playing (metadata@v1): the player's store, and where the song is on the clock.
@@ -196,6 +200,9 @@ void write_bmp(const fs::path& path) {
 void pump(int frames) {
     for (int i = 0; i < frames; ++i) {
         g_now_us += 33'000;
+        if (g_now_playing && player::panel::meters_tap().wants_blocks()) {
+            g_groove.feed(player::panel::meters_tap(), g_now_us);
+        }
         player::panel::screen_update();
         lv_timer_handler();
     }
@@ -622,6 +629,8 @@ void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, 
     g_board.stream = "bursts";
     g_held = false;
     g_position.reset();
+    // What the Meters view hears: a groove over this room (a stereo programme plays only L and R).
+    g_groove.reset(std::vector<iclforge::render::PlanSpot>(spots.begin(), spots.end()), facts.codec == iclforge::nowview::Codec::kPcm);
 }
 
 // A music mix over a few rooms: sample levels, not measurements.
@@ -2503,6 +2512,12 @@ iclforge::prefs::Backend& preferences_backend() {
 
 std::int64_t time_us() { return g_now_us; }
 
+iclforge::meters::MeterTap& meters_tap() {
+    // The scenarios that show the Meters view write into it (a tap the preview feeds itself); nothing plays here.
+    static iclforge::meters::MeterTap tap;
+    return tap;
+}
+
 FontFile archivo_regular() {
     static const FontFile font = load_font("Archivo-Regular.ttf");
     return font;
@@ -3073,6 +3088,20 @@ int main(int argc, char** argv) {
                                  .objects = 15},
                        kSevenOneFour);
          }, 10'000'000},
+        // The Meters view (planning/p4x-meters-view.md): a spectrum of what the tap hears, a groove over the room, and the channels in the
+        // representation the display's width and the room's outputs ask for.
+        {"s19-meters-2-0", [&] {
+             g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kGlow;
+             g_settings.view = iclforge::nowview::View::kMeters;
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo);
+             say_no_title();
+         }, 10'000'000},
+        {"s19-meters-5-1", [&] { play_room("5.1", kDolbyFiveOne, kFiveOne, 640); }, 10'000'000},
+        {"s19-meters-7-1-4", [&] {
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true, .objects = 15},
+                       kSevenOneFour, 768);
+         }, 10'000'000},
+        {"s19-meters-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix, 640); }, 10'000'000},
     };
 
     int number = 0;
@@ -3093,6 +3122,8 @@ int main(int argc, char** argv) {
         g_settings.view = iclforge::nowview::View::kSpeakers;
         g_settings.dim_after_minutes = 5;
         play_room("5.1", kDolbyFiveOne, kFiveOne);
+        // The scenarios before this one have left the screen untouched for minutes: a touch is what starts the count.
+        tap(500, 300);
         g_now_us += 10'000'000;
         pump(6);
         const bool lit_before = !player::panel::screen_stats().dimmed && g_backlight == 80;

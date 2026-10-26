@@ -33,6 +33,7 @@
 #include "fonts.hpp"
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
+#include "meters_screen.hpp"
 #include "now_screen.hpp"
 #include "prefs_screen.hpp"
 
@@ -349,6 +350,7 @@ struct Screen {
     bool np_active = false;
     bool np_card = false;
     bool np_clock = false;
+    bool np_meters = false;  // the Meters view (meters_screen.hpp)
     bool np_was_showing = false;
     std::uint32_t np_since_ms = 0;
     // Dimmed or dark: a black cover over everything, the backlight at its floor (dimmed) or off (dark: the
@@ -850,6 +852,7 @@ void clear_stage() {
     g.np_active = false;
     g.np_card = false;
     g.np_clock = false;
+    g.np_meters = false;
     g.words.clear();
     g.dots.fill(nullptr);
     g.dot_count = 0;
@@ -1123,7 +1126,7 @@ void build_plain(int content_w) {
 // fonts can draw, and with none the speakers show in its place (never an empty card); the speakers need
 // the room the player plays to, and with none, or with the view off, the sentence the screen has always
 // had stands.
-enum class NoLyrics : int { kSentence = 0, kSpeakers = 1, kTitle = 2 };
+enum class NoLyrics : int { kSentence = 0, kSpeakers = 1, kTitle = 2, kMeters = 3 };
 
 NoLyrics no_lyrics_shown() {
     using iclforge::nowview::View;
@@ -1133,6 +1136,9 @@ NoLyrics no_lyrics_shown() {
     }
     if ((chosen == View::kSpeakers || chosen == View::kTitle || chosen == View::kDark) && g.now_known) {
         return NoLyrics::kSpeakers;
+    }
+    if (chosen == View::kMeters && g.now_known) {
+        return NoLyrics::kMeters;
     }
     return NoLyrics::kSentence;
 }
@@ -1163,6 +1169,13 @@ void build_no_lyrics(int content_w) {
             // The dark view draws the speakers too: they are what a touch lights.
             if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
                 g.np_active = true;
+                return;
+            }
+            break;
+        case NoLyrics::kMeters:
+            if (now_build_meters(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
+                g.np_active = true;
+                g.np_meters = true;
                 return;
             }
             break;
@@ -1521,16 +1534,19 @@ bool screen_update() {
     const bool speakers_chosen = no_lyrics && (g.now_set.view == iclforge::nowview::View::kSpeakers ||
                                                g.now_set.view == iclforge::nowview::View::kTitle || dark_view);
     const bool clock_chosen = no_lyrics && g.now_set.view == iclforge::nowview::View::kClock;
-    if (speakers_chosen || clock_chosen) {
+    // The Meters view reads the room as the speakers do (their spots), and the player's output itself (the tap).
+    const bool meters_chosen = no_lyrics && g.now_set.view == iclforge::nowview::View::kMeters;
+    const bool room_chosen = speakers_chosen || meters_chosen;
+    if (room_chosen || clock_chosen) {
         // The speakers move with the sound, five times a second; the clock needs only the line over it, which
         // changes with the stream, so once a second.
-        if (g.now_read_us == 0 || now_us - g.now_read_us >= (speakers_chosen ? 200'000U : 1'000'000U)) {
+        if (g.now_read_us == 0 || now_us - g.now_read_us >= (room_chosen ? 200'000U : 1'000'000U)) {
             g.now_read_us = now_us;
             const bool read = read_now_playing(g.now);
             if (!read) {
                 g.now.heading.clear();
             }
-            g.now_known = speakers_chosen && read && !g.now.spots.empty();
+            g.now_known = room_chosen && read && !g.now.spots.empty();
             g.now_key = g.now_known ? now_room_key(g.now) : 0;
             // What the server says is playing, in the same read (the clock has no use for it); a change of the
             // words is the card's (and the speakers' header's) due, the position and length are not.
@@ -1613,6 +1629,9 @@ bool screen_update() {
         } else if (g.np_clock) {
             // Through a dim as well: the clock is what the dim leaves to see.
             now_update_clock(g.wall);
+        } else if (g.np_meters) {
+            // The meters stop and stop asking the player for its output while the screen is dimmed.
+            g.filling = now_update_meters(now_us, g.dimmed);
         } else if (g.np_active && !g.np_card && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }

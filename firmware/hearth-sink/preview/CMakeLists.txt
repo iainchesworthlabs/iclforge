@@ -28,12 +28,15 @@ set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LVGL_DIR}" lvgl EXCLUDE_FROM_ALL)
+# The table of invalid rectangles the firmware's build gives LVGL (firmware/hearth-sink/CMakeLists.txt): 32 redraws the whole Meters view each step.
+target_compile_definitions(lvgl PRIVATE LV_INV_BUF_SIZE=256)
 
 add_executable(panel_preview
     preview.cpp
     "${MAIN}/panel/lvgl/lyric_screen.cpp"
     "${MAIN}/panel/lvgl/dev_screen.cpp"
     "${MAIN}/panel/lvgl/now_screen.cpp"
+    "${MAIN}/panel/lvgl/meters_screen.cpp"
     "${MAIN}/panel/lvgl/prefs_screen.cpp"
     "${MAIN}/panel/lvgl/prefs_pages.cpp"
     "${MAIN}/panel/lvgl/prefs_editors.cpp"
@@ -56,7 +59,8 @@ target_include_directories(panel_preview PRIVATE
     "${REPO}/libs/lyrics/include"
     "${REPO}/libs/render/include"
     "${REPO}/libs/base/include"
-    "${REPO}/libs/device/include")
+    "${REPO}/libs/device/include"
+    "${REPO}/libs/dsp/include")
 target_compile_definitions(panel_preview PRIVATE
     "PREVIEW_FONT_DIR=\"${MAIN}/panel/fonts\""
     "PREVIEW_EXAMPLES_DIR=\"${REPO}/examples/karaoke\"")
