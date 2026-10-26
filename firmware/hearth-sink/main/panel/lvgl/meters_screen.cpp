@@ -215,6 +215,30 @@ void show_rows(const Chart& c, dr::Rows rows) {
     lv_obj_invalidate_area(c.object, &area);
 }
 
+// The same for a cell of the chart.
+void show_cell(const Chart& c, const dr::Cell& cell) {
+    if (c.object == nullptr || cell.empty()) {
+        return;
+    }
+    lv_area_t at;
+    lv_obj_get_coords(c.object, &at);
+    const lv_area_t area{at.x1 + cell.x0, at.y1 + cell.y0, at.x1 + cell.x1 - 1, at.y1 + cell.y1 - 1};
+    lv_obj_invalidate_area(c.object, &area);
+}
+
+// Draws what a row of bars changed and tells LVGL: a rectangle for each run of neighbouring bars that is cheaper together than apart
+// (meters_draw.hpp, plan_cells), not one of the plot's whole width for the rows of the bar that moved most. The kit measured the render at
+// about 135 ns a pixel and 1 ms an area: 21 ms for 124,000 pixels in the 5.1 room, 47 ms with a JOC stream decoding.
+void draw_cells(const Chart& chart, const dr::VChart& geometry, std::span<const dr::VBar> bars, std::span<const std::uint8_t> lines, const dr::Colours& colours,
+                bool troughs, std::span<const dr::Change> changes) {
+    std::array<dr::Cell, dr::kMaxChanges> cells{};
+    const std::size_t n = dr::plan_cells(changes, cells);
+    for (std::size_t i = 0; i < n; ++i) {
+        dr::render_vbars(chart.px, chart.stride, geometry, bars, lines, colours, troughs, cells[i]);
+        show_cell(chart, cells[i]);
+    }
+}
+
 // Gives a chart's buffer back. The object is LVGL's: the stage's clearing has deleted it, and one that is still there goes now.
 void drop_chart(Chart& c) {
     if (c.object != nullptr && lv_obj_is_valid(c.object)) {
@@ -234,13 +258,13 @@ struct Bar {
     int decimals = 1;
 };
 
-// Moves a vertical meter's bar to a level and notes the rows of its chart that changed.
-void move_vbar(Bar& bar, dr::VBar& drawn, float db, float seconds, int total, dr::Rows& touched) {
+// Moves a vertical meter's bar to a level and notes the columns and rows of its chart that changed.
+void move_vbar(Bar& bar, dr::VBar& drawn, float db, float seconds, int total, dr::Change& change) {
     bar.bal.update(db, seconds, mv::kMeterFallDbPerS, mv::kMeterHoldS, mv::kMeterPeakFallDbPerS);
     const int top = total - pixels(bar.bal.level, total);
     const int peak = pixels(bar.bal.peak, total);
     const int tick = peak > 1 ? total - peak : -1;
-    touched.join(dr::rows_touched(drawn.top, drawn.tick, top, tick, total));
+    change = {drawn.x, drawn.x + drawn.width, dr::rows_touched(drawn.top, drawn.tick, top, tick, total)};
     drawn.top = top;
     drawn.tick = tick;
 }
@@ -646,28 +670,26 @@ void now_meters_refresh(std::uint32_t took_us) {
 namespace {
 
 void update_spectrum(float seconds) {
-    dr::Rows touched;
-    const std::size_t bars = g.bars.size();
+    std::array<dr::Change, dr::kMaxChanges> changes{};
+    const std::size_t bars = std::min(g.bars.size(), changes.size());
     for (std::size_t j = 0; j < bars; ++j) {
         const float level = mv::bar_db(g.averaged, static_cast<int>(j), g.per_bar);
         g.bal[j].update(level, seconds, mv::kSpectrumFallDbPerS, mv::kSpectrumHoldS, mv::kSpectrumPeakFallDbPerS);
         const int top = g.sh - pixels(g.bal[j].level, g.sh);
         const int peak = pixels(g.bal[j].peak, g.sh);
         const int tick = peak > 1 ? std::max(g.sh - peak - 2, 0) : -1;
-        touched.join(dr::rows_touched(g.bars[j].top, g.bars[j].tick, top, tick, g.sh));
+        changes[j] = {g.bars[j].x, g.bars[j].x + g.bars[j].width, dr::rows_touched(g.bars[j].top, g.bars[j].tick, top, tick, g.sh)};
         g.bars[j].top = top;
         g.bars[j].tick = tick;
     }
-    if (!touched.empty()) {
-        dr::render_vbars(g.spectrum.px, g.spectrum.stride, g.spectrum_geometry, g.bars, g.lines, kSpectrumColours, false, touched.first, touched.last);
-        show_rows(g.spectrum, touched);
-    }
+    draw_cells(g.spectrum, g.spectrum_geometry, g.bars, g.lines, kSpectrumColours, false, std::span<const dr::Change>(changes.data(), bars));
 }
 
 // `numbers`: the numbers under or beside the bars are written this time.
 void update_channels(const mv::FastLevels& fast, float seconds, bool numbers) {
     const std::span<const float> peaks(fast.peak_db.data(), fast.outputs);
-    dr::Rows touched;
+    dr::Rows touched;  // the pair's: the whole of its chart's width
+    std::array<dr::Change, dr::kMaxChanges> changes{};
     switch (g.rep) {
         case mv::Representation::kPair: {
             float l = mv::kSilentDb;
@@ -691,20 +713,22 @@ void update_channels(const mv::FastLevels& fast, float seconds, bool numbers) {
         }
         case mv::Representation::kSum:
             for (std::size_t m = 0; m < mv::kMasters; ++m) {
-                move_vbar(g.meters[m], g.meter_bars[m], mv::power_sum_db(peaks, g.fold.master[m].span()), seconds, g.channels_geometry.height, touched);
+                move_vbar(g.meters[m], g.meter_bars[m], mv::power_sum_db(peaks, g.fold.master[m].span()), seconds, g.channels_geometry.height, changes[m]);
             }
             break;
         case mv::Representation::kGrid:
             for (std::size_t k = 0; k < g.meters.size(); ++k) {
                 const std::size_t o = g.outputs[k];
-                move_vbar(g.meters[k], g.meter_bars[k], o < peaks.size() ? peaks[o] : mv::kSilentDb, seconds, g.channels_geometry.height, touched);
+                move_vbar(g.meters[k], g.meter_bars[k], o < peaks.size() ? peaks[o] : mv::kSilentDb, seconds, g.channels_geometry.height, changes[k]);
             }
             break;
     }
-    if (g.rep != mv::Representation::kPair && !touched.empty()) {
-        dr::render_vbars(g.channels.px, g.channels.stride, g.channels_geometry, g.meter_bars, {}, kMeterColours, true, touched.first, touched.last);
+    if (g.rep != mv::Representation::kPair) {
+        const std::size_t n = std::min(g.meter_bars.size(), changes.size());
+        draw_cells(g.channels, g.channels_geometry, g.meter_bars, {}, kMeterColours, true, std::span<const dr::Change>(changes.data(), n));
+    } else {
+        show_rows(g.channels, touched);
     }
-    show_rows(g.channels, touched);
     if (!numbers) {
         return;
     }

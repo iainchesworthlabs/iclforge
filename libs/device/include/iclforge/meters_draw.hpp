@@ -13,8 +13,10 @@
 // scale crosses everything but the ticks, as a translucent stroke of the stage's colour does.
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 
 namespace iclforge::meters::draw {
@@ -79,23 +81,38 @@ struct VChart {
     int red_row = 0;    // and above this one red
 };
 
-// Rows [y0, y1) of the chart into `px` (`stride` pixels a row). `line_rows[y]` is non-zero where a line of the scale crosses row y; it
-// may be empty. `troughs`: each bar has its trough (a meter), not just the stage under it (a spectrum).
+// A rectangle of a chart: columns [x0, x1) of rows [y0, y1).
+struct Cell {
+    int x0 = 0;
+    int x1 = 0;
+    int y0 = 0;
+    int y1 = 0;
+    [[nodiscard]] constexpr bool empty() const noexcept { return x0 >= x1 || y0 >= y1; }
+    [[nodiscard]] constexpr std::int64_t area() const noexcept { return empty() ? 0 : static_cast<std::int64_t>(x1 - x0) * (y1 - y0); }
+};
+
+// The cell of the chart into `px` (`stride` pixels a row). `line_rows[y]` is non-zero where a line of the scale crosses row y; it
+// may be empty. `troughs`: each bar has its trough (a meter), not just the stage under it (a spectrum). A bar the cell cuts is cut.
 inline void render_vbars(std::uint16_t* px, std::size_t stride, const VChart& chart, std::span<const VBar> bars, std::span<const std::uint8_t> line_rows,
-                         const Colours& colours, bool troughs, int y0, int y1) noexcept {
-    y0 = std::max(y0, 0);
-    y1 = std::min(y1, chart.height);
+                         const Colours& colours, bool troughs, Cell cell) noexcept {
+    const int y0 = std::max(cell.y0, 0);
+    const int y1 = std::min(cell.y1, chart.height);
+    const int cx0 = std::max(cell.x0, 0);
+    const int cx1 = std::min(cell.x1, chart.width);
+    if (cx0 >= cx1) {
+        return;
+    }
     for (int y = y0; y < y1; ++y) {
         std::uint16_t* const row = px + static_cast<std::size_t>(y) * stride;
         const bool line = static_cast<std::size_t>(y) < line_rows.size() && line_rows[static_cast<std::size_t>(y)] != 0;
-        std::fill_n(row, chart.width, line ? colours.stage_line : colours.stage);
+        std::fill(row + cx0, row + cx1, line ? colours.stage_line : colours.stage);
         const std::uint16_t zone = y < chart.red_row ? (line ? colours.red_line : colours.red)
                                    : y < chart.amber_row ? (line ? colours.amber_line : colours.amber)
                                                          : (line ? colours.green_line : colours.green);
         const std::uint16_t trough = line ? colours.trough_line : colours.trough;
         for (const VBar& bar : bars) {
-            const int x0 = std::max(bar.x, 0);
-            const int x1 = std::min(bar.x + bar.width, chart.width);
+            const int x0 = std::max(bar.x, cx0);
+            const int x1 = std::min(bar.x + bar.width, cx1);
             if (x1 <= x0) {
                 continue;
             }
@@ -111,6 +128,12 @@ inline void render_vbars(std::uint16_t* px, std::size_t stride, const VChart& ch
             }
         }
     }
+}
+
+// Rows [y0, y1) of the whole width.
+inline void render_vbars(std::uint16_t* px, std::size_t stride, const VChart& chart, std::span<const VBar> bars, std::span<const std::uint8_t> line_rows,
+                         const Colours& colours, bool troughs, int y0, int y1) noexcept {
+    render_vbars(px, stride, chart, bars, line_rows, colours, troughs, Cell{0, chart.width, y0, y1});
 }
 
 // The rows a bar's change touches: [first, last) of the rows that differ between its old and its new `top` and `tick`, or an empty range. A
@@ -148,6 +171,101 @@ struct Rows {
     out.first = std::max(out.first, 0);
     out.last = std::min(out.last, height);
     return out;
+}
+
+// --- what to redraw ----------------------------------------------------------------------------------------------------
+
+// What a bar's change touches: the columns it covers and the rows between its old and new top and tick (empty: it did not move).
+struct Change {
+    int x0 = 0;
+    int x1 = 0;
+    Rows rows;
+};
+
+// What one more rectangle for LVGL to draw and copy costs, in the pixels of one. The kit's 5.1 room measured about 135 ns a pixel and
+// about a millisecond for the first pixel of an area (planning/p4x-meters-view.md, "Kit results"), so 8,000: a spectrum that moves every
+// bar a few rows is a handful of rectangles, not one of the whole plot's width and not one for each of its 31 bars.
+inline constexpr std::int64_t kAreaCostPx = 8'000;
+inline constexpr std::size_t kMaxChanges = 64;
+
+// The rectangles to redraw for the changes of bars side by side, in order of their columns: runs of neighbouring changed bars share a
+// rectangle (their columns, the union of their rows) when that costs less than one each, by the least total of `area_cost_px` an
+// area and a pixel each (a partition of the changed bars into runs, by dynamic programming: at most 64 of them; more is one rectangle for all).
+// Writes at most out.size() cells, in column order, and returns how many; none if nothing changed.
+[[nodiscard]] inline std::size_t plan_cells(std::span<const Change> changes, std::span<Cell> out, std::int64_t area_cost_px = kAreaCostPx) noexcept {
+    std::array<std::uint8_t, kMaxChanges> index{};
+    std::size_t m = 0;
+    bool too_many = false;
+    Cell all;
+    bool any = false;
+    for (std::size_t k = 0; k < changes.size(); ++k) {
+        const Change& c = changes[k];
+        if (c.rows.empty() || c.x0 >= c.x1) {
+            continue;
+        }
+        if (!any) {
+            all = {c.x0, c.x1, c.rows.first, c.rows.last};
+            any = true;
+        } else {
+            all = {std::min(all.x0, c.x0), std::max(all.x1, c.x1), std::min(all.y0, c.rows.first), std::max(all.y1, c.rows.last)};
+        }
+        if (m < kMaxChanges) {
+            index[m] = static_cast<std::uint8_t>(k);
+        } else {
+            too_many = true;
+        }
+        ++m;
+    }
+    if (!any || out.empty()) {
+        return 0;
+    }
+    if (too_many || m == 1) {
+        out[0] = all;
+        return 1;
+    }
+    constexpr std::int64_t kInfinite = std::numeric_limits<std::int64_t>::max();
+    std::array<std::int64_t, kMaxChanges + 1> best{};
+    std::array<std::uint8_t, kMaxChanges + 1> from{};
+    for (std::size_t j = 1; j <= m; ++j) {
+        best[j] = kInfinite;
+        int x_min = std::numeric_limits<int>::max();
+        int x_max = std::numeric_limits<int>::min();
+        int y_min = std::numeric_limits<int>::max();
+        int y_max = std::numeric_limits<int>::min();
+        for (std::size_t i = j; i-- > 0;) {
+            const Change& c = changes[index[i]];
+            x_min = std::min(x_min, c.x0);
+            x_max = std::max(x_max, c.x1);
+            y_min = std::min(y_min, c.rows.first);
+            y_max = std::max(y_max, c.rows.last);
+            const std::int64_t cost = best[i] + area_cost_px + static_cast<std::int64_t>(x_max - x_min) * (y_max - y_min);
+            if (cost < best[j]) {
+                best[j] = cost;
+                from[j] = static_cast<std::uint8_t>(i);
+            }
+        }
+    }
+    std::size_t groups = 0;
+    for (std::size_t j = m; j > 0; j = from[j]) {
+        ++groups;
+    }
+    if (groups > out.size()) {
+        out[0] = all;
+        return 1;
+    }
+    std::size_t at = groups;
+    for (std::size_t j = m; j > 0; j = from[j]) {
+        Cell cell;
+        bool first = true;
+        for (std::size_t i = from[j]; i < j; ++i) {
+            const Change& c = changes[index[i]];
+            cell = first ? Cell{c.x0, c.x1, c.rows.first, c.rows.last}
+                         : Cell{std::min(cell.x0, c.x0), std::max(cell.x1, c.x1), std::min(cell.y0, c.rows.first), std::max(cell.y1, c.rows.last)};
+            first = false;
+        }
+        out[--at] = cell;
+    }
+    return groups;
 }
 
 // --- horizontal bars -----------------------------------------------------------------------------------------------------

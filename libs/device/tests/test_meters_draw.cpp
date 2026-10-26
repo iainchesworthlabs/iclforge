@@ -262,3 +262,178 @@ TEST_CASE("redrawing only the rows a change touches gives the picture a full red
         REQUIRE(inc.px == full.px);
     }
 }
+
+TEST_CASE("a cell writes only its columns and rows, and cuts the bars at its edge", "[meters-draw]") {
+    const md::VChart chart{40, 20, 15, 5};
+    const std::array<md::VBar, 3> bars{{{2, 10, 6, -1}, {14, 10, 4, -1}, {26, 10, 8, -1}}};
+    Canvas c(40, 20);
+    md::render_vbars(c.px.data(), 40, chart, bars, {}, kColours, false, md::Cell{12, 30, 3, 9});
+    for (int y = 0; y < 20; ++y) {
+        for (int x = 0; x < 40; ++x) {
+            const bool inside = x >= 12 && x < 30 && y >= 3 && y < 9;
+            if (!inside) {
+                REQUIRE(c.at(x, y) == kSentinel);
+            } else {
+                REQUIRE(c.at(x, y) != kSentinel);
+            }
+        }
+    }
+    // The second bar is whole, lit from row 4 (red: above row 5); the first is outside the cell and the gap before the second is only stage.
+    CHECK(c.at(14, 4) == kColours.red);
+    CHECK(c.at(23, 4) == kColours.red);
+    CHECK(c.at(14, 3) == kColours.stage);
+    CHECK(c.at(12, 6) == kColours.stage);
+    // The third is cut at column 30, lit from row 8 (amber: above row 15).
+    CHECK(c.at(26, 8) == kColours.amber);
+    CHECK(c.at(29, 8) == kColours.amber);
+    CHECK(c.at(26, 7) == kColours.stage);
+    // An empty cell writes nothing.
+    Canvas d(40, 20);
+    md::render_vbars(d.px.data(), 40, chart, bars, {}, kColours, false, md::Cell{5, 5, 0, 20});
+    CHECK(d.px == Canvas(40, 20).px);
+}
+
+TEST_CASE("the cells to redraw: none for no change, one for one, one for neighbours that move alike, one each for bars far apart", "[meters-draw]") {
+    std::array<md::Cell, 8> out{};
+    std::array<md::Change, 4> none{};
+    CHECK(md::plan_cells(none, out) == 0);
+
+    const std::array<md::Change, 3> one{{{0, 10, {}}, {12, 22, {30, 40}}, {24, 34, {}}}};
+    REQUIRE(md::plan_cells(one, out) == 1);
+    CHECK(out[0].x0 == 12);
+    CHECK(out[0].x1 == 22);
+    CHECK(out[0].y0 == 30);
+    CHECK(out[0].y1 == 40);
+
+    // Neighbours that move over the same rows: one cell is cheaper than two (an area costs 8,000 pixels).
+    const std::array<md::Change, 3> alike{{{0, 10, {30, 40}}, {12, 22, {32, 40}}, {24, 34, {30, 38}}}};
+    REQUIRE(md::plan_cells(alike, out) == 1);
+    CHECK(out[0].x0 == 0);
+    CHECK(out[0].x1 == 34);
+    CHECK(out[0].y0 == 30);
+    CHECK(out[0].y1 == 40);
+
+    // Far apart: 900 columns of ten rows cost more than the second area.
+    const std::array<md::Change, 2> apart{{{0, 10, {30, 40}}, {900, 910, {30, 40}}}};
+    REQUIRE(md::plan_cells(apart, out) == 2);
+    CHECK(out[0].x1 == 10);
+    CHECK(out[1].x0 == 900);
+
+    // Rows far apart: a tall cell for both costs more than two short ones.
+    const std::array<md::Change, 2> tall{{{0, 100, {0, 10}}, {110, 210, {290, 300}}}};
+    REQUIRE(md::plan_cells(tall, out) == 2);
+    // A free area is one cell for each bar that changed.
+    const std::array<md::Change, 3> free_areas{{{0, 10, {1, 3}}, {12, 22, {1, 3}}, {24, 34, {1, 3}}}};
+    CHECK(md::plan_cells(free_areas, out, 0) == 3);
+    // Too little room: one cell for all of them.
+    std::array<md::Cell, 1> room{};
+    REQUIRE(md::plan_cells(free_areas, room, 0) == 1);
+    CHECK(room[0].x0 == 0);
+    CHECK(room[0].x1 == 34);
+}
+
+TEST_CASE("the plan covers every change and costs no more than one cell for all of them or one for each, over a long random walk", "[meters-draw]") {
+    std::uint32_t state = 777;
+    const auto next = [&](int n) {
+        state = state * 1664525U + 1013904223U;
+        return static_cast<int>((state >> 8) % static_cast<std::uint32_t>(n));
+    };
+    for (int round = 0; round < 3000; ++round) {
+        std::array<md::Change, 31> changes{};
+        int moved = 0;
+        for (int k = 0; k < 31; ++k) {
+            changes[static_cast<std::size_t>(k)].x0 = k * 30;
+            changes[static_cast<std::size_t>(k)].x1 = k * 30 + 26;
+            if (next(3) != 0) {
+                const int a = next(240);
+                changes[static_cast<std::size_t>(k)].rows = {a, a + 1 + next(1 + (round % 4) * 12)};
+                ++moved;
+            }
+        }
+        std::array<md::Cell, 64> cells{};
+        const std::int64_t area_cost = next(4) == 0 ? 0 : 8'000;
+        const std::size_t n = md::plan_cells(changes, cells, area_cost);
+        if (moved == 0) {
+            REQUIRE(n == 0);
+            continue;
+        }
+        REQUIRE(n >= 1);
+        std::int64_t planned = static_cast<std::int64_t>(n) * area_cost;
+        for (std::size_t i = 0; i < n; ++i) {
+            planned += cells[i].area();
+            if (i > 0) {
+                REQUIRE(cells[i].x0 >= cells[i - 1].x1);  // in column order, apart
+            }
+        }
+        std::int64_t each = 0;
+        md::Cell all;
+        bool first = true;
+        for (const md::Change& c : changes) {
+            if (c.rows.empty()) {
+                continue;
+            }
+            // covered by a cell
+            bool covered = false;
+            for (std::size_t i = 0; i < n; ++i) {
+                covered = covered || (cells[i].x0 <= c.x0 && cells[i].x1 >= c.x1 && cells[i].y0 <= c.rows.first && cells[i].y1 >= c.rows.last);
+            }
+            REQUIRE(covered);
+            each += area_cost + static_cast<std::int64_t>(c.x1 - c.x0) * (c.rows.last - c.rows.first);
+            all = first ? md::Cell{c.x0, c.x1, c.rows.first, c.rows.last}
+                        : md::Cell{std::min(all.x0, c.x0), std::max(all.x1, c.x1), std::min(all.y0, c.rows.first), std::max(all.y1, c.rows.last)};
+            first = false;
+        }
+        REQUIRE(planned <= each);
+        REQUIRE(planned <= area_cost + all.area());
+    }
+}
+
+TEST_CASE("redrawing only the planned cells gives the picture a full redraw would, over a long random walk", "[meters-draw]") {
+    constexpr int kW = 400;
+    constexpr int kH = 90;
+    constexpr int kBars = 31;
+    const md::VChart chart{kW, kH, 60, 25};
+    std::vector<std::uint8_t> lines(kH, 0);
+    for (int y = 10; y < kH; y += 20) {
+        lines[static_cast<std::size_t>(y)] = 1;
+    }
+    std::array<md::VBar, kBars> bars{};
+    for (int k = 0; k < kBars; ++k) {
+        bars[static_cast<std::size_t>(k)] = {k * 13, 10, kH, -1};
+    }
+    Canvas inc(kW, kH);
+    md::render_vbars(inc.px.data(), kW, chart, bars, lines, kColours, false, 0, kH);
+    std::uint32_t state = 4242;
+    const auto next = [&](int n) {
+        state = state * 1664525U + 1013904223U;
+        return static_cast<int>((state >> 8) % static_cast<std::uint32_t>(n));
+    };
+    int cells_drawn = 0;
+    for (int step = 0; step < 3000; ++step) {
+        std::array<md::Change, kBars> changes{};
+        for (int k = 0; k < kBars; ++k) {
+            md::VBar& b = bars[static_cast<std::size_t>(k)];
+            md::Change& c = changes[static_cast<std::size_t>(k)];
+            c.x0 = b.x;
+            c.x1 = b.x + b.width;
+            if (next(3) == 0) {
+                continue;
+            }
+            const int top = std::clamp(b.top + next(9) - 4, 0, kH);
+            const int tick = next(4) == 0 ? -1 : std::max(0, std::min(top - 2 - next(30), kH - 2));
+            c.rows = md::rows_touched(b.top, b.tick, top, tick, kH);
+            b.top = top;
+            b.tick = tick;
+        }
+        std::array<md::Cell, 64> cells{};
+        const std::size_t n = md::plan_cells(changes, cells, step % 5 == 0 ? 0 : md::kAreaCostPx);
+        for (std::size_t i = 0; i < n; ++i) {
+            md::render_vbars(inc.px.data(), kW, chart, bars, lines, kColours, false, cells[i]);
+        }
+        cells_drawn += static_cast<int>(n);
+        Canvas full(kW, kH);
+        md::render_vbars(full.px.data(), kW, chart, bars, lines, kColours, false, 0, kH);
+        REQUIRE(inc.px == full.px);
+    }
+    CHECK(cells_drawn > 3000);  // a free area (every fifth step) is a cell for each run of bars
+}
