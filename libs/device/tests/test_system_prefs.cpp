@@ -86,16 +86,16 @@ TEST_CASE("every entry says whether Reset preferences touches it: values reset, 
     }
 }
 
-TEST_CASE("the cable-or-Wi-Fi choice is there only on a board that has both", "[prefs-system]") {
+TEST_CASE("the wired-or-Wi-Fi choice is there only on a board that has both", "[prefs-system]") {
     for (const auto& variant : iclforge::known_variants()) {
         INFO(variant.name);
         FakeBackend backend(variant.caps);
         const prefs::Entry entry = resolved(backend, "network-preference");
         REQUIRE(entry.availability.available == variant.caps.network.choice());
         if (!entry.availability.available) {
-            // The one interface a board has is named: the radio, the cable, or neither.
+            // The one interface a board has is named: the radio, wired, or neither.
             const char* which = variant.caps.network.wifi       ? "Wi-Fi only"
-                                : variant.caps.network.ethernet ? "cable only"
+                                : variant.caps.network.ethernet ? "wired only"
                                                                 : "no network";
             REQUIRE(contains(entry.availability.reason, which));
         }
@@ -103,7 +103,7 @@ TEST_CASE("the cable-or-Wi-Fi choice is there only on a board that has both", "[
     BoardCaps cable_only = iclforge::variants::p4_rev3_kit();
     cable_only.network = {.ethernet = true};
     FakeBackend backend(cable_only);
-    REQUIRE(contains(resolved(backend, "network-preference").availability.reason, "cable only"));
+    REQUIRE(contains(resolved(backend, "network-preference").availability.reason, "wired only"));
     BoardCaps none = iclforge::variants::p4_rev3_kit();
     none.network = {};
     FakeBackend isolated(none);
@@ -119,8 +119,8 @@ TEST_CASE("setting the network preference goes to the board on a board with a ch
         REQUIRE(result.ok);
         REQUIRE(kit.network_pref_ == word);
     }
-    // "cable" is the label's word, not the route's.
-    REQUIRE_FALSE(prefs::set_value(kit, *prefs::find("network-preference"), "cable").ok);
+    // "wired" is the label's word, not the route's.
+    REQUIRE_FALSE(prefs::set_value(kit, *prefs::find("network-preference"), "wired").ok);
     REQUIRE(kit.network_pref_ == "auto");
 
     FakeBackend s3(iclforge::variants::s3_n16r8());
@@ -160,7 +160,7 @@ TEST_CASE("the network preference asks first, in the words of the developer view
     REQUIRE(blocked.tone == iclforge::devview::Tone::attention);
     REQUIRE(contains(blocked.lines[0], "No Wi-Fi network is stored"));
     // A word that is not a preference has no step.
-    REQUIRE(pref.confirm_step(kit, "cable").title.empty());
+    REQUIRE(pref.confirm_step(kit, "wired").title.empty());
 }
 
 TEST_CASE("a name is held to the rule before the board is asked", "[prefs-system]") {
@@ -287,7 +287,7 @@ TEST_CASE("Factory reset is two steps, the second a held button, and its first s
     REQUIRE_FALSE(first.hold);
     REQUIRE(contains(first.lines[0], "its name, its Wi-Fi network and password"));
     REQUIRE(contains(first.lines[1], "2 servers have to pair with this player again"));
-    REQUIRE(contains(first.lines[2], "The cable stays in use"));
+    REQUIRE(contains(first.lines[2], "The wired network stays in use"));
 
     // No cable plugged in: the same step says the board is stranded, and what brings it back.
     kit.situation_.cable_link = false;

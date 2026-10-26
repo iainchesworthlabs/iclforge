@@ -531,22 +531,11 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
     return std::string(value.substr(0, dash)) + " to " + std::string(value.substr(dash + 1));
 }
 
-// What a person reads for a zone: "Melbourne (Australia)" for a name, "UTC" for none, a string as it is.
+// What a person reads for a zone, from the word its route takes (a name, a POSIX string or none): "Melbourne (Australia)"
+// for a name or for a string the table holds, "UTC" for none, "UTC+10:00 (custom)" for a zone in no table; never the
+// string (wallclock::zone_readable).
 [[nodiscard]] inline std::string time_zone_label(std::string_view value) {
-    if (value == wallclock::kNoZone) {
-        return "UTC";
-    }
-    const std::optional<wallclock::NamedZone> named = wallclock::find_time_zone(value);
-    if (!named) {
-        return std::string(value);
-    }
-    // A city with a place between it and its region already says where it is ("Buenos Aires (Argentina)").
-    const std::string city = wallclock::zone_label(named->name);
-    const std::string_view region = wallclock::zone_region(named->name);
-    if (region == wallclock::kOtherRegion || city.find(" (") != std::string::npos) {
-        return city;
-    }
-    return city + " (" + std::string(region) + ")";
+    return wallclock::zone_readable(value, value);
 }
 
 [[nodiscard]] inline std::string get_now_view(const Backend& backend) {
@@ -646,7 +635,7 @@ namespace detail {
         return Availability::no("This board has Wi-Fi only, so there is nothing to choose between.");
     }
     if (caps.network.ethernet) {
-        return Availability::no("This board has a cable only, so there is nothing to choose between.");
+        return Availability::no("This board is wired only, so there is nothing to choose between.");
     }
     return Availability::no("This board has no network.");
 }
@@ -658,7 +647,7 @@ namespace detail {
 
 inline constexpr std::array<ChoiceDef, 3> kNetworkChoices{{
     {.id = "auto", .label = "Automatic"},
-    {.id = "ethernet", .label = "Cable"},
+    {.id = "ethernet", .label = "Wired"},
     {.id = "wifi", .label = "Wi-Fi"},
 }};
 
@@ -1008,7 +997,7 @@ inline constexpr std::array<Pref, 21> kRegistry{{
     {.id = "network-preference",
      .group = Group::kNetwork,
      .label = "Wired or Wi-Fi",
-     .note = "Which network the player uses when it has both: the cable, Wi-Fi, or whichever is linked.",
+     .note = "Which network the player uses when it has both: wired, Wi-Fi, or whichever is linked.",
      .kind = Kind::kChoice,
      .apply = Apply::kLive,
      .route = "/network-preference",

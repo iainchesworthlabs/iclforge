@@ -359,9 +359,16 @@ test.describe('with the clock running', () => {
         await city.selectOption({ label: 'Melbourne' });
         await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne']);
         await expect(page.getByRole('status')).toHaveText('Time zone Australia/Melbourne.');
-        await expect(page.locator('#zone-input')).toHaveValue('AEST-10AEDT,M10.1.0,M4.1.0/3');
+        // The page says where the board is as a place, and never fills the field with the string the board keeps it by.
+        await expect(page.locator('#zone-now')).toHaveText('Now: Melbourne (Australia).');
+        await expect(page.locator('#time-now')).toContainText('Melbourne (Australia)');
+        await expect(page.locator('#zone-input')).toHaveValue('');
         await expect(region).toHaveValue('Australia');
         await expect(city).toHaveValue('Australia/Melbourne');
+        // Save with nothing typed sends nothing: it is not a request for UTC.
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByRole('status')).toHaveText('Choose a region and a city, or type a zone.');
+        expect(stub.sent('PUT /timezone')).toHaveLength(1);
         // A city with a place between its region and itself is named with it.
         await region.selectOption('America');
         await expect(city.locator('option', { hasText: 'Buenos Aires (Argentina)' })).toHaveCount(1);
@@ -371,12 +378,20 @@ test.describe('with the clock running', () => {
         await region.selectOption('Other');
         await city.selectOption({ label: 'UTC' });
         await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC']);
-        // A string typed instead has no name: both lists go back to their prompts.
+        // A string typed instead has no name; the table has a place for it (Tokyo's), which the lists show.
         await page.locator('#zone-input').fill('JST-9');
         await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
         await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC', 'JST-9']);
+        await expect(page.locator('#zone-now')).toHaveText('Now: Tokyo (Asia).');
+        await expect(region).toHaveValue('Asia');
+        await expect(city).toHaveValue('Asia/Tokyo');
+        // One in no table is read as its offset and the person's own, and both lists go back to their prompts.
+        await page.locator('#zone-input').fill('ZZZ-9:45');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('#zone-now')).toHaveText('Now: UTC+09:45 (custom).');
         await expect(region).toHaveValue('');
         await expect(city).toHaveValue('');
+        await expect(page.locator('#zone-input')).not.toHaveValue('AEST-10AEDT,M10.1.0,M4.1.0/3');
     });
 
     test("a board that has no list of zones, or whose list cannot be read at first, still takes a typed zone", async ({
