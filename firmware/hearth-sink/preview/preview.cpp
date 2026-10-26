@@ -1085,6 +1085,57 @@ int check_display_and_time(lv_obj_t* prefs, int width, int height, const fs::pat
     }
     g_settings.night = {};
 
+    // A zone set through a page that kept only the string (Melbourne's rule) reads as the place the table holds for it, and
+    // the editor opens at it as if it had been picked; one in no table reads as its offset. Never the string.
+    {
+        const auto refresh = [&] {
+            g_now_us += 1'500'000;
+            pump(4);
+        };
+        g_zone = {.posix = "AEST-10AEDT,M10.1.0,M4.1.0/3", .name = ""};
+        refresh();
+        expect(shows_text(prefs, "Melbourne (Australia)"), "a zone set by its string alone reads as its place");
+        expect(!shows_text(prefs, "AEST", true), "and the string is nowhere on the sheet");
+        if (lv_obj_t* const label = find_label(prefs, "Time zone")) {
+            scroll_label_to_top(label);
+            pump(2);
+            write_bmp(out / ("prefs-time-posix-" + size + ".bmp"));
+        }
+        expect(tap_object(find_row_button(prefs, "Time zone", "Melbourne (Australia)")), "its row opens the editor");
+        pump(4);
+        lv_obj_t* const at_place = player::panel::editor_root();
+        expect(at_place != nullptr, "and the editor opens");
+        if (at_place != nullptr) {
+            expect(shows_text(at_place, "Now: Melbourne (Australia)"), "saying where the board is, as a place");
+            expect(shows_text(at_place, "Sydney"), "among the places of its region");
+            expect(!shows_text(at_place, "AEST", true), "and not by its string");
+            write_bmp(out / ("prefs-zone-posix-" + size + ".bmp"));
+            expect(tap_button("Done"), "with a Done");
+            pump(4);
+        }
+        g_zone = {.posix = "ZZZ-9:45", .name = ""};
+        refresh();
+        expect(shows_text(prefs, "UTC+09:45 (custom)"), "a zone in no table reads as its offset");
+        expect(!shows_text(prefs, "ZZZ", true), "and not as its string");
+        if (lv_obj_t* const label = find_label(prefs, "Time zone")) {
+            scroll_label_to_top(label);
+            pump(2);
+            write_bmp(out / ("prefs-time-custom-" + size + ".bmp"));
+        }
+        expect(tap_object(find_row_button(prefs, "Time zone", "UTC+09:45 (custom)")), "its row opens the editor too");
+        pump(4);
+        lv_obj_t* const custom = player::panel::editor_root();
+        expect(custom != nullptr, "and it opens");
+        if (custom != nullptr) {
+            expect(shows_text(custom, "Now: UTC+09:45 (custom)"), "saying what the zone is");
+            expect(!shows_text(custom, "ZZZ", true), "and not by its string");
+            expect(tap_button("Done"), "and has its Done");
+            pump(4);
+        }
+        g_zone = {};
+        refresh();
+    }
+
     // The time zone: the regions, then the places in one, opening where the zone already is.
     lv_obj_t* const zone_button = find_row_button(prefs, "Time zone", "UTC");
     if (lv_obj_t* const label = find_label(prefs, "Time zone")) {

@@ -165,4 +165,83 @@ struct ZoneChoice {
     return ZoneChoice{std::string(stored_posix), std::string()};
 }
 
+// --- what a person reads --------------------------------------------------------------------------------------------
+// A screen or a page never shows a POSIX string (the routes still take and report it, for tools): a zone is read as the
+// place it is, or, for one that is in no table, as its offset.
+
+// The place a POSIX string stands for, where the table holds it: for a string that several places share (Melbourne,
+// Sydney, Hobart and Canberra are one) the place the generator prefers, the most populous of them
+// (data::kPreferred, gen_time_zones.py's PREFERRED), and for a string one place has, that place. Nothing for a string
+// the table does not hold. Exact: `AEST-10AEDT,M10.1.0,M4.1.0/3` and nothing near it.
+[[nodiscard]] constexpr std::optional<NamedZone> find_time_zone_by_string(std::string_view posix) {
+    if (posix.empty()) {
+        return std::nullopt;
+    }
+    for (std::size_t i = 0; i < data::kPreferredCount; ++i) {
+        if (std::string_view(data::kZones[data::kPreferred[i]].posix) == posix) {
+            return time_zone_at(data::kPreferred[i]);
+        }
+    }
+    for (std::size_t i = 0; i < data::kZoneCount; ++i) {
+        if (std::string_view(data::kZones[i].posix) == posix) {
+            return time_zone_at(i);
+        }
+    }
+    return std::nullopt;
+}
+
+// The place a stored zone is: the one the person chose by name when the table knows the name, else the table's place for
+// the string (a zone set through a page that kept only the string), else none.
+[[nodiscard]] constexpr std::optional<NamedZone> zone_place(std::string_view posix, std::string_view name) {
+    if (const std::optional<NamedZone> named = find_time_zone(name)) {
+        return named;
+    }
+    return find_time_zone_by_string(posix);
+}
+
+// "Melbourne (Australia)": the city, and in brackets where it is. A city with a place between it and its region already
+// says (`Buenos Aires (Argentina)`, `Center (North Dakota)`), and UTC is UTC.
+[[nodiscard]] inline std::string zone_display(std::string_view name) {
+    const std::string city = zone_label(name);
+    const std::string_view region = zone_region(name);
+    if (region == kOtherRegion || city.find(" (") != std::string::npos) {
+        return city;
+    }
+    return city + " (" + std::string(region) + ")";
+}
+
+// "UTC+10:00", "UTC-03:30": an offset east of UTC, as people say it (a POSIX string counts hours west).
+[[nodiscard]] inline std::string offset_text(int east_s) {
+    const int minutes = (east_s < 0 ? -east_s : east_s) / 60;
+    std::string out = "UTC";
+    out += east_s < 0 ? '-' : '+';
+    out += static_cast<char>('0' + minutes / 600 % 10);
+    out += static_cast<char>('0' + minutes / 60 % 10);
+    out += ':';
+    out += static_cast<char>('0' + minutes % 60 / 10);
+    out += static_cast<char>('0' + minutes % 10);
+    return out;
+}
+
+// What a screen or a page says for a stored zone: the place (`Melbourne (Australia)`, from the name or, with none, from the
+// string), `UTC` for none, and for a zone in no table its offset and what it is (`UTC+10:00 (custom)`, `UTC+10:00 (custom,
+// with daylight saving)`). NEVER the string. `posix` may be `none` or empty.
+[[nodiscard]] inline std::string zone_readable(std::string_view posix, std::string_view name = {}) {
+    if (const std::optional<NamedZone> place = zone_place(posix, name)) {
+        return zone_display(place->name);
+    }
+    if (posix.empty() || posix == kNoZone) {
+        return "UTC";
+    }
+    const std::optional<ZoneRules> rules = parse_zone_rules(posix);
+    if (!rules) {
+        return "a zone this board does not read";
+    }
+    std::string out = offset_text(rules->offsets.std_east_s) + " (custom";
+    if (rules->offsets.has_dst) {
+        out += ", with daylight saving";
+    }
+    return out + ")";
+}
+
 }  // namespace iclforge::wallclock

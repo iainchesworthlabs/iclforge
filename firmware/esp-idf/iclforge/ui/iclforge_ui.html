@@ -253,9 +253,10 @@ dialog::backdrop{background:#0009}
 </div></div>
 <form id="zone-form" class="row">
 <label class="lbl" for="zone-select">Time zone</label><div>
+<p id="zone-now" class="val"></p>
 <div id="zone-pick" class="inline" hidden><select id="zone-select" aria-describedby="zone-help"></select><select id="zone-city" aria-label="City"></select></div>
-<div class="inline"><input id="zone-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="UTC" aria-label="Time zone as a POSIX string"><button type="submit" class="primary">Save</button></div>
-<p id="zone-help" class="help">Choose a region and a city, or type a POSIX time zone such as AEST-10AEDT,M10.1.0,M4.1.0/3 (its offset counts hours west of UTC) and Save. Empty is UTC.</p>
+<div class="inline"><input id="zone-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="Another zone" aria-label="Another time zone, as a POSIX string"><button type="submit" class="primary">Save</button></div>
+<p id="zone-help" class="help">Choose a region and a city (Other, then UTC, is no zone), or type a POSIX time zone for a place that is not in the list, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (its offset counts hours west of UTC), and Save.</p>
 </div>
 </form>
 <form id="ntp-form" class="row">

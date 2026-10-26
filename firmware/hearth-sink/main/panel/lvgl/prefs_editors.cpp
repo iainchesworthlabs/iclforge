@@ -273,7 +273,25 @@ void build_times() {
     return kNoRegion;
 }
 
-[[nodiscard]] std::string current_word() { return g.pref->get != nullptr ? g.pref->get(preferences_backend()) : std::string(); }
+// The zone the board holds, as the editor reads it: the place (a name in the table, the one the person chose or, for a
+// zone that was set with a string and no name, the table's place for the string), what a person reads for it, and
+// whether the board has none. The string itself is never shown (wallclock::zone_readable).
+struct Current {
+    std::string place;
+    std::string readable;
+    bool none = false;
+};
+
+[[nodiscard]] Current current_zone() {
+    const wc::ZoneChoice zone = preferences_backend().time_zone();
+    Current out;
+    if (const std::optional<wc::NamedZone> place = wc::zone_place(zone.posix, zone.name)) {
+        out.place = std::string(place->name);
+    }
+    out.none = zone.posix.empty() || zone.posix == wc::kNoZone;
+    out.readable = wc::zone_readable(zone.posix, zone.name);
+    return out;
+}
 
 [[nodiscard]] std::string zone_title() {
     if (g.region == kNoRegion) {
@@ -283,19 +301,21 @@ void build_times() {
 }
 
 void paint_zone() {
-    const std::string current = current_word();
-    const std::string key = current + "|" + std::to_string(g.region) + "|" + g.status_text;
+    const Current current = current_zone();
+    const std::string key = current.place + "|" + current.readable + "|" + std::to_string(g.region) + "|" + g.status_text;
     if (key == g.painted) {
         return;
     }
     g.painted = key;
-    const std::size_t current_region = region_of(current);
+    const std::size_t current_region = current.place.empty() ? kNoRegion : region_of(current.place);
     for (const Item& item : g.items) {
         bool chosen = false;
         switch (item.act) {
             case Act::kZone:
+                chosen = item.word == current.place;
+                break;
             case Act::kNoZone:
-                chosen = item.word == current;
+                chosen = current.none && current.place.empty();
                 break;
             case Act::kRegion:
                 chosen = item.arg == current_region;
@@ -305,7 +325,7 @@ void paint_zone() {
         }
         style_choice(item.button, item.label, chosen);
     }
-    show_summary("Now: " + (g.pref->label_of != nullptr ? g.pref->label_of(current) : current));
+    show_summary("Now: " + current.readable);
 }
 
 void add_item(Act act, std::size_t arg, const std::string& text, const std::string& word, bool more) {
@@ -353,7 +373,7 @@ void build_list() {
     paint_zone();
     // The zone already chosen in view, so that a person who wants the one next to it does not scroll for it.
     lv_obj_update_layout(g.list);
-    const std::string current = current_word();
+    const std::string current = current_zone().place;
     for (const Item& item : g.items) {
         if (item.act != Act::kRegion && !item.word.empty() && item.word == current) {
             lv_obj_scroll_to_view(item.button, LV_ANIM_OFF);
@@ -390,8 +410,8 @@ void build_zone() {
     lv_obj_set_style_pad_row(g.list, m.gap, 0);
 
     // Open where the zone already chosen is: the places in its region, with it in view.
-    const wc::ZoneChoice zone = preferences_backend().time_zone();
-    g.region = zone.name.empty() ? kNoRegion : region_of(zone.name);
+    const std::string place = current_zone().place;
+    g.region = place.empty() ? kNoRegion : region_of(place);
     build_list();
 }
 

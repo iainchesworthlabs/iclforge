@@ -5,6 +5,7 @@
 // rules end in. See iclforge/time_zones.hpp.
 
 #include <cstddef>
+#include <cstdint>
 
 namespace iclforge::wallclock::data {
 
@@ -439,5 +440,64 @@ inline constexpr ZoneRow kZones[] = {
 };
 
 inline constexpr std::size_t kZoneCount = sizeof(kZones) / sizeof(kZones[0]);
+
+// The place a string stands for when several names share it, as indices into kZones
+// (PREFERRED in the generator): one for every shared string, in table order.
+inline constexpr std::uint16_t kPreferred[] = {
+    0,
+    3,
+    13,
+    17,
+    24,
+    27,
+    30,
+    49,
+    53,
+    84,
+    87,
+    98,
+    114,
+    133,
+    134,
+    146,
+    153,
+    155,
+    159,
+    161,
+    163,
+    176,
+    177,
+    219,
+    227,
+    228,
+    229,
+    232,
+    238,
+    270,
+    271,
+    272,
+    275,
+    285,
+    287,
+    295,
+    300,
+    301,
+    309,
+    317,
+    330,
+    334,
+    337,
+    344,
+    381,
+    382,
+    389,
+    394,
+    406,
+    407,
+    414,
+};
+
+inline constexpr std::size_t kPreferredCount =
+    sizeof(kPreferred) / sizeof(kPreferred[0]);
 
 }  // namespace iclforge::wallclock::data

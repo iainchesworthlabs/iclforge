@@ -531,22 +531,11 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
     return std::string(value.substr(0, dash)) + " to " + std::string(value.substr(dash + 1));
 }
 
-// What a person reads for a zone: "Melbourne (Australia)" for a name, "UTC" for none, a string as it is.
+// What a person reads for a zone, from the word its route takes (a name, a POSIX string or none): "Melbourne (Australia)"
+// for a name or for a string the table holds, "UTC" for none, "UTC+10:00 (custom)" for a zone in no table; never the
+// string (wallclock::zone_readable).
 [[nodiscard]] inline std::string time_zone_label(std::string_view value) {
-    if (value == wallclock::kNoZone) {
-        return "UTC";
-    }
-    const std::optional<wallclock::NamedZone> named = wallclock::find_time_zone(value);
-    if (!named) {
-        return std::string(value);
-    }
-    // A city with a place between it and its region already says where it is ("Buenos Aires (Argentina)").
-    const std::string city = wallclock::zone_label(named->name);
-    const std::string_view region = wallclock::zone_region(named->name);
-    if (region == wallclock::kOtherRegion || city.find(" (") != std::string::npos) {
-        return city;
-    }
-    return city + " (" + std::string(region) + ")";
+    return wallclock::zone_readable(value, value);
 }
 
 [[nodiscard]] inline std::string get_now_view(const Backend& backend) {

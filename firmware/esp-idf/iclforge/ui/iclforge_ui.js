@@ -590,17 +590,22 @@
   function time(t, fresh) {
     $('time-group').hidden = !t || typeof t !== 'object';
     if ($('time-group').hidden) return;
+    // The zone is shown as the place it is ("Melbourne (Australia)", "UTC", "UTC+10:00 (custom)"), never as the string the
+    // board keeps it by: that is the board's, and a person who types one types it.
+    const where = str(t.zone_label);
     $('time-now').textContent = str(t.local)
-      ? t.local + (t.zone === 'none' ? ' UTC' : '')
+      ? t.local + (where ? ' ' + where : '')
       : t.sync ? 'Waiting for a time server.' : 'Not kept: no time server is asked.';
+    $('zone-now').textContent = where ? 'Now: ' + where + '.' : '';
     if (fresh('timesync')) $('time-sync').checked = t.sync === true;
-    field($('zone-input'), t.zone === 'none' ? '' : str(t.zone));
+    field($('zone-input'), '');
     loadZones();
-    // The zone the person chose by name is shown by it; a string they typed leaves both lists at their prompts.
+    // The place the zone is, by the name chosen or by the table's place for the string, is shown by region and city; a zone
+    // in no table leaves both lists at their prompts.
     if (zoneNames?.length && document.activeElement !== $('zone-select') && document.activeElement !== $('zone-city')) {
-      const named = zoneNames.includes(t.zone_name) ? t.zone_name : '';
-      $('zone-select').value = named ? zoneRegion(named) : '';
-      zoneCities(named ? zoneRegion(named) : '', named);
+      const place = zoneNames.includes(t.zone_place) ? t.zone_place : '';
+      $('zone-select').value = place ? zoneRegion(place) : '';
+      zoneCities(place ? zoneRegion(place) : '', place);
     }
     field($('ntp-input'), t.server === 'none' ? '' : str(t.server));
     $('ntp-help').textContent = 'A host name or an IPv4 address. Empty is the router\'s, then pool.ntp.org.' +
@@ -772,7 +777,14 @@
 
   $('zone-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    setZone($('zone-input').value.trim());
+    const typed = $('zone-input').value.trim();
+    // The field is never filled in with the zone the board has, so an empty one is nothing typed, not UTC; where there is no
+    // list to choose UTC from, it still is.
+    if (!typed && !$('zone-pick').hidden) {
+      say('Choose a region and a city, or type a zone.');
+      return;
+    }
+    setZone(typed);
   });
 
   $('ntp-form').addEventListener('submit', (event) => {

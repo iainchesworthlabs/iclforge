@@ -54,6 +54,67 @@ ALIASES = {"Australia/Canberra": "Australia/Sydney"}
 # "no zone".
 EXTRAS = ("UTC",)
 
+# Where a POSIX string stands for several places (Melbourne, Sydney, Hobart and Canberra are
+# one string), the place a board names when it is told the string and no name: the most
+# populous of them, one for each string that is shared (by city, in 2026: Melbourne passed
+# Sydney in the ABS's 2023 estimates). A person who set a zone through a page that stored only
+# the string reads the place here on the screen, and a place that was not theirs has the same
+# clock; they choose their own and it is stored. `preferred_indices` holds every shared string
+# to exactly one of these.
+PREFERRED = (
+    "Africa/Abidjan",
+    "Africa/Algiers",
+    "Africa/Casablanca",
+    "Africa/Dar_es_Salaam",
+    "Africa/Johannesburg",
+    "Africa/Khartoum",
+    "Africa/Lagos",
+    "Africa/Tripoli",
+    "America/Anchorage",
+    "America/Caracas",
+    "America/Chicago",
+    "America/Denver",
+    "America/Halifax",
+    "America/Lima",
+    "America/Los_Angeles",
+    "America/Mexico_City",
+    "America/New_York",
+    "America/Noronha",
+    "America/Nuuk",
+    "America/Panama",
+    "America/Phoenix",
+    "America/Santo_Domingo",
+    "America/Sao_Paulo",
+    "Asia/Bangkok",
+    "Asia/Dhaka",
+    "Asia/Dili",
+    "Asia/Dubai",
+    "Asia/Gaza",
+    "Asia/Jakarta",
+    "Asia/Seoul",
+    "Asia/Shanghai",
+    "Asia/Singapore",
+    "Asia/Tashkent",
+    "Asia/Vladivostok",
+    "Asia/Yangon",
+    "Atlantic/Madeira",
+    "Australia/Adelaide",
+    "Australia/Brisbane",
+    "Australia/Melbourne",
+    "Europe/Berlin",
+    "Europe/Istanbul",
+    "Europe/Kyiv",
+    "Europe/London",
+    "Europe/Moscow",
+    "Pacific/Apia",
+    "Pacific/Auckland",
+    "Pacific/Fiji",
+    "Pacific/Guam",
+    "Pacific/Noumea",
+    "Pacific/Pago_Pago",
+    "Pacific/Tahiti",
+)
+
 # The longest a POSIX string may be (iclforge::wallclock::kTimeZoneMaxBytes) and a zone name
 # (kTimeZoneNameMaxBytes).
 POSIX_MAX = 63
@@ -150,7 +211,38 @@ def build(directory: Path) -> list[tuple[str, str]]:
     return rows
 
 
+def preferred_indices(rows: list[tuple[str, str]], complete: bool = False) -> list[int]:
+    """The index of the place each shared string means (PREFERRED), in table order: one for
+    every string that more than one name has, and an error for a string with none or two. With
+    `complete` (the real table, not a few rows made up for a test) a preferred name that is not
+    offered is an error too."""
+    groups: dict[str, list[int]] = {}
+    for index, (_, posix) in enumerate(rows):
+        groups.setdefault(posix, []).append(index)
+    offered = {name for name, _ in rows}
+    unknown = [name for name in PREFERRED if name not in offered]
+    if complete and unknown:
+        raise ValueError(f"PREFERRED names zones that are not offered: {unknown}")
+    chosen = []
+    for posix, members in groups.items():
+        if len(members) < 2:
+            continue
+        among = [i for i in members if rows[i][0] in PREFERRED]
+        if len(among) != 1:
+            names = [rows[i][0] for i in members]
+            raise ValueError(
+                f"{posix!r} is shared by {names}, and PREFERRED holds {len(among)} of them, not one"
+            )
+        chosen.append(among[0])
+    taken = {rows[i][0] for i in chosen}
+    stray = [name for name in PREFERRED if name in offered and name not in taken]
+    if stray:
+        raise ValueError(f"PREFERRED has zones whose strings no other zone shares: {stray}")
+    return sorted(chosen)
+
+
 def render(rows: list[tuple[str, str]], version: str) -> str:
+    preferred = preferred_indices(rows)
     out = [
         "#pragma once",
         "",
@@ -159,6 +251,7 @@ def render(rows: list[tuple[str, str]], version: str) -> str:
         "// rules end in. See iclforge/time_zones.hpp.",
         "",
         "#include <cstddef>",
+        "#include <cstdint>",
         "",
         "namespace iclforge::wallclock::data {",
         "",
@@ -176,6 +269,15 @@ def render(rows: list[tuple[str, str]], version: str) -> str:
         "};",
         "",
         "inline constexpr std::size_t kZoneCount = sizeof(kZones) / sizeof(kZones[0]);",
+        "",
+        "// The place a string stands for when several names share it, as indices into kZones",
+        "// (PREFERRED in the generator): one for every shared string, in table order.",
+        "inline constexpr std::uint16_t kPreferred[] = {",
+        *[f"    {index}," for index in preferred],
+        "};",
+        "",
+        "inline constexpr std::size_t kPreferredCount =",
+        "    sizeof(kPreferred) / sizeof(kPreferred[0]);",
         "",
         "}  // namespace iclforge::wallclock::data",
         "",
@@ -343,6 +445,7 @@ def main(argv: list[str] | None = None) -> int:
 
     directory = zoneinfo_dir(args.tzdata_dir)
     rows = build(directory)
+    preferred_indices(rows, complete=True)
     text = render(rows, version_of(directory))
     status = 0
     if args.check:
