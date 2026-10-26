@@ -45,7 +45,9 @@ and the rest of a larger room's, the height speakers among them), and **the spea
 which one you hear is the one you see. A tap on a speaker chooses it (it is ringed) and plays the tone through it. For the
 chosen speaker, *Level* goes up and down half a decibel a tap and *Distance* a tenth of a metre, or a metre with *-1 m* and
 *+1 m* (the first *+* on a speaker with no distance starts it at the farthest distance the others have, so that nothing moves
-until you move it); the line above them says what is in force at it.
+until you move it); the line above them says what is in force at it. A 2.0 room is the same sheet with two speakers:
+
+![The Speakers sheet in a 2.0 room, the right speaker lit](screenshots/p4-panel-speakers-2-0.png)
 
 **The five buttons are a bar at the foot of the sheet that is always on the screen**: *Play* (the chosen speaker once), *Repeat*
 (it over and over, so that a level can be set by ear), *Play each* (every speaker in turn), *Stop* and *Reset* (the chosen
