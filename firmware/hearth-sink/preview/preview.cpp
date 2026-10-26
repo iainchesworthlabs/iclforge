@@ -469,6 +469,16 @@ Rect rect_of(lv_obj_t* object) {
     return {area.x1, area.y1, area.x2, area.y2};
 }
 
+// Whether `object` has a scrolling list for an ancestor below `root`; that list is returned.
+lv_obj_t* scroller_above(lv_obj_t* object, lv_obj_t* root) {
+    for (lv_obj_t* p = lv_obj_get_parent(object); p != nullptr && p != root; p = lv_obj_get_parent(p)) {
+        if (lv_obj_has_flag(p, LV_OBJ_FLAG_SCROLLABLE)) {
+            return p;
+        }
+    }
+    return nullptr;
+}
+
 // Walks the sheet under `root` and fails the run for text that is cut off, a control that sticks out of what holds it
 // or off the screen, a touch target smaller than a fingertip (iclforge::screen::kMinTargetPx), two of them
 // overlapping or closer than iclforge::screen::kMinGapPx. A list that scrolls is checked in full, not only the part
@@ -490,6 +500,8 @@ int audit(lv_obj_t* root, const std::string& what) {
         ++failures;
     };
     std::vector<lv_obj_t*> targets;
+    // The list each touch target is in, or none: what scrolls under a bar is clipped by it and is never on the glass beside it.
+    std::vector<lv_obj_t*> holders;
     const auto walk = [&](auto&& self, lv_obj_t* parent, bool scrolling) -> void {
         const bool under_scroll = scrolling || lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
         const Rect p = rect_of(parent);
@@ -524,6 +536,7 @@ int audit(lv_obj_t* root, const std::string& what) {
             }
             if (lv_obj_has_flag(child, player::panel::kTouchTargetFlag)) {
                 targets.push_back(child);
+                holders.push_back(scroller_above(child, root));
                 const int w = r.x2 - r.x1 + 1;
                 const int h = r.y2 - r.y1 + 1;
                 if (std::min(w, h) < iclforge::screen::kMinTargetPx) {
@@ -557,6 +570,9 @@ int audit(lv_obj_t* root, const std::string& what) {
             continue;
         }
         for (std::size_t j = i + 1; j < targets.size(); ++j) {
+            if (holders[i] != holders[j]) {
+                continue;
+            }
             const Rect b = reachable_part(targets[j]);
             if (b.x1 > b.x2 || b.y1 > b.y2) {
                 continue;
@@ -1316,6 +1332,70 @@ bool tap_in(lv_obj_t* root, const std::string& text, std::size_t nth = 0) {
     return true;
 }
 
+// A button of the bar at the foot of the Speakers sheet, by the long name or by the short one it has where the long ones do not
+// fit one line (a 320 by 240 and a 240 by 240 module).
+std::string bar_name(lv_obj_t* sheet, const std::string& long_name) {
+    const std::string shorter = long_name == "Repeat" ? "Loop" : long_name == "Play each" ? "All" : long_name;
+    return buttons_in(sheet, long_name).empty() ? shorter : long_name;
+}
+
+// The list that scrolls under `root`, or none.
+lv_obj_t* find_scroller(lv_obj_t* root) {
+    const std::uint32_t count = lv_obj_get_child_count(root);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        lv_obj_t* const child = lv_obj_get_child(root, static_cast<std::int32_t>(i));
+        if (lv_obj_has_flag(child, LV_OBJ_FLAG_SCROLLABLE)) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
+// audit() lets a list that scrolls run off the glass, as a list may, and so it let a bar of buttons at the end of the Speakers
+// sheet be below the screen on the kit (a 9.1.6 room is taller than a 5.1 one, and the five buttons went after it). This is the
+// check that a control cannot hide there: every touch target of the sheet is on the glass, and a control that is not in the list
+// (the bars at the top and the foot) is wholly on the screen at any size; one that is in the list is wholly inside the part of
+// the list that shows, with the list at rest, where `list_must_fit` says the room and the speaker are to be seen without a finger.
+// Prints how far a list runs past its glass, so that a size that scrolls says so. Returns the failures.
+int audit_on_glass(lv_obj_t* root, const std::string& what, bool list_must_fit) {
+    int failures = 0;
+    lv_obj_t* const list = find_scroller(root);
+    if (list != nullptr) {
+        lv_obj_scroll_to_y(list, 0, LV_ANIM_OFF);
+    }
+    lv_obj_update_layout(root);
+    std::vector<lv_obj_t*> targets;
+    collect_touch_targets(root, targets);
+    for (lv_obj_t* const target : targets) {
+        const Rect r = rect_of(target);
+        lv_obj_t* const holder = scroller_above(target, root);
+        const Rect glass = holder != nullptr ? rect_of(holder) : Rect{0, 0, g_width - 1, g_height - 1};
+        if (holder != nullptr && !list_must_fit) {
+            continue;
+        }
+        if (r.x1 < glass.x1 || r.x2 > glass.x2 || r.y1 < glass.y1 || r.y2 > glass.y2) {
+            std::string name = button_text(target);
+            std::printf("  FAIL %s: \"%s\" is not on the glass (%d,%d)-(%d,%d) where the %s shows (%d,%d)-(%d,%d)\n", what.c_str(),
+                        name.c_str(), r.x1, r.y1, r.x2, r.y2, holder != nullptr ? "list" : "screen", glass.x1, glass.y1, glass.x2,
+                        glass.y2);
+            ++failures;
+        }
+    }
+    if (list != nullptr) {
+        std::printf("  %-26s the list runs %d px past its glass\n", what.c_str(), static_cast<int>(lv_obj_get_scroll_bottom(list)));
+    }
+    return failures;
+}
+
+// Whether the speaker `id` is lit on the sheet: its shape is the accent's, as the Back button is.
+bool is_lit(lv_obj_t* sheet, const std::string& id) {
+    const std::vector<lv_obj_t*> node = buttons_in(sheet, id);
+    const std::vector<lv_obj_t*> back = buttons_in(sheet, "Back");
+    return !node.empty() && !back.empty() &&
+           lv_color_to_u32(lv_obj_get_style_bg_color(node.front(), LV_PART_MAIN)) ==
+               lv_color_to_u32(lv_obj_get_style_bg_color(back.front(), LV_PART_MAIN));
+}
+
 // The Sound group of the Preferences sheet that is open, and the Speakers sheet it opens, at one size. Returns the number of
 // failures, having said each.
 int check_sound_group(int width, int height, const fs::path& out, const std::string& size) {
@@ -1341,80 +1421,144 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     for (const char* shown : {"SOUND", "Identify speakers", "Speaker levels and distances", "none set"}) {
         expect(shows_text(prefs, shown), std::string("Preferences shows ") + shown);
     }
-    expect(shows_text(prefs, "Plays a quiet test tone", true), "the Identify row says what it does");
+    expect(shows_text(prefs, "lights the one you should hear", true), "the Identify row says what it does");
+    {
+        // The Sound group is some way down the list: scrolled to, for the picture of it.
+        const std::vector<lv_obj_t*> identify = buttons_in(prefs, "Identify");
+        if (!identify.empty()) {
+            lv_obj_scroll_to_view_recursive(identify.front(), LV_ANIM_OFF);
+            // ... and a half screen further, so that the row is in the middle and what follows it is in the picture too.
+            lv_obj_t* const list = find_scroller(prefs);
+            if (list != nullptr) {
+                lv_obj_scroll_by(list, 0, -(height / 2), LV_ANIM_OFF);
+            }
+        }
+        pump(2);
+        write_bmp(out / ("prefs-sound-" + size + ".bmp"));
+    }
 
-    // Identify speakers: Play each starts the tone through every speaker, the button says Stop while it plays.
-    expect(tap_in(prefs, "Play each"), "the Identify row has a Play each button");
-    expect(!g_tone_requests.empty() && g_tone_requests.back() == "all", "Play each asks for every speaker in turn");
-    expect(g_sound.tone_running, "and the tone is running");
-    pump(8);
-    expect(!buttons_in(prefs, "Stop").empty() && buttons_in(prefs, "Play each").empty(), "while it plays the button says Stop");
-    write_bmp(out / ("prefs-sound-playing-" + size + ".bmp"));
-    expect(tap_in(prefs, "Stop"), "and Stop is there to press");
-    expect(g_tone_requests.back() == "off" && !g_sound.tone_running, "Stop stops it");
-    pump(8);
-    expect(!buttons_in(prefs, "Play each").empty(), "and the button is Play each again");
-
-    // A song is playing: the board says so under the row, and the tone does not start.
+    // A song is playing: the board says so under the row, the tone does not start, and the sheet is there to say why.
     g_sound.tone_blocked = "A song is playing: the test tone waits until it stops.";
     g_now_us += 1'000'000;  // the list looks at the board once a second
     pump(8);
     expect(shows_text(prefs, "A song is playing", true), "a song playing is said under the Identify row");
-    const std::size_t asked = g_tone_requests.size();
-    tap_in(prefs, "Play each");
-    pump(4);
-    expect(!g_sound.tone_running, "and a tap on it does not play over the song");
-    expect(g_tone_requests.size() == asked + 1, "the board was asked, and said no");
+    tap_in(prefs, "Identify");
+    pump(8);
+    lv_obj_t* sheet = player::panel::sound_sheet_root();
+    expect(sheet != nullptr, "Identify opens the Speakers sheet even where the board cannot play");
+    expect(!g_sound.tone_running, "and does not play over the song");
+    if (sheet != nullptr) {
+        expect(shows_text(sheet, "A song is playing", true), "the sheet says why");
+        tap_in(sheet, "Back");
+        pump(8);
+    }
     g_sound.tone_blocked.clear();
     pump(8);
 
-    // The tone started from the list is stopped by closing it.
-    tap_in(prefs, "Play each");
-    expect(g_sound.tone_running, "the tone is running again");
-    // (closed below, with the Speakers sheet under it)
+    // Identify speakers is the Speakers sheet, with the sequence running: every speaker has its ID on it, and the one the tone
+    // is on is lit.
+    expect(tap_in(prefs, "Identify"), "the Identify row has an Identify button");
+    pump(8);
+    sheet = player::panel::sound_sheet_root();
+    expect(sheet != nullptr, "Identify opens the Speakers sheet");
+    if (sheet == nullptr) {
+        return failures;
+    }
+    expect(!g_tone_requests.empty() && g_tone_requests.back() == "all", "and asks for every speaker in turn");
+    expect(g_sound.tone_running, "so the tone is running");
+    for (const char* role : {"L", "C", "R", "Ls", "Rs", "LFE"}) {
+        expect(!buttons_in(sheet, role).empty(), std::string("the room has the ") + role + " speaker, with its ID on it");
+    }
+    for (const player::SoundSheet::Speaker& speaker : g_sound.speakers) {
+        g_sound.tone_role = speaker.role;
+        pump(8);
+        for (const player::SoundSheet::Speaker& other : g_sound.speakers) {
+            const std::string id(st::role_name(other.role));
+            expect(is_lit(sheet, id) == (other.role == speaker.role),
+                   "while the tone is on " + std::string(st::role_name(speaker.role)) + ", " + id +
+                       (other.role == speaker.role ? " is lit" : " is not"));
+        }
+    }
+    g_sound.tone_role = *st::parse_role("Ls");
+    pump(8);
+    write_bmp(out / ("speakers-lit-" + size + ".bmp"));
+    failures += audit(sheet, "speakers " + size);
+    failures += audit_on_glass(sheet, "speakers on glass " + size, width >= 1024);
+    // Stop is a button of the bar, and the controls are still there: the sheet is not only a Stop.
+    expect(tap_in(sheet, "Stop"), "the bar has a Stop button");
+    expect(g_tone_requests.back() == "off" && !g_sound.tone_running, "Stop stops the tone");
+    pump(8);
+    expect(shows_text(sheet, "Level") && shows_text(sheet, "Distance"), "and the level and the distance are still there");
+    expect(player::panel::sound_sheet_root() != nullptr, "and so is the sheet");
+    tap_in(sheet, "Back");
+    pump(8);
+    expect(player::panel::sound_sheet_root() == nullptr, "Back puts the sheet away");
+    expect(player::panel::prefs_root() != nullptr, "the Preferences list is under it");
 
-    // The Speakers sheet.
+    // The worst case, which is what a person on the kit meets: every layout the sheet draws, a speaker lit in each, and the
+    // bars on the glass in all of them. A room that is taller than the glass lets the list scroll; the bars never move.
+    for (const char* layout : {"2.0", "5.1", "7.1.4", "9.1.6"}) {
+        set_room(layout);
+        g_sound.tone_running = true;
+        g_sound.tone_role = g_sound.speakers.back().role;
+        pump(8);
+        expect(tap_in(prefs, "Edit"), std::string("the Edit button is there for ") + layout);
+        pump(8);
+        lv_obj_t* const room = player::panel::sound_sheet_root();
+        expect(room != nullptr, std::string("the sheet opens for ") + layout);
+        if (room == nullptr) {
+            continue;
+        }
+        const std::string what = std::string("speakers ") + layout + " " + size;
+        for (const player::SoundSheet::Speaker& speaker : g_sound.speakers) {
+            expect(!buttons_in(room, std::string(st::role_name(speaker.role))).empty(),
+                   std::string(layout) + " has " + std::string(st::role_name(speaker.role)) + " with its ID on it");
+        }
+        // The speaker the tone is on, and no other, is lit.
+        int lit = 0;
+        for (const player::SoundSheet::Speaker& speaker : g_sound.speakers) {
+            lit += is_lit(room, std::string(st::role_name(speaker.role))) ? 1 : 0;
+        }
+        expect(lit == 1, std::string(layout) + " has exactly one speaker lit");
+        failures += audit(room, what);
+        // The kit's panel shows the whole sheet without a finger, the 9.1.6 room among them; an 800 by 480 one, all but a 9.1.6;
+        // the smaller ones scroll what is between the bars.
+        const bool whole = width >= 1024 || (width >= 800 && std::string(layout) != "9.1.6");
+        failures += audit_on_glass(room, what + " on glass", whole);
+        for (const char* label : {"Play", "Repeat", "Play each", "Stop", "Reset"}) {
+            expect(!buttons_in(room, bar_name(room, label)).empty(), what + " has the " + label + " button");
+        }
+        write_bmp(out / (std::string("speakers-") + layout + "-lit-" + size + ".bmp"));
+        tap_in(room, "Back");
+        pump(8);
+    }
+    g_sound.tone_running = false;
+    g_sound.tone_role = st::kNoRole;
+    set_room("5.1");
+    pump(8);
+
+    // The Speakers sheet, for the speaker trim.
     expect(tap_in(prefs, "Edit"), "the speaker trim row has an Edit button");
     pump(8);
-    lv_obj_t* const sheet = player::panel::sound_sheet_root();
+    sheet = player::panel::sound_sheet_root();
     expect(sheet != nullptr, "Edit opens the Speakers sheet");
     if (sheet == nullptr) {
         return failures;
     }
     write_bmp(out / ("speakers-" + size + ".bmp"));
-    failures += audit(sheet, "speakers " + size);
     for (const char* shown : {"Speakers", "Level", "Distance", "Front left", "0 dB", "not set"}) {
         expect(shows_text(sheet, shown, std::string(shown) == "Front left"), std::string("the sheet shows ") + shown);
     }
-    for (const char* role : {"L", "C", "R", "Ls", "Rs", "LFE"}) {
-        expect(!buttons_in(sheet, role).empty(), std::string("the room has the ") + role + " speaker to touch");
-    }
-    // The tone from the list went on into the sheet; the sheet takes it away with it.
 
     // A tap on a speaker chooses it and plays the tone through it.
     expect(tap_in(sheet, "Ls"), "a speaker of the room can be tapped");
     expect(g_tone_requests.back() == "Ls", "a tap on Ls plays Ls");
     pump(8);
     expect(shows_text(sheet, "Left surround", true), "and the sheet is about the left surround");
-    write_bmp(out / ("speakers-lit-" + size + ".bmp"));
-    {
-        const std::vector<lv_obj_t*> lit = buttons_in(sheet, "Ls");
-        const std::vector<lv_obj_t*> other = buttons_in(sheet, "Rs");
-        expect(!lit.empty() && !other.empty() &&
-                   lv_color_to_u32(lv_obj_get_style_bg_color(lit.front(), LV_PART_MAIN)) !=
-                       lv_color_to_u32(lv_obj_get_style_bg_color(other.front(), LV_PART_MAIN)),
-               "the speaker the tone is on is lit and the others are not");
-    }
+    expect(is_lit(sheet, "Ls") && !is_lit(sheet, "Rs"), "the speaker the tone is on is lit and the others are not");
     g_sound.tone_role = *st::parse_role("Rs");
     pump(8);
-    {
-        const std::vector<lv_obj_t*> lit = buttons_in(sheet, "Rs");
-        const std::vector<lv_obj_t*> other = buttons_in(sheet, "Ls");
-        expect(!lit.empty() && !other.empty() &&
-                   lv_color_to_u32(lv_obj_get_style_bg_color(lit.front(), LV_PART_MAIN)) !=
-                       lv_color_to_u32(lv_obj_get_style_bg_color(other.front(), LV_PART_MAIN)),
-               "and the light follows the tone to the next speaker");
-    }
+    expect(is_lit(sheet, "Rs") && !is_lit(sheet, "Ls"), "and the light follows the tone to the next speaker");
 
     // The level: a half decibel a step, in both directions, and the sheet says what it is.
     tap_in(sheet, "+", 0);
@@ -1456,7 +1600,7 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     pump(4);
     expect(g_trim_requests.back() == "R distance=1.10", "and moves by metres");
     write_bmp(out / ("speakers-distance-" + size + ".bmp"));
-    // Past what the delay lines hold, the board says no and the sheet says why.
+    // Past what the delay lines hold, the board says no and the sheet says why, where the person looks (above the controls).
     tap_in(sheet, "Ls");
     for (int i = 0; i < 6; ++i) {
         tap_in(sheet, "+1 m");
@@ -1471,12 +1615,12 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     pump(4);
 
     // Repeat, Play each and Stop.
-    tap_in(sheet, "Repeat");
+    tap_in(sheet, bar_name(sheet, "Repeat"));
     expect(g_tone_requests.back() == "R loop", "Repeat asks for the chosen speaker over and over");
     pump(4);
-    tap_in(sheet, "Repeat");
+    tap_in(sheet, bar_name(sheet, "Repeat"));
     expect(g_tone_requests.back() == "off", "and Repeat again stops it");
-    tap_in(sheet, "Play each");
+    tap_in(sheet, bar_name(sheet, "Play each"));
     expect(g_tone_requests.back() == "all", "Play each plays every speaker in turn");
     pump(4);
     tap_in(sheet, "Stop");
@@ -1507,8 +1651,6 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     for (const char* role : {"Lrs", "Rrs", "Vhl", "Vhr"}) {
         expect(!buttons_in(player::panel::sound_sheet_root(), role).empty(), std::string("7.1.4 has the ") + role + " speaker to touch");
     }
-    write_bmp(out / ("speakers-7-1-4-" + size + ".bmp"));
-    failures += audit(player::panel::sound_sheet_root(), "speakers 7.1.4 " + size);
 
     // A board with no delay lines keeps the level and greys the distance, with its reason.
     g_sound.delay = false;
@@ -1530,7 +1672,7 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     pump(8);
 
     // Back: the page goes, the tone with it, and the list is under it as it was.
-    tap_in(player::panel::sound_sheet_root(), "Play each");
+    tap_in(player::panel::sound_sheet_root(), bar_name(player::panel::sound_sheet_root(), "Play each"));
     expect(g_sound.tone_running, "the tone is running when the sheet is left");
     expect(tap_in(player::panel::sound_sheet_root(), "Back"), "the sheet has a Back button");
     pump(8);
@@ -1539,10 +1681,6 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     expect(player::panel::prefs_root() != nullptr, "the Preferences list is under it");
     expect(shows_text(player::panel::prefs_root(), "2 speakers set", true) || shows_text(player::panel::prefs_root(), "1 speaker set", true),
            "and says what is set");
-
-    // Leaving the Preferences stops a tone the list started.
-    tap_in(player::panel::prefs_root(), "Play each");
-    expect(g_sound.tone_running, "the list starts the tone");
     return failures;
 }
 
@@ -2048,7 +2186,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         tap_button("Close");
         pump(6);
         expect(player::panel::prefs_root() == nullptr, "Close puts the Preferences sheet away");
-        expect(!g_sound.tone_running, "and a tone the list started goes with it");
+        expect(!g_sound.tone_running, "and no tone is left playing");
     }
 
     // Dimming and Preferences: the tap that wakes a dimmed screen does not also open Preferences, the sheet keeps the

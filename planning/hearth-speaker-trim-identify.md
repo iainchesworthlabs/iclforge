@@ -140,11 +140,13 @@ stand-in to the firmware's strings and routes), and the page's request list in `
 (`libs/device/include/iclforge/preferences.hpp`, the contract of the programme's first task). Both are available where the build
 has a Sendspin player and say *This build has no player, so it has no speakers to play a tone through.* where it has not.
 
-- **Identify speakers** is an action. Its button says *Play each* and, while the tone plays, *Stop*: the entry's two choices are
-  `run` and `running`, and the value read is the one the board is in, so the button needs nothing but the registry to follow
-  the tone (the screen repaints once a second, at once after a tap). A press while it plays stops it. A song playing, or a play
-  from the web page, is said under the row (the entry's `inert` text), and a press the board refuses is refused in the same
-  words as `POST /identify`'s.
+- **Identify speakers** is an action whose button says *Identify*. A press asks the board for the tone through every speaker in
+  turn (`POST /identify`'s `all`) and **opens the Speakers sheet**, where the speaker the tone is on is lit: the first version
+  made the button *Play each* and then *Stop*, and the owner, on the kit, found that a button that only said Stop did not say which
+  speaker was which. The entry still has its two choices, `run` and `running`, so that `GET /preferences` says when the tone plays,
+  but the screen's button no longer changes with them; a press while it plays starts it over (the sheet's *Stop* is the stop).
+  A song playing, or a play from the web page, is said under the row (the entry's `inert` text) and on the sheet, and a press
+  the board refuses is refused in the same words as `POST /identify`'s; the sheet opens either way and says why.
 - **Speaker levels and distances** is the new kind `sheet` (added at the end of `Kind`, as the header asks): a row that says what is
   set (*none set*, *1 speaker set*, *3 speakers set*) and an *Edit* button that opens the Speakers sheet. Its setter takes the
   words of `PUT /trim`, so the row, the route and the sheet are one path. A sheet has no choices to list.
@@ -153,15 +155,20 @@ has a Sendspin player and say *This build has no player, so it has no speakers t
 again when the layout changes under it (a `PUT /layout` from the web page). It has:
 
 - the room, drawn by `room_plan.hpp` (read-only, as the lyric screen uses it) for the layout in force, only the speakers the
-  layout has at an output, with the speaker the tone is on lit from `GET /identify`'s `role` and the chosen one ringed; a tap on a
-  speaker chooses it and plays the tone through it. The room's height is as tall as the layout needs for no two shapes to be
-  closer than 6 px (a 5.1 room 220 px, a 7.1.4 room taller). A display narrower than 760 px has no room: the speakers are a row of
-  buttons in output order, which are the same touch targets;
+  layout has at an output, **each with its ID inside it**, the speaker the tone is on lit from `GET /identify`'s `role` and the
+  chosen one ringed; a tap on a speaker chooses it and plays the tone through it. The room's height is as tall as the layout needs
+  for no two shapes to be closer than 6 px, no taller: at the kit's width a 2.0 room is 120 px, a 5.1 180, a 7.1.4 240 and a
+  9.1.6 260. A display narrower than 760 px has no room: the speakers are a row of buttons in output order, which are the same
+  touch targets;
 - for the chosen speaker, *Level* (- and + a half decibel, from -12 to +12 dB) and *Distance* (- and + a tenth of a metre, and
   -1 m and +1 m; the first + on a speaker with no distance starts it at the farthest distance any speaker has, so that setting
   it changes nothing until it is moved, and 3 m when none has one; a - from 0.1 m takes it away again);
-- *Play*, *Repeat* (the chosen speaker over and over until it is pressed again, so that a level can be set by ear), *Play each*,
-  *Stop* and *Reset* (the chosen speaker back to 0 dB and no distance);
+- **a bar at the foot, fixed**: *Play*, *Repeat* (the chosen speaker over and over until it is pressed again, so that a level can
+  be set by ear), *Play each*, *Stop* and *Reset* (the chosen speaker back to 0 dB and no distance). The first version put these
+  at the end of the page that scrolled, and on the kit's 9.1.6 room they were below the screen. Now the title's bar, this bar
+  and what is between them are three objects: the room and the speaker scroll between the bars where they are more than the
+  screen holds, and neither bar moves. Where five buttons do not fit one line the bar wraps them onto two (a 240 by 240 module) and
+  is as tall as that needs, and where only shorter words fit one line it uses them (*Loop*, *All*);
 - what is really in force for the chosen speaker (*In force: -1.5 dB, 1.2 ms later*), and under the controls, why a control does
   nothing: a song is playing; this board has no delay lines (the distance is greyed, the level is not); a Sendspin server is
   setting the levels or the delays now; the speaker's delay is cut to what the lines hold.
@@ -269,14 +276,20 @@ A refusal is 400 for words the route does not read, 409 for what the board canno
 - `apps/demos/wasm/tests/device-ui/sound.spec.js`: the page against the stand-in, and the stand-in's JSON
   against the headers that write it, key for key.
 - `libs/device/tests/test_preferences.cpp`: the Sound entries against every known board (a reason wherever greyed, a default
-  where on), the button that says Stop while its tone plays and stops it when pressed, a board that refuses, a build with no
-  player, the sheet's summary and its text going to the board whole, and the listing's JSON.
+  where on), the Identify button starting the tone (and starting it over when pressed again), a board that refuses, a build with
+  no player, the sheet's summary and its text going to the board whole, and the listing's JSON.
 - `libs/render/tests/test_speaker_trim.cpp` (`[editor]`): the level's 49 stops, the distance's steps, seed, ends and "not set",
   the words, and the statements the sheet sends being ones the table's own parser takes for every role.
 - `firmware/hearth-sink/preview` (the screen on a computer): the Preferences list with the Sound group and the sheet at 1024 by 600,
-  800 by 480, 480 by 320, 320 by 240 and 240 by 240: every touch target 48 px and 6 px apart, text not cut off, a tap on a speaker
-  playing it and lighting it, the light following the tone, the level and distance steps, a refusal said, Repeat, Play each, Stop,
-  Reset, a song playing, a layout changing under the sheet, no delay lines, a server's levels, and the tone going with the sheet.
+  800 by 480, 480 by 320, 320 by 240 and 240 by 240: every touch target 48 px and 6 px apart, text not cut off, Identify opening the
+  sheet with the tone running and each speaker lit in turn (every ID on a speaker, exactly one lit), a tap on a speaker playing it
+  and lighting it, the level and distance steps, a refusal said, Repeat, Play each, Stop (which leaves the controls), Reset, a song
+  playing, a layout changing under the sheet, no delay lines, a server's levels, and the tone going with the sheet.
+  **The room is drawn in every layout the sheet knows, 2.0, 5.1, 7.1.4 and 9.1.6, at every size, and `audit_on_glass()` holds
+  the sheet to the glass**: the bars at the top and the foot to the screen, and what scrolls between them to its own viewport where
+  it is to be seen without a finger (all four layouts at 1024 by 600; all but 9.1.6 at 800 by 480). The first version of
+  the sheet passed `audit()`, which lets a list that scrolls run off the glass, with its buttons below the kit's screen in a
+  9.1.6 room (the check ran 5.1 and 7.1.4 and never the kit's layout); a room made taller on purpose now fails the new check.
 - Firmware builds, no board: the P4X profile (`p4-rev3`), the S3 profile (`s3-n16r8`) and the C6 (`c6-16mb`), and the
   no-player seam syntax-checked with the same flags.
 
@@ -292,8 +305,9 @@ A refusal is 400 for words the route does not read, 409 for what the board canno
 4. A tone refused while a stream plays; a stream started while a tone sounds ends it in the next
    block (look for the scope trace stopping, not fading); the page closed during a loop.
 5. `GET /hardware` and the free internal heap at boot against main's, S3 and P4X.
-6. On the kit's panel: *Identify speakers* in the list plays each speaker in turn and ends at the last; a tap on each speaker of
-   the sheet plays it and lights it, and the light is on the speaker you hear; *Repeat* while the level is stepped is heard to
+6. On the kit's panel: *Identify* in the list opens the sheet and plays each speaker in turn, ending at the last, the light on
+   the speaker you hear (on the kit's layout, 9.1.6, with all sixteen labelled); a tap on each speaker of the sheet plays it and
+   lights it; the five buttons are on the glass; *Repeat* while the level is stepped is heard to
    change by half a decibel; *Back* and a stream starting each end a tone in the next block; a distance on two speakers is a delay on the
    scope; the sheet is not slower to draw than the list (`prefs_build_us_max` in `GET :8081/panel`, which counts the list's build; the
    sheet's own build is in the log line).

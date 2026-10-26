@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/render/layout.hpp"
@@ -43,8 +44,8 @@ constexpr std::uint16_t kSeedCm = 300;
 // speakers as a row of buttons.
 constexpr int kRoomMinWidth = 760;
 // The room's height: at least this, and taller by this much at a time until its speakers are apart, up to the most.
-constexpr int kPlanMinHeight = 220;
-constexpr int kPlanGrowStep = 20;
+constexpr int kPlanMinHeight = 120;
+constexpr int kPlanGrowStep = 10;
 constexpr int kPlanMaxHeight = 520;
 
 enum class Op : int {
@@ -251,29 +252,6 @@ void on_target(lv_event_t* event) {
     return std::max(ui.m->row_target, prefs_text_width(ui.body, text) + 2 * ui.m->pad);
 }
 
-// A row of the panel: the label at the left and the controls at the right where they fit on one line with it, under it
-// where they do not. Returns the box the controls go in.
-lv_obj_t* make_row(const PrefsUi& ui, lv_obj_t* parent, int content_w, const std::string& label, int control_w) {
-    const int gap = ui.m->gap;
-    const int label_w = prefs_text_width(ui.body, label);
-    const bool one_line = label_w + 2 * gap + control_w <= content_w;
-    lv_obj_t* const top = prefs_box(parent);
-    lv_obj_set_size(top, content_w, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_row(top, gap / 2, 0);
-    lv_obj_set_flex_align(top, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_t* const text = prefs_label(top, label, ui.body, ui.c->text);
-    lv_label_set_long_mode(text, LV_LABEL_LONG_MODE_WRAP);
-    lv_obj_set_width(text, one_line ? label_w + 2 : content_w);
-    lv_obj_t* const controls = prefs_box(top);
-    lv_obj_set_size(controls, one_line ? control_w : content_w, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_column(controls, gap, 0);
-    lv_obj_set_style_pad_row(controls, gap, 0);
-    lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    return controls;
-}
-
 // - value + : a group that stays together on a line.
 lv_obj_t* make_stepper(const PrefsUi& ui, lv_obj_t* parent, int value_w, Op minus, Op plus, lv_obj_t*& minus_out,
                        lv_obj_t*& value_out, lv_obj_t*& plus_out) {
@@ -295,6 +273,16 @@ lv_obj_t* make_stepper(const PrefsUi& ui, lv_obj_t* parent, int value_w, Op minu
 
 lv_obj_t* make_action(const PrefsUi& ui, lv_obj_t* parent, const std::string& text, Op op) {
     return prefs_button(parent, text, button_width(ui, text), ui.m->row_target, ui.c->surface_up, ui.c->text, &on_target,
+                        pack(op, 0), nullptr);
+}
+
+// The two buttons that step a distance a metre: as wide as their text and a little room, never under a fingertip.
+[[nodiscard]] int step_button_width(const PrefsUi& ui, const std::string& text) {
+    return std::max(ui.m->row_target, prefs_text_width(ui.body, text) + ui.m->gap);
+}
+
+lv_obj_t* make_step_button(const PrefsUi& ui, lv_obj_t* parent, const std::string& text, Op op) {
+    return prefs_button(parent, text, step_button_width(ui, text), ui.m->row_target, ui.c->surface_up, ui.c->text, &on_target,
                         pack(op, 0), nullptr);
 }
 
@@ -326,15 +314,16 @@ lv_obj_t* make_node(const PrefsUi& ui, lv_obj_t* parent, const std::string& name
     return true;
 }
 
-// The room as the layout draws it, the speakers that go to an output in the places they have. False when the layout
-// cannot be read back from its text, and the speakers are a row of buttons instead.
+// The room as the layout draws it, the speakers that go to an output in the places they have, each with its ID inside it.
+// False when the layout cannot be read back from its text, and the speakers are a row of buttons instead.
 bool build_room(const PrefsUi& ui, lv_obj_t* parent, int content_w) {
     const std::optional<rp::OutputLayout> layout = rp::OutputLayout::parse(g.data.layout);
     if (!layout) {
         return false;
     }
     const std::vector<rp::PlanSpot> spots = rp::plan_spots(*layout);
-    // As tall as the room needs for its speakers to be a fingertip apart: a 5.1 room is short, a 9.1.6 room is not.
+    // As tall as the room needs for its speakers to be a fingertip apart, and no taller: a 2.0 room is short, a 9.1.6 room
+    // is 260 px at the kit's width.
     int plan_h = kPlanMinHeight;
     std::vector<rp::PlanNode> places = rp::plan_nodes(spots, rp::PlanArea{.width = content_w, .height = plan_h});
     while (plan_h < kPlanMaxHeight && !apart(places)) {
@@ -371,6 +360,28 @@ void build_chips(const PrefsUi& ui, lv_obj_t* parent, int content_w) {
     }
 }
 
+// A label that is as wide as its text and no wider.
+lv_obj_t* make_caption(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t rgb) {
+    lv_obj_t* const label = prefs_label(parent, text, font, rgb);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_CLIP);
+    lv_obj_set_width(label, LV_SIZE_CONTENT);
+    return label;
+}
+
+// A row of a group: a caption, then what it labels, on one line where the group's width allows and wrapped inside it where
+// it does not. `width` is the group's, set outright so that the groups of a row wrap against one another.
+lv_obj_t* make_group(const PrefsUi& ui, lv_obj_t* parent, int width) {
+    lv_obj_t* const group = prefs_box(parent);
+    lv_obj_set_size(group, width, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(group, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(group, ui.m->gap, 0);
+    lv_obj_set_style_pad_row(group, ui.m->gap, 0);
+    lv_obj_set_flex_align(group, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    return group;
+}
+
+// The chosen speaker: what it is and what is in force at it, why the board said no, the level and the distance (on one
+// line where the display is wide enough for both, one under the other where it is not), and why a control does nothing.
 void build_panel(const PrefsUi& ui, lv_obj_t* parent, int content_w) {
     const iclforge::screen::Metrics& m = *ui.m;
     const int gap = m.gap;
@@ -378,55 +389,100 @@ void build_panel(const PrefsUi& ui, lv_obj_t* parent, int content_w) {
     lv_obj_set_size(panel, content_w, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(panel, gap, 0);
-    lv_obj_set_style_pad_top(panel, gap, 0);
 
-    g.name = prefs_label(panel, "", ui.heading, ui.c->text);
-    lv_label_set_long_mode(g.name, LV_LABEL_LONG_MODE_CLIP);
-    lv_obj_set_width(g.name, content_w);
-    g.applied = prefs_paragraph(panel, "", ui.note, ui.c->muted, content_w);
-    // Why the board refused the last thing asked of it, in the accent: a few lines, wrapped, for six seconds, where it is
-    // seen without scrolling down to the buttons.
+    lv_obj_t* const who = prefs_box(panel);
+    lv_obj_set_size(who, content_w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(who, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(who, 2 * gap, 0);
+    lv_obj_set_flex_align(who, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+    g.name = make_caption(who, "", ui.heading, ui.c->text);
+    g.applied = make_caption(who, "", ui.note, ui.c->muted);
+    // Why the board refused the last thing asked of it, in the accent: a few lines, wrapped, for six seconds.
     g.status = prefs_paragraph(panel, "", ui.note, ui.c->accent, content_w);
     lv_obj_add_flag(g.status, LV_OBJ_FLAG_HIDDEN);
 
     const int level_w = std::max(prefs_text_width(ui.body, "+11.5 dB"), prefs_text_width(ui.body, "-12 dB"));
-    lv_obj_t* const level =
-        make_row(ui, panel, content_w, "Level", 2 * m.row_target + 2 * gap + level_w);
-    make_stepper(ui, level, level_w, Op::kLevelMinus, Op::kLevelPlus, g.level_minus, g.level_value, g.level_plus);
-
-    const int dist_w = std::max(prefs_text_width(ui.body, "10.00 m"), prefs_text_width(ui.body, "not set"));
+    const int dist_w = std::max(prefs_text_width(ui.body, "9.95 m"), prefs_text_width(ui.body, "not set"));
     const std::string coarse_less = "-1 m";
     const std::string coarse_more = "+1 m";
-    const int fine_w = 2 * m.row_target + 2 * gap + dist_w;
-    const int coarse_w = button_width(ui, coarse_less) + gap + button_width(ui, coarse_more);
-    lv_obj_t* const distance = make_row(ui, panel, content_w, "Distance", fine_w + gap + coarse_w);
+    const int stepper_level_w = 2 * m.row_target + 2 * gap + level_w;
+    const int stepper_dist_w = 2 * m.row_target + 2 * gap + dist_w;
+    const int coarse_w = step_button_width(ui, coarse_less) + gap + step_button_width(ui, coarse_more);
+    const int level_label_w = prefs_text_width(ui.body, "Level") + 2;
+    const int dist_label_w = prefs_text_width(ui.body, "Distance") + 2;
+    const int level_group_w = std::min(content_w, level_label_w + gap + stepper_level_w);
+    const int dist_group_w = std::min(content_w, dist_label_w + gap + stepper_dist_w + gap + coarse_w);
+
+    lv_obj_t* const steppers = prefs_box(panel);
+    lv_obj_set_size(steppers, content_w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(steppers, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(steppers, 2 * gap, 0);
+    lv_obj_set_style_pad_row(steppers, gap, 0);
+
+    lv_obj_t* const level = make_group(ui, steppers, level_group_w);
+    lv_obj_t* const level_caption = prefs_label(level, "Level", ui.body, ui.c->text);
+    lv_obj_set_width(level_caption, level_label_w);
+    lv_label_set_long_mode(level_caption, LV_LABEL_LONG_MODE_CLIP);
+    make_stepper(ui, level, level_w, Op::kLevelMinus, Op::kLevelPlus, g.level_minus, g.level_value, g.level_plus);
+
+    lv_obj_t* const distance = make_group(ui, steppers, dist_group_w);
+    lv_obj_t* const distance_caption = prefs_label(distance, "Distance", ui.body, ui.c->text);
+    lv_obj_set_width(distance_caption, dist_label_w);
+    lv_label_set_long_mode(distance_caption, LV_LABEL_LONG_MODE_CLIP);
     make_stepper(ui, distance, dist_w, Op::kDistMinus, Op::kDistPlus, g.dist_minus, g.dist_value, g.dist_plus);
     lv_obj_t* const coarse = prefs_box(distance);
     lv_obj_set_size(coarse, coarse_w, m.row_target);
     lv_obj_set_flex_flow(coarse, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(coarse, gap, 0);
     lv_obj_set_flex_align(coarse, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    g.dist_minus_coarse = make_action(ui, coarse, coarse_less, Op::kDistMinusCoarse);
-    g.dist_plus_coarse = make_action(ui, coarse, coarse_more, Op::kDistPlusCoarse);
-
-    lv_obj_t* const actions = prefs_box(panel);
-    lv_obj_set_size(actions, content_w, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_column(actions, gap, 0);
-    lv_obj_set_style_pad_row(actions, gap, 0);
-    g.play = make_action(ui, actions, "Play", Op::kPlay);
-    g.repeat = make_action(ui, actions, "Repeat", Op::kRepeat);
-    g.each = make_action(ui, actions, "Play each", Op::kEach);
-    g.stop = make_action(ui, actions, "Stop", Op::kStop);
-    g.reset = make_action(ui, actions, "Reset", Op::kReset);
+    g.dist_minus_coarse = make_step_button(ui, coarse, coarse_less, Op::kDistMinusCoarse);
+    g.dist_plus_coarse = make_step_button(ui, coarse, coarse_more, Op::kDistPlusCoarse);
 
     g.notes = prefs_paragraph(panel, "", ui.note, ui.c->muted, content_w);
+}
+
+// What the bar at the foot of the sheet says on its five buttons, and how tall it is. The words are the long ones where
+// they fit on one line and the short ones where only those do; where neither does the buttons wrap onto a second line (a
+// 240 by 240 module), and the bar is as tall as that needs, so that it is always the whole of it that is on the glass.
+struct BarPlan {
+    std::array<const char*, 5> labels{"Play", "Repeat", "Play each", "Stop", "Reset"};
+    int rows = 1;
+    int height = 0;
+};
+
+[[nodiscard]] int rows_of(const PrefsUi& ui, const std::array<const char*, 5>& labels, int width) {
+    int rows = 1;
+    int used = 0;
+    for (const char* const label : labels) {
+        const int w = button_width(ui, label);
+        if (used != 0 && used + ui.m->gap + w > width) {
+            ++rows;
+            used = 0;
+        }
+        used += (used != 0 ? ui.m->gap : 0) + w;
+    }
+    return rows;
+}
+
+[[nodiscard]] BarPlan plan_bar(const PrefsUi& ui, int content_w) {
+    BarPlan plan;
+    const std::array<const char*, 5> shorter{"Play", "Loop", "All", "Stop", "Reset"};
+    plan.rows = rows_of(ui, plan.labels, content_w);
+    if (plan.rows > 1 && rows_of(ui, shorter, content_w) < plan.rows) {
+        plan.labels = shorter;
+        plan.rows = rows_of(ui, shorter, content_w);
+    }
+    plan.height = plan.rows * ui.m->row_target + (plan.rows - 1) * ui.m->gap + 2 * ui.m->gap;
+    return plan;
 }
 
 void build_view() {
     const PrefsUi ui = prefs_ui();
     const iclforge::screen::Metrics& m = *ui.m;
     const int content_w = m.width - 2 * m.margin;
+    const BarPlan bar_plan = plan_bar(ui, content_w);
+    // What is between the two bars, which are fixed: the room and the chosen speaker, scrolling where they are more than it.
+    const int body_h = m.height - m.bar - bar_plan.height;
 
     g.nodes.clear();
     lv_obj_t* const root = prefs_box(lv_screen_active());
@@ -438,7 +494,7 @@ void build_view() {
     // A tap on the sheet is the sheet's: it never reaches the one under it.
     lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);
 
-    // The bar: the title and Back. A refusal is said in the page, where it can run to the lines it needs.
+    // The bar at the top: the title and Back. A refusal is said in the page, where it can run to the lines it needs.
     lv_obj_t* const bar = prefs_box(root);
     lv_obj_set_size(bar, m.width, m.bar);
     lv_obj_set_pos(bar, 0, 0);
@@ -446,7 +502,6 @@ void build_view() {
     lv_obj_set_style_border_width(bar, 2, 0);
     lv_obj_set_style_border_color(bar, color(ui.c->faint), 0);
     lv_obj_t* const title = prefs_label(bar, "Speakers", ui.title, ui.c->text);
-    const int title_w = prefs_text_width(ui.title, "Speakers");
     lv_label_set_long_mode(title, LV_LABEL_LONG_MODE_CLIP);
     lv_obj_set_pos(title, m.margin, (m.bar - lv_font_get_line_height(ui.title)) / 2);
     const int back_w = std::max(m.target, prefs_text_width(ui.body, "Back") + 2 * m.pad);
@@ -454,12 +509,11 @@ void build_view() {
     lv_obj_t* const back =
         prefs_button(bar, "Back", back_w, m.bar_button, ui.c->accent, ui.c->bg, &on_target, pack(Op::kBack, 0), nullptr);
     lv_obj_set_pos(back, back_x, (m.bar - m.bar_button) / 2);
-    static_cast<void>(title_w);
     g.status_shown.clear();
 
-    // The page under the bar: scrolls up and down.
+    // The page between the bars: scrolls up and down where the room and the speaker are more than it.
     lv_obj_t* const list = prefs_box(root);
-    lv_obj_set_size(list, m.width, m.height - m.bar);
+    lv_obj_set_size(list, m.width, body_h);
     lv_obj_set_pos(list, 0, m.bar);
     lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(list, LV_OBJ_FLAG_CLICKABLE);
@@ -473,7 +527,30 @@ void build_view() {
     lv_obj_set_style_pad_left(list, m.margin, 0);
     lv_obj_set_style_pad_right(list, m.margin, 0);
     lv_obj_set_style_pad_top(list, m.gap, 0);
-    lv_obj_set_style_pad_bottom(list, m.margin, 0);
+    lv_obj_set_style_pad_bottom(list, m.gap, 0);
+
+    // The bar at the foot, fixed: the five buttons are on the glass whatever the room is, and Stop is there to be pressed
+    // while the tone is on.
+    lv_obj_t* const foot = prefs_box(root);
+    lv_obj_set_size(foot, m.width, bar_plan.height);
+    lv_obj_set_pos(foot, 0, m.height - bar_plan.height);
+    lv_obj_set_style_bg_opa(foot, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(foot, color(ui.c->surface), 0);
+    lv_obj_set_style_border_side(foot, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_set_style_border_width(foot, 2, 0);
+    lv_obj_set_style_border_color(foot, color(ui.c->faint), 0);
+    lv_obj_set_style_pad_left(foot, m.margin, 0);
+    lv_obj_set_style_pad_right(foot, m.margin, 0);
+    lv_obj_set_style_pad_top(foot, m.gap - 2, 0);
+    lv_obj_set_flex_flow(foot, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(foot, m.gap, 0);
+    lv_obj_set_style_pad_row(foot, m.gap, 0);
+    lv_obj_set_flex_align(foot, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    g.play = make_action(ui, foot, bar_plan.labels[0], Op::kPlay);
+    g.repeat = make_action(ui, foot, bar_plan.labels[1], Op::kRepeat);
+    g.each = make_action(ui, foot, bar_plan.labels[2], Op::kEach);
+    g.stop = make_action(ui, foot, bar_plan.labels[3], Op::kStop);
+    g.reset = make_action(ui, foot, bar_plan.labels[4], Op::kReset);
 
     if (!g.data.player) {
         // A board with no player is not offered the row; a sheet that was open when the answer changed says why.
@@ -656,6 +733,11 @@ void refresh(std::uint32_t now) {
 }  // namespace
 
 void sound_sheet_open() { g.want_open = true; }
+
+bool sound_sheet_serves(const iclforge::prefs::Pref& pref) {
+    const std::string_view id = pref.id;
+    return id == "identify-speakers" || id == "speaker-trim";
+}
 
 bool sound_sheet_active() { return (g.open && !g.want_close) || g.want_open; }
 
