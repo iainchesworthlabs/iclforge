@@ -8,7 +8,9 @@
 // reaches a board.
 
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
+const zlib = require('zlib');
 const { test, expect } = require('@playwright/test');
 const {
     REPLIES,
@@ -36,6 +38,7 @@ const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclfo
 // libs/device, which the component and the host tests both compile.
 const LIBS_DEVICE = path.resolve(__dirname, '../../../../../libs/device/include/iclforge');
 const CONTROL = fs.readFileSync(path.join(COMPONENT, 'src/control.cpp'), 'utf8');
+const COMPONENT_CMAKE = fs.readFileSync(path.join(COMPONENT, 'CMakeLists.txt'), 'utf8');
 // iclforge::Firmware answers the firmware routes that Control carries, and
 // firmware_image.hpp words a refused image; firmware_status.hpp writes
 // GET /firmware.
@@ -113,8 +116,40 @@ test("the stand-in answers the firmware routes with iclforge::Firmware's texts",
 test("the stand-in sends the page with the firmware's headers", () => {
     expect(STRINGS[STRINGS.indexOf('Content-Security-Policy') + 1]).toBe(POLICY);
     expect(STRINGS[STRINGS.indexOf('Cache-Control') + 1]).toBe('no-cache');
+    expect(STRINGS[STRINGS.indexOf('Content-Encoding') + 1]).toBe('gzip');
     expect(STRINGS).toContain('text/html; charset=utf-8');
     expect(STRINGS).toContain('text/javascript; charset=utf-8');
+});
+
+test('the stand-in and the firmware both send the page gzipped, and a browser reads it as written', async () => {
+    // The component embeds the gzip of each file (tools/gzip_asset.py) and send_file says so; the stand-in does the same.
+    expect(COMPONENT_CMAKE).toContain('gzip_asset.py');
+    expect(COMPONENT_CMAKE).not.toContain('EMBED_FILES');
+    for (const symbol of ['iclforge_ui_html_gz_start', 'iclforge_ui_html_gz_end', 'iclforge_ui_js_gz_start', 'iclforge_ui_js_gz_end']) {
+        expect(CONTROL, symbol).toContain(`asm("_binary_${symbol}")`);
+    }
+    const stub = await startStub();
+    try {
+        for (const [route, source] of [
+            ['', 'iclforge_ui.html'],
+            ['ui.js', 'iclforge_ui.js'],
+        ]) {
+            const reply = await new Promise((resolve, reject) => {
+                http.get(`${stub.url}${route}`, (res) => {
+                    const parts = [];
+                    res.on('data', (part) => parts.push(part));
+                    res.on('end', () => resolve({ headers: res.headers, body: Buffer.concat(parts) }));
+                }).on('error', reject);
+            });
+            expect(reply.headers['content-encoding'], route).toBe('gzip');
+            const written = fs.readFileSync(path.join(UI_DIR, source));
+            expect(zlib.gunzipSync(reply.body).equals(written), route).toBe(true);
+            // Smaller by a good deal (the page is 69 KB as written), which is the reason for it.
+            expect(reply.body.length, route).toBeLessThan(written.length / 2);
+        }
+    } finally {
+        await stub.close();
+    }
 });
 
 test("the stand-in has the firmware's routes and no others", () => {

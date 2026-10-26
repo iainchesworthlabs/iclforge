@@ -197,6 +197,10 @@ The sections below contain the complete change list and fixes.
   *Melbourne (Australia)*; else its offset, *UTC+09:45 (custom)*), on the Preferences row, in the picker, and on the board's
   page, whose `GET /status` has `zone_place` and `zone_label` beside the `zone` that tools read. Display only: nothing is
   stored from the guess.
+- **The board's web page is embedded gzipped: 47 KB less in every image.** `iclforge_ui.html` and `iclforge_ui.js` are
+  69 KB as written and 22 KB gzipped; the component writes the gzip at build time (reproducibly) and the control surface sends
+  it with `Content-Encoding: gzip`, which a browser reads as it always did (`curl` needs `--compressed`). The 4 MB ESP32-C6
+  image, which had grown 8,720 bytes past its OTA slot, is 38,672 bytes under it.
 - **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
   which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
   `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`

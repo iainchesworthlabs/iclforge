@@ -22,6 +22,7 @@
 
 const crypto = require('crypto');
 const http = require('http');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
@@ -1508,14 +1509,17 @@ async function startStub() {
         res.end(body);
     };
 
+    // The page is sent gzipped, as the firmware sends it (src/control.cpp send_file: the component embeds the gzip of
+    // each file, firmware/esp-idf/iclforge/tools/gzip_asset.py): a browser decodes it, so the page is what it was.
     const file = (res, name, type) => {
         closing(res);
         res.writeHead(200, {
             'Content-Type': type,
+            'Content-Encoding': 'gzip',
             'Cache-Control': 'no-cache',
             'Content-Security-Policy': POLICY,
         });
-        res.end(fs.readFileSync(path.join(UI_DIR, name)));
+        res.end(zlib.gzipSync(fs.readFileSync(path.join(UI_DIR, name)), { level: 9 }));
     };
 
     // A play moves on at each poll, the way a player on its own tasks would
