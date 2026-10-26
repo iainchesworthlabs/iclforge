@@ -41,3 +41,36 @@ program's output converted to PNG.
 `speakers_options/` is a project of its own for the speakers view (planning/p4x-speakers-options.md): the old glow, the
 responsive glow and the pulse style drawn over a synthetic groove in 2.0, 5.1, 7.1.4 and 9.1.6 as stills and frame
 sequences, with the pixels each flushes counted, and `speakers_tune`, which chooses the glow's constants without LVGL.
+
+## Scripted taps
+
+`panel_preview --drive` is the same screen code with a **virtual pointer** and no scenarios of its own: it reads a command a
+line on stdin and answers a line of JSON (`init`, `tap LABEL [ROW]`, `tap-at`, `swipe`, `wait`, `shown`, `prefs`, `ui`,
+`shot`). A button is found by what it says, as a person finds it, and one off the glass is reached by swiping the list with
+the pointer, not by calling LVGL; the answer's `events` are the touches made. `prefs` is `GET /preferences`, written by the
+firmware's own `iclforge::prefs::to_json` over the preview's backend, so a script reads the same state here and on a board.
+
+`tools/hearth/screen_script.py` is the driver. A **script** is a few lines of taps and expectations
+(`scripts/*.screen`, grammar in the tool's header and in `planning/screen-test-harness.md`):
+
+```
+board p4-rev3-kit
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+tap "+" in "Brightness"
+expect pref brightness = 90
+expect shown "90%"
+```
+
+```
+python tools/hearth/screen_script.py check                                   # the grammar, no preview needed
+python tools/hearth/screen_script.py run --preview build-preview/panel_preview   # every script, on the preview
+ctest --test-dir build-preview --output-on-failure                           # the same, registered with this project
+```
+
+`tools/hearth/test_screen_script.py` (the CI "Oracle unit tests" step) holds the grammar and the runner with a stand-in
+preview and a stand-in board, and runs every script on the real screen code when `ICLFORGE_PANEL_PREVIEW` names a built
+`panel_preview`. The same script can also be run on a board in step with the preview (`--board`, a lease, `probe` for a
+read-only look first): see `planning/screen-test-harness.md`, "Hardware in the loop". That path has not yet been run on a board.

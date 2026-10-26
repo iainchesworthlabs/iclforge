@@ -1,0 +1,22 @@
+# The brightness stepper on the kit (a stepper of ten stops, 10 to 100 %): + and - move it one stop, and the
+# sheet says the value it holds. The same lines run on the preview and, in step with it, on a kit.
+board p4-rev3-kit
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+expect shown "Brightness"
+expect pref brightness = 80
+expect shown "80%"
+
+tap "+" in "Brightness"
+expect pref brightness = 90
+expect shown "90%"
+
+tap "-" in "Brightness"
+tap "-" in "Brightness"
+expect pref brightness = 70
+expect shown "70%"
+shot brightness-70
+
+tap "Close"
