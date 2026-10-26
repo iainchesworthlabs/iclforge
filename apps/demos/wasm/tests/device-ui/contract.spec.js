@@ -398,14 +398,14 @@ test("the stand-in answers GET /panel-stats with the keys panel_stats.hpp writes
     const between = (from, to) => STATS.slice(STATS.indexOf(from), STATS.indexOf(to));
     const keysOf = (text) =>
         [...text.matchAll(/(?:\b(?:number|signed_number|fixed1|timing|key)\(out, "([a-z_]+)"|\\"([a-z_]+)\\":)/g)].map((m) => m[1] || m[2]);
-    const timing = keysOf(between('inline void timing(', 'representation_name'));
-    // timing() writes its own name first and then the four: the name is the caller's, so the helper's first key is dropped.
-    const timingKeys = timing.slice(1);
+    // timing() writes the four after the name its caller gives, which is not a literal and so is not among them.
+    const timingKeys = keysOf(between('inline void timing(', 'representation_name'));
     expect(timingKeys).toEqual(['last', 'mean', 'max', 'n']);
-    const panelSource = keysOf(between('inline std::string panel_stats_json', 'namespace iclforge::panelstats'.slice(0, 0) + '}  // namespace iclforge::panelstats'));
+    const panelSource = keysOf(between('inline std::string panel_stats_json', '}  // namespace iclforge::panelstats'));
     const meterSource = keysOf(between('inline std::string meters_json', 'inline std::string panel_stats_json'));
     const stub = await startStub();
     try {
+        stub.device.screen = screenBoard();
         const body = JSON.parse(await (await fetch(`${stub.url}panel-stats`)).text());
         expect(Object.keys(body)).toEqual(['panel', 'meters']);
         const { panel, meters } = body;
@@ -426,8 +426,9 @@ test("the stand-in answers GET /panel-stats with the keys panel_stats.hpp writes
 });
 
 test('the stand-in answers GET /panel-stats with a refusal on a board with no screen, and lists the route', async () => {
-    const stub = await startStub({ screen: null });
+    const stub = await startStub();
     try {
+        // A board with no screen has nothing to measure; the route is listed all the same, as every board's.
         const reply = await fetch(`${stub.url}panel-stats`);
         expect(reply.status).toBe(404);
         expect(await reply.text()).toBe(REPLIES.noScreen);
