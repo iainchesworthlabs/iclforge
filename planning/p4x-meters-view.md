@@ -305,7 +305,21 @@ restart keeps its C6 link):
 |---|---|---|
 | **I0** "as it was" | the speakers view before the Glow and Pulse styles: `main` at `eadb09da8`, the commit before #1642 | `python tools/hearth/bench_flash.py build --tag mv-i0 --worktree <a checkout of eadb09da8> --wifi p4-rev3` |
 | **I1** "now" | `main` with the Meters PRs: the speakers view (Glow by default, Pulse by `PUT /speakers-style`) and the Meters view | `python tools/hearth/bench_flash.py build --tag mv-i1 --wifi p4-rev3` |
-| **I2** "AC-4" | I1 with `sdkconfig.ac4`: AC-4 is a build option on the P4 and the locked profile has none, so this is a bench build and is **not held to the profile** | the same `SDKCONFIG_DEFAULTS` as `sink_profile.py defaults p4-rev3`, then `;firmware/hearth-sink/sdkconfig.ac4`, then the bench's Wi-Fi fragment, with `idf.py -B D:\esp\build\iclforge\mv-i2-p4-rev3 -DIDF_TARGET=esp32p4 build` |
+| **I2** "AC-4" | I1 with `sdkconfig.ac4`: AC-4 is a build option on the P4 and the locked profile has none, so this is a bench build and is **not held to the profile**. Built and proved on the host side on 2026-10-26: **3,799,936 bytes** in the 4 MB app partition (395,392 free) | the recipe below |
+
+**I2's recipe** (the bench's build wrapper takes a locked profile and its named overlays, and AC-4 is neither): the profile's own
+`SDKCONFIG_DEFAULTS`, then `sdkconfig.ac4`, then the bench's Wi-Fi fragment, in a build directory of its own, from a checkout of the commit under test:
+
+```
+set IDF_TOOLS_PATH=D:\esp\tools && D:\esp\esp-idf\export.bat
+python tools/hearth/sink_profile.py defaults p4-rev3
+:: prints sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi
+idf.py -C firmware/hearth-sink -B D:\esp\build\iclforge\mv-i2-p4-rev3 -DSDKCONFIG=D:\esp\build\iclforge\mv-i2-p4-rev3\sdkconfig ^
+  -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=<each file above as firmware/hearth-sink/<file>>;firmware/hearth-sink/sdkconfig.ac4;D:/esp/build/ac3forge/wifi_credentials.sdkconfig" build
+```
+
+Delete the build directory's `sdkconfig` first if it exists (an old one overrides a changed default). The image is not a profile's, so `sink_profile.py verify`
+does not apply to it and `bench_flash.py ota` is given its `--build-dir`.
 
 Put an image on with `python tools/hearth/bench_flash.py ota --build-dir D:\esp\build\iclforge\mv-i1-p4-rev3 --session <id> P4X`, then confirm with
 `bench_flash.py verify`. Record each image's commit and size in the report's label.
