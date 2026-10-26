@@ -54,12 +54,14 @@ See [README.md](README.md) for the project overview and
   as a few objects, not 100 to 200 small invalid areas.
 - **Changed: the Meters view draws each chart as one canvas, and its analysis works in float.** The kit put the view's cost in its 100 to 200 small invalid areas a
   refresh (each a pass over the object tree and a flush to the glass). The spectrum plot, the channel bars and the pair of meters are now one RGB565 canvas each, redrawn
-  only in the rows that changed (`iclforge/meters_draw.hpp`, held bit for bit to a full redraw by test), so an update flushes 2 to 6 areas where it flushed 58 to 118 (the panel
-  preview counts them and fails above 12); the numbers under the bars change at 4 Hz; the analysis's power average, levels and ballistics are float (the P4 has no double unit), and
+  only in a few rectangles around the bars that moved (`iclforge/meters_draw.hpp`, `plan_cells()`: neighbouring bars share one when that is cheaper, and the result is held bit for bit to a
+  full redraw by test), so an update flushes 6 to 7 areas and 0.7 to 1.2 million pixels a second where it flushed 58 to 118 areas (the panel preview counts them and fails above 12); the numbers under the bars change at 4 Hz; the analysis's power average, levels and ballistics are float (the P4 has no double unit), and
   the 17 bands up to 800 Hz are analysed every other update (`Analyzer::analyze_low` and `analyze_high`, equal to the whole by test); `meters_screen.cpp` and `panel.cpp` build at -O2.
   `GET /panel-stats` gains the tap's cost in parts (`us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`) and an exact refresh mean. `tools/hearth/panel_measure.py`
   now judges the rate as the owner asked, **20 Hz if possible, else a steady 10 Hz**, and says which cell holds which, and names faults that are only in the first, cold opening
-  of the view. The representations, the zone colours and the governor are unchanged. **Not yet measured on a board.**
+  of the view. The governor does not judge the first two seconds of a view (its first draw and the cold code), rises under 60 % of a fast step and takes the resting 100 ms of its loop as the
+  allowance at ten a second; an update is charged the refreshes since the last one and not the last refresh (a still picture costs nothing). The representations and the zone colours are unchanged.
+  **The first kit run of the canvas drawing** (planning/p4x-meters-view.md): a 5.1 stream holds 20 updates a second, a 9.1.6 room holds them once warm, and a JOC 7.1.4 stream does not hold a steady 10.
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,

@@ -435,10 +435,13 @@ for each invalid area it flushes and each flush is a DSI transfer of its own (1 
 
 - **The spectrum plot is one object**, an RGB565 canvas (`lv_canvas`, a draw buffer in the PSRAM), and so are **the channel bars** (every group, one canvas) and **the pair of
   meters** (one canvas). `iclforge/meters_draw.hpp` is the pure drawing (the zones, the peak ticks, the faint line, the troughs) into any 16-bit buffer, host-tested; an update works out
-  which rows of a bar changed (`rows_touched`), draws only those, and invalidates the one rectangle they make, so **an update is two to six invalid areas** (the panel preview counts the
-  flushes an update makes: **58 to 118 before, 4.3 to 5.7 now at 1024 by 600**, 2 to 3 below that), at the price of somewhat more pixels in them (a bar's rows, not its three
-  rectangles; the preview's bound is 7 million a second at 1024 by 600). A test redraws
-  a bar by random walk, incrementally and from scratch, and holds the two bit for bit.
+  which rows of a bar changed (`rows_touched`), draws only those and tells LVGL. **The first form invalidated one rectangle**, the plot's width by the rows of the bar that moved most:
+  **an update was 4 to 6 invalid areas** (the panel preview counts the flushes an update makes: **58 to 118 before, 4.3 to 5.7 at 1024 by 600**) but 2.5 to 3 million pixels a second, and the
+  kit's first run of it (build a37bf4281, `Kit results, the canvas drawing`) measured the render at **21 ms an update in the 5.1 room and 47 ms with a JOC stream decoding: 135 ns a pixel**, the
+  PSRAM's bandwidth shared with the decoder (about 12 bytes a pixel: the background, the canvas and the copy to the glass). **The second form plans the rectangles**
+  (`plan_cells()`, `libs/device/include/iclforge/meters_draw.hpp`): neighbouring bars that changed share one rectangle (their columns, the union of their rows) when that costs less than one
+  each, by the least total of 8,000 pixels an area (the kit's about 1 ms) and one for each pixel, over at most 64 bars by dynamic programming; the preview flushes **0.7 to 1.2 million pixels a
+  second in 6 to 7 areas** at 1024 by 600. A test redraws a bar chart by random walk, in the planned cells and from scratch, and holds the two bit for bit.
 - **The numbers** under the bars (the dB figures) are text and change at **4 Hz**, not every update.
 - **The analysis is cheaper**: the spectrum's power average, the band levels, the downmix and the ballistics work in `float` (the P4 has no double unit: a `pow`, `log10` or `exp`
   in double is software, microseconds each; they are `exp2f`/`log2f` now), and the low half of the bands (the 2048-point transform at 12 kHz) is analysed **every other update**, the high half

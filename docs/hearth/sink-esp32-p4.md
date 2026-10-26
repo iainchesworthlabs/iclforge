@@ -419,8 +419,8 @@ frames about to be played to a `BlockTap` (`iclforge/block_tap.hpp`), one pointe
 50 ms; the screen takes the mix, analyses it (`iclforge/dsp/spectrum.hpp`: a 2048-point transform of the signal at 12 kHz for the
 17 bands up to 800 Hz and a 1024-point one at 48 kHz above it, so that a low band is not smeared over a fifth of a second and a high
 one is not slow), averages the power over 80 ms, and lets the bars fall at 30 dB a second (meters 24). It does this twenty times a
-second whatever the frame rate. The spectrum, the channel bars and the pair of meters are each one canvas, redrawn only in the rows of a bar or a tick that
-moved, so an update is a few invalid areas and not a hundred (a rectangle for each part of each bar, which the kit measured at 80 to 290 ms a refresh). When the screen is dimmed or another view is
+second whatever the frame rate. The spectrum, the channel bars and the pair of meters are each one canvas, redrawn only where a bar or a tick moved, in a few rectangles (one for each run of
+neighbouring bars that move alike), so an update is a handful of invalid areas and not a hundred (a rectangle for each part of each bar, which the kit measured at 80 to 290 ms a refresh). When the screen is dimmed or another view is
 chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
 tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
 How fast it runs on the kit, and the protocol that measures it, are in
