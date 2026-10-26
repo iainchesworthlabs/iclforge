@@ -170,6 +170,8 @@ struct Running {
 };
 Running g_started;  // start_player's until g_running points at it
 std::atomic<const Running*> g_running{nullptr};
+// The tap the screen has asked the player to show its blocks to (sendspin_set_block_tap), under g_mutex with the player's start.
+iclforge::BlockTap* g_block_tap = nullptr;
 // The host whose clock the player reads, from when start_player() has made it.
 std::atomic<const iclforge::SendspinHost*> g_clock{nullptr};
 
@@ -916,6 +918,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
             // A choice made while the player started: the setting is stored before the route calls
             // sendspin_set_dynamic_range(), so the stored one is the latest either way.
             g_started.player->set_dynamic_range(settings().dynamic_range);
+            g_started.player->set_block_tap(g_block_tap);
             if (!std::exchange(g_board_changed, false)) {
                 g_running.store(&g_started);
                 break;
@@ -986,6 +989,15 @@ void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange range) {
         r->player->set_dynamic_range(range);
     }
     // A player that has yet to start reads the stored setting as it does.
+}
+
+void sendspin_set_block_tap(iclforge::BlockTap* tap) {
+    // Under the lock the player's start takes, so that the tap lands either on the player that is being made or on the one that runs.
+    const std::lock_guard lock(g_mutex);
+    g_block_tap = tap;
+    if (const Running* const r = running()) {
+        r->player->set_block_tap(tap);
+    }
 }
 
 void sendspin_board_changed() {

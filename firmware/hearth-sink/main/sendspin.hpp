@@ -12,6 +12,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/ac3/decoder/dynamic_range.hpp"
+#include "iclforge/block_tap.hpp"
 #include "iclforge/control.hpp"
 #include "iclforge/now_view.hpp"
 
@@ -68,6 +69,10 @@ void sendspin_set_external(bool external);
 // start. The player reads the stored one (settings().dynamic_range) as it starts, so this is for a
 // change made while it runs; the route stores the setting first.
 void sendspin_set_dynamic_range(iclforge::ac3::DynamicRange range);
+
+// The tap that sees each block of the output as it is about to be heard, while it wants to (iclforge/block_tap.hpp: the Meters view's mix and
+// peaks). Not owned; null takes it away. Kept for a player that has yet to start, and handed to it when it does.
+void sendspin_set_block_tap(iclforge::BlockTap* tap);
 
 // The board's name, slot width or wiring changed: what it tells servers in
 // its hello follows, and a server that was told otherwise connects again. A
