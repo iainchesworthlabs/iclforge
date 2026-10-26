@@ -418,3 +418,89 @@ TEST_CASE("time_zones: what the board holds after reading its store follows a na
     CHECK(wc::reconcile_zone("JST-9", "").posix == "JST-9");
     CHECK(wc::reconcile_zone("", "").posix.empty());
 }
+
+// --- what a person reads: the place, never the string -------------------------------------------------------------
+
+TEST_CASE("a POSIX string is read as the place the table holds for it", "[time_zones]") {
+    // Exact, and the one place a string stands for when it has one.
+    const auto tokyo = wc::find_time_zone_by_string("JST-9");
+    REQUIRE(tokyo.has_value());
+    CHECK(tokyo->name == "Asia/Tokyo");
+    // A string several places share is the one the generator prefers (the most populous): Melbourne, Sydney, Hobart,
+    // Canberra and Macquarie are one string, and the owner's zone is Melbourne.
+    const auto melbourne = wc::find_time_zone_by_string("AEST-10AEDT,M10.1.0,M4.1.0/3");
+    REQUIRE(melbourne.has_value());
+    CHECK(melbourne->name == "Australia/Melbourne");
+    CHECK(wc::zone_readable("AEST-10AEDT,M10.1.0,M4.1.0/3") == "Melbourne (Australia)");
+    // The name a person chose wins over the string: Sydney is Sydney though Melbourne is what the string alone says.
+    CHECK(wc::zone_readable("AEST-10AEDT,M10.1.0,M4.1.0/3", "Australia/Sydney") == "Sydney (Australia)");
+    CHECK(wc::zone_readable("AEST-10AEDT,M10.1.0,M4.1.0/3", "Australia/Hobart") == "Hobart (Australia)");
+    // A name the table does not know does not say the zone; the string does.
+    CHECK(wc::zone_readable("AEST-10AEDT,M10.1.0,M4.1.0/3", "Australia/Atlantis") == "Melbourne (Australia)");
+    // Not exact is not found: a string one rule away is another zone.
+    CHECK_FALSE(wc::find_time_zone_by_string("AEST-10AEDT,M10.1.0,M4.1.0/2").has_value());
+    CHECK_FALSE(wc::find_time_zone_by_string("aest-10aedt,m10.1.0,m4.1.0/3").has_value());
+    CHECK_FALSE(wc::find_time_zone_by_string("").has_value());
+    CHECK_FALSE(wc::find_time_zone_by_string("none").has_value());
+}
+
+TEST_CASE("every string in the table reads as a place the table holds for it", "[time_zones]") {
+    std::set<std::string> shared;
+    std::set<std::string> seen;
+    for (std::size_t i = 0; i < wc::time_zone_count(); ++i) {
+        const wc::NamedZone zone = wc::time_zone_at(i);
+        INFO(zone.name << " " << zone.posix);
+        const auto place = wc::find_time_zone_by_string(zone.posix);
+        REQUIRE(place.has_value());
+        // The place has the string, so its clock is the zone's; and the text a person reads is a place, not the string.
+        CHECK(place->posix == zone.posix);
+        const std::string text = wc::zone_readable(zone.posix);
+        CHECK(text == wc::zone_display(place->name));
+        CHECK(text.find(zone.posix) == std::string::npos);
+        // A name that is chosen is the one that is read, whatever place its string would give.
+        CHECK(wc::zone_readable(zone.posix, zone.name) == wc::zone_display(zone.name));
+        if (!seen.insert(std::string(zone.posix)).second) {
+            shared.insert(std::string(zone.posix));
+        }
+    }
+    // One place is preferred for each string that is shared, and none for a string that is not.
+    CHECK(wc::data::kPreferredCount == shared.size());
+    std::set<std::string> preferred;
+    for (std::size_t i = 0; i < wc::data::kPreferredCount; ++i) {
+        const std::string posix = wc::data::kZones[wc::data::kPreferred[i]].posix;
+        INFO(wc::data::kZones[wc::data::kPreferred[i]].name);
+        CHECK(shared.count(posix) == 1);
+        CHECK(preferred.insert(posix).second);
+    }
+}
+
+TEST_CASE("a string in no table is read as its offset, and that it is the person's own", "[time_zones]") {
+    CHECK(wc::zone_readable("ZZZ-10") == "UTC+10:00 (custom)");
+    CHECK(wc::zone_readable("ZZZ-9:45") == "UTC+09:45 (custom)");
+    CHECK(wc::zone_readable("<-0330>3:30") == "UTC-03:30 (custom)");
+    CHECK(wc::zone_readable("ZZZ5") == "UTC-05:00 (custom)");
+    CHECK(wc::zone_readable("ZZZ0") == "UTC+00:00 (custom)");
+    // With daylight saving the rule says so, in words.
+    CHECK(wc::zone_readable("CUT-9:30CUD,M10.1.0,M4.1.0/3") == "UTC+09:30 (custom, with daylight saving)");
+    // None, and the empty string, are UTC; the table's own UTC is too.
+    CHECK(wc::zone_readable("none") == "UTC");
+    CHECK(wc::zone_readable("") == "UTC");
+    CHECK(wc::zone_readable("UTC0") == "UTC");
+    CHECK(wc::zone_readable("none", "UTC") == "UTC");
+    // The string is never in what is shown.
+    for (const char* custom : {"ZZZ-10", "ZZZ-9:45", "<-0330>3:30", "CUT-9:30CUD,M10.1.0,M4.1.0/3", "ZZZ0"}) {
+        INFO(custom);
+        CHECK(wc::zone_readable(custom).find(custom) == std::string::npos);
+    }
+    // A string the board would not read at all is not shown either.
+    CHECK(wc::zone_readable("not a zone") == "a zone this board does not read");
+}
+
+TEST_CASE("an offset is written the way people say it", "[time_zones]") {
+    CHECK(wc::offset_text(0) == "UTC+00:00");
+    CHECK(wc::offset_text(10 * 3600) == "UTC+10:00");
+    CHECK(wc::offset_text(-(3 * 3600 + 30 * 60)) == "UTC-03:30");
+    CHECK(wc::offset_text(12 * 3600 + 45 * 60) == "UTC+12:45");
+    CHECK(wc::offset_text(-12 * 3600) == "UTC-12:00");
+    CHECK(wc::offset_text(14 * 3600) == "UTC+14:00");
+}

@@ -85,14 +85,14 @@ TEST_CASE("About reads out the friendly subset in order", "[aboutview]") {
     for (const Row& row : rows) {
         labels.push_back(row.label);
     }
-    const std::vector<std::string> expected = {"Version", "Running from", "Name",   "Cable", "Wi-Fi",
+    const std::vector<std::string> expected = {"Version", "Running from", "Name",   "Wired", "Wi-Fi",
                                                "Web page", "Chip",         "Speaker layout", "Paired servers"};
     CHECK(labels == expected);
 
     CHECK(row_of(rows, "Version").value == "v0.10.0-beta.1-5228");
     CHECK(row_of(rows, "Running from").value == "ota_0");
     CHECK(row_of(rows, "Name").value == "Study \xC2\xB7 study.local");
-    CHECK(row_of(rows, "Cable").value == "in use \xC2\xB7 192.168.1.163 \xC2\xB7 e8:f6:0a:e7:53:fb");
+    CHECK(row_of(rows, "Wired").value == "in use \xC2\xB7 192.168.1.163 \xC2\xB7 e8:f6:0a:e7:53:fb");
     CHECK(row_of(rows, "Wi-Fi").value == "192.168.1.251 \xC2\xB7 e8:f6:0a:e7:53:f9");
     CHECK(row_of(rows, "Web page").value == "http://192.168.1.163/");
     CHECK(row_of(rows, "Chip").value == "ESP32-P4 v3.2");
@@ -104,17 +104,17 @@ TEST_CASE("the interface in use is the one the board says", "[aboutview]") {
     Facts f = kit();
     f.active = "wifi";
     const std::vector<Row> rows = about_rows(f);
-    CHECK(row_of(rows, "Cable").value.find("in use") == std::string::npos);
+    CHECK(row_of(rows, "Wired").value.find("in use") == std::string::npos);
     CHECK(row_of(rows, "Wi-Fi").value.find("in use") == 0);
 }
 
-TEST_CASE("a board with Wi-Fi alone has no cable row", "[aboutview]") {
+TEST_CASE("a board with Wi-Fi alone has no wired row", "[aboutview]") {
     Facts f = kit();
     f.ethernet = {};
     f.preference.clear();
     f.active = "wifi";
     const std::vector<Row> rows = about_rows(f);
-    CHECK(find(rows, "Cable") == nullptr);
+    CHECK(find(rows, "Wired") == nullptr);
     REQUIRE(find(rows, "Wi-Fi") != nullptr);
     CHECK(row_of(rows, "Wi-Fi").value.find("in use \xC2\xB7 192.168.1.251") == 0);
 }
@@ -128,7 +128,7 @@ TEST_CASE("a board that has no address yet says so, quietly", "[aboutview]") {
     const std::vector<Row> rows = about_rows(f);
     CHECK(row_of(rows, "Web page").value == "no address yet");
     CHECK(row_of(rows, "Web page").tone == Tone::muted);
-    CHECK(row_of(rows, "Cable").tone == Tone::muted);
+    CHECK(row_of(rows, "Wired").tone == Tone::muted);
 }
 
 TEST_CASE("a build with no network says so", "[aboutview]") {
@@ -138,7 +138,7 @@ TEST_CASE("a build with no network says so", "[aboutview]") {
     f.active.clear();
     f.web_address.clear();
     const std::vector<Row> rows = about_rows(f);
-    CHECK(find(rows, "Cable") == nullptr);
+    CHECK(find(rows, "Wired") == nullptr);
     CHECK(find(rows, "Wi-Fi") == nullptr);
     CHECK(row_of(rows, "Network").value == "none");
 }

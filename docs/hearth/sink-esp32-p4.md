@@ -18,14 +18,14 @@ they are sung.
     (E-AC-3) and about 10% (AC-4 5.1), and with the song filling the screen the light streams' decode
     time moves by 5 to 12% (under 1% of a frame). **The glitches the first measurement put on the glass
     are not its:** about one play in five reaches the kit with its first chunk 300 to 600 ms late, with
-    the glass, without it and at 40 Hz, over Wi-Fi and (more often) over the cable, and those plays
+    the glass, without it and at 40 Hz, over Wi-Fi and (more often) over wired, and those plays
     lose the start of their first second: lwIP's six-entry TCP receive mailbox refused the first
     segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk
     ([the trace](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#what-the-glitches-were-the-first-chunk-comes-late)).
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
     owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
-    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it,
-    takes an update over it, falls back to Wi-Fi when the cable is pulled and returns to the cable
+    Wi-Fi ([wired](#wired-and-wi-fi)): the sink answers on it, plays Sendspin through it,
+    takes an update over it, falls back to Wi-Fi when the Ethernet cable is pulled and returns to wired
     when it is put back, so the kit can run on a PoE splitter; **the splitter itself is not yet tried.**
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
@@ -271,7 +271,7 @@ greyed, and a default that is never a choice the board cannot make.
 | Night from and to: a pair of times (editor) | `night-times` | `/night-schedule` | the same |
 | Night covers idle screen: on or off | `night-idle` | `/night-idle` | the same |
 | Time zone: a place by region (editor) | `time-zone` | `/timezone` | the board keeps the time |
-| Wired or Wi-Fi: automatic, cable, Wi-Fi | `network-preference` | `/network-preference` | the board has both a cable and Wi-Fi |
+| Wired or Wi-Fi: automatic, wired, Wi-Fi | `network-preference` | `/network-preference` | the board has both a wired network and Wi-Fi |
 | Name of this player | `name` | `/name` | always |
 | About | `about` | `/hardware` | always |
 | Paired servers | `paired-servers` | `/pairing` | the board runs the Sendspin player |
@@ -567,7 +567,7 @@ leave the audio alone). This is a page for someone at arm's length, not the two-
 
 | Section | What it says |
 |---|---|
-| **Network** | The interface **in use**; for the cable and for the radio its link (the cable's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page |
+| **Network** | The interface **in use**; for the wired network and for the radio its link (the wired network's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page |
 | **Configuration** | The profile and its hash (`/hardware`), the firmware version and the slot it runs from, the chip and its revision, the ESP-IDF, the cores and the CPU and PSRAM clocks, the output layout, the slots and their width and the sink, how long the board has been up and why it last reset, and whether a core dump is stored |
 | **Streaming** | The server and the connections; whether the clock has converged and its error; the stream; bursts played, underruns, late, dropped, resyncs and invalid chunks; the playout's offset and the burst time, each with its worst; a meter for each output; and the figures of a play from `POST /play` (`us_per_frame`, `worst_frame_us`, `sink_us_per_frame`, `render_us_per_frame`), which are dashes until one has run |
 | **Performance** | The internal heap and the PSRAM, free and at their lowest; the panel's own render time and late cycles; the touch controller's reads, failures and touches |
@@ -578,18 +578,18 @@ clock that has not converged while something plays, a reset by a panic, a watchd
 (`wdt` is not one: it is how this board restarts), a stored core dump, an internal heap that has
 fallen below 16 KB.
 
-![The same view of a board in trouble: no cable, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
+![The same view of a board in trouble: no wired link, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
 
-**The network preference.** The row of three buttons, Auto, Ethernet and Wi-Fi, is the board's
-[network preference](#the-cable-and-wi-fi), the chosen one in the accent colour. A tap on another one
+**The network preference.** The row of three buttons, Automatic, Wired and Wi-Fi, is the board's
+[network preference](#wired-and-wi-fi), the chosen one in the accent colour. A tap on another one
 **asks first**, so that a stray tap cannot cut the board off the network it is being used over:
 
-![Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-dev-confirm.png)
+![Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-dev-confirm.png)
 
 Cancel, a tap anywhere else or eight seconds of nothing changes nothing. A change the board is sure
 to refuse (the interface it names holds no address, or no Wi-Fi network is stored) is said so in the
 accent colour and Switch is dimmed. **Switch** asks for the change as `PUT /network-preference` does
-(the same call; it returns at once and the work is done on a task of its own, verified as the cable
+(the same call; it returns at once and the work is done on a task of its own, verified as the wired
 section says), and the view says "Switching..." until the board keeps the preference, then "Done.",
 or "The board refused the change." if it has not after 45 seconds.
 
@@ -607,7 +607,7 @@ and its pictures are drawn by the same code as the board's, by the
 ### The time of day
 
 **Every ESP board that has a network keeps its time with a time server**, by default, from the
-moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its cable), where QEMU's
+moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its wired network), where QEMU's
 network has nothing to ask and a build with no network has nothing to ask over, so those keep no
 time (the routes below answer 404). It is lwIP's SNTP client (`firmware/hearth-sink/main/clock/sntp/`).
 The panel's [clock view](#the-clock) draws what it keeps; a board with no screen has it for its page,
@@ -640,7 +640,7 @@ All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`, a
 chose) and take effect at once, with no restart. **They are on the board's own web page too**, in a Time section
 of Settings: the time the board keeps and how it got it, a checkbox for whether to ask a time server, a region and a
 city (the page asks the board for its list of zones) with a field for any other zone, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
-object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `server`, `servers`, `answers`), and the console
+object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `zone_place`, `zone_label`, `server`, `servers`, `answers`), and the console
 says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
 pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
 it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
@@ -659,6 +659,21 @@ board's C library would give its own for, differently from the next one's), is r
 that says so; one the grammar accepts is then read by the board's own C library, on a day in January
 and a day in July, and refused with a 409 if the library did not read it as written (a library that
 cannot parse a string falls back to UTC without saying so). With none set the time is UTC.
+
+**A screen or a page never shows the string.** It is the board's way of keeping a zone and the routes' way of reporting
+it (`GET /timezone`, `GET /status`'s `zone` and the Preferences entry's `value`, for tools); a person reads the place
+(`iclforge::wallclock::zone_readable`, host tested). The name they chose is the place. A zone set with a string and no
+name (through the page before it had a picker, or by hand) is read as **the place the table holds for the string**: an
+exact match, and where several places share it (Melbourne, Sydney, Hobart and Canberra are one) the most populous, which
+`tools/hearth/gen_time_zones.py` writes down as `PREFERRED` (51 strings are shared; the table says which place
+each means, in 102 bytes of flash), so a board set to `AEST-10AEDT,M10.1.0,M4.1.0/3` reads *Melbourne (Australia)* on the
+Preferences row, in the picker (which opens at Australia with Melbourne marked) and on the page, though no name was stored.
+A zone in no table reads as its offset and as the person's own: *UTC+09:45 (custom)*, *UTC+09:30 (custom, with daylight
+saving)*. The guess is display only and is not stored: it would turn a guess at which of four cities was meant into a
+choice. `GET /status`'s `time` has the place (`zone_place`: a name in the table, or `none`) and the words
+(`zone_label`: *Melbourne (Australia)*, *UTC*, *UTC+09:45 (custom)*), which the page shows in *Now* and under the time zone.
+The page's field for a zone not in the list is never filled in with the board's string; Save with nothing typed asks
+for a choice and sends nothing (UTC is Other, then UTC).
 
 The grammar and the words (`libs/device/include/iclforge/wall_clock.hpp`) are held to the letter by
 the host tests (`test_wall_clock.cpp`: the zones and the servers taken and the ones refused, the offsets,
@@ -688,29 +703,29 @@ screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this imag
 driver) and which touch controller (the older board's has a GT911). **Secure Download is not
 supported on a v3.1 chip, and the image never enables it.**
 
-### The cable, and Wi-Fi
+### Wired, and Wi-Fi
 
 The kit's RJ45 port (the chip's own Ethernet MAC and an IP101GR PHY on RMII, 10/100 Mbit/s) is a
 network of the sink as the Wi-Fi is, so the kit can sit on a PoE splitter with no USB cable: the
 splitter's Ethernet leg into the RJ45, its USB-C leg into the kit's **power** input (not the
 connector marked JTAG, which is the console and the flashing port). The image is updated over the
 same network, the way [Sink firmware](sink-firmware.md) describes, and everything that answers on
-Wi-Fi answers on the cable: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
+Wi-Fi answers on wired: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
 mDNS (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`), the Sendspin player and its pairing,
-and the idle screen, which shows the address and then `Ethernet` or `Wi-Fi <network>`.
+and the idle screen, which shows the address and then `Wired` or `Wi-Fi <network>`.
 
 **Which one it uses.** The board takes an address on whichever has a link, by DHCP, under the name
-it is called (`hearth-<mac tail>`). With **auto**, the default, it uses the cable while the cable
-holds an address and the Wi-Fi when only that does, and goes back to the cable when it returns, with
-no restart. Both are up when the cable is in and a Wi-Fi network is stored, the cable's interface
+it is called (`hearth-<mac tail>`). With **auto**, the default, it uses wired while wired
+holds an address and the Wi-Fi when only that does, and goes back to wired when it returns, with
+no restart. Both are up when the Ethernet cable is in and a Wi-Fi network is stored, the wired interface
 with the higher route priority (200 against the Wi-Fi's 100; ESP-IDF's own number for Ethernet, 50,
-would have put a board with both on Wi-Fi). A board with the cable in and **no Wi-Fi network
-stored** comes up on the cable alone and needs nothing else. The setting, `network preference`,
+would have put a board with both on Wi-Fi). A board with the Ethernet cable in and **no Wi-Fi network
+stored** comes up on wired alone and needs nothing else. The setting, `network preference`,
 chooses what the board does:
 
-| Preference | The cable | The Wi-Fi station |
+| Preference | Wired | The Wi-Fi station |
 |---|---|---|
-| `auto` | used while it holds an address | joined as the way out if the cable goes; used when only it holds an address |
+| `auto` | used while it holds an address | joined as the way out if wired goes; used when only it holds an address |
 | `ethernet` | the only network | switched off: no radio, nothing joined |
 | `wifi` | switched off | the only network |
 
@@ -723,17 +738,17 @@ curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes eff
 ```
 
 A pinned preference leaves the board with one network and nothing to fall back to, so a change made
-while the board runs is checked before it is kept. `ethernet` brings the cable up first (it waits
+while the board runs is checked before it is kept. `ethernet` brings wired up first (it waits
 for a link and an address) and only then stores the preference and switches the Wi-Fi off; `wifi`
-joins the stored network first and only then stores it and stops the cable. A change whose interface
+joins the stored network first and only then stores it and stops wired. A change whose interface
 does not come up is **not kept**: the preference stays what it was, the other interface stays on, and
-the console says so (`network: no cable answered, so the WiFi station is not switched off`). The
+the console says so (`network: no wired link answered, so the WiFi station is not switched off`). The
 reply (`200`) is sent before any of this, so it comes back over the interface the change may switch
 off; read `GET /network-preference` a few seconds later to see what was kept.
 `PUT /network-preference wifi` with no Wi-Fi network stored is refused (`409`). Improv over USB and
-`PUT /network` still store a Wi-Fi network, and a board on the cable alone reports Improv's *ready*
+`PUT /network` still store a Wi-Fi network, and a board on wired alone reports Improv's *ready*
 state (it has no Wi-Fi), so a client still offers its Wi-Fi form; the Wi-Fi it is given joins while
-the cable stays in use.
+wired stays in use.
 
 **What `GET /status` says.** The `network` object keeps its four fields (`kind`, `ssid`,
 `rssi_dbm`, `address`), which now describe the interface **in use** (`kind` is `"ethernet"` or
@@ -754,9 +769,9 @@ one network `preference` and `interfaces` are `null`.
 }
 ```
 
-`enabled` is "not switched off by the preference", `link` is a cable with a partner on it
-(Ethernet) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
-stored, and `mac` is the interface's own address, for a DHCP reservation (the cable's is the chip's
+`enabled` is "not switched off by the preference", `link` is a partner on the Ethernet port
+(wired) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
+stored, and `mac` is the interface's own address, for a DHCP reservation (the wired one is the chip's
 base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A diagnostics view or a
 control for the preference reads `GET /status` and `GET` and `PUT /network-preference` and nothing
 else.
@@ -766,49 +781,49 @@ else.
     rescued by the update's own rollback (an image that does not reach the network, the HTTP server
     and the Sendspin player inside five minutes goes back to the one before it, and so does one that
     panics on its first boot; both were tried on the kit) or by putting the USB cable back. Keep the
-    Wi-Fi network stored, so the board has a way out if the cable goes. See
-    [What was tested](#what-was-tested-on-the-cable) for what was and was not tried.
+    Wi-Fi network stored, so the board has a way out if wired goes. See
+    [What was tested](#what-was-tested-on-wired) for what was and was not tried.
 
-#### What was tested on the cable
+#### What was tested on wired
 
-On the v3.2 kit, 2026-10-20, with the owner's cable to their router (100 Mbit/s, full duplex), the
+On the v3.2 kit, 2026-10-20, with the owner's Ethernet cable to their router (100 Mbit/s, full duplex), the
 Wi-Fi and the USB cable on as well. Details and the numbers:
 [the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20).
 
-- **The update path, before the cable:** ten `ota.py push` runs (eight accepted, an image that never
+- **The update path, before wired:** ten `ota.py push` runs (eight accepted, an image that never
   becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
   bootloader in about 25 s), a `PUT` rollback, eight `POST /restart` and four rounds of a USB flash
   followed 20 s later by an update: the C6 link was back each time, 7 to 10 s after the restart.
 - **The PHY** answers on the default pins at SMI address 1 with the IP101's ID, and negotiates 100
   Mbit/s full duplex.
-- **Boot:** with the cable in, it answers on the cable 10 s after reset and the Wi-Fi joins behind it
-  at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
-  **no Wi-Fi network stored** it comes up on the cable alone, with the page, mDNS and the Sendspin
-  player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.
-- **A cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
+- **Boot:** with the Ethernet cable in, it answers on wired 10 s after reset and the Wi-Fi joins behind it
+  at 14 s; with no Ethernet cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
+  **no Wi-Fi network stored** it comes up on wired alone, with the page, mDNS and the Sendspin
+  player, and Improv over USB then gives it a Wi-Fi network that joins while wired stays in use.
+- **An Ethernet cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
   pulled** (four times, by the owner, three with the board idle and one in the middle of a play)
-  made the Wi-Fi the interface in use within half a second, with no restart, and the cable returned
-  4 to 5 s after it was put back. A play cut by the pull ended there (926 bursts, no underrun until
+  made the Wi-Fi the interface in use within half a second, with no restart, and wired returned
+  4 to 5 s after the cable was put back. A play cut by the pull ended there (926 bursts, no underrun until
   it) and the board was idle and answering; the next play ran in full.
-- **Everything that answers on Wi-Fi answers on the cable:** the page, `/api`, `/hardware`, `GET /log`,
-  `PUT /firmware` (an update over the cable restarted the board, which answered on the cable 10 s
+- **Everything that answers on Wi-Fi answers on wired:** the page, `/api`, `/hardware`, `GET /log`,
+  `PUT /firmware` (an update over wired restarted the board, which answered on wired 10 s
   later and passed its trial), mDNS (`hearth-<mac tail>.local` has an A record for each address) and
-  Sendspin, which played four 30 s AC-3 streams through the cable, 938 of 938 bursts each with no
+  Sendspin, which played four 30 s AC-3 streams through wired, 938 of 938 bursts each with no
   underrun (one with a late burst and a resync at its start).
-- **The preference** set to each of the three words with the cable in did what the table says, and
+- **The preference** set to each of the three words with the Ethernet cable in did what the table says, and
   survived a restart; `ethernet` with no cable in was not kept and left the Wi-Fi on throughout.
-  With `ethernet` set (the Wi-Fi radio off), an update sent to the cable's address restarted the
-  board, which came back on the cable alone and passed its trial: the PoE case with the radio off.
-- **Bad images on the cable:** an image that panics on its trial and one that never reports healthy,
-  both built with the cable, pushed to the cable's address, were rolled back (about 25 s, and at the
-  300 s deadline) and the board returned on the cable.
+  With `ethernet` set (the Wi-Fi radio off), an update sent to the wired address restarted the
+  board, which came back on wired alone and passed its trial: the PoE case with the radio off.
+- **Bad images on wired:** an image that panics on its trial and one that never reports healthy,
+  both built with wired, pushed to the wired address, were rolled back (about 25 s, and at the
+  300 s deadline) and the board returned on wired.
 - **Cost:** the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
   smaller (about 281 KB free, largest block about 256 KB).
 
 **Not tested:** a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. A
-board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is joined as well
-(the cable goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
-out if the cable goes, and the first move to PoE should be done with the USB cable at hand.**
+board whose DHCP server is slow gives wired 15 s at boot before the Wi-Fi is joined as well
+(wired goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
+out if wired goes, and the first move to PoE should be done with the USB cable at hand.**
 
 ### Name, restart and reset
 
@@ -821,10 +836,10 @@ what a rename changes); what the kit adds is below.
   The restart a person asks for - `POST /restart`, and the restart that Restart and the factory
   reset end in - all go through it, a second slower than a CPU reset, with the USB console's port
   gone for a second or two.
-- **A factory reset leaves the kit reachable on its cable.** The cable needs nothing stored: the
+- **A factory reset leaves the kit reachable on wired.** Wired needs nothing stored: the
   kit asks the router for an address again, and has no Wi-Fi network until you give it one (the
   page's *Wi-Fi network* field, or Improv over the USB-C marked JTAG). **The same reset on a board
-  without a cable plugged in leaves it with no network at all.** Whether a cable is in is what the
+  without an Ethernet cable plugged in leaves it with no network at all.** Whether wired has a link is what the
   confirming step reads, and it says which of the two the board is in.
 - **The radio's own copy of the network.** ESP-IDF's Wi-Fi driver keeps the SSID and passphrase it is
   given in NVS, and on the kit the driver is the ESP32-C6's. The factory reset asks the radio to forget
@@ -847,7 +862,7 @@ not cut off at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240.
 
 | Entry | A tap |
 |---|---|
-| **Wired or Wi-Fi** | Automatic, Cable or Wi-Fi, on a board that has both. It asks first, in the developer view's words, and a switch the board is certain to refuse says so and cannot be made. |
+| **Wired or Wi-Fi** | Automatic, Wired or Wi-Fi, on a board that has both. It asks first, in the developer view's words, and a switch the board is certain to refuse says so and cannot be made. |
 | **Name of this player** | Opens the keyboard. |
 | **About** | Opens the version, the slot it runs from, the name, the address and MAC of each interface, the page's address, the chip, the layout and the number of paired servers. |
 | **Paired servers** | Opens the list, each server with a Forget. |
@@ -855,11 +870,11 @@ not cut off at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240.
 | **Reset preferences** | Asks, naming what changes on this board, and puts those choices back. |
 | **Factory reset** | Asks twice: what is lost, and then a button held for three seconds. |
 
-**The switch between the cable and Wi-Fi** is the developer view's control (the same words, the same call), here
+**The switch between wired and Wi-Fi** is the developer view's control (the same words, the same call), here
 with a card over the sheet. The board keeps the preference only once the interface it names holds an address, as
-[the cable section](#the-cable-and-wi-fi) says.
+[the wired section](#wired-and-wi-fi) says.
 
-![Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-prefs-network.png)
+![Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-prefs-network.png)
 
 **The name** is typed on a keyboard of its own: lower case, a shift for one capital, digits and the punctuation a
 room's name uses (`- _ . , ' & ( ) # + !`), and two pages of accented letters (Latin-1, and the Latin Extended-A
@@ -878,7 +893,7 @@ The same keyboard on a 480 by 320 panel, where the keys scroll under the name:
 of the board), and never shows the Wi-Fi passphrase or the pairing token. The developer view stays behind the three
 taps on the name.
 
-![About: the version, the slot, the name, the cable's and the radio's addresses and MACs, the page, the chip, the layout and the paired servers](screenshots/p4-panel-prefs-about.png)
+![About: the version, the slot, the name, the wired and the radio's addresses and MACs, the page, the chip, the layout and the paired servers](screenshots/p4-panel-prefs-about.png)
 
 **The paired servers** are listed by name, with what each is doing ("playing now", "connected", "played here
 last", "not seen since the player started"), and a Forget on each. Forgetting one asks first and says what
@@ -893,17 +908,17 @@ console and *Forget every server* on the page.
 
 **Reset preferences** puts back the choices that every registry entry says are reset (the screen without
 lyrics, its dim time, the brightness, the clock's hours and seconds and the night schedule; an entry that another page
-adds says for itself) and keeps the name, the Wi-Fi network, the choice between the cable and Wi-Fi, the wiring, the
+adds says for itself) and keeps the name, the Wi-Fi network, the choice between wired and Wi-Fi, the wiring, the
 speaker layout, the time zone and the pairings. It goes through each entry's own
 setter, so the screen and the clock follow as they follow a change.
 
 **Factory reset** is the one action that can strand a board, so it asks twice. The first card says what is lost
 (the name, the network and its password, the paired servers, the layout, the DAC wiring and every preference), how
-many servers will have to pair again, and, from what the board sees, whether it stays reachable: with a cable
-plugged in, "The cable stays in use"; with no cable, or on a board that has Wi-Fi alone, "After the reset it has NO
+many servers will have to pair again, and, from what the board sees, whether it stays reachable: with the wired
+network linked, "The wired network stays in use"; with no wired link, or on a board that has Wi-Fi alone, "After the reset it has NO
 network", and what brings it back (Improv over the USB cable, at improv-wifi.com in Chrome or Edge).
 
-![Erase everything? What is lost, that two servers have to pair again, and that the cable stays in use. Cancel, Continue](screenshots/p4-panel-prefs-factory.png)
+![Erase everything? What is lost, that two servers have to pair again, and that the wired network stays in use. Cancel, Continue](screenshots/p4-panel-prefs-factory.png)
 
 The second step is a button that has to be held for three seconds, its progress filling it; letting go cancels, and
 a tap does nothing.

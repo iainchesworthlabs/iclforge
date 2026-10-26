@@ -298,7 +298,7 @@ void load_all() {
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
     std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
-                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, night %s%s, time zone %s%s%s, "
+                "no-lyrics screen %s (%s), dims after %s, brightness %d, clock %s, night %s%s, time zone %s, "
                 "time server %s, time sync %s, dynamic range %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
@@ -310,8 +310,8 @@ void load_all() {
                 g_settings.brightness_percent, iclforge::wallclock::clock_format_text(g_settings.clock_format).c_str(),
                 iclforge::nowview::night_schedule_text(g_settings.night).c_str(),
                 g_settings.night.idle ? " (idle screen too)" : "",
-                iclforge::wallclock::zone_setting_text(g_settings.time_zone.data()).c_str(),
-                g_settings.time_zone_name[0] != '\0' ? " = " : "", g_settings.time_zone_name.data(),
+                // As a person reads it (the place, or the offset), not the string the board keeps it by.
+                iclforge::wallclock::zone_readable(g_settings.time_zone.data(), g_settings.time_zone_name.data()).c_str(),
                 iclforge::wallclock::ntp_server_setting_text(g_settings.ntp_server.data()).c_str(),
                 iclforge::wallclock::time_sync_text(g_settings.time_sync),
                 iclforge::ac3::dynamic_range_name(g_settings.dynamic_range).data());

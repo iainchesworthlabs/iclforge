@@ -386,7 +386,7 @@ void rebuild_rows() {
     if (has_choice) {
         control_y = y + 6;
         g.rows_objects.push_back(make_label(parent, "Prefer", g.regular.latin, g.c.muted, kLeftX, control_y + 22, kKeyWidth));
-        static const char* const kNames[3] = {"Auto", "Ethernet", "Wi-Fi"};
+        static const char* const kNames[3] = {"Automatic", "Wired", "Wi-Fi"};
         for (int i = 0; i < 3; ++i) {
             lv_obj_t* label = nullptr;
             lv_obj_t* const button =

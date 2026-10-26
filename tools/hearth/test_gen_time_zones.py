@@ -195,5 +195,53 @@ class CheckedInHeader(unittest.TestCase):
         self.assertEqual(gen.render(gen.build(directory), version), header)
 
 
+class Preferred(unittest.TestCase):
+    """Where several zones share a string, one is the place a board names for it (PREFERRED)."""
+
+    MELBOURNE = "AEST-10AEDT,M10.1.0,M4.1.0/3"
+
+    def test_a_shared_string_has_its_preferred_place_and_a_string_one_zone_has_none(self) -> None:
+        rows = [
+            ("Asia/Tokyo", "JST-9"),
+            ("Australia/Canberra", self.MELBOURNE),
+            ("Australia/Melbourne", self.MELBOURNE),
+            ("Australia/Sydney", self.MELBOURNE),
+        ]
+        self.assertEqual(gen.preferred_indices(rows), [2])
+
+    def test_a_shared_string_with_no_preferred_place_or_two_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            gen.preferred_indices([("Europe/Rome", "CET"), ("Europe/Vienna", "CET")])
+        with self.assertRaises(ValueError):
+            gen.preferred_indices(
+                [
+                    ("Australia/Melbourne", self.MELBOURNE),
+                    ("Australia/Brisbane", self.MELBOURNE),
+                    ("Australia/Adelaide", self.MELBOURNE),
+                ]
+            )
+
+    def test_a_preferred_zone_whose_string_is_not_shared_is_refused(self) -> None:
+        rows = [("Australia/Melbourne", self.MELBOURNE), ("Asia/Tokyo", "JST-9")]
+        with self.assertRaises(ValueError):
+            gen.preferred_indices(rows)
+
+    def test_the_real_table_has_exactly_one_for_each_shared_string(self) -> None:
+        # Each name is listed once, and in the table's own (sorted) order.
+        self.assertEqual(len(set(gen.PREFERRED)), len(gen.PREFERRED))
+        self.assertEqual(gen.PREFERRED, tuple(sorted(gen.PREFERRED)))
+
+    def test_the_header_lists_them_as_indices_in_table_order(self) -> None:
+        rows = [
+            ("Asia/Tokyo", "JST-9"),
+            ("Australia/Canberra", self.MELBOURNE),
+            ("Australia/Melbourne", self.MELBOURNE),
+            ("UTC", "UTC0"),
+        ]
+        text = gen.render(rows, "2099z")
+        self.assertIn("inline constexpr std::uint16_t kPreferred[] = {\n    2,\n};", text)
+        self.assertIn("kPreferredCount", text)
+
+
 if __name__ == "__main__":
     unittest.main()
