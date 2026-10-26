@@ -1,6 +1,16 @@
 # The Meters view: an instrument display for the no-lyrics screen
 
-!!! note "Status as of 2026-10-26: stage 1, round 2 (an adaptive layout); nothing is built into the firmware, and the owner has not picked"
+!!! note "Status as of 2026-10-26: decided and built, tested on the host; not run on a board"
+    **Decided by the owner, 2026-10-26:** the adaptive rule (the pair on a small screen or in a 2.0 room, the surround sum on a middle one, every output
+    in groups on a large one; a tap on a channel to focus it is not built yet); the spectrum in green, amber and red zones; a range of -60 to 0 dB (no
+    -80 to -20 setting); 20 updates a second if the panel's task can keep up and 10 if not; and *measuring and characterising the performance is
+    definitely required*. **Built** in five PRs: the analysis and the rules (#1682), the player's tap (#1683), the screen, the choice and the route
+    (#1685), `GET /panel-stats` with the rate governor and the kit protocol (#1686), and the preview's checks at every size and room with the pictures
+    (5 of 5). The kit has not run it: [Measuring it](#measuring-it) and the [kit protocol](#kit-protocol) are what does, and what
+    [What it costs](#what-it-costs) calls an estimate stays one until it has.
+
+    The page below is the study that led to it, as it was written. The pictures of the built view are in `docs/hearth/sink-esp32-p4.md`.
+
     The owner, who turned down all seven speakers options, gave a reference instead: the displays of RME's audio
     interfaces (the ADI-2/4 Pro SE and the Fireface UCX II), *"another screen preference would be something like this"*.
     This page is the prototype of that as a new choice of what the screen shows without lyrics, **Meters**: what it
@@ -225,7 +235,7 @@ is mostly in the cache after the first pass; internal RAM is not needed.
 speakers view's tuning follows that serial, so the window cannot simply be halved; the tap's loop would keep a second, shorter peak a block for the Meters view only
 (`BurstPlayerLevels` grows an array and a serial), at no cost per sample beyond the compare it already does.
 
-## What the pick would build
+## What the pick would build (as built, 2026-10-26)
 
 - `View::kMeters = 5` in `libs/device/include/iclforge/now_view.hpp` (`kDark` is 4; never renumbered). A board that stores 5 and runs an older image keeps its default and says so.
 - The registry's *Screen without lyrics* gains a **Meters** choice (`libs/device/include/iclforge/preferences.hpp`, `kNowViewChoices`) with an availability: a screen of at least
@@ -368,7 +378,10 @@ screen on the large one, and one custom-drawn widget for the spectrum in place o
 LVGL (5 to 8 times the host's) are assumptions; `analysis_us` and `widgets_us` and `render_us` are those numbers measured, and **the first thing to
 read** is `meters.analysis_us.mean` in the `eac3-5.1-on-9.1.6` row.
 
-## Questions for the owner
+## Questions for the owner (answered 2026-10-26)
+
+The owner chose the adaptive rule of round 2 (which takes the place of "which"), the **zones** (green, amber and red) for the spectrum, **-60 to 0 dB**
+with no second range, and **20 updates a second if possible, else 10**. The questions as they were asked:
 
 1. **Which?** The recommendation is below; B's bars are what the speakers view cannot give (how loud each output is, the exact number), and A is the picture on the ADI-2.
 2. **The spectrum's colour:** the accent red as drawn (the ADI-2), or green, amber and red zones in it as the Fireface's bars have.

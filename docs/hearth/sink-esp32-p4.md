@@ -425,6 +425,13 @@ tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in 
 How fast it runs on the kit, and the protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 
+![The Meters view, a 2.0 room: the spectrum, and the pair of meters under it](screenshots/p4-panel-meters-2-0.png)
+![The Meters view, 5.1: every output a bar, grouped in space](screenshots/p4-panel-meters-5-1.png)
+![The Meters view, 7.1.4](screenshots/p4-panel-meters-7-1-4.png)
+![The Meters view, a 5.1 stream on a 9.1.6 room: sixteen bars](screenshots/p4-panel-meters-9-1-6.png)
+![On a 480 by 320 screen: the surround sum, six bars, and half the spectrum's bars](screenshots/p4-panel-meters-sum-480x320.png)
+![On a 240 by 240 screen: the pair, whatever the room](screenshots/p4-panel-meters-pair-240x240.png)
+
 **What the Meters view costs, and the rate it holds.** `GET /panel-stats` (port 80, on a board with a screen) says what the panel
 costs: LVGL's refreshes (the start of one to its end, the flush to the glass included), the panel task's stack never-free minimum, the
 PSRAM and internal heap now and at their lowest, and, once the view has been opened, the Meters view's own figures since it opened: the rate it
