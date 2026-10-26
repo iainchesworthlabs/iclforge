@@ -26,15 +26,17 @@
 //
 // WHAT THE GRAMMAR CAN SAY (libs/render's layout.hpp), and so what the sheet offers. Around you: 1, 2, 3, 4, 5, 7 or 9
 // (C; L R; L C R; L R Ls Rs; L C R Ls Rs; plus Lrs Rrs; plus Lw Rw). Subwoofers: none, one (LFE) or two (LFE, LFE2).
-// Heights: none, 2 (Vhl Vhr), 4 (plus Lts Rts) or 6 (plus Vhc Ts). Of the three ways a height can be realized, the
-// board plays two differently: IN THE CEILING (":top") puts the heights straight overhead (elevation 90 degrees), and
-// ON THE WALL (no suffix) and UP-FIRING (":upfiring", a module that bounces the sound off the ceiling) leave them
-// where the layout's own angle puts them - the library draws no separate tier for the second, so those two are
-// played alike and differ only as labels /status carries. The sheet says so under the buttons rather than offer a
-// difference the board does not make. NOT OFFERED: ":small" (a speaker that cannot reproduce the bottom octaves has its
-// bass sent to the subwoofer). The name form has no spelling for it, a list does, and a list of a 9.1.4 room with
-// every ring speaker marked is longer than the 95 characters the layout echo keeps (OutputLayout::kTextBytes), so the
-// layout would not read back; a list is still taken by PUT /layout and the web page.
+// Heights: none, 2 (Vhl Vhr), 4 (plus Lts Rts) or 6 (plus Vhc Ts). The grammar has three ways to realize a height, and
+// the board plays two differently: IN THE CEILING (":top") puts the heights straight overhead (elevation 90 degrees),
+// and the other two - on the wall (no suffix, or ":height") and up-firing (":upfiring", a module that bounces the sound
+// off the ceiling) - leave them where the layout's own angle puts them. The library draws no separate tier for either,
+// so they are played alike and differ only as labels /status carries (a test holds the two renderings equal). The
+// owner's call, 2026-10-26: "if it's the difference we can't make", so the sheet offers ONE of them, HIGH, and
+// the ceiling. A layout set another way as ":upfiring" or ":height" reads back as High, and is "in use" as it is.
+// NOT OFFERED: ":small" (a speaker that cannot reproduce the bottom octaves has its bass sent to the subwoofer). The
+// name form has no spelling for it, a list does, and a list of a 9.1.4 room with every ring speaker marked is longer
+// than the 95 characters the layout echo keeps (OutputLayout::kTextBytes), so the layout would not read back; a list
+// is still taken by PUT /layout and the web page.
 //
 // More than sixteen outputs is not a layout whatever the board ("9.2.6" is 17): a pick that sums to more is refused with
 // that sentence before the board is asked.
@@ -47,15 +49,16 @@
 
 namespace iclforge {
 
-// How the heights are mounted. kWall is the grammar's default and spells no suffix.
-enum class HeightMount : std::uint8_t { kWall, kCeiling, kUpFiring };
+// How the heights are mounted. kHigh is the grammar's default and spells no suffix: on the wall or up-firing, which
+// the renderer plays the same (the library's one upper tier). kCeiling is ":top", straight overhead.
+enum class HeightMount : std::uint8_t { kHigh, kCeiling };
 
 // What the room has.
 struct LayoutPick {
     int around = 2;
     int subwoofers = 0;
     int heights = 0;
-    HeightMount mount = HeightMount::kWall;
+    HeightMount mount = HeightMount::kHigh;
 
     friend bool operator==(const LayoutPick&, const LayoutPick&) = default;
 };
@@ -63,7 +66,7 @@ struct LayoutPick {
 inline constexpr std::array<int, 7> kAroundSteps{1, 2, 3, 4, 5, 7, 9};
 inline constexpr std::array<int, 3> kSubwooferSteps{0, 1, 2};
 inline constexpr std::array<int, 4> kHeightSteps{0, 2, 4, 6};
-inline constexpr std::size_t kMountSteps = 3;
+inline constexpr std::size_t kMountSteps = 2;
 
 // A layout is at most this many outputs (OutputLayout::kMaxSlots).
 inline constexpr std::size_t kMaxLayoutOutputs = 16;
@@ -73,15 +76,13 @@ inline constexpr std::size_t kMaxLayoutOutputs = 16;
 }
 
 // "5.1.4", "7.1.4:top", "2.0": the name the pick is, the canonical short form (the heights field is left out when
-// there are none, the suffix when the heights are on the wall).
+// there are none, the suffix when the heights are high).
 [[nodiscard]] inline std::string pick_name(const LayoutPick& pick) {
     std::string name = std::to_string(pick.around) + "." + std::to_string(pick.subwoofers);
     if (pick.heights > 0) {
         name += "." + std::to_string(pick.heights);
         if (pick.mount == HeightMount::kCeiling) {
             name += ":top";
-        } else if (pick.mount == HeightMount::kUpFiring) {
-            name += ":upfiring";
         }
     }
     return name;
@@ -128,10 +129,8 @@ template <std::size_t N>
         const std::string_view suffix = rest.substr(colon + 1);
         if (suffix == "top") {
             pick.mount = HeightMount::kCeiling;
-        } else if (suffix == "upfiring") {
-            pick.mount = HeightMount::kUpFiring;
-        } else if (suffix != "height") {
-            return std::nullopt;  // ":height" is the wall's own label
+        } else if (suffix != "upfiring" && suffix != "height") {
+            return std::nullopt;  // those two are the other spellings of High
         }
         rest = rest.substr(0, colon);
     }
@@ -149,7 +148,7 @@ template <std::size_t N>
         !builder_detail::among(kHeightSteps, pick.heights)) {
         return std::nullopt;
     }
-    if (pick.heights == 0 && pick.mount != HeightMount::kWall) {
+    if (pick.heights == 0 && (pick.mount != HeightMount::kHigh || name.find(':') != std::string_view::npos)) {
         return std::nullopt;  // "5.1:top" has no heights to realize
     }
     return pick;
@@ -166,11 +165,7 @@ template <std::size_t N>
     }
     if (pick.heights > 0) {
         out += ", " + std::string{word_of(pick.heights)};
-        switch (pick.mount) {
-            case HeightMount::kWall: out += " heights"; break;
-            case HeightMount::kCeiling: out += " heights in the ceiling"; break;
-            case HeightMount::kUpFiring: out += " up-firing heights"; break;
-        }
+        out += pick.mount == HeightMount::kCeiling ? " ceiling speakers" : " high speakers";
     }
     return out;
 }
@@ -281,7 +276,7 @@ namespace builder_detail {
 [[nodiscard]] inline std::vector<PickStep> pick_steps(const BoardCaps& caps, const LayoutPick& pick, PickField field) {
     std::vector<PickStep> out;
     const auto least_with = [&](int around, int subs, int heights) {
-        return LayoutPick{around, subs, heights, HeightMount::kWall};
+        return LayoutPick{around, subs, heights, HeightMount::kHigh};
     };
     const auto add = [&](int value, std::string label, const LayoutPick& smallest, PickField which) {
         PickStep step;
@@ -315,9 +310,8 @@ namespace builder_detail {
             const bool has_heights = pick.heights > 0;
             const char* const reason = "Only a layout with heights has them to mount.";
             const std::array<std::pair<HeightMount, const char*>, kMountSteps> mounts{{
-                {HeightMount::kWall, "On the wall"},
+                {HeightMount::kHigh, "High"},
                 {HeightMount::kCeiling, "In the ceiling"},
-                {HeightMount::kUpFiring, "Up-firing"},
             }};
             for (const auto& [mount, label] : mounts) {
                 PickStep step;
@@ -335,7 +329,7 @@ namespace builder_detail {
     return out;
 }
 
-// The pick with one field set. Heights of none put the mount back on the wall (it has nothing to say then).
+// The pick with one field set. Heights of none put the mount back to High (it has nothing to say then).
 [[nodiscard]] inline LayoutPick with_field(LayoutPick pick, PickField field, int value) {
     switch (field) {
         case PickField::kAround: pick.around = value; break;
@@ -343,7 +337,7 @@ namespace builder_detail {
         case PickField::kHeights:
             pick.heights = value;
             if (value == 0) {
-                pick.mount = HeightMount::kWall;
+                pick.mount = HeightMount::kHigh;
             }
             break;
         case PickField::kMount: pick.mount = static_cast<HeightMount>(value); break;

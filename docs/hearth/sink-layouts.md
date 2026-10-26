@@ -67,17 +67,17 @@ A board with a screen has **Speaker layout** in Preferences, under Sound: the la
 **Quick picks** are the layouts a home has, in two groups: *Around you* (`1.0` to `9.1`) and *With heights*
 (`5.1.2` to `9.1.6`). A layout the board cannot carry is greyed, and touching it says why in the card above the
 buttons. **Build yours** is how many speakers are around you, how many subwoofers, how many heights, and how the
-heights are mounted: on the wall, in the ceiling or up-firing. The room the layout makes is drawn beside the
+heights are mounted: high, or in the ceiling. The room the layout makes is drawn beside the
 buttons and changes as they are pressed; the footer names the layout in words and holds **Apply**, and Cancel
 is in the bar, so neither is ever off the screen. Only the buttons scroll.
 
 ![The Speaker layout sheet on the P4X kit's 1024 by 600 screen, Quick picks: 7.1.4 chosen and in use, its room drawn beside the buttons](screenshots/p4-panel-layout-quick-kit.png)
 
-![Build yours on the kit, at the widest the grammar has: nine around you, one subwoofer and six up-firing heights, the room of sixteen speakers beside them](screenshots/p4-panel-layout-build-kit.png)
+![Build yours on the kit, at the widest the grammar has: nine around you, one subwoofer and six heights in the ceiling, the room of sixteen speakers beside them](screenshots/p4-panel-layout-build-kit.png)
 
 What the board plays differently is only the ceiling: heights **in the ceiling** are put straight overhead, and
-heights **on the wall** and **up-firing** are played the same way (the renderer has one upper tier), so the
-sheet says so under the buttons. Bass-managed small speakers are not offered here, because the name has no
+**high** heights, on the wall or up-firing, are played the same way (the renderer has one upper tier), so the
+sheet has one button for them. Bass-managed small speakers are not offered here, because the name has no
 spelling for them; a speaker list still sets them, through the route and the web page.
 
 The same sheet on an ESP32-S3 whose sink carries four slots: what the board carries is said at the head, the

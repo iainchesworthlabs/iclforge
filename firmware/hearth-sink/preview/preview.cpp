@@ -1749,7 +1749,7 @@ int reachable(lv_obj_t* root, const std::string& what) {
 
 // The Speaker layout sheet (layout_sheet.cpp): the Preferences row that opens it, the quick picks, the buttons that build a
 // layout, what a board that cannot carry them says, the question while a stream plays, and the worst case - nine around you,
-// one subwoofer and six up-firing heights on the kit - held to the glass at every size.
+// one subwoofer and six heights, in the ceiling, on the kit - held to the glass at every size.
 int check_layout_sheet(int width, int height, const fs::path& out, const std::string& lrc) {
     namespace nv = iclforge::nowview;
     const std::string size = std::to_string(width) + "x" + std::to_string(height);
@@ -1860,7 +1860,7 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
     expect(tap_in(sheet, "Two"), "two subwoofers can be touched");
     pump(6);
     expect(shows_text(sheet, "2.2", true), "two around you and two subwoofers is 2.2");
-    expect(tap_in(sheet, "Up-firing"), "heights are mounted somehow");
+    expect(tap_in(sheet, "High"), "heights are mounted somehow");
     pump(6);
     expect(shows_text(sheet, "Only a layout with heights has them to mount.", true), "but not when there are none");
     expect(g_layout == "2.0", "nothing was applied");
@@ -1957,23 +1957,28 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
             pump(6);
             expect(tap_in(sheet, "Build yours"), "Build yours");
             pump(6);
-            // The worst case: nine around you, one subwoofer, six heights, up-firing - the longest summary, the most
-            // buttons selected, the room with the most speakers - at the display's size.
-            expect(tap_in(sheet, "Up-firing"), "9.1.6 can be mounted up-firing");
+            // High is the one rendering of the wall and up-firing: the board cannot tell them apart.
+            if (width >= 800) {
+                expect(shows_text(sheet, "9.1.6: nine around you, one subwoofer, six high speakers"),
+                       "9.1.6 is high speakers until they are put in the ceiling");
+            }
+            // The worst case: nine around you, one subwoofer, six heights, in the ceiling - the longest summary, the
+            // most buttons selected, the room with the most speakers, all of them overhead - at the display's size.
+            expect(tap_in(sheet, "In the ceiling"), "9.1.6 can be mounted in the ceiling");
             pump(6);
     settle(sheet);
     write_bmp(out / ("layout-worst-kit-" + size + ".bmp"));
             failures += audit(sheet, "speaker layout, worst case, kit " + size);
             failures += reachable(sheet, "speaker layout, worst case, kit " + size);
-            expect(shows_text(sheet, "9.1.6:upfiring", true), "the footer names the layout");
+            expect(shows_text(sheet, "9.1.6:top", true), "the footer names the layout");
             if (width >= 800) {
-                expect(shows_text(sheet, "9.1.6:upfiring: nine around you, one subwoofer, six up-firing heights"),
+                expect(shows_text(sheet, "9.1.6:top: nine around you, one subwoofer, six ceiling speakers"),
                        "and, with room, says it in words");
             }
             // Seventeen outputs is not a layout.
             expect(tap_in(sheet, "Two"), "two subwoofers can be touched");
             pump(6);
-            expect(shows_text(sheet, "9.2.6:upfiring would be 17 outputs, and a layout has at most 16.", true),
+            expect(shows_text(sheet, "9.2.6:top would be 17 outputs, and a layout has at most 16.", true),
                    "nine around you, two subwoofers and six heights is seventeen outputs");
     settle(sheet);
     write_bmp(out / ("layout-seventeen-kit-" + size + ".bmp"));
@@ -1982,15 +1987,32 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
             pump(6);
             expect(tap_in(sheet, "Apply"), "Apply can be touched on the kit");
             pump(8);
-            expect(g_layout == "9.1.6:upfiring", "9.1.6 up-firing is taken on the kit");
+            expect(g_layout == "9.1.6:top", "9.1.6 in the ceiling is taken on the kit");
             expect(player::panel::layout_sheet_root() == nullptr, "and the sheet goes away");
             pump(4);
-            expect(shows_text(kit, "9.1.6:upfiring"), "and the row shows it");
-            expect(shows_text(kit, "Nine around you, one subwoofer, six up-firing heights.", true) ||
+            expect(shows_text(kit, "9.1.6:top"), "and the row shows it");
+            expect(shows_text(kit, "Nine around you, one subwoofer, six ceiling speakers.", true) ||
                        shows_text(kit, "Nine around you", true),
                    "in words");
             settle(kit);
             failures += audit(kit, "preferences, speaker layout row, kit " + size);
+        }
+        close_prefs();
+    }
+
+    // A layout the board was told as ":upfiring" is High, and the sheet says High is in use.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "7.1.4:upfiring";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const alias = player::panel::prefs_root();
+        sheet = alias != nullptr ? open_sheet(alias) : nullptr;
+        if (sheet != nullptr) {
+            expect(shows_text(sheet, "In use now"), "7.1.4:upfiring is the high 7.1.4, in use now");
+            tap_in(sheet, "Cancel");
+            pump(6);
         }
         close_prefs();
     }

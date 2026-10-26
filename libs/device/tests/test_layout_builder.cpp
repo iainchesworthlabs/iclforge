@@ -60,10 +60,9 @@ std::vector<LayoutPick> all_picks() {
     for (const int around : iclforge::kAroundSteps) {
         for (const int subs : iclforge::kSubwooferSteps) {
             for (const int heights : iclforge::kHeightSteps) {
-                out.push_back({around, subs, heights, HeightMount::kWall});
+                out.push_back({around, subs, heights, HeightMount::kHigh});
                 if (heights > 0) {
                     out.push_back({around, subs, heights, HeightMount::kCeiling});
-                    out.push_back({around, subs, heights, HeightMount::kUpFiring});
                 }
             }
         }
@@ -126,20 +125,29 @@ TEST_CASE("a name that is not a pick says so", "[layout-builder]") {
         INFO(text);
         REQUIRE_FALSE(iclforge::pick_of(text).has_value());
     }
-    // The wall's own label is the wall.
-    const std::optional<LayoutPick> labelled = iclforge::pick_of("7.1.4:height");
-    REQUIRE(labelled.has_value());
-    REQUIRE(labelled->mount == HeightMount::kWall);
+    // The other spellings of High are High, and ":top" is the ceiling.
+    for (const char* text : {"7.1.4:height", "7.1.4:upfiring", "7.1.4"}) {
+        const std::optional<LayoutPick> high = iclforge::pick_of(text);
+        INFO(text);
+        REQUIRE(high.has_value());
+        REQUIRE(high->mount == HeightMount::kHigh);
+        REQUIRE(iclforge::pick_name(*high) == "7.1.4");
+    }
+    REQUIRE(iclforge::pick_of("7.1.4:top")->mount == HeightMount::kCeiling);
+    // Heights of none have nothing to mount, however it is spelled.
+    REQUIRE_FALSE(iclforge::pick_of("5.1:upfiring").has_value());
+    REQUIRE_FALSE(iclforge::pick_of("5.1:height").has_value());
 }
 
 TEST_CASE("the words for a pick", "[layout-builder]") {
-    REQUIRE(iclforge::pick_summary({7, 1, 4, HeightMount::kWall}) == "7.1.4: seven around you, one subwoofer, four heights");
-    REQUIRE(iclforge::pick_summary({2, 0, 0, HeightMount::kWall}) == "2.0: two around you");
-    REQUIRE(iclforge::pick_summary({5, 2, 0, HeightMount::kWall}) == "5.2: five around you, two subwoofers");
+    REQUIRE(iclforge::pick_summary({7, 1, 4, HeightMount::kHigh}) ==
+            "7.1.4: seven around you, one subwoofer, four high speakers");
+    REQUIRE(iclforge::pick_summary({2, 0, 0, HeightMount::kHigh}) == "2.0: two around you");
+    REQUIRE(iclforge::pick_summary({5, 2, 0, HeightMount::kHigh}) == "5.2: five around you, two subwoofers");
     REQUIRE(iclforge::pick_summary({9, 1, 6, HeightMount::kCeiling}) ==
-            "9.1.6:top: nine around you, one subwoofer, six heights in the ceiling");
-    REQUIRE(iclforge::pick_summary({5, 1, 2, HeightMount::kUpFiring}) ==
-            "5.1.2:upfiring: five around you, one subwoofer, two up-firing heights");
+            "9.1.6:top: nine around you, one subwoofer, six ceiling speakers");
+    REQUIRE(iclforge::pick_summary({5, 1, 2, HeightMount::kCeiling}) ==
+            "5.1.2:top: five around you, one subwoofer, two ceiling speakers");
 }
 
 TEST_CASE("a pick is judged by the one verdict", "[layout-builder]") {
@@ -168,7 +176,7 @@ TEST_CASE("a pick is judged by the one verdict", "[layout-builder]") {
 
 TEST_CASE("a seventeen-output pick is refused with its own sentence", "[layout-builder]") {
     const iclforge::PickVerdict verdict =
-        iclforge::judge_pick(variants::p4_rev3_kit(), {9, 2, 6, HeightMount::kWall});
+        iclforge::judge_pick(variants::p4_rev3_kit(), {9, 2, 6, HeightMount::kHigh});
     REQUIRE_FALSE(verdict.accepted());
     REQUIRE(verdict.reason == "9.2.6 would be 17 outputs, and a layout has at most 16.");
 }
@@ -179,7 +187,7 @@ TEST_CASE("a greyed button is greyed for a reason, and never withholds what the 
         for (const PickField field :
              {PickField::kAround, PickField::kSubwoofers, PickField::kHeights, PickField::kMount}) {
             // The buttons do not depend on the pick but for the mount's (it needs heights).
-            for (const LayoutPick& now : {LayoutPick{2, 0, 0, HeightMount::kWall}, LayoutPick{5, 1, 4, HeightMount::kWall}}) {
+            for (const LayoutPick& now : {LayoutPick{2, 0, 0, HeightMount::kHigh}, LayoutPick{5, 1, 4, HeightMount::kHigh}}) {
                 const std::vector<iclforge::PickStep> steps = iclforge::pick_steps(board.caps, now, field);
                 REQUIRE_FALSE(steps.empty());
                 for (const iclforge::PickStep& step : steps) {
@@ -292,7 +300,7 @@ TEST_CASE("applying a pick asks the verdict first and the board only for a layou
     REQUIRE(kit.sets == 1);
 
     // A layout past sixteen is refused with its own sentence, and the board is never asked.
-    const auto too_wide = iclforge::apply_pick(kit, {9, 2, 6, HeightMount::kWall});
+    const auto too_wide = iclforge::apply_pick(kit, {9, 2, 6, HeightMount::kHigh});
     REQUIRE_FALSE(too_wide.ok);
     REQUIRE(too_wide.message == "9.2.6 would be 17 outputs, and a layout has at most 16.");
     REQUIRE(kit.layout_ == "7.1.4:top");
@@ -303,22 +311,52 @@ TEST_CASE("applying a pick asks the verdict first and the board only for a layou
     four.sink.slot_bits = 32;
     four.sink.second_line = false;
     FakeBackend s3(four);
-    const auto refused = iclforge::apply_pick(s3, {9, 1, 6, HeightMount::kWall});
+    const auto refused = iclforge::apply_pick(s3, {9, 1, 6, HeightMount::kHigh});
     REQUIRE_FALSE(refused.ok);
-    REQUIRE(refused.message == iclforge::judge_pick(four, {9, 1, 6, HeightMount::kWall}).reason);
+    REQUIRE(refused.message == iclforge::judge_pick(four, {9, 1, 6, HeightMount::kHigh}).reason);
     REQUIRE(s3.layout_ == "2.0");
     REQUIRE(s3.sets == 0);
 
     // A board with no output says so.
     FakeBackend none{BoardCaps{}};
-    const auto nothing = iclforge::apply_pick(none, {2, 0, 0, HeightMount::kWall});
+    const auto nothing = iclforge::apply_pick(none, {2, 0, 0, HeightMount::kHigh});
     REQUIRE_FALSE(nothing.ok);
     REQUIRE(nothing.message == "This board has no audio output to set a layout for.");
 
     // A board that could not store it says so.
     kit.refuse_next = true;
-    const auto failed = iclforge::apply_pick(kit, {5, 1, 0, HeightMount::kWall});
+    const auto failed = iclforge::apply_pick(kit, {5, 1, 0, HeightMount::kHigh});
     REQUIRE_FALSE(failed.ok);
     REQUIRE(failed.message == "The board could not take that.");
     REQUIRE(kit.layout_ == "7.1.4:top");
+}
+
+TEST_CASE("high is one rendering whether it is on the wall or up-firing, and the ceiling is another", "[layout-builder]") {
+    // The reason the sheet offers one button for the two: libs/render draws them at the same angles. ":top" is the one
+    // that moves the heights (to straight overhead).
+    std::size_t compared = 0;
+    for (const LayoutPick& pick : all_picks()) {
+        if (pick.heights == 0 || pick.mount != HeightMount::kHigh || iclforge::pick_slots(pick) > iclforge::kMaxLayoutOutputs) {
+            continue;
+        }
+        const std::string name = iclforge::pick_name(pick);
+        const std::optional<OutputLayout> plain = OutputLayout::parse(name);
+        const std::optional<OutputLayout> wall = OutputLayout::parse(name + ":height");
+        const std::optional<OutputLayout> up = OutputLayout::parse(name + ":upfiring");
+        const std::optional<OutputLayout> top = OutputLayout::parse(name + ":top");
+        INFO(name);
+        REQUIRE((plain && wall && up && top));
+        REQUIRE(plain->slots() == top->slots());
+        bool ceiling_moved = false;
+        for (std::size_t i = 0; i < plain->slots(); ++i) {
+            REQUIRE(plain->slot(i).direction.azimuth_deg == wall->slot(i).direction.azimuth_deg);
+            REQUIRE(plain->slot(i).direction.elevation_deg == wall->slot(i).direction.elevation_deg);
+            REQUIRE(plain->slot(i).direction.azimuth_deg == up->slot(i).direction.azimuth_deg);
+            REQUIRE(plain->slot(i).direction.elevation_deg == up->slot(i).direction.elevation_deg);
+            ceiling_moved = ceiling_moved || top->slot(i).direction.elevation_deg != plain->slot(i).direction.elevation_deg;
+        }
+        REQUIRE(ceiling_moved);
+        ++compared;
+    }
+    REQUIRE(compared >= 40);
 }

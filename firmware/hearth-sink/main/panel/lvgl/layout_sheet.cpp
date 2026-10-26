@@ -90,9 +90,11 @@ struct Sheet {
     int footer_text_w = 0;
 
     bool build_tab = false;
-    // The working layout, and what is in force (empty when it is a speaker list the sheet cannot show as buttons).
+    // The working layout, and what is in force: as the word the board holds, and as a pick (empty when it is a speaker
+    // list the sheet cannot show as buttons; ":upfiring" and ":height" read as High, which plays the same).
     lb::LayoutPick pick;
     std::string in_force_text;
+    std::optional<lb::LayoutPick> in_force;
     // A sentence about the layout in force that is not the verdict's: a speaker list that choosing here replaces.
     std::string info;
     // The last refusal, or a greyed button's reason, for a few seconds, and what the card calls it.
@@ -143,6 +145,9 @@ constexpr std::array<lb::PickField, 4> kFields{lb::PickField::kAround, lb::PickF
 [[nodiscard]] std::size_t field_index(lb::PickField field) { return static_cast<std::size_t>(field); }
 
 [[nodiscard]] bool hint_live() { return !g.hint.empty() && g.now_ms - g.hint_ms < kHintShownMs; }
+
+// Whether the working layout is the one in force: the same pick, so that High is High however the board was told.
+[[nodiscard]] bool is_in_force() { return g.in_force.has_value() && *g.in_force == g.pick; }
 
 // --- building --------------------------------------------------------------------------------------
 
@@ -239,7 +244,7 @@ void build_build_page(const PrefsUi& ui, lv_obj_t* parent, int cw) {
         }
     }
     g.mount_note = prefs_paragraph(g.build_page,
-                                   "Wall and up-firing play alike; the ceiling is straight overhead.",
+                                   "High is on the wall or up-firing; the ceiling is straight overhead.",
                                    ui.note, ui.c->muted, cw);
 }
 
@@ -517,7 +522,7 @@ void repaint() {
     }
     const iclforge::BoardCaps caps = preferences_backend().caps();
     const lb::PickVerdict verdict = lb::judge_pick(caps, g.pick);
-    const bool same = lb::pick_name(g.pick) == g.in_force_text;
+    const bool same = is_in_force();
     g.quick_states = lb::quick_states(caps);
 
     // Which page, and which tab says so.
@@ -698,7 +703,7 @@ void apply() {
         say(verdict.reason, "Not available on this board");
         return;
     }
-    if (lb::pick_name(g.pick) == g.in_force_text) {
+    if (is_in_force()) {
         say("That is the layout in use now.", "Not changed");
         return;
     }
@@ -776,10 +781,11 @@ void on_target(lv_event_t* event) {
 // What the board holds now: the layout in force, and the pick the sheet starts from.
 void read_in_force(bool starting) {
     g.in_force_text = preferences_backend().layout();
+    g.in_force = lb::pick_of(g.in_force_text);
     if (!starting) {
         return;
     }
-    const std::optional<lb::LayoutPick> shown = lb::pick_of(g.in_force_text);
+    const std::optional<lb::LayoutPick> shown = g.in_force;
     g.pick = shown.value_or(lb::LayoutPick{});
     g.info = shown ? std::string()
                    : "This board is set to a speaker list (" + g.in_force_text +

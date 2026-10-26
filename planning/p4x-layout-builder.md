@@ -19,14 +19,15 @@ layout:
 - **Quick picks**: fifteen chips in two groups, *Around you* (`1.0 2.0 2.1 3.1 5.0 5.1 7.1 9.1`) and *With heights*
   (`5.1.2 5.1.4 7.1.2 7.1.4 9.1.2 9.1.4 9.1.6`). Every layout of the old list is among them (a test holds it).
 - **Build yours**: *Around you* 1, 2, 3, 4, 5, 7 or 9; *Subwoofers* none, one or two; *Heights* none, 2, 4 or 6;
-  *Heights are* on the wall, in the ceiling or up-firing. The four groups are one line each where the display is
+  *Heights are* high, or in the ceiling. The four groups are one line each where the display is
   wide enough (the kit's), and a heading above their buttons where it is not.
 
 Beside the buttons (on a display 440 pixels of content wide and up) the **room** the working layout makes is
 drawn from above, the speakers in the places the grammar gives them, the subwoofers in a strip under it, and it
-changes as a button is pressed, so that the difference between the heights in the ceiling and on the wall can be
-seen. The **footer** is fixed: the layout's name and, where it fits, what it is in words ("9.1.6:upfiring: nine
-around you, one subwoofer, six up-firing heights"), whether it is supported, taken with a limit or not available,
+changes as a button is pressed, so that the difference between high heights and heights in the ceiling can be
+seen (the ceiling ones are fanned in the middle of the room, over the listener). The **footer** is fixed: the layout's
+name and, where it fits, what it is in words ("9.1.6:top: nine around you, one subwoofer, six ceiling speakers";
+"7.1.4: ... four high speakers"), whether it is supported, taken with a limit or not available,
 and **Apply**; **Cancel** is in the fixed bar. Only the buttons scroll, so Apply and Cancel are never off the glass.
 While a stream plays, Apply asks first ("Changing the speakers makes the music drop out for a moment. Change to
 7.1.4?"), as the list did.
@@ -62,7 +63,7 @@ From `libs/render/include/iclforge/render/layout.hpp`:
 |---|---|
 | How many around you, subwoofers, heights | Each is a place in the name, a slot in the output, and a direction (`spatial.hpp`) |
 | Heights **in the ceiling** (`:top`) | Elevation 90 degrees: straight overhead, over the listener. The room shows them drawn over the middle |
-| Heights **on the wall** (no suffix) or **up-firing** (`:upfiring`) | Rendered the same way: the library has one upper tier (ITU-R BS.2051) and keeps these two as labels `/status` carries. The sheet offers both and says so under the buttons |
+| Heights **high**: on the wall (no suffix, or `:height`) or up-firing (`:upfiring`) | Rendered the same way: the library has one upper tier (ITU-R BS.2051) and keeps these as labels `/status` carries. A test holds the renderings equal, which is why the sheet has **one** button for them, High (the owner's decision, 2026-10-26: "if it's the difference we can't make"). A layout the board was told as `:upfiring` or `:height` reads back as High and is "in use now" |
 | `:small` (a speaker that cannot reproduce the bottom octaves; its bass goes to the subwoofer) | **Not offered.** The name form has no spelling for it. A list can, but a 9-around list with every ring speaker marked is longer than the 95 characters the layout echo keeps (`OutputLayout::kTextBytes`), so it would not read back; a list is still taken by `PUT /layout` and the web page |
 | More than sixteen outputs (`9.2.6`, 17) | Not a layout whatever the board; shown refused with "9.2.6 would be 17 outputs, and a layout has at most 16." |
 
@@ -79,7 +80,7 @@ a control smaller than a fingertip or sticking out, two touch targets overlappin
 (counted only for the part of a target a finger can reach: a button scrolled out of its box behind the footer is
 under nothing), and **every touch target can be brought onto the glass by scrolling its box**. That check is new,
 because a button off the bottom of a sheet that cannot be scrolled to it passed the old ones. It is run for the
-worst case, nine around you, one subwoofer and six up-firing heights on the kit, at each size, and for the
+worst case, nine around you, one subwoofer and six heights in the ceiling on the kit, at each size, and for the
 seventeen-output refusal, the chip with no TDM clock, a board that carries four, and a speaker list in force.
 
 ## What is tested where
@@ -91,13 +92,14 @@ seventeen-output refusal, the chip with no TDM clock, a board that carries four,
 | `firmware/hearth-sink/preview/preview.cpp` | The sheet on the glass at five sizes (above), with the Preferences row, Apply, the question while a stream plays, Cancel |
 | `firmware/hearth-sink/preview/scripts/prefs-layout-*.screen` | The same flows as scripts the screen-script driver runs on the preview, and, in step with it, on a kit |
 
-## Open questions for the owner
+## Decided by the owner, 2026-10-26
 
-1. **Two ways in on one screen, as tabs.** On the kit both could be visible at once (the quick picks above the
-   buttons); the tabs were chosen because the same sheet then fits 240 by 240, and because the buttons already
-   show where a chip put them. If the owner would rather see both on the kit, it is a layout change in
-   `build_view()`.
-2. **Wall and up-firing play the same.** The sheet offers both because the grammar has both, and says so. If the
-   owner would rather have two buttons (wall or up-firing, and in the ceiling), it is the mount group.
-3. **Small speakers** (bass-managed) are a list-only feature today. A name spelling (`5.1.4:small`) would make them a
-   button, and needs the library's grammar to change; that is not a change to make for a sheet.
+1. **Two ways in on one screen, as tabs**, as built. (On the kit both could have been visible at once; the tabs are
+   what lets the same sheet fit 240 by 240.)
+2. **Wall and up-firing are one option, High**, because the board cannot tell them apart. The buttons are High and In
+   the ceiling, and the sheet's note is one line: "High is on the wall or up-firing; the ceiling is straight overhead."
+
+## Still open
+
+**Small speakers** (bass-managed) are a list-only feature today. A name spelling (`5.1.4:small`) would make them a
+button, and needs the library's grammar to change; that is not a change to make for a sheet.

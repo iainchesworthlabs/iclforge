@@ -148,9 +148,17 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
     for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
         for (const int lfe : {0, 1, 2}) {
             for (const int height : {0, 2, 4, 6}) {
+              // The same layouts with the heights in the ceiling (":top"): every height speaker is straight overhead.
+              for (const bool ceiling : {false, true}) {
+                if (ceiling && height == 0) {
+                    continue;
+                }
                 std::string name = std::to_string(front) + "." + std::to_string(lfe);
                 if (height != 0) {
                     name += "." + std::to_string(height);
+                }
+                if (ceiling) {
+                    name += ":top";
                 }
                 const auto layout = OutputLayout::parse(name);
                 if (!layout) {
@@ -171,6 +179,7 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
                         CHECK_FALSE(touches(nodes[a], nodes[b]));
                     }
                 }
+              }
             }
         }
     }
@@ -191,9 +200,16 @@ TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, ins
         for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
             for (const int lfe : {0, 1, 2}) {
                 for (const int height : {0, 2, 4, 6}) {
+                  for (const bool ceiling : {false, true}) {
+                    if (ceiling && height == 0) {
+                        continue;
+                    }
                     std::string name = std::to_string(front) + "." + std::to_string(lfe);
                     if (height != 0) {
                         name += "." + std::to_string(height);
+                    }
+                    if (ceiling) {
+                        name += ":top";
                     }
                     const auto layout = OutputLayout::parse(name);
                     if (!layout) {
@@ -214,11 +230,12 @@ TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, ins
                             CHECK_FALSE(touches(nodes[a], nodes[b]));
                         }
                     }
+                  }
                 }
             }
         }
     }
-    CHECK(checked >= 80);
+    CHECK(checked >= 160);
 }
 
 TEST_CASE("plan_nodes_fit: a bigger pane has bigger speakers, and an empty pane is an empty room", "[room_plan]") {
