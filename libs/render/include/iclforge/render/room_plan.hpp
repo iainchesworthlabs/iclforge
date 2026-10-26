@@ -199,6 +199,58 @@ namespace detail {
     return nodes;
 }
 
+// The room that plan_nodes() lays out at kPlanFitReference, scaled by the one factor that makes it fit `width` by
+// `height` and centred in it, so that a pane a quarter of the screen draws the same room as the whole screen does
+// (plan_nodes() keeps a margin of 170 and 62 pixels and sizes of 48 to 84, which are the screen's and leave a small
+// area nothing). Every node stays inside the area. The shapes shrink with the room; below about 30 pixels a node is too
+// small to carry its name, which is the caller's to leave off (PlanNode::w says).
+inline constexpr PlanArea kPlanFitReference{640, 560};
+
+[[nodiscard]] inline std::vector<PlanNode> plan_nodes_fit(std::span<const PlanSpot> spots, int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return std::vector<PlanNode>(spots.size());
+    }
+    // The low-frequency feeds go in a strip of their own under the room: in a room this narrow the rear surrounds of a
+    // 7.2 or 9.2 layout would otherwise sit where the two feeds are drawn.
+    std::vector<PlanSpot> ring(spots.begin(), spots.end());
+    int feeds = 0;
+    for (PlanSpot& spot : ring) {
+        if (spot.lfe && spot.connected) {
+            spot.connected = false;
+            ++feeds;
+        }
+    }
+    const int strip = feeds > 0 ? kPlanLfeHeight + 12 : 0;
+    std::vector<PlanNode> nodes = plan_nodes(ring, PlanArea{kPlanFitReference.width, kPlanFitReference.height - strip});
+    int placed = 0;
+    for (std::size_t i = 0; i < spots.size(); ++i) {
+        if (!(spots[i].lfe && spots[i].connected)) {
+            continue;
+        }
+        nodes[i].shape = PlanShape::kLfe;
+        nodes[i].w = kPlanLfeWidth;
+        nodes[i].h = kPlanLfeHeight;
+        nodes[i].x = kPlanFitReference.width / 2 +
+                     static_cast<int>(std::lround((placed - (feeds - 1) / 2.0) * 110.0));
+        nodes[i].y = kPlanFitReference.height - kPlanLfeHeight / 2 - 4;
+        ++placed;
+    }
+    const double scale = std::min(static_cast<double>(width) / kPlanFitReference.width,
+                                  static_cast<double>(height) / kPlanFitReference.height);
+    const double offset_x = (width - kPlanFitReference.width * scale) / 2.0;
+    const double offset_y = (height - kPlanFitReference.height * scale) / 2.0;
+    for (PlanNode& node : nodes) {
+        if (node.shape == PlanShape::kNone) {
+            continue;
+        }
+        node.w = std::max(2, static_cast<int>(std::lround(node.w * scale)));
+        node.h = std::max(2, static_cast<int>(std::lround(node.h * scale)));
+        node.x = std::clamp(static_cast<int>(std::lround(offset_x + node.x * scale)), node.w / 2, width - node.w / 2);
+        node.y = std::clamp(static_cast<int>(std::lround(offset_y + node.y * scale)), node.h / 2, height - node.h / 2);
+    }
+    return nodes;
+}
+
 // How an output's measured level shows: a glow in a few steps, not a fade. The board measures every
 // 100 ms; a screen that followed each window with a continuous fade redrew 1.7 Mpx a second in a 7.1.4 room
 // (nine times the lyric screen's fill), and a glow that jumps with every window is the thing a dim room least

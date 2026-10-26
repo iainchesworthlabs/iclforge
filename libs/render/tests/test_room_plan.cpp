@@ -177,6 +177,68 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
     CHECK(checked >= 20);
 }
 
+TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, inside it, with no two speakers on each other",
+          "[room_plan]") {
+    // The panes the layout sheet draws a room in: the kit's right-hand pane, a medium screen's strip, a 240-pixel
+    // screen's square.
+    struct Pane {
+        int width;
+        int height;
+    };
+    std::size_t checked = 0;
+    for (const Pane pane : {Pane{400, 360}, Pane{300, 200}, Pane{200, 120}, Pane{640, 560}}) {
+        for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
+            for (const int lfe : {0, 1, 2}) {
+                for (const int height : {0, 2, 4, 6}) {
+                    std::string name = std::to_string(front) + "." + std::to_string(lfe);
+                    if (height != 0) {
+                        name += "." + std::to_string(height);
+                    }
+                    const auto layout = OutputLayout::parse(name);
+                    if (!layout) {
+                        continue;
+                    }
+                    ++checked;
+                    const std::vector<PlanSpot> spots = iclforge::render::plan_spots(*layout);
+                    const std::vector<PlanNode> nodes = iclforge::render::plan_nodes_fit(spots, pane.width, pane.height);
+                    REQUIRE(nodes.size() == spots.size());
+                    for (std::size_t a = 0; a < nodes.size(); ++a) {
+                        INFO(name << " in " << pane.width << "x" << pane.height << " slot " << spots[a].name);
+                        CHECK(nodes[a].x - nodes[a].w / 2 >= 0);
+                        CHECK(nodes[a].x + nodes[a].w / 2 <= pane.width);
+                        CHECK(nodes[a].y - nodes[a].h / 2 >= 0);
+                        CHECK(nodes[a].y + nodes[a].h / 2 <= pane.height);
+                        for (std::size_t b = a + 1; b < nodes.size(); ++b) {
+                            INFO(name << ": " << spots[a].name << " and " << spots[b].name);
+                            CHECK_FALSE(touches(nodes[a], nodes[b]));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    CHECK(checked >= 80);
+}
+
+TEST_CASE("plan_nodes_fit: the room keeps its shape at any size, and an empty pane is an empty room", "[room_plan]") {
+    const auto layout = OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    const std::vector<PlanSpot> spots = iclforge::render::plan_spots(*layout);
+    const std::vector<PlanNode> big = iclforge::render::plan_nodes_fit(spots, 640, 560);
+    const std::vector<PlanNode> small = iclforge::render::plan_nodes_fit(spots, 320, 280);
+    REQUIRE(big.size() == small.size());
+    for (std::size_t i = 0; i < big.size(); ++i) {
+        INFO(spots[i].name);
+        // Half the size: half the place and half the speaker, give or take a rounded pixel.
+        CHECK(std::abs(small[i].x * 2 - big[i].x) <= 2);
+        CHECK(std::abs(small[i].y * 2 - big[i].y) <= 2);
+        CHECK(std::abs(small[i].w * 2 - big[i].w) <= 2);
+    }
+    for (const PlanNode& node : iclforge::render::plan_nodes_fit(spots, 0, 100)) {
+        CHECK(node.shape == PlanShape::kNone);
+    }
+}
+
 TEST_CASE("plan_nodes: slots placed at the same angle are drawn apart, not on each other", "[room_plan]") {
     // A speaker list may put two slots on one spot (a spare, or two small speakers in a corner).
     const Planned stacked = planned("30/0,30/0,-30/0,0/0,0/45");
