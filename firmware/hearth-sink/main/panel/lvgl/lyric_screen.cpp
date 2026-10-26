@@ -1631,7 +1631,7 @@ bool screen_update() {
             now_update_clock(g.wall);
         } else if (g.np_meters) {
             // The meters stop and stop asking the player for its output while the screen is dimmed.
-            now_update_meters(now_us, g.dimmed);
+            g.filling = now_update_meters(now_us, g.dimmed);
         } else if (g.np_active && !g.np_card && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }

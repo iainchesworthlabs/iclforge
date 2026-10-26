@@ -43,7 +43,9 @@ constexpr std::uint32_t kTrough = 0x201D1C;
 constexpr std::uint32_t kTickColour = 0xECE7E5;
 // The stage's own colour, for the lines of the scale that cross the bars.
 constexpr std::uint32_t kStageBg = 0x151313;
-constexpr std::uint64_t kStepUs = 50'000;  // twenty updates a second
+constexpr std::int64_t kStepUs = 50'000;  // twenty updates a second
+// A frame that comes this much before an update is due is that update's: the loop's own beat jitters by a tick or two.
+constexpr std::int64_t kEarlyUs = 8'000;
 
 lv_color_t color(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
@@ -260,6 +262,7 @@ struct State {
     std::array<float, dsp::kBands> averaged{};
     bool have_spectrum = false;
     std::uint64_t last_us = 0;
+    std::int64_t due_us = 0;  // when the next update is due (0: the next frame's)
 };
 
 State g;
@@ -323,7 +326,7 @@ Block build_spectrum(lv_obj_t* parent, const Dim& d, std::string_view layout, st
         if (db > static_cast<int>(mv::kFloorDb)) {
             rect(parent, left_x, std::min(ly, g.sy + g.sh - 1), plot_w, 1, kStageBg, 120);
         }
-        std::array<char, 8> text{};
+        std::array<char, 12> text{};
         std::snprintf(text.data(), text.size(), "%d", db);
         label(parent, text.data(), d.f_small, 0x8B8583, left_x - d.scale_w - 2, ly - d.f_small / 2 - 2, d.scale_w, Align::kRight);
     }
@@ -608,20 +611,26 @@ void update_channels(const mv::FastLevels& fast, float seconds) {
 
 }  // namespace
 
-void now_update_meters(std::uint64_t now_us, bool dimmed) {
+bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     if (!g.built) {
-        return;
+        return false;
     }
     mv::MeterTap& tap = meters_tap();
     // While dimmed the player is not asked for its output, and nothing is drawn.
     tap.set_wanted(!dimmed);
     if (dimmed) {
         g.last_us = 0;
-        return;
+        g.due_us = 0;
+        return false;
     }
-    if (g.last_us != 0 && now_us - g.last_us < kStepUs) {
-        return;
+    // The step keeps its own beat rather than the frames': a loop of 30 frames a second serves a 50 ms step at 67 ms, 33 ms, 67 ms ... and
+    // twenty a second is what comes of it; counting 50 ms from the last update would give fifteen.
+    const auto now = static_cast<std::int64_t>(now_us);
+    if (g.due_us != 0 && now + kEarlyUs < g.due_us) {
+        return true;
     }
+    const std::int64_t missed = g.due_us == 0 ? 0 : std::max<std::int64_t>(now - g.due_us, 0) / kStepUs;
+    g.due_us = g.due_us == 0 ? now + kStepUs : g.due_us + kStepUs * (1 + missed);
     const float seconds = g.last_us == 0 ? 0.05F : std::clamp(static_cast<float>(now_us - g.last_us) / 1.0e6F, 0.02F, 0.25F);
     g.last_us = now_us;
     if (tap.read_history(g.heavy->history)) {
@@ -633,6 +642,7 @@ void now_update_meters(std::uint64_t now_us, bool dimmed) {
         update_spectrum(seconds);
     }
     update_channels(tap.fast_levels(), seconds);
+    return true;
 }
 
 }  // namespace player::panel

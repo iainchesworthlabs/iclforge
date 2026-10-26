@@ -21,8 +21,10 @@ namespace player::panel {
 bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying& now, const NowStyle& style);
 
 // Brings the view up to date: at most twenty times a second, whatever the frame rate, and only a bar or a tick whose pixel moved is redrawn.
-// `dimmed`: the screen is dimmed, so nothing is drawn and the player is not asked for its output. Cheap to call every frame.
-void now_update_meters(std::uint64_t now_us, bool dimmed);
+// `dimmed`: the screen is dimmed, so nothing is drawn and the player is not asked for its output. Cheap to call every frame. True while the
+// view wants the panel's loop at its frame rate (it is showing and not dimmed) and not at its resting beat of ten a second, which would
+// cap the view at ten updates a second.
+bool now_update_meters(std::uint64_t now_us, bool dimmed);
 
 // The stage was cleared (now_forget() calls this): the objects are gone, the player is no longer asked for its output, and what was
 // kept for the analysis is given back.
