@@ -24,6 +24,7 @@
 #include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
+#include "iclforge/meters_view.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/preferences.hpp"
 #include "iclforge/render/layout.hpp"
@@ -36,6 +37,7 @@
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/layout_sheet.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
+#include "panel/lvgl/meters_screen.hpp"
 #include "panel/lvgl/now_screen.hpp"
 #include "panel/lvgl/prefs_editors.hpp"
 #include "panel/lvgl/prefs_pages.hpp"
@@ -2050,6 +2052,94 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
     return failures;
 }
 
+// The Meters view at a display size, in each room the product has (planning/p4x-meters-view.md): the representation the rule gives for
+// the width and the room's outputs, twenty updates a second, no fall to ten, and the pixels LVGL flushes a second, which is what keeps
+// the invalid-area table at 256 honest: with LVGL's 32 every spectrum update redraws the whole glass (11 to 12 million pixels a second
+// at 1024 by 600), and a change that lost the 256 would show here as a number several times the bound. One picture a room.
+int check_meters(int width, int height, const fs::path& out, lv_display_t*& disp) {
+    namespace nv = iclforge::nowview;
+    namespace mv = iclforge::meters;
+    const std::string size = std::to_string(width) + "x" + std::to_string(height);
+    std::printf("-- meters %s\n", size.c_str());
+    disp = open_display(width, height, disp);
+    if (!player::panel::screen_init(disp, width, height)) {
+        std::puts("  FAIL the screen did not come up");
+        return 1;
+    }
+    int failures = 0;
+    const auto expect = [&](bool ok, const std::string& what) {
+        if (!ok) {
+            std::printf("  FAIL %s: %s\n", size.c_str(), what.c_str());
+            ++failures;
+        }
+    };
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    set_up_system_fixture();
+    g_settings = {nv::View::kMeters, 5};
+    g_board = {};
+    g_board.name = "hearth-4f2a91";
+    g_board.address = "192.168.1.50";
+    g_board.network = "HomeNet";
+    g_board.firmware = "0.11.0";
+    g_board.player = true;
+    g_board.stream = "bursts";
+    // The most the view may flush a second: 4.5 screens' worth. The view flushes 2 to 3.6 screens' worth a second at every size (1.3 to 1.8
+    // million pixels at 1024 by 600, 0.8 to 1.2 at 800 by 480, 0.45 to 0.54 at 480 by 320, 0.16 to 0.19 at 240 by 240); a table of invalid
+    // rectangles that is too small flushes 19 (LVGL's 32 at 1024 by 600) and 5 to 7 (128).
+    const double bound_mpx = 4.5 * static_cast<double>(width) * static_cast<double>(height) / 1.0e6;
+
+    struct Room {
+        const char* layout;
+        nv::StreamFacts facts;
+        const std::vector<Level>* levels;
+        int kbps;
+        int outputs;  // connected, not the LFE alone: what representation_for() is given
+    };
+    const Room rooms[] = {
+        {"2.0", {.codec = nv::Codec::kPcm}, &kStereo, 0, 2},
+        {"5.1", kDolbyFiveOne, &kFiveOne, 640, 6},
+        {"7.1.4", {.codec = nv::Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true, .objects = 15}, &kSevenOneFour, 768, 12},
+        {"9.1.6", kDolbyFiveOne, &kNineOneSix, 640, 16},
+    };
+    for (const Room& room : rooms) {
+        const std::string what = std::string(room.layout) + " at " + size;
+        play_room(room.layout, room.facts, *room.levels, room.kbps);
+        if (room.facts.codec == nv::Codec::kPcm) {
+            say_no_title();
+        }
+        g_now_us += 3'000'000;
+        pump(6);
+        const std::uint64_t before = g_flushed_pixels;
+        const std::int64_t began = g_now_us;
+        pump(150);  // five seconds of 33 ms frames
+        const double seconds = static_cast<double>(g_now_us - began) / 1.0e6;
+        const double mpx = static_cast<double>(g_flushed_pixels - before) / seconds / 1.0e6;
+        const iclforge::panelstats::MetersStats stats = player::panel::now_meters_stats();
+        expect(std::string(player::panel::screen_stats().name) == "nolyrics", what + ": the no-lyrics screen shows");
+        expect(stats.showing, what + ": the Meters view is up");
+        expect(stats.outputs == room.outputs, what + ": it meters " + std::to_string(room.outputs) + " outputs, not " + std::to_string(stats.outputs));
+        const mv::Representation want = mv::representation_for(width, room.outputs);
+        expect(stats.representation == want, what + ": the representation is " + std::string(iclforge::panelstats::representation_name(want)) +
+                                                  ", not " + std::string(iclforge::panelstats::representation_name(stats.representation)));
+        expect(stats.rate_hz == 20 && stats.governor.falls == 0, what + ": it holds twenty updates a second");
+        expect(stats.governor.updates >= 100 && stats.governor.updates <= 140, what + ": about twenty updates a second (" + std::to_string(stats.governor.updates) + " in all)");
+        expect(stats.governor.dropped == 0, what + ": no step went by with no update");
+        expect(mpx <= bound_mpx, what + ": LVGL flushes " + std::to_string(mpx) + " Mpx/s, over the bound of " + std::to_string(bound_mpx));
+        std::printf("  %-6s %-5s %6.2f Mpx/s  %llu updates, rate %d Hz, mean update %.0f us\n", room.layout,
+                    std::string(iclforge::panelstats::representation_name(stats.representation)).c_str(), mpx,
+                    static_cast<unsigned long long>(stats.governor.updates), stats.rate_hz,
+                    stats.analysis.mean_us() + stats.widgets.mean_us());
+        write_bmp(out / (std::string("meters-") + room.layout + "-" + size + ".bmp"));
+    }
+    // A screen that dims stops the meters and stops asking the player for its output.
+    g_now_us += 3600LL * 1'000'000;
+    pump(6);
+    expect(!player::panel::meters_tap().wanted(), size + ": a dimmed screen does not ask the player for its output");
+    return failures;
+}
+
 int check_sheets(int width, int height, const fs::path& out, const std::string& lrc, lv_display_t*& disp) {
     namespace nv = iclforge::nowview;
     const std::string size = std::to_string(width) + "x" + std::to_string(height);
@@ -3446,6 +3536,11 @@ int main(int argc, char** argv) {
     for (const auto& [width, height] :
          {std::pair{1024, 600}, std::pair{800, 480}, std::pair{480, 320}, std::pair{320, 240}, std::pair{240, 240}}) {
         failures += check_sheets(width, height, out, auld, disp);
+    }
+    // The Meters view, at the sizes it is offered at (a screen under 240 by 240 does not have it).
+    std::puts("The Meters view at each display size:");
+    for (const auto& [width, height] : {std::pair{1024, 600}, std::pair{800, 480}, std::pair{480, 320}, std::pair{320, 240}, std::pair{240, 240}}) {
+        failures += check_meters(width, height, out, disp);
     }
     if (failures != 0) {
         std::printf("%d failures\n", failures);

@@ -45,6 +45,13 @@ See [README.md](README.md) for the project overview and
   analysis's transform now works in buffers the analyzer owns, not 8 KB of the panel task's stack (held bit for bit to the library's by test).
   `tools/hearth/panel_measure.py` runs the protocol of `planning/p4x-meters-view.md` on a booked board unattended (rows, schedule, criteria, report) and
   compares the speakers view with the image before it. **Nothing here has run on a board.**
+- **Added: the Meters view's pictures and its checks at every size and room (5 of 5).** The panel preview draws the view in a 2.0, 5.1, 7.1.4 and 9.1.6 room at
+  1024 by 600, 800 by 480, 480 by 320, 320 by 240 and 240 by 240, and holds it to the plan: the representation the width and the outputs ask for, twenty updates
+  a second with no fall to ten, and no more than 4.5 screens' worth of pixels flushed a second (2 to 3.6 measured; the 19 of LVGL's default invalid-area table fails
+  it, so losing the 256 fails the preview and not a board). Six of the pictures are in `docs/hearth/sink-esp32-p4.md`. **The protocol of 4 of 5 has run on the kit once**
+  (`planning/p4x-meters-view.md`, "Kit results"): the stream is whole in every row and the Meters view costs the decode task 0.4 to 0.8 ms a burst, but on music an
+  update takes 130 to 440 ms (the step is 50), so the view falls to 10 updates a second and still does not keep up; the spectrum and the bars need to be drawn
+  as a few objects, not 100 to 200 small invalid areas.
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
