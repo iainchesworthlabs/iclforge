@@ -147,6 +147,10 @@
     "4ed3e7a60": {
       "commit": "4ed3e7a6073359e9122239dcedcfc32087839b81",
       "what": "the tree panel_preview was built from: main merged into the speakers style branch with the display and time rows, so the Preferences sheet lists Speakers style after Dim after, then Brightness, the clock, the night schedule, the time zone and the Speaker layout, 2026-10-25"
+    },
+    "1a73f31bb": {
+      "commit": "1a73f31bbc600a7010608ff48c57ce1753b78e23",
+      "what": "the tree panel_preview was built from: the Speaker layout sheet (quick picks, build yours, the room beside the buttons, a footer that stays on the glass), 2026-10-26"
     }
   },
   "pictures": [
@@ -667,22 +671,34 @@
       "build": "f3fe720e2"
     },
     {
-      "path": "docs/hearth/screenshots/p4-panel-prefs-layout-s3.png",
+      "path": "docs/hearth/screenshots/p4-panel-layout-quick-kit.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
-      "by_hand": "The preview tool's Speaker layout scenario (check_sheets in preview.cpp): an ESP32-S3 board with a touch panel, whose sink carries four 32-bit slots on one line, opens Preferences and the list is scrolled to 5.1. It writes prefs-layout-s3-1024x600.bmp, converted to PNG. Built as the other panel pictures are (see p4-panel-stream-pcm.png).",
-      "build": "4ed3e7a60"
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The kit (sixteen 32-bit slots, a chip that clocks them) with 7.1.4 in force opens Preferences, Speaker layout, Change: Quick picks. It writes layout-quick-kit-1024x600.bmp.",
+      "build": "1a73f31bb"
     },
     {
-      "path": "docs/hearth/screenshots/p4-panel-prefs-layout-s3-small.png",
+      "path": "docs/hearth/screenshots/p4-panel-layout-build-kit.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
-      "by_hand": "The same scenario at 480 by 320: prefs-layout-s3-480x320.bmp, converted to PNG.",
-      "build": "4ed3e7a60"
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The same kit, Build yours at the widest the grammar has: nine around you, one subwoofer, six up-firing heights. It writes layout-worst-kit-1024x600.bmp.",
+      "build": "1a73f31bb"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-layout-unavailable-s3.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. An ESP32-S3 board whose sink carries four 32-bit slots on one line, with 2.0 in force: a touch on the greyed 5.1. It writes layout-unavailable-s3-1024x600.bmp.",
+      "build": "1a73f31bb"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-layout-small.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The kit's worst case (9.1.6 up-firing) on a 480 by 320 display. It writes layout-worst-kit-480x320.bmp.",
+      "build": "1a73f31bb"
     },
     {
       "path": "docs/hearth/screenshots/p4-panel-prefs-layout-confirm.png",
       "program": "panel_preview (firmware/hearth-sink/preview)",
-      "by_hand": "The same board with a 5.1 stream playing: a tap on 1.0 asks first. prefs-layout-confirm-1024x600.bmp, converted to PNG.",
-      "build": "4ed3e7a60"
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): the preview tool's Speaker layout scenarios (check_layout_sheet in preview.cpp) write one 24-bit BMP a step, converted to PNG. The S3 board of the picture above with a 5.1 stream playing: Apply on 1.0 asks first. It writes layout-confirm-1024x600.bmp.",
+      "build": "1a73f31bb"
     },
     {
       "path": "docs/karaoke/screenshots/hearth-karaoke-page.png",
