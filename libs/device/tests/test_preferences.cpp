@@ -789,20 +789,22 @@ TEST_CASE("the listing carries the new entries with their routes, kinds and valu
 
 // --- Sound: the identify tone and the per-speaker trim ---------------------------------------------------------------
 
-TEST_CASE("Identify speakers is a button that says Stop while its tone plays", "[preferences][sound]") {
+TEST_CASE("Identify speakers is a button that starts the tone through every speaker, and the listing says when it plays",
+          "[preferences][sound]") {
     FakeBackend backend(iclforge::variants::p4_rev3_kit());
     const prefs::Pref& identify = *prefs::find("identify-speakers");
     REQUIRE(identify.kind == prefs::Kind::kAction);
     REQUIRE(identify.group == prefs::Group::kSound);
     REQUIRE(std::string(identify.route) == "/identify");
+    // The sheet it opens has Stop; the button on the list is the one that says what it does.
+    REQUIRE(std::string(identify.button) == "Identify");
 
     const prefs::Entry rest = prefs::resolve(identify, backend, backend.caps());
     REQUIRE(rest.availability.available);
     REQUIRE(rest.value == "run");
-    REQUIRE(rest.value_label == "Play each");
     REQUIRE(rest.inert.empty());
 
-    // A press starts the tone through the board, once.
+    // A press starts the tone through the board.
     const prefs::SetResult started = prefs::set_value(backend, identify, "run");
     REQUIRE(started.ok);
     REQUIRE(backend.identifying_);
@@ -811,11 +813,10 @@ TEST_CASE("Identify speakers is a button that says Stop while its tone plays", "
     REQUIRE(playing.value == "running");
     REQUIRE(playing.value_label == "Stop");
 
-    // The same button, pressed while it plays, stops it, and does not start a second.
+    // Pressed again while it plays, it starts over (the list's button never stops anything; the sheet's Stop does).
     REQUIRE(prefs::set_value(backend, identify, "run").ok);
-    REQUIRE_FALSE(backend.identifying_);
-    REQUIRE(backend.tones_started == 1);
-    REQUIRE(prefs::resolve(identify, backend, backend.caps()).value_label == "Play each");
+    REQUIRE(backend.identifying_);
+    REQUIRE(backend.tones_started == 2);
 }
 
 TEST_CASE("Identify speakers says why it cannot play now, and the board's refusal is reported", "[preferences][sound]") {
@@ -829,13 +830,11 @@ TEST_CASE("Identify speakers says why it cannot play now, and the board's refusa
     REQUIRE_FALSE(refused.ok);
     REQUIRE_FALSE(backend.identifying_);
 
-    // Once it plays the Stop button is never held back, whatever else has come to hold the sink.
+    // A tone that is on is not blocked by what came after it (the board ended it): the row says nothing of it.
     backend.blocked_.clear();
     REQUIRE(prefs::set_value(backend, identify, "run").ok);
     backend.blocked_ = "A song is playing: the test tone waits until it stops.";
     REQUIRE(prefs::resolve(identify, backend, backend.caps()).inert.empty());
-    REQUIRE(prefs::set_value(backend, identify, "run").ok);
-    REQUIRE_FALSE(backend.identifying_);
 }
 
 TEST_CASE("the speaker trim is a sheet whose row says what is set, and its text goes to the board whole",

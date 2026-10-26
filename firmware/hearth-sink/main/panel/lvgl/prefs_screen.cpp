@@ -365,10 +365,6 @@ void paint_row(Row& row, const prefs::Entry& entry) {
     if (row.action != nullptr) {
         // Greyed by the board (it cannot) or by the moment (an update is under way): the reason is under the row.
         style_button(row.action, false, on && entry.inert.empty());
-        // An action whose choices say its state (Play each, Stop) shows the one it is in.
-        if (entry.pref->kind == prefs::Kind::kAction && !entry.choices.empty() && !entry.value_label.empty()) {
-            lv_label_set_text(lv_obj_get_child(row.action, 0), entry.value_label.c_str());
-        }
     }
     const std::string details = details_of(entry);
     if (row.details != nullptr) {
@@ -766,6 +762,13 @@ void on_target(lv_event_t* event) {
             break;
         }
         case Op::kRun:
+            // An action the Speakers sheet serves (Identify speakers) is run, and the sheet that shows which speaker it is
+            // on opens over the list, whether or not the board said yes: the sheet says why not.
+            if (sound_sheet_serves(*entry.pref) && entry.availability.available) {
+                apply_value(row, "run");
+                sound_sheet_open();
+                return;
+            }
             // An action that asks first is run from the page that asks; one the moment forbids says why under its row.
             if (entry.pref->confirm_step != nullptr && entry.availability.available) {
                 if (entry.inert.empty()) {

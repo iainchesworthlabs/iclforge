@@ -768,9 +768,10 @@ inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
     return backend.identify_running() ? "running" : "run";
 }
 
-// Pressed while it plays, the button is Stop: the board is told what the person sees.
+// Pressed, the button starts the tone through every speaker in turn (again, if it is on): the screen opens the Speakers
+// sheet beside it, where the speaker the tone is on is lit and Stop is a button of the sheet's.
 [[nodiscard]] inline bool set_identify(Backend& backend, std::string_view /*word*/) {
-    return backend.identify_each(!backend.identify_running());
+    return backend.identify_each(true);
 }
 
 [[nodiscard]] inline std::string identify_inert(const Backend& backend) {
@@ -967,7 +968,7 @@ inline constexpr std::array<Pref, 21> kRegistry{{
     {.id = "identify-speakers",
      .group = Group::kSound,
      .label = "Identify speakers",
-     .note = "Plays a quiet test tone through each speaker in turn, so that you can hear which is which.",
+     .note = "Plays a quiet test tone through each speaker in turn, and lights the one you should hear.",
      .kind = Kind::kAction,
      .apply = Apply::kLive,
      .route = "/identify",
@@ -977,7 +978,8 @@ inline constexpr std::array<Pref, 21> kRegistry{{
      .inert = &detail::identify_inert,
      .get = &detail::get_identify,
      .set = &detail::set_identify,
-     .on_reset = OnReset::kKeep},
+     .on_reset = OnReset::kKeep,
+     .button = "Identify"},
     {.id = "speaker-trim",
      .group = Group::kSound,
      .label = "Speaker levels and distances",
