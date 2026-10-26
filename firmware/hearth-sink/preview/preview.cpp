@@ -34,6 +34,7 @@
 #include "panel/lvgl/board_info.hpp"
 #include "panel/lvgl/dev_info.hpp"
 #include "panel/lvgl/fonts.hpp"
+#include "panel/lvgl/layout_sheet.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
 #include "panel/lvgl/now_screen.hpp"
 #include "panel/lvgl/prefs_editors.hpp"
@@ -320,12 +321,38 @@ bool shows_text(lv_obj_t* object, const std::string& text, bool contains = false
     return false;
 }
 
+// Scrolls every scrolling box that holds `object` until the object is inside it. LVGL's own scroll_to_view_recursive brings
+// each container into view of the one above it, which is not the object when a container is taller than the box that
+// scrolls it (a page of buttons under a sheet's tabs).
+void show_in_scroller(lv_obj_t* object) {
+    lv_obj_update_layout(object);
+    for (lv_obj_t* box = lv_obj_get_parent(object); box != nullptr; box = lv_obj_get_parent(box)) {
+        if (!lv_obj_has_flag(box, LV_OBJ_FLAG_SCROLLABLE)) {
+            continue;
+        }
+        lv_area_t at;
+        lv_area_t in;
+        lv_obj_get_coords(object, &at);
+        lv_obj_get_coords(box, &in);
+        int dy = 0;
+        if (at.y2 > in.y2) {
+            dy = -(at.y2 - in.y2 + 4);
+        } else if (at.y1 < in.y1) {
+            dy = in.y1 - at.y1 + 4;
+        }
+        if (dy != 0) {
+            lv_obj_scroll_by(box, 0, dy, LV_ANIM_OFF);
+            lv_obj_update_layout(box);
+        }
+    }
+}
+
 // A tap on the middle of a button, scrolled into view first if it is on a list.
 bool tap_object(lv_obj_t* button) {
     if (button == nullptr) {
         return false;
     }
-    lv_obj_scroll_to_view_recursive(button, LV_ANIM_OFF);
+    show_in_scroller(button);
     lv_obj_update_layout(button);
     lv_area_t area;
     lv_obj_get_coords(button, &area);
@@ -530,14 +557,33 @@ int audit(lv_obj_t* root, const std::string& what) {
     };
     walk(walk, root, false);
     int smallest = 1 << 20;
+    // What of a target a finger can reach: the part of it inside every box that scrolls it. A target scrolled out of
+    // its box (behind a fixed footer, in the coordinates) is not under anything.
+    const auto reachable_part = [](lv_obj_t* object) {
+        Rect r = rect_of(object);
+        for (lv_obj_t* box = lv_obj_get_parent(object); box != nullptr; box = lv_obj_get_parent(box)) {
+            if (lv_obj_has_flag(box, LV_OBJ_FLAG_SCROLLABLE)) {
+                const Rect in = rect_of(box);
+                r = {std::max(r.x1, in.x1), std::max(r.y1, in.y1), std::min(r.x2, in.x2), std::min(r.y2, in.y2)};
+            }
+        }
+        return r;
+    };
     for (std::size_t i = 0; i < targets.size(); ++i) {
-        const Rect a = rect_of(targets[i]);
-        smallest = std::min({smallest, a.x2 - a.x1 + 1, a.y2 - a.y1 + 1});
+        const Rect whole = rect_of(targets[i]);
+        smallest = std::min({smallest, whole.x2 - whole.x1 + 1, whole.y2 - whole.y1 + 1});
+        const Rect a = reachable_part(targets[i]);
+        if (a.x1 > a.x2 || a.y1 > a.y2) {
+            continue;
+        }
         for (std::size_t j = i + 1; j < targets.size(); ++j) {
             if (holders[i] != holders[j]) {
                 continue;
             }
-            const Rect b = rect_of(targets[j]);
+            const Rect b = reachable_part(targets[j]);
+            if (b.x1 > b.x2 || b.y1 > b.y2) {
+                continue;
+            }
             // The space between them along each axis, negative where they overlap on it.
             const int dx = std::max(a.x1, b.x1) - std::min(a.x2, b.x2) - 1;
             const int dy = std::max(a.y1, b.y1) - std::min(a.y2, b.y2) - 1;
@@ -1287,7 +1333,7 @@ bool tap_in(lv_obj_t* root, const std::string& text, std::size_t nth = 0) {
         std::printf("  no button \"%s\" (%zu) is shown\n", text.c_str(), nth);
         return false;
     }
-    lv_obj_scroll_to_view_recursive(found[nth], LV_ANIM_OFF);
+    show_in_scroller(found[nth]);
     lv_obj_update_layout(found[nth]);
     lv_area_t area;
     lv_obj_get_coords(found[nth], &area);
@@ -1650,6 +1696,360 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
 // The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
 // board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
 // taps the way a person does. Returns the number of failures, having said each.
+// Every touch target under `root` can be brought onto the glass: scrolled to, it is on the screen and inside every box
+// that scrolls it. audit() holds the fixed controls to the screen; this holds the ones that scroll, so that a button off the
+// bottom of a sheet that cannot be scrolled to it is a failure and not a surprise.
+void scroll_all_to_top(lv_obj_t* object) {
+    if (lv_obj_has_flag(object, LV_OBJ_FLAG_SCROLLABLE)) {
+        lv_obj_scroll_to(object, 0, 0, LV_ANIM_OFF);
+    }
+    const std::uint32_t count = lv_obj_get_child_count(object);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        scroll_all_to_top(lv_obj_get_child(object, static_cast<std::int32_t>(i)));
+    }
+}
+
+int reachable(lv_obj_t* root, const std::string& what) {
+    if (root == nullptr) {
+        std::printf("  FAIL %s: there is no sheet to look at\n", what.c_str());
+        return 1;
+    }
+    lv_obj_update_layout(root);
+    std::vector<lv_obj_t*> targets;
+    collect_touch_targets(root, targets);
+    int failures = 0;
+    for (lv_obj_t* const target : targets) {
+        show_in_scroller(target);
+        lv_obj_update_layout(root);
+        lv_area_t at;
+        lv_obj_get_coords(target, &at);
+        bool ok = at.x1 >= 0 && at.y1 >= 0 && at.x2 < g_width && at.y2 < g_height;
+        for (lv_obj_t* parent = lv_obj_get_parent(target); parent != nullptr && ok; parent = lv_obj_get_parent(parent)) {
+            if (!lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE)) {
+                continue;
+            }
+            lv_area_t box;
+            lv_obj_get_coords(parent, &box);
+            ok = at.x1 >= box.x1 && at.x2 <= box.x2 && at.y1 >= box.y1 && at.y2 <= box.y2;
+        }
+        if (!ok) {
+            std::string boxes;
+            for (lv_obj_t* parent = lv_obj_get_parent(target); parent != nullptr; parent = lv_obj_get_parent(parent)) {
+                if (lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE)) {
+                    lv_area_t box;
+                    lv_obj_get_coords(parent, &box);
+                    boxes += " in (" + std::to_string(box.x1) + "," + std::to_string(box.y1) + ")-(" +
+                             std::to_string(box.x2) + "," + std::to_string(box.y2) + ") scrolled " +
+                             std::to_string(lv_obj_get_scroll_y(parent)) + ", " +
+                             std::to_string(lv_obj_get_scroll_bottom(parent)) + " more below";
+                }
+            }
+            std::printf("  FAIL %s: \"%s\" cannot be brought onto the glass (%d,%d)-(%d,%d)%s\n", what.c_str(),
+                        button_text(target).c_str(), at.x1, at.y1, at.x2, at.y2, boxes.c_str());
+            ++failures;
+        }
+    }
+    scroll_all_to_top(root);
+    lv_obj_update_layout(root);
+    std::printf("  %-26s %2zu touch targets, every one can be brought onto the glass: %s\n", what.c_str(), targets.size(),
+                failures == 0 ? "yes" : "NO");
+    return failures;
+}
+
+// The Speaker layout sheet (layout_sheet.cpp): the Preferences row that opens it, the quick picks, the buttons that build a
+// layout, what a board that cannot carry them says, the question while a stream plays, and the worst case - nine around you,
+// one subwoofer and six heights, in the ceiling, on the kit - held to the glass at every size.
+int check_layout_sheet(int width, int height, const fs::path& out, const std::string& lrc) {
+    namespace nv = iclforge::nowview;
+    const std::string size = std::to_string(width) + "x" + std::to_string(height);
+    int failures = 0;
+    const auto expect = [&](bool ok, const std::string& what) {
+        if (!ok) {
+            std::printf("  FAIL %s: %s\n", size.c_str(), what.c_str());
+            ++failures;
+        }
+    };
+    const auto open_sheet = [&](lv_obj_t* prefs) -> lv_obj_t* {
+        if (!tap_object(find_row_button(prefs, "Speaker layout", "Change"))) {
+            expect(false, "the Speaker layout row has a Change button");
+            return nullptr;
+        }
+        pump(8);
+        lv_obj_t* const sheet = player::panel::layout_sheet_root();
+        expect(sheet != nullptr, "Change opens the Speaker layout sheet");
+        return sheet;
+    };
+    // Scrolled to the top, as a person finds it when the sheet opens (a tap on a button scrolled to it before).
+    const auto settle = [&](lv_obj_t* root) {
+        scroll_all_to_top(root);
+        lv_obj_update_layout(root);
+        pump(2);
+    };
+    const auto close_prefs = [&] {
+        g_now_playing = false;
+        g_settings = {nv::View::kSpeakers, 5};
+        hold(lrc, 5'750);
+        pump(6);
+        tap_button("Close");
+        pump(6);
+    };
+
+    // A board that can carry only some of the layouts (an ESP32-S3, four 32-bit slots on one line).
+    g_caps = iclforge::variants::s3_spi_320x240();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "2.0";
+    g_settings = {nv::View::kSpeakers, 5};
+    g_now_playing = false;
+    expect(tap_button("Preferences"), "the footer has a Preferences button on an S3");
+    pump(8);
+    lv_obj_t* const prefs = player::panel::prefs_root();
+    expect(prefs != nullptr, "Preferences opens on an S3");
+    if (prefs == nullptr) {
+        return failures;
+    }
+    failures += audit(prefs, "preferences, speaker layout row " + size);
+    expect(shows_text(prefs, "Speaker layout"), "the Sound group has the speaker layout");
+    expect(shows_text(prefs, "Two around you.", true), "and says in words what is in use");
+    lv_obj_t* sheet = open_sheet(prefs);
+    if (sheet == nullptr) {
+        return failures;
+    }
+    settle(sheet);
+    write_bmp(out / ("layout-quick-s3-" + size + ".bmp"));
+    failures += audit(sheet, "speaker layout, quick picks, S3 " + size);
+    failures += reachable(sheet, "speaker layout, quick picks, S3 " + size);
+    for (const char* shown : {"Speaker layout", "Quick picks", "Build yours", "Around you", "With heights"}) {
+        expect(shows_text(sheet, shown), std::string("the sheet shows ") + shown);
+    }
+    expect(shows_text(sheet, "This board carries up to 4 speakers (32-bit slots, one line); 16-bit slots would carry 8.", true),
+           "the sheet says what the board carries and what would carry more");
+    for (const char* chip : {"1.0", "2.0", "2.1", "3.1", "5.1", "7.1", "9.1", "5.1.2", "7.1.4", "9.1.4", "9.1.6"}) {
+        expect(!buttons_in(sheet, chip).empty(), std::string("the quick picks have ") + chip);
+    }
+    expect(!buttons_in(sheet, "Apply").empty() && !buttons_in(sheet, "Cancel").empty(), "Apply and Cancel are always there");
+
+    // A layout the board cannot carry is greyed: a tap says why and changes nothing.
+    expect(tap_in(sheet, "5.1"), "5.1 can be touched");
+    pump(6);
+    expect(g_layout == "2.0", "a tap on a layout the board cannot carry changes nothing");
+    expect(shows_text(sheet, "Not available on this board"), "and the card says so");
+    expect(shows_text(sheet, "5.1 needs 6 slots; this board's output carries 4 (32-bit slots, one line).", true),
+           "with what it needs and what the board has");
+    expect(shows_text(sheet, "16-bit slots would carry 8", true), "and what would help");
+    settle(sheet);
+    write_bmp(out / ("layout-unavailable-s3-" + size + ".bmp"));
+    failures += audit(sheet, "speaker layout, a greyed layout, S3 " + size);
+    expect(tap_in(sheet, "Apply"), "Apply can be touched");
+    pump(6);
+    expect(g_layout == "2.0", "and applies nothing while the working layout is the one in use");
+
+    // One the board carries with a limit is taken.
+    expect(tap_in(sheet, "2.1"), "2.1 can be touched");
+    pump(6);
+    expect(shows_text(sheet, "Works, with a limit"), "a layout nobody has measured on this board says it has a limit");
+    expect(shows_text(sheet, "Not verified", true), "and says what");
+    settle(sheet);
+    write_bmp(out / ("layout-limit-s3-" + size + ".bmp"));
+    failures += audit(sheet, "speaker layout, a layout with a limit, S3 " + size);
+
+    // Build yours: the same working layout, as buttons.
+    expect(tap_in(sheet, "Build yours"), "the sheet has a Build yours tab");
+    pump(6);
+    settle(sheet);
+    write_bmp(out / ("layout-build-s3-" + size + ".bmp"));
+    failures += audit(sheet, "speaker layout, build yours, S3 " + size);
+    failures += reachable(sheet, "speaker layout, build yours, S3 " + size);
+    for (const char* heading : {"Around you", "Subwoofers", "Heights", "Heights are"}) {
+        expect(shows_text(sheet, heading), std::string("Build yours has the ") + heading + " group");
+    }
+    expect(tap_in(sheet, "9"), "nine around you can be touched");
+    pump(6);
+    expect(shows_text(sheet, "Nine around you needs 9 slots", true), "nine around you says it needs nine slots");
+    expect(tap_in(sheet, "Two"), "two subwoofers can be touched");
+    pump(6);
+    expect(shows_text(sheet, "2.2", true), "two around you and two subwoofers is 2.2");
+    expect(tap_in(sheet, "High"), "heights are mounted somehow");
+    pump(6);
+    expect(shows_text(sheet, "Only a layout with heights has them to mount.", true), "but not when there are none");
+    expect(g_layout == "2.0", "nothing was applied");
+    expect(tap_in(sheet, "Apply"), "Apply can be touched on 2.2");
+    pump(8);
+    expect(g_layout == "2.2", "Apply makes the working layout the board's");
+    expect(player::panel::layout_sheet_root() == nullptr, "and puts the sheet away");
+    pump(4);
+    expect(shows_text(prefs, "2.2"), "and the Preferences row follows");
+
+    // Music playing: Apply asks first, and Cancel leaves it as it was.
+    play_room("5.1", kDolbyFiveOne, kFiveOne);
+    pump(4);
+    sheet = open_sheet(prefs);
+    if (sheet != nullptr) {
+        expect(tap_in(sheet, "1.0"), "1.0 can be touched");
+        pump(4);
+        expect(tap_in(sheet, "Apply"), "Apply can be touched while a stream plays");
+        pump(6);
+        expect(g_layout == "2.2", "while a stream plays Apply asks before it changes the layout");
+        expect(shows_text(sheet, "drop out for a moment", true), "and the question says what it costs");
+        expect(shows_text(sheet, "Change to 1.0?", true), "and what the change is");
+    settle(sheet);
+    write_bmp(out / ("layout-confirm-" + size + ".bmp"));
+        // The question covers the sheet (a tap cannot reach it); what is held to the fingertip rule is the question.
+        lv_obj_t* const question = lv_obj_get_child(sheet, static_cast<std::int32_t>(lv_obj_get_child_count(sheet)) - 1);
+        failures += audit(question, "speaker layout question " + size);
+        expect(tap_in(question, "Cancel"), "the question has a Cancel");
+        pump(4);
+        expect(g_layout == "2.2", "Cancel leaves the layout as it was");
+        expect(!shows_text(sheet, "drop out for a moment", true), "and puts the question away");
+        expect(tap_in(sheet, "Apply"), "Apply asks again");
+        pump(6);
+        lv_obj_t* const again = lv_obj_get_child(sheet, static_cast<std::int32_t>(lv_obj_get_child_count(sheet)) - 1);
+        expect(tap_in(again, "Change"), "the question has a Change");
+        pump(8);
+        expect(g_layout == "1.0", "Change makes it");
+        expect(player::panel::layout_sheet_root() == nullptr, "and puts the sheet away");
+    }
+    pump(4);
+    // Cancel in the bar leaves everything as it was.
+    sheet = open_sheet(prefs);
+    if (sheet != nullptr) {
+        g_now_playing = false;
+        expect(tap_in(sheet, "9.1"), "9.1 can be touched");
+        expect(tap_in(sheet, "Cancel"), "the bar has a Cancel");
+        pump(8);
+        expect(player::panel::layout_sheet_root() == nullptr, "Cancel puts the sheet away");
+        expect(g_layout == "1.0", "and changes nothing");
+    }
+    close_prefs();
+
+    // A board that cannot clock a TDM frame (an ESP32-P4 below v3.0) says why and offers stereo.
+    g_caps = iclforge::variants::p4_rev1();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "2.0";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const old_chip = player::panel::prefs_root();
+        sheet = open_sheet(old_chip);
+        if (sheet != nullptr) {
+    settle(sheet);
+    write_bmp(out / ("layout-p4-rev1-" + size + ".bmp"));
+            failures += audit(sheet, "speaker layout, P4 rev 1 " + size);
+            failures += reachable(sheet, "speaker layout, P4 rev 1 " + size);
+            expect(shows_text(sheet, "so only 1.0 and 2.0 can play.", true), "a chip with no TDM clock says why");
+            expect(tap_in(sheet, "2.1"), "2.1 can be touched");
+            pump(4);
+            expect(shows_text(sheet, "Not available on this board"), "and is not available");
+            tap_in(sheet, "Cancel");
+            pump(6);
+        }
+        close_prefs();
+    }
+
+    // A kit (sixteen 32-bit slots, a chip that clocks them) carries every layout, with no note on any, and the worst case.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "7.1.4";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const kit = player::panel::prefs_root();
+        expect(kit != nullptr, "Preferences opens on the kit");
+        sheet = kit != nullptr ? open_sheet(kit) : nullptr;
+        if (sheet != nullptr) {
+    settle(sheet);
+    write_bmp(out / ("layout-quick-kit-" + size + ".bmp"));
+            failures += audit(sheet, "speaker layout, quick picks, kit " + size);
+            failures += reachable(sheet, "speaker layout, quick picks, kit " + size);
+            expect(!shows_text(sheet, "Not available", true), "nothing is greyed on a board that carries them all");
+            expect(tap_in(sheet, "9.1.6"), "9.1.6 can be touched");
+            pump(6);
+            expect(tap_in(sheet, "Build yours"), "Build yours");
+            pump(6);
+            // High is the one rendering of the wall and up-firing: the board cannot tell them apart.
+            if (width >= 800) {
+                expect(shows_text(sheet, "9.1.6: nine around you, one subwoofer, six high speakers"),
+                       "9.1.6 is high speakers until they are put in the ceiling");
+            }
+            // The worst case: nine around you, one subwoofer, six heights, in the ceiling - the longest summary, the
+            // most buttons selected, the room with the most speakers, all of them overhead - at the display's size.
+            expect(tap_in(sheet, "In the ceiling"), "9.1.6 can be mounted in the ceiling");
+            pump(6);
+    settle(sheet);
+    write_bmp(out / ("layout-worst-kit-" + size + ".bmp"));
+            failures += audit(sheet, "speaker layout, worst case, kit " + size);
+            failures += reachable(sheet, "speaker layout, worst case, kit " + size);
+            expect(shows_text(sheet, "9.1.6:top", true), "the footer names the layout");
+            if (width >= 800) {
+                expect(shows_text(sheet, "9.1.6:top: nine around you, one subwoofer, six ceiling speakers"),
+                       "and, with room, says it in words");
+            }
+            // Seventeen outputs is not a layout.
+            expect(tap_in(sheet, "Two"), "two subwoofers can be touched");
+            pump(6);
+            expect(shows_text(sheet, "9.2.6:top would be 17 outputs, and a layout has at most 16.", true),
+                   "nine around you, two subwoofers and six heights is seventeen outputs");
+    settle(sheet);
+    write_bmp(out / ("layout-seventeen-kit-" + size + ".bmp"));
+            failures += audit(sheet, "speaker layout, seventeen outputs, kit " + size);
+            expect(tap_in(sheet, "One"), "one subwoofer again");
+            pump(6);
+            expect(tap_in(sheet, "Apply"), "Apply can be touched on the kit");
+            pump(8);
+            expect(g_layout == "9.1.6:top", "9.1.6 in the ceiling is taken on the kit");
+            expect(player::panel::layout_sheet_root() == nullptr, "and the sheet goes away");
+            pump(4);
+            expect(shows_text(kit, "9.1.6:top"), "and the row shows it");
+            expect(shows_text(kit, "Nine around you, one subwoofer, six ceiling speakers.", true) ||
+                       shows_text(kit, "Nine around you", true),
+                   "in words");
+            settle(kit);
+            failures += audit(kit, "preferences, speaker layout row, kit " + size);
+        }
+        close_prefs();
+    }
+
+    // A layout the board was told as ":upfiring" is High, and the sheet says High is in use.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "7.1.4:upfiring";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const alias = player::panel::prefs_root();
+        sheet = alias != nullptr ? open_sheet(alias) : nullptr;
+        if (sheet != nullptr) {
+            expect(shows_text(sheet, "In use now"), "7.1.4:upfiring is the high 7.1.4, in use now");
+            tap_in(sheet, "Cancel");
+            pump(6);
+        }
+        close_prefs();
+    }
+
+    // A speaker list a person wrote is shown as it was, and choosing a layout replaces it.
+    g_caps = iclforge::variants::p4_rev3_kit();
+    g_caps.display.width = width;
+    g_caps.display.height = height;
+    g_layout = "L,R,C,LFE,Ls,Rs";
+    if (tap_button("Preferences")) {
+        pump(8);
+        lv_obj_t* const listed = player::panel::prefs_root();
+        expect(shows_text(listed, "L,R,C,LFE,Ls,Rs"), "a speaker list is shown as it was written");
+        sheet = listed != nullptr ? open_sheet(listed) : nullptr;
+        if (sheet != nullptr) {
+            expect(shows_text(sheet, "This board is set to a speaker list", true), "and the sheet says so");
+    settle(sheet);
+    write_bmp(out / ("layout-list-kit-" + size + ".bmp"));
+            failures += audit(sheet, "speaker layout, a speaker list, kit " + size);
+            tap_in(sheet, "Cancel");
+            pump(6);
+        }
+        close_prefs();
+    }
+    g_layout = "2.0";
+    return failures;
+}
+
 int check_sheets(int width, int height, const fs::path& out, const std::string& lrc, lv_display_t*& disp) {
     namespace nv = iclforge::nowview;
     const std::string size = std::to_string(width) + "x" + std::to_string(height);
@@ -1934,99 +2334,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         pump(6);
     }
 
-    // The speaker layout: a board that can carry only some of the layouts (an ESP32-S3, four 32-bit slots on one line)
-    // lists every one, the ones it cannot carry greyed with the reason beside them, and a tap on a greyed one does
-    // nothing. One it carries with a limit is taken. While a stream plays a change is asked about first, and nothing
-    // plays on the question's other side until it is answered.
-    g_caps = iclforge::variants::s3_spi_320x240();
-    g_caps.display.width = width;
-    g_caps.display.height = height;
-    g_layout = "2.0";
-    g_settings = {nv::View::kSpeakers, 5};
-    g_now_playing = false;
-    expect(tap_button("Preferences"), "the footer has a Preferences button on an S3");
-    pump(8);
-    lv_obj_t* const sound = player::panel::prefs_root();
-    expect(sound != nullptr, "Preferences opens on an S3");
-    if (sound != nullptr) {
-        failures += audit(sound, "preferences, speaker layout " + size);
-        expect(shows_text(sound, "Speaker layout"), "the Sound group has the speaker layout");
-        for (const char* layout : {"1.0", "2.0", "2.1", "5.1", "7.1.4", "9.1.6"}) {
-            expect(find_button(layout) != nullptr, std::string("the layout list shows ") + layout);
-        }
-        lv_obj_scroll_to_view_recursive(find_button("5.1"), LV_ANIM_OFF);
-        pump(4);
-        write_bmp(out / ("prefs-layout-s3-" + size + ".bmp"));
-        expect(shows_text(sound, "5.1 needs 6 slots; this board's output carries 4 (32-bit slots, one line).", true),
-               "a layout the board cannot carry says what it needs and what the board has");
-        expect(shows_text(sound, "16-bit slots would carry 8", true), "and what would help");
-        expect(shows_text(sound, "Not verified", true), "a layout nobody has measured says so");
-        tap_button("5.1");
-        pump(4);
-        expect(g_layout == "2.0", "a tap on a layout the board cannot carry does nothing");
-        tap_button("2.1");
-        pump(4);
-        expect(g_layout == "2.1", "a layout the board carries with a limit is taken");
-        tap_button("2.0");
-        pump(4);
-        expect(g_layout == "2.0", "and so is the board's own again");
-
-        // Music playing: the change is asked about, and Cancel leaves it as it was.
-        play_room("5.1", kDolbyFiveOne, kFiveOne);
-        pump(4);
-        tap_button("1.0");
-        pump(4);
-        expect(g_layout == "2.0", "while a stream plays a tap on a layout asks before it changes it");
-        expect(shows_text(sound, "drop out for a moment", true), "and the question says what it costs");
-        expect(shows_text(sound, "Change to 1.0?", true), "and what the change is");
-        write_bmp(out / ("prefs-layout-confirm-" + size + ".bmp"));
-        // The question covers the sheet (a tap cannot reach it); what is held to the fingertip rule is the question.
-        failures += audit(lv_obj_get_child(sound, static_cast<std::int32_t>(lv_obj_get_child_count(sound)) - 1),
-                          "preferences, speaker layout question " + size);
-        tap_button("Cancel");
-        pump(4);
-        expect(g_layout == "2.0", "Cancel leaves the layout as it was");
-        expect(!shows_text(sound, "drop out for a moment", true), "and puts the question away");
-        tap_button("1.0");
-        pump(4);
-        tap_button("Change");
-        pump(4);
-        expect(g_layout == "1.0", "Change makes it");
-        tap_button("2.0");
-        pump(4);
-        tap_button("Change");
-        pump(4);
-        expect(g_layout == "2.0", "and the question can be asked again");
-        g_now_playing = false;
-        g_settings = {nv::View::kSpeakers, 5};
-        hold(lrc, 5'750);
-        pump(6);
-        tap_button("Close");
-        pump(6);
-    }
-
-    // A kit (sixteen 32-bit slots, a chip that clocks them) carries every layout, with no note on any.
-    g_caps = iclforge::variants::p4_rev3_kit();
-    g_caps.display.width = width;
-    g_caps.display.height = height;
-    g_layout = "7.1.4";
-    if (tap_button("Preferences")) {
-        pump(8);
-        lv_obj_t* const kit = player::panel::prefs_root();
-        expect(kit != nullptr, "Preferences opens on the kit");
-        if (kit != nullptr) {
-            failures += audit(kit, "preferences, speaker layout, kit " + size);
-            lv_obj_scroll_to_view_recursive(find_button("5.1"), LV_ANIM_OFF);
-            pump(4);
-            write_bmp(out / ("prefs-layout-kit-" + size + ".bmp"));
-            expect(!shows_text(kit, "needs", true), "nothing is greyed on a board that carries them all");
-            tap_button("9.1.6");
-            pump(4);
-            expect(g_layout == "9.1.6", "9.1.6 is taken on the kit");
-            tap_button("Close");
-            pump(6);
-        }
-    }
+    failures += check_layout_sheet(width, height, out, lrc);
     return failures;
 }
 

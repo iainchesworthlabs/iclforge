@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
+  layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
+  you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the
+  heights are high or in the ceiling), with the room the layout makes drawn beside the buttons, its name
+  in a footer that stays on the glass with Apply, and the verdict's own sentence for anything this board cannot carry. The
+  sheet is checked from 1024 by 600 down to 240 by 240, including that every control can be reached by scrolling to it.
+  Heights in the ceiling are put straight overhead; high heights, on the wall or up-firing, are played the same way, so the
+  sheet has one button for them.
+  `PUT /layout`, `GET /layout-options` and the device page are unchanged. The plan is `planning/p4x-layout-builder.md`.
 - **Added: the analysis and the rules of a Meters view for the Hearth sink's no-lyrics screen, host-tested and not yet drawn.** An instrument display
   after the owner's reference, the displays of RME's audio interfaces: a third-octave spectrum of the main mix (31 bands, 20 Hz to 20 kHz, from the newest
   171 ms of a 48 kHz mono mix, in float32 through the family's FFT, 100 kflops a pass, in `iclforge/dsp/spectrum.hpp`: 0 dB for a full-scale sine, a decibel
