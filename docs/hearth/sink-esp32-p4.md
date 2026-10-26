@@ -440,7 +440,8 @@ holds, how long an update's analysis, widgets and render take (last, mean, large
 tap costs the audio path for a burst of 1,536 frames. The developer view shows the same in its PERFORMANCE section. The view runs at **twenty updates
 a second when the panel's task can keep up and ten when it cannot** (`iclforge/meters_governor.hpp`): over the last 20 updates, an average cost
 above 70 % of the 50 ms step, or 4 updates started more than 15 ms later than the loop could have started them, drops it to ten; it returns to
-twenty only after 10 s at ten with the cost under 45 % and nothing late, so that it does not flip. The target is **20 Hz if possible, else a steady 10 Hz** (no more than
+twenty only after 10 s at ten with the cost under 60 % and nothing late, so that it does not flip; the first two seconds of a view are not judged (its first draw and the
+cold code are not what it costs). The target is **20 Hz if possible, else a steady 10 Hz** (no more than
 1 % of the steps without an update, an update under half of its step), and the kit protocol says which room holds which. How each room holds up on the kit, and the
 protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).

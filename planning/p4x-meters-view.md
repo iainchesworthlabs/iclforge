@@ -287,10 +287,14 @@ The owner's rule: 20 Hz if possible, else 10 Hz. `iclforge/meters_governor.hpp` 
 
 - **Cannot keep up** is judged over the last 20 updates (a second at 20 Hz), never on one: the **average cost** of an update
   (analysis + widgets + the refreshes since the last update) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
-  could have started them**, or a whole step missed. The allowance for lateness is one frame of the panel's loop (33 ms at 30 fps), because a 30 fps
-  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault.
-- **It rises again** only after **10 s** at ten, with the average cost **under 45 % of a fast step (22.5 ms)** and not one late or missed update in
-  the window. The gap between 70 and 45 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
+  could have started them**, or a whole step missed. The allowance for lateness is one beat of the panel's loop: a frame (33 ms at 30 fps) at twenty a second, because a 30 fps
+  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault, and the resting 100 ms at ten, where an update can be due any time in the beat before
+  the loop looks (the first kit run of the canvas drawing counted half of the updates at ten a second late against a 33 ms allowance).
+- **The first two seconds of a view are not judged** (they are counted: `updates`, `late`, `dropped` include them; the window does not). The kit's first run
+  showed why: the opening's first draw of the stage (110 ms) and the first run of the code from the flash, cold in the cache, missed ten steps in the first second,
+  the view fell to ten, and could not rise because it never saw a cost under 45 %. Waking from dimming starts the grace again.
+- **It rises again** only after **10 s** at ten, with the average cost **under 60 % of a fast step (30 ms)** and not one late or missed update in
+  the window (the canvas drawing's steady cost on the kit is 26 to 31 ms in a 5.1 room and a 9.1.6 one, so 45 % was a limit it could never come back under). The gap between 70 and 60 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
   a minute at twenty a second puts it back.
 - At ten a second the panel's loop goes back to its resting beat of 100 ms (`filling` false), which is exactly the step: a view at 10 Hz costs the
   task nothing between updates. At twenty it asks for the panel's frame rate (30 fps) and keeps its own beat inside it (due times 50 ms apart), which
@@ -390,7 +394,7 @@ repeat: the first, cold opening of the Meters view against the second (`meters-a
 
 **After.** Collect the three `report.md`s and the comparison into the plan page as **Kit results** (the date, the commits, the tables), replace the
 estimates under *What it costs* by the measured costs and say which numbers moved, and set the governor's limits (`GovernorLimits`) to what the kit
-shows (the 70 % and 45 % thresholds and the 15 ms allowance are the plan's guesses). A failed criterion is a finding with its samples attached, not a
+shows (the 70 % and 60 % thresholds and the 15 ms allowance are the plan's guesses). A failed criterion is a finding with its samples attached, not a
 reason to loosen a number; the levers, in the order the plan gives them, are 10 updates a second (already automatic), the 15 bars of the 480-px
 screen on the large one, and one custom-drawn widget for the spectrum in place of 62 objects.
 

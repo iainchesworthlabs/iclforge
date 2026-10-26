@@ -749,8 +749,10 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     const std::int64_t step = g.governor.step_us();
     const std::int64_t behind = g.due_us == 0 ? 0 : std::max<std::int64_t>(now - g.due_us, 0);
     const std::int64_t missed = behind / step;
-    // Lateness the loop's own frame accounts for is nobody's fault: only what is past it counts against the rate.
-    const std::int64_t late = std::max<std::int64_t>(behind - panel_frame_us(), 0);
+    // Lateness the loop's own beat accounts for is nobody's fault: only what is past it counts against the rate. The beat is a frame while the view
+    // fills (twenty a second) and 100 ms while it rests (ten), when an update can be due any time in the beat before the loop looks.
+    const std::int64_t beat = g.governor.slow() ? mv::kSlowStepUs : static_cast<std::int64_t>(panel_frame_us());
+    const std::int64_t late = std::max<std::int64_t>(behind - beat, 0);
     const float seconds = g.last_us == 0 ? static_cast<float>(step) / 1.0e6F : std::clamp(static_cast<float>(now_us - g.last_us) / 1.0e6F, 0.02F, 0.25F);
     g.last_us = now_us;
 
