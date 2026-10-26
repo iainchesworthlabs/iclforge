@@ -12,10 +12,10 @@
 # So the image is built here, for a change to anything it is compiled from (tools/ci/plan_gate.py,
 # ESP_IMAGE_PREFIXES: the sink, the component, the profile tools, the libraries), the same way ci.yml
 # builds it: the profile's fragments, its identity, `idf.py build` (which fails when the image is
-# bigger than the slot) and `sink_profile.py verify` with the size report. About three minutes on a
-# runner that has not built it before (the ci.yml step takes 2m34s), beside the profile guard's
-# fourteen: the gate takes no longer. To hold another profile to its budget the same way, add it
-# to the list below.
+# bigger than the slot) and `sink_profile.py verify` with the size report. About six minutes of one
+# runner on a cold one (the first run: 164 s to start the IDF container, 182 s to build; the ci.yml
+# step builds it in 2m34s), beside the profile guard's seven to fourteen and the GCC job's nine: the
+# gate takes no longer. To hold another profile to its budget the same way, add it to the list below.
 #
 # A change must also leave room for the next one: `verify --app-headroom` fails an image with fewer
 # than that many bytes under the slot, 10,240 (10 KiB) for the 4 MB C6. The changes that cost the
