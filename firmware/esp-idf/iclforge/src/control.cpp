@@ -482,7 +482,7 @@ struct Control::Impl {
             "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
             "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
             "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
-            "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; "
+            "GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; "
             "PUT one "
             "to change it\n"
             "GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT "

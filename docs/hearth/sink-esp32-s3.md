@@ -172,7 +172,7 @@ defaults, at once and with no restart: every entry of the board's preferences th
 (what the screen shows without lyrics, when it dims, the brightness, the clock's hours and seconds and
 the night schedule; an entry added later says for itself),
 each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
-the name, the Wi-Fi network and the choice between the cable and Wi-Fi, the DAC wiring, the
+the name, the Wi-Fi network and the choice between wired and Wi-Fi, the DAC wiring, the
 speaker layout and the time zone (the room's, not a matter of taste), the time server and whether
 the board asks it, and the pairings. On a board with a
 screen the same thing is *Reset preferences* on the sheet
@@ -187,7 +187,7 @@ firmware routes are.
 
 **A board on Wi-Fi alone has no network after a factory reset.** It cannot be reached to be told
 one. Connect it to a computer with a USB cable and give it a network over Improv, as
-[Join a network](#join-a-network) says. A board with a cable (the ESP32-P4X kit) stays on it and
+[Join a network](#join-a-network) says. A board with a wired network (the ESP32-P4X kit) stays on it and
 asks the router for an address again. An image built with a Wi-Fi network of its own (a development
 build; no published image has one) joins that network again.
 

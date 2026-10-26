@@ -1064,7 +1064,7 @@ void build_idle(int content_w) {
 
     std::string where = g.info.address.empty() ? "No network address yet" : g.info.address;
     if (!g.info.address.empty() && g.info.via == "ethernet") {
-        where += "   Ethernet";
+        where += "   Wired";
     } else if (!g.info.network.empty()) {
         where += "   Wi-Fi " + g.info.network;
     }

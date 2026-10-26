@@ -121,14 +121,14 @@ TEST_CASE("the factory reset lists what is lost", "[sysactions]") {
     }
 }
 
-TEST_CASE("the factory reset on a board with a cable says the cable stays", "[sysactions]") {
+TEST_CASE("the factory reset on a board with a wired network says it stays", "[sysactions]") {
     Situation situation;
     situation.has_cable = true;
     situation.cable_link = true;
     situation.has_wifi = true;
     situation.paired = 2;
     const Confirm confirm = confirm_for(Action::factory_reset, situation);
-    CHECK(says(confirm, "The cable stays in use"));
+    CHECK(says(confirm, "The wired network stays in use"));
     CHECK(says(confirm, "asks your router for an address"));
     CHECK_FALSE(says(confirm, "NO network"));
     CHECK_FALSE(says(confirm, "improv-wifi.com"));
@@ -149,13 +149,13 @@ TEST_CASE("the factory reset on a Wi-Fi-only board says it is stranded, and what
     CHECK(confirm.accept == "Continue");
 }
 
-TEST_CASE("the factory reset on a board whose cable is not plugged in is a stranded board too", "[sysactions]") {
+TEST_CASE("the factory reset on a board whose wired network has no link is a stranded board too", "[sysactions]") {
     Situation situation;
     situation.has_cable = true;
     situation.cable_link = false;
     situation.has_wifi = true;
     const Confirm confirm = confirm_for(Action::factory_reset, situation);
-    CHECK(says(confirm, "No cable is plugged in."));
+    CHECK(says(confirm, "The wired network has no link."));
     CHECK(says(confirm, "NO network"));
     CHECK(says(confirm, "improv-wifi.com"));
 }

@@ -381,8 +381,8 @@ config ICLFORGE_EXAMPLE_NETWORK_ETHERNET
     default n
     help
         Drives the chip's own Ethernet MAC through an RMII PHY. The board takes an address by DHCP
-        on whichever interface has a link, prefers the cable when both have one, and goes on by WiFi
-        when the cable is out (and back to the cable when it returns) with no restart. The
+        on whichever interface has a link, prefers wired when both have one, and goes on by WiFi
+        when wired has no link (and back to wired when it returns) with no restart. The
         preference between the two is a setting of the board (PUT /network-preference), stored in
         NVS like its name and its network.
 

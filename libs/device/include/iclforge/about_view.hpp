@@ -63,12 +63,12 @@ struct Row {
             return;
         }
         std::string value = devview::address_text(in);
-        if (facts.active == (std::string_view(label) == "Cable" ? "ethernet" : "wifi")) {
+        if (facts.active == (std::string_view(label) == "Wired" ? "ethernet" : "wifi")) {
             value = join({"in use", value});
         }
         rows.push_back({label, value, in.address.empty() ? Tone::muted : Tone::text});
     };
-    interface_row("Cable", facts.ethernet);
+    interface_row("Wired", facts.ethernet);
     interface_row("Wi-Fi", facts.wifi);
     if (!facts.ethernet.present && !facts.wifi.present) {
         rows.push_back({"Network", "none", Tone::muted});
