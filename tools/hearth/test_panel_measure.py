@@ -335,16 +335,44 @@ class Judgement(unittest.TestCase):
             self.verdicts(pm.ROWS[1], full_run(meter=meters(torn=1)))["tap-torn"]["ok"]
         )
 
-    def test_a_small_room_must_hold_twenty_a_second_a_large_one_is_only_reported(self) -> None:
-        slow = meters(rate=10, falls=1, cost=30_000)
-        self.assertFalse(
-            self.verdicts(pm.ROWS[1], full_run(meter=slow))["rate"]["ok"]
-        )  # 5.1: six outputs
-        verdict = self.verdicts(
-            pm.ROWS[2], full_run(meter=meters(rate=10, falls=1, cost=30_000, outputs=16))
-        )["rate"]  # 9.1.6
-        self.assertTrue(verdict["ok"])
-        self.assertIn("reported", verdict["text"])
+    def test_a_cell_holds_twenty_a_second_or_else_a_steady_ten_and_which_is_said(self) -> None:
+        twenty = self.verdicts(pm.ROWS[1], full_run(meter=meters()))["rate"]
+        self.assertTrue(twenty["ok"])
+        self.assertIn("holds 20 Hz", twenty["text"])
+        # Fell to ten and held it: an update costs under half of a 100 ms step, no step missed.
+        steady = self.verdicts(pm.ROWS[1], full_run(meter=meters(rate=10, falls=1, cost=30_000)))
+        self.assertTrue(steady["rate"]["ok"])
+        self.assertIn("steady 10 Hz", steady["rate"]["text"])
+        # Fell to ten and still did not keep up: the kit's first run (an update cost 130 to 440 ms).
+        slow = self.verdicts(
+            pm.ROWS[2],
+            full_run(meter=meters(rate=10, falls=1, cost=131_000, dropped=205, outputs=16)),
+        )["rate"]
+        self.assertFalse(slow["ok"])
+        self.assertIn("neither 20 Hz nor a steady 10", slow["text"])
+        # Cheap but missing steps: not steady.
+        missing = self.verdicts(
+            pm.ROWS[1], full_run(meter=meters(rate=10, falls=1, cost=30_000, dropped=50))
+        )["rate"]
+        self.assertFalse(missing["ok"])
+        # A fall to ten and back is a fall: twenty is held only with none.
+        fell = self.verdicts(pm.ROWS[1], full_run(meter=meters(rate=20, falls=1)))["rate"]
+        self.assertTrue(fell["ok"])
+        self.assertIn("steady 10 Hz", fell["text"])
+
+    def test_faults_only_in_the_first_opening_say_so(self) -> None:
+        samples = full_run(meter=meters())
+        for s in samples:
+            if s["segment"] == "meters-a" and s["t"] > 45:
+                s["status"]["underruns"] = 1
+                s["status"]["resyncs"] = 1
+        text = self.verdicts(pm.ROWS[1], samples)["stream"]["text"]
+        self.assertIn("only the first, cold opening", text)
+        for s in samples:
+            if s["segment"] == "meters-b" and s["t"] > 105:
+                s["status"]["underruns"] = 1
+        text = self.verdicts(pm.ROWS[1], samples)["stream"]["text"]
+        self.assertNotIn("only the first, cold opening", text)
 
     def test_the_cost_is_held_to_half_of_the_step_in_force(self) -> None:
         self.assertTrue(

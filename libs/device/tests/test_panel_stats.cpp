@@ -66,13 +66,18 @@ TEST_CASE("the meters object carries the rate, the representation, the timings a
     p.meters.tap.frames = 1536;  // one burst
     p.meters.tap.us_total = 20;
     p.meters.tap.us_max_block = 9;
+    p.meters.tap.sampled_blocks = 4;  // four blocks timed in parts: 40 us in the pass, 10 in the pack, 2 us of clock reads
+    p.meters.tap.us_pass = 40;
+    p.meters.tap.us_pack = 10;
+    p.meters.tap.us_clock = 2;
     const std::string json = ps::panel_stats_json(p);
     CHECK(json.find(",\"meters\":{\"showing\":true,\"representation\":\"grid\",\"outputs\":12,\"width\":1024,\"height\":600,\"opens\":3,\"open_ms\":61000,"
                     "\"rate_hz\":10,\"mean_cost_us\":41234,\"updates\":700,\"late\":5,\"dropped\":2,\"falls\":1,\"rises\":0,") != std::string::npos);
     CHECK(json.find("\"analysis_us\":{\"last\":9000,\"mean\":9000.0,\"max\":9000,\"n\":1}") != std::string::npos);
     CHECK(json.find("\"widgets_us\":{\"last\":2500,") != std::string::npos);
     CHECK(json.find("\"render_us\":{\"last\":30000,") != std::string::npos);
-    CHECK(json.find("\"tap\":{\"blocks\":6,\"us_per_burst\":20.0,\"us_max_block\":9,\"reads\":0,\"torn\":0,\"short_reads\":0}}") != std::string::npos);
+    CHECK(json.find("\"tap\":{\"blocks\":6,\"us_per_burst\":20.0,\"us_max_block\":9,\"us_pass_per_burst\":60.0,\"us_pack_per_burst\":15.0,"
+                    "\"us_per_clock_read\":0.5,\"reads\":0,\"torn\":0,\"short_reads\":0}}") != std::string::npos);
 }
 
 TEST_CASE("the representation names are the screen's", "[panelstats]") {

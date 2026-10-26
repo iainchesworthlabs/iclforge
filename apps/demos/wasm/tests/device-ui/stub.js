@@ -359,7 +359,7 @@ function panelStats() {
             analysis_us: timingStats(8200, 8100.2, 9900, 1190),
             widgets_us: timingStats(1100, 1250.7, 3400, 1190),
             render_us: timingStats(11800, 12400.5, 31200, 1190),
-            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, reads: 1190, torn: 0, short_reads: 0 },
+            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, us_pass_per_burst: 12.0, us_pack_per_burst: 6.0, us_per_clock_read: 0.5, reads: 1190, torn: 0, short_reads: 0 },
         },
     };
 }

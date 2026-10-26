@@ -2085,10 +2085,13 @@ int check_meters(int width, int height, const fs::path& out, lv_display_t*& disp
     g_board.firmware = "0.11.0";
     g_board.player = true;
     g_board.stream = "bursts";
-    // The most the view may flush a second: 4.5 screens' worth. The view flushes 2 to 3.6 screens' worth a second at every size (1.3 to 1.8
-    // million pixels at 1024 by 600, 0.8 to 1.2 at 800 by 480, 0.45 to 0.54 at 480 by 320, 0.16 to 0.19 at 240 by 240); a table of invalid
-    // rectangles that is too small flushes 19 (LVGL's 32 at 1024 by 600) and 5 to 7 (128).
-    const double bound_mpx = 4.5 * static_cast<double>(width) * static_cast<double>(height) / 1.0e6;
+    // What an update may cost LVGL, in the two things the kit's first run showed it pays for. AREAS: every area is a pass over the object tree and a
+    // copy to the frame buffer (about a millisecond on the P4), and the first drawing, an object for each part of each bar, left 100 to 200 of them
+    // an update (130 to 440 ms): the charts are one buffer each, and an update is a few areas, at most 12 flushes (a chart's rows through the
+    // 40-row render buffers). PIXELS: the rows a change touches, across the chart, are copied whole, which is more than the bars' own pixels (up to 7
+    // screens' worth a second at the worst, a 2.0 room whose spectrum has the screen); a screen redrawn in full every update is 20.
+    constexpr double kMaxAreasAnUpdate = 12.0;
+    const double bound_mpx = 7.0 * static_cast<double>(width) * static_cast<double>(height) / 1.0e6;
 
     struct Room {
         const char* layout;
@@ -2112,11 +2115,14 @@ int check_meters(int width, int height, const fs::path& out, lv_display_t*& disp
         g_now_us += 3'000'000;
         pump(6);
         const std::uint64_t before = g_flushed_pixels;
+        const std::uint32_t areas_before = g_flushed_areas;
+        const std::uint64_t updates_before = player::panel::now_meters_stats().governor.updates;
         const std::int64_t began = g_now_us;
         pump(150);  // five seconds of 33 ms frames
         const double seconds = static_cast<double>(g_now_us - began) / 1.0e6;
         const double mpx = static_cast<double>(g_flushed_pixels - before) / seconds / 1.0e6;
         const iclforge::panelstats::MetersStats stats = player::panel::now_meters_stats();
+        const double areas_an_update = static_cast<double>(g_flushed_areas - areas_before) / std::max<double>(1.0, static_cast<double>(stats.governor.updates - updates_before));
         expect(std::string(player::panel::screen_stats().name) == "nolyrics", what + ": the no-lyrics screen shows");
         expect(stats.showing, what + ": the Meters view is up");
         expect(stats.outputs == room.outputs, what + ": it meters " + std::to_string(room.outputs) + " outputs, not " + std::to_string(stats.outputs));
@@ -2127,8 +2133,9 @@ int check_meters(int width, int height, const fs::path& out, lv_display_t*& disp
         expect(stats.governor.updates >= 100 && stats.governor.updates <= 140, what + ": about twenty updates a second (" + std::to_string(stats.governor.updates) + " in all)");
         expect(stats.governor.dropped == 0, what + ": no step went by with no update");
         expect(mpx <= bound_mpx, what + ": LVGL flushes " + std::to_string(mpx) + " Mpx/s, over the bound of " + std::to_string(bound_mpx));
-        std::printf("  %-6s %-5s %6.2f Mpx/s  %llu updates, rate %d Hz, mean update %.0f us\n", room.layout,
-                    std::string(iclforge::panelstats::representation_name(stats.representation)).c_str(), mpx,
+        expect(areas_an_update <= kMaxAreasAnUpdate, what + ": LVGL flushes " + std::to_string(areas_an_update) + " areas an update, over " + std::to_string(kMaxAreasAnUpdate));
+        std::printf("  %-6s %-5s %6.2f Mpx/s %5.1f areas an update  %llu updates, rate %d Hz, mean update %.0f us\n", room.layout,
+                    std::string(iclforge::panelstats::representation_name(stats.representation)).c_str(), mpx, areas_an_update,
                     static_cast<unsigned long long>(stats.governor.updates), stats.rate_hz,
                     stats.analysis.mean_us() + stats.widgets.mean_us());
         write_bmp(out / (std::string("meters-") + room.layout + "-" + size + ".bmp"));
