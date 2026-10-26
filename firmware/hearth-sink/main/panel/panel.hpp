@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <string>
 
 #include "iclforge/board_caps.hpp"
 #include "iclforge/dev_view.hpp"
@@ -108,5 +110,9 @@ bool panel_start();
 
 // What the panel has done so far; all zero without one.
 [[nodiscard]] PanelStats panel_stats();
+
+// GET /panel-stats (iclforge/panel_stats.hpp): what the panel and the Meters view cost, as JSON text, for a person or a script on port 80
+// (the capture port is off in a release image). Safe from the control surface's task. Nothing without a panel running.
+[[nodiscard]] std::optional<std::string> panel_stats_text();
 
 }  // namespace player

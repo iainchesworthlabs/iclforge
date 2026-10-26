@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,8 +24,10 @@
 #include <string_view>
 
 #include "iclforge/dsp/spectrum.hpp"
+#include "iclforge/meters_governor.hpp"
 #include "iclforge/meters_tap.hpp"
 #include "iclforge/meters_view.hpp"
+#include "iclforge/panel_stats.hpp"
 
 #include "fonts.hpp"
 #include "lv_alloc.hpp"
@@ -35,6 +38,7 @@ namespace {
 
 namespace mv = iclforge::meters;
 namespace dsp = iclforge::dsp::spectrum;
+namespace ps = iclforge::panelstats;
 
 constexpr std::uint32_t kGreen = 0x4FC28A;
 constexpr std::uint32_t kAmber = 0xF0B24A;
@@ -43,9 +47,14 @@ constexpr std::uint32_t kTrough = 0x201D1C;
 constexpr std::uint32_t kTickColour = 0xECE7E5;
 // The stage's own colour, for the lines of the scale that cross the bars.
 constexpr std::uint32_t kStageBg = 0x151313;
-constexpr std::int64_t kStepUs = 50'000;  // twenty updates a second
 // A frame that comes this much before an update is due is that update's: the loop's own beat jitters by a tick or two.
 constexpr std::int64_t kEarlyUs = 8'000;
+
+// A microsecond clock for timing the view's own work: the same one the tap's blocks are timed with on the firmware (esp_timer), a steady clock
+// on the preview's host. Only differences of it are used.
+std::uint64_t micros() {
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+}
 
 lv_color_t color(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
@@ -263,9 +272,38 @@ struct State {
     bool have_spectrum = false;
     std::uint64_t last_us = 0;
     std::int64_t due_us = 0;  // when the next update is due (0: the next frame's)
+    // What the view costs (iclforge/panel_stats.hpp), and the rate it holds (iclforge/meters_governor.hpp).
+    mv::RateGovernor governor;
+    ps::MetersStats stats;
+    mv::TapStats tap_base;  // the tap's counters when the view opened: what it reports is since then
+    std::uint64_t opened_us = 0;
 };
 
 State g;
+std::uint32_t g_opens = 0;
+// The last opening's figures, kept when the view is closed so that a measurement can read them after the screen has gone to another view.
+ps::MetersStats g_last;
+
+// What the stats say now: the view's own figures, the governor's, and the tap's since the view opened.
+ps::MetersStats snapshot() {
+    ps::MetersStats s = g.stats;
+    s.showing = g.built;
+    s.opens = g_opens;
+    s.open_ms = g.built ? (micros() - g.opened_us) / 1000 : 0;
+    s.rate_hz = g.governor.rate_hz();
+    s.mean_cost_us = static_cast<std::int64_t>(g.governor.mean_cost_us());
+    s.governor = g.governor.stats();
+    const mv::TapStats now = meters_tap().stats();
+    s.tap = now;
+    s.tap.blocks -= g.tap_base.blocks;
+    s.tap.frames -= g.tap_base.frames;
+    s.tap.us_total -= g.tap_base.us_total;
+    s.tap.windows -= g.tap_base.windows;
+    s.tap.reads -= g.tap_base.reads;
+    s.tap.torn -= g.tap_base.torn;
+    s.tap.short_reads -= g.tap_base.short_reads;
+    return s;
+}
 
 // --- building -------------------------------------------------------------------------------------------------------
 
@@ -518,6 +556,14 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
     }
     g.built = true;
     mv::MeterTap& tap = meters_tap();
+    ++g_opens;
+    g.opened_us = micros();
+    g.tap_base = tap.stats();
+    tap.reset_max();
+    g.stats.representation = g.rep;
+    g.stats.outputs = static_cast<int>(fold.connected.count);
+    g.stats.width = width;
+    g.stats.height = height;
     tap.set_wanted(true);
     return true;
 }
@@ -530,8 +576,18 @@ void now_forget_meters() {
     }
     if (g.built) {
         meters_tap().set_wanted(false);
+        g_last = snapshot();
+        g_last.showing = false;
     }
     g = State{};
+}
+
+ps::MetersStats now_meters_stats() { return g.built ? snapshot() : g_last; }
+
+void now_meters_refresh(std::uint32_t took_us) {
+    if (g.built) {
+        g.stats.render.add(took_us);
+    }
 }
 
 namespace {
@@ -621,28 +677,44 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     if (dimmed) {
         g.last_us = 0;
         g.due_us = 0;
+        g.governor.restart_window();
         return false;
     }
     // The step keeps its own beat rather than the frames': a loop of 30 frames a second serves a 50 ms step at 67 ms, 33 ms, 67 ms ... and
     // twenty a second is what comes of it; counting 50 ms from the last update would give fifteen.
     const auto now = static_cast<std::int64_t>(now_us);
+    const bool fast = !g.governor.slow();
     if (g.due_us != 0 && now + kEarlyUs < g.due_us) {
-        return true;
+        return fast;
     }
-    const std::int64_t missed = g.due_us == 0 ? 0 : std::max<std::int64_t>(now - g.due_us, 0) / kStepUs;
-    g.due_us = g.due_us == 0 ? now + kStepUs : g.due_us + kStepUs * (1 + missed);
-    const float seconds = g.last_us == 0 ? 0.05F : std::clamp(static_cast<float>(now_us - g.last_us) / 1.0e6F, 0.02F, 0.25F);
+    const std::int64_t step = g.governor.step_us();
+    const std::int64_t behind = g.due_us == 0 ? 0 : std::max<std::int64_t>(now - g.due_us, 0);
+    const std::int64_t missed = behind / step;
+    // Lateness the loop's own frame accounts for is nobody's fault: only what is past it counts against the rate.
+    const std::int64_t late = std::max<std::int64_t>(behind - panel_frame_us(), 0);
+    const float seconds = g.last_us == 0 ? static_cast<float>(step) / 1.0e6F : std::clamp(static_cast<float>(now_us - g.last_us) / 1.0e6F, 0.02F, 0.25F);
     g.last_us = now_us;
+
+    const std::uint64_t t0 = micros();
     if (tap.read_history(g.heavy->history)) {
         g.heavy->analyzer.analyze(g.heavy->history, g.bands);
         g.average.feed(g.bands, seconds, mv::kSpectrumAverageS, g.averaged);
         g.have_spectrum = true;
     }
+    const std::uint64_t t1 = micros();
     if (g.have_spectrum) {
         update_spectrum(seconds);
     }
     update_channels(tap.fast_levels(), seconds);
-    return true;
+    const std::uint64_t t2 = micros();
+    g.stats.analysis.add(t1 - t0);
+    g.stats.widgets.add(t2 - t1);
+
+    // What this update cost the task: its own work, and the refresh the one before it asked for (the one this asks for comes after).
+    const std::int64_t cost = static_cast<std::int64_t>(t2 - t0) + static_cast<std::int64_t>(g.stats.render.last_us);
+    const std::int64_t next = g.governor.record(now, cost, late, missed);
+    g.due_us = next != step || g.due_us == 0 ? now + next : g.due_us + next * (1 + missed);
+    return !g.governor.slow();
 }
 
 }  // namespace player::panel

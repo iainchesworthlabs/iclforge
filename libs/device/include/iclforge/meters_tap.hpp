@@ -190,6 +190,10 @@ class MeterTap final : public iclforge::BlockTap {
         return out;
     }
 
+    // Forgets the longest block so far, so that a view that has just opened reads its own. A block being timed as this runs may put its time
+    // back: the figure is a measurement, not a count.
+    void reset_max() noexcept { us_max_block_.store(0, std::memory_order_relaxed); }
+
     [[nodiscard]] TapStats stats() const noexcept {
         TapStats s;
         s.blocks = blocks_.load(std::memory_order_relaxed);

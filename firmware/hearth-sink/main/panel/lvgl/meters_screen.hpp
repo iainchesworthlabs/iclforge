@@ -4,6 +4,8 @@
 
 #include "lvgl.h"
 
+#include "iclforge/panel_stats.hpp"
+
 #include "board_info.hpp"
 #include "now_screen.hpp"
 
@@ -25,6 +27,13 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
 // view wants the panel's loop at its frame rate (it is showing and not dimmed) and not at its resting beat of ten a second, which would
 // cap the view at ten updates a second.
 bool now_update_meters(std::uint64_t now_us, bool dimmed);
+
+// What the view has cost since it was last opened, and the rate it holds (iclforge/panel_stats.hpp): live while it shows, the last opening's
+// figures after. With LVGL locked, as the panel's own counters are read.
+[[nodiscard]] iclforge::panelstats::MetersStats now_meters_stats();
+
+// LVGL finished a refresh that took `took_us` (the panel's task calls this from the refresh-ready event): counted while the view shows.
+void now_meters_refresh(std::uint32_t took_us);
 
 // The stage was cleared (now_forget() calls this): the objects are gone, the player is no longer asked for its output, and what was
 // kept for the analysis is given back.

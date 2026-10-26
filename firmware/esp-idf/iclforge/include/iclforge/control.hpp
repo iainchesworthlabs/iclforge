@@ -385,6 +385,9 @@ struct ControlHandlers {
     // plays; stops at once when one begins; ends by its own limits in any case.
     std::function<std::optional<std::string>()> identify;
     std::function<std::optional<ControlRefusal>(std::string_view body)> set_identify;
+    // GET /panel-stats: what the screen costs, as JSON (iclforge/panel_stats.hpp): the panel's refresh times, the heap, and the Meters view's rate,
+    // timings and misses. Unset on a board with no screen, which answers that it has none; nothing while the panel is not running.
+    std::function<std::optional<std::string>()> panel_stats;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.

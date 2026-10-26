@@ -16,8 +16,9 @@
 //
 // A real frame of 2 N samples is the complex transform of N points, unpacked: z[n] = x[2n] + i x[2n + 1]. The band's level is the
 // power of the bins that fall in it, the bins at its edges shared by the overlap. Nothing here allocates after construction
-// (about 55 KB of tables and scratch, which a caller allocates once, not on a stack) and nothing is double; the transform's own scratch is
-// on the stack (8 KB at 1,024 points).
+// (about 63 KB of tables and scratch, which a caller allocates once, not on a stack) and nothing is double: the library's transform keeps two
+// work buffers on the stack (8 KB at 1,024 points), which the panel's 16 KB stack, with 9 KB of it already spoken for by LVGL, cannot spare,
+// so the passes are run here in buffers the analyzer owns (detail::forward_in, held bit for bit to the library's by test_spectrum.cpp).
 //
 // Not safe to call from two threads at once: it owns its scratch.
 
@@ -64,6 +65,40 @@ inline constexpr float kSilentDb = -120.0F;
 
 namespace detail {
 
+// fft::stockham_forward with its two work buffers given, so that it keeps nothing on the stack: the same passes, the same twiddles, the same
+// order, the result in `re` and `im`.
+template <std::size_t P>
+void forward_in(const fft::StockhamTables<P, float>& t, std::span<float, P> re, std::span<float, P> im, std::span<float, P> re2,
+                std::span<float, P> im2) {
+    using tiered::fft_kernels::pass_to;
+    using tiered::fft_kernels::static_for;
+    float* const buffers_re[2] = {re.data(), re2.data()};
+    float* const buffers_im[2] = {im.data(), im2.data()};
+    constexpr auto kPasses = static_cast<int>(fft::StockhamTables<P, float>::kPasses);
+    static_for<kPasses>([&](auto ic) {
+        constexpr auto i = static_cast<std::size_t>(decltype(ic)::value);
+        using Shape = fft::detail::PassShape<P, i>;
+        const float* const src_re = buffers_re[i % 2];
+        const float* const src_im = buffers_im[i % 2];
+        float* const dst_re = buffers_re[(i + 1) % 2];
+        float* const dst_im = buffers_im[(i + 1) % 2];
+        const fft::Complex<float>* const tw = t.twiddles.data() + Shape::offset;
+        const auto in = [src_re, src_im](std::size_t index) noexcept { return fft::Complex<float>{src_re[index], src_im[index]}; };
+        const auto store = [dst_re, dst_im](std::size_t index, fft::Complex<float> value) noexcept {
+            dst_re[index] = value.re;
+            dst_im[index] = value.im;
+        };
+        pass_to<float, static_cast<int>(Shape::r), false, true>(in, store, std::integral_constant<std::size_t, Shape::m>{},
+                                                                 std::integral_constant<std::size_t, Shape::s>{}, tw, tw, tw);
+    });
+    if constexpr (kPasses % 2 != 0) {
+        for (std::size_t k = 0; k < P; ++k) {
+            re[k] = re2[k];
+            im[k] = im2[k];
+        }
+    }
+}
+
 // The power of the bins of a real frame of `Frame` samples, one-sided: 0 to Frame / 2 inclusive. The tables are the window (a periodic Hann,
 // symmetric, so half of it), the factors e^(-2 pi i k / Frame) of the unpacking, and the transform's.
 template <std::size_t Frame>
@@ -89,13 +124,15 @@ class RealPower {
         }
     }
 
-    // `frame`: Frame samples, oldest first. `re` and `im`: kHalf values of scratch each. `out`: kHalf + 1 values.
-    void power(std::span<const float, Frame> frame, std::span<float, kHalf> re, std::span<float, kHalf> im, std::span<float, kHalf + 1> out) const {
+    // `frame`: Frame samples, oldest first. `re` and `im`: kHalf values of scratch each, and `re2` and `im2` the transform's work buffers, the
+    // same. `out`: kHalf + 1 values.
+    void power(std::span<const float, Frame> frame, std::span<float, kHalf> re, std::span<float, kHalf> im, std::span<float, kHalf> re2,
+               std::span<float, kHalf> im2, std::span<float, kHalf + 1> out) const {
         for (std::size_t n = 0; n < kHalf; ++n) {
             re[n] = window_at(2 * n) * frame[2 * n];
             im[n] = window_at(2 * n + 1) * frame[2 * n + 1];
         }
-        fft::stockham_forward<kHalf, float, float>(tables_, re, im);
+        forward_in<kHalf>(tables_, re, im, re2, im2);
         for (std::size_t k = 0; k <= kHalf; ++k) {
             const std::size_t a = k % kHalf;
             const std::size_t b = (kHalf - k) % kHalf;
@@ -174,7 +211,8 @@ class Analyzer {
             frame_[n] = static_cast<float>(sum) * (kInt16 / static_cast<float>(kDecimate));
         }
         low_.power(std::span<const float, kLowFrame>(frame_.data(), kLowFrame), std::span<float, kLowFrame / 2>(re_.data(), kLowFrame / 2),
-                   std::span<float, kLowFrame / 2>(im_.data(), kLowFrame / 2), std::span<float, kLowFrame / 2 + 1>(power_.data(), kLowFrame / 2 + 1));
+                   std::span<float, kLowFrame / 2>(im_.data(), kLowFrame / 2), std::span<float, kLowFrame / 2>(re2_.data(), kLowFrame / 2),
+                   std::span<float, kLowFrame / 2>(im2_.data(), kLowFrame / 2), std::span<float, kLowFrame / 2 + 1>(power_.data(), kLowFrame / 2 + 1));
         for (int b = 0; b < kLowBands; ++b) {
             db[static_cast<std::size_t>(b)] = band_level(b, low_bins_, low_.scale());
         }
@@ -182,7 +220,8 @@ class Analyzer {
             frame_[n] = static_cast<float>(history[kHistory - kHighFrame + n]) * kInt16;
         }
         high_.power(std::span<const float, kHighFrame>(frame_.data(), kHighFrame), std::span<float, kHighFrame / 2>(re_.data(), kHighFrame / 2),
-                    std::span<float, kHighFrame / 2>(im_.data(), kHighFrame / 2),
+                    std::span<float, kHighFrame / 2>(im_.data(), kHighFrame / 2), std::span<float, kHighFrame / 2>(re2_.data(), kHighFrame / 2),
+                    std::span<float, kHighFrame / 2>(im2_.data(), kHighFrame / 2),
                     std::span<float, kHighFrame / 2 + 1>(power_.data(), kHighFrame / 2 + 1));
         for (int b = kLowBands; b < kBands; ++b) {
             db[static_cast<std::size_t>(b)] = band_level(b, high_bins_, high_.scale());
@@ -208,6 +247,8 @@ class Analyzer {
     std::array<float, kLowFrame> frame_{};
     std::array<float, kLowFrame / 2> re_{};
     std::array<float, kLowFrame / 2> im_{};
+    std::array<float, kLowFrame / 2> re2_{};
+    std::array<float, kLowFrame / 2> im2_{};
     std::array<float, kLowFrame / 2 + 1> power_{};
 };
 
@@ -227,7 +268,7 @@ class Reference {
             frame_[n] = static_cast<float>(history[n]) / 32768.0F;
         }
         fft_.power(std::span<const float, kHistory>(frame_), std::span<float, kHistory / 2>(re_), std::span<float, kHistory / 2>(im_),
-                   std::span<float, kHistory / 2 + 1>(power_));
+                   std::span<float, kHistory / 2>(re2_), std::span<float, kHistory / 2>(im2_), std::span<float, kHistory / 2 + 1>(power_));
         for (std::size_t b = 0; b < static_cast<std::size_t>(kBands); ++b) {
             double sum = 0.0;
             for (std::size_t i = first_bin_[b]; i < end_bin_[b]; ++i) {
@@ -245,6 +286,8 @@ class Reference {
     std::vector<float> frame_ = std::vector<float>(kHistory);
     std::vector<float> re_ = std::vector<float>(kHistory / 2);
     std::vector<float> im_ = std::vector<float>(kHistory / 2);
+    std::vector<float> re2_ = std::vector<float>(kHistory / 2);
+    std::vector<float> im2_ = std::vector<float>(kHistory / 2);
     std::vector<float> power_ = std::vector<float>(kHistory / 2 + 1);
 };
 

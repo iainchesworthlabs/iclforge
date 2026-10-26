@@ -516,6 +516,7 @@ struct Control::Impl {
             "PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset\n"
             "GET  /identify      the test tone: what it is doing and its limits, as JSON\n"
             "POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop\n"
+            "GET  /panel-stats   what the panel and the Meters view cost, as JSON, on a board with a screen\n"
             "GET  /pairing       the servers this board is paired with, as JSON\n"
             "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
             "(Sendspin pairing)\n"
@@ -1249,6 +1250,18 @@ struct Control::Impl {
         return send_json_text(req, std::move(*json));
     }
 
+    static esp_err_t on_panel_stats_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.panel_stats) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::optional<std::string> json = h.panel_stats();
+        if (!json) {
+            return send_text(req, "404 Not Found", "the screen is not running\n");
+        }
+        return send_json_text(req, std::move(*json));
+    }
+
     static esp_err_t on_trim_put(httpd_req_t* req) {
         if (refused_in_flash_mode(req)) {
             return ESP_OK;
@@ -1671,6 +1684,7 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/time-sync", .method = HTTP_GET, .handler = &Impl::on_time_sync_get},
         {.uri = "/time-sync", .method = HTTP_PUT, .handler = &Impl::on_time_sync_put},
         {.uri = "/trim", .method = HTTP_GET, .handler = &Impl::on_trim_get},
+        {.uri = "/panel-stats", .method = HTTP_GET, .handler = &Impl::on_panel_stats_get},
         {.uri = "/trim", .method = HTTP_PUT, .handler = &Impl::on_trim_put},
         {.uri = "/identify", .method = HTTP_GET, .handler = &Impl::on_identify_get},
         {.uri = "/identify", .method = HTTP_POST, .handler = &Impl::on_identify_post},

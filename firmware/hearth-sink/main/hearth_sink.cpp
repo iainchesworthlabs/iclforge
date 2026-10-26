@@ -797,6 +797,8 @@ iclforge::ControlHandlers control_handlers() {
         };
         h.night = []() { return player::preferences().night(); };
         h.set_night = [](const iclforge::nowview::NightSchedule& night) { return player::preferences().set_night(night); };
+        // What the screen costs (iclforge/panel_stats.hpp), read on port 80 where the capture port is off.
+        h.panel_stats = []() { return player::panel_stats_text(); };
     }
     // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
     // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
