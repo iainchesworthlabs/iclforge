@@ -38,6 +38,7 @@ add_executable(panel_preview
     "${MAIN}/panel/lvgl/prefs_pages.cpp"
     "${MAIN}/panel/lvgl/prefs_editors.cpp"
     "${MAIN}/panel/lvgl/sound_sheet.cpp"
+    "${MAIN}/panel/lvgl/layout_sheet.cpp"
     "${MAIN}/panel/lvgl/glyphs.cpp"
     "${REPO}/libs/lyrics/src/lyrics.cpp"
     "${REPO}/libs/lyrics/src/stage.cpp"

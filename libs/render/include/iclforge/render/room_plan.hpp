@@ -81,6 +81,10 @@ inline constexpr int kPlanEarSize = 58;
 inline constexpr int kPlanHeightSize = 48;
 inline constexpr int kPlanLfeWidth = 84;
 inline constexpr int kPlanLfeHeight = 50;
+// A speaker at or above this elevation is overhead, and where there are several they are fanned on a ring of this size
+// (in units of the room's radius) instead of piled on the listener.
+inline constexpr double kPlanOverheadDeg = 80.0;
+inline constexpr double kPlanOverheadRing = 0.3;
 
 // The sizes plan_nodes() lays a room out in: the margins the speakers keep from the edge of the area, the speakers' own
 // sizes, how far apart two must be and the step by which two that touch are pushed apart. The defaults are the screen's
@@ -125,11 +129,21 @@ namespace detail {
     double max_u = -1e9;
     double min_v = 1e9;
     double max_v = -1e9;
+    // Two or more speakers straight overhead (a layout with its heights in the ceiling) have no direction from above: all
+    // would land on the listener. They are drawn on a small ring of their own, each in the direction its azimuth names. One
+    // overhead speaker (the top surround of a 9.1.6) stays over the listener, where it always was.
+    int overhead = 0;
+    for (const PlanSpot& spot : spots) {
+        overhead += spot.connected && !spot.lfe && spot.elevation_deg >= kPlanOverheadDeg ? 1 : 0;
+    }
     for (std::size_t i = 0; i < spots.size(); ++i) {
         if (!spots[i].connected || spots[i].lfe) {
             continue;
         }
-        const double ring = std::cos(spots[i].elevation_deg * kDegrees);
+        double ring = std::cos(spots[i].elevation_deg * kDegrees);
+        if (overhead >= 2 && spots[i].elevation_deg >= kPlanOverheadDeg) {
+            ring = std::max(ring, kPlanOverheadRing);
+        }
         u[i] = -std::sin(spots[i].azimuth_deg * kDegrees) * ring;
         v[i] = -std::cos(spots[i].azimuth_deg * kDegrees) * ring;
         placed.push_back(i);

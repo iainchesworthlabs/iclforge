@@ -115,11 +115,13 @@ enum class Kind : std::uint8_t { kChoice, kStepper, kToggle, kText, kAction, kIn
 enum class Apply : std::uint8_t { kLive, kNextPlay, kRestart };
 
 // How a screen draws an entry's value. kButtons: a kChoice's choices side by side, wrapping, with the reasons of the
-// greyed ones in lines under the row. kList: one choice a line, its note or reason beside it, for a list too long to
-// read as buttons (the speaker layouts, whose limits each need a sentence). kTimes and kZone are for a kText entry
+// greyed ones in lines under the row. kBuilder: the choices are too many, and each limit too long, to read as buttons in
+// a row (the speaker layouts): the row shows the value and a Change button that opens a sheet of its own where the
+// choice is made by saying what the room has (panel/lvgl/layout_sheet.cpp, over layout_builder.hpp); the choices below
+// are what the web page and GET /preferences list. kTimes and kZone are for a kText entry
 // whose value is chosen in an editor of its own over the sheet and not typed (a pair of times, a place in a list):
 // panel/lvgl/prefs_editors.cpp draws them. A page or the REST routes need none.
-enum class Editor : std::uint8_t { kButtons, kList, kTimes, kZone };
+enum class Editor : std::uint8_t { kButtons, kBuilder, kTimes, kZone };
 
 [[nodiscard]] constexpr const char* apply_name(Apply apply) {
     switch (apply) {
@@ -296,7 +298,7 @@ struct Pref {
     // What the button that runs or opens the entry says ("Restart", "View"): an action, an info entry and a list have
     // one. Empty is "Run".
     const char* button = "";
-    // How the screen draws the choices of a kChoice (kButtons, kList), or the editor of its own that a kText's value
+    // How the screen draws the choices of a kChoice (kButtons, kBuilder), or the editor of its own that a kText's value
     // is chosen in over the sheet (kTimes, kZone: prefs_editors.cpp). See Editor.
     Editor editor = Editor::kButtons;
     // How a kText entry with an editor shows its value, where the word a route takes is not what a person reads.
@@ -940,7 +942,7 @@ inline constexpr std::array<Pref, 21> kRegistry{{
     {.id = "speaker-layout",
      .group = Group::kSound,
      .label = "Speaker layout",
-     .note = "The speakers this player drives, one for each output. Greyed ones are not available on this board.",
+     .note = "The speakers this player drives, one for each output. Pick a common layout, or say what the room has.",
      .kind = Kind::kChoice,
      .apply = Apply::kLive,
      .route = "/layout",
@@ -950,7 +952,7 @@ inline constexpr std::array<Pref, 21> kRegistry{{
      .get = &detail::get_layout,
      .set = &detail::set_layout,
      .on_reset = OnReset::kKeep,
-     .editor = Editor::kList,
+     .editor = Editor::kBuilder,
      .confirm = "Changing the speakers makes the music drop out for a moment."},
     {.id = "identify-speakers",
      .group = Group::kSound,
