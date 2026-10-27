@@ -43,9 +43,9 @@
 #
 # The control surface (include/iclforge/control.hpp, src/control.cpp) is here
 # too, on esp_http_server, with the web page it serves: ui/iclforge_ui.html and
-# ui/iclforge_ui.js, embedded as they are and sent from flash
-# (planning/esp32-device-ui.md). IDF names an embedded file's symbols after its
-# base name, hence the component's name on both. Like the rest of this archive
+# ui/iclforge_ui.js, embedded gzipped (tools/gzip_asset.py: 22 KB where they are 69 KB as written, on every
+# board) and sent from flash with Content-Encoding: gzip (planning/esp32-device-ui.md). IDF names an embedded
+# file's symbols after its base name, hence the component's name on both. Like the rest of this archive
 # they reach a firmware only when something in it uses Control.
 #
 # The Sendspin player (CONFIG_ICLFORGE_SENDSPIN, this directory's Kconfig) adds
@@ -99,6 +99,25 @@ if(CONFIG_ICLFORGE_SENDSPIN)
         list(APPEND ICLFORGE_COMPONENT_SRCS "src/ac4_stream_none.cpp")
     endif()
 endif()
+# The web page, gzipped at build time into this component's binary directory and embedded from there (below the
+# registration). A change to either file or to the script writes the .gz again. Not in IDF's first pass over this file,
+# which reads it in script mode to learn the requirements, where a command may not be added.
+set(ICLFORGE_UI_GZ "")
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    idf_build_get_property(ICLFORGE_PYTHON PYTHON)
+    foreach(ICLFORGE_UI_ASSET iclforge_ui.html iclforge_ui.js)
+        set(ICLFORGE_UI_OUT "${CMAKE_CURRENT_BINARY_DIR}/ui/${ICLFORGE_UI_ASSET}.gz")
+        add_custom_command(
+            OUTPUT "${ICLFORGE_UI_OUT}"
+            COMMAND "${ICLFORGE_PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/tools/gzip_asset.py"
+                    "${CMAKE_CURRENT_LIST_DIR}/ui/${ICLFORGE_UI_ASSET}" "${ICLFORGE_UI_OUT}"
+            DEPENDS "${CMAKE_CURRENT_LIST_DIR}/ui/${ICLFORGE_UI_ASSET}" "${CMAKE_CURRENT_LIST_DIR}/tools/gzip_asset.py"
+            COMMENT "gzip ${ICLFORGE_UI_ASSET}"
+            VERBATIM)
+        list(APPEND ICLFORGE_UI_GZ "${ICLFORGE_UI_OUT}")
+    endforeach()
+endif()
+
 idf_component_register(
     SRCS ${ICLFORGE_COMPONENT_SRCS}
     INCLUDE_DIRS "include"
@@ -120,8 +139,14 @@ idf_component_register(
     # esp_http_client: src/firmware_pull.cpp's connection to GitHub, with the certificate bundle of mbedtls
     # (esp_crt_bundle.h); the index's signature is checked with mbedtls's x509 and pk.
     PRIV_REQUIRES lwip esp_psram esp_app_format app_update esp_partition spi_flash hal espcoredump vfs
-                  esp_http_client
-    EMBED_FILES "ui/iclforge_ui.html" "ui/iclforge_ui.js")
+                  esp_http_client)
+
+# IDF names these `_binary_iclforge_ui_html_gz_start` and so on, after the file name (src/control.cpp).
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    foreach(ICLFORGE_UI_OUT ${ICLFORGE_UI_GZ})
+        target_add_binary_data(${COMPONENT_LIB} "${ICLFORGE_UI_OUT}" BINARY)
+    endforeach()
+endif()
 
 # libopus, built into this component when the Sendspin player is to decode Opus (opus.cmake).
 # Below the registration, as the conversion directory further down is: the option is not set in

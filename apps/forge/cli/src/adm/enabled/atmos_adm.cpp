@@ -38,6 +38,7 @@ std::expected<AdmAtmosSource, std::string> load_adm_atmos_source(std::string_vie
     AdmAtmosSource out;
     out.sample_rate = bridged->sample_rate;
     out.is_bed = std::move(bridged->is_bed);
+    out.is_lfe = std::move(bridged->is_lfe);
     out.paths = std::move(bridged->paths);
     out.pcm = std::move(bridged->pcm);
     for (std::size_t i = 0; i < bridged->unmapped.size(); ++i) {

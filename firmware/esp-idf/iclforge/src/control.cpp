@@ -30,14 +30,14 @@
 #include "iclforge/time_zones.hpp"
 #include "iclforge/wall_clock.hpp"
 
-// The web UI's two files. CMakeLists.txt embeds them (EMBED_FILES) and they stay
-// in flash. ESP-IDF names each symbol after the file's base name, which is why
+// The web UI's two files, gzipped. CMakeLists.txt writes them (tools/gzip_asset.py) and embeds them
+// (target_add_binary_data) and they stay in flash. ESP-IDF names each symbol after the file's base name, which is why
 // the files carry the component's name: a firmware that embeds an index.html of
 // its own would otherwise have two definitions of one symbol.
-extern const char iclforge_ui_html_start[] asm("_binary_iclforge_ui_html_start");
-extern const char iclforge_ui_html_end[] asm("_binary_iclforge_ui_html_end");
-extern const char iclforge_ui_js_start[] asm("_binary_iclforge_ui_js_start");
-extern const char iclforge_ui_js_end[] asm("_binary_iclforge_ui_js_end");
+extern const char iclforge_ui_html_start[] asm("_binary_iclforge_ui_html_gz_start");
+extern const char iclforge_ui_html_end[] asm("_binary_iclforge_ui_html_gz_end");
+extern const char iclforge_ui_js_start[] asm("_binary_iclforge_ui_js_gz_start");
+extern const char iclforge_ui_js_end[] asm("_binary_iclforge_ui_js_gz_end");
 
 namespace iclforge {
 namespace {
@@ -404,9 +404,11 @@ esp_err_t send_text(httpd_req_t* req, const char* status, const char* text) {
 // ask again rather than keep a script from before a firmware update. The
 // policy lets the page run script from the device alone and style from its own
 // <style> element, and allows the empty data: icon the page declares so that a
-// browser does not ask for /favicon.ico.
+// browser does not ask for /favicon.ico. The files are gzip (69 KB as written, 22 KB sent), always: a browser asks for
+// gzip, and a client that does not (curl without --compressed) is sent the bytes it can unzip.
 esp_err_t send_file(httpd_req_t* req, const char* type, const char* begin, const char* end) {
     httpd_resp_set_type(req, type);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Content-Security-Policy",
                        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; "

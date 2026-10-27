@@ -15,6 +15,20 @@ See [README.md](README.md) for the project overview and
   (on by default; the CPU copy stays if the DMA will not start) turns it on: on the kit the Meters view's drawing takes 6 to 11 % less
   (0.5 to 1.6 ms an update), the audio burst, sync error and internal heap are unchanged, and the picture reads back right. The image
   is 14.5 KB bigger. Measurements in `planning/p4x-meters-view.md`, "Kit results, 2026-10-28".
+- **Fixed: a bed's LFE was lost, and counted twice, going into Atmos from an ADM master, an IAB file or the window's object mode (#1627).**
+  An LFE cannot be an Atmos object: an object reaches the LFE as `lfe_send * gain`, and the same gain pans it into the speakers, so
+  the bridges' gain 0 / `lfe_send` 1 made it silent, and it took one of the fifteen object slots beside the encoder's own implicit LFE.
+  A 5.1.4 bed read back out of its own ADM master came out of `forge atmos-adm` with the LFE at -120 dBFS and "10 bed speaker feed(s) +
+  the bed's LFE = 11 objects"; a 9.1.6 one, fifteen feeds and an LFE, was refused as "more channels than AtmosEncoder supports". The LFE
+  is now the encoder's: `AtmosEncoder::encode_frame` takes it as an `lfe` span, added to the bed's LFE unpanned and at unity (a new
+  overload; the old one is unchanged), `forge atmos-adm` and `atmos-iab` feed it there for E-AC-3 and write it as AC-4's LFE object for
+  `codec=ac4` (where it went in as an object at -infinity dB), and `BridgeResult` and `IabBridgeResult` hold the objects to fifteen
+  without it (`lfe_count()`, `object_slot_count()`). Two LFE channels (LFE and LFE2) are added into the stream's one LFE, with a
+  warning; a source of nothing but its LFE is refused, since JOC needs an object to reconstruct. forge-gui's object mode built a channel
+  assigned to the LFE bed position the same way (silent, and counted against the fifteen) and now feeds it the same way, with the
+  count and the "Only the LFE is assigned" refusal to match. Not changed: `atmos-encode` of a plain WAV still makes every channel an
+  object, as documented, so the LFE column of a 5.1 file is panned with the rest; and a bed LFE's own gain in the master is still not
+  read (it is carried at unity).
 - **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
   layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
   you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the
@@ -99,8 +113,10 @@ See [README.md](README.md) for the project overview and
   other port. The screen tests and the bench get the server from a new `panel-capture` overlay
   (`sink_profile.py defaults p4-rev3 --overlay panel-capture`), and the `panel-null` development build keeps it. The control
   surface on port 80 is still open to the network, as the device UI plan records; this closes the second door and not
-  that one. `p4-rev3`'s hash moves (`ff9b27a6c4fd` to `d3a19fc4876d`); its board-suite baseline is kept under the old one
-  (`baseline_accepted`) until it is re-recorded on the kit.
+  that one. `p4-rev3`'s hash moves (`ff9b27a6c4fd` to `d3a19fc4876d`); its board-suite baseline was recorded again on the
+  kit with this image (three restarts, three plays of each row). The boot block holds only `internal_free` and `largest`:
+  over HTTP the board's `GET /log` cut the boot budget line at 128 characters, so its `ask_*`, `headroom`, `floor` and
+  `verdict` fields were not read; a run over the serial console reads them.
 - **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
   player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
   (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
@@ -228,6 +244,10 @@ The sections below contain the complete change list and fixes.
   *Melbourne (Australia)*; else its offset, *UTC+09:45 (custom)*), on the Preferences row, in the picker, and on the board's
   page, whose `GET /status` has `zone_place` and `zone_label` beside the `zone` that tools read. Display only: nothing is
   stored from the guess.
+- **The board's web page is embedded gzipped: 47 KB less in every image.** `iclforge_ui.html` and `iclforge_ui.js` are
+  69 KB as written and 22 KB gzipped; the component writes the gzip at build time (reproducibly) and the control surface sends
+  it with `Content-Encoding: gzip`, which a browser reads as it always did (`curl` needs `--compressed`). The 4 MB ESP32-C6
+  image, which had grown 8,720 bytes past its OTA slot, is 38,672 bytes under it.
 - **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
   which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
   `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`

@@ -36,6 +36,7 @@
 #include <filesystem>
 #include <fstream>
 #include <numbers>
+#include <optional>
 #include <random>
 #include <span>
 #include <string>
@@ -339,28 +340,60 @@ int main(int argc, char** argv) {
     // iclforge::objects::oba::evaluate_placements() reads each channel's
     // iclforge::objects::oba::ObjectPath at the frame's own end time, the same pattern every other
     // Atmos example in this directory uses.
-    const auto objects = static_cast<int>(bridged->channel_count());
+    //
+    // The LFE bed channel (IabBridgeResult::is_lfe) is not one of the objects. An object reaches the
+    // LFE only as lfe_send * gain, and the same gain pans it into the speakers, so a channel sent to
+    // the LFE alone would be silent: it is the encoder's own LFE, which encode_frame takes as a span
+    // of its own. So the encoder is built for the other channels, and the LFE's samples go in beside
+    // them. A stream has one LFE; a file with two (LFE and LFE2) adds them together first, as
+    // forge's atmos-iab does, and this example stops short of that.
+    if (bridged->lfe_count() > 1) {
+        fmt::printf("%zu LFE channels: add them into one feed first\n", bridged->lfe_count());
+        return 1;
+    }
+    std::vector<std::size_t> slots;  // the channels that take an object slot, in order
+    std::optional<std::size_t> lfe;  // the LFE channel, if the file has one
+    for (std::size_t ch = 0; ch < bridged->channel_count(); ++ch) {
+        if (bridged->is_lfe[ch]) {
+            lfe = ch;
+        } else {
+            slots.push_back(ch);
+        }
+    }
+    if (slots.empty()) {
+        fmt::printf("an Atmos stream needs a channel besides the LFE\n");
+        return 1;
+    }
+    const auto objects = static_cast<int>(slots.size());
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, objects};
 
     const auto total_samples = bridged->pcm.empty() ? std::size_t{0} : bridged->pcm.front().size();
     const auto total_frames =
         total_samples / static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame);
-    std::vector<std::span<const float>> views(bridged->channel_count());
+    std::vector<std::span<const float>> views(slots.size());
     std::vector<std::byte> stream;
 
     for (std::size_t f = 0; f < total_frames; ++f) {
         const auto start = f * static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame);
-        for (std::size_t ch = 0; ch < bridged->channel_count(); ++ch) {
-            views[ch] =
-                std::span<const float>(bridged->pcm[ch])
-                    .subspan(start, static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame));
+        const auto frame_samples = static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame);
+        for (std::size_t k = 0; k < slots.size(); ++k) {
+            views[k] = std::span<const float>(bridged->pcm[slots[k]]).subspan(start, frame_samples);
         }
         const double t =
             static_cast<double>(start + static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame)) /
             static_cast<double>(kSampleRate);
-        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
+        // Every channel's placement at t, of which the objects' are the ones that count.
+        const auto everywhere = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
+        std::vector<iclforge::objects::oba::ObjectPlacement> placement;
+        placement.reserve(slots.size());
+        for (const auto slot : slots) {
+            placement.push_back(everywhere[slot]);
+        }
+        const std::span<const float> lfe_frame =
+            lfe ? std::span<const float>(bridged->pcm[*lfe]).subspan(start, frame_samples)
+                : std::span<const float>{};
 
-        const auto unit = encoder.encode_frame(views, placement);
+        const auto unit = encoder.encode_frame(views, placement, lfe_frame);
         if (!unit) {
             fmt::printf("encode_frame failed: %d\n", static_cast<int>(unit.error()));
             return 1;
@@ -381,12 +414,13 @@ int main(int argc, char** argv) {
     }
 
     std::size_t bed_count = 0;
-    for (const bool is_bed : bridged->is_bed) {
-        bed_count += is_bed ? 1 : 0;
+    for (const auto slot : slots) {
+        bed_count += bridged->is_bed[slot] ? 1 : 0;
     }
     fmt::printf(
         "%zu bytes of DD+ JOC E-AC-3 from %zu IAB-authored frame(s): %zu bed channel(s) + "
-        "%zu dynamic object(s)\n",
-        stream.size(), total_frames, bed_count, bridged->channel_count() - bed_count);
+        "%zu dynamic object(s)%s\n",
+        stream.size(), total_frames, bed_count, slots.size() - bed_count,
+        lfe ? " + the bed's LFE" : "");
     return 0;
 }

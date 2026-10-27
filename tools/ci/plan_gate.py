@@ -23,6 +23,10 @@ ready for `$GITHUB_OUTPUT`:
                their fragments (ESP_PREFIXES), so the gate configures every profile
                in the IDF container and holds it to its definition (_profiles.yml);
                a configure, not a build: nothing here compiles for a board
+    esp_size   true when the change can alter the ESP32 sinks' images (ESP_IMAGE_PREFIXES: what
+               `esp` reads, and the libraries that are compiled into them), so the gate builds the
+               4 MB C6 image and holds it to its OTA slot (_esp_size.yml): a profile's budget there
+               is the slot, and an image over it cannot be flashed over the network
     reason     the first path that forced `build`, for the run's summary
     gui_reason the first path that pulled Qt in
 
@@ -81,6 +85,17 @@ ESP_PREFIXES = (
     "tools/hearth/sink_profile.py",
     "tools/hearth/kconfig_scan.py",
     ".github/workflows/_profiles.yml",
+)
+
+# What can change the size of an ESP32 sink's image: the above, and the libraries (and the build
+# files and vendored code under them) that the sinks compile in, whatever `esp` makes of them. A
+# library's own tests and fuzzers are not in the image (LIBRARY_CONSUMERS).
+ESP_IMAGE_PREFIXES = (
+    *ESP_PREFIXES,
+    "libs/",
+    "cmake/",
+    "external/",
+    ".github/workflows/_esp_size.yml",
 )
 
 # The projects whose change can alter how fast the encoder runs or how much it allocates:
@@ -194,6 +209,8 @@ def plan(
             "compare": "false",
             "esp": "true",
             "esp_reason": "full run (queue entry, push to main or dispatch)",
+            "esp_size": "true",
+            "esp_size_reason": "full run (queue entry, push to main or dispatch)",
             "reason": "full run (queue entry, push to main or dispatch)",
             "gui_reason": "full run (queue entry, push to main or dispatch)",
         }
@@ -203,6 +220,7 @@ def plan(
     machinery = False
     compare = False
     esp_reason = ""
+    esp_size_reason = ""
     build_reason = ""
     gui_reason = ""
 
@@ -217,6 +235,8 @@ def plan(
         all_docs = False
         if path.startswith(ESP_PREFIXES):
             esp_reason = esp_reason or path
+        if path.startswith(ESP_IMAGE_PREFIXES) and not LIBRARY_CONSUMERS.match(path):
+            esp_size_reason = esp_size_reason or path
 
         if path.startswith(GATE_MACHINERY):
             machinery = True
@@ -265,6 +285,8 @@ def plan(
             "compare": "false",
             "esp": "true",
             "esp_reason": "no file list; running everything",
+            "esp_size": "true",
+            "esp_size_reason": "no file list; running everything",
             "reason": "no file list; building everything",
             "gui_reason": "no file list; building everything",
         }
@@ -278,6 +300,8 @@ def plan(
             "compare": "false",
             "esp": "false",
             "esp_reason": "",
+            "esp_size": "false",
+            "esp_size_reason": "",
             "reason": "documentation only",
             "gui_reason": "",
         }
@@ -293,6 +317,8 @@ def plan(
         "compare": "true" if compare else "false",
         "esp": "true" if esp_reason else "false",
         "esp_reason": esp_reason,
+        "esp_size": "true" if esp_size_reason else "false",
+        "esp_size_reason": esp_size_reason,
         "reason": build_reason or "nothing a Linux C++ build reads (lint only)",
         "gui_reason": gui_reason,
     }
@@ -324,9 +350,11 @@ def main(argv: list[str]) -> int:
         "machinery",
         "compare",
         "esp",
+        "esp_size",
         "reason",
         "gui_reason",
         "esp_reason",
+        "esp_size_reason",
     )
     for key in keys:
         print(f"{key}={result[key]}")

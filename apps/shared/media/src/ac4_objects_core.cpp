@@ -125,6 +125,10 @@ iclforge::objects::oba::Position ac4_pin_position(double azimuth_deg) {
     return {.x = 0.5 - 0.5 * std::sin(radians), .y = 0.5 - 0.5 * std::cos(radians), .z = 0.0};
 }
 
+iclforge::objects::oba::ObjectPlacement ac4_lfe_placement() {
+    return {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .gain = 1.0, .lfe_send = 0.0};
+}
+
 std::vector<std::vector<float>> ac4_flat_planes(std::span<const Ac4SourceView> sources) {
     std::size_t total = 0;
     std::size_t channels = 0;
@@ -244,7 +248,7 @@ std::vector<iclforge::objects::oba::ObjectPlacement> ac4_scene_placements(
                           .lfe_send = 0.0};
                 break;
             case Ac4ObjectSlot::Kind::kLfe:
-                out[i] = {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .gain = 1.0, .lfe_send = 0.0};
+                out[i] = ac4_lfe_placement();
                 break;
         }
     }

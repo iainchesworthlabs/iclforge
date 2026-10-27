@@ -643,6 +643,28 @@ class Verify(unittest.TestCase):
         (build / sp.APP_NAME).write_bytes(b"\0" * 100)
         self.assertEqual(sp.verify(self.data, "a", build), [])
 
+    def test_an_image_with_less_room_than_a_change_must_leave_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 91)
+        # Without the ask it is inside its budget, as before.
+        self.assertEqual(sp.verify(self.data, "a", build), [])
+        findings = sp.verify(self.data, "a", build, app_headroom=10)
+        self.assertEqual(self.rules(findings), ["budget"])
+        self.assertIn("9 under the profile's 100", findings[0].message)
+        self.assertIn("leave 10 free", findings[0].message)
+
+    def test_an_image_with_exactly_the_room_asked_for_passes(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 90)
+        self.assertEqual(sp.verify(self.data, "a", build, app_headroom=10), [])
+
+    def test_an_image_over_its_budget_is_one_finding_with_or_without_the_room(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 101)
+        findings = sp.verify(self.data, "a", build, app_headroom=10)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("over the profile's 100", findings[0].message)
+
     def test_a_profile_that_locks_nothing_is_said_so(self) -> None:
         self.data["profiles"]["a"]["locked"] = {}
         build = make_build(self.root, dict(FINAL))
@@ -881,6 +903,21 @@ class CommandLine(unittest.TestCase):
             )
             self.assertEqual(code, 1)
             self.assertIn("::error title=profile a, locked::", out)
+
+    def test_verify_with_app_headroom_fails_an_image_too_close_to_its_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profiles = Path(tmp) / "profiles.json"
+            profiles.write_text(json.dumps(small_data()), "utf-8")
+            build = make_build(Path(tmp), dict(FINAL))
+            (build / sp.APP_NAME).write_bytes(b"\0" * 95)
+            argv = ("--profiles", str(profiles), "verify", "a", "--build-dir", str(build))
+            self.assertEqual(self.run_cli(*argv)[0], 0)
+            code, out, _ = self.run_cli(*argv, "--app-headroom", "10", "--github")
+            self.assertEqual(code, 1)
+            self.assertIn("::error title=profile a, budget::", out)
+            self.assertIn("a change must leave 10 free", out)
+            code, _, _ = self.run_cli(*argv, "--app-headroom", "5")
+            self.assertEqual(code, 0)
 
 
 class KconfigChange(unittest.TestCase):

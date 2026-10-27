@@ -6,7 +6,7 @@
 // the page does". The error paths are the device's own refusals (400, 409), a
 // connection closed unanswered and a device that does not answer at all.
 
-const { test, expect } = require('./fixtures');
+const { test, expect, holdClockAt } = require('./fixtures');
 const { REPLIES } = require('./stub');
 
 const DEMO = 'http://10.0.2.2:8000/demo.ec3';
@@ -130,6 +130,18 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Name').fill('Kitchen');
         await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
         await expect(page.getByRole('status')).toHaveText('Name Kitchen: no connection.');
+    });
+
+    test('a connection closed unanswered says so on a connection that was reused too', async ({ page, stub }) => {
+        // Chromium sends a request again that a reused connection closes unanswered, once for each such connection
+        // it has, and a run that is slow between next() and the click can meet one (stub.js, resends): here every
+        // connection is left open, so that it does. The page sent the request once, and the stand-in saw it once.
+        stub.reuseConnections(true);
+        stub.next('PUT /name', 'drop');
+        await page.getByLabel('Name').fill('Kitchen');
+        await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByRole('status')).toHaveText('Name Kitchen: no connection.');
+        expect(stub.sent('PUT /name')).toHaveLength(1);
     });
 
     test('a play someone else started shows through to its end', async ({ page, stub }) => {
@@ -427,8 +439,7 @@ async function everySecondUntil(page, last) {
 
 test.describe('with the clock held', () => {
     test.beforeEach(async ({ page, stub }) => {
-        await page.clock.install({ time: new Date('2026-09-11T12:00:00Z') });
-        await page.clock.pauseAt(new Date('2026-09-11T12:00:00Z'));
+        await holdClockAt(page, new Date('2026-09-11T12:00:00Z'));
         await page.goto(stub.url);
         await expect(page.locator('#state')).toHaveText('Stopped');
     });

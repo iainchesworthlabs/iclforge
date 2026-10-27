@@ -114,6 +114,12 @@ struct Ac4ObjectSlot {
 // channel come out at one position.
 [[nodiscard]] iclforge::objects::oba::Position ac4_pin_position(double azimuth_deg);
 
+// What an AC-4 stream's LFE object is placed at: the room's centre, at unity gain, sending nothing
+// anywhere else. The stream marks the object as the LFE by the writer's own `lfe` flag
+// (ac4_objects_config), so the placement only has to leave its audio at full level: a gain below
+// one would turn the LFE down, and zero silences it.
+[[nodiscard]] iclforge::objects::oba::ObjectPlacement ac4_lfe_placement();
+
 // One source file's channels as the encoder's flat input: `offset_samples` of
 // leading silence, then its samples.
 struct Ac4SourceView {

@@ -276,6 +276,7 @@ iclforge::ac3::oba::AtmosEncoder::bed_latency() const
 iclforge::ac3::oba::AtmosEncoder::dynamic_object_count() const
 iclforge::ac3::oba::AtmosEncoder::encode_bed_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
 iclforge::ac3::oba::AtmosEncoder::encode_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<iclforge::objects::oba::ObjectPlacement const, 18446744073709551615ul>)
+iclforge::ac3::oba::AtmosEncoder::encode_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<iclforge::objects::oba::ObjectPlacement const, 18446744073709551615ul>, std::span<float const, 18446744073709551615ul>)
 iclforge::ac3::oba::AtmosEncoder::latency() const
 iclforge::ac3::oba::AtmosEncoder::operator=(iclforge::ac3::oba::AtmosEncoder&&)
 iclforge::ac3::oba::AtmosEncoder::parameters() const

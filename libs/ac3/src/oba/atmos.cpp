@@ -614,10 +614,25 @@ void AtmosEncoder::Impl::render_and_reconstruct(
 std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
     std::span<const std::span<const float>> objects,
     std::span<const iclforge::objects::oba::ObjectPlacement> placement) {
+    return encode_frame(objects, placement, std::span<const float>{});
+}
+
+std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
+    std::span<const std::span<const float>> objects,
+    std::span<const iclforge::objects::oba::ObjectPlacement> placement,
+    std::span<const float> lfe) {
     ICLFORGE_ZONE_SCOPED_N("AtmosEncoder::encode_frame");
     assert(impl_->program_.dynamic_only);
     assert(static_cast<int>(objects.size()) == impl_->objects_);
     assert(static_cast<int>(placement.size()) == impl_->objects_);
+
+    // A feed for the bed's LFE is one whole frame or nothing: a short one would
+    // leave the tail of the frame unwritten and a long one has no place to go.
+    // Refused rather than asserted, because the caller reads the length off a
+    // file it did not write.
+    if (!lfe.empty() && static_cast<int>(lfe.size()) != impl_->frame_samples_) {
+        return std::unexpected(FrameError::kInvalidObjectAudio);
+    }
 
     // The object count is fixed at construction, which cannot fail, so this
     // is the first place a count the container cannot carry can be refused.
@@ -663,6 +678,20 @@ std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
 
     // --- 2-4. Bed render and JOC reconstruction matrix -----------------------
     impl_->render_and_reconstruct(objects, pan, target, scale, target_lfe);
+
+    // The bed's own LFE, when the source has one: added to the LFE channel
+    // after the objects' sends, unpanned and at unity gain - exactly what
+    // encode_bed_frame does with a CBI bed's LFE, and for the same reason it is
+    // no JOC object: §6.3.2.2 bypasses the LFE, so nothing reconstructs it and
+    // no matrix or ramp state is there for a direct feed to disturb. It cannot
+    // ride an object instead, since an object reaches the LFE only through
+    // lfe_send * gain and the same gain pans it into the speakers.
+    if (!lfe.empty()) {
+        auto& bed_lfe = impl_->bed_[5];
+        for (int n = 0; n < impl_->frame_samples_; ++n) {
+            bed_lfe[static_cast<std::size_t>(n)] += lfe[static_cast<std::size_t>(n)];
+        }
+    }
 
     // --- 5. Metadata --------------------------------------------------------
     std::vector<iclforge::objects::oba::DynamicObject> described(count);
