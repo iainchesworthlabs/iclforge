@@ -647,6 +647,13 @@ mounts it gets the page: [`firmware/esp-idf/iclforge/ui/iclforge_ui.html`](../fi
 and [`ac3forge_ui.js`](../firmware/esp-idf/iclforge/ui/iclforge_ui.js), listed as `EMBED_FILES` in the
 component's `idf_component_register`. ESP-IDF places embedded files in `.rodata.embedded`, which
 is flash, and names their symbols after the file's base name (`_binary_ac3forge_ui_html_start`);
+**since 2026-10-26 they are embedded gzipped**: the component's CMakeLists writes each file's gzip into
+its build directory (`firmware/esp-idf/iclforge/tools/gzip_asset.py`: level 9, no name or time in the header, so a build is
+reproducible) and embeds that with `target_add_binary_data`, so the symbols are
+`_binary_iclforge_ui_html_gz_start` and so on, and `send_file` adds `Content-Encoding: gzip`. 69,221
+bytes as written, 21,700 sent: 47 KB less in every image (the 4 MB C6's slot had gone 8,720 bytes over).
+A client that does not ask for gzip is sent it all the same (a browser always does; `curl` needs
+`--compressed`). The size limit the page is held to (`budget.spec.js`) is on the source, as it was.
 the prefix is there because a firmware that embeds its own `index.html` would otherwise fail to
 link with two definitions of the same symbol.
 

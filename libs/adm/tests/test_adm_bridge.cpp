@@ -3,6 +3,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
@@ -598,6 +599,99 @@ TEST_CASE("build() rejects more than 15 channels", "[adm][bridge]") {
     const auto result = iclforge::adm::build(doc);
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::adm::BridgeError::kTooManyChannels);
+}
+
+namespace {
+
+// A document of `objects` dynamic objects and then `lfes` LFE bed channels (DirectSpeakers, speakerLabel
+// "LFE", then "LFE2" for a second), one audioObject each, every channel carrying a constant. The
+// objects are what AtmosEncoder takes a slot for; the LFE channels are its implicit LFE.
+iclforge::adm::AdmDocument document_of(std::size_t objects, std::size_t lfes) {
+    iclforge::adm::AdmDocument doc;
+    doc.model.programmes.push_back({.id = "APR_0001", .name = "P", .content_refs = {"ACO_0001"}});
+    iclforge::adm::AudioContent content{.id = "ACO_0001", .name = "C", .object_refs = {}};
+    doc.audio.sample_rate = 48000;
+    for (std::size_t i = 0; i < objects + lfes; ++i) {
+        const bool lfe = i >= objects;
+        const auto suffix = std::to_string(i + 1);
+        const std::string object_id = "AO_00" + suffix;
+        const std::string pack_id = "AP_00" + suffix;
+        const std::string channel_id = "AC_00" + suffix;
+        const std::string uid = "ATU_0000000" + suffix;
+        const auto type = lfe ? iclforge::adm::TypeDefinition::kDirectSpeakers
+                              : iclforge::adm::TypeDefinition::kObjects;
+        content.object_refs.push_back(object_id);
+        doc.model.objects.push_back({.id = object_id,
+                                     .name = "O",
+                                     .start_s = 0.0,
+                                     .has_duration = false,
+                                     .duration_s = 0.0,
+                                     .pack_format_refs = {pack_id},
+                                     .track_uid_refs = {uid},
+                                     .object_refs = {}});
+        doc.model.pack_formats.push_back({.id = pack_id,
+                                          .name = "Pack",
+                                          .type = type,
+                                          .channel_format_refs = {channel_id},
+                                          .pack_format_refs = {}});
+        auto channel = channel_with({block_at(0.0, std::nullopt, polar(0.0, 0.0))});
+        channel.id = channel_id;
+        channel.type = type;
+        if (lfe) {
+            channel.block_formats[0].speaker_labels = {i == objects ? "LFE" : "LFE2"};
+        }
+        doc.model.channel_formats.push_back(std::move(channel));
+        doc.chna.push_back({.track_index = static_cast<std::uint16_t>(i + 1), .uid = uid,
+                            .track_ref = "", .pack_ref = ""});
+        doc.audio.channels.push_back(std::vector<float>(kFrame, 0.1f));
+    }
+    doc.model.contents.push_back(std::move(content));
+    return doc;
+}
+
+}  // namespace
+
+TEST_CASE("build() holds fifteen objects and an LFE, because the LFE is not one of them",
+          "[adm][bridge]") {
+    // A 9.1.6 bed: fifteen speaker feeds and the LFE. TS 103 420 8.3.2.2's sixteen are those
+    // fifteen objects and AtmosEncoder's own implicit LFE, so the LFE channel must not be counted
+    // against the fifteen as well - it was, and the file was refused.
+    const auto result = iclforge::adm::build(document_of(15, 1));
+    REQUIRE(result.has_value());
+    CHECK(result->channel_count() == 16);
+    CHECK(result->object_slot_count() == 15);
+    CHECK(result->lfe_count() == 1);
+    CHECK(result->is_lfe[15]);
+    CHECK(std::count(result->is_lfe.begin(), result->is_lfe.begin() + 15, true) == 0);
+}
+
+TEST_CASE("build() still refuses a sixteenth object beside the LFE", "[adm][bridge]") {
+    const auto result = iclforge::adm::build(document_of(16, 1));
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == iclforge::adm::BridgeError::kTooManyChannels);
+}
+
+TEST_CASE("build() takes a dual-LFE bed's second LFE as the same implicit LFE, not an object",
+          "[adm][bridge]") {
+    // LFE and LFE2: both are marked, neither takes an object slot. There is one LFE in the stream, so
+    // it is the consumer that adds them together (apps/forge/cli's take_lfe_channels).
+    const auto result = iclforge::adm::build(document_of(15, 2));
+    REQUIRE(result.has_value());
+    CHECK(result->lfe_count() == 2);
+    CHECK(result->object_slot_count() == 15);
+    CHECK(result->is_lfe[15]);
+    CHECK(result->is_lfe[16]);
+}
+
+TEST_CASE("build() bridges a document of nothing but its LFE, with no object slot to give it",
+          "[adm][bridge]") {
+    // The bridge reports what is there. That an Atmos stream needs an object beside the LFE is the
+    // encode's to refuse, and forge's atmos-adm does.
+    const auto result = iclforge::adm::build(document_of(0, 1));
+    REQUIRE(result.has_value());
+    CHECK(result->channel_count() == 1);
+    CHECK(result->object_slot_count() == 0);
+    CHECK(result->lfe_count() == 1);
 }
 
 TEST_CASE("build() picks the lowest-ID audioProgramme by default", "[adm][bridge]") {

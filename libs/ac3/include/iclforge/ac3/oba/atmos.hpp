@@ -153,6 +153,24 @@ class ICLFORGE_AC3_EXPORT AtmosEncoder {
         std::span<const std::span<const float>> objects,
         std::span<const iclforge::objects::oba::ObjectPlacement> placement);
 
+    // The same, plus a source's own LFE channel. `lfe` is one frame of it
+    // (the same length as each object's span), or empty for none - which is
+    // the overload above exactly. It is added to the bed's LFE unpanned and at
+    // unity gain, on top of whatever the objects send there with lfe_send: it
+    // is not an object, takes none of the fifteen object slots, and is not
+    // reconstructed by JOC (§6.3.2.2 bypasses the LFE), the same treatment
+    // encode_bed_frame() gives a CBI bed's. A source whose LFE arrives as one
+    // of its channels - an ADM or IAB bed, a 5.1 WAV - passes it here and
+    // builds the encoder for its OTHER channels, because an object has no way
+    // to reach the LFE alone: lfe_send scales by the object's gain, and that
+    // same gain pans it into the speakers.
+    //
+    // A span of any other length is refused with kInvalidObjectAudio.
+    [[nodiscard]] std::expected<eac3::AccessUnit, FrameError> encode_frame(
+        std::span<const std::span<const float>> objects,
+        std::span<const iclforge::objects::oba::ObjectPlacement> placement,
+        std::span<const float> lfe);
+
     // One frame of a CBI bed's audio - only on an encoder built with the
     // BedProgram constructor. `channels` is exactly bed_channel_count(program())
     // spans of one frame each (kSamplesPerFrame by default, 256/512/768 under a
