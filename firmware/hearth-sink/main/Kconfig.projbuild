@@ -1077,6 +1077,19 @@ config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
         LVGL draws a dirty area through two buffers of this many rows of the
         panel's width, in RGB565: 80 KB each at 1024 wide and 40 rows.
 
+config ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH
+    bool "Copy each render buffer into the DSI frame buffer with the 2D-DMA"
+    default y
+    depends on ICLFORGE_EXAMPLE_PANEL_DSI
+    help
+        Without this ESP-IDF copies each rendered area into the frame buffer
+        on the CPU, line by line, PSRAM to PSRAM, and tells LVGL it is done
+        before returning: the panel task is held for the copy and the second
+        render buffer never overlaps it. With it the copy is a 2D-DMA job and
+        LVGL is told from the interrupt that ends it, so the task draws the
+        next chunk meanwhile. The jobs read and write PSRAM, as the CPU did.
+        If the DMA cannot be set up the CPU copy stays.
+
 config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT
     int "Port that serves the picture as a BMP at /panel.bmp (0 = none)"
     default 0
