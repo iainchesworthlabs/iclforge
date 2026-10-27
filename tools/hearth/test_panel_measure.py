@@ -184,6 +184,53 @@ class Schedule(unittest.TestCase):
         plan = pm.segments("all", 60, 20, 3, 10)
         self.assertEqual(pm.total_seconds(plan), 10 + 4 * 60 + 20 * 6 + 20)
 
+    def test_the_baseline_schedule_puts_the_dark_view_either_side_of_every_other_view(self) -> None:
+        plan = pm.segments("baseline", 40, 20, 3, 10)
+        self.assertEqual(
+            [s.name for s in plan],
+            [
+                "settle",
+                "dark-0",
+                "speakers-glow",
+                "dark-1",
+                "meters-a",
+                "dark-2",
+                "speakers-pulse",
+                "dark-3",
+                "meters-b",
+                "dark-4",
+            ],
+        )
+        self.assertTrue(all(s.view == "dark" for s in plan if s.name.startswith("dark-")))
+        # No cycles, however many are asked for: the leak test is the other schedule's.
+        self.assertEqual(pm.total_seconds(plan), 10 + 9 * 40 + 20)
+
+    def test_a_views_cost_is_its_burst_less_the_dark_stretches_either_side(self) -> None:
+        figures = {
+            "dark-0": {"burst_us_mean": 4000.0},
+            "speakers-glow": {"burst_us_mean": 4100.0},
+            "dark-1": {"burst_us_mean": 4040.0},
+            "meters-a": {"burst_us_mean": 4300.0},
+            "dark-2": {"burst_us_mean": 4080.0},
+            "speakers-pulse": {"burst_us_mean": None},
+        }
+        costs = {c["segment"]: c for c in pm.dark_costs(figures)}
+        self.assertEqual(set(costs), {"speakers-glow", "meters-a"})
+        self.assertAlmostEqual(costs["speakers-glow"]["dark"], 4020.0)
+        self.assertAlmostEqual(costs["speakers-glow"]["cost"], 80.0)
+        self.assertAlmostEqual(costs["meters-a"]["cost"], 4300.0 - 4060.0)
+
+    def test_a_view_at_the_end_has_the_one_dark_stretch_there_is_and_a_run_with_none_has_no_costs(
+        self,
+    ) -> None:
+        self.assertEqual(
+            pm.dark_costs({"meters-a": {"burst_us_mean": 5.0}, "dark-0": {"burst_us_mean": 3.0}})[
+                0
+            ]["cost"],
+            2.0,
+        )
+        self.assertEqual(pm.dark_costs({"speakers-glow": {"burst_us_mean": 1.0}}), [])
+
     def test_the_segment_in_force_is_found_by_time_and_the_last_stays_after_the_end(self) -> None:
         plan = pm.segments("all", 60, 1, 3, 10)
         self.assertEqual(pm.segment_at(plan, 0).name, "settle")
@@ -206,6 +253,42 @@ class Figures(unittest.TestCase):
         self.assertAlmostEqual(pm.timing_mean_between(first, last), 22.0)
         self.assertIsNone(pm.timing_mean_between(first, first))
         self.assertIsNone(pm.timing_mean_between(None, last))
+
+    def test_a_segments_burst_is_read_between_two_readings_of_the_boards_running_mean(self) -> None:
+        # The board's burst_us is the mean of every burst since the stream began: a minute at
+        # 4,000 us and then a minute at 4,500 reads 4,250 at the end; the second minute's is 4,500.
+        plan = [
+            pm.Segment("a", "speakers", "glow", 60, 5),
+            pm.Segment("b", "meters", "glow", 60, 5),
+        ]
+        samples: list[dict[str, Any]] = []
+        total = 0
+        bursts = 0
+        for second in range(120):
+            cost = 4000 if second < 60 else 4500
+            for _ in range(30):
+                bursts += 1
+                total += cost
+            samples.append(
+                {
+                    "t": float(second),
+                    "segment": "a" if second < 60 else "b",
+                    "status": status(bursts, burst_us=total // bursts),
+                    "panel": None,
+                }
+            )
+        grouped = pm.group_samples(samples, plan)
+        first = pm.summarise(grouped["a"], plan[0])
+        second = pm.summarise(grouped["b"], plan[1])
+        self.assertAlmostEqual(first["burst_us_mean"], 4000, delta=1)
+        self.assertAlmostEqual(second["burst_us_mean"], 4500, delta=15)
+        self.assertAlmostEqual(second["burst_us_max"], 4500, delta=150)
+
+    def test_the_mean_between_two_readings_needs_bursts_between_them(self) -> None:
+        a = {"status": status(100, burst_us=4000)}
+        b = {"status": status(160, burst_us=4100)}
+        self.assertAlmostEqual(pm.running_mean_between(a, b), (4100 * 160 - 4000 * 100) / 60)
+        self.assertIsNone(pm.running_mean_between(a, a))
 
     def test_percentile_takes_the_value_at_the_rank(self) -> None:
         self.assertEqual(pm.percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.95), 10)
