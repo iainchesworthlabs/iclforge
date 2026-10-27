@@ -66,6 +66,17 @@ See [README.md](README.md) for the project overview and
   (`planning/p4x-meters-view.md`, "Kit results"): the stream is whole in every row and the Meters view costs the decode task 0.4 to 0.8 ms a burst, but on music an
   update takes 130 to 440 ms (the step is 50), so the view falls to 10 updates a second and still does not keep up; the spectrum and the bars need to be drawn
   as a few objects, not 100 to 200 small invalid areas.
+- **Changed: the Meters view draws each chart as one canvas, and its analysis works in float.** The kit put the view's cost in its 100 to 200 small invalid areas a
+  refresh (each a pass over the object tree and a flush to the glass). The spectrum plot, the channel bars and the pair of meters are now one RGB565 canvas each, redrawn
+  only in a few rectangles around the bars that moved (`iclforge/meters_draw.hpp`, `plan_cells()`: neighbouring bars share one when that is cheaper, and the result is held bit for bit to a
+  full redraw by test), so an update flushes 6 to 7 areas and 0.7 to 1.2 million pixels a second where it flushed 58 to 118 areas (the panel preview counts them and fails above 12); the numbers under the bars change at 4 Hz; the analysis's power average, levels and ballistics are float (the P4 has no double unit), and
+  the 17 bands up to 800 Hz are analysed every other update (`Analyzer::analyze_low` and `analyze_high`, equal to the whole by test); `meters_screen.cpp` and `panel.cpp` build at -O2.
+  `GET /panel-stats` gains the tap's cost in parts (`us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`) and an exact refresh mean. `tools/hearth/panel_measure.py`
+  now judges the rate as the owner asked, **20 Hz if possible, else a steady 10 Hz**, and says which cell holds which, and names faults that are only in the first, cold opening
+  of the view. The governor does not judge the first two seconds of a view (its first draw and the cold code), rises under 60 % of a fast step and takes the resting 100 ms of its loop as the
+  allowance at ten a second; an update is charged the refreshes since the last one and not the last refresh (a still picture costs nothing). The representations and the zone colours are unchanged.
+  **Measured on the kit** (planning/p4x-meters-view.md, "Kit results, second run"): an update costs 11 to 29 ms where it cost 130 to 440, and **a stereo, 5.1, 9.1.6, JOC 7.1.4 and AC-4 5.1 stream each hold 20 updates a second** with no fall to ten, in the first opening of the
+  view and the second; the audio is whole in every music row. Open: the JOC row misses 1.7 % of its steps and an update takes 59 % of the step, and the player's tap costs 330 to 720 us a burst (more than the plan's guess of 150 to 500).
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,

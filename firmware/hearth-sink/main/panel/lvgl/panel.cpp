@@ -344,6 +344,7 @@ void on_refresh_ready(lv_event_t* /*event*/) {
     g_stats.render_us_last = took;
     g_stats.render_us_max = std::max(g_stats.render_us_max, took);
     g_stats.render_us_mean = static_cast<std::uint32_t>(g_render_total_us / g_stats.refreshes);
+    g_stats.render_us_total = g_render_total_us;
     panel::now_meters_refresh(took);
 }
 

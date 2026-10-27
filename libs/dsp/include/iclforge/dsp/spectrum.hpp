@@ -16,7 +16,7 @@
 //
 // A real frame of 2 N samples is the complex transform of N points, unpacked: z[n] = x[2n] + i x[2n + 1]. The band's level is the
 // power of the bins that fall in it, the bins at its edges shared by the overlap. Nothing here allocates after construction
-// (about 63 KB of tables and scratch, which a caller allocates once, not on a stack) and nothing is double: the library's transform keeps two
+// (about 63 KB of tables and scratch, which a caller allocates once, not on a stack) and nothing a second costs is double (a P4 has no double unit): the library's transform keeps two
 // work buffers on the stack (8 KB at 1,024 points), which the panel's 16 KB stack, with 9 KB of it already spoken for by LVGL, cannot spare,
 // so the passes are run here in buffers the analyzer owns (detail::forward_in, held bit for bit to the library's by test_spectrum.cpp).
 //
@@ -55,6 +55,13 @@ inline constexpr std::size_t kHistory = kLowFrame * kDecimate;
 inline constexpr float kSilentDb = -120.0F;
 
 // A full-scale sine has a mean square of 0.5: 0 dB.
+// 10^(dB / 10) and 10 log10(x) in single precision: the P4 has no double-precision unit, and a double pow or log10 there is several microseconds, thirty
+// times an update (planning/p4x-meters-view.md, "Kit results"). A float keeps 1e-6 dB of the 0.01 the bars are read to.
+[[nodiscard]] inline float db_to_power(float db) { return std::exp2(db * 0.33219281F); }
+[[nodiscard]] inline float power_to_db(float power) { return 3.01029996F * std::log2(power); }
+
+[[nodiscard]] inline float to_db_f(float mean_square) { return mean_square <= 1e-12F ? kSilentDb : power_to_db(mean_square / 0.5F); }
+
 [[nodiscard]] inline float to_db(double mean_square) {
     return mean_square <= 1e-12 ? kSilentDb : static_cast<float>(10.0 * std::log10(mean_square / 0.5));
 }
@@ -202,6 +209,13 @@ class Analyzer {
 
     // The levels of the 31 bands, in dB below a full-scale sine's power, of `history`: the newest kHistory samples, oldest first.
     void analyze(std::span<const std::int16_t, kHistory> history, std::array<float, kBands>& db) {
+        analyze_low(history, db);
+        analyze_high(history, db);
+    }
+
+    // The two halves of it, which a caller may run at different rates: the 17 bands up to 800 Hz look at the newest 171 ms (a window that long
+    // changes little in 50 ms, so every other update loses nothing), the 14 above it at the newest 21 ms.
+    void analyze_low(std::span<const std::int16_t, kHistory> history, std::array<float, kBands>& db) {
         constexpr float kInt16 = 1.0F / 32768.0F;
         for (std::size_t n = 0; n < kLowFrame; ++n) {
             std::int32_t sum = 0;
@@ -214,8 +228,12 @@ class Analyzer {
                    std::span<float, kLowFrame / 2>(im_.data(), kLowFrame / 2), std::span<float, kLowFrame / 2>(re2_.data(), kLowFrame / 2),
                    std::span<float, kLowFrame / 2>(im2_.data(), kLowFrame / 2), std::span<float, kLowFrame / 2 + 1>(power_.data(), kLowFrame / 2 + 1));
         for (int b = 0; b < kLowBands; ++b) {
-            db[static_cast<std::size_t>(b)] = band_level(b, low_bins_, low_.scale());
+            db[static_cast<std::size_t>(b)] = band_level(b, low_bins_, static_cast<float>(low_.scale()));
         }
+    }
+
+    void analyze_high(std::span<const std::int16_t, kHistory> history, std::array<float, kBands>& db) {
+        constexpr float kInt16 = 1.0F / 32768.0F;
         for (std::size_t n = 0; n < kHighFrame; ++n) {
             frame_[n] = static_cast<float>(history[kHistory - kHighFrame + n]) * kInt16;
         }
@@ -224,17 +242,17 @@ class Analyzer {
                     std::span<float, kHighFrame / 2>(im2_.data(), kHighFrame / 2),
                     std::span<float, kHighFrame / 2 + 1>(power_.data(), kHighFrame / 2 + 1));
         for (int b = kLowBands; b < kBands; ++b) {
-            db[static_cast<std::size_t>(b)] = band_level(b, high_bins_, high_.scale());
+            db[static_cast<std::size_t>(b)] = band_level(b, high_bins_, static_cast<float>(high_.scale()));
         }
     }
 
    private:
-    [[nodiscard]] float band_level(int band, const std::vector<detail::Bin>& bins, double scale) const {
-        double sum = 0.0;
+    [[nodiscard]] float band_level(int band, const std::vector<detail::Bin>& bins, float scale) const {
+        float sum = 0.0F;
         for (std::size_t i = first_bin_[static_cast<std::size_t>(band)]; i < end_bin_[static_cast<std::size_t>(band)]; ++i) {
-            sum += static_cast<double>(bins[i].share) * static_cast<double>(power_[bins[i].index]);
+            sum += bins[i].share * power_[bins[i].index];
         }
-        return to_db(sum * scale);
+        return to_db_f(sum * scale);
     }
 
     detail::RealPower<kLowFrame> low_;
@@ -294,15 +312,15 @@ class Reference {
 // The time average of a real-time analyser: each band's power, not its level, follows a one-pole of time constant `tau` (0.1 s is "fast"), so that a
 // noise-like band does not flicker by the few degrees of freedom of one short frame.
 struct PowerAverage {
-    std::array<double, kBands> power{};
+    std::array<float, kBands> power{};
     bool primed = false;
 
     void feed(const std::array<float, kBands>& db, float seconds, float tau, std::array<float, kBands>& out) {
-        const double a = 1.0 - std::exp(-static_cast<double>(seconds) / static_cast<double>(tau));
+        const float a = 1.0F - std::exp(-seconds / tau);
         for (std::size_t b = 0; b < static_cast<std::size_t>(kBands); ++b) {
-            const double p = db[b] <= kSilentDb ? 0.0 : 0.5 * std::pow(10.0, static_cast<double>(db[b]) / 10.0);
+            const float p = db[b] <= kSilentDb ? 0.0F : 0.5F * db_to_power(db[b]);
             power[b] = primed ? power[b] + a * (p - power[b]) : p;
-            out[b] = to_db(power[b]);
+            out[b] = to_db_f(power[b]);
         }
         primed = true;
     }

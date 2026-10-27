@@ -48,6 +48,8 @@ struct PanelStats {
     std::uint32_t render_us_last = 0;
     std::uint32_t render_us_mean = 0;
     std::uint32_t render_us_max = 0;
+    // And all of them added, which a mean between two readings is worked out from.
+    std::uint64_t render_us_total = 0;
     // The longest the screen took to rebuild its rows (a line change), microseconds, and how many
     // times it did.
     std::uint32_t rebuild_us_max = 0;

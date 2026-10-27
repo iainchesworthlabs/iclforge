@@ -156,7 +156,12 @@ TAP_BUDGET_US = {
 }  # the tap's cost for a burst: up to 8 outputs, and more
 TAP_LARGE_OUTPUTS = 8
 COST_FRACTION_OF_STEP = 0.5  # the mean cost of an update, as a share of the step in force
-MUST_HOLD_20HZ_OUTPUTS = 6  # a room of this many outputs or fewer must hold twenty updates a second
+SLOW_STEP_US = 100_000  # the step at ten updates a second
+# The owner's wish (2026-10-26): twenty updates a second if possible, else a steady ten.
+# A cell holds twenty with no fall to ten. It holds a steady ten when it fell (or never could),
+# at most this share of its steps went by with no update, and an update costs at most half of
+# the ten-a-second step.
+STEADY_TEN_MISSED_FRACTION = 0.01
 STACK_FREE_MIN = 4096  # the panel task's stack, bytes free at its least
 INTERNAL_DROP_MAX = (
     8192  # the internal heap's low point under the Meters view, against the speakers view's
@@ -335,11 +340,20 @@ def judge_row(
             )
         )
     ]
+    # The kit's first run had an underrun and a resync at the first opening of the view on a
+    # stereo PCM stream and not at the second: whether the faults are the cold first build's is
+    # worth a line of its own.
+    cold = bool(bad) and all(b.startswith("meters-a:") for b in bad)
     add(
         "stream",
         None if not figures else not bad,
         "no underrun, late or dropped burst, resync or invalid burst in any segment"
-        + (f" (found: {'; '.join(bad)})" if bad else ""),
+        + (f" (found: {'; '.join(bad)})" if bad else "")
+        + (
+            "; only the first, cold opening of the view: repeat it before blaming the view"
+            if cold
+            else ""
+        ),
     )
 
     # 2. The Meters view's burst is the speakers view's, give or take the tap.
@@ -378,14 +392,31 @@ def judge_row(
     if meter_names:
         rate = min(figures[n]["meters"]["rate_hz_min"] for n in meter_names)
         falls = sum(figures[n]["meters"]["falls"] for n in meter_names)
-        must = row.outputs <= MUST_HOLD_20HZ_OUTPUTS
-        add(
-            "rate",
-            (rate == 20) if must else True,
-            f"holds {rate} Hz ({falls} falls)"
-            + ("" if must else ", reported: this room is not required to hold 20 Hz"),
-        )
         cost = max(figures[n]["meters"]["mean_cost_us"] for n in meter_names)
+        updates = sum(figures[n]["meters"]["updates"] for n in meter_names)
+        missed = sum(figures[n]["meters"]["dropped"] for n in meter_names)
+        missed_share = missed / max(updates + missed, 1)
+        steady_ten = (
+            missed_share <= STEADY_TEN_MISSED_FRACTION
+            and cost <= COST_FRACTION_OF_STEP * SLOW_STEP_US
+        )
+        if rate == 20 and falls == 0:
+            add("rate", True, "holds 20 Hz")
+        elif steady_ten:
+            add(
+                "rate",
+                True,
+                f"holds a steady 10 Hz ({falls} falls from 20; an update costs "
+                f"{cost / 1000:.1f} ms)",
+            )
+        else:
+            add(
+                "rate",
+                False,
+                f"holds neither 20 Hz nor a steady 10: {falls} falls, an update costs "
+                f"{cost / 1000:.1f} ms, {100 * missed_share:.0f} % of the steps went by "
+                "with no update",
+            )
         step = 50_000 if rate == 20 else 100_000
         add(
             "cost",
@@ -393,8 +424,12 @@ def judge_row(
             f"an update costs {cost / 1000:.1f} ms on average, {100 * cost / step:.0f} % of the "
             f"{step // 1000} ms step (at most {100 * COST_FRACTION_OF_STEP:.0f} %)",
         )
-        misses = sum(figures[n]["meters"]["dropped"] for n in meter_names)
-        add("dropped", misses == 0, f"{misses} whole steps went by with no update")
+        add(
+            "dropped",
+            missed_share <= STEADY_TEN_MISSED_FRACTION,
+            f"{missed} whole steps went by with no update ({100 * missed_share:.1f} % of the "
+            f"steps; at most {100 * STEADY_TEN_MISSED_FRACTION:.0f} %)",
+        )
     else:
         add("rate", None, "the Meters view showing")
 

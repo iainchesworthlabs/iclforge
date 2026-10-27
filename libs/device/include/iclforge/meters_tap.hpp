@@ -107,9 +107,23 @@ struct TapStats {
     std::uint32_t reads = 0;    // history reads asked for
     std::uint32_t torn = 0;     // of them, dropped because the writer overran the copy
     std::uint32_t short_reads = 0;  // of them, before enough was written
+    // Where the time of a block goes, from every sixteenth block (which is timed in parts, at the price of three more reads of the clock): the pass
+    // over the outputs (the mix and the peaks), the scale to 16 bits and the ring's write, and what a read of the clock itself cost. The kit's
+    // first run measured 370 to 860 us a burst for a tap that adds and compares 1,536 samples an output, and these say whether it is the
+    // loops, the memory they read, or the clock.
+    std::uint32_t sampled_blocks = 0;
+    std::uint32_t us_pass = 0;
+    std::uint32_t us_pack = 0;
+    std::uint32_t us_clock = 0;
 
     // Microseconds a 1,536-frame burst cost the audio path, on average.
     [[nodiscard]] double us_per_burst() const { return frames == 0 ? 0.0 : static_cast<double>(us_total) * 1536.0 / static_cast<double>(frames); }
+    // The same for a part: the sampled blocks' time a block, times the six blocks of a burst.
+    [[nodiscard]] double part_per_burst(std::uint32_t part_us) const {
+        return sampled_blocks == 0 ? 0.0 : static_cast<double>(part_us) * 6.0 / static_cast<double>(sampled_blocks);
+    }
+    // What one read of the clock cost, in microseconds.
+    [[nodiscard]] double us_per_clock_read() const { return sampled_blocks == 0 ? 0.0 : static_cast<double>(us_clock) / static_cast<double>(sampled_blocks); }
 };
 
 class MeterTap final : public iclforge::BlockTap {
@@ -127,6 +141,9 @@ class MeterTap final : public iclforge::BlockTap {
 
     void block(std::span<const std::span<float>> outputs, std::size_t frames, std::uint32_t live) noexcept override {
         const std::uint64_t t0 = clock_ != nullptr ? clock_() : 0;
+        // Every sixteenth block is timed in parts.
+        const bool sampled = clock_ != nullptr && (seen_++ & 15U) == 15U;
+        const std::uint64_t t_clock = sampled ? clock_() : 0;
         frames = std::min(frames, kTapBlockFrames);
         std::array<float, kTapBlockFrames> mix{};
         const std::size_t count = std::min(outputs.size(), kTapMaxOutputs);
@@ -143,6 +160,7 @@ class MeterTap final : public iclforge::BlockTap {
             }
             peak_[o] = peak;
         }
+        const std::uint64_t t_pass = sampled ? clock_() : 0;
         // The sum, scaled to the range of 16 bits and rounded.
         const float scale = 32767.0F / static_cast<float>(1U << mix_shift(count));
         std::array<std::int16_t, kTapBlockFrames> block16{};
@@ -151,6 +169,17 @@ class MeterTap final : public iclforge::BlockTap {
             block16[k] = static_cast<std::int16_t>(v >= 0.0F ? v + 0.5F : v - 0.5F);
         }
         ring_.write(std::span<const std::int16_t>(block16.data(), frames));
+        if (sampled) {
+            const std::uint64_t t_pack = clock_();
+            // One writer: a store of the sum is all a counter needs.
+            const auto add = [](std::atomic<std::uint32_t>& counter, std::uint64_t us) {
+                counter.store(counter.load(std::memory_order_relaxed) + static_cast<std::uint32_t>(us), std::memory_order_relaxed);
+            };
+            add(us_pass_, t_pass - t_clock);
+            add(us_pack_, t_pack - t_pass);
+            add(us_clock_, t_clock - t0);
+            add(sampled_blocks_, 1);
+        }
         window_frames_ += frames;
         if (window_frames_ >= kFastWindowFrames) {
             close_window(count);
@@ -204,6 +233,10 @@ class MeterTap final : public iclforge::BlockTap {
         s.reads = reads_.load(std::memory_order_relaxed);
         s.torn = torn_.load(std::memory_order_relaxed);
         s.short_reads = short_reads_.load(std::memory_order_relaxed);
+        s.sampled_blocks = sampled_blocks_.load(std::memory_order_relaxed);
+        s.us_pass = us_pass_.load(std::memory_order_relaxed);
+        s.us_pack = us_pack_.load(std::memory_order_relaxed);
+        s.us_clock = us_clock_.load(std::memory_order_relaxed);
         return s;
     }
 
@@ -224,6 +257,7 @@ class MeterTap final : public iclforge::BlockTap {
     // The writer's own state.
     std::array<float, kTapMaxOutputs> peak_{};
     std::size_t window_frames_ = 0;
+    std::uint32_t seen_ = 0;
     // What the reader reads.
     std::array<std::atomic<float>, kTapMaxOutputs> published_{};
     std::atomic<std::size_t> published_outputs_{0};
@@ -233,6 +267,10 @@ class MeterTap final : public iclforge::BlockTap {
     std::atomic<std::uint64_t> frames_{0};
     std::atomic<std::uint64_t> us_total_{0};
     std::atomic<std::uint32_t> us_max_block_{0};
+    std::atomic<std::uint32_t> sampled_blocks_{0};
+    std::atomic<std::uint32_t> us_pass_{0};
+    std::atomic<std::uint32_t> us_pack_{0};
+    std::atomic<std::uint32_t> us_clock_{0};
     mutable std::atomic<std::uint32_t> reads_{0};
     mutable std::atomic<std::uint32_t> torn_{0};
     mutable std::atomic<std::uint32_t> short_reads_{0};

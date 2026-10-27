@@ -61,18 +61,23 @@ inline constexpr int kBands = 31;
 // The level of a bar of `per_bar` bands: their powers added (levels are in dB below a full-scale sine, so the sum of the 10^(dB/10)).
 inline constexpr float kSilentDb = -120.0F;
 
+// 10^(dB / 10) and 10 log10(p) in single precision: the P4 has no double-precision unit, and a double pow or log10 there is several microseconds
+// (planning/p4x-meters-view.md, "Kit results"). A float keeps 1e-6 dB of what a bar is read to.
+[[nodiscard]] inline float db_to_power(float db) { return std::exp2(db * 0.33219281F); }
+[[nodiscard]] inline float power_to_db(float power) { return power <= 1e-12F ? kSilentDb : 3.01029996F * std::log2(power); }
+
 [[nodiscard]] inline float bar_db(std::span<const float, kBands> bands, int bar, int per_bar) {
     if (per_bar == 1) {
         return bands[static_cast<std::size_t>(bar)];
     }
-    double sum = 0.0;
+    float sum = 0.0F;
     for (int b = first_band_of_bar(bar, per_bar); b < first_band_of_bar(bar, per_bar) + per_bar && b < kBands; ++b) {
         const float db = bands[static_cast<std::size_t>(b)];
         if (db > kSilentDb) {
-            sum += std::pow(10.0, static_cast<double>(db) / 10.0);
+            sum += db_to_power(db);
         }
     }
-    return sum <= 1e-12 ? kSilentDb : static_cast<float>(10.0 * std::log10(sum));
+    return power_to_db(sum);
 }
 
 // The names under the bands, as many as fit (the screen draws every fourth on a row or two).
@@ -184,26 +189,26 @@ struct Fold {
 
 // Levels of channels that are not known to agree add as powers: the dB of the sum of the 10^(dB/10) of `members` (kSilentDb when there are none or all are silent).
 [[nodiscard]] inline float power_sum_db(std::span<const float> peak_db, std::span<const std::uint8_t> members) {
-    double p = 0.0;
+    float p = 0.0F;
     for (const std::uint8_t o : members) {
         if (o < peak_db.size() && peak_db[o] > kSilentDb) {
-            p += std::pow(10.0, static_cast<double>(peak_db[o]) / 10.0);
+            p += db_to_power(peak_db[o]);
         }
     }
-    return p <= 1e-12 ? kSilentDb : static_cast<float>(10.0 * std::log10(p));
+    return power_to_db(p);
 }
 
 // The stereo downmix of the room, in the same terms (ITU: the centre and a surround at -3 dB into the side it goes to; the LFE not at all).
 inline void downmix_db(std::span<const float> peak_db, const Fold& fold, float& left, float& right) {
-    std::array<double, kMasters> p{};
+    std::array<float, kMasters> p{};
     for (std::size_t m = 0; m < kMasters; ++m) {
         const float db = power_sum_db(peak_db, fold.master[m].span());
-        p[m] = db > kSilentDb ? std::pow(10.0, static_cast<double>(db) / 10.0) : 0.0;
+        p[m] = db > kSilentDb ? db_to_power(db) : 0.0F;
     }
-    const double l = p[static_cast<std::size_t>(Master::kL)] + 0.5 * p[static_cast<std::size_t>(Master::kC)] + 0.5 * p[static_cast<std::size_t>(Master::kLs)];
-    const double r = p[static_cast<std::size_t>(Master::kR)] + 0.5 * p[static_cast<std::size_t>(Master::kC)] + 0.5 * p[static_cast<std::size_t>(Master::kRs)];
-    left = l <= 1e-12 ? kSilentDb : static_cast<float>(10.0 * std::log10(l));
-    right = r <= 1e-12 ? kSilentDb : static_cast<float>(10.0 * std::log10(r));
+    const float l = p[static_cast<std::size_t>(Master::kL)] + 0.5F * p[static_cast<std::size_t>(Master::kC)] + 0.5F * p[static_cast<std::size_t>(Master::kLs)];
+    const float r = p[static_cast<std::size_t>(Master::kR)] + 0.5F * p[static_cast<std::size_t>(Master::kC)] + 0.5F * p[static_cast<std::size_t>(Master::kRs)];
+    left = power_to_db(l);
+    right = power_to_db(r);
 }
 
 }  // namespace iclforge::meters

@@ -197,6 +197,33 @@ TEST_CASE("the transform in the analyzer's own buffers is the library's, bit for
     check(std::integral_constant<std::size_t, 256>{});
 }
 
+TEST_CASE("the two halves of the analysis are the whole, bit for bit, and each leaves the other's bands alone", "[spectrum]") {
+    Noise noise;
+    History h{};
+    for (std::size_t n = 0; n < h.size(); ++n) {
+        h[n] = static_cast<std::int16_t>(noise.next() * 9000.0F + 6000.0F * std::sin(0.3F * static_cast<float>(n)));
+    }
+    auto analyzer = std::make_unique<sp::Analyzer>();
+    Levels whole{};
+    analyzer->analyze(h, whole);
+    Levels low{};
+    Levels high{};
+    low.fill(-77.0F);
+    high.fill(-77.0F);
+    analyzer->analyze_low(h, low);
+    analyzer->analyze_high(h, high);
+    for (int b = 0; b < sp::kBands; ++b) {
+        const auto i = static_cast<std::size_t>(b);
+        if (b < sp::kLowBands) {
+            CHECK(low[i] == whole[i]);
+            CHECK(high[i] == -77.0F);
+        } else {
+            CHECK(high[i] == whole[i]);
+            CHECK(low[i] == -77.0F);
+        }
+    }
+}
+
 TEST_CASE("the power average follows a step by its time constant, and starts at the first level", "[spectrum]") {
     sp::PowerAverage avg;
     Levels loud{};

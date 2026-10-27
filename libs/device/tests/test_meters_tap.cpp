@@ -181,6 +181,8 @@ TEST_CASE("the tap counts and times what it does", "[meters-tap]") {
     // Two reads of the clock a block, 3 us apart: 3 us a block.
     REQUIRE(stats.us_total == 12 * 3);
     REQUIRE(stats.us_max_block == 3);
+    // Every sixteenth block is timed in parts: none of these twelve.
+    REQUIRE(stats.sampled_blocks == 0);
     // A burst of 1,536 frames is six blocks of 256: 18 us on that clock.
     REQUIRE(std::fabs(stats.us_per_burst() - 18.0) < 1e-9);
     // A view that opens reads its own longest block, not the board's.
@@ -209,4 +211,25 @@ TEST_CASE("the tap is asked for only while the screen wants it", "[meters-tap]")
     REQUIRE(tap->wanted());
     tap->set_wanted(false);
     REQUIRE_FALSE(tap->wants_blocks());
+}
+
+TEST_CASE("every sixteenth block is timed in its parts, and the parts add up to what a block took, less the bookkeeping", "[meters-tap]") {
+    g_now = 0;
+    auto tap = make_tap(&fake_clock);
+    for (int i = 0; i < 64; ++i) {
+        Feed feed(2, {0.1F, 0.1F}, 256);
+        tap->block(feed.span(), 256, 0b11);
+    }
+    const mt::TapStats stats = tap->stats();
+    REQUIRE(stats.blocks == 64);
+    REQUIRE(stats.sampled_blocks == 4);
+    // On a clock that moves 3 us a read: the clock's own cost is one read (3), the pass one (3 more than the read after it began), the pack one.
+    CHECK(stats.us_clock == 4 * 3);
+    CHECK(stats.us_pass == 4 * 3);
+    CHECK(stats.us_pack == 4 * 3);
+    CHECK(std::fabs(stats.us_per_clock_read() - 3.0) < 1e-9);
+    CHECK(std::fabs(stats.part_per_burst(stats.us_pass) - 18.0) < 1e-9);  // six blocks of 3 us
+    mt::TapStats none;
+    CHECK(none.part_per_burst(5) == 0.0);
+    CHECK(none.us_per_clock_read() == 0.0);
 }
