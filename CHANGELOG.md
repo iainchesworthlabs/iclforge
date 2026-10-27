@@ -10,6 +10,11 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the P4X's screen copies each drawn area into the frame buffer with the 2D-DMA, not the CPU.** ESP-IDF's DSI panel copied every
+  flushed area on the CPU (line by line, PSRAM to PSRAM) and the 2D-DMA hook was never turned on. `ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH`
+  (on by default; the CPU copy stays if the DMA will not start) turns it on: on the kit the Meters view's drawing takes 6 to 11 % less
+  (0.5 to 1.6 ms an update), the audio burst, sync error and internal heap are unchanged, and the picture reads back right. The image
+  is 14.5 KB bigger. Measurements in `planning/p4x-meters-view.md`, "Kit results, 2026-10-28".
 - **Fixed: a bed's LFE was lost, and counted twice, going into Atmos from an ADM master, an IAB file or the window's object mode (#1627).**
   An LFE cannot be an Atmos object: an object reaches the LFE as `lfe_send * gain`, and the same gain pans it into the speakers, so
   the bridges' gain 0 / `lfe_send` 1 made it silent, and it took one of the fifteen object slots beside the encoder's own implicit LFE.
