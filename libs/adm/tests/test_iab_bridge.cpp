@@ -756,20 +756,61 @@ TEST_CASE("build_iab treats AudioDataID 0 as legitimate silence, not an error",
     }
 }
 
-TEST_CASE("build_iab refuses more than 15 channels", "[adm][bridge][iab]") {
+namespace {
+
+// Every ChannelID here maps to a distinct BedLabel (§10.3.5's own uniqueness rule - "A ChannelID
+// shall not be indicated more than once within a BedDefinition element"), so these exercise the
+// count cap itself, not the mapping table. Sixteen channels, of which 0xD is the LFE: fifteen speaker
+// feeds and the LFE.
+constexpr std::array<std::uint32_t, 16> kSixteenIds = {0x0, 0x2, 0x4,  0x6,  0xA,  0x7,  0x8,  0xD,
+                                                       0xE, 0xF, 0x82, 0x83, 0x84, 0x85, 0x88, 0x89};
+
+std::vector<iclforge::iab::BedChannel> sixteen_channels() {
     std::vector<iclforge::iab::BedChannel> channels;
-    // Every ChannelID in this loop maps to a distinct BedLabel (§10.3.5's own uniqueness rule -
-    // "A ChannelID shall not be indicated more than once within a BedDefinition element"), so this
-    // exercises the count cap itself, not the mapping table.
-    constexpr std::array<std::uint32_t, 16> kIds = {0x0, 0x2, 0x4,  0x6,  0xA,  0x7,  0x8,  0xD,
-                                                    0xE, 0xF, 0x82, 0x83, 0x84, 0x85, 0x88, 0x89};
-    for (const auto id : kIds) {
+    for (const auto id : kSixteenIds) {
         channels.push_back(make_bed_channel(id));
     }
-    auto frame = make_frame({make_bed(1, channels)});
+    return channels;
+}
+
+}  // namespace
+
+TEST_CASE("build_iab holds fifteen channels and the LFE, because the LFE is not one of them",
+          "[adm][bridge][iab]") {
+    // TS 103 420 8.3.2.2's sixteen are fifteen objects and AtmosEncoder's own implicit LFE, so the
+    // LFE channel must not be counted against the fifteen as well - it was, and this was refused.
+    auto frame = make_frame({make_bed(1, sixteen_channels())});
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    CHECK(result->channel_count() == 16);
+    CHECK(result->object_slot_count() == 15);
+    CHECK(result->lfe_count() == 1);
+}
+
+TEST_CASE("build_iab refuses a sixteenth channel that is not the LFE", "[adm][bridge][iab]") {
+    // The same sixteen, and one more from a second bed (a different MetaID is a different
+    // channel): sixteen that take an object slot, one too many beside the LFE.
+    auto frame = make_frame({make_bed(1, sixteen_channels()), make_bed(2, {make_bed_channel(0x0)})});
     const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::adm::BridgeError::kTooManyChannels);
+}
+
+TEST_CASE("build_iab counts neither LFE of a dual-LFE programme against the fifteen",
+          "[adm][bridge][iab]") {
+    // 0xD is the LFE and 0x87 the BS.2051-2 LFE2 alias, in two beds. Fifteen speaker feeds beside them.
+    std::vector<iclforge::iab::BedChannel> feeds;
+    for (const auto id : kSixteenIds) {
+        if (id != 0xD) {
+            feeds.push_back(make_bed_channel(id));
+        }
+    }
+    feeds.push_back(make_bed_channel(0xD));
+    auto frame = make_frame({make_bed(1, feeds), make_bed(2, {make_bed_channel(0x87)})});
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    CHECK(result->lfe_count() == 2);
+    CHECK(result->object_slot_count() == 15);
 }
 
 namespace {

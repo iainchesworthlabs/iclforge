@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a bed's LFE was lost, and counted twice, going into Atmos from an ADM master, an IAB file or the window's object mode (#1627).**
+  An LFE cannot be an Atmos object: an object reaches the LFE as `lfe_send * gain`, and the same gain pans it into the speakers, so
+  the bridges' gain 0 / `lfe_send` 1 made it silent, and it took one of the fifteen object slots beside the encoder's own implicit LFE.
+  A 5.1.4 bed read back out of its own ADM master came out of `forge atmos-adm` with the LFE at -120 dBFS and "10 bed speaker feed(s) +
+  the bed's LFE = 11 objects"; a 9.1.6 one, fifteen feeds and an LFE, was refused as "more channels than AtmosEncoder supports". The LFE
+  is now the encoder's: `AtmosEncoder::encode_frame` takes it as an `lfe` span, added to the bed's LFE unpanned and at unity (a new
+  overload; the old one is unchanged), `forge atmos-adm` and `atmos-iab` feed it there for E-AC-3 and write it as AC-4's LFE object for
+  `codec=ac4` (where it went in as an object at -infinity dB), and `BridgeResult` and `IabBridgeResult` hold the objects to fifteen
+  without it (`lfe_count()`, `object_slot_count()`). Two LFE channels (LFE and LFE2) are added into the stream's one LFE, with a
+  warning; a source of nothing but its LFE is refused, since JOC needs an object to reconstruct. forge-gui's object mode built a channel
+  assigned to the LFE bed position the same way (silent, and counted against the fifteen) and now feeds it the same way, with the
+  count and the "Only the LFE is assigned" refusal to match. Not changed: `atmos-encode` of a plain WAV still makes every channel an
+  object, as documented, so the LFE column of a 5.1 file is panned with the rest; and a bed LFE's own gain in the master is still not
+  read (it is carried at unity).
 - **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
   layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
   you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the

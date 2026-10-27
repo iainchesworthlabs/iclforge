@@ -363,17 +363,17 @@
 <context>
     <name>EncoderController</name>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8472"/>
+        <location filename="../../src/encoder_controller.cpp" line="8515"/>
         <source>Saved to %1</source>
         <translation>אויפֿגעהיט אין %1</translation>
     </message>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8475"/>
+        <location filename="../../src/encoder_controller.cpp" line="8518"/>
         <source>Could not write %1: %2</source>
         <translation>האָט ניט געקענט שרײַבן %1: %2</translation>
     </message>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8494"/>
+        <location filename="../../src/encoder_controller.cpp" line="8537"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>דער דאָזיקער בוי טראָגט נישט קיין אײַנגעבויטע נאָטיצן־טעקע (:/notices/NOTICES.txt איז נישט אַרײַנקאָמפּילירט געוואָרן); די NOTICES.txt לעבן דער אַפּליקאַציע און דער LICENSE פֿון דעם רעפּאָזיטאָריע זאָגן וואָס עס קומט מיט.</translation>
     </message>
