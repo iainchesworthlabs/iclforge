@@ -62,6 +62,7 @@
 #include "source_frame.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "channel_geometry.hpp"
+#include "lfe_pins.hpp"
 #include "fmp4_folder_writer.hpp"
 #include "recording_sink.hpp"
 
@@ -567,6 +568,11 @@ iclforge::objects::oba::Position speaker_pin_position(double azimuth_deg) {
     const double radians = azimuth_deg * std::numbers::pi / 180.0;
     return {.x = 0.5 - 0.45 * std::sin(radians), .y = 0.5 - 0.45 * std::cos(radians), .z = 0.0};
 }
+
+// Object mode's pins split into speaker pins and the LFE, and the LFE's feed: lfe_pins.hpp says why
+// an LFE pin is not an object.
+using forge_gui::fill_lfe_frame;
+using forge_gui::split_pins;
 
 // Where a failed or cancelled run's frames land when the keep-partial
 // preference is on: ".partial" spliced in before the suffix, so "out.ec3"
@@ -3063,7 +3069,8 @@ void EncoderController::startMotionPreview() {
     // and moved into the worker below, so the worker never reads
     // object_keyframes_/object_configs_ directly.
     const auto dynamic = dynamicObjectChannels();
-    const auto pinned = pinnedObjectChannels();
+    const auto pins = split_pins(pinnedObjectChannels());
+    const auto& pinned = pins.speakers;  // the LFE is no object: it is the `lfe` feed below
     const std::size_t ndynamic = std::min<std::size_t>(dynamic.size(), 15);
     const std::size_t nobjects = ndynamic + pinned.size();
 
@@ -3089,18 +3096,12 @@ void EncoderController::startMotionPreview() {
         paths.emplace_back(std::move(*fallback));
     }
     for (const auto& [flat, location] : pinned) {
-        using iclforge::ac3::eac3::chanmap::Location;
-        const bool lfe_pin = location == Location::kLfe || location == Location::kLfe2;
-        const auto azimuth =
-            lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
+        const auto azimuth = location_azimuth_deg(location);
         const auto position = azimuth
                                   ? speaker_pin_position(*azimuth)
                                   : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
         auto pin_path = iclforge::objects::oba::KeyframePath::create(
-            {{.time_s = 0.0,
-              .position = position,
-              .gain = lfe_pin ? 0.0 : 1.0,
-              .lfe_send = lfe_pin ? 1.0 : 0.0}});
+            {{.time_s = 0.0, .position = position, .gain = 1.0, .lfe_send = 0.0}});
         paths.emplace_back(std::move(*pin_path));
     }
 
@@ -3127,6 +3128,11 @@ void EncoderController::startMotionPreview() {
     }
     for (const auto& [flat, location] : pinned) {
         object_planes.push_back(std::move(planes[flat]));
+    }
+    std::vector<std::vector<float>> lfe_planes;
+    lfe_planes.reserve(pins.lfes.size());
+    for (const std::size_t flat : pins.lfes) {
+        lfe_planes.push_back(std::move(planes[flat]));
     }
     planes = std::move(object_planes);
 
@@ -3165,7 +3171,7 @@ void EncoderController::startMotionPreview() {
     setBusy(true);
 
     jobs_.run([this, p, sample_rate, nobjects, paths = std::move(paths),
-               planes = std::move(planes)]() mutable {
+               planes = std::move(planes), lfe_planes = std::move(lfe_planes)]() mutable {
         // Heap-allocated - see encodeObjects'/runLiveSession's own PREfast
         // C6262 comment on why: a multi-KB internal history buffer pushes a
         // worker thread's stack frame too far.
@@ -3179,15 +3185,21 @@ void EncoderController::startMotionPreview() {
         iclforge::ac3::analysis::LevelMeter meter{iclforge::ac3::Acmod::k3_2, true, sample_rate};
 
         // The longest of the channels actually used as an object, same as
-        // encodeObjects()'s own `total`.
+        // encodeObjects()'s own `total` - the LFE channels included.
         std::size_t total = 0;
         for (std::size_t ch = 0; ch < nobjects; ++ch) {
             total = std::max(total, planes[ch].size());
+        }
+        for (const auto& plane : lfe_planes) {
+            total = std::max(total, plane.size());
         }
         std::vector<std::vector<float>> block(nobjects,
                                               std::vector<float>(iclforge::ac3::kSamplesPerFrame));
         std::vector<std::span<const float>> views(nobjects);
         std::vector<std::span<const float>> metered(6);
+        // The bed's LFE feed, as encodeObjects()'s: empty when no channel is assigned to it.
+        std::vector<float> lfe_block(lfe_planes.empty() ? 0 : iclforge::ac3::kSamplesPerFrame);
+        std::vector<float> lfe_scratch(lfe_block.size());
         // The bed comes back in AC-3 coded order (L C R Ls Rs LFE); this is
         // the same coded-to-WAV permutation runLiveSession's own monitor
         // path reorders a decoded frame with.
@@ -3208,12 +3220,15 @@ void EncoderController::startMotionPreview() {
                 iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
+            if (!lfe_planes.empty()) {
+                fill_lfe_frame(lfe_planes, start, lfe_block, lfe_scratch);
+            }
             // The placement is the object's position at the END of the
             // frame - same convention encodeObjects() uses.
             const double t = static_cast<double>(start + iclforge::ac3::kSamplesPerFrame) /
                              static_cast<double>(sample_rate);
             const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
-            const auto unit = encoder->encode_frame(views, placement);
+            const auto unit = encoder->encode_frame(views, placement, lfe_block);
             if (!unit) {
                 problem = QStringLiteral(
                     "The frame cannot hold a 5.1 bed and the object metadata at this bit "
@@ -7542,14 +7557,20 @@ void EncoderController::encodeTo(const QUrl& url) {
     }
     if (object_mode) {
         // TS 103 420 §8.3.2.2's sixteen-object cap, with the bed's LFE as
-        // one of them: dynamic objects plus every bed-pinned channel have to
-        // fit in the other fifteen. Refused here, before a run entry opens,
-        // the same way a channel plan that cannot be routed is.
+        // one of them: dynamic objects plus every speaker-pinned channel have
+        // to fit in the other fifteen. A channel pinned to the LFE is that
+        // sixteenth - the bed's own LFE, not an object (see split_pins) - so
+        // it is not counted against them. Refused here, before a run entry
+        // opens, the same way a channel plan that cannot be routed is.
         const auto ndynamic = dynamicObjectChannels().size();
-        const auto npinned = pinnedObjectChannels().size();
+        const auto pins = split_pins(pinnedObjectChannels());
+        const auto npinned = pins.speakers.size();
         if (ndynamic + npinned == 0) {
-            setStatus(QStringLiteral("Nothing is assigned to an object or a bed position — "
-                                     "give at least one channel a destination."));
+            setStatus(pins.lfes.empty()
+                          ? QStringLiteral("Nothing is assigned to an object or a bed position — "
+                                           "give at least one channel a destination.")
+                          : QStringLiteral("Only the LFE is assigned — an Atmos stream needs at "
+                                           "least one object or speaker-fed channel besides it."));
             emit encodeRefused(status_);
             return;
         }
@@ -8024,10 +8045,13 @@ void EncoderController::encodeObjects(const QString& path,
     // Which of the flat channels ride, and how, follows the assignment table
     // (every channel is a dynamic object when nothing is assigned - the
     // behaviour this path has always had). encodeTo already enforced TS 103
-    // 420 §8.3.2.2's sixteen-object cap over dynamic + pinned together, with
-    // the bed's LFE as one of the sixteen.
+    // 420 §8.3.2.2's sixteen-object cap over dynamic + speaker-pinned
+    // together, with the bed's LFE as one of the sixteen. A channel pinned to
+    // the LFE is that LFE, not an object (see split_pins): it rides the
+    // encoder's `lfe` feed below and is not counted in nobjects.
     const auto dynamic = dynamicObjectChannels();
-    const auto pinned = pinnedObjectChannels();
+    const auto pins = split_pins(pinnedObjectChannels());
+    const auto& pinned = pins.speakers;
     const std::size_t ndynamic = std::min<std::size_t>(dynamic.size(), 15);
     const std::size_t nobjects = ndynamic + pinned.size();
 
@@ -8078,20 +8102,14 @@ void EncoderController::encodeObjects(const QString& path,
     // are the same coded thing. Unity gain - it is a channel feed, and the
     // inverse-root law above exists for objects sharing arbitrary positions,
     // not for one source aimed at its own speaker. The LFE has no direction
-    // to pin at, so it rides as a pure lfe_send.
+    // to pin at and cannot be an object (see split_pins): it is not here.
     for (const auto& [flat, location] : pinned) {
-        using iclforge::ac3::eac3::chanmap::Location;
-        const bool lfe_pin = location == Location::kLfe || location == Location::kLfe2;
-        const auto azimuth =
-            lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
+        const auto azimuth = location_azimuth_deg(location);
         const auto position = azimuth
                                   ? speaker_pin_position(*azimuth)
                                   : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
         auto pin_path = iclforge::objects::oba::KeyframePath::create(
-            {{.time_s = 0.0,
-              .position = position,
-              .gain = lfe_pin ? 0.0 : 1.0,
-              .lfe_send = lfe_pin ? 1.0 : 0.0}});
+            {{.time_s = 0.0, .position = position, .gain = 1.0, .lfe_send = 0.0}});
         paths.emplace_back(std::move(*pin_path));
     }
 
@@ -8100,7 +8118,8 @@ void EncoderController::encodeObjects(const QString& path,
     // objectModel/config addressing, each built via buildObjectPlane so a
     // trim or an objm fold reaches the stream), then the pinned channels.
     // Channels assigned nowhere are dropped here, which is what
-    // "Unassigned - it will not be heard" means.
+    // "Unassigned - it will not be heard" means. The LFE channels are kept
+    // apart, in source order, for the worker's `lfe` feed.
     std::vector<std::vector<float>> object_planes;
     object_planes.reserve(nobjects);
     for (std::size_t i = 0; i < ndynamic; ++i) {
@@ -8109,7 +8128,17 @@ void EncoderController::encodeObjects(const QString& path,
     for (const auto& [flat, location] : pinned) {
         object_planes.push_back(std::move(planes[flat]));
     }
+    std::vector<std::vector<float>> lfe_planes;
+    lfe_planes.reserve(pins.lfes.size());
+    for (const std::size_t flat : pins.lfes) {
+        lfe_planes.push_back(std::move(planes[flat]));
+    }
     planes = std::move(object_planes);
+    const QString lfe_note =
+        lfe_planes.size() > 1
+            ? QStringLiteral(" The %1 LFE channels are summed into the bed's one LFE.")
+                  .arg(static_cast<int>(lfe_planes.size()))
+            : QString{};
 
     // The meters follow the BED, not the source: 5.1 is what comes out and
     // what a legacy decoder hears, whatever the source layout was.
@@ -8125,9 +8154,10 @@ void EncoderController::encodeObjects(const QString& path,
     clearClipLatches();
 
     const bool keep_partial = keep_partial_output_;
-    jobs_.run([this, path, p, sample_rate, nobjects, keep_partial,
+    jobs_.run([this, path, p, sample_rate, nobjects, keep_partial, lfe_note,
                paths = std::move(paths),
-               planes = std::move(planes)]() mutable {
+               planes = std::move(planes),
+               lfe_planes = std::move(lfe_planes)]() mutable {
         iclforge::ac3::oba::AtmosEncoder encoder{{.sample_rate = p.sample_rate,
                                         .bitrate_kbps = p.bitrate_kbps,
                                         .dialnorm = p.meta.dialnorm,
@@ -8138,15 +8168,23 @@ void EncoderController::encodeObjects(const QString& path,
 
         // The longest of the channels actually used as an object - see
         // encodeChannels' identical reasoning for why this is a max, not
-        // just channel 0's length, once more than one source is in play.
+        // just channel 0's length, once more than one source is in play. The
+        // LFE channels count too: an LFE that outlasts the rest is still heard.
         std::size_t total = 0;
         for (std::size_t ch = 0; ch < nobjects; ++ch) {
             total = std::max(total, planes[ch].size());
+        }
+        for (const auto& plane : lfe_planes) {
+            total = std::max(total, plane.size());
         }
         std::vector<std::vector<float>> block(nobjects,
                                               std::vector<float>(iclforge::ac3::kSamplesPerFrame));
         std::vector<std::span<const float>> views(nobjects);
         std::vector<std::span<const float>> metered(6);
+        // The bed's LFE feed, when a channel is assigned to it: empty otherwise, which
+        // encode_frame reads as none.
+        std::vector<float> lfe_block(lfe_planes.empty() ? 0 : iclforge::ac3::kSamplesPerFrame);
+        std::vector<float> lfe_scratch(lfe_block.size());
         std::vector<std::vector<std::byte>> frames;
         std::uint64_t bytes = 0;
         bool cancelled = false;
@@ -8166,6 +8204,9 @@ void EncoderController::encodeObjects(const QString& path,
                 iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
+            if (!lfe_planes.empty()) {
+                fill_lfe_frame(lfe_planes, start, lfe_block, lfe_scratch);
+            }
             // The placement is the object's position at the END of the
             // frame - same convention forge's 'atmos' uses, because that is
             // where OAMD's ramp and the JOC matrix both finish. Re-evaluated
@@ -8174,7 +8215,7 @@ void EncoderController::encodeObjects(const QString& path,
             const double t = static_cast<double>(start + iclforge::ac3::kSamplesPerFrame) /
                              static_cast<double>(sample_rate);
             const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
-            const auto unit = encoder.encode_frame(views, placement);
+            const auto unit = encoder.encode_frame(views, placement, lfe_block);
             if (!unit) {
                 problem = QStringLiteral(
                     "The frame cannot hold a 5.1 bed and the object metadata at this bit "
@@ -8236,7 +8277,8 @@ void EncoderController::encodeObjects(const QString& path,
         const auto count = frames.size();
         const auto objects = iclforge::objects::oba::object_count(encoder.program());
         QMetaObject::invokeMethod(this, [this, count, bytes, nobjects, objects, cancelled,
-                                         problem, partial_note, totals = std::move(totals)] {
+                                         problem, partial_note, lfe_note,
+                                         totals = std::move(totals)] {
             setBusy(false);
             setMetering(false);
             setProgress(cancelled ? 0.0 : 1.0);
@@ -8252,7 +8294,8 @@ void EncoderController::encodeObjects(const QString& path,
                               .arg(bytes / 1024)
                               .arg(QFileInfo(output_path_).fileName())
                               .arg(nobjects)
-                              .arg(objects));
+                              .arg(objects) +
+                          lfe_note);
             }
             emit encodeFinished(!cancelled && problem.isEmpty(), status());
         });

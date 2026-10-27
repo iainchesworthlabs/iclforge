@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <expected>
 #include <optional>
@@ -54,9 +55,15 @@
 //     encodeObjects) already uses. This module follows suit - a bed channel becomes one more entry
 //     in the same flat channel list, with a static (or, rarely, dynamic - see
 //     build_channel_path()'s own comment) ObjectPath pinned at its speakerLabel's room position, at
-//     unity gain; a bed channel whose speakerLabel identifies it as the LFE (Table 12: "LFE",
-//     "LFE1", "LFE2") is instead routed at gain 0 / lfe_send 1, since (per atmos.hpp's own
-//     ObjectPlacement comment) "Objects never reach the LFE by panning".
+//     unity gain. A bed channel whose speakerLabel identifies it as the LFE (Table 12: "LFE",
+//     "LFE1", "LFE2") is NOT an object: it is the encoder's own LFE, and BridgeResult::is_lfe marks
+//     it so that a caller routes its PCM to AtmosEncoder::encode_frame's `lfe` span and builds the
+//     encoder for the other channels alone. It cannot ride an object, because (per atmos.hpp's own
+//     ObjectPlacement comment) "Objects never reach the LFE by panning" - an object reaches it as
+//     lfe_send * gain, and the same gain pans the object into the speakers, so no path can send to
+//     the LFE and nowhere else. Its path is therefore inert, gain 0 / lfe_send 1: a caller that
+//     ignores is_lfe and feeds it as an object gets silence from it, not bass in a speaker. A
+//     dual-LFE bed has two such channels; there is one LFE to feed, so a caller sums them.
 //   - Position/gain automation (ITU-R BS.2076-2 Clause 10.3's jumpPosition/interpolationLength
 //     hold-vs-glide state machine) is implemented in build_channel_path() below - see that
 //     function's own comment for the full walkthrough, verified against the standard's own
@@ -92,8 +99,9 @@ enum class BridgeError : std::uint8_t {
     kEmptyBlockSequence,     // an audioChannelFormat had zero audioBlockFormats - illegal per
                              // BS.2076-2 §5.3.2's "1..*", but ac3adm's own parser does not itself
                              // enforce this, so it is checked here rather than assumed
-    kTooManyChannels,        // more bed + dynamic-object channels than AtmosEncoder supports - see
-                             // build()'s own comment for the exact cap and its citation
+    kTooManyChannels,        // more bed + dynamic-object channels than AtmosEncoder supports, the
+                             // LFE bed channels not counted (they are its implicit LFE, not objects) -
+                             // see build()'s own comment for the exact cap and its citation
     kEmptyInput,             // write() only: WriteInput::channels was empty, or a dynamic-object
                              // channel's `updates` was empty (every channel needs at least one
                              // DynamicObject state to place it, even a static, never-moving one)
@@ -148,7 +156,8 @@ enum class BridgeError : std::uint8_t {
 // on why this, plus the block's own rtime_s, is the whole absolute-time computation - no third,
 // programme-level term). `force_lfe` overrides every resulting keyframe to gain 0.0/lfe_send 1.0,
 // discarding the block's own real position/gain data entirely (see this header's own top comment
-// on why) - pass true only for a bed channel whose speakerLabel identifies it as the LFE.
+// on why: the path it makes is inert, the LFE is fed to the encoder as PCM and not as an object) -
+// pass true only for a bed channel whose speakerLabel identifies it as the LFE.
 //
 // Exposed (not file-local) specifically so this state machine can be tested directly against
 // hand-built iclforge::adm::AudioChannelFormat fixtures, independent of a full BW64
@@ -172,8 +181,9 @@ struct BridgeResult {
                    // zoneExclusion that is not a TS 103 420 Table B.18 preset). Empty for a
                    // channel that loses nothing. For callers that want to warn.
     std::vector<bool> is_bed;                 // true: a DirectSpeakers bed channel
-    std::vector<bool> is_lfe;                 // true only for a bed channel routed via lfe_send
-                                               // (see this header's own top comment)
+    std::vector<bool> is_lfe;                 // true only for a bed channel that is the LFE: not an
+                                               // AtmosEncoder object - feed its pcm to encode_frame's
+                                               // `lfe` span instead (see this header's own top comment)
     std::vector<iclforge::objects::oba::ObjectPath>
         paths;  // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::span<const float>>
@@ -188,6 +198,13 @@ struct BridgeResult {
                                     // duplicated here
 
     [[nodiscard]] std::size_t channel_count() const { return paths.size(); }
+    // How many of those are LFE bed channels - the ones that feed the encoder's LFE.
+    [[nodiscard]] std::size_t lfe_count() const {
+        return static_cast<std::size_t>(std::ranges::count(is_lfe, true));
+    }
+    // How many need a slot in AtmosEncoder's object list: every channel but the LFE ones. This
+    // is the number build() holds to the 15-object cap and the one AtmosEncoder is constructed with.
+    [[nodiscard]] std::size_t object_slot_count() const { return channel_count() - lfe_count(); }
 };
 
 // Resolves `programme_id` (or, if empty, the lowest-ID audioProgramme - BS.2076-2 §5.8: "When
