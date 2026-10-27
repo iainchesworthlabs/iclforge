@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the Meters view's tap takes 39 % less of the decode task's time, and `panel_measure.py` reads the burst right.** The tap that
+  hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room and 701 us in a 7.1.4 one on the decode core: scalar loops
+  and six 64-bit atomics a block, each a critical section on both cores (RV32 has no 64-bit AMO). It now takes four outputs at a time, writes
+  its ring in place and keeps 32-bit counters: 345 us and 429 us on the kit, the same numbers bit for bit (the test holds it to the old loops).
+  The harness had been averaging `burst_us`, which the board keeps as a mean since the stream began, so every burst figure it reported was
+  diluted: the Meters view costs the decoder 0.95 to 1.2 ms a burst in a 5.1 room and 1.6 to 2.2 ms under JOC, not the 0.4 to 0.9 reported
+  (the glow, the pulse and a dark screen cost it nothing). `--views baseline` puts the dark view either side of each view to say so. Where the
+  panel task runs was tried: on the decode core it gives JOC 1.1 ms a burst back and the view falls to 10 Hz, so it is not changed. Measurements
+  in `planning/p4x-meters-view.md`, "What the screen costs the audio path".
 - **Changed: the P4X's screen copies each drawn area into the frame buffer with the 2D-DMA, not the CPU.** ESP-IDF's DSI panel copied every
   flushed area on the CPU (line by line, PSRAM to PSRAM) and the 2D-DMA hook was never turned on. `ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH`
   (on by default; the CPU copy stays if the DMA will not start) turns it on: on the kit the Meters view's drawing takes 6 to 11 % less
