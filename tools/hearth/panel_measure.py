@@ -500,11 +500,11 @@ def render(run: dict[str, Any]) -> str:
         if result.get("error"):
             lines += [f"**not measured:** {result['error']}", ""]
             continue
-        lines += [
+        header = (
             "| Segment | burst mean | burst p95 | late | dropped | underruns | refresh mean | rate "
-            "| update cost | analysis | widgets | render | tap/burst |",
-            "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
-        ]
+            "| update cost | analysis | widgets | render | tap/burst |"
+        )
+        lines += [header, "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for name, f in result["figures"].items():
             m = f.get("meters") or {}
             lines.append(

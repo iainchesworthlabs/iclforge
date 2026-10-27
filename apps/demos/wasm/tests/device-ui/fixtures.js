@@ -49,4 +49,15 @@ const test = base.test.extend({
     },
 });
 
-module.exports = { test, expect: base.expect };
+// The page's clock, held still at `time`. Playwright's clock runs from the time it is installed with, so a pauseAt to
+// that same time a moment later is a move to the past, and throws "Cannot fast-forward to the past": under load, with
+// a worker's first page, a few milliseconds were enough. Installed a minute early, the gap is jumped over instead, and
+// the clock stops at `time` exactly; nothing is scheduled before the page loads, so nothing fires on the way.
+const CLOCK_HEAD_START_MS = 60_000;
+
+async function holdClockAt(page, time) {
+    await page.clock.install({ time: new Date(time.getTime() - CLOCK_HEAD_START_MS) });
+    await page.clock.pauseAt(time);
+}
+
+module.exports = { test, expect: base.expect, holdClockAt };

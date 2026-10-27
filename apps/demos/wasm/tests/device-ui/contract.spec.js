@@ -31,6 +31,8 @@ const {
     timeBoard,
     PREFERENCES,
     validTimeZone,
+    zonePlace,
+    zoneReadable,
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
@@ -605,7 +607,9 @@ test('every zone the board offers by name is a string the stand-in takes, and th
     }
     const names = ZONE_ROWS.map((z) => z[0]);
     expect(new Set(names).size, 'a zone listed twice').toBe(names.length);
-    expect([...names].sort()).toEqual(names);
+    // In code-unit order, which is the order the board's binary search needs (time_zones.hpp); localeCompare would
+    // place '_' and '-' differently.
+    expect([...names].sort((a, b) => (a < b ? -1 : Number(a > b)))).toEqual(names);
     for (const name of ['Australia/Melbourne', 'Australia/Sydney', 'Australia/Perth', 'America/New_York', 'Europe/London', 'UTC']) {
         expect(names).toContain(name);
     }
@@ -707,13 +711,12 @@ test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware
             expect(time.zone_place, custom).toBe('none');
             expect(time.zone_label, custom).toBe(label);
         }
-        // The string the board keeps is never in what a person reads, for any string the table holds.
+        // The string the board keeps is never in what a person reads, for any string the table holds. What a PUT of the
+        // string and a GET /status read back, asked of the stand-in's own functions: the table's rows are not sent
+        // over HTTP (the stand-in answers 200 to each, which the grammar check of the first test holds it to).
         for (const posix of new Set(ZONE_ROWS.map((z) => z[1]))) {
-            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: posix });
-            expect(reply.status, posix).toBe(200);
-            time = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
-            expect(time.zone_label, posix).not.toContain(posix);
-            expect(ZONE_ROWS.map((z) => z[0]), posix).toContain(time.zone_place);
+            expect(zoneReadable(posix, ''), posix).not.toContain(posix);
+            expect(ZONE_ROWS.map((z) => z[0]), posix).toContain(zonePlace(posix, ''));
         }
         for (const bad of ['australia/melbourne', 'Australia/Melburne', 'Melbourne', 'Australia/Melbourne extra']) {
             reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: bad });
