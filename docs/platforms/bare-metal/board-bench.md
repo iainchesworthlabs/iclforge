@@ -5,11 +5,15 @@ ESP32-C6 and the ESP32-P4: what is tested with no board, what CI runs and in whi
 is played on a board and compared with a recorded baseline. It is for a developer who changes the
 firmware, a decoder it links, or the tools around it.
 
-!!! note "Status as of 2026-10-13 (main at `2155abecb`)"
-    Five of the seven build profiles have a baseline recorded on a board: `s3-n16r8`,
-    `s3-n16r8-ac4`, `c6-16mb`, `p4-rev1` and `p4-rev1-ac4`. `c6-4mb` and `p4-rev3` have none,
-    since no board of either shape has run the suite. The board suite is run by hand: no CI job
+!!! note "Status as of 2026-10-29"
+    Four of the five build profiles that a board can run have a baseline recorded on a board: `s3-n16r8`
+    (S3a), `c6-16mb`, `p4-rev1` (P4a) and `p4-rev3` (the P4X kit). `c6-4mb` has none, since no board of
+    that shape has run the suite. The board suite is run by hand: no CI job
     has a board.
+
+    **2026-10-29:** `s3-n16r8-ac4` was folded into `s3-n16r8`, which took the decoder, the 64 KB data cache and the
+    AC-4 plays' list (it keeps its 4 KB allocation limit), and `p4-rev3` took the decoder and the four AC-4 HTTP rows;
+    both were re-recorded on a board (the tables below).
 
     **2026-10-29:** `p4-rev1-ac4` was folded into `p4-rev1` (the same fragments and locked values, so the same hash): its
     baseline is now `p4-rev1`'s, and every `p4-rev1-ac4` column and row below is `p4-rev1`'s figures. The old `p4-rev1`
@@ -154,8 +158,8 @@ run to that profile's baseline. The list is `firmware/hearth-sink/suite.json`:
 | `profiles` | Per profile: `plays` (the rows, in order), its own `tolerance` over the suite's, and `baseline_accepted` where a baseline is kept under an older hash |
 
 A row names a stream and how it is played. `python tools/hearth/board_suite.py plan --profile
-s3-n16r8-ac4` prints a profile's rows. Every profile with a board plays 30 s of AC-3 2.0 at
-192 kbit/s and 30 s of E-AC-3 2.0 at 96 kbit/s (938 frames each); the two AC-4 profiles add
+s3-n16r8` prints a profile's rows. Every profile with a board plays 30 s of AC-3 2.0 at
+192 kbit/s and 30 s of E-AC-3 2.0 at 96 kbit/s (938 frames each); every profile but the C6's adds
 three- and four-frame AC-4 streams whose PCM the host pins.
 
 ### What a run does
@@ -241,8 +245,8 @@ own, each with the spread it was measured from in a `note`.
 | Sink queue's least headroom | More than 2 ms under | |
 | Boot: largest internal block | More than 1,024 bytes under | `c6-16mb`: 12,288; `p4-rev1`: 8,192 (the block steps by 4 KB from boot to boot) |
 | Boot: internal RAM free | More than 2,048 bytes under | `p4-rev1`: 4,096 |
-| Glitched plays of a Sendspin row | More than one over the baseline's count | The two S3 profiles allow the E-AC-3 row two |
-| Least heap during a Sendspin play | Held only for a row that names a margin | S3: 2,048 for E-AC-3 (and AC-4 music on `s3-n16r8-ac4`); `c6-16mb`: 3,072 for E-AC-3 |
+| Glitched plays of a Sendspin row | More than one over the baseline's count | The S3 allows the E-AC-3 row two |
+| Least heap during a Sendspin play | Held only for a row that names a margin | S3: 2,048 for E-AC-3 and AC-4 music; `c6-16mb`: 3,072 for E-AC-3 |
 | State, units, boot verdict, PCM hash | Any difference | |
 | Sink underruns on a `/play` row | Any | |
 
@@ -379,44 +383,43 @@ brackets. Lower is faster; 1000 is real time.
 
 | Profile | Chip | Board | Recorded (UTC) | Image |
 |---|---|---|---|---|
-| `s3-n16r8` | ESP32-S3 | S3a | 2026-10-12 15:09 | `v0.10.0-beta.1-4565-gc3878ebaa` |
-| `s3-n16r8-ac4` | ESP32-S3 | S3a | 2026-10-12 22:34 | `v0.10.0-beta.1-4723-ge3da66cb3` |
-| `p4-rev1` | ESP32-P4 | P4a | 2026-10-12 14:54 | `v0.10.0-beta.1-4565-gc3878ebaa` |
-| `p4-rev1-ac4` | ESP32-P4 | P4a | 2026-10-12 23:04 | `v0.10.0-beta.1-4723-ge3da66cb3-` |
+| `s3-n16r8` | ESP32-S3 | S3a | 2026-10-29 | `v0.10.0-beta.1-5587-g2a14b2b96` (the one image: AC-4, 64 KB cache) |
+| `p4-rev1` | ESP32-P4 | P4a | 2026-10-12 23:04 | `v0.10.0-beta.1-4723-ge3da66cb3-` (recorded as `p4-rev1-ac4`) |
+| `p4-rev3` | ESP32-P4 | P4X | 2026-10-29 | `v0.10.0-beta.1-5587-g2a14b2b96` |
 | `c6-16mb` | ESP32-C6 | C6 | 2026-10-12 23:17 | `v0.10.0-beta.1-4738-g357812dae` |
 
-The image name ends in the commit it was built from. The trailing dash on the `p4-rev1-ac4`
+The image name ends in the commit it was built from. The trailing dash on the `p4-rev1`
 image is `-dirty` cut short by the 32-byte version field: that tree had uncommitted changes.
 
 **Over `POST /play`** (the C6 refuses these):
 
-| Stream | `s3-n16r8` | `s3-n16r8-ac4` | `p4-rev1` | `p4-rev1-ac4` |
-|---|---|---|---|---|
-| AC-3 2.0, 192 kbit/s | 123 (122–124) | 120 (120–122) | 61 (61–61) | 61 (61–62) |
-| E-AC-3 2.0, 96 kbit/s | 87 (86–88) | 82 (81–83) | 41 (41–41) | 40 (40–40) |
-| AC-4 2.0, A-SPX, 192 kbit/s | | 505 (503–515) | | 240 (234–246) |
-| AC-4 2.0, A-CPL | | 641 (636–646) | | 287 (277–292) |
-| AC-4 2.0, A-SPX with companding, 48 kbit/s | | 606 (592–612) | | 281 (268–304) |
-| AC-4 5.1, 192 kbit/s, folded to 2.0 | | | | 619 (587–629) |
+| Stream | `s3-n16r8` | `p4-rev1` | `p4-rev3` |
+|---|---|---|---|
+| AC-3 2.0, 192 kbit/s | 121 (120–122) | 61 (61–62) | 56 (56–56) |
+| E-AC-3 2.0, 96 kbit/s | 82 (82–85) | 40 (40–40) | 42 (42–42) |
+| AC-3 5.1 onto 9.1.6, sixteen 32-bit slots | | | 143 (142–144) |
+| AC-4 2.0, A-SPX, 192 kbit/s | 511 (501–513) | 240 (234–246) | 261 (250–272) |
+| AC-4 2.0, A-CPL | 640 (637–641) | 287 (277–292) | 317 (308–321) |
+| AC-4 2.0, A-SPX with companding, 48 kbit/s | 605 (596–621) | 281 (268–304) | 320 (319–324) |
+| AC-4 5.1, 192 kbit/s, folded to 2.0 (`p4-rev3`: onto 9.1.6) | | 619 (587–629) | 676 (673–694) |
 
 **Over Sendspin**, with the plays of five that glitched:
 
-| Stream | `s3-n16r8` | `s3-n16r8-ac4` | `p4-rev1` | `p4-rev1-ac4` | `c6-16mb` |
-|---|---|---|---|---|---|
-| AC-3 2.0 | 204 (204–204), 1 | 200 (199–201), 0 | 85 (85–85), 0 | 85 (85–86), 0 | 660 (653–667), 0 |
-| E-AC-3 2.0 | 167 (166–168), 2 | 162 (161–163), 2 | 67 (67–67), 0 | 67 (67–67), 1 | 756 (748–760), 0 |
-| AC-4 2.0, A-SPX | | 516 (513–518), 2 | | 189 (188–190), 1 | |
-| AC-4 2.0, A-CPL | | 689 (684–695), 3 | | | |
-| AC-4 5.1, folded to 2.0 | | | | 590 (588–593), 1 | |
+| Stream | `s3-n16r8` | `p4-rev1` | `c6-16mb` |
+|---|---|---|---|
+| AC-3 2.0 | 202 (202–203), 1 | 85 (85–86), 0 | 660 (653–667), 0 |
+| E-AC-3 2.0 | 164 (164–165), 2 | 67 (67–67), 1 | 756 (748–760), 0 |
+| AC-4 2.0, A-SPX | 515 (514–517), 0 | 189 (188–190), 1 | |
+| AC-4 2.0, A-CPL | 693 (691–696), 4 | | |
+| AC-4 5.1, folded to 2.0 | | 590 (588–593), 1 | |
 
 **At boot**, the worst of eight:
 
 | Profile | Internal RAM free | Largest block | Headroom | Verdict |
 |---|---|---|---|---|
-| `s3-n16r8` | 85,667 | 31,744 | 23,552 | `ok` |
-| `s3-n16r8-ac4` | 66,159 | 31,744 | 23,552 | `ok` |
-| `p4-rev1` | 291,783 | 217,088 | 184,320 | `ok` |
-| `p4-rev1-ac4` | 295,707 | 208,896 | 167,936 | `ok` |
+| `s3-n16r8` | 75,503 | 34,816 | 26,624 | `ok` |
+| `p4-rev1` | 295,707 | 208,896 | 167,936 | `ok` |
+| `p4-rev3` | 86,967 | 56,320 | 48,128 | `ok` (worst of three) |
 | `c6-16mb` | 136,668 | 118,784 | 86,016 | `below-floor` (the floor is 160,796) |
 
 What the tables do and do not say:

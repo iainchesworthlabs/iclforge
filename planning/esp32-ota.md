@@ -935,9 +935,9 @@ machine before upload. O7 decides which.
   is one more build there. `package-esp32-firmware` merges and checks them, and uploads
   `esp32-firmware` (14 days) and, on a release, `packages-esp32-firmware`.
 - `build-esp32c3` builds one more P4 image, the release profile with the stage timers on, to hold that the
-  zone markers compile. It is not packaged. Since 2026-10-29 the v1.x P4 release image carries the AC-4 decoder
-  (`sdkconfig.ac4`, phase D14b of [`ac4.md`](ac4.md); [`ac4-in-release-images.md`](ac4-in-release-images.md)), so it
-  decodes AC-3, E-AC-3 and AC-4; the v3.x, the S3's and the C6's still decode AC-3 and E-AC-3 only.
+  zone markers compile. It is not packaged. Since 2026-10-29 the P4 (v1.x and v3.x) and S3 release images carry the AC-4 decoder
+  (`sdkconfig.ac4`, phase D14b of [`ac4.md`](ac4.md); [`ac4-in-release-images.md`](ac4-in-release-images.md)), so they
+  decode AC-3, E-AC-3 and AC-4; the C6's still decodes AC-3 and E-AC-3 only.
 - `release.yml` lists the four factory images and the manifest in its completeness check. It adds
   `*.bin` and the manifest to the files it checksums, signs and attests, whose lists name
   extensions and had no `.bin`.

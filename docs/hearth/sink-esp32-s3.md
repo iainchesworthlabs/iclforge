@@ -56,23 +56,25 @@ idf.py -p PORT flash monitor
 ```
 
 In PowerShell, set the first line as `$env:SDKCONFIG_DEFAULTS = "..."`. `PORT` is the board's
-serial port, such as `COM5` or `/dev/ttyACM0`. The four files over the defaults do this:
+serial port, such as `COM5` or `/dev/ttyACM0`. The files over the defaults do this:
 
 | File | What it sets |
 |---|---|
 | `sdkconfig.hw` | The console on the S3's own USB connector, so one cable does everything |
 | `sdkconfig.psram` | Octal PSRAM for the decoder's large allocations and the player's ring, a deeper I2S queue, and a 32 KB instruction cache |
 | `sdkconfig.sendspin` | The Sendspin player on Wi-Fi, the page and the REST routes on port 80, nothing played at boot, and lwIP's task on core 0 beside the network |
+| `sdkconfig.psram-4k` | PSRAM tried first for every allocation of 4 KB and more, so that an E-AC-3 stream leaves the board 44 KB of internal RAM at its least where 16 KB left it a few hundred bytes |
+| `sdkconfig.ac4` | The AC-4 decoder, both decode stacks at 40,960 bytes (in PSRAM on this part), a frame's per-channel stages on both cores |
 | `sdkconfig.s3-fast` | The flash read four bits a clock (QIO), 64-byte lines in the data cache, and the firmware's code and constants run from PSRAM |
+| `sdkconfig.s3-dcache` | A 64 KB data cache, which is 32 KB of the heap |
 
 The QIO mode is the second stage bootloader's, so a board takes it with one USB flash that
 includes its bootloader (`idf.py flash` does); a network update leaves the mode the board has, and a
 bootloader that cannot set the flash chip's quad-enable bit stays in DIO.
 
-AC-4 is another file over those, `sdkconfig.ac4`, put before `sdkconfig.s3-fast`, and a fifth,
-`sdkconfig.s3-dcache`, after it: a 64 KB data cache, which is 32 KB of the heap (an AC-4 play with
-Wi-Fi up has 31 KB of internal RAM left at its least, from 64; an image without the AC-4 decoder
-does not have it to give, and the cache does nothing for AC-3 and E-AC-3). With all of them the part
+Since 2026-10-29 the published image has all of them: one image decodes AC-3, E-AC-3 and AC-4. The 64 KB data cache costs 32 KB of
+the heap (the board boots with 75 KB of internal RAM free in place of 110) and the allocation limit stays at 4 KB, so an E-AC-3 stream
+leaves 44 KB and an E-AC-3 JOC 7.1.4, 9.1.6 or 5.1.4 play 60 KB at the end of its lap; an AC-4 play takes 512 for itself. With all of them the part
 decodes 2.0 in real time (SIMPLE mode at 0.40 of a frame's duration, A-SPX at 0.50, with the
 decoder's second core), the frame-rate converter at every rate (0.67 to 0.87) and E-AC-3 7.1.4
 (0.75), and 5.1 in SIMPLE mode at 0.99; the rest of 5.1 takes 1.25 to 1.44 and 5.1.4 2.28 to 2.69.

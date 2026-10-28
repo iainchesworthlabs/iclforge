@@ -15,7 +15,7 @@ fixed-point tier (phase D14d of
 [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s));
 a decode does not fit a C6 beside WiFi, and on a board the play is refused.
 A Hearth sink built with the decoder takes AC-4 in a Sendspin group on the P4 and the S3
-([Hearth](../../hearth/index.md#esp32-sinks)); the published sink images have the decoder off.
+([Hearth](../../hearth/index.md#esp32-sinks)); the published P4 and S3 sink images have the decoder, the C6's has it off.
 
 The variant table keeps codec support, Hearth support, distribution and evidence separate.
 

@@ -109,23 +109,24 @@ Proposed ids, from the board and not from the codec:
 
 | Profile | Fragments after `sdkconfig.defaults`, in order | Release image | Boards |
 |---|---|---|---|
-| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a `.156`, S3b `.45` (16 MB flash, 8 MB octal PSRAM) |
-| `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | the same boards |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | `hearth-sink-esp32s3` | S3a `.156`, S3b `.45` (16 MB flash, 8 MB octal PSRAM) |
 | `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` | `hearth-sink-esp32c6-16mb` | C6 `.117` |
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none on the bench: any C6 module |
 | `p4-rev1` | `hw`, `p4`, `sendspin`, `ac4` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
-| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `ac4`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
 
-**AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`; on the P4 it is in the release profiles.** The owner
+**AC-4 was its own profile on the S3 and the P4 (the owner, 2026-10-12); since 2026-10-29 it is in every release profile but the C6's.** The owner
 decided on 2026-10-12 that AC-4 is a profile of its own on both boards, because it changes locked keys: `sdkconfig.ac4`
 sets the decode stack to 40,960, `sdkconfig.s3-dcache` takes 32 KB of heap for a 64 KB data cache, and the images had different
-heap budgets, speeds and baselines. **On 2026-10-29 the P4's two profiles were folded** (the owner: "if we need to fold the
+heap budgets, speeds and baselines. **On 2026-10-29 the profiles were folded** (the owner: "if we need to fold the
 profiles together, that's fine. The budget can be grown"): `p4-rev1` is what `p4-rev1-ac4` was (the same fragments and the same
 locked values, so the same hash, `f797fb39d0f9`, and the baseline P4a recorded on 2026-10-12 stands for it), with an app budget
-of 3,400,000 bytes against the 4 MiB slot; `p4-rev3` did not take it: the kit ran the AC-4 image on 2026-10-29 and its internal RAM could not hold the decoder's
-second lane (the 24,576-byte stack) beside the screen, so the AC-4 plays ran on one core and the AC-3 and E-AC-3 HTTP
-plays of the suite failed an allocation. The decision for the S3 is open:
-[`ac4-in-release-images.md`](ac4-in-release-images.md) has the measurements and a recommended configuration.
+of 3,400,000 bytes against the 4 MiB slot. `p4-rev3` took the decoder after the kit's first run of the AC-4 image on 2026-10-29 failed
+(the largest internal block, 37,888 bytes after the I2S queue, was under the 40,960-byte decode stack and the 24,576-byte lane
+stack): the player now places a stack in PSRAM when no internal block holds it, `p4-rev3` locks the HTTP play's decode stack
+in PSRAM, and its budget is 3,950,000 against an image of 3,811,472. `s3-n16r8` took the decoder and the 64 KB data cache and
+kept its 4 KB allocation limit (budget 2,750,000, image 2,621,600), with `psram-4k` after `psram` and `LWIP_TCP_OOSEQ_MAX_PBUFS` bounded in
+`sdkconfig.psram`. [`ac4-in-release-images.md`](ac4-in-release-images.md) has the measurements.
 
 A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside Wi-Fi
 ([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)).
