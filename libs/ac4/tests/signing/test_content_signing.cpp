@@ -375,7 +375,18 @@ TEST_CASE("a stream with no signature, or no frames, says so", "[ac4][signing]")
         content.frames = f.stream.views();
         const auto result = f.verify(content);
         REQUIRE(Fixture::refused(result) == E::kBadOrMissingSignature);
-        REQUIRE(result.error().detail.find("no content signature") != std::string::npos);
+        // Worded for the carriers (a sidecar file or a box), which the base library cannot name.
+        REQUIRE(result.error().detail.find("no sidecar file or no signature box") !=
+                std::string::npos);
+    }
+    SECTION("signature bytes that a carrier did not mark as present are not used") {
+        signing::CarriedContent content;
+        content.frames = f.stream.views();
+        content.signature = f.payload;  // a good signature, but signature_present is false
+        const auto result = f.verify(content);
+        REQUIRE(Fixture::refused(result) == E::kBadOrMissingSignature);
+        REQUIRE(result.error().detail.find("no sidecar file or no signature box") !=
+                std::string::npos);
     }
     SECTION("no signature and no trust: the operator's input is named first") {
         signing::CarriedContent content;
