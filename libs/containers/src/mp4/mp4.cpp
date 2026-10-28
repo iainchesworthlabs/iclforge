@@ -96,6 +96,7 @@ Bytes build_moov(const AudioTrack& track, const MuxOptions& options,
         put_bytes(trak_body, build_edts(*options.edit));
     }
     put_bytes(trak_body, mdia);
+    put_bytes(trak_body, detail::build_user_boxes(track));
     Bytes trak;
     put_box(trak, "trak", trak_body);
 
@@ -134,7 +135,8 @@ std::expected<std::vector<std::byte>, MuxError> mux(
         track.sample_rate > std::numeric_limits<std::uint16_t>::max() ||
         track.samples_per_frame == 0 || track.codec_config.empty() ||
         (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 &&
-         track.codec_id != kCodecAc4)) {
+         track.codec_id != kCodecAc4) ||
+        !detail::user_boxes_valid(track)) {
         return std::unexpected(MuxError::kInvalidTrack);
     }
 

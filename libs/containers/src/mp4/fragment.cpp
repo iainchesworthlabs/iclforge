@@ -156,6 +156,7 @@ Bytes build_init_segment(const AudioTrack& track, const FragmentOptions& options
     Bytes trak_body;
     put_bytes(trak_body, detail::build_tkhd(total_samples));
     put_bytes(trak_body, mdia);
+    put_bytes(trak_body, detail::build_user_boxes(track));
     Bytes trak;
     put_box(trak, "trak", trak_body);
 
@@ -355,7 +356,8 @@ std::optional<MuxError> validate(const AudioTrack& track, const FragmentOptions&
         track.sample_rate > std::numeric_limits<std::uint16_t>::max() ||
         track.samples_per_frame == 0 || track.codec_config.empty() ||
         (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 &&
-         track.codec_id != kCodecAc4)) {
+         track.codec_id != kCodecAc4) ||
+        !detail::user_boxes_valid(track)) {
         return MuxError::kInvalidTrack;
     }
     if (options.frames_per_fragment == 0 ||

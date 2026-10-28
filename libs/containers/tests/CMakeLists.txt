@@ -8,6 +8,7 @@ iclforge_add_test_binary(iclforge-containers-tests PROJECT containers SOURCES
     matroska/test_matroska.cpp
     matroska/test_matroska_reader.cpp
     mp4/test_mp4_reader.cpp
+    mp4/test_mp4_user_boxes.cpp
     mpegts/test_mpegts_reader.cpp)
 
 target_link_libraries(iclforge-containers-tests PRIVATE iclforge::containers iclforge::ac3 iclforge::ac4)

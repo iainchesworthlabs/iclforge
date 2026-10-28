@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -72,6 +73,22 @@ enum class MuxError : std::uint8_t {
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
 
+// ISO/IEC 14496-12 §4.2's `uuid` box: the extension point for a box that has no four-character
+// code of its own. The box type is the literal 'uuid', and the first 16 bytes of its body, the
+// "usertype", say what the rest is. This module does not know what any usertype means; it writes
+// the box and reads it back, which is how a codec-blind container carries a payload that a layer
+// above it defines (a content signature, for instance).
+struct UserBox {
+    std::array<std::byte, 16> usertype{};
+    std::vector<std::byte> payload;
+};
+
+// What a track may carry in AudioTrack::user_boxes, and what the reader keeps in
+// ReadTrack::user_boxes. A real payload is a few kilobytes; the bounds keep a hostile file from
+// making the reader hold more than a few megabytes of boxes it does not understand.
+inline constexpr std::size_t kMaxUserBoxes = 8;
+inline constexpr std::size_t kMaxUserBoxPayloadBytes = std::size_t{1} << 20;
+
 struct AudioTrack {
     // Selects the sample entry box ('ac-3' or 'ec-3') and, through it, which
     // configuration box wraps `codec_config` ('dac3' or 'dec3' respectively -
@@ -104,6 +121,12 @@ struct AudioTrack {
     // 29.97, 59.94 and 119.88 fps, whose frames are no whole number of
     // samples, takes 240 000 (ETSI TS 103 190-2 Table E.1).
     std::uint32_t timescale = 0;
+    // `uuid` boxes written as children of the track's `trak`, after its `mdia`, in this order. The
+    // `trak` holds data about this track, which is where a payload that describes the track's
+    // samples belongs; `moov/udta` holds the movie's metadata. At most kMaxUserBoxes of at most
+    // kMaxUserBoxPayloadBytes each, else kInvalidTrack. They change the size of `moov` and nothing
+    // else: the samples and their sample table are the same with or without them.
+    std::vector<UserBox> user_boxes{};
 };
 
 // The timescale a track counts in: AudioTrack::timescale, or its sample rate.

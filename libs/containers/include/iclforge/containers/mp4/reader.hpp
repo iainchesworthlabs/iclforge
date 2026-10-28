@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "iclforge/containers/export.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 // The read side of iclforge::containers::mp4::mux()/iclforge::containers::mp4::fragment(): pulling
 // one audio track's samples back out of an MP4, plain or fragmented.
@@ -149,6 +150,11 @@ struct ReadTrack {
     // ReadOptions::max_edits allows. Neither box is needed to find a sample,
     // so a broken one is left out rather than failing the file.
     std::vector<EditListEntry> edits;
+    // The `uuid` boxes that are direct children of the track's `trak`, in file order: AudioTrack's
+    // user_boxes read back. A payload that is larger than kMaxUserBoxPayloadBytes, a box too short
+    // to hold a usertype, and every box after the first kMaxUserBoxes are left out and the file
+    // reads as it would without them. A `uuid` box anywhere else in the file is not reported.
+    std::vector<UserBox> user_boxes;
 };
 
 // What a track the reader did not select is, by the handler its mdia declares: "soun" is audio,

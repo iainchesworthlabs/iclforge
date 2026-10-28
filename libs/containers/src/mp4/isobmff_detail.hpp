@@ -225,6 +225,33 @@ inline Bytes build_sample_entry(const AudioTrack& track) {
     return out;
 }
 
+// The `uuid` boxes of AudioTrack::user_boxes, back to back (ISO/IEC 14496-12 §4.2: the box type is
+// 'uuid' and the first 16 bytes of the body are the usertype). Empty for a track with none, which
+// is every track written before the field existed, so its bytes do not change.
+inline Bytes build_user_boxes(const AudioTrack& track) {
+    Bytes out;
+    for (const UserBox& box : track.user_boxes) {
+        Bytes body;
+        put_bytes(body, box.usertype);
+        put_bytes(body, box.payload);
+        put_box(out, "uuid", body);
+    }
+    return out;
+}
+
+// Whether a track's user boxes are within the bounds the header names.
+[[nodiscard]] inline bool user_boxes_valid(const AudioTrack& track) {
+    if (track.user_boxes.size() > kMaxUserBoxes) {
+        return false;
+    }
+    for (const UserBox& box : track.user_boxes) {
+        if (box.payload.size() > kMaxUserBoxPayloadBytes) {
+            return false;
+        }
+    }
+    return true;
+}
+
 inline Bytes build_stsd(const AudioTrack& track) {
     Bytes body;
     put_u32(body, 1);  // entry_count: exactly one sample description

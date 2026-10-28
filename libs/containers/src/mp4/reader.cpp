@@ -9,6 +9,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "iclforge/base/bitreader.hpp"
@@ -56,6 +57,7 @@ constexpr std::uint32_t kTraf = fourcc("traf");
 constexpr std::uint32_t kTfhd = fourcc("tfhd");
 constexpr std::uint32_t kTrun = fourcc("trun");
 constexpr std::uint32_t kMdat = fourcc("mdat");
+constexpr std::uint32_t kUuid = fourcc("uuid");
 constexpr std::uint32_t kAc3Entry = fourcc("ac-3");
 constexpr std::uint32_t kEc3Entry = fourcc("ec-3");
 constexpr std::uint32_t kAc4Entry = fourcc("ac-4");  // TS 103 190-2 Annex E.4
@@ -191,6 +193,7 @@ struct PendingTrack {
     int channels = 0;
     CodecConfig codec_config;
     std::vector<EditListEntry> edits;
+    std::vector<UserBox> user_boxes;
     std::vector<std::uint32_t> sizes;
     std::vector<ChunkRun> chunk_runs;
     std::vector<std::uint64_t> chunk_offsets;
@@ -428,6 +431,7 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
                         .language = s.pending.language,
                         .codec_config = s.pending.codec_config,
                         .edits = s.pending.edits,
+                        .user_boxes = s.pending.user_boxes,
                     };
                     s.track_found = true;
                     selected_now = true;
@@ -936,7 +940,17 @@ std::expected<void, DemuxError> walk(ReaderState& s, std::span<const std::byte> 
             continue;
         }
 
-        if (!is_wanted_leaf(box.type)) {
+        // A `uuid` box that is a direct child of a trak is read (and kept only if that trak is the
+        // one selected), so long as it is one the bounds allow (ReadTrack::user_boxes): a payload past the bound, a box too
+        // short for its usertype and a box that runs to the end of the file are skipped by
+        // length like any box the walk does not want, and the file reads as it would without them.
+        const bool in_trak_box =
+            box.type == kUuid && s.in_trak && !s.open.empty() && s.open.back().type == kTrak;
+        const bool wanted_user_box = in_trak_box && !box.to_eof && body_bytes >= 16 &&
+                                     body_bytes - 16 <= kMaxUserBoxPayloadBytes &&
+                                     s.pending.user_boxes.size() < kMaxUserBoxes;
+
+        if (!is_wanted_leaf(box.type) && !wanted_user_box) {
             // Skipped by length alone - never held. mdat lands here, which
             // is exactly right: its bytes reach the caller through
             // drain_samples, not through this parser.
@@ -1016,6 +1030,17 @@ std::expected<void, DemuxError> walk(ReaderState& s, std::span<const std::byte> 
             case kTrun:
                 ok = parse_trun(body, s);
                 break;
+            case kUuid: {
+                // wanted_user_box was true to get here: the body holds the 16-byte usertype
+                // and then the payload.
+                UserBox user_box;
+                std::copy_n(body.begin(), user_box.usertype.size(), user_box.usertype.begin());
+                user_box.payload.assign(
+                    body.begin() + static_cast<std::ptrdiff_t>(user_box.usertype.size()),
+                    body.end());
+                s.pending.user_boxes.push_back(std::move(user_box));
+                break;
+            }
             default:
                 break;
         }
