@@ -212,3 +212,38 @@ TEST_CASE("restart_window starts the grace again", "[meters][governor]") {
     }
     CHECK_FALSE(g.slow());
 }
+
+TEST_CASE("a view held at ten a second stays there however cheap its updates, and rises by the rules once let go", "[meters][governor]") {
+    mt::RateGovernor g{judged()};
+    std::int64_t t = run(g, 0, 40, 10'000);
+    CHECK_FALSE(g.slow());
+    g.set_hold_slow(true);
+    CHECK(g.slow());
+    CHECK(g.holding_slow());
+    CHECK(g.step_us() == mt::kSlowStepUs);
+    CHECK(g.stats().falls == 0);  // a hold is not the panel failing
+    // Three minutes of cheap, punctual updates: it does not try twenty.
+    t = run(g, t, 1800, 10'000);
+    CHECK(g.slow());
+    CHECK(g.stats().rises == 0);
+    // Let go: it is at ten a second still, and rises once the dwell has passed with the cost under 60 percent of a step.
+    g.set_hold_slow(false);
+    CHECK(g.slow());
+    t = run(g, t, 400, 10'000);
+    CHECK_FALSE(g.slow());
+    CHECK(g.stats().rises == 1);
+}
+
+TEST_CASE("holding a view that is already at ten a second changes nothing, and a hold taken twice is one", "[meters][governor]") {
+    mt::RateGovernor g{judged()};
+    run(g, 0, 20, 45'000);
+    REQUIRE(g.slow());
+    const auto falls = g.stats().falls;
+    g.set_hold_slow(true);
+    g.set_hold_slow(true);
+    CHECK(g.slow());
+    CHECK(g.stats().falls == falls);
+    g.set_hold_slow(false);
+    g.set_hold_slow(false);
+    CHECK(g.slow());
+}

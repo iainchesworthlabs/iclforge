@@ -210,9 +210,22 @@ class MeterTap final : public iclforge::BlockTap {
         // The sum, scaled to the range of 16 bits and rounded half away from zero, into the ring where it will be read.
         const float scale = 32767.0F / static_cast<float>(1U << mix_shift(count));
         ring_.write_runs(frames, [&](std::atomic<std::int16_t>* slot, std::size_t from, std::size_t run) noexcept {
-            for (std::size_t i = 0; i < run; ++i) {
-                const float v = std::fmin(std::fmax(mix[from + i] * scale, -32768.0F), 32767.0F);
-                slot[i].store(static_cast<std::int16_t>(v + std::copysign(0.5F, v)), std::memory_order_relaxed);
+            // Four samples at a time, all four converted before any is stored: one sample is a chain of eight float operations, each waiting for the last
+            // on a core that issues in order (the kit measured 39 cycles a sample for the one-at-a-time loop), and four chains side by side fill the waits.
+            std::size_t i = 0;
+            for (; i + 4 <= run; i += 4) {
+                const float* const m = mix.data() + from + i;
+                const std::int16_t a = to_s16(m[0], scale);
+                const std::int16_t b = to_s16(m[1], scale);
+                const std::int16_t c = to_s16(m[2], scale);
+                const std::int16_t d = to_s16(m[3], scale);
+                slot[i].store(a, std::memory_order_relaxed);
+                slot[i + 1].store(b, std::memory_order_relaxed);
+                slot[i + 2].store(c, std::memory_order_relaxed);
+                slot[i + 3].store(d, std::memory_order_relaxed);
+            }
+            for (; i < run; ++i) {
+                slot[i].store(to_s16(mix[from + i], scale), std::memory_order_relaxed);
             }
         });
         if (sampled) {
@@ -289,6 +302,12 @@ class MeterTap final : public iclforge::BlockTap {
     }
 
    private:
+    // One sample of the mix as it goes to the ring: scaled, clamped to 16 bits and rounded half away from zero.
+    [[nodiscard]] static std::int16_t to_s16(float sum, float scale) noexcept {
+        const float v = std::fmin(std::fmax(sum * scale, -32768.0F), 32767.0F);
+        return static_cast<std::int16_t>(v + std::copysign(0.5F, v));
+    }
+
     // Adds the next outputs of `in` (at most four of the `left`) to the mix, in their order, so that the sum is the one a loop over the outputs makes, and
     // takes each one's peak; the first group sets the mix and the others add to it. Returns how many outputs it took. The four outputs of a group, and
     // their four peaks, stay in registers for the whole block.
