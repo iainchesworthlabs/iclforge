@@ -38,6 +38,7 @@
 #include "iclforge/containers/mp4/reader.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "iclforge/containers/mpegts/reader.hpp"
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
@@ -382,6 +383,16 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
                              in_path, iclforge::ac4::dac4_refusal(ac4_in->toc));
                 return kExitInput;
             }
+            // sign-content: the samples are the frames the signature covers, and the signature
+            // goes in a uuid box of the track. A signature the input MP4 carried is not carried
+            // over: the new file is a different file, and says what it was signed with.
+            auto signer = prepare_content_signer(meta, out_path, /*to_mp4=*/true);
+            if (!signer.has_value()) {
+                return signer.error();
+            }
+            if (!signer->sign(ac4_in->mp4_samples)) {
+                return kExitRuntime;
+            }
             const iclforge::containers::mp4::AudioTrack track{
                 .codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
                 .sample_rate = static_cast<std::uint32_t>(ac4_in->toc.sample_rate_hz),
@@ -392,7 +403,8 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
                 .samples_per_frame = timing->sample_delta,
                 .codec_config = std::move(dac4),
                 .rfc6381 = iclforge::ac4::rfc6381_codec_string(ac4_in->toc),
-                .timescale = timing->timescale};
+                .timescale = timing->timescale,
+                .user_boxes = signer->user_boxes()};
             iclforge::containers::mp4::MuxOptions options;
             options.sync_samples = ac4_in->iframes;
             const auto ac4_file =
@@ -414,10 +426,18 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
                     ? fmt::format("{} samples/frame", timing->sample_delta)
                     : fmt::format("{}/{} s a frame", timing->sample_delta, timing->timescale),
                 ac4_file->size(), track.rfc6381, out_path);
+            signer->report(status_stream());
             return kExitOk;
         }
         fmt::println(stderr, "error: {}", iclforge::ac3::io::describe(scanned.error()));
         return kExitInput;
+    }
+    if (meta.sign_content) {
+        fmt::println(stderr,
+                     "error: sign-content signs AC-4 content, and {} is AC-3 or E-AC-3; E-AC-3's "
+                     "objects are signed by sign-objects on atmos-encode",
+                     in_path);
+        return kExitUsage;
     }
     // A legacy core (§E2.3.1.2) is an E-AC-3 stream whose independent
     // substream 0 is an AC-3 frame, so it takes the 'ec-3' entry like any
@@ -650,6 +670,16 @@ int fmp4_ac4(Ac4Input& input, std::string_view in_path, std::string_view out_dir
                      iclforge::ac4::dac4_refusal(input.toc));
         return kExitInput;
     }
+    // sign-content: the signature goes in a uuid box of the track, which a fragmented file keeps
+    // in its initialization segment (init.mp4). verify-content reads one file, so to check the
+    // result, put the initialization segment and the media segments end to end.
+    auto signer = prepare_content_signer(meta, out_dir, /*to_mp4=*/true);
+    if (!signer.has_value()) {
+        return signer.error();
+    }
+    if (!signer->sign(input.mp4_samples)) {
+        return kExitRuntime;
+    }
     const iclforge::containers::mp4::AudioTrack track{
         .codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
         .sample_rate = static_cast<std::uint32_t>(input.toc.sample_rate_hz),
@@ -658,7 +688,8 @@ int fmp4_ac4(Ac4Input& input, std::string_view in_path, std::string_view out_dir
         .samples_per_frame = timing->sample_delta,
         .codec_config = std::move(dac4),
         .rfc6381 = iclforge::ac4::rfc6381_codec_string(input.toc),
-        .timescale = timing->timescale};
+        .timescale = timing->timescale,
+        .user_boxes = signer->user_boxes()};
     auto fragmented = iclforge::containers::mp4::fragment(
         track, input.mp4_samples,
         iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = frames_per_fragment,
@@ -721,6 +752,7 @@ int fmp4_ac4(Ac4Input& input, std::string_view in_path, std::string_view out_dir
                    "ca4m and ca4s)",
                    input.mp4_samples.size(), iframes, track.sample_rate, track.rfc6381,
                    rendition.fragmented.media_segments.size(), out_dir);
+    signer->report(status_stream());
     return kExitOk;
 }
 
@@ -746,6 +778,13 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
         }
         fmt::println(stderr, "error: {}", iclforge::ac3::io::describe(scanned.error()));
         return kExitInput;
+    }
+    if (meta.sign_content) {
+        fmt::println(stderr,
+                     "error: sign-content signs AC-4 content, and {} is AC-3 or E-AC-3; E-AC-3's "
+                     "objects are signed by sign-objects on atmos-encode",
+                     in_path);
+        return kExitUsage;
     }
     const auto primary = build_rendition(*scanned, frames_per_fragment, in_path);
     if (!primary.has_value()) {

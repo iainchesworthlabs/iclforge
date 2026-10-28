@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/core/types.hpp"
@@ -231,19 +232,45 @@ int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
 }  // namespace
 
 int run_monitor(std::string_view in_path, int device_index, const Options& meta) {
-    const auto raw = read_elementary_stream(in_path);
+    // verify-content judges the file as it lies on disk (an MP4 carries its signature in a box
+    // that the elementary stream drops), so the bytes are read once and given to the check and to
+    // the container reader both.
+    std::vector<std::byte> file;
+    std::vector<std::byte> raw;
+    if (meta.verify_content) {
+        file = read_all(in_path);
+        if (file.empty()) {
+            fmt::println(stderr, "error: cannot read {}", in_path);
+            return kExitInput;
+        }
+        raw = elementary_stream_of(in_path, file);
+    } else {
+        raw = read_elementary_stream(in_path);
+    }
     if (raw.empty()) {
         return kExitInput;
     }
     // AC-4's sync word, 0xAC40 or 0xAC41, where A/52's is 0x0B77: its own
     // decoder, and none of the A/52 checks below.
     if (is_ac4_stream(raw)) {
+        // Before a device is touched: a stream that fails verify-content is not played.
+        const ContentDecision content = judge_content(meta, in_path, file, status_stream());
+        if (!content.proceed) {
+            return content.exit_code;
+        }
         warn_karaoke_not_ac3(meta, "AC-4");
         const auto target = monitor_target(device_index);
         if (!target.has_value()) {
             return target.error();
         }
         return monitor_ac4(raw, in_path, *target, meta);
+    }
+    if (meta.verify_content) {
+        fmt::println(stderr,
+                     "error: {} is AC-3 or E-AC-3: verify-content checks AC-4's content "
+                     "signature; verify-objects checks E-AC-3's object signatures",
+                     in_path);
+        return kExitUsage;
     }
     if (!apply_object_verification(raw, meta, status_stream())) {
         return kExitInput;

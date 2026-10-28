@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
@@ -208,6 +209,12 @@ struct Scene {
 int run_ac4_encode_objects(std::string_view in_path, std::string_view out_path,
                            std::uint32_t bitrate, const forge_cli::Options& meta) {
     const Options::Ac4Encode& opts = meta.ac4enc;
+    // This command writes a raw stream whatever the output is called, so a signature goes beside
+    // it. The key and chain are loaded before the encode, so a missing one is found at once.
+    auto signer = prepare_content_signer(meta, out_path, /*to_mp4=*/false);
+    if (!signer.has_value()) {
+        return signer.error();
+    }
     auto wav = read_wav_arg(in_path);
     if (!wav.has_value()) {
         fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::io::describe(wav.error()));
@@ -276,11 +283,14 @@ int run_ac4_encode_objects(std::string_view in_path, std::string_view out_path,
         return kExitInput;
     }
     frames->insert(frames->end(), rest->begin(), rest->end());
+    if (!signer->sign(*frames)) {
+        return kExitRuntime;
+    }
     std::vector<std::vector<std::byte>> bytes;
     for (const iclforge::ac4::EncodedFrame& frame : *frames) {
         bytes.push_back(iclforge::ac4::sync_frame(frame.raw_ac4_frame, opts.crc.value_or(true)));
     }
-    if (!write_frames(out_path, bytes)) {
+    if (!write_frames(out_path, bytes) || !signer->write_sidecar()) {
         return kExitOutput;
     }
     if (trace_file.is_open()) {
@@ -295,6 +305,7 @@ int run_ac4_encode_objects(std::string_view in_path, std::string_view out_path,
                    frames->size(), out_path, config.sample_rate_hz, wav->channels.size(), bitrate);
     status_println(status, "          the decoder's output lags the input by {} samples",
                    encoder->delay_samples() + encoder->decoder_delay_samples());
+    signer->report(status);
     return kExitOk;
 }
 

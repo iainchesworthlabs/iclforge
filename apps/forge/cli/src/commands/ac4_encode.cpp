@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
@@ -269,6 +270,13 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
                      "error: crc= is a raw stream's sync frames' CRC; an MP4 sample is the raw "
                      "frame alone, with no sync word and no CRC");
         return kExitUsage;
+    }
+    // sign-content: the key and chain are loaded here, before the encode, so that a missing one
+    // is found at once and not after the encode. The signature itself is made from the frames
+    // below and goes inside the MP4 or beside the raw stream.
+    auto signer = prepare_content_signer(meta, out_path, to_mp4);
+    if (!signer.has_value()) {
+        return signer.error();
     }
 
     // The substreams, numbered from 1 without a gap: 1 the positional input,
@@ -686,15 +694,18 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
     }
     frames->insert(frames->end(), rest->begin(), rest->end());
 
+    if (!signer->sign(*frames)) {
+        return kExitRuntime;
+    }
     const iclforge::ac4::Toc& toc = encoder->toc();
-    const auto packaged =
-        iclforge::apps::package_ac4(*frames, toc, to_mp4, opts.crc.value_or(true));
+    const auto packaged = iclforge::apps::package_ac4(*frames, toc, to_mp4, opts.crc.value_or(true),
+                                                      signer->user_boxes());
     if (!packaged.has_value()) {
         fmt::println(stderr, "error: {}", packaged.error().message);
         return packaged.error().usage ? kExitUsage : kExitOutput;
     }
     const std::string& rfc6381 = packaged->rfc6381;
-    if (!write_frames(out_path, packaged->chunks)) {
+    if (!write_frames(out_path, packaged->chunks) || !signer->write_sidecar()) {
         return kExitOutput;
     }
     if (trace_file.is_open()) {
@@ -729,6 +740,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
         rate_mode_name(config.rate_mode),
         encoder->delay_samples() + encoder->decoder_delay_samples(),
         native ? "" : ", to the nearest sample");
+    signer->report(status);
     return kExitOk;
 }
 

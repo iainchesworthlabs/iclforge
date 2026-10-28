@@ -27,6 +27,7 @@
 #include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
 #include "commands/synth.hpp"
+#include "content_signing_cli.hpp"
 #include "exit_codes.hpp"
 #include "platform/console_encoding.hpp"
 #include "support.hpp"
@@ -265,7 +266,8 @@ constexpr std::array<Command, 46> kCommands{{
      "file (same formats as atmos-path), objects it doesn't mention keep their default "
      "placement; with codec=ac4, AC-4 objects (A-JOC, or coding=direct) in a raw stream or an "
      "MP4 file",
-     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects,
+     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects |
+         topic::kContent,
      Needs::kNothing,
      [](const Args& x) {
          return run_atmos_encode(x.str(1), x.str(2), x.u32(3, 448), x.u32(4, 0), x.meta,
@@ -277,7 +279,7 @@ constexpr std::array<Command, 46> kCommands{{
      "(coding=ajoc, the default, or coding=direct); every bed/object channel the resolved "
      "audioProgramme names becomes a dynamic object, driven by the file's own authored automation "
      "- no scene file needed. Only in builds with -DICLFORGE_BUILD_ADM=ON",
-     topic::kAtmos | topic::kMeta | topic::kObjects,
+     topic::kAtmos | topic::kMeta | topic::kObjects | topic::kContent,
      Needs::kAdm,
      [](const Args& x) {
          return run_atmos_adm(x.str(1), x.str(2), x.u32(3, 448), x.meta, x.str(4));
@@ -289,7 +291,7 @@ constexpr std::array<Command, 46> kCommands{{
      "(coding=ajoc, the default, or coding=direct); every Bed channel/Object the file names "
      "becomes a dynamic object, driven by the file's own authored panning - no scene file needed. "
      "Only in builds with -DICLFORGE_BUILD_ADM=ON",
-     topic::kAtmos | topic::kMeta | topic::kObjects,
+     topic::kAtmos | topic::kMeta | topic::kObjects | topic::kContent,
      Needs::kAdm,
      [](const Args& x) { return run_atmos_iab(x.str(1), x.str(2), x.u32(3, 448), x.meta); }},
     {"atmos-cbi", 3, "<in.wav> <out.ec3> [bitrate_kbps] [layout]",
@@ -384,7 +386,7 @@ constexpr std::array<Command, 46> kCommands{{
      "dialogue enhancement metadata; substreamN= and presentationN= add substreams, each an input "
      "of its own, and the presentations that play them; syntax-trace=<file> writes what the "
      "encoder writes",
-     topic::kStdio | topic::kAc4Encode,
+     topic::kStdio | topic::kAc4Encode | topic::kContent,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
     {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
@@ -397,13 +399,14 @@ constexpr std::array<Command, 46> kCommands{{
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
      "pinned to their speaker, dynamic objects positioned by their own timeline",
-     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects,
+     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects | topic::kContent,
      Needs::kNothing,
      [](const Args& x) { return run_decode(x.str(1), x.str(2), x.meta, x.str(3), x.str(4)); }},
     {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
      "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 "
      "TOC/presentations/substream groups, bare or inside a container, and what the container "
-     "says of its track; table or documented JSON",
+     "says of its track; table or documented JSON. An AC-4 content signature is reported too "
+     "(the signer, the date and the chain's SHA-1 fingerprints), without a key or any trust",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
     {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
@@ -501,7 +504,9 @@ constexpr std::array<Command, 46> kCommands{{
      Needs::kNothing,
      [](const Args& x) { return run_mkv(x.str(1), x.str(2), x.meta); }},
     {"mp4", 3, "<in.ac3|in.ec3|in.ac4> <out.mp4>",
-     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4", topic::kNone,
+     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4; sign-content signs an "
+     "AC-4 input into a uuid box of the track",
+     topic::kContent,
      Needs::kNothing,
      [](const Args& x) { return run_mp4(x.str(1), x.str(2), x.meta); }},
     {"fmp4", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment]",
@@ -509,7 +514,7 @@ constexpr std::array<Command, 46> kCommands{{
      "an object-stripped 5.1 companion rendition. AC-4 as TS 103 190-2 Annex H has it: each "
      "fragment starting at an I-frame, the timescale Table E.1 gives, the ca4m and ca4s brands "
      "and the DASH descriptors of Annex G",
-     topic::kFmp4 | topic::kMeta,
+     topic::kFmp4 | topic::kMeta | topic::kContent,
      Needs::kNothing,
      [](const Args& x) { return run_fmp4(x.str(1), x.str(2), x.u32(3, 48), x.meta); }},
     {"ts", 3, "<in.ac3|in.ec3|in.ac4> <out.ts> [dvb|atsc]",
@@ -556,7 +561,7 @@ constexpr std::array<Command, 46> kCommands{{
      [](const Args& x) { return run_play(x.str(1), x.i32(2, -1), x.meta); }},
     {"monitor", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [device_index]",
      "decode and play on an ordinary (non-bitstreamed) output",
-     topic::kDecode | topic::kAc4Decode | topic::kObjects,
+     topic::kDecode | topic::kAc4Decode | topic::kObjects | topic::kContent,
      Needs::kMonitor,
      [](const Args& x) { return run_monitor(x.str(1), x.i32(2, -1), x.meta); }},
     {"spatial", 2, "<in.ec3> [device_index]",
@@ -716,6 +721,9 @@ int run_main(int argc, char** argv) {
                                token == "couple" || token == "heavy" || token == "heavy2" ||
                                token == "mixmeta" || token == "sign-objects" ||
                                token == "verify-objects" || token == "gate-objects" ||
+                               token == "sign-content" || token == "verify-content" ||
+                               token == "gate-content" ||
+                               token == "allow-expired-intermediates" ||
                                token == "verify" ||
                                token == "bed-only" ||
                                token == "keep-partial" || token == "fast-mdct" ||
@@ -758,6 +766,11 @@ int run_main(int argc, char** argv) {
     }
 
     const std::string_view command{args[0]};
+    // The content-signing options against the command: an option no command would read is said to
+    // be useless and not dropped.
+    if (!content_options_fit_command(meta, command)) {
+        return kExitUsage;
+    }
     if (const auto* c = find_command(command)) {
         if (args.size() < c->min_args) {
             // This command's own row and grammars, not the whole manual: the

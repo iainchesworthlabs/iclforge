@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 112> kOptionTokens{{
+constexpr std::array<OptionToken, 126> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -50,6 +50,20 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
+    {"sign-content", "AC-4: sign the output (needs signing-key= and signing-chain=)"},
+    {"verify-content", "AC-4 decode/monitor: refuse a stream whose content signature does not verify"},
+    {"gate-content", "AC-4 decode: decode without the objects unless the content signature verifies"},
+    {"allow-expired-intermediates", "verify-content/gate-content: accept an expired intermediate certificate"},
+    {"signing-chain=", "sign-content: the signer's certificates (PEM or DER), the leaf and its issuers"},
+    {"trust-anchor=", "verify-content/gate-content: a certificate to trust; repeat for more"},
+    {"trust-key=", "verify-content/gate-content: a public key to trust directly; repeat for more"},
+    {"content-signature=", "the file holding an elementary stream's signature (default <stream>.sig)"},
+    {"sign-time=", "sign-content: the signed date, ISO 8601 UTC (default: now)"},
+    {"verify-time=", "verify-content/gate-content: the time chain validity is judged at (default: now)"},
+    {"signer-profile=", "verify-content/gate-content: spec (default) or any, the signer certificate's expected shape"},
+    {"signer-title=", "verify-content/gate-content: replace the expected signer title"},
+    {"signer-cn=", "verify-content/gate-content: replace the expected signer common name"},
+    {"signer-serial=", "verify-content/gate-content: replace the expected signer serial number (hex)"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"karaoke", "decode/monitor: an AC-3 or E-AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
@@ -755,6 +769,21 @@ void print_objects_topic() {
     fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
+void print_content_topic() {
+    fmt::println("");
+    fmt::println("sign-content/verify-content/gate-content sign and check an AC-4 stream as a");
+    fmt::println("       whole: one SHA-256 over its frames, an ECDSA P-256 signature over that,");
+    fmt::println("       and the signer's certificate chain, in a file beside an elementary stream");
+    fmt::println("       (<stream>.sig) or in a uuid box of an MP4's AC-4 track. You bring the key");
+    fmt::println("       and the chain; nothing is built in. verify-content refuses a stream that");
+    fmt::println("       is unsigned, altered or signed by someone you do not trust; gate-content");
+    fmt::println("       decodes it without its object audio and carries on. Neither is on unless");
+    fmt::println("       given, and a signed stream decodes like an unsigned one without them. A");
+    fmt::println("       signature is never checked against nothing: give trust-anchor= or");
+    fmt::println("       trust-key=, or set ICLFORGE_CONTENT_TRUST_FILE. See");
+    fmt::println("       docs/concepts/content-signing.md.");
+}
+
 // The per-topic sections, in the order both the full listing and a single
 // command's help print them. One table, so the two orders cannot diverge.
 struct TopicSection {
@@ -762,7 +791,7 @@ struct TopicSection {
     void (*print)();
 };
 
-constexpr std::array<TopicSection, 18> kTopicSections{{
+constexpr std::array<TopicSection, 19> kTopicSections{{
     {topic::kStdio, print_stdio_topic},
     {topic::kLive, print_live_topic},
     {topic::kPlay, print_play_topic},
@@ -781,6 +810,7 @@ constexpr std::array<TopicSection, 18> kTopicSections{{
     {topic::kQc, print_qc_topic},
     {topic::kProbe, print_probe_topic},
     {topic::kStreamTools, print_stream_tools_topic},
+    {topic::kContent, print_content_topic},
 }};
 
 void print_topic_sections(std::uint32_t mask) {
@@ -910,6 +940,48 @@ void print_option_blocks(std::uint32_t mask) {
                      "use (or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give "
                      "verify-objects and gate-objects several keys - a frame is good under any of "
                      "them; sign-objects takes one");
+    }
+    if ((mask & topic::kContent) != 0) {
+        fmt::println("");
+        fmt::println("AC-4 content signing options (any order, after the positional arguments):");
+        fmt::println("  sign-content      ac4-encode, mp4, fmp4, and atmos-encode/atmos-adm/atmos-iab "
+                     "with codec=ac4: sign the output. The signature goes in a uuid box of an "
+                     "MP4's track, or beside a raw stream as <out>.sig (content-signature= names "
+                     "another file); fmp4 puts it in init.mp4");
+        fmt::println("  signing-key=<path>      the private key, PEM (PKCS#8 or SEC1) or DER; or "
+                     "ICLFORGE_CONTENT_SIGNING_KEY_FILE, or the PEM itself in "
+                     "ICLFORGE_CONTENT_SIGNING_KEY. Read as an EC key here, where sign-objects "
+                     "reads an HMAC key from the same option");
+        fmt::println("  signing-chain=<path>    the certificates, PEM or DER: the leaf and its "
+                     "issuers in any order, the root included or not; or "
+                     "ICLFORGE_CONTENT_SIGNING_CHAIN_FILE. The leaf must hold the key");
+        fmt::println("  sign-time=<ISO 8601 UTC>    the signed date to record, 2026-10-29T12:00:00Z "
+                     "(default: the system clock). The signature does not cover it");
+        fmt::println("  verify-content    decode/monitor: refuse the command unless the content "
+                     "signature verifies under the trust given. An unsigned stream is refused too");
+        fmt::println("  gate-content      decode: the licensed policy - content that does not "
+                     "verify (unsigned, altered, signed by someone else) decodes without its "
+                     "object audio, for the whole stream, and the decode carries on. A "
+                     "presentation of object audio alone then has nothing to play and is refused. "
+                     "Not combinable with verify-content");
+        fmt::println("  trust-anchor=<path>     a certificate you trust (PEM or DER, one or "
+                     "several in a file); repeat for more. The chain must lead to one");
+        fmt::println("  trust-key=<path>        a public key (PEM SPKI) or a certificate whose "
+                     "key you trust directly, whatever the chain says; repeat for more");
+        fmt::println("                    with neither, ICLFORGE_CONTENT_TRUST_FILE; with none "
+                     "anywhere the command is refused. Naming a path means the environment is "
+                     "not read");
+        fmt::println("  content-signature=<path>    the file holding an elementary stream's "
+                     "signature (default <stream>.sig); an MP4 carries its own");
+        fmt::println("  verify-time=<ISO 8601 UTC>  the time the chain's validity is judged at "
+                     "(default: the system clock)");
+        fmt::println("  allow-expired-intermediates    accept an intermediate certificate past its "
+                     "notAfter, and say so. The anchor and the leaf must still be in date");
+        fmt::println("  signer-profile=spec|any     what the signer's certificate must look like: "
+                     "spec (the default) is the specification's title Code/Content Signer, common "
+                     "name ILok and serial 1798A2B5D62000000005; any checks none of the three");
+        fmt::println("  signer-title=, signer-cn=, signer-serial=    replace one part of that "
+                     "profile");
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");

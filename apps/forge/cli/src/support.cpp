@@ -61,6 +61,7 @@
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -1733,6 +1734,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.sign_objects = true;
             continue;
         }
+        if (token == "sign-content") {
+            out.sign_content = true;
+            continue;
+        }
+        if (token == "verify-content") {
+            out.verify_content = true;
+            continue;
+        }
+        if (token == "gate-content") {
+            out.gate_content = true;
+            continue;
+        }
+        if (token == "allow-expired-intermediates") {
+            out.allow_expired_intermediates = true;
+            continue;
+        }
         if (token == "bed-only") {
             out.bed_only = true;
             continue;
@@ -3206,6 +3223,52 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.signing_keys.emplace_back(value);
             continue;
         }
+        if (key == "signing-chain" || key == "trust-anchor" || key == "trust-key" ||
+            key == "content-signature") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: {}= needs a file path", key);
+                return false;
+            }
+            if (key == "signing-chain") {
+                out.signing_chain = std::string{value};
+            } else if (key == "trust-anchor") {
+                out.trust_anchors.emplace_back(value);
+            } else if (key == "trust-key") {
+                out.trust_keys.emplace_back(value);
+            } else {
+                out.content_signature = std::string{value};
+            }
+            continue;
+        }
+        if (key == "sign-time" || key == "verify-time") {
+            const auto when = iclforge::base::crypto::parse_iso8601_utc(value);
+            if (!when.has_value()) {
+                fmt::println(stderr,
+                             "error: {}= needs a UTC time such as 2026-10-29T12:00:00Z (got '{}')",
+                             key, value);
+                return false;
+            }
+            (key == "sign-time" ? out.sign_time : out.verify_time) = *when;
+            continue;
+        }
+        if (key == "signer-profile") {
+            if (value != "spec" && value != "any") {
+                fmt::println(stderr, "error: signer-profile= is spec or any (got '{}')", value);
+                return false;
+            }
+            out.signer_profile_any = value == "any";
+            continue;
+        }
+        if (key == "signer-title" || key == "signer-cn" || key == "signer-serial") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: {}= needs a value", key);
+                return false;
+            }
+            (key == "signer-title" ? out.signer_title
+             : key == "signer-cn"  ? out.signer_cn
+                                   : out.signer_serial) = std::string{value};
+            continue;
+        }
         if (key == "programme") {
             // §E2.3.1.2 numbers independent substreams I0-I7, so the id is
             // the whole of what selects a programme - there is no separate
@@ -3280,6 +3343,27 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         fmt::println(stderr,
                      "error: verify-objects refuses a stream whose objects do not verify and "
                      "gate-objects plays it as its bed - give one, not both");
+        return false;
+    }
+    // The same for AC-4's pair.
+    if (out.verify_content && out.gate_content) {
+        fmt::println(stderr,
+                     "error: verify-content refuses a stream that does not verify and "
+                     "gate-content decodes it without its objects - give one, not both");
+        return false;
+    }
+    // The signing options of the two families belong to different streams: say so, and name the
+    // option for the other one, rather than let a command sign nothing.
+    if (out.sign_content && out.sign_objects) {
+        fmt::println(stderr,
+                     "error: sign-content signs AC-4 and sign-objects signs E-AC-3's object "
+                     "container - one command writes one of them");
+        return false;
+    }
+    if ((out.verify_content || out.gate_content) && (out.verify_objects || out.gate_objects)) {
+        fmt::println(stderr,
+                     "error: verify-content and gate-content check AC-4, verify-objects and "
+                     "gate-objects check E-AC-3 - give the pair for the stream you decode");
         return false;
     }
     // The levels are the capable decoder's: Table C.2.2, the aware decoder's, has none, and the
@@ -4349,6 +4433,11 @@ std::vector<std::byte> read_elementary_stream(std::string_view in_path) {
         fmt::println(stderr, "error: cannot read {}", in_path);
         return {};
     }
+    return elementary_stream_of(in_path, bytes);
+}
+
+std::vector<std::byte> elementary_stream_of(std::string_view in_path,
+                                            std::span<const std::byte> bytes) {
     auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
     if (!result.error.empty()) {
         fmt::println(stderr, "error: {} is a {}", in_path, result.error);

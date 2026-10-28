@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../multi_source.hpp"
 #include "../support.hpp"
@@ -296,6 +297,18 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
                              const std::vector<std::span<const float>>& lfe_pcm,
                              std::string_view in_path, std::string_view out_path,
                              std::uint32_t bitrate, const Options& meta) {
+    if (meta.sign_objects) {
+        fmt::println(stderr,
+                     "error: sign-objects signs E-AC-3's EMDF object container; an AC-4 object "
+                     "stream is signed whole by sign-content (docs/concepts/content-signing.md)");
+        return kExitUsage;
+    }
+    // sign-content: loaded before the encode, so a missing key or chain is found at once. This
+    // command writes a raw stream, so the signature goes beside it.
+    auto signer = prepare_content_signer(meta, out_path, /*to_mp4=*/false);
+    if (!signer.has_value()) {
+        return signer.error();
+    }
     if (sample_rate != 48000 && sample_rate != 44100) {
         fmt::println(stderr,
                      "error: {} objects need a 48 or 44.1 kHz source for AC-4 (its object "
@@ -350,12 +363,15 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
         fmt::println(stderr, "error: {}", encoded.error().message);
         return kExitInput;
     }
+    if (!signer->sign(encoded->frames)) {
+        return kExitRuntime;
+    }
     std::vector<std::vector<std::byte>> bytes;
     bytes.reserve(encoded->frames.size());
     for (const iclforge::ac4::EncodedFrame& frame : encoded->frames) {
         bytes.push_back(iclforge::ac4::sync_frame(frame.raw_ac4_frame, /*crc=*/true));
     }
-    if (!write_frames(out_path, bytes)) {
+    if (!write_frames(out_path, bytes) || !signer->write_sidecar()) {
         return kExitOutput;
     }
     std::size_t bed_count = 0;
@@ -372,6 +388,7 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
                    params.coding == iclforge::ac4::ObjectCoding::kAjoc ? "A-JOC" : "direct");
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
+    signer->report(status);
     return kExitOk;
 }
 
@@ -903,7 +920,7 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
     if (meta.sign_objects) {
         fmt::println(stderr,
                      "error: sign-objects signs E-AC-3's EMDF object container; an AC-4 object "
-                     "stream carries no such signature");
+                     "stream is signed whole by sign-content (docs/concepts/content-signing.md)");
         return kExitUsage;
     }
     if (meta.p.measure_dialnorm) {
@@ -918,6 +935,12 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
                      "error: crc= is a raw stream's sync frames' CRC; an MP4 sample is the raw "
                      "frame alone, with no sync word and no CRC");
         return kExitUsage;
+    }
+    // sign-content: loaded before the sources are read and encoded, so a missing key or chain is
+    // found at once.
+    auto signer = prepare_content_signer(meta, out_path, to_mp4);
+    if (!signer.has_value()) {
+        return signer.error();
     }
     const bool routed = !meta.sources.empty() || meta.map_spec.has_value();
     if (routed && objects != 0) {
@@ -1035,12 +1058,16 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
         return kExitInput;
     }
     const bool crc = meta.ac4enc.crc.value_or(true);
-    const auto packaged = iclforge::apps::package_ac4(encoded->frames, encoded->toc, to_mp4, crc);
+    if (!signer->sign(encoded->frames)) {
+        return kExitRuntime;
+    }
+    const auto packaged = iclforge::apps::package_ac4(encoded->frames, encoded->toc, to_mp4, crc,
+                                                      signer->user_boxes());
     if (!packaged.has_value()) {
         fmt::println(stderr, "error: {}", packaged.error().message);
         return packaged.error().usage ? kExitUsage : kExitOutput;
     }
-    if (!write_frames(out_path, packaged->chunks)) {
+    if (!write_frames(out_path, packaged->chunks) || !signer->write_sidecar()) {
         return kExitOutput;
     }
     const auto status = status_stream(out_path);
@@ -1052,6 +1079,7 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
                           : std::string{crc ? "raw with CRC" : "raw without CRC"});
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
+    signer->report(status);
     return kExitOk;
 }
 

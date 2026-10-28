@@ -49,6 +49,12 @@ load_content_signer(std::string_view key_path, std::string_view chain_path);
     std::span<const iclforge::ac4::EncodedFrame> frames,
     const iclforge::base::crypto::SigningCredentials& credentials, std::int64_t signed_unix);
 
+// The same for frames already held as spans, which is what `mp4` and `fmp4` have after scanning
+// an AC-4 stream: the raw frame of each sync frame, without its sync word, size and CRC.
+[[nodiscard]] std::expected<std::vector<std::byte>, std::string> sign_ac4_samples(
+    std::span<const std::span<const std::byte>> samples,
+    const iclforge::base::crypto::SigningCredentials& credentials, std::int64_t signed_unix);
+
 // One line saying who signed and when, for the status output of a command that signed:
 // "signed as serial 1798A2B5D62000000005 (CN=ILok, ...) at 2026-10-29T00:00:00Z".
 [[nodiscard]] std::string describe_signer(
@@ -60,6 +66,9 @@ load_content_signer(std::string_view key_path, std::string_view chain_path);
 // $ICLFORGE_CONTENT_TRUST_FILE when no path was given (load_trust_store); there is no default
 // that trusts anything.
 struct ContentTrustSettings {
+    // The option the operator gave, for the sentences that say what is missing: "verify-content"
+    // or "gate-content".
+    std::string option = "verify-content";
     std::vector<std::string> anchor_paths;  // trust-anchor=
     std::vector<std::string> key_paths;     // trust-key=
     // The time chain validity is judged at: verify-time=, else the clock.
@@ -121,7 +130,22 @@ struct ContentCheck {
 
 // --- Inspection (no key, no trust) --------------------------------------------------------------
 
+// One certificate of the chain a signature carries, as `probe` reports it.
+struct InspectedCertificate {
+    // Empty and `problem` set when the DER does not parse.
+    std::string subject;
+    std::string serial;
+    std::string not_before;  // ISO 8601 UTC
+    std::string not_after;
+    // SHA-1 of the DER as openssl prints it ("AB:CD:..."), which a signer publishes.
+    std::string sha1;
+    std::string problem;
+};
+
 struct SignatureInspection {
+    // False for a container that has nowhere to carry a content signature (Matroska, MPEG-TS), in
+    // which case `probe` says nothing about signatures. True otherwise.
+    bool supported = true;
     // False when the stream carries no signature (or none could be found).
     bool present = false;
     // Why nothing could be read, or why the signature does not parse; empty when it does.
@@ -131,6 +155,12 @@ struct SignatureInspection {
     // signer publishes. Says nothing about whether the signature is valid: only verify-content,
     // with the operator's trust, does.
     std::vector<std::string> lines;
+    // The same facts as fields, for probe's JSON. Set when the signature parses.
+    std::string carrier;
+    std::string signer_serial;
+    std::string signed_date;
+    std::int32_t version = 0;
+    std::vector<InspectedCertificate> certificates;
 };
 
 [[nodiscard]] SignatureInspection inspect_ac4_signature(std::span<const std::byte> file,

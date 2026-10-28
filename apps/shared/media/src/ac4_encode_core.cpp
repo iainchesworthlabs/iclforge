@@ -286,7 +286,7 @@ bool ac4_output_names_mp4(std::string_view out_path) {
 
 std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
     std::span<const iclforge::ac4::EncodedFrame> frames, const iclforge::ac4::Toc& toc, bool mp4,
-    bool crc) {
+    bool crc, std::span<const iclforge::containers::mp4::UserBox> user_boxes) {
     Ac4Packaged out;
     if (!mp4) {
         out.chunks.reserve(frames.size());
@@ -329,7 +329,9 @@ std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
         .samples_per_frame = timing->sample_delta,
         .codec_config = std::move(dac4),
         .rfc6381 = iclforge::ac4::rfc6381_codec_string(toc),
-        .timescale = timing->timescale};
+        .timescale = timing->timescale,
+        .user_boxes =
+            std::vector<iclforge::containers::mp4::UserBox>(user_boxes.begin(), user_boxes.end())};
     out.rfc6381 = track.rfc6381;
     auto muxed = iclforge::containers::mp4::mux(track, samples, options);
     if (!muxed.has_value()) {

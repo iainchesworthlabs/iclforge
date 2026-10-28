@@ -78,8 +78,11 @@ inline constexpr std::uint32_t kAc4Encode = 1U << 20;
 inline constexpr std::uint32_t kAc4Decode = 1U << 21;
 // lyrics-to-lrc's own option block: lyrics-encoding=, overwrite=.
 inline constexpr std::uint32_t kLyricsConvert = 1U << 22;
+// AC-4 content signing and verification: sign-content, verify-content, gate-content and their
+// key, chain and trust options.
+inline constexpr std::uint32_t kContent = 1U << 23;
 
-inline constexpr std::uint32_t kAll = 0x7FFFFFU;
+inline constexpr std::uint32_t kAll = 0xFFFFFFU;
 
 }  // namespace topic
 

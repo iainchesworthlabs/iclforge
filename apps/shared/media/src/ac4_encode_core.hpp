@@ -12,6 +12,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 // What forge's `ac4-encode` and forge-gui's AC-4 encode share, so that the
 // command line the GUI echoes writes the same bytes the GUI does: the encoder's
@@ -91,9 +92,12 @@ struct Ac4PackageError {
     bool usage = false;
 };
 
+// `user_boxes` are written into the MP4 track's `trak` (iclforge::containers::mp4::UserBox), which
+// is where forge's sign-content puts a content signature; they are not used for a raw stream.
+// This function does not know what they hold.
 [[nodiscard]] std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
     std::span<const iclforge::ac4::EncodedFrame> frames, const iclforge::ac4::Toc& toc, bool mp4,
-    bool crc);
+    bool crc, std::span<const iclforge::containers::mp4::UserBox> user_boxes = {});
 
 // Whether an output path names an MP4 file, as `remux` matches them: by the
 // path's extension, case kept, .mp4, .m4a or .mov. What forge's ac4-encode and

@@ -388,6 +388,40 @@ struct Options {
     // verify-objects; the two cannot be combined (one says "refuse", the other
     // "play the bed"). See ac3::signing::gate_atmos_stream.
     bool gate_objects = false;
+    // AC-4 content signing (pace-ccjf1; docs/concepts/content-signing.md). The three modes are the
+    // AC-4 counterparts of sign-objects, verify-objects and gate-objects, and are separate options
+    // because the material differs: a certificate chain and an EC key, not an HMAC key, and a
+    // signature over the whole stream, not a tag on each frame. sign-content writes a signature
+    // beside an elementary stream or in an MP4; verify-content refuses the command for a stream
+    // that does not verify; gate-content decodes a stream that does not verify without its
+    // objects. verify-content and gate-content cannot be combined (as for the AC-3 pair).
+    bool sign_content = false;
+    bool verify_content = false;
+    bool gate_content = false;
+    // signing-chain=<path>: the certificates of the signer, with sign-content (signing-key= names
+    // the private key, as for sign-objects, and is read as an EC key here).
+    std::string signing_chain;
+    // trust-anchor=<path> and trust-key=<path>, repeatable: what verify-content and gate-content
+    // accept. With none of either, ICLFORGE_CONTENT_TRUST_FILE; with none anywhere the command is
+    // refused, because a signature is never checked against nothing.
+    std::vector<std::string> trust_anchors;
+    std::vector<std::string> trust_keys;
+    // content-signature=<path>: the sidecar file of an elementary stream. Read by verify-content
+    // and gate-content, written by sign-content; default <stream>.sig.
+    std::string content_signature;
+    // sign-time= and verify-time= (ISO 8601 UTC): the date recorded in a signature, and the time
+    // chain validity is judged at. Unset means the system clock.
+    std::optional<std::int64_t> sign_time;
+    std::optional<std::int64_t> verify_time;
+    // allow-expired-intermediates: the relaxation of the chain policy that accepts an expired
+    // intermediate certificate (the specification's Part 6.1 step 4 leaves it open).
+    bool allow_expired_intermediates = false;
+    // signer-profile=spec|any and the three fields that replace one part of it. The profile is
+    // what the signer's leaf certificate must look like; "spec" is the specification's.
+    bool signer_profile_any = false;
+    std::optional<std::string> signer_title;
+    std::optional<std::string> signer_cn;
+    std::optional<std::string> signer_serial;
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.
@@ -1147,6 +1181,15 @@ std::vector<std::byte> read_all(std::string_view path);
 // does the right thing with an empty result regardless of which of those it
 // was.
 [[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path);
+
+// read_elementary_stream's second half, for a command that has already read the file: the
+// elementary stream in `bytes` (the bytes themselves if they are one, or the first track of a
+// container), with the same error message and an empty result on failure. verify-content and
+// gate-content read the file once and give it to both this and the signature check, because the
+// signature of an MP4 is in the container this function takes apart, and a "-" input can be read
+// only once.
+[[nodiscard]] std::vector<std::byte> elementary_stream_of(std::string_view in_path,
+                                                          std::span<const std::byte> bytes);
 
 // Wraps iclforge::ac3::io::read_wav to honor the "-" stdin convention (is_stdio_path
 // above): "-" reads the WAV from stdin, binary mode set first, instead of

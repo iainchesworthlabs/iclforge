@@ -107,7 +107,13 @@ std::expected<std::vector<std::byte>, std::string> sign_encoded_frames(
     for (const iclforge::ac4::EncodedFrame& frame : frames) {
         views.emplace_back(frame.raw_ac4_frame);
     }
-    auto payload = signing::sign_frames(views, credentials, signed_unix);
+    return sign_ac4_samples(views, credentials, signed_unix);
+}
+
+std::expected<std::vector<std::byte>, std::string> sign_ac4_samples(
+    std::span<const std::span<const std::byte>> samples,
+    const crypto::SigningCredentials& credentials, std::int64_t signed_unix) {
+    auto payload = signing::sign_frames(samples, credentials, signed_unix);
     if (!payload.has_value()) {
         return std::unexpected(fmt::format("sign-content: {} ({})",
                                            crypto::describe(payload.error().error),
@@ -132,12 +138,12 @@ std::expected<crypto::TrustStore, std::string> load_content_trust(
     if (!trust.has_value()) {
         if (trust.error().kind == crypto::CredentialErrorKind::kAbsent) {
             return std::unexpected(fmt::format(
-                "verify-content needs something to trust: {}; pass trust-anchor=<certificate> or "
+                "{} needs something to trust: {}; pass trust-anchor=<certificate> or "
                 "trust-key=<public key>, or set ICLFORGE_CONTENT_TRUST_FILE. A signature is never "
                 "checked against nothing",
-                trust.error().message));
+                settings.option, trust.error().message));
         }
-        return std::unexpected(fmt::format("verify-content: {}", trust.error().message));
+        return std::unexpected(fmt::format("{}: {}", settings.option, trust.error().message));
     }
     return std::move(*trust);
 }
@@ -262,6 +268,7 @@ SignatureInspection inspect_ac4_signature(std::span<const std::byte> file,
             carrier = &mp4;
             break;
         case Reading::kNoSignatureContainer:
+            out.supported = false;
             out.problem = "Matroska and MPEG-TS carry no AC-4 content signature";
             return out;
     }
@@ -281,6 +288,10 @@ SignatureInspection inspect_ac4_signature(std::span<const std::byte> file,
                                   parsed.error().detail);
         return out;
     }
+    out.carrier = std::string{carrier->name()};
+    out.signer_serial = parsed->signer_info.signer_serial_number;
+    out.signed_date = parsed->signature_values.signed_info.signed_date;
+    out.version = parsed->signature_values.signed_info.canonical_version;
     out.lines.push_back(
         fmt::format("carrier: {}; {} bytes", carrier->name(), content->signature.size()));
     out.lines.push_back(fmt::format("signer serial: {}", parsed->signer_info.signer_serial_number));
@@ -297,8 +308,22 @@ SignatureInspection inspect_ac4_signature(std::span<const std::byte> file,
         if (!certificate.has_value()) {
             out.lines.push_back(fmt::format("certificate {}: does not parse ({})", number,
                                             crypto::describe(certificate.error())));
+            out.certificates.push_back(
+                {.subject = {},
+                 .serial = {},
+                 .not_before = {},
+                 .not_after = {},
+                 .sha1 = {},
+                 .problem = std::string{crypto::describe(certificate.error())}});
             continue;
         }
+        out.certificates.push_back(
+            {.subject = subject_of(*certificate),
+             .serial = certificate->serial_hex(),
+             .not_before = crypto::format_iso8601_utc(certificate->not_before),
+             .not_after = crypto::format_iso8601_utc(certificate->not_after),
+             .sha1 = certificate->sha1_fingerprint(),
+             .problem = {}});
         out.lines.push_back(fmt::format("certificate {}: {} serial {}, valid {} to {}", number,
                                         subject_of(*certificate), certificate->serial_hex(),
                                         crypto::format_iso8601_utc(certificate->not_before),

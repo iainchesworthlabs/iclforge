@@ -22,6 +22,7 @@
 
 #include "../adm/atmos_adm.hpp"
 #include "../adm/decode_adm.hpp"
+#include "../content_signing_cli.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
@@ -37,6 +38,7 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
 #include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/signing/content_signing.hpp"
 #include "iclforge/objects/joc_domain.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/verify/bap_census.hpp"
@@ -492,8 +494,14 @@ iclforge::objects::oba::DynamicObject to_oba_dynamic_object(
 // 7.1.4 by default, through the layout renderer Hearth plays E-AC-3's objects
 // with (apps/shared/media/src/ac4_object_render.hpp); the object options, which write
 // E-AC-3's objects out, are reported rather than applied.
-int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, std::string_view out_path,
-                   const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
+// verify-content and gate-content (docs/concepts/content-signing.md) have been settled by the
+// caller from the file as it lies on disk, because the signature of an MP4 is in the container and
+// not in the elementary stream this function is given; `content` is that outcome. gate-content only
+// changes the decoder's configuration, by the one field the library names for it.
+int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path,
+                   std::string_view out_path, const forge_cli::Options& meta,
+                   std::string_view objects_dir, std::string_view adm_out,
+                   const forge_cli::ContentDecision& content) {
     const auto status = status_stream(out_path);
     if (meta.output.mode != iclforge::ac3::OperatingMode::kCustom) {
         fmt::println(
@@ -517,11 +525,15 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
     // Options AC-3's and E-AC-3's decode reads: said, not silently dropped.
     // The two that promise a result AC-4 cannot give are refused.
     if (!meta.bap_census_path.empty() || meta.verify_objects || meta.gate_objects) {
-        fmt::println(stderr, "error: {} is AC-4: {} AC-3's and E-AC-3's", in_path,
-                     meta.verify_objects
-                         ? "verify-objects checks the EMDF object signatures of"
-                         : meta.gate_objects ? "gate-objects plays the signed EMDF object layer of"
-                                             : "bap-census= counts the bit allocation of");
+        fmt::println(
+            stderr, "error: {} is AC-4: {} AC-3's and E-AC-3's{}", in_path,
+            meta.verify_objects ? "verify-objects checks the EMDF object signatures of"
+            : meta.gate_objects ? "gate-objects plays the signed EMDF object layer of"
+                                : "bap-census= counts the bit allocation of",
+            meta.verify_objects ? "; verify-content checks an AC-4 stream's content signature"
+            : meta.gate_objects ? "; gate-content decodes an AC-4 stream without its objects "
+                                  "unless its content signature verifies"
+                                : "");
         return kExitUsage;
     }
     if (!meta.eac3_decode_tokens.empty()) {
@@ -551,6 +563,10 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
                    << r.value << '\t' << r.name << '\n';
     };
     iclforge::ac4::DecoderConfig config = ac4_decoder_config(meta);
+    // gate-content: a stream that did not verify decodes without its object audio.
+    if (meta.gate_content) {
+        config = iclforge::ac4::signing::soft_mode_config(config, content.verified);
+    }
     if (!meta.syntax_trace_path.empty()) {
         trace_file.open(std::filesystem::path{meta.syntax_trace_path}, std::ios::binary);
         if (!trace_file) {
@@ -667,6 +683,12 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         const auto decoded = decoder.decode(frame.raw_ac4_frame);
         if (!decoded.has_value()) {
             fmt::println(stderr, "error: {}: frame {}: {}", in_path, frames_done, decoder.refusal_reason());
+            if (meta.gate_content && !content.verified) {
+                fmt::println(stderr,
+                             "  gate-content left the object audio out because the content did not "
+                             "verify, and a presentation of object audio alone has nothing else to "
+                             "play");
+            }
             sink.abort();
             return kExitInput;
         }
@@ -779,6 +801,10 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
     }
     status_println(status, "decoded {} AC-4 frames{} -> {} ({}, {} Hz)", decoded_frames,
                    ac4_decoding(config.decoding), out_path, layout, first.sample_rate_hz);
+    if (meta.gate_content && !content.verified) {
+        status_println(status,
+                       "          gate-content: the content did not verify; object audio left out");
+    }
     status_println(status, "          presentation {}{}", first.presentation,
                    first.presentation_id ? fmt::format(" (presentation_id {})", *first.presentation_id)
                                          : std::string{});
@@ -1437,7 +1463,22 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
 int run_decode(std::string_view in_path, std::string_view out_path,
                const forge_cli::Options& requested, std::string_view objects_dir,
                std::string_view adm_out) {
-    const auto stream = read_elementary_stream(in_path);
+    // verify-content and gate-content judge the file as it lies on disk (an MP4 carries its
+    // signature in a box that the elementary stream drops), so the bytes are read once and given
+    // to the check and to the container reader both. A "-" input can be read only once.
+    const bool judges_content = requested.verify_content || requested.gate_content;
+    std::vector<std::byte> file;
+    std::vector<std::byte> stream;
+    if (judges_content) {
+        file = read_all(in_path);
+        if (file.empty()) {
+            fmt::println(stderr, "error: cannot read {}", in_path);
+            return kExitInput;
+        }
+        stream = elementary_stream_of(in_path, file);
+    } else {
+        stream = read_elementary_stream(in_path);
+    }
     if (stream.empty()) {
         return kExitInput;
     }
@@ -1445,7 +1486,22 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // AC-3's and E-AC-3's is 0x0B77; the first two bytes decide which decoder
     // reads the stream, before anything below reads it as AC-3.
     if (is_ac4_stream(stream)) {
-        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out);
+        // Before anything is decoded or written: a stream that fails verify-content is refused
+        // with no output file.
+        const forge_cli::ContentDecision content =
+            forge_cli::judge_content(requested, in_path, file, status_stream(out_path));
+        if (!content.proceed) {
+            return content.exit_code;
+        }
+        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out, content);
+    }
+    if (judges_content) {
+        fmt::println(stderr,
+                     "error: {} is AC-3 or E-AC-3: {} checks AC-4's content signature; "
+                     "{} checks E-AC-3's object signatures",
+                     in_path, requested.verify_content ? "verify-content" : "gate-content",
+                     requested.verify_content ? "verify-objects" : "gate-objects");
+        return kExitUsage;
     }
     if (!requested.syntax_trace_path.empty()) {
         fmt::println(stderr, "error: syntax-trace= records AC-4 syntax, and {} is AC-3 or E-AC-3", in_path);

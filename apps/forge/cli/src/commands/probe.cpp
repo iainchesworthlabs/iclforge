@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <fmt/base.h>
 #include <fmt/format.h>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -14,9 +15,11 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
+#include "../ac4_content_signing.hpp"
 #include "../json.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
@@ -634,8 +637,82 @@ void print_ac4_table(std::string_view path, const Ac4Summary& summary,
     }
 }
 
+// The content signature of the AC-4 file at `in_path`, as `probe` reports it: whether there is
+// one, who signed it and the fingerprints of its chain, with no key and no trust, so it says
+// nothing of whether the signature holds (verify-content does that). `file` is the file as it
+// lies on disk: the container, whose `uuid` box carries the signature of an MP4, or the
+// elementary stream, whose signature is in the sidecar (content-signature=, else <in_path>.sig,
+// if there is one).
+iclforge::apps::SignatureInspection inspect_signature(std::string_view in_path,
+                                                      std::span<const std::byte> file,
+                                                      const Options& meta) {
+    std::vector<std::byte> sidecar;
+    const bool named = !meta.content_signature.empty();
+    const std::string path =
+        named ? meta.content_signature
+              : (is_stdio_path(in_path) ? std::string{} : std::string{in_path} + ".sig");
+    std::error_code ec;
+    if (!path.empty() && std::filesystem::exists(path, ec)) {
+        sidecar = read_all(path);
+    }
+    return iclforge::apps::inspect_ac4_signature(file, sidecar);
+}
+
+void write_content_signature(JsonWriter& json, const iclforge::apps::SignatureInspection& found) {
+    json.key("content_signature");
+    if (!found.supported || (!found.present && found.problem.empty())) {
+        json.value_null();
+        return;
+    }
+    json.begin_object();
+    json.member("present", found.present);
+    if (!found.problem.empty()) {
+        json.member("problem", found.problem);
+    }
+    if (found.present && found.problem.empty()) {
+        json.member("carrier", found.carrier);
+        json.member("signer_serial", found.signer_serial);
+        // The signer's statement, which the signature does not cover.
+        json.member("signed", found.signed_date);
+        json.member("version", static_cast<std::int64_t>(found.version));
+        json.key("certificates");
+        json.begin_array();
+        for (const iclforge::apps::InspectedCertificate& certificate : found.certificates) {
+            json.begin_object();
+            if (!certificate.problem.empty()) {
+                json.member("problem", certificate.problem);
+            } else {
+                json.member("subject", certificate.subject);
+                json.member("serial", certificate.serial);
+                json.member("not_before", certificate.not_before);
+                json.member("not_after", certificate.not_after);
+                json.member("sha1", certificate.sha1);
+            }
+            json.end_object();
+        }
+        json.end_array();
+    }
+    json.end_object();
+}
+
+void print_content_signature(const iclforge::apps::SignatureInspection& found) {
+    if (!found.supported || (!found.present && found.problem.empty())) {
+        return;  // Nothing to report: an unsigned stream is the usual one.
+    }
+    std::vector<std::string> lines = found.lines;
+    if (!found.problem.empty()) {
+        lines.push_back(found.problem);
+    }
+    bool first = true;
+    for (const std::string& line : lines) {
+        fmt::println("{:<16}{}", first ? "content sig." : "", line);
+        first = false;
+    }
+}
+
 int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& meta,
-                  const iclforge::apps::ContainerFacts& container) {
+                  const iclforge::apps::ContainerFacts& container,
+                  std::span<const std::byte> container_file) {
     // Reads the whole input into memory - unlike the AC-3/E-AC-3 path above,
     // which pulls forward through a fixed window (see docs/forge/cli/commands.md's
     // "Memory is flat" claim, which is specific to that path and not
@@ -650,6 +727,9 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
         data[i] = static_cast<std::byte>(raw[i]);
     }
     const auto summary = summarize_ac4(data);
+    // The file as it lies on disk: the container when there was one, else the stream itself.
+    const auto signature = inspect_signature(
+        in_path, container_file.empty() ? std::span<const std::byte>{data} : container_file, meta);
     if (summary.sync_frames == 0) {
         fmt::println(stderr, "error: {}",
                      summary.parse_error ? iclforge::ac4::describe(*summary.parse_error)
@@ -665,10 +745,12 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
         // null for a bare stream: the schema's members are never omitted.
         write_container(json, container);
         write_ac4_stream(json, summary);
+        write_content_signature(json, signature);
         json.end_object();
         json.finish();
     } else {
         print_ac4_table(in_path, summary, container);
+        print_content_signature(signature);
     }
     return summary.crc_failures > 0 || summary.parse_error ? 1 : 0;
 }
@@ -701,6 +783,9 @@ int run_probe(std::string_view in_path, const Options& meta) {
     // container through (container_input.hpp). A bare stream, from a file or
     // from stdin, is read as it arrives, as before.
     iclforge::apps::ContainerFacts container;
+    // The container's bytes, kept for the content signature that an MP4 carries in a box the
+    // elementary stream drops. Empty for a bare stream.
+    std::vector<std::byte> container_file;
     std::istringstream demuxed;
     std::istream* source = is_stdio_path(in_path) ? static_cast<std::istream*>(&std::cin) : &file;
     if (!is_stdio_path(in_path)) {
@@ -713,8 +798,8 @@ int run_probe(std::string_view in_path, const Options& meta) {
         const auto kind =
             iclforge::apps::sniff_container(std::as_bytes(std::span{head}).first(got));
         if (kind != iclforge::apps::ContainerKind::kUnknown) {
-            const auto bytes = read_all(in_path);
-            auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
+            container_file = read_all(in_path);
+            auto result = iclforge::apps::elementary_stream_from_bytes(container_file);
             if (!result.error.empty()) {
                 fmt::println(stderr, "error: {} is a {}", in_path, result.error);
                 return 1;
@@ -745,7 +830,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
     // AccessUnitReader below is unaffected either way - this dispatch has
     // to happen before it, since it is hardwired to AC-3/E-AC-3 framing.
     if (in.peek() == 0xAC) {
-        return run_probe_ac4(in_path, in, meta, container);
+        return run_probe_ac4(in_path, in, meta, container, container_file);
     }
 
     // The JSON document is written as the walk produces it - the frames array
