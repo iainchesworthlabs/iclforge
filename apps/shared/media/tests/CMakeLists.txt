@@ -24,6 +24,10 @@
 # associated_mix.cpp joined for the same reason: 'decode' and 'monitor' choose an associated
 # service and pair its units with the main's through it, and 'monitor' cannot get past opening
 # a render device on a headless CI leg (test_associated_mix.cpp).
+# mp4_signature_carrier.cpp joined as the MP4 carrier of an AC-4 content signature: it finds the
+# `uuid` box in a track and hands the track's samples to the verifier, and
+# test_mp4_signature_carrier.cpp holds that the samples of an MP4 and the frames of an elementary
+# stream have one digest.
 # sink_wait.hpp is header-only: 'play', 'monitor', 'identify' and 'live' wait on their sinks
 # through it, and test_sink_wait.cpp holds those waits against sinks that stop on cue. These three
 # tests were in libs/ac3/tests and libs/audio/tests until the code they test moved (C7-2).
@@ -34,6 +38,7 @@ iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     test_ac4_objects_core.cpp
     test_associated_mix.cpp
     test_container_input.cpp
+    test_mp4_signature_carrier.cpp
     test_recording_sink.cpp
     test_sink_wait.cpp
     test_source_frame.cpp
@@ -41,11 +46,16 @@ iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/fmp4_folder_writer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/recording_sink.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/container_input.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/mp4_signature_carrier.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/stream_playback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/associated_mix.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_objects_core.cpp")
-target_include_directories(iclforge-app-media-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+# test_mp4_signature_carrier.cpp signs with a key and chain tests/support/test_pki.hpp builds at run
+# time (an ephemeral key from a seed; no key is committed).
+target_include_directories(iclforge-app-media-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+    "${PROJECT_SOURCE_DIR}/tests/support")
 target_link_libraries(iclforge-app-media-tests
     PRIVATE
         iclforge::ac3

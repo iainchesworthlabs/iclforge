@@ -108,6 +108,15 @@ set(_ac4_inspector_sources
     src/io/carriage.cpp
     src/io/elementary.cpp)
 
+# AC-4 content signing (ac4/signing/): the signed span, sign and verify over a stream's frames,
+# and the elementary stream's carrier. Only the full library has it. The minimum-footprint archive
+# (minimal.cmake) lists none of these, and no encoder or decoder source includes a signing header
+# (libs/ac4/tests/signing/test_layering.cpp scans for it): signing is a tool's step around the
+# codec, and it needs iclforge::base's cryptography, which that profile does not build.
+set(_ac4_signing_sources
+    src/signing/carrier.cpp
+    src/signing/content_signing.cpp)
+
 # What the decoder and the encoder compute alike: the tables generated from the
 # ETSI attachments, in namespace iclforge::ac4::detail, and the transforms, the
 # QMF banks and the sample rate converter, which are dsp's tiered kernels
@@ -196,6 +205,7 @@ else()
             ${_ac4_meta_sources}
             ${_ac4_inspector_sources}
             ${_ac4_kernel_sources}
+            ${_ac4_signing_sources}
         PRIVATE_INCLUDES ${_ac4_private_includes}
         LINK_PRIVATE ${_ac4_link_private})
 endif()

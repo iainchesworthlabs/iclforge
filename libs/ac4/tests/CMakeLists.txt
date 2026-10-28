@@ -25,9 +25,19 @@ iclforge_add_test_binary(iclforge-ac4-tests PROJECT ac4 SOURCES
     encoder/test_nine_x_four.cpp
     encoder/test_objects.cpp
     encoder/test_presentations.cpp
-    encoder/test_rates.cpp)
+    encoder/test_rates.cpp
+    signing/test_carrier.cpp
+    signing/test_content_signing.cpp
+    signing/test_layering.cpp)
 
 target_link_libraries(iclforge-ac4-tests PRIVATE iclforge::ac4 iclforge::ac3 iclforge::base_headers)
+
+# signing/ tests the content signing of ac4/signing/ against the key and chain tests/support/
+# test_pki.hpp builds at run time (an ephemeral key from a seed; none is committed), and
+# signing/test_layering.cpp reads the library's sources and CMakeLists.txt from this directory.
+target_include_directories(iclforge-ac4-tests PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
+target_compile_definitions(iclforge-ac4-tests PRIVATE
+    "ICLFORGE_AC4_SOURCE_DIR=\"${_ac4_root}\"")
 
 # decoder/test_{asf,metadata,presentation,channel_elements}.cpp reach the
 # AC-4 decoder's syntax functions (libs/ac4/src/decoder/syntax/) to hold each branch of
