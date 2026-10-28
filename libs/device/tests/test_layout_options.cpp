@@ -73,7 +73,7 @@ std::vector<Case> boards() {
     out.push_back({"S3 16-bit, one line", s3(16, false)});
     out.push_back({"S3 32-bit, two lines", s3(32, true)});
     out.push_back({"S3 16-bit, two lines", s3(16, true)});
-    out.push_back({"S3 with AC-4", s3(32, false, "s3-n16r8-ac4")});
+    out.push_back({"S3 with AC-4", s3(32, false, "s3-n16r8")});
     out.push_back({"P4 rev3, 16-bit slots", [] {
                        BoardCaps caps = p4_rev3();
                        caps.sink.slot_bits = 16;
@@ -389,14 +389,14 @@ TEST_CASE("every profile the project defines has an evidence row", "[device][lay
     // A new hardware variant is a new profile (firmware/hearth-sink/profiles.json) and a row in
     // kLayoutEvidence; tools/hearth/test_sink_profile.py holds the two lists to each other.
     for (const char* profile :
-         {"s3-n16r8", "s3-n16r8-ac4", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev3"}) {
+         {"s3-n16r8", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev3"}) {
         bool found = false;
         for (const auto& row : iclforge::kLayoutEvidence) {
             found = found || row.profile == profile;
         }
         CHECK(found);
     }
-    CHECK(iclforge::kLayoutEvidence.size() == 6);
+    CHECK(iclforge::kLayoutEvidence.size() == 5);
 }
 
 TEST_CASE("GET /layout-options is the head and one object a layout, in a fixed key order", "[device][layout_options]") {

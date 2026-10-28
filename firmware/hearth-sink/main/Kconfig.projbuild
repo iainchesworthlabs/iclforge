@@ -911,7 +911,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4
         stream it was measured on up to 5.1 (2.0 0.28 to 0.69, 5.1 0.62 to 0.91 with the second
         core, planning/ac4.md D14g to D14i), so it lists AC-4 and states 6 channels, which leaves
         5.1.4 to the server. An ESP32-S3 with the decoder and the 64 KB data cache
-        (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8-ac4 profile) keeps up with every
+        (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8 profile) keeps up with every
         2.0 stream up to 25 frames a second over Sendspin, 0.48 to 0.59 of a frame at frame rate
         index 13 and 0.78 to 0.80 at 24 and 25, and falls behind at 29.97 (0.99, with underruns),
         so it lists AC-4 at 2 channels and 25 frames a second and a server decodes the rest and
