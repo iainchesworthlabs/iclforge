@@ -1,10 +1,10 @@
 # AC-4 content signing (pace-ccjf1, bring your own key and chain)
 
-!!! note "Status as of 2026-10-29: phase 0 (this document) written; nothing else built"
+!!! note "Status as of 2026-10-29: phases 0 and 1 done"
     | Phase | What | State |
     |---|---|---|
     | 0 | This document | Written |
-    | 1 | Crypto in `libs/base`: P-256, ECDSA, DER, X.509, chain validation, key and certificate loaders | Not started |
+    | 1 | Crypto in `libs/base`: P-256, ECDSA, DER, X.509, chain validation, key and certificate loaders | Done; evidence under [Phase 1 results](#phase-1-results) |
     | 2 | Thrift binary and `ContentSignature` build and verify | Not started |
     | 3 | Carrier and AC-4 integration (elementary stream, MP4) | Not started |
     | 4 | CLI, library surface, documentation, changelog | Not started |
@@ -106,13 +106,19 @@ libs/base/include/iclforge/base/crypto/
   thrift_binary.hpp        TBinaryProtocol writer and bounded reader
   content_signature.hpp    the pace-ccjf1 structures, sign_digest, verify_digest, error codes
 libs/base/src/crypto/
-  uint256.hpp, montgomery.hpp   private: 256-bit values and constant-time modular arithmetic
-  p256_curve.hpp                private: Jacobian points, scalar multiplication
+  p256_math.hpp            private: 8x32-bit limbs, Montgomery arithmetic for p and n, Jacobian points,
+                           scalar multiplication, the curve constants
+  der.hpp                  private: the bounded DER reader (read_element, OIDs, EC key algorithm)
   p256.cpp, ecdsa_der.cpp, sha1.cpp, x509.cpp, credentials.cpp, thrift_binary.cpp,
   content_signature.cpp
-libs/base/tests/           test_p256.cpp, test_x509.cpp, test_credentials.cpp,
-                           test_thrift_binary.cpp, test_content_signature.cpp
-libs/base/fuzz/            fuzz_x509_parse.cpp, fuzz_content_signature_verify.cpp
+libs/base/tests/           test_p256.cpp, test_sha1.cpp, test_ecdsa_der.cpp, test_x509.cpp,
+                           test_credentials.cpp, test_interop.cpp (with interop/p256_interop.py),
+                           p256_vectors.inc (generated), then test_thrift_binary.cpp and
+                           test_content_signature.cpp
+libs/base/fuzz/            fuzz_x509_parse.cpp, then fuzz_content_signature_verify.cpp
+tests/support/             test_pki.hpp: ephemeral keys and X.509 certificates written for tests
+tools/generators/          gen_p256_vectors.py: writes p256_vectors.inc
+tools/checks/              check_p256_constant_time.py, with p256_constant_time.cpp
 ```
 
 `Sha256` becomes an exported class, because `libs/ac4` hashes frames incrementally.
@@ -199,9 +205,10 @@ Verification uses the same routines. It handles public data, so it needs no extr
 the code keeps the amount to review small.
 
 Limits, stated plainly: the constant-time property is by construction and has been checked by
-tests that compare against OpenSSL and by running signing under `valgrind --tool=memcheck` with the
-key marked undefined (a branch or index on the secret is reported); it has not been formally
-verified, and the compiler could in principle introduce a branch in a mask select. This is
+tests that compare against OpenSSL and by `tools/checks/check_p256_constant_time.py`, which runs
+signing under `valgrind --tool=memcheck` with the key marked undefined (a branch or index on the
+secret is reported). It has not been formally verified, it covers the machine code of one compiler
+at one optimisation level, and it does not see variable-time instructions or caches. This is
 adequate for the use it is built for, an offline tool signing with a key the operator holds,
 where the attacker model is local. It is not a replacement for an HSM or an external signer. An
 operator who needs that can sign elsewhere and use the library's verify side only. If review finds the
@@ -528,7 +535,7 @@ the fingerprints a vendor publishes (spec §10.1).
 | Page | Change |
 |---|---|
 | `docs/library/signing.md` | Gains an "AC-4 content signing" section after the AC-3 one; the closing statement that AC-4 is not signed is replaced. |
-| `docs/concepts/object-signing.md` | "Sibling: AC-4" is rewritten; the decode-modes table gains the AC-4 column; the `gate-objects` bullet "a usage error on AC-4" now points to `gate-content`. A new concept page, `docs/concepts/content-signing.md`, explains the scheme, the trust model and the carrier. |
+| `docs/concepts/object-signing.md` | "Sibling: AC-4" is rewritten; the decode-modes table gains the AC-4 column; the `gate-objects` bullet "a usage error on AC-4" now points to `gate-content`. A new concept page on content signing explains the scheme, the trust model and the carrier. |
 | `docs/forge/cli/commands.md`, `metadata-options.md` | The options above. |
 | `docs/library/capabilities.md`, `index.md`, `api-stability.md`, `docs/threat-model.md`, `tools/fuzz/README.md` | The new capability, the header tiers, the new foreign-input surface and fuzz harness. |
 | `CHANGELOG.md`, `ROADMAP.md` | An entry under Unreleased; the roadmap row for object authenticity modes gains AC-4. |
@@ -589,6 +596,44 @@ kept, as `CONTRIBUTING.md` asks.
 | 16 | §2.3 | "Range 68-72" for the DER length; a minimal encoding with a short `r` or `s` is shorter. | Any minimal DER with `1 <= r, s <= n-1` is accepted. |
 | 17 | §10.1 | The fingerprints are SHA-1. | SHA-1 is implemented for identification only and is never used to judge a signature. |
 | 18 | §2.2 | Low-`s` is not mentioned. | Not normalised; `(r, n-s)` also verifies. The RFC 6979 vectors keep their published values. |
+
+## Phase 1 results
+
+What was built, and what proves each claim. `build/bin/iclforge-base-tests` is the binary built by
+`/home/claude/wt/build.sh ac4-signing iclforge-base-tests`; `"[crypto]"` selects the 41 test cases
+of this phase.
+
+| Claim | Evidence |
+|---|---|
+| The curve constants, the Montgomery constants, the modular arithmetic (204 input pairs each for `p` and `n`, edge values included, with the product, sum, difference and inverse of each) and `k*G` (98 scalars) agree with Python integers and OpenSSL | `iclforge-base-tests "[p256]"`, vectors in `libs/base/tests/p256_vectors.inc`, written by `python3 tools/generators/gen_p256_vectors.py` |
+| RFC 6979 appendix A.2.5: the public key, `k`, `r` and `s` of both messages, and 32 more keys with `k` from an independent Python implementation of section 3.2 | `iclforge-base-tests "[rfc6979]"` |
+| Verification agrees with OpenSSL on 24 valid and 144 invalid signatures (bit-flipped digest, `r`, `s`, swapped, other key, `r` or `s` equal to 0 or `n`, `r + n`) | `iclforge-base-tests "[p256]"` |
+| A signature made here verifies under OpenSSL (120 keys) and 240 tampered ones of ours are rejected by it; 300 made by OpenSSL verify here and 900 tampered ones are rejected by both | `iclforge-base-tests "[interop]"`, which runs `libs/base/tests/interop/p256_interop.py` |
+| Chains built by OpenSSL are judged as `openssl verify` judges them in 13 scenarios (good, expired root, intermediate or leaf, not yet valid, wrong root, intermediate not a CA, without `keyCertSign`, path length 0 and 1, unknown critical and non-critical extension) | the same test |
+| Keys OpenSSL writes (PKCS#8 and SEC 1, PEM and DER, `ecparam -genkey` with and without `-noout`, `genpkey`) load; encrypted ones, P-384, Ed25519 and RSA are refused with their own errors | the same test, and `[credentials]` |
+| Certificates OpenSSL writes read field for field, including the SHA-1 and SHA-256 fingerprints as `openssl x509 -fingerprint` prints them, and a version 1 certificate from `openssl x509 -req` | the same test |
+| Our certificates, keys and chain are read, verified and printed by OpenSSL | the `verify` step of the same test |
+| Hostile DER: every truncation of a signature and of a certificate is refused, a mutation of any byte of a signature either fails or re-encodes to the same bytes, and 300,000 mutated inputs ran through the readers under ASan and UBSan without a report | `[der]`, `[x509]`; the fuzzing run was an ad hoc driver, because the libFuzzer runtime is not installed on this machine (the harness `libs/base/fuzz/fuzz_x509_parse.cpp` is registered in `tools/fuzz/run.sh` and has not been built through it) |
+| Signing has no branch or table index on the secret scalar, except four known sites | `python3 tools/checks/check_p256_constant_time.py` (exit 0), and the same command fails when the table lookup is replaced by `table[nibble]` |
+| The tests can fail | each of three changes made to the sources, then undone, was caught: dropping the carry term of `mont_mul` (11 of 13 `[p256]` cases failed), `may_issue` always true, expiry never checked and anchors matched by subject only (4 of 6 `[chain]` cases failed) |
+
+Things the implementation settled that the plan left open:
+
+- The expired-intermediate relaxation covers a certificate that is neither the leaf nor the
+  anchor. An anchor that has expired is refused under both policies, so the specification's own
+  chain is accepted today by anchoring on its signing CA (valid to 2034, if the dates in the
+  specification are right) and not on the Master CA.
+- A chain whose last certificate is itself an anchor is accepted. The content signature is then
+  verified under that certificate's key, so only the holder of the anchor's private key can have
+  made it. This is how a pinned certificate works.
+- The self-signature of an anchor is not checked; an anchor is trusted for being the operator's.
+- An anchor matches a chain certificate on subject and key, not on bytes, so a re-issued CA
+  certificate with the same key still anchors.
+- `Certificate::serial_hex()` is the whole bytes ("01", not "1"). OpenSSL prints the serial
+  without leading zeros; the interop test pads before comparing.
+- `signing-key=`-style resolution reads a path first, then the file variable, then the inline
+  variable, and a path that cannot be read is an error and is not skipped in favour of a variable.
+  A trust file in the environment is read only when the command line named no trust.
 
 ## Decisions needing owner review
 

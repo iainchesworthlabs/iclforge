@@ -2,7 +2,7 @@
 
 # base
 
-What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version.
+What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the P-256 ECDSA, X.509 and key-loading code that AC-4 content signing is built on, the scalar building blocks of the arithmetic tiers and the build version.
 
 A library.
 

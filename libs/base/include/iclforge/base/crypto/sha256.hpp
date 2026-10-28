@@ -1,8 +1,10 @@
 #pragma once
 
 // SHA-256 (FIPS 180-4), self-contained: the hash under hmac_sha256.hpp, which the EMDF Atmos
-// signer (iclforge::ac3::signing) computes its tag with. A caller wants the MAC or the signer
-// above it, not the raw hash. No third-party dependency by design:
+// signer (iclforge::ac3::signing) computes its tag with, and the message digest of the ECDSA
+// signatures in p256.hpp, which AC-4 content signing is built on. The incremental class is
+// exported because content signing hashes a whole stream's frames one at a time. No third-party
+// dependency by design:
 // the codec's third-party libraries are {fmt}, for formatting, and nlohmann/json,
 // for one file reader (see the top of vcpkg.json), so this is a from-the-standard
 // implementation rather than a pull of OpenSSL/mbedTLS for one primitive.
@@ -18,7 +20,7 @@ namespace iclforge::base::crypto {
 
 // Incremental so HMAC can feed it ipad/opad and the message in separate
 // updates without first concatenating them into one buffer.
-class Sha256 {
+class ICLFORGE_BASE_EXPORT Sha256 {
 public:
     Sha256() { reset(); }
 
@@ -36,9 +38,8 @@ private:
     std::size_t buffered_ = 0;
 };
 
-// Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) so that
-// libs/base/tests/test_crypto.cpp can run FIPS 180-4's known-answer vectors against a shared
-// libiclforge_base.
+// Convenience one-shot over a whole buffer. Exported so that libs/base/tests/test_crypto.cpp can
+// run FIPS 180-4's known-answer vectors against a shared libiclforge_base.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> sha256(std::span<const std::byte> data);
 
 }  // namespace iclforge::base::crypto

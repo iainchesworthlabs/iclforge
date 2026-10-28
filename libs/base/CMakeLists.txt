@@ -1,7 +1,8 @@
 # ---------------------------------------------------------------------------
 # iclforge::base - what every codec and every service builds on and none of them owns: the MSB-first
 # bit reader and writer, the speaker vocabulary (Location, Layout), the downmix target names, the CPU
-# feature probe, the operator's signing key with SHA-256 and HMAC-SHA-256 (iclforge::base::crypto),
+# feature probe, the operator's signing key with SHA-256 and HMAC-SHA-256 and the P-256 ECDSA, X.509
+# and key-loading code AC-4 content signing is built on (iclforge::base::crypto),
 # the scalar building blocks the codecs' arithmetic tiers share (Fixed32, MantExp and the project's
 # own float functions), and the build-variant directories the probe, the profiling markers and the
 # SIMD kernels are selected through.
@@ -272,6 +273,11 @@ iclforge_add_library(base
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
         src/crypto/signing_key.cpp
+        src/crypto/sha1.cpp
+        src/crypto/p256.cpp
+        src/crypto/ecdsa_der.cpp
+        src/crypto/x509.cpp
+        src/crypto/credentials.cpp
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
         "${_iclforge_profiling_dir}"
@@ -291,5 +297,6 @@ add_dependencies(iclforge_base_objects iclforge_version)
 # /wd4996 on the whole target.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(src/cpu_features.cpp src/crypto/signing_key.cpp
+        src/crypto/credentials.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()

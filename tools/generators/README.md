@@ -143,6 +143,7 @@ All of these are run from the repo root.
 | `gen_stereo_reference_wav.py` | `testdata/audio/reference_stereo.wav` | stdlib only |
 | `gen_object_scene_wav.py` | `testdata/audio/reference_objects.wav` and `reference_objects.paths`, the five-object scene the object-quality leg encodes | stdlib only |
 | `gen_gui_resample_test_wav.py` | `libs/base/fuzz/seeds/fuzz_wav_read/resample-44100.wav`, which the GUI's resample-on-load QML test also loads | stdlib only |
+| `gen_p256_vectors.py` | `libs/base/tests/p256_vectors.inc`, the known-answer vectors for the in-tree P-256 and ECDSA code: modular arithmetic by Python integers, curve points and signature verdicts by OpenSSL; deterministic, no secret | needs the Python `cryptography` package |
 | `gen_programme_fixtures.py` | both programme fixtures + `corpus.json` | needs `--source-dir` and `ffmpeg` |
 | `gen_external_baseline.py` | `testdata/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
 | `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, never committed | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
