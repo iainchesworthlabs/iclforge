@@ -63,6 +63,26 @@ target_sources(iclforge-forge-cli-tests PRIVATE
 target_include_directories(iclforge-forge-cli-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src")
 
+# test_ac4_content_signing.cpp and test_mp4_signature_carrier.cpp hold the code behind forge's
+# sign-content, verify-content and gate-content (src/ac4_content_signing.cpp, which loads keys and
+# trust, picks a carrier, with apps/shared/media/src/container_input.cpp's sniff of what a file is,
+# and words the verdict, and src/mp4_signature_carrier.cpp, which finds the signature's `uuid` box
+# in an MP4) directly, with the real encoder's streams, and test_cli_content_signing.cpp runs the
+# built forge over the same ground. The code sits here, in
+# the application, because it joins iclforge::base (keys, X.509), iclforge::ac4 and
+# iclforge::containers, and tools/checks/projects.json lets only an application use all three.
+# The keys and chains are built at run time from a seed (tests/support/test_pki.hpp); none is
+# committed.
+target_sources(iclforge-forge-cli-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/container_input.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_content_signing.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/mp4_signature_carrier.cpp"
+    test_ac4_content_signing.cpp
+    test_mp4_signature_carrier.cpp)
+target_include_directories(iclforge-forge-cli-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+    "${PROJECT_SOURCE_DIR}/tests/support")
+
 # test_cli_atmos_adm.cpp (ADM BWF reader phase 3, forge's 'atmos-adm' command) needs the ADM option
 # on top of the forge binary this directory is only added for: it runs the real, built forge binary
 # as a subprocess (ICLFORGE_CLI_EXE) against an ADM fixture, so the command it exercises only exists

@@ -9,8 +9,8 @@
 //   ElementaryCarrier  an `.ac4` elementary stream, with the signature in a file beside it
 //                      (`<stream>.sig`). The stream is not touched.
 //   Mp4UuidCarrier     an MP4 file, with the signature in a `uuid` box in the AC-4 track's `trak`.
-//                      It lives in apps/shared/media, because iclforge::ac4 does not use the
-//                      container library.
+//                      It lives in the forge command line's sources (apps/forge/cli/src), because
+//                      iclforge::ac4 does not use the container library.
 //
 // A Carrier reads. Writing is each writer's own affair, since a writer already knows its
 // container: sign_frames() (content_signing.hpp) returns the payload, the sidecar writer stores it

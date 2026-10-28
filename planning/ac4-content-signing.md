@@ -64,7 +64,7 @@ asymmetric cryptography. This work takes its mode structure and ergonomics.
 | AC-4 raw frames, scan and splitter | `libs/ac4/include/iclforge/ac4/io/elementary.hpp` | The signed span is built from `raw_ac4_frame`. |
 | User EMDF payloads in the encoder; payload report in the decoder | `ac4::EmdfPayload`, `SubstreamReport::emdf_payloads` | Considered as a carrier; not chosen. |
 | MP4 writer and reader | `libs/containers/src/mp4/` | Extended with a codec-blind user box. |
-| Container input for the programs | `apps/shared/media/src/container_input.cpp` | Extended to return the box payload with the elementary stream. |
+| Container input for the programs | `apps/shared/media/src/container_input.cpp` | Not extended: `container_input` hands a decoder the elementary stream and drops the container, so the signature carrier reads the file itself (`sniff_container` says what it is). |
 | `DecoderConfig::skip_objects` | `libs/ac4/include/iclforge/ac4/decoder/config.hpp` | The degradation for the soft mode. |
 
 The current statements that AC-4 is unsigned are in `docs/library/signing.md`,
@@ -140,13 +140,14 @@ AC-3 signer).
 ```
 libs/containers/   mp4::AudioTrack::user_boxes and mp4::ReadTrack::user_boxes (a 16-byte usertype
                    and a payload; codec-blind)
-apps/shared/media/ container_input: returns the content signature box of an MP4 with the stream;
-                   Mp4UuidCarrier
-apps/forge/cli/    sign-content, verify-content, gate-content and their options
+apps/forge/cli/    Mp4UuidCarrier; the shared sign and verify helpers (ac4_content_signing); the
+                   command wiring; sign-content, verify-content, gate-content and their options
 ```
 
 Layering: `ac4` may use `base`, `dsp`, `objects` and `render`, and not `containers`. The MP4 carrier
-is therefore in `apps/shared/media`, which may use both. The row of `tools/checks/projects.json` for
+needs the container library and the signature code in `base` together. `apps/shared/media` may use
+`containers` and `ac4` and not `base`, so the carrier and the helpers around it are in
+`apps/forge/cli/src`, which may use all of them (decision 21). The row of `tools/checks/projects.json` for
 `base` gains the words "ECDSA P-256, X.509 and content signatures" in its purpose, and the generated
 project pages are regenerated.
 
@@ -499,7 +500,7 @@ class ElementaryCarrier final : public Carrier { ... };   // scan() + the sideca
 (`sign_digest`, `verify_digest`) takes a digest and a payload and does not see a carrier. Signing
 is not part of the interface: each writer already knows its container, so it takes the payload
 `sign_frames` returns and writes it in its own form (the sidecar writer in the CLI, `mux()` with a
-`user_boxes` entry for MP4). `Mp4UuidCarrier` in `apps/shared/media` implements `Carrier` for
+`user_boxes` entry for MP4). `Mp4UuidCarrier` in `apps/forge/cli/src` implements `Carrier` for
 MP4 with the container library. A later in-band carrier (option B) adds a class and a writer, and
 leaves the signing core and the callers of `verify_frames` unchanged.
 
@@ -721,10 +722,11 @@ Things the implementation settled that the plan left open:
 
 The carrier layer: a codec-blind `uuid` user box in `iclforge::containers`, the signed span and
 the sign and verify operations in `iclforge::ac4::signing`, the elementary stream carrier there, and
-the MP4 carrier in `apps/shared/media`. The tags below select this phase's tests:
+the MP4 carrier in `apps/forge/cli/src` (it was written in `apps/shared/media` and moved in phase 4,
+when `check_layering.py` showed that project may not use `base`). The tags below select this phase's tests:
 `build/bin/iclforge-containers-tests "[user_box]"` (7 cases, 3,152 assertions),
 `build/bin/iclforge-ac4-tests "[signing]"` (21 cases, 715 assertions) and
-`build/bin/iclforge-app-media-tests "[signing]"` (10 cases, 249 assertions).
+`build/bin/iclforge-forge-cli-tests "[signing]"` (the carrier's 10 cases, 249 assertions, among others).
 
 | Claim | Evidence |
 |---|---|
@@ -732,12 +734,12 @@ the MP4 carrier in `apps/shared/media`. The tags below select this phase's tests
 | Nine boxes, or a payload one byte past 1 MiB, are `kInvalidTrack` when writing and are left out when reading, which keeps the first eight and carries on; a body shorter than a usertype is left out; a body of exactly a usertype has an empty payload; a `uuid` box in `moov` or in `mdia` is not reported; a box declaring 2 GiB does not make the reader allocate | the same |
 | The container tests can fail | fourteen changes made to the writer and the reader, then undone, each caught (a count bound dropped, a payload bound dropped or off by one, usertype and payload swapped or merged, boxes not written by `mux()` or by the init segment, boxes not validated by either writer, a short body accepted, a ninth box kept, a `uuid` box read at any depth or anywhere, boxes never reported): 1 to 6 of 7 cases failed each time |
 | The signed span is the concatenation of every frame's `raw_ac4_frame`; its digest equals SHA-256 of the same bytes laid end to end, and does not depend on how they are cut into frames | `iclforge-ac4-tests "[signing]"`, on ten frames the encoder wrote from two tones |
-| The digest of an MP4's samples is the digest of the elementary stream, and one signature verifies both | `iclforge-app-media-tests "[signing]"`: the samples demuxed from the MP4 are hashed apart from the library and compared |
+| The digest of an MP4's samples is the digest of the elementary stream, and one signature verifies both | `iclforge-forge-cli-tests "[signing]"`: the samples demuxed from the MP4 are hashed apart from the library and compared |
 | One bit changed in the first, middle or last byte of any frame fails with `kSignatureInvalid`; a frame dropped (first, middle, last), repeated, swapped with another, appended from another stream, or a byte cut from the end fails the same way | `iclforge-ac4-tests "[signing]"` |
 | A stream with the CRC word and one without it verify under one signature: the framing is outside the signed span (register 3), and a test records that so a change to it is a decision | `iclforge-ac4-tests "[carrier]"` |
 | A stream that does not scan to its last byte is refused by the carrier and not verified on the frames that did: a tail of other bytes (`kLostSync`, at the offset), a frame cut short (`kTruncatedFrame`), leading bytes, noise | the same |
 | A stream with no signature says so; with no trust configured the operator's input is named first; a stream of no frames is `kNoContent` | the same |
-| The MP4 carrier reads the `uuid` box with the specification's UUID, ignores boxes with another usertype (one bit off), refuses two signature boxes, an AC-3 track, a file that is not an MP4 and an empty file; a truncated MP4 either is refused or reads fewer samples, and fails the signature; a fragmented file carries the box in its init segment and verifies as one file | `iclforge-app-media-tests "[signing]"` |
+| The MP4 carrier reads the `uuid` box with the specification's UUID, ignores boxes with another usertype (one bit off), refuses two signature boxes, an AC-3 track, a file that is not an MP4 and an empty file; a truncated MP4 either is refused or reads fewer samples, and fails the signature; a fragmented file carries the box in its init segment and verifies as one file | `iclforge-forge-cli-tests "[signing]"` |
 | No encoder, decoder, table of contents or container source includes a signing or cryptography header; `minimal.cmake` lists no signing source; the full library lists them | `iclforge-ac4-tests "[layering]"` (a scan of 100 or more files); the first two checks were shown to fail by adding a signing include and then a cryptography include to `decoder.cpp`, and the third by adding the signing variable to `minimal.cmake` (the last check, that the full library lists the sources, was not mutated) |
 | Layering, namespaces, no `std::format`, doc paths | `python3 tools/checks/check_layering.py` (0 failures), `check_namespaces.py` (0 failures, 4 known debts), `check_no_std_format.py`, `check_doc_paths.py` (0 missing) |
 
@@ -809,3 +811,10 @@ Things the implementation settled that the plan left open:
     which a verifier treats as unsigned. A stricter reader would refuse the file.
 20. **Two signature boxes are refused** (`kAmbiguousSignature`) and not resolved by taking the first
     or the last.
+21. **The MP4 carrier and the command helpers are in `apps/forge/cli/src`**, not in `apps/shared/media`.
+    `tools/checks/projects.json` lets `app-media` use `ac3`, `ac4`, `containers`, `objects` and
+    `render`, and not `base`, where the signature and key code is. The alternatives were to add
+    `base` to that row (a change to the layering table, which is yours to make) or to re-export the
+    `base` types through an `ac4` header. Neither was done. The cost is that Hearth and Crucible, which
+    compile `app-media`, do not get the carrier; if either should verify content, the layering row is
+    the decision.

@@ -13,9 +13,10 @@
 // track's `trak`, whose payload is the serialised ContentSignature. The samples of the track are
 // the frames the signature covers, byte for byte, so a stream and its MP4 have one digest.
 //
-// In apps/shared/media, not in iclforge::ac4, because the codec library does not use the
-// container library (the layering of tools/checks/projects.json): finding a box in a file needs
-// both, and this is the layer that has both, as container_input.hpp is.
+// In the forge command line's sources, not in iclforge::ac4, because the codec library does not
+// use the container library (the layering of tools/checks/projects.json): finding a box in a file
+// needs both of them and the signature code of iclforge::base, and an application is the layer
+// that may use all three.
 //
 // Writing is the other half and is one line for a caller: put content_signature_user_box(payload)
 // in AudioTrack::user_boxes and mux() or fragment() writes it. A fragmented file carries it in

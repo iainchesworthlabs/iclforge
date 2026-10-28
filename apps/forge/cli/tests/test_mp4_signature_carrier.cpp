@@ -8,17 +8,14 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <numbers>
 #include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac4/encoder/encoder.hpp"
-#include "iclforge/ac4/io/carriage.hpp"
+#include "ac4_signing_fixture.hpp"
 #include "iclforge/ac4/signing/carrier.hpp"
 #include "iclforge/ac4/signing/content_signing.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
@@ -39,66 +36,10 @@ using Bytes = std::vector<std::byte>;
 
 constexpr std::int64_t kNow = 1793232000;  // 2026-10-29T00:00:00Z
 
-struct Encoded {
-    std::vector<iclforge::ac4::EncodedFrame> frames;
-    mp4::AudioTrack track;
-
-    [[nodiscard]] std::vector<std::span<const std::byte>> views() const {
-        std::vector<std::span<const std::byte>> out;
-        for (const auto& frame : frames) {
-            out.emplace_back(frame.raw_ac4_frame);
-        }
-        return out;
-    }
-    [[nodiscard]] Bytes elementary() const {
-        Bytes out;
-        for (const auto& frame : frames) {
-            const Bytes sync = iclforge::ac4::sync_frame(frame.raw_ac4_frame, false);
-            out.insert(out.end(), sync.begin(), sync.end());
-        }
-        return out;
-    }
-};
-
-// Stereo, two tones, about ten frames of real audio, and the AC-4 track the encoder describes.
-const Encoded& encoded() {
-    static const Encoded stream = [] {
-        auto encoder = iclforge::ac4::Encoder::create(iclforge::ac4::EncoderConfig{});
-        REQUIRE(encoder.has_value());
-        const auto tone = [](double hz) {
-            std::vector<float> x(24000);
-            for (std::size_t n = 0; n < x.size(); ++n) {
-                x[n] = static_cast<float>(
-                    0.4 * std::sin(2.0 * std::numbers::pi * hz * static_cast<double>(n) / 48000.0));
-            }
-            return x;
-        };
-        const std::vector<float> left = tone(440.0);
-        const std::vector<float> right = tone(660.0);
-        const std::vector<std::span<const float>> channels{left, right};
-        Encoded out;
-        auto first = encoder->encode(channels);
-        REQUIRE(first.has_value());
-        out.frames = std::move(*first);
-        auto rest = encoder->flush();
-        REQUIRE(rest.has_value());
-        out.frames.insert(out.frames.end(), rest->begin(), rest->end());
-        REQUIRE(out.frames.size() >= 3);
-
-        out.track.codec_id = std::string{mp4::kCodecAc4};
-        out.track.sample_rate = 48000;
-        out.track.channels = 2;
-        out.track.samples_per_frame = static_cast<std::uint32_t>(out.frames.front().samples);
-        out.track.codec_config = iclforge::ac4::build_dac4(encoder->toc());
-        out.track.rfc6381 = iclforge::ac4::rfc6381_codec_string(encoder->toc());
-        REQUIRE_FALSE(out.track.codec_config.empty());
-        return out;
-    }();
-    return stream;
-}
+using Encoded = iclforge::test::media_signing::Encoded;
 
 struct Fixture {
-    const Encoded& stream = encoded();
+    const Encoded& stream = iclforge::test::media_signing::shared();
     pki::Authority authority = pki::make_authority();
     crypto::SigningCredentials credentials{authority.leaf.keys.key, authority.chain()};
     Bytes payload;
