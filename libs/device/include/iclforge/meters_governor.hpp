@@ -12,10 +12,13 @@
 //          long after its due time, less one frame of the loop: a 30 fps loop serves a 50 ms step up to 33 ms late and no fault of
 //          anyone's), or a whole step was missed: something else held the task, which is the sign a number averaged over a second hides.
 //
-// It goes back to twenty a second only after 10 s at ten, with the cost under 45 % of a fast step (22.5 ms) and no late update in the
-// window: the gap between 70 and 45 % and the 10 s keep it from flipping. A fall within a minute of a rise doubles the 10 s (up to
-// 160 s); a minute at twenty a second puts it back. The thresholds are the plan's guesses until the kit has measured the real costs
-// (planning/p4x-meters-view.md, "Kit protocol"): they are one struct so that a measurement changes numbers and not code.
+// It goes back to twenty a second only after 10 s at ten, with the cost under 60 % of a fast step (30 ms) and no late update in the
+// window: the gap between 70 and 60 % and the 10 s keep it from flipping. A fall within a minute of a rise doubles the 10 s (up to
+// 160 s); a minute at twenty a second puts it back. The first two seconds of a view, and of a view woken from dimming, are not judged:
+// the first draw of the stage and the first run of the code from the flash (cold in the cache) are not what the view costs, and the kit's
+// first run fell to ten a second in them and could not rise from it. The thresholds are the plan's guesses until the kit has measured
+// the real costs (planning/p4x-meters-view.md, "Kit protocol"; the first update of the canvas drawing cost 26 to 31 ms in the 5.1 and
+// 9.1.6 rooms): they are one struct so that a measurement changes numbers and not code.
 
 #include <algorithm>
 #include <array>
@@ -29,12 +32,13 @@ inline constexpr std::int64_t kSlowStepUs = 100'000;  // ten a second
 
 struct GovernorLimits {
     double demote_load = 0.70;  // of a fast step, the window's average cost above which it falls to ten a second
-    double promote_load = 0.45;  // of a fast step, the average cost under which it may rise again
+    double promote_load = 0.60;  // of a fast step, the average cost under which it may rise again
     std::int64_t late_us = 15'000;  // an update that starts this long after it could have is late
     int demote_late = 4;  // late updates (or missed steps) in the window that make it fall
     std::int64_t dwell_us = 10'000'000;  // at ten a second before it tries twenty again
     std::int64_t dwell_max_us = 160'000'000;
     std::int64_t flap_us = 60'000'000;  // a fall within this long of a rise doubles the dwell
+    std::int64_t grace_us = 2'000'000;  // from the first update (or the first after restart_window()): counted, but not judged
 };
 
 inline constexpr std::size_t kGovernorWindow = 20;
@@ -70,6 +74,12 @@ class RateGovernor {
         const bool is_late = late_us > limits_.late_us;
         stats_.late += is_late ? 1 : 0;
         stats_.dropped += static_cast<std::uint64_t>(std::max<std::int64_t>(missed, 0));
+        if (graced_from_us_ < 0) {
+            graced_from_us_ = now_us;
+        }
+        if (now_us - graced_from_us_ < limits_.grace_us) {
+            return step_us();
+        }
         const bool bad = is_late || missed > 0;
         push(static_cast<double>(std::max<std::int64_t>(cost_us, 0)), bad);
         if (since_us_ < 0) {
@@ -91,7 +101,7 @@ class RateGovernor {
                 ++stats_.falls;
                 clear();
             }
-        } else if (now_us - since_us_ >= dwell_us_ && filled_ >= kGovernorWindow && load < limits_.promote_load && bad_ == 0) {
+        } else if (!hold_slow_ && now_us - since_us_ >= dwell_us_ && filled_ >= kGovernorWindow && load < limits_.promote_load && bad_ == 0) {
             slow_ = false;
             since_us_ = now_us;
             rose_us_ = now_us;
@@ -101,8 +111,26 @@ class RateGovernor {
         return step_us();
     }
 
-    // The view was closed or the stream restarted: the window starts again, the rate in force stays.
-    void restart_window() noexcept { clear(); }
+    // The view was closed or the stream restarted: the window starts again, and so does the grace; the rate in force stays.
+    void restart_window() noexcept {
+        clear();
+        graced_from_us_ = -1;
+    }
+
+    // The decoder is busy and the audio comes first: the view is held at ten a second, whatever an update costs, and does not try twenty. Taken off, it
+    // is where it was and may rise by the rules above. Holding is not a fall: the counters are the measure of the panel's own limits.
+    void set_hold_slow(bool hold) noexcept {
+        if (hold == hold_slow_) {
+            return;
+        }
+        hold_slow_ = hold;
+        if (hold && !slow_) {
+            slow_ = true;
+            since_us_ = -1;
+            clear();
+        }
+    }
+    [[nodiscard]] bool holding_slow() const noexcept { return hold_slow_; }
 
    private:
     void push(double cost, bool bad) noexcept {
@@ -135,6 +163,8 @@ class RateGovernor {
     double cost_sum_ = 0.0;
     int bad_ = 0;
     bool slow_ = false;
+    bool hold_slow_ = false;
+    std::int64_t graced_from_us_ = -1;  // when the first update of this stretch ran: the grace counts from it
     std::int64_t since_us_ = -1;  // when the rate in force took effect (or the first update)
     std::int64_t rose_us_ = -1;
     std::int64_t dwell_us_;

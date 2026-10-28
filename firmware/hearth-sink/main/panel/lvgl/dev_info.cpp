@@ -311,7 +311,7 @@ std::string panel_stats_report(const PanelStats& panel, const iclforge::panelsta
     out.refresh.last_us = panel.render_us_last;
     out.refresh.max_us = panel.render_us_max;
     out.refresh.count = panel.refreshes;
-    out.refresh.total_us = static_cast<std::uint64_t>(panel.render_us_mean) * panel.refreshes;
+    out.refresh.total_us = panel.render_us_total;
     out.task_stack_free_min = panel.stack_free;
     out.psram_free = static_cast<std::uint32_t>(heap_caps_get_free_size(kExternal));
     out.psram_free_min = static_cast<std::uint32_t>(heap_caps_get_minimum_free_size(kExternal));

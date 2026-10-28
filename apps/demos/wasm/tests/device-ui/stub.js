@@ -360,7 +360,7 @@ function panelStats() {
             analysis_us: timingStats(8200, 8100.2, 9900, 1190),
             widgets_us: timingStats(1100, 1250.7, 3400, 1190),
             render_us: timingStats(11800, 12400.5, 31200, 1190),
-            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, reads: 1190, torn: 0, short_reads: 0 },
+            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, us_pass_per_burst: 12.0, us_pack_per_burst: 6.0, us_per_clock_read: 0.5, reads: 1190, torn: 0, short_reads: 0 },
         },
     };
 }
@@ -1543,8 +1543,16 @@ async function startStub() {
     // drop then meets it on a connection Chromium did not reuse, and is not
     // sent again (see next()).
     let dropsPending = 0;
+    // Chromium sends a request again that a connection it reused closes unanswered, whatever the method. Closing the
+    // idle connections and the answers (above, and next()) leaves a connection no drop can meet, except one that was
+    // not idle yet when next() closed the idle ones: a poll's answer, still going out, and the request to be dropped
+    // then goes down that connection, and its second sending is answered. So a drop that met a reused connection
+    // takes the same request's second sending with it, and that one is not recorded: the page sent it once.
+    const resends = new Map();
+    const RESEND_WINDOW_MS = 3000;
+    let reusing = false; // reuseConnections(): the answers and the idle connections are left open
     const closing = (res) => {
-        if (dropsPending > 0 || device.down > 0) {
+        if (!reusing && (dropsPending > 0 || device.down > 0)) {
             res.setHeader('Connection', 'close');
         }
     };
@@ -2290,6 +2298,21 @@ async function startStub() {
             const raw = Buffer.concat(chunks);
             const body = raw.toString('utf8');
             const route = req.method + ' ' + (req.url || '/').split('?')[0];
+            const reused = req.socket.served > 0;
+            req.socket.served = (req.socket.served || 0) + 1;
+            const resend = resends.get(route);
+            if (resend && body === resend.body && Date.now() - resend.at < RESEND_WINDOW_MS) {
+                // Another reused connection closes this one unanswered too, and the request is sent again, until it
+                // is on a new connection.
+                if (reused) {
+                    resend.at = Date.now();
+                } else {
+                    resends.delete(route);
+                }
+                req.socket.destroy();
+                return;
+            }
+            resends.delete(route);
             requests.push({ route, body, raw, at: Date.now(), headers: req.headers });
             if (device.down > 0 && route !== 'GET /' && route !== 'GET /ui.js') {
                 device.down -= 1;
@@ -2304,6 +2327,9 @@ async function startStub() {
             const next = (scripted.get(route) || []).shift();
             if (next === 'drop') {
                 dropsPending -= 1;
+                if (reused) {
+                    resends.set(route, { body, at: Date.now() });
+                }
                 req.socket.destroy();
             } else if (next === 'hang') {
                 // Never answered: the page's own timeout has to notice.
@@ -2342,8 +2368,15 @@ async function startStub() {
             scripted.get(route).push(reply);
             if (reply === 'drop') {
                 dropsPending += 1;
-                server.closeIdleConnections();
+                if (!reusing) {
+                    server.closeIdleConnections();
+                }
             }
+        },
+        // Leave the connections open as a drop is scripted, as a connection that was not idle yet when next() closed
+        // the idle ones is: the dropped request then meets a reused connection, and is sent again.
+        reuseConnections(on) {
+            reusing = on;
         },
         // Hold the answers to a route until the returned function is called.
         hold(route) {
@@ -2399,4 +2432,6 @@ module.exports = {
     speakersOf,
     served,
     validTimeZone,
+    zonePlace,
+    zoneReadable,
 };

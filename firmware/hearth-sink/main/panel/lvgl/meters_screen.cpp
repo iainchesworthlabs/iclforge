@@ -24,10 +24,13 @@
 #include <string_view>
 
 #include "iclforge/dsp/spectrum.hpp"
+#include "iclforge/meters_draw.hpp"
 #include "iclforge/meters_governor.hpp"
 #include "iclforge/meters_tap.hpp"
 #include "iclforge/meters_view.hpp"
 #include "iclforge/panel_stats.hpp"
+
+#include "src/misc/cache/instance/lv_image_cache.h"
 
 #include "fonts.hpp"
 #include "lv_alloc.hpp"
@@ -39,6 +42,7 @@ namespace {
 namespace mv = iclforge::meters;
 namespace dsp = iclforge::dsp::spectrum;
 namespace ps = iclforge::panelstats;
+namespace dr = iclforge::meters::draw;
 
 constexpr std::uint32_t kGreen = 0x4FC28A;
 constexpr std::uint32_t kAmber = 0xF0B24A;
@@ -49,6 +53,12 @@ constexpr std::uint32_t kTickColour = 0xECE7E5;
 constexpr std::uint32_t kStageBg = 0x151313;
 // A frame that comes this much before an update is due is that update's: the loop's own beat jitters by a tick or two.
 constexpr std::int64_t kEarlyUs = 8'000;
+// The two kinds of chart's colours: a spectrum has no troughs and a line of the scale across its bars; a meter has its trough.
+constexpr dr::Colours kSpectrumColours = dr::make_colours(kStageBg, kStageBg, kGreen, kAmber, kRed, kTickColour, kStageBg, 120);
+constexpr dr::Colours kMeterColours = dr::make_colours(kStageBg, kTrough, kGreen, kAmber, kRed, kTickColour, kStageBg, 120);
+// The numbers (each meter's peak) are written four times a second: a label's text changing is an area of its own for LVGL to draw and copy, and
+// nobody reads twenty numbers a second.
+constexpr std::int64_t kValueEveryUs = 250'000;
 
 // A microsecond clock for timing the view's own work: the same one the tap's blocks are timed with on the firmware (esp_timer), a steady clock
 // on the preview's host. Only differences of it are used.
@@ -144,8 +154,6 @@ lv_obj_t* label(lv_obj_t* parent, const char* text, int px, std::uint32_t rgb, i
     return l;
 }
 
-void set_opa(lv_obj_t* object, bool on) { lv_obj_set_style_bg_opa(object, on ? LV_OPA_COVER : LV_OPA_TRANSP, 0); }
-
 // A number in a label of its own: the text is kept here and the label is told only when it changed.
 struct Value {
     lv_obj_t* object = nullptr;
@@ -165,74 +173,113 @@ struct Value {
     }
 };
 
-// A level meter, vertical or horizontal: green, amber and red in a column or a row, a peak-hold tick, the numeric peak.
-struct Meter {
-    bool vertical = false;
-    int x = 0;
-    int y = 0;
+// A chart: a buffer in LVGL's heap that LVGL shows as an image and the view writes by the rows that changed (iclforge/meters_draw.hpp), so that an
+// update is one area for LVGL to draw and copy, not one for each part of each bar. The first drawing, an object for each of them, took 130 to 440 ms an
+// update on the kit (planning/p4x-meters-view.md, "Kit results").
+struct Chart {
+    lv_obj_t* object = nullptr;
+    lv_draw_buf_t* buffer = nullptr;
+    std::uint16_t* px = nullptr;
+    std::size_t stride = 0;  // pixels a row
     int w = 0;
     int h = 0;
-    std::array<lv_obj_t*, 3> zone{};
-    lv_obj_t* tick = nullptr;
+};
+
+bool make_chart(Chart& c, lv_obj_t* parent, int x, int y, int w, int h) {
+    c = Chart{};
+    c.buffer = lv_draw_buf_create(static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h), LV_COLOR_FORMAT_RGB565, 0);
+    if (c.buffer == nullptr) {
+        return false;
+    }
+    c.object = lv_canvas_create(parent);
+    lv_canvas_set_draw_buf(c.object, c.buffer);
+    lv_obj_remove_flag(c.object, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(c.object, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_pos(c.object, x, y);
+    lv_obj_update_layout(c.object);  // so that its coordinates on the display are known when the first rows are shown
+    c.px = static_cast<std::uint16_t*>(static_cast<void*>(c.buffer->data));
+    c.stride = c.buffer->header.stride / sizeof(std::uint16_t);
+    c.w = w;
+    c.h = h;
+    return true;
+}
+
+// Tells LVGL that rows [first, last) of the chart changed: one area (in the display's coordinates, which is what lv_obj_invalidate_area() takes).
+void show_rows(const Chart& c, dr::Rows rows) {
+    if (c.object == nullptr || rows.empty()) {
+        return;
+    }
+    lv_area_t at;
+    lv_obj_get_coords(c.object, &at);
+    const lv_area_t area{at.x1, at.y1 + rows.first, at.x1 + c.w - 1, at.y1 + rows.last - 1};
+    lv_obj_invalidate_area(c.object, &area);
+}
+
+// The same for a cell of the chart.
+void show_cell(const Chart& c, const dr::Cell& cell) {
+    if (c.object == nullptr || cell.empty()) {
+        return;
+    }
+    lv_area_t at;
+    lv_obj_get_coords(c.object, &at);
+    const lv_area_t area{at.x1 + cell.x0, at.y1 + cell.y0, at.x1 + cell.x1 - 1, at.y1 + cell.y1 - 1};
+    lv_obj_invalidate_area(c.object, &area);
+}
+
+// Draws what a row of bars changed and tells LVGL: a rectangle for each run of neighbouring bars that is cheaper together than apart
+// (meters_draw.hpp, plan_cells), not one of the plot's whole width for the rows of the bar that moved most. The kit measured the render at
+// about 135 ns a pixel and 1 ms an area: 21 ms for 124,000 pixels in the 5.1 room, 47 ms with a JOC stream decoding.
+void draw_cells(const Chart& chart, const dr::VChart& geometry, std::span<const dr::VBar> bars, std::span<const std::uint8_t> lines, const dr::Colours& colours,
+                bool troughs, std::span<const dr::Change> changes) {
+    std::array<dr::Cell, dr::kMaxChanges> cells{};
+    const std::size_t n = dr::plan_cells(changes, cells);
+    for (std::size_t i = 0; i < n; ++i) {
+        dr::render_vbars(chart.px, chart.stride, geometry, bars, lines, colours, troughs, cells[i]);
+        show_cell(chart, cells[i]);
+    }
+}
+
+// Gives a chart's buffer back. The object is LVGL's: the stage's clearing has deleted it, and one that is still there goes now.
+void drop_chart(Chart& c) {
+    if (c.object != nullptr && lv_obj_is_valid(c.object)) {
+        lv_obj_delete(c.object);
+    }
+    if (c.buffer != nullptr) {
+        lv_image_cache_drop(c.buffer);
+        lv_draw_buf_destroy(c.buffer);
+    }
+    c = Chart{};
+}
+
+// A level meter's bar: its ballistics and the number it shows.
+struct Bar {
+    dsp::Ballistic bal;
     Value* value = nullptr;
     int decimals = 1;
-    dsp::Ballistic bal;
-    int px_level = -1;
-    int px_tick = -1;
-
-    void build(lv_obj_t* parent, int mx, int my, int mw, int mh, bool vert, Value* v) {
-        x = mx;
-        y = my;
-        w = mw;
-        h = mh;
-        vertical = vert;
-        value = v;
-        rect(parent, x, y, w, h, kTrough);
-        const std::array<std::uint32_t, 3> colours = {kGreen, kAmber, kRed};
-        for (std::size_t i = 0; i < 3; ++i) {
-            zone[i] = rect(parent, x, y, 1, 1, colours[i]);
-            set_opa(zone[i], false);
-        }
-        tick = rect(parent, x, y, vert ? w : 2, vert ? 2 : h, kTickColour, 0);
-    }
-
-    void update(float db, float seconds) {
-        bal.update(db, seconds, mv::kMeterFallDbPerS, mv::kMeterHoldS, mv::kMeterPeakFallDbPerS);
-        const int total = vertical ? h : w;
-        const int lit = pixels(bal.level, total);
-        if (lit != px_level) {
-            px_level = lit;
-            const std::array<int, 3> from = {0, pixels(mv::kMeterAmberDb, total), pixels(mv::kMeterRedDb, total)};
-            const std::array<int, 3> to = {std::min(lit, from[1]), std::min(lit, from[2]), lit};
-            for (std::size_t i = 0; i < 3; ++i) {
-                const int len = std::max(0, to[i] - from[i]);
-                set_opa(zone[i], len > 0);
-                if (len > 0) {
-                    if (vertical) {
-                        lv_obj_set_size(zone[i], w, len);
-                        lv_obj_set_pos(zone[i], x, y + h - from[i] - len);
-                    } else {
-                        lv_obj_set_size(zone[i], len, h);
-                        lv_obj_set_pos(zone[i], x + from[i], y);
-                    }
-                }
-            }
-        }
-        const int tk = pixels(bal.peak, total);
-        if (tk != px_tick) {
-            px_tick = tk;
-            lv_obj_set_style_bg_opa(tick, tk > 1 ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-            if (vertical) {
-                lv_obj_set_y(tick, y + h - std::max(tk, 2));
-            } else {
-                lv_obj_set_x(tick, x + std::max(tk, 2) - 2);
-            }
-        }
-        if (value != nullptr) {
-            value->set(bal.peak, decimals);
-        }
-    }
 };
+
+// Moves a vertical meter's bar to a level and notes the columns and rows of its chart that changed.
+void move_vbar(Bar& bar, dr::VBar& drawn, float db, float seconds, int total, dr::Change& change) {
+    bar.bal.update(db, seconds, mv::kMeterFallDbPerS, mv::kMeterHoldS, mv::kMeterPeakFallDbPerS);
+    const int top = total - pixels(bar.bal.level, total);
+    const int peak = pixels(bar.bal.peak, total);
+    const int tick = peak > 1 ? total - peak : -1;
+    change = {drawn.x, drawn.x + drawn.width, dr::rows_touched(drawn.top, drawn.tick, top, tick, total)};
+    drawn.top = top;
+    drawn.tick = tick;
+}
+
+// The same for a horizontal one (the pair's): whether it moved.
+bool move_hbar(Bar& bar, dr::HBar& drawn, float db, float seconds, int total) {
+    bar.bal.update(db, seconds, mv::kMeterFallDbPerS, mv::kMeterHoldS, mv::kMeterPeakFallDbPerS);
+    const int lit = pixels(bar.bal.level, total);
+    const int peak = pixels(bar.bal.peak, total);
+    const int tick = peak > 1 ? peak - 2 : -1;
+    const bool moved = lit != drawn.lit || tick != drawn.tick;
+    drawn.lit = lit;
+    drawn.tick = tick;
+    return moved;
+}
 
 // What the analysis needs and the view keeps while it shows: 63 KB of tables and scratch (the transform's work buffers among them: the panel's stack has no room for them) and the 16 KB the ring is read into, in LVGL's heap
 // (PSRAM on the firmware), given back when the stage is cleared.
@@ -248,19 +295,25 @@ struct State {
     mv::Fold fold;
     int per_bar = 1;
     bool downmix = false;
-    // The spectrum's plot, and each bar's three rectangles and its tick.
+    // The spectrum's plot, as a chart: each bar's ballistics, what it last drew and the lines of the scale across it.
     int sx = 0;
     int sy = 0;
     int sw = 0;
     int sh = 0;
-    LvVector<std::array<lv_obj_t*, 3>> bar;
-    LvVector<lv_obj_t*> tick;
-    LvVector<int> bar_px;
-    LvVector<int> tick_px;
+    Chart spectrum;
+    dr::VChart spectrum_geometry;
     LvVector<dsp::Ballistic> bal;
-    // The channels: two horizontal meters for the pair, or a bar for each master or output.
-    LvVector<Meter> meters;
+    LvVector<dr::VBar> bars;
+    LvVector<std::uint8_t> lines;
+    // The channels, as a chart: two horizontal meters for the pair, or a bar for each master or output.
+    Chart channels;
+    dr::VChart channels_geometry;
+    dr::HChart pair_geometry;
+    LvVector<Bar> meters;
+    LvVector<dr::VBar> meter_bars;
+    LvVector<dr::HBar> pair_bars;
     LvVector<Value> values;
+    std::int64_t values_due_us = 0;  // when the numbers are next written (0: now)
     LvVector<std::uint8_t> outputs;  // a grid's: the output each bar is
     Value peak_text;
     float peak_held = mv::kSilentDb;
@@ -272,6 +325,9 @@ struct State {
     bool have_spectrum = false;
     std::uint64_t last_us = 0;
     std::int64_t due_us = 0;  // when the next update is due (0: the next frame's)
+    std::uint32_t analyses = 0;  // updates that read the ring: every other one runs the low half of the analysis at twenty a second
+    // The time LVGL took to refresh since the last update: an update that moved no pixel asks for no refresh, and the one before it is not charged again.
+    std::uint64_t render_since_us = 0;
     // What the view costs (iclforge/panel_stats.hpp), and the rate it holds (iclforge/meters_governor.hpp).
     mv::RateGovernor governor;
     ps::MetersStats stats;
@@ -281,6 +337,9 @@ struct State {
 
 State g;
 std::uint32_t g_opens = 0;
+// The audio comes first: while the decoder is busy the panel holds the view at ten a second (now_meters_hold_slow()). Kept here, not in
+// State, which every opening makes again.
+bool g_hold_slow = false;
 // The last opening's figures, kept when the view is closed so that a measurement can read them after the screen has gone to another view.
 ps::MetersStats g_last;
 
@@ -302,6 +361,10 @@ ps::MetersStats snapshot() {
     s.tap.reads -= g.tap_base.reads;
     s.tap.torn -= g.tap_base.torn;
     s.tap.short_reads -= g.tap_base.short_reads;
+    s.tap.sampled_blocks -= g.tap_base.sampled_blocks;
+    s.tap.us_pass -= g.tap_base.us_pass;
+    s.tap.us_pack -= g.tap_base.us_pack;
+    s.tap.us_clock -= g.tap_base.us_clock;
     return s;
 }
 
@@ -339,37 +402,31 @@ Block build_spectrum(lv_obj_t* parent, const Dim& d, std::string_view layout, st
     g.sh = std::max(20, bottom.y - 6 - labels_h - plot_y);
     g.per_bar = mv::bands_per_bar(d.w);
     const int bars = mv::spectrum_bars(g.per_bar);
-    g.bar.assign(static_cast<std::size_t>(bars), {});
-    g.tick.assign(static_cast<std::size_t>(bars), nullptr);
-    g.bar_px.assign(static_cast<std::size_t>(bars), 0);
-    g.tick_px.assign(static_cast<std::size_t>(bars), -1);
     g.bal.assign(static_cast<std::size_t>(bars), {});
+    g.bars.assign(static_cast<std::size_t>(bars), {});
     const float pitch = static_cast<float>(plot_w) / static_cast<float>(bars);
     const int bar_w = std::max(2, static_cast<int>(std::lround(pitch * (g.per_bar == 1 ? 0.78F : 0.8F))));
     const auto bar_x = [&](int j) { return left_x + static_cast<int>(std::lround(static_cast<float>(j) * pitch + (pitch - static_cast<float>(bar_w)) / 2.0F)); };
     // The plot's floor, so the bars have something to stand on.
     rect(parent, left_x, g.sy + g.sh, plot_w, 1, 0x4B4645);
-    const std::array<std::uint32_t, 3> colours = {kGreen, kAmber, kRed};
     for (int j = 0; j < bars; ++j) {
-        for (std::size_t z = 0; z < 3; ++z) {
-            lv_obj_t* const r = rect(parent, bar_x(j), g.sy + g.sh, bar_w, 1, colours[z]);
-            set_opa(r, false);
-            g.bar[static_cast<std::size_t>(j)][z] = r;
-        }
+        g.bars[static_cast<std::size_t>(j)] = {bar_x(j) - left_x, bar_w, g.sh, -1};
     }
+    g.spectrum_geometry = {plot_w, g.sh, g.sh - pixels(mv::kSpectrumAmberDb, g.sh), g.sh - pixels(mv::kSpectrumRedDb, g.sh)};
+    g.lines.assign(static_cast<std::size_t>(g.sh), 0);
     // The lines of the scale cross the bars, so that a bar is read against them.
     const int step = g.sh >= 120 ? 10 : 20;
     for (int db = 0; db >= static_cast<int>(mv::kFloorDb); db -= step) {
         const int ly = g.sy + static_cast<int>(std::lround((1.0F - unit(static_cast<float>(db), mv::kFloorDb, mv::kTopDb)) * static_cast<float>(g.sh)));
         if (db > static_cast<int>(mv::kFloorDb)) {
-            rect(parent, left_x, std::min(ly, g.sy + g.sh - 1), plot_w, 1, kStageBg, 120);
+            g.lines[static_cast<std::size_t>(std::min(ly - g.sy, g.sh - 1))] = 1;
         }
         std::array<char, 12> text{};
         std::snprintf(text.data(), text.size(), "%d", db);
         label(parent, text.data(), d.f_small, 0x8B8583, left_x - d.scale_w - 2, ly - d.f_small / 2 - 2, d.scale_w, Align::kRight);
     }
-    for (int j = 0; j < bars; ++j) {
-        g.tick[static_cast<std::size_t>(j)] = rect(parent, bar_x(j), g.sy + g.sh, bar_w, 2, kTickColour, 0);
+    if (make_chart(g.spectrum, parent, left_x, g.sy, plot_w, g.sh)) {
+        dr::render_vbars(g.spectrum.px, g.spectrum.stride, g.spectrum_geometry, g.bars, g.lines, kSpectrumColours, false, 0, g.sh);
     }
     // The names of the bands: every fourth on a row or two.
     const int stride = g.per_bar == 1 ? 4 : g.per_bar == 2 ? 3 : 1;
@@ -396,14 +453,22 @@ void build_bars(lv_obj_t* parent, const Dim& d, const Block& block, const std::v
     const int bar_h = std::max(8, block.h - caption_h - value_h - name_h);
     const int bar_w = std::clamp(static_cast<int>(static_cast<float>(pitch) * 0.55F), 6, d.wide ? 64 : 44);
     g.meters.assign(centres.size(), {});
+    g.meter_bars.assign(centres.size(), {});
     g.values.assign(centres.size(), {});
+    const int chart_x = centres.front() - bar_w / 2;
+    const int chart_w = centres.back() + (bar_w - bar_w / 2) - chart_x;
     for (std::size_t k = 0; k < centres.size(); ++k) {
         if (values) {
             g.values[k].object = label(parent, "", d.f_small, 0xECE7E5, centres[k] - pitch / 2, block.y, pitch, Align::kCentre);
         }
         g.meters[k].decimals = values && centres.size() <= 12 ? 1 : 0;
-        g.meters[k].build(parent, centres[k] - bar_w / 2, bar_top, bar_w, bar_h, true, values ? &g.values[k] : nullptr);
+        g.meters[k].value = values ? &g.values[k] : nullptr;
+        g.meter_bars[k] = {centres[k] - bar_w / 2 - chart_x, bar_w, bar_h, -1};
         label(parent, names[k].c_str(), d.f_small + 1, 0x8B8583, centres[k] - pitch / 2, bar_top + bar_h + 3, pitch, Align::kCentre);
+    }
+    g.channels_geometry = {chart_w, bar_h, bar_h - pixels(mv::kMeterAmberDb, bar_h), bar_h - pixels(mv::kMeterRedDb, bar_h)};
+    if (make_chart(g.channels, parent, chart_x, bar_top, chart_w, bar_h)) {
+        dr::render_vbars(g.channels.px, g.channels.stride, g.channels_geometry, g.meter_bars, {}, kMeterColours, true, 0, bar_h);
     }
     // The scale of the bars, at the left.
     for (const float db : {0.0F, -18.0F, -40.0F}) {
@@ -466,6 +531,7 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
         return false;
     }
     g = State{};
+    g.governor.set_hold_slow(g_hold_slow);
     g.heavy = new (memory) Heavy();
     g.d = dim_of(width, height);
     g.fold = fold;
@@ -489,12 +555,19 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
         const int my = bottom.y + scale_gap;
         g.values.assign(2, {});
         g.meters.assign(2, {});
+        g.pair_bars.assign(2, {});
+        const int chart_w = plot_w - value_w - 8;
         const std::array<int, 2> rows = {my, my + meter_h + gap};
         const std::array<const char*, 2> names = {"L", "R"};
         for (std::size_t i = 0; i < 2; ++i) {
             g.values[i].object = label(parent, "", d.f_label, kTickColour, left_x + plot_w - value_w, rows[i] + (meter_h - d.f_label) / 2 - 2, value_w, Align::kRight);
             label(parent, names[i], d.f_small + 2, 0x8B8583, d.m, rows[i] + (meter_h - d.f_small) / 2 - 3, d.f_small + 6);
-            g.meters[i].build(parent, left_x, rows[i], plot_w - value_w - 8, meter_h, false, &g.values[i]);
+            g.meters[i].value = &g.values[i];
+            g.pair_bars[i] = {rows[i] - my, meter_h, 0, -1};
+        }
+        g.pair_geometry = {chart_w, 2 * meter_h + gap, pixels(mv::kMeterAmberDb, chart_w), pixels(mv::kMeterRedDb, chart_w)};
+        if (make_chart(g.channels, parent, left_x, my, chart_w, 2 * meter_h + gap)) {
+            dr::render_hbars(g.channels.px, g.channels.stride, g.pair_geometry, g.pair_bars, kMeterColours, 0, g.channels.h);
         }
         if (tall) {
             for (const float db : {-60.0F, -40.0F, -20.0F, -10.0F, 0.0F}) {
@@ -554,6 +627,11 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
         }
         build_bars(parent, d, bottom, centres, pitch, names, captions);
     }
+    if (g.spectrum.object == nullptr || g.channels.object == nullptr) {
+        // No memory for a chart: the view is not shown, and the screen draws what it draws without it.
+        now_forget_meters();
+        return false;
+    }
     g.built = true;
     mv::MeterTap& tap = meters_tap();
     ++g_opens;
@@ -579,53 +657,48 @@ void now_forget_meters() {
         g_last = snapshot();
         g_last.showing = false;
     }
+    drop_chart(g.spectrum);
+    drop_chart(g.channels);
     g = State{};
 }
 
 ps::MetersStats now_meters_stats() { return g.built ? snapshot() : g_last; }
 
+void now_meters_hold_slow(bool hold) {
+    g_hold_slow = hold;
+    g.governor.set_hold_slow(hold);
+}
+
 void now_meters_refresh(std::uint32_t took_us) {
     if (g.built) {
         g.stats.render.add(took_us);
+        g.render_since_us += took_us;
     }
 }
 
 namespace {
 
 void update_spectrum(float seconds) {
-    const std::size_t bars = g.bar.size();
+    std::array<dr::Change, dr::kMaxChanges> changes{};
+    const std::size_t bars = std::min(g.bars.size(), changes.size());
     for (std::size_t j = 0; j < bars; ++j) {
         const float level = mv::bar_db(g.averaged, static_cast<int>(j), g.per_bar);
         g.bal[j].update(level, seconds, mv::kSpectrumFallDbPerS, mv::kSpectrumHoldS, mv::kSpectrumPeakFallDbPerS);
-        const int bh = pixels(g.bal[j].level, g.sh);
-        if (bh != g.bar_px[j]) {
-            g.bar_px[j] = bh;
-            const std::array<int, 3> from = {0, pixels(mv::kSpectrumAmberDb, g.sh), pixels(mv::kSpectrumRedDb, g.sh)};
-            const std::array<int, 3> to = {std::min(bh, from[1]), std::min(bh, from[2]), bh};
-            for (std::size_t z = 0; z < 3; ++z) {
-                const int len = std::max(0, to[z] - from[z]);
-                set_opa(g.bar[j][z], len > 0);
-                if (len > 0) {
-                    lv_obj_set_height(g.bar[j][z], len);
-                    lv_obj_set_y(g.bar[j][z], g.sy + g.sh - from[z] - len);
-                }
-            }
-        }
-        const int th = pixels(g.bal[j].peak, g.sh);
-        if (th != g.tick_px[j]) {
-            g.tick_px[j] = th;
-            lv_obj_set_style_bg_opa(g.tick[j], th > 1 ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-            lv_obj_set_y(g.tick[j], g.sy + g.sh - std::max(th, 1) - 2);
-        }
+        const int top = g.sh - pixels(g.bal[j].level, g.sh);
+        const int peak = pixels(g.bal[j].peak, g.sh);
+        const int tick = peak > 1 ? std::max(g.sh - peak - 2, 0) : -1;
+        changes[j] = {g.bars[j].x, g.bars[j].x + g.bars[j].width, dr::rows_touched(g.bars[j].top, g.bars[j].tick, top, tick, g.sh)};
+        g.bars[j].top = top;
+        g.bars[j].tick = tick;
     }
+    draw_cells(g.spectrum, g.spectrum_geometry, g.bars, g.lines, kSpectrumColours, false, std::span<const dr::Change>(changes.data(), bars));
 }
 
-void update_channels(const mv::FastLevels& fast, float seconds) {
+// `numbers`: the numbers under or beside the bars are written this time.
+void update_channels(const mv::FastLevels& fast, float seconds, bool numbers) {
     const std::span<const float> peaks(fast.peak_db.data(), fast.outputs);
-    float loudest = mv::kSilentDb;
-    for (const float db : peaks) {
-        loudest = std::max(loudest, db);
-    }
+    dr::Rows touched;  // the pair's: the whole of its chart's width
+    std::array<dr::Change, dr::kMaxChanges> changes{};
     switch (g.rep) {
         case mv::Representation::kPair: {
             float l = mv::kSilentDb;
@@ -638,22 +711,40 @@ void update_channels(const mv::FastLevels& fast, float seconds) {
                 l = a < peaks.size() ? peaks[a] : mv::kSilentDb;
                 r = b < peaks.size() ? peaks[b] : mv::kSilentDb;
             }
-            g.meters[0].update(l, seconds);
-            g.meters[1].update(r, seconds);
+            const bool moved_l = move_hbar(g.meters[0], g.pair_bars[0], l, seconds, g.pair_geometry.width);
+            const bool moved_r = move_hbar(g.meters[1], g.pair_bars[1], r, seconds, g.pair_geometry.width);
+            if (moved_l || moved_r) {
+                touched = {0, g.channels.h};
+                dr::render_hbars(g.channels.px, g.channels.stride, g.pair_geometry, g.pair_bars, kMeterColours, 0, g.channels.h);
+            }
             g.peak_held = std::max(g.meters[0].bal.peak, g.meters[1].bal.peak);
             break;
         }
         case mv::Representation::kSum:
             for (std::size_t m = 0; m < mv::kMasters; ++m) {
-                g.meters[m].update(mv::power_sum_db(peaks, g.fold.master[m].span()), seconds);
+                move_vbar(g.meters[m], g.meter_bars[m], mv::power_sum_db(peaks, g.fold.master[m].span()), seconds, g.channels_geometry.height, changes[m]);
             }
             break;
         case mv::Representation::kGrid:
             for (std::size_t k = 0; k < g.meters.size(); ++k) {
                 const std::size_t o = g.outputs[k];
-                g.meters[k].update(o < peaks.size() ? peaks[o] : mv::kSilentDb, seconds);
+                move_vbar(g.meters[k], g.meter_bars[k], o < peaks.size() ? peaks[o] : mv::kSilentDb, seconds, g.channels_geometry.height, changes[k]);
             }
             break;
+    }
+    if (g.rep != mv::Representation::kPair) {
+        const std::size_t n = std::min(g.meter_bars.size(), changes.size());
+        draw_cells(g.channels, g.channels_geometry, g.meter_bars, {}, kMeterColours, true, std::span<const dr::Change>(changes.data(), n));
+    } else {
+        show_rows(g.channels, touched);
+    }
+    if (!numbers) {
+        return;
+    }
+    for (Bar& bar : g.meters) {
+        if (bar.value != nullptr) {
+            bar.value->set(bar.bal.peak, bar.decimals);
+        }
     }
     if (g.peak_text.object != nullptr) {
         std::array<char, 16> text{};
@@ -677,6 +768,7 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     if (dimmed) {
         g.last_us = 0;
         g.due_us = 0;
+        g.render_since_us = 0;
         g.governor.restart_window();
         return false;
     }
@@ -690,14 +782,22 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     const std::int64_t step = g.governor.step_us();
     const std::int64_t behind = g.due_us == 0 ? 0 : std::max<std::int64_t>(now - g.due_us, 0);
     const std::int64_t missed = behind / step;
-    // Lateness the loop's own frame accounts for is nobody's fault: only what is past it counts against the rate.
-    const std::int64_t late = std::max<std::int64_t>(behind - panel_frame_us(), 0);
+    // Lateness the loop's own beat accounts for is nobody's fault: only what is past it counts against the rate. The beat is a frame while the view
+    // fills (twenty a second) and 100 ms while it rests (ten), when an update can be due any time in the beat before the loop looks.
+    const std::int64_t beat = g.governor.slow() ? mv::kSlowStepUs : static_cast<std::int64_t>(panel_frame_us());
+    const std::int64_t late = std::max<std::int64_t>(behind - beat, 0);
     const float seconds = g.last_us == 0 ? static_cast<float>(step) / 1.0e6F : std::clamp(static_cast<float>(now_us - g.last_us) / 1.0e6F, 0.02F, 0.25F);
     g.last_us = now_us;
 
     const std::uint64_t t0 = micros();
     if (tap.read_history(g.heavy->history)) {
-        g.heavy->analyzer.analyze(g.heavy->history, g.bands);
+        // The 17 bands up to 800 Hz look at the newest 171 ms, which changes little in 50: at twenty updates a second they are done every other one
+        // (the bigger of the two transforms, two thirds of the work), and at ten, or the first time, every one.
+        if (!g.have_spectrum || g.governor.slow() || (g.analyses & 1U) == 0) {
+            g.heavy->analyzer.analyze_low(g.heavy->history, g.bands);
+        }
+        g.heavy->analyzer.analyze_high(g.heavy->history, g.bands);
+        ++g.analyses;
         g.average.feed(g.bands, seconds, mv::kSpectrumAverageS, g.averaged);
         g.have_spectrum = true;
     }
@@ -705,13 +805,19 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed) {
     if (g.have_spectrum) {
         update_spectrum(seconds);
     }
-    update_channels(tap.fast_levels(), seconds);
+    const bool numbers = g.values_due_us == 0 || now >= g.values_due_us;
+    if (numbers) {
+        g.values_due_us = now + kValueEveryUs;
+    }
+    update_channels(tap.fast_levels(), seconds, numbers);
     const std::uint64_t t2 = micros();
     g.stats.analysis.add(t1 - t0);
     g.stats.widgets.add(t2 - t1);
 
-    // What this update cost the task: its own work, and the refresh the one before it asked for (the one this asks for comes after).
-    const std::int64_t cost = static_cast<std::int64_t>(t2 - t0) + static_cast<std::int64_t>(g.stats.render.last_us);
+    // What this update cost the task: its own work, and the refreshes since the last update, which it asked for (the one this asks for comes after).
+    // None if it moved no pixel: a steady tone is a still picture, and the last refresh's time is not charged to it again.
+    const std::int64_t cost = static_cast<std::int64_t>(t2 - t0) + static_cast<std::int64_t>(g.render_since_us);
+    g.render_since_us = 0;
     const std::int64_t next = g.governor.record(now, cost, late, missed);
     g.due_us = next != step || g.due_us == 0 ? now + next : g.due_us + next * (1 + missed);
     return !g.governor.slow();

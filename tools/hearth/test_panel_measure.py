@@ -184,6 +184,53 @@ class Schedule(unittest.TestCase):
         plan = pm.segments("all", 60, 20, 3, 10)
         self.assertEqual(pm.total_seconds(plan), 10 + 4 * 60 + 20 * 6 + 20)
 
+    def test_the_baseline_schedule_puts_the_dark_view_either_side_of_every_other_view(self) -> None:
+        plan = pm.segments("baseline", 40, 20, 3, 10)
+        self.assertEqual(
+            [s.name for s in plan],
+            [
+                "settle",
+                "dark-0",
+                "speakers-glow",
+                "dark-1",
+                "meters-a",
+                "dark-2",
+                "speakers-pulse",
+                "dark-3",
+                "meters-b",
+                "dark-4",
+            ],
+        )
+        self.assertTrue(all(s.view == "dark" for s in plan if s.name.startswith("dark-")))
+        # No cycles, however many are asked for: the leak test is the other schedule's.
+        self.assertEqual(pm.total_seconds(plan), 10 + 9 * 40 + 20)
+
+    def test_a_views_cost_is_its_burst_less_the_dark_stretches_either_side(self) -> None:
+        figures = {
+            "dark-0": {"burst_us_mean": 4000.0},
+            "speakers-glow": {"burst_us_mean": 4100.0},
+            "dark-1": {"burst_us_mean": 4040.0},
+            "meters-a": {"burst_us_mean": 4300.0},
+            "dark-2": {"burst_us_mean": 4080.0},
+            "speakers-pulse": {"burst_us_mean": None},
+        }
+        costs = {c["segment"]: c for c in pm.dark_costs(figures)}
+        self.assertEqual(set(costs), {"speakers-glow", "meters-a"})
+        self.assertAlmostEqual(costs["speakers-glow"]["dark"], 4020.0)
+        self.assertAlmostEqual(costs["speakers-glow"]["cost"], 80.0)
+        self.assertAlmostEqual(costs["meters-a"]["cost"], 4300.0 - 4060.0)
+
+    def test_a_view_at_the_end_has_the_one_dark_stretch_there_is_and_a_run_with_none_has_no_costs(
+        self,
+    ) -> None:
+        self.assertEqual(
+            pm.dark_costs({"meters-a": {"burst_us_mean": 5.0}, "dark-0": {"burst_us_mean": 3.0}})[
+                0
+            ]["cost"],
+            2.0,
+        )
+        self.assertEqual(pm.dark_costs({"speakers-glow": {"burst_us_mean": 1.0}}), [])
+
     def test_the_segment_in_force_is_found_by_time_and_the_last_stays_after_the_end(self) -> None:
         plan = pm.segments("all", 60, 1, 3, 10)
         self.assertEqual(pm.segment_at(plan, 0).name, "settle")
@@ -206,6 +253,42 @@ class Figures(unittest.TestCase):
         self.assertAlmostEqual(pm.timing_mean_between(first, last), 22.0)
         self.assertIsNone(pm.timing_mean_between(first, first))
         self.assertIsNone(pm.timing_mean_between(None, last))
+
+    def test_a_segments_burst_is_read_between_two_readings_of_the_boards_running_mean(self) -> None:
+        # The board's burst_us is the mean of every burst since the stream began: a minute at
+        # 4,000 us and then a minute at 4,500 reads 4,250 at the end; the second minute's is 4,500.
+        plan = [
+            pm.Segment("a", "speakers", "glow", 60, 5),
+            pm.Segment("b", "meters", "glow", 60, 5),
+        ]
+        samples: list[dict[str, Any]] = []
+        total = 0
+        bursts = 0
+        for second in range(120):
+            cost = 4000 if second < 60 else 4500
+            for _ in range(30):
+                bursts += 1
+                total += cost
+            samples.append(
+                {
+                    "t": float(second),
+                    "segment": "a" if second < 60 else "b",
+                    "status": status(bursts, burst_us=total // bursts),
+                    "panel": None,
+                }
+            )
+        grouped = pm.group_samples(samples, plan)
+        first = pm.summarise(grouped["a"], plan[0])
+        second = pm.summarise(grouped["b"], plan[1])
+        self.assertAlmostEqual(first["burst_us_mean"], 4000, delta=1)
+        self.assertAlmostEqual(second["burst_us_mean"], 4500, delta=15)
+        self.assertAlmostEqual(second["burst_us_max"], 4500, delta=150)
+
+    def test_the_mean_between_two_readings_needs_bursts_between_them(self) -> None:
+        a = {"status": status(100, burst_us=4000)}
+        b = {"status": status(160, burst_us=4100)}
+        self.assertAlmostEqual(pm.running_mean_between(a, b), (4100 * 160 - 4000 * 100) / 60)
+        self.assertIsNone(pm.running_mean_between(a, a))
 
     def test_percentile_takes_the_value_at_the_rank(self) -> None:
         self.assertEqual(pm.percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.95), 10)
@@ -335,16 +418,44 @@ class Judgement(unittest.TestCase):
             self.verdicts(pm.ROWS[1], full_run(meter=meters(torn=1)))["tap-torn"]["ok"]
         )
 
-    def test_a_small_room_must_hold_twenty_a_second_a_large_one_is_only_reported(self) -> None:
-        slow = meters(rate=10, falls=1, cost=30_000)
-        self.assertFalse(
-            self.verdicts(pm.ROWS[1], full_run(meter=slow))["rate"]["ok"]
-        )  # 5.1: six outputs
-        verdict = self.verdicts(
-            pm.ROWS[2], full_run(meter=meters(rate=10, falls=1, cost=30_000, outputs=16))
-        )["rate"]  # 9.1.6
-        self.assertTrue(verdict["ok"])
-        self.assertIn("reported", verdict["text"])
+    def test_a_cell_holds_twenty_a_second_or_else_a_steady_ten_and_which_is_said(self) -> None:
+        twenty = self.verdicts(pm.ROWS[1], full_run(meter=meters()))["rate"]
+        self.assertTrue(twenty["ok"])
+        self.assertIn("holds 20 Hz", twenty["text"])
+        # Fell to ten and held it: an update costs under half of a 100 ms step, no step missed.
+        steady = self.verdicts(pm.ROWS[1], full_run(meter=meters(rate=10, falls=1, cost=30_000)))
+        self.assertTrue(steady["rate"]["ok"])
+        self.assertIn("steady 10 Hz", steady["rate"]["text"])
+        # Fell to ten and still did not keep up: the kit's first run (an update cost 130 to 440 ms).
+        slow = self.verdicts(
+            pm.ROWS[2],
+            full_run(meter=meters(rate=10, falls=1, cost=131_000, dropped=205, outputs=16)),
+        )["rate"]
+        self.assertFalse(slow["ok"])
+        self.assertIn("neither 20 Hz nor a steady 10", slow["text"])
+        # Cheap but missing steps: not steady.
+        missing = self.verdicts(
+            pm.ROWS[1], full_run(meter=meters(rate=10, falls=1, cost=30_000, dropped=50))
+        )["rate"]
+        self.assertFalse(missing["ok"])
+        # A fall to ten and back is a fall: twenty is held only with none.
+        fell = self.verdicts(pm.ROWS[1], full_run(meter=meters(rate=20, falls=1)))["rate"]
+        self.assertTrue(fell["ok"])
+        self.assertIn("steady 10 Hz", fell["text"])
+
+    def test_faults_only_in_the_first_opening_say_so(self) -> None:
+        samples = full_run(meter=meters())
+        for s in samples:
+            if s["segment"] == "meters-a" and s["t"] > 45:
+                s["status"]["underruns"] = 1
+                s["status"]["resyncs"] = 1
+        text = self.verdicts(pm.ROWS[1], samples)["stream"]["text"]
+        self.assertIn("only the first, cold opening", text)
+        for s in samples:
+            if s["segment"] == "meters-b" and s["t"] > 105:
+                s["status"]["underruns"] = 1
+        text = self.verdicts(pm.ROWS[1], samples)["stream"]["text"]
+        self.assertNotIn("only the first, cold opening", text)
 
     def test_the_cost_is_held_to_half_of_the_step_in_force(self) -> None:
         self.assertTrue(
@@ -356,9 +467,13 @@ class Judgement(unittest.TestCase):
         ten = meters(rate=10, cost=49_000, falls=1, outputs=16)
         self.assertTrue(self.verdicts(pm.ROWS[2], full_run(meter=ten))["cost"]["ok"])
 
-    def test_a_dropped_step_fails(self) -> None:
-        self.assertFalse(
+    def test_a_dropped_step_is_allowed_to_a_hundredth_of_them_and_no_more(self) -> None:
+        # Two segments of 1,000 updates each.
+        self.assertTrue(
             self.verdicts(pm.ROWS[1], full_run(meter=meters(dropped=2)))["dropped"]["ok"]
+        )
+        self.assertFalse(
+            self.verdicts(pm.ROWS[1], full_run(meter=meters(dropped=60)))["dropped"]["ok"]
         )
 
     def test_a_panel_stack_nearly_used_up_fails(self) -> None:
@@ -419,7 +534,7 @@ class Report(unittest.TestCase):
         self.assertIn("All criteria that could be judged pass.", text)
 
     def test_a_failure_is_named_in_the_verdict(self) -> None:
-        result = pm.analyse(pm.ROWS[1], full_run(meter=meters(dropped=3)), PLAN)
+        result = pm.analyse(pm.ROWS[1], full_run(meter=meters(dropped=60)), PLAN)
         text = pm.render({"label": "x", "rows": [result]})
         self.assertIn("**FAIL**", text)
         self.assertIn("Failed: eac3-5.1 dropped.", text)

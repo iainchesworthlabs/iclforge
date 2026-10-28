@@ -344,6 +344,7 @@ void on_refresh_ready(lv_event_t* /*event*/) {
     g_stats.render_us_last = took;
     g_stats.render_us_max = std::max(g_stats.render_us_max, took);
     g_stats.render_us_mean = static_cast<std::uint32_t>(g_render_total_us / g_stats.refreshes);
+    g_stats.render_us_total = g_render_total_us;
     panel::now_meters_refresh(took);
 }
 
@@ -378,11 +379,40 @@ void rest(std::int64_t rest_us) {
     }
 }
 
+// The audio comes first. A decoder that spends a long share of its 32 ms on a burst (a 7.1.4 object stream, AC-4) is slowed by the screen's memory
+// traffic beside it: the kit measured the Meters view at +1.6 to 2.2 ms a burst under JOC, +0.5 to 0.7 with the screen's task kept on the decode
+// core (planning/p4x-meters-view.md, "What the screen costs the audio path"). So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+// or more (in at that, out at 70 % of it, so it does not flap) the Meters view is held at ten updates a second. At YIELD 2 this task is also made
+// on the decode core (start()), where it cannot run beside the decode task: FreeRTOS here has no call to move a task between cores, so that one is
+// for always. Looked at once a second; a stream that is not bursts is never busy.
+void follow_decoder_load() {
+    if constexpr (CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD != 0) {
+        static bool busy = false;
+        std::uint64_t burst_us = 0;
+        if (const auto status = sendspin_status()) {
+            burst_us = status->stream == "bursts" ? static_cast<std::uint64_t>(status->burst_us) : 0;
+        }
+        constexpr std::uint64_t kEnterUs = CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US;
+        const bool want = burst_us >= kEnterUs || (busy && burst_us >= kEnterUs * 7 / 10);
+        if (want == busy) {
+            return;
+        }
+        busy = want;
+        {
+            const std::lock_guard lock(g_lock);
+            panel::now_meters_hold_slow(busy);
+        }
+        std::printf("panel: the decoder is %s (a burst of %llu us): the Meters view is %s\n", busy ? "busy" : "free again",
+                    static_cast<unsigned long long>(burst_us), busy ? "held at ten a second" : "let go");
+    }
+}
+
 void run(void* /*arg*/) {
     const std::int64_t fill_period_us = 1'000'000 / std::max(kFps, 1);
     constexpr std::int64_t kRestPeriodUs = 100'000;
     std::int64_t period_us = fill_period_us;
     std::uint32_t reported_ms = tick_ms();
+    std::uint32_t followed_ms = reported_ms;
     for (;;) {
         const std::int64_t started = esp_timer_get_time();
         bool filling = false;
@@ -423,6 +453,10 @@ void run(void* /*arg*/) {
         // A line on the console every ten seconds while something is being drawn, which is also what
         // GET /log carries to a board with no cable on it.
         const std::uint32_t now = tick_ms();
+        if (now - followed_ms >= 1000) {
+            followed_ms = now;
+            follow_decoder_load();
+        }
         if (now - reported_ms >= 10000) {
             reported_ms = now;
             const std::lock_guard lock(g_lock);
@@ -747,10 +781,14 @@ bool panel_start() {
     g_stats.touch = g_display.touch;
     g_stats.screen = "idle";
 
-    // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point.
+    // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point. On any core, unless the audio is to come first
+    // by the strictest rule (PANEL_YIELD 2): then on the decode task's, where the two cannot run side by side.
+    constexpr BaseType_t kPanelCore = CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD == 2 && CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE >= 0
+                                          ? static_cast<BaseType_t>(CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE)
+                                          : tskNO_AFFINITY;
     const BaseType_t created = xTaskCreatePinnedToCoreWithCaps(
         &run, "panel", CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES, nullptr,
-        CONFIG_ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY, &g_task, tskNO_AFFINITY,
+        CONFIG_ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY, &g_task, kPanelCore,
         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (created != pdPASS) {
         std::printf("panel: its task could not be created\n");

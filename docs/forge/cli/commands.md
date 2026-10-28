@@ -465,6 +465,14 @@ That `decode` line closes the round trip: `objects_dir` writes each object's own
 `adm_out.wav` (needs `-DICLFORGE_BUILD_ADM=ON`) writes a fresh ADM BWF master back out, its
 objects' positions, gains and timing read from what the AC-4 stream's own Annex F metadata says.
 
+**The LFE.** `atmos-adm` and `atmos-iab` do not make the master's LFE bed channel an object: the
+stream has an LFE of its own (E-AC-3's, AC-4's LFE object), and the channel feeds it at the level it
+was mixed. So the LFE does not take one of the fifteen object slots either: a 9.1.6 master, fifteen
+speaker feeds and an LFE, fits, and the status line counts it once (`15 bed speaker feed(s) + 0
+dynamic object(s) + the bed's LFE = 16 objects`). A stream has one LFE, so a master with two (LFE and
+LFE2) has them added together, with a warning; a master of nothing but its LFE is refused, since an
+Atmos stream needs a speaker feed or an object beside it.
+
 #### AC-4 objects from a WAV
 
 `atmos-encode` takes `codec=ac4` too (planning/ac4.md, I5b), and writes the objects it makes of a

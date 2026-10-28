@@ -363,17 +363,17 @@
 <context>
     <name>EncoderController</name>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8472"/>
+        <location filename="../../src/encoder_controller.cpp" line="8515"/>
         <source>Saved to %1</source>
         <translation>Enregistré dans %1</translation>
     </message>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8475"/>
+        <location filename="../../src/encoder_controller.cpp" line="8518"/>
         <source>Could not write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../../src/encoder_controller.cpp" line="8494"/>
+        <location filename="../../src/encoder_controller.cpp" line="8537"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>Cette version ne porte pas de fichier de notices intégré (:/notices/NOTICES.txt n&apos;a pas été compilé dedans) ; le NOTICES.txt à côté de l&apos;application et le LICENSE du dépôt disent ce qu&apos;elle livre.</translation>
     </message>

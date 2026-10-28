@@ -355,6 +355,7 @@ def main():
         ]
     )
     print("wrote", ec3, m4a)
+    return 0
 
 
 if __name__ == "__main__":

@@ -269,12 +269,12 @@ mean since the count began, the largest, and how many.
 | `panel.internal_free`, `internal_free_min`, `internal_largest` | the same for internal RAM, which the decoder and the network share |
 | `meters.showing`, `representation`, `outputs`, `width`, `height` | the Meters view is up now; `pair`, `sum` or `grid`; the outputs of the room; the stage it was built for |
 | `meters.opens`, `open_ms` | times it has been opened since boot, and how long this opening has lasted. **Everything below is since the opening** (and is the last opening's after it is closed) |
-| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the render before it |
+| `meters.rate_hz`, `mean_cost_us` | the rate in force (20 or 10), and what an update costs on average over the governor's window: analysis + widgets + the refreshes since the last update (none if no pixel moved: a steady tone is a still picture) |
 | `meters.updates`, `late`, `dropped`, `falls`, `rises` | updates run; those that started more than 15 ms later than the panel's loop could have started them (one 30 fps frame is allowed for); whole steps that went by with none; twenty-to-ten falls and rises |
 | `meters.analysis_us` | the tap read, the transform, the power average and the ballistics |
 | `meters.widgets_us` | setting the bars, ticks and labels that moved (LVGL only invalidates; nothing is drawn yet) |
 | `meters.render_us` | LVGL's refreshes while the view shows |
-| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; reads the screen made and the ones the writer overran or that came before enough was written |
+| `meters.tap.blocks`, `us_per_burst`, `us_max_block`, `us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`, `reads`, `torn`, `short_reads` | what the audio path pays: the player's block tap, in microseconds for a burst of 1,536 frames (six blocks), on its decode task; the same split into the pass over the outputs and the pack into the ring (every sixteenth block is timed in parts), and one clock read; reads the screen made and the ones the writer overran or that came before enough was written |
 
 The developer view (three taps on the footer's name) shows the same figures in its PERFORMANCE section once the Meters view has been opened: the
 rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `widgets`, `render`), and `late`, `dropped` and the tap's cost.
@@ -286,11 +286,15 @@ rate and shape (`20 Hz · grid 12 · showing`), the three means (`analysis`, `wi
 The owner's rule: 20 Hz if possible, else 10 Hz. `iclforge/meters_governor.hpp` (host-tested) is "if possible":
 
 - **Cannot keep up** is judged over the last 20 updates (a second at 20 Hz), never on one: the **average cost** of an update
-  (analysis + widgets + the render before it) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
-  could have started them**, or a whole step missed. The allowance for lateness is one frame of the panel's loop (33 ms at 30 fps), because a 30 fps
-  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault.
-- **It rises again** only after **10 s** at ten, with the average cost **under 45 % of a fast step (22.5 ms)** and not one late or missed update in
-  the window. The gap between 70 and 45 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
+  (analysis + widgets + the refreshes since the last update) over **70 % of a 50 ms step (35 ms)**, **or 4 of the 20** started more than **15 ms later than the loop
+  could have started them**, or a whole step missed. The allowance for lateness is one beat of the panel's loop: a frame (33 ms at 30 fps) at twenty a second, because a 30 fps
+  loop serves a 50 ms step up to 33 ms after it is due and that is nobody's fault, and the resting 100 ms at ten, where an update can be due any time in the beat before
+  the loop looks (the first kit run of the canvas drawing counted half of the updates at ten a second late against a 33 ms allowance).
+- **The first two seconds of a view are not judged** (they are counted: `updates`, `late`, `dropped` include them; the window does not). The kit's first run
+  showed why: the opening's first draw of the stage (110 ms) and the first run of the code from the flash, cold in the cache, missed ten steps in the first second,
+  the view fell to ten, and could not rise because it never saw a cost under 45 %. Waking from dimming starts the grace again.
+- **It rises again** only after **10 s** at ten, with the average cost **under 60 % of a fast step (30 ms)** and not one late or missed update in
+  the window (the canvas drawing's steady cost on the kit is 26 to 31 ms in a 5.1 room and a 9.1.6 one, so 45 % was a limit it could never come back under). The gap between 70 and 60 % and the 10 s are the hysteresis; a fall within a minute of a rise doubles the 10 s (to 160 s at most), and
   a minute at twenty a second puts it back.
 - At ten a second the panel's loop goes back to its resting beat of 100 ms (`filling` false), which is exactly the step: a view at 10 Hz costs the
   task nothing between updates. At twenty it asks for the panel's frame rate (30 fps) and keeps its own beat inside it (due times 50 ms apart), which
@@ -374,18 +378,23 @@ Each run writes `<row>.samples.json` (a sample a second: the stream's counters a
 | **stream** | no underrun, late or dropped burst, resync or invalid burst in **any** segment, whichever view shows |
 | **burst** | the Meters view's mean `burst_us` is at most the speakers view's (glow) plus the larger of 15 % and 250 us |
 | **tap** | the tap costs the audio path at most 150 us a burst up to 8 outputs, 500 us above; and not one history read torn |
-| **rate** | a room of up to 6 outputs holds 20 Hz with no fall; a larger room is *reported* (it may fall to 10 Hz, which is the rule working) |
-| **cost** | an update's mean cost (analysis + widgets + the render before it) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
-| **dropped** | no whole step went by with no update |
+| **rate** | **20 Hz if possible, else a steady 10 Hz** (the owner, 2026-10-26), and the report says which cell holds which. A cell holds 20 Hz if it ran at 20 with no fall. It holds a steady 10 Hz if it fell (or could not hold 20), no more than 1 % of its steps went by with no update, and an update costs at most half of the 100 ms step. Anything else fails: the glass would show a few updates a second |
+| **cost** | an update's mean cost (analysis + widgets + the refreshes since the last update) is at most 50 % of the step in force (25 ms at 20 Hz, 50 ms at 10 Hz) |
+| **dropped** | at most 1 % of the steps went by with no update (the same 1 % as a steady 10 Hz) |
 | **stack** | the panel task's stack had at least 4 KiB free at its least |
 | **internal** | the internal heap's low point under the Meters view is within 8 KiB of the speakers view's |
 | **leak** | PSRAM free after the 20th return to the speakers view is within 16 KiB of its value after the first |
 | **sync** | the largest sync error (`error_us`) under the Meters view is within 1 ms of the speakers view's |
 | **as it was** (`compare`) | the glow's mean burst against I0's speakers view is within 5 % or 100 us; the pulse is reported |
 
+The *as it was* difference is **not only the speakers view's style**. I1 also has the Meters tap in the player (one pointer load per block while no view
+wants it) and the responsive-levels read the speakers view makes of the player (`read_now_levels`), and an earlier window measured Glow against Pulse within
+1 %, so when a burst differs between I0 and I1 the style is not where to look first. The *stream* criterion's first-opening finding below is a second thing to
+repeat: the first, cold opening of the Meters view against the second (`meters-a` against `meters-b`), which the report now names when every fault is in the first.
+
 **After.** Collect the three `report.md`s and the comparison into the plan page as **Kit results** (the date, the commits, the tables), replace the
 estimates under *What it costs* by the measured costs and say which numbers moved, and set the governor's limits (`GovernorLimits`) to what the kit
-shows (the 70 % and 45 % thresholds and the 15 ms allowance are the plan's guesses). A failed criterion is a finding with its samples attached, not a
+shows (the 70 % and 60 % thresholds and the 15 ms allowance are the plan's guesses). A failed criterion is a finding with its samples attached, not a
 reason to loosen a number; the levers, in the order the plan gives them, are 10 updates a second (already automatic), the 15 bars of the 480-px
 screen on the large one, and one custom-drawn widget for the spectrum in place of 62 objects.
 
@@ -416,6 +425,134 @@ The first run of the protocol, on the kit (`P4X`, 1024 by 600, 400 MHz, over its
 - **The speakers view as it was against as it is** (I0 against I1): the glow's mean burst is within -2.2 to +1.6 % in three rows and +6.6 % (16 us) on the stereo PCM tones, all inside the allowance (5 % or 100 us); the pulse is reported at +2.9 to +29 % (0.6 ms on the heaviest row), and its refresh costs 2.0 to 6.8 ms, as the glow's does.
 
 What this changes: the levers the plan listed, in the order it gave them, are now needed and are not enough in the first form: **10 updates a second is already automatic and is not enough**. The cost is the number of small invalid areas and objects, not the pixels (1.3 to 1.8 million a second), so the next step is **one custom-drawn object for the spectrum and one for each group of bars**, which makes an update two or three invalid areas and a handful of draw calls instead of 100 to 200; then the tap's loop (its second pass over the outputs' floats, which the level meter already reads once) and the analysis' placement (its tables in the PSRAM). The kit protocol runs unchanged on the result.
+
+### The rework: one canvas a chart (2026-10-26)
+
+What the speakers view's drawing does that the Meters view's did not: it has **a few objects** (at most 16 circles), changes an opacity only **in quantised steps and
+only when a step changes**, runs at about 10 Hz and **never changes a geometry**, so a refresh is a few small invalid areas. The Meters view had a rectangle for
+each part of each bar (three and a tick a bar, 100 to 200 objects), every one with a geometry that moved every update; LVGL then walks the whole object tree once
+for each invalid area it flushes and each flush is a DSI transfer of its own (1 to 1.5 ms on the P4 whatever its size).
+
+- **The spectrum plot is one object**, an RGB565 canvas (`lv_canvas`, a draw buffer in the PSRAM), and so are **the channel bars** (every group, one canvas) and **the pair of
+  meters** (one canvas). `iclforge/meters_draw.hpp` is the pure drawing (the zones, the peak ticks, the faint line, the troughs) into any 16-bit buffer, host-tested; an update works out
+  which rows of a bar changed (`rows_touched`), draws only those and tells LVGL. **The first form invalidated one rectangle**, the plot's width by the rows of the bar that moved most:
+  **an update was 4 to 6 invalid areas** (the panel preview counts the flushes an update makes: **58 to 118 before, 4.3 to 5.7 at 1024 by 600**) but 2.5 to 3 million pixels a second, and the
+  kit's first run of it (build a37bf4281, `Kit results, the canvas drawing`) measured the render at **21 ms an update in the 5.1 room and 47 ms with a JOC stream decoding: 135 ns a pixel**, the
+  PSRAM's bandwidth shared with the decoder (about 12 bytes a pixel: the background, the canvas and the copy to the glass). **The second form plans the rectangles**
+  (`plan_cells()`, `libs/device/include/iclforge/meters_draw.hpp`): neighbouring bars that changed share one rectangle (their columns, the union of their rows) when that costs less than one
+  each, by the least total of 8,000 pixels an area (the kit's about 1 ms) and one for each pixel, over at most 64 bars by dynamic programming; the preview flushes **0.7 to 1.2 million pixels a
+  second in 6 to 7 areas** at 1024 by 600. A test redraws a bar chart by random walk, in the planned cells and from scratch, and holds the two bit for bit.
+- **The numbers** under the bars (the dB figures) are text and change at **4 Hz**, not every update.
+- **The analysis is cheaper**: the spectrum's power average, the band levels, the downmix and the ballistics work in `float` (the P4 has no double unit: a `pow`, `log10` or `exp`
+  in double is software, microseconds each; they are `exp2f`/`log2f` now), and the low half of the bands (the 2048-point transform at 12 kHz) is analysed **every other update**, the high half
+  every update; the halves are held equal to the whole by test, and a slowed view (the governor at 10 Hz) analyses both every update.
+- **-O2** for `meters_screen.cpp` and `panel.cpp` (the player's tap is header-only and runs in panel.cpp's translation unit); the project's -Os does not inline or unroll.
+- **The refresh means are exact** (`panel.refresh_us` was a mean of means).
+- **The tap's cost is measured in parts**: every sixteenth block times its pass over the outputs, its pack into the ring and its clock reads (`tap.us_pass_per_burst`, `us_pack_per_burst`,
+  `us_per_clock_read`); the kit showed 370 to 860 us a burst for about 45 ns a sample, the same as the level meter's own pass, and the parts say where it goes.
+- **Not changed**: the representations, the zone colours, the governor (20 to 10 Hz) and the protocol. A **lighter mode** (fewer bars, a smaller matrix) is deliberately not built: it is added only if the
+  reworked view cannot hold a steady 10 Hz on a 9.1.6 room or a JOC 7.1.4 stream on the kit, so that the glass never shows two to eight updates a second.
+
+**Measured on the board twice, below** (the first form of it, one rectangle for a chart, and the planned cells): **every row holds 20 Hz**. No lighter mode was built.
+
+### Kit results, 2026-10-26, second run: the canvas drawing
+
+Booked 20:44 to 21:27 local. Images: **I1c** `eb9677196` (the canvas drawing with `plan_cells`, the governor's grace and its 60 % rise, `p4-rev3`) and **I2c** (the same with `sdkconfig.ac4`),
+both put on by OTA, **over the kit's Ethernet address**; the protocol of *Kit protocol* above, five rows, no I0 (the comparison with the speakers view as it was stays that of the first run). The raw samples and
+reports are in the session's notes folder (`meters-kit-window-2026-10-26/i1c-canvas-planner-eb9677196`, `i2c-ac4-canvas-planner-eb9677196`; `i1b-canvas-a37bf4281` is the first form of the drawing, over the Wi-Fi address by mistake: its
+PCM row has underruns in both views and is not used here). Times are the two Meters segments' means, in milliseconds unless a unit says otherwise.
+
+**Every cell holds 20 updates a second with no fall to ten, in the first (cold) opening of the view and the second. The first run's 130 to 440 ms an update is 11 to 29 ms. The audio is whole.** What still fails is the plan's own tap limit in
+every row, and in the JOC row the cost and the steps missed, by a little.
+
+| Row (room, what the screen draws) | Burst, speakers view (us) | Burst, Meters view (us) | Rate held | An update costs (analysis + widgets + render) | Steps with no update | Tap, a burst (pass + pack, us) |
+|---|---|---|---|---|---|---|
+| stereo PCM, two tones (2.0, `pair`) | 247 | 290 to 305 | **20 Hz** | 1.7 to 2.3 (1.9 + 0.1 + 4 refreshes in 60 s: a still picture) | 0.8 % | 329 (112 + 174) |
+| E-AC-3 5.1 (5.1, `grid` of 6) | 4,037 | 4,413 to 4,542 | **20 Hz** | 11.3 to 12.5 (1.8 + 2.2 + 7.4) | 0.3 % | 573 (352 + 210) |
+| E-AC-3 5.1 on a 9.1.6 room (`grid` of 16) | 4,620 | 4,995 to 5,125 | **20 Hz** | 11.7 to 12.9 (1.9 + 2.3 + 7.7) | 0.4 % | 578 (356 + 211) |
+| E-AC-3 JOC, 7.1.4 (`grid` of 12) | 21,552 | 22,287 to 22,569 | **20 Hz** | 23.8 to 29.3 (3.3 + 4.8 + 16.5) | **1.7 %** | 723 (487 + 217) |
+| AC-4 5.1 (5.1, `grid` of 6; image I2c) | 25,937 | 26,495 to 26,688 | **20 Hz** | 14.1 to 16.2 (4.8 + 3.3 + 8.6) | 0.8 % | 584 (356 + 219) |
+
+Against the first run (the drawing as 100 to 200 objects): an update in the 5.1 room 129 to 131 -> 11 to 12; 9.1.6 165 to 173 -> 12 to 13; JOC 432 to 437 -> 24 to 29; AC-4 231 to 237 -> 14 to 16; the widgets 44 to 137 -> 2 to 5; the render
+81 to 288 -> 7 to 17 (a refresh 7.4 ms in the 5.1 room, by the preview's count for 38,000 pixels in six areas, where the first form's one rectangle cost 21 ms for 124,000 in four, and 16.5 ms against 47 ms under a JOC stream); the analysis 5.4 to 9.6 -> 1.8 to 4.8.
+
+- **The criteria**: *rate*, *stack*, *internal*, *leak*, *sync* and *burst* pass in every row; *cost* (at most 50 % of the step) and *dropped* (at most 1 %) pass in all but the JOC row (59 % and 1.7 %: 40 steps of 2,300 with no update, 13 and 11 updates late; the cell
+  is the closest to the limit because the decoder takes 22 of the 32 ms of a burst and shares the PSRAM, and the view's render goes from 7 ms in the 5.1 room to 16.5; the governor's own limit of 70 % (35 ms) is 6 ms away); *tap* fails everywhere (below).
+- **The tap costs the audio path 329 to 723 us a burst, 1 to 2.3 % of one**, against a limit of 150 us up to 8 outputs and 500 above, which was a guess. The sub-timers say where: the pass over the outputs 112 us (2 outputs), 352 (6),
+  356 (a 5.1 stream on 16 slots), 487 (12 outputs under JOC), 40 to 60 us an output, and the pack into the ring 170 to 220 us whatever the room; a clock read is 1.1 us. The first run's 370 to 860 us at -Os became 330 to 720 at -O2: the loops are what is left.
+  The audio does not mind it: no underrun, late or dropped burst, resync or invalid burst in any music row, the burst grows 2 to 12 % in the music rows (17 to 23 % in the PCM row, 43 to 58 us), and the largest sync error is within 1 ms of the speakers view's in every row.
+- **The stereo PCM row's stream is unclean in every segment, the speakers view's too**: 6 underruns and 6 resyncs in `speakers-glow`, before the Meters view had been shown once, then 1, 1 and 3 (and one overrun history read). It is not the view; the
+  first run's one underrun at the first opening of the view is the same thing seen once. Not explained: the dev Music Assistant was paired and connected this time and was not in the first run, and the MA/Atmos coordinator restarted that add-on at 20:50, during this row (it ran about 20:46 to 20:52; the six underruns of `speakers-glow` were at about 20:47, before the restart,
+  the 1, 1 and 3 after it); the add-on dialled the kit again from about 20:56 and the four rows after it have no stream fault. To repeat with the add-on stopped before it is called a stream problem.
+- **The first, cold opening no longer falls to ten.** In the first form it fell in the first second of the 9.1.6 and JOC rows (the first draw of the stage, 110 ms, and the code cold from the flash missed ten steps) and could not rise; the governor does not judge the first
+  two seconds, and rises under 60 % of a fast step. A rise is still never seen on the kit, because nothing falls.
+- **Memory is not the problem**: 20 openings and closings lost at most 2.1 KB of PSRAM in the 5.1, 9.1.6 and PCM rows (the JOC and AC-4 rows gained 230 and 455 KB, the decoder's own allocation); the panel task's stack never had fewer than 10,812 bytes free; the
+  internal heap's low point is the same under both views in each row.
+- **The planner's cost model** (8,000 pixels an area) was set from the first form's 21 ms for 124,000 pixels in 4.3 areas (the preview's counts), about 135 ns a pixel and 1 ms an area if the pixel cost held; the second form's 7.4 ms for 38,000 pixels in 5.9 areas says 70 ns a
+  pixel and 0.8 ms an area, so a pixel is cheaper than assumed and an area dearer than a tenth of a refresh: the constant is in the right place (the plan is two or three cells of several hundred pixels' width) and a measured one would change a number in `meters_draw.hpp`, not code.
+
+What this leaves: the JOC row's two marginal criteria and the tap's cost are the open items; the ways to move them are in the order of effort the tap's two loops (a few hundred us for the audio path, not the glass), the draw buffers' rows (`ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS`, 40:
+smaller buffers stay in the cache and the render of every view gets cheaper; not tried), and a lighter mode (fewer bars), which the owner's rule asks for only if a room cannot hold 10 Hz: none of the five rooms comes near it now.
+
+### Kit results, 2026-10-28: the copy into the frame buffer by 2D-DMA
+
+Booked by the owner for the question "does PIE, PPA or the DMA help the drawing without hurting the audio". PIE does not (the P4's is integer-only: s8 to s32, u8 to u32; the v3.x guide's one PIE change is "updated for saturation and rounding"), and the bar fills are about 3 % of an update. What the code showed instead: `display_dsi.cpp` never called `esp_lcd_dpi_panel_enable_dma2d()`, so ESP-IDF 6.1 copied every flushed area into the frame buffer on the CPU (`memcpy` line by line, PSRAM to PSRAM, and a cache sync over whole rows) and told LVGL it was done before returning. `ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH` (default on) turns that into a 2D-DMA job; if the DMA will not start, the CPU copy stays and the boot log says so.
+
+Same code both arms (the canvas drawing, `eb9677196` against `8e827333d`), each put on the kit by OTA in one window (over the Ethernet address, the protocol above, 306 s a row, six open and close cycles), the control first. Times are the two Meters segments' means, in milliseconds; the extra burst is the Meters segments' mean burst less the speakers-glow segment's, in microseconds.
+
+| Row | Render, CPU copy -> 2D-DMA | An update (analysis + widgets + render) | Meters view's extra burst, us | Underruns, late, dropped | Internal heap low point, KB |
+|---|---|---|---|---|---|
+| E-AC-3 5.1 | 7.60 -> 7.10 (-7 %) | 11.2 -> 11.4 | 448 -> 447 | 0 | 86.8 -> 82.3 |
+| E-AC-3 5.1 on 9.1.6 | 7.87 -> 7.41 (-6 %) | 11.3 -> 11.5 | 421 -> 408 | 0 | 9.4 -> 9.7 |
+| E-AC-3 JOC 7.1.4 | 15.99 -> 14.41 (-10 %) | 23.9 -> 24.7 | 931 -> 873 | 0 | 12.7 -> 12.5 |
+| AC-4 5.1 | 8.64 -> 7.70 (-11 %) | 16.5 -> 15.5 | 604 -> 560 | 0 | 14.4 -> 14.9 |
+
+**Correction (2026-10-28, the same day): the "extra burst" column is wrong by a factor of two to four.** The board's `burst_us` is the mean of every burst since the stream began, so the mean of its readings over a minute is a mean of the whole history, and a stretch that costs 1 ms a burst moves it by a quarter of that. Read between two readings of it, the Meters view's extra burst in these four rows is 1,209 -> 1,185 (5.1), 1,182 -> 1,144 (9.1.6), 2,420 -> 2,157 (JOC) and 1,948 -> 2,016 us (AC-4): the 2D-DMA arm is no worse for the audio (the extra changes by -2 %, -3 %, -11 % and +3 %, within the run-to-run noise of about 200 us in the heavy rows; JOC's -263 us is the one change that size), but the extra is what the next section says it is, not 400 to 900 us. Every burst figure above this line is of the running mean, and the qualitative findings stand (the audio is whole in every music row).
+
+- **A real but small gain, and none for the audio to pay.** The render falls 6 to 11 % (0.5 to 1.6 ms an update); an update's own cost moves inside the run-to-run noise (about 0.5 ms); AC-4's speakers-view refresh falls 6.8 -> 6.0 ms and the other rows' stay within noise; the audio burst, the sync error (about 250 us in every row) and the internal heap are unchanged within the same noise. The image is 14.5 KB bigger (2,843,120 B against 2,828,224 on the p4-rev3 profile, 56.9 KB under its 2,900,000 limit); the 5.1 room's internal heap low point is 4.5 KB lower, the others' are not.
+- **The picture is right.** `GET :8081/panel.bmp` of a capture build, at two openings of the Meters view in the 9.1.6 room, shows clean bars, axes and labels (no stale or misplaced cell); the idle screen read back twice is identical (0 of 614,400 pixels differ).
+- **What a flush costs** (a capture build with a probe, 512 flushes a print): about 4,400 pixels a flush and 6.5 flushes an update; the CPU is in the driver call for 120 to 150 us, and the DMA takes 190 to 250 us from the call to the interrupt. So the copy is 0.85 ms of CPU an update, and what is left of the 7 ms render, about 6.5 ms, is LVGL's own drawing of the area (the background and the canvas blit) into PSRAM buffers. That part doubles under the JOC decoder for much the same pixels (14 to 16 ms against 7), which points at a bus the decoder and the scan-out (104 MB/s) share, not at instructions.
+- **Render buffers in internal RAM do not pass the audio gate where it matters.** Two buffers of 8 rows (32 KB) in internal RAM: the 5.1 room, which has 80 KB spare, renders in 6.6 ms (7 % under the 2D-DMA arm, 13 % under the CPU copy); in the 9.1.6 room and under JOC, which have 9 and 13 KB spare at their low points, the harness's HTTP connection to the board was reset at the first request of the first row and again in the JOC row after three segments, so neither row produced a verdict (the cause was not read from the board's log). Not taken. The probe and this variant are in `2026-10-28-experiments-probe-and-sram.patch` beside the raw runs.
+- **What is left, in the order of effort:** LVGL's direct mode into the frame buffer (no render buffers, no flush, no copy: 160 KB of PSRAM, 0.85 ms of CPU and the copy's bus traffic an update; tearing as today); fewer, larger areas (the planner's 8,000-pixel cost of an area was set against the CPU copy and wants re-measuring); LVGL's PPA backend (off in this build; its draw-buffer handler syncs the whole buffer's cache, `lv_draw_ppa_buf.c`, which for a chart's canvas is hundreds of KB, so look at that first). PIE is not on the list.
+
+### What the screen costs the audio path (2026-10-28, owner: "free cycles for decoding")
+
+**The measurement, corrected.** `GET /status`'s `burst_us` is the mean of every burst since the stream began (`decode_us_total / timed_bursts`, reset when the stream starts), so `panel_measure.py` has been averaging a running mean, and every burst figure before this section is diluted by the history before its segment. It now reads a segment's mean between two readings, `(mean_b * n_b - mean_a * n_a) / (n_b - n_a)` with the burst counts (good to about 10 us in a minute of a quarter-hour-old stream, the board keeping whole microseconds), and its tail from windows of ten seconds. `--views baseline` puts the dark view (nothing drawn) either side of each other view, so a view's cost is its burst less the dark stretches around it.
+
+**What each view costs a burst** (microseconds of the decode task's burst of 1,536 frames, the kit, p4-rev3, 40 s segments, two Meters segments a row; the first tap is `203e560b4`, the cheaper one is this change):
+
+Glow and pulse: the first tap's run, then the cheaper tap's. Meters: its two segments, a and b.
+
+| Room | The burst with the dark view | Glow | Pulse | Meters, first tap | Meters, cheaper tap | The tap itself, first -> cheaper |
+|---|---|---|---|---|---|---|
+| E-AC-3 5.1 | 3,910 | +16; +25 | +36; +63 | +1,199, +1,202 | +945, +943 | 564 -> 345 |
+| E-AC-3 JOC 7.1.4 | 21,450 | -172; -173 | +46; +78 | +1,911, +2,210 | +1,619, +1,836 | 701 -> 429 |
+| E-AC-3 5.1 on 9.1.6 (older run, against the speakers view) | 4,350 | | | +1,182 | | 573 |
+| AC-4 5.1 (older run, against the speakers view) | 25,780 | | | +1,948 | | 582 |
+
+- **Only the Meters view costs the decoder anything.** The glow and the pulse are within the noise (a few tens of microseconds in the 5.1 room, about 200 in the heavy ones) of the dark view, which is nothing drawn: the render, the flush and the scan-out of the other views do not show in the burst. The Meters view adds 24 to 30 % to a 5.1 burst, 8 to 10 % to a JOC one and 7.5 % to AC-4's, which at 25.8 ms of the 32 is the room with the least left (4.2 ms with the view, 6.2 without).
+- **The tap is a quarter to a third of that, not all of it.** 345 us of 945 in the 5.1 room and 429 of 1,730 under JOC. The rest is the panel's own work slowing the decoder while the two run at once; see the placement below. The plan's *burst* criterion (at most the speakers view's plus the larger of 15 % and 250 us) was written against the diluted figure and now fails the 5.1 room (+24 %, +30 % with the first tap) and passes the others; it is not changed here.
+- **The tap: 39 % cheaper, bit for bit the same numbers.** It was scalar code at 14 to 25 instructions a sample, in a loop an output at a time that stored and loaded the mix between them, a staging array the ring was copied from afterwards, a logarithm a window on the decode task, and six 64-bit atomics a block, each a critical section on both cores (RV32 has no 64-bit AMO; `__atomic_*_8` takes `s_atomic_lock`). Now the outputs go four at a time with the mix and four peaks in registers, the conversion writes the ring in place, the head is 32 bits, the writer's counters are 32-bit AMOs that the reader drains into 64-bit totals, and the peaks are published as magnitudes. `test_meters_tap.cpp` holds it to the first version's loops over 165 combinations of outputs, live masks and block lengths, and across the 32-bit wrap of the head. On the kit: pass 349 -> 189 us a burst (5.1) and 470 -> 254 (JOC); pack 208 -> 150 and 216 -> 158. The pack was 39 cycles a sample for about 11 instructions (one chain of eight dependent float operations an iteration on an in-order core), so it now converts four samples side by side before storing any: 150 -> 101 us a burst in 5.1 and 158 -> 107 in JOC. The tap is then 303 us (5.1), 355 (JOC 7.1.4) and 307 (AC-4 5.1), where the first version took 564, 701 and 582: 46 to 49 % less. What is left is the pass, about 185 to 250 us, and 12 reads of the clock a burst at 1.2 us each (15 us).
+- **Where the panel runs matters, and not the way to hope.** The same image with the panel task pinned to core 0 (the network's, and the decode lane's worker), to core 1 (the decode task's) and as it is (any core), the Meters view's extra burst against the dark view:
+
+| Panel task | 5.1: extra burst | 5.1: update | JOC: extra burst | JOC: update, rate |
+|---|---|---|---|---|
+| any core (as it is) | +945, +943 | 10.9 to 11.0 ms, 20 Hz | +1,619, +1,836 | 20.9 to 21.7 ms, 20 Hz |
+| core 0 | +963, +967 | 10.7 to 11.0 ms, 20 Hz | +1,702, +1,802 | 20.9 to 25.3 ms, 20 Hz |
+| core 1 | +840, +856 | 11.7 to 12.4 ms, 20 Hz | +508, +685 | 53.9 ms, 10 Hz, 12.5 % of the steps with no update |
+
+  On core 1 the decoder gives back 1.1 ms of a JOC burst (5 % of it) because the panel can only run while the decode task sleeps in the sink, never beside it; and the screen pays for it, since in a room whose decoder holds both cores for 21 ms of the 32 the panel's gaps are 9 ms on one core: its render goes from 14.5 to 38 ms and the view falls to 10 Hz and does not hold that either (the cost criterion and the dropped steps fail). Core 0 changes nothing. So the interference is the panel's memory traffic while the decoder runs, not the scheduler, and it is not recovered by placement without the screen's rate. (Inferred from the pinning; no bus counters were read.) The 5.1 room gets 100 us back and loses nothing. FreeRTOS in this build (IDF's, not the SMP kernel) cannot move a task between cores after it is made, so the placement is fixed when the panel's task starts.
+- **The audio first (owner, 2026-10-28: "audio wins over graphics"): `ICLFORGE_EXAMPLE_PANEL_YIELD`, default 1.** The panel reads the player's mean burst once a second; at 14 ms or more of the 32 (in at that, out at 70 % of it: JOC 7.1.4 is 21 ms, AC-4 5.1 is 26, a 5.1 E-AC-3 room 4) the Meters view is held at ten updates a second (`RateGovernor::set_hold_slow`, which is not counted as a fall). Level 2 also makes the panel task on the decode core, always. The unrolled tap, the baseline schedule, the Meters view's extra burst against the dark view and what the screen did (the kit, `2026-10-28-y-{ty1,ty2,ta0,ta1,ta2}`):
+
+| Room | 0: no policy | 1: held at ten (default) | 2: held, and the panel on the decode core |
+|---|---|---|---|
+| E-AC-3 5.1 (never busy) | +929, +926; 20 Hz, 11.0 to 11.1 ms | the same: it does not engage | +824, +790; 20 Hz, 11.5 to 12.8 ms |
+| E-AC-3 JOC 7.1.4 | +1,619, +1,836 (the tap then 429 us, now 355) | +914, +1,211; 10 Hz, 25 to 31 ms an update, 2.5 % of the steps missed | +469, +741; 10 Hz asked, 50 to 61 ms, 11.3 % missed |
+| AC-4 5.1 | +1,473, +1,563 | +1,143, +1,128; 10 Hz, 20 ms, 3.4 % missed | +631, +667; 10 Hz asked, 21 to 27 ms, 16.3 % missed |
+
+  Level 1 takes 0.4 to 0.7 ms a burst off the decoder in the two heavy rooms (a quarter to two fifths of the view's cost) for a steady ten updates a second. Level 2 takes 0.9 to 1.1 ms off (to +0.6 to +0.7 ms in AC-4, 0.5 to 0.7 under JOC), but its view misses 11 to 16 % of its steps (about 8.5 to 9 updates a second in practice), and because the pin is for every screen the speakers view under JOC refreshes in twice the time (the glow 8.1 -> 16.8 ms, the pulse 6.8 -> 13.7; AC-4's did not move). So level 1 is the default, and 2 is a setting for a board where the audio has to have every microsecond. The AC-4 burst with the view is 27.1 ms of the 32 at level 0, 27.05 at 1 and 26.2 at 2 (25.6 with the dark view).
+- **What is left for the decoder, in the order of effort:** fewer reads of the clock (about 15 us a burst); the panel's own traffic while a burst runs, which is the rest (about 0.6 ms in 5.1, 0.9 under JOC and 1.1 in AC-4 even at level 1): the analysis's 63 KB of tables and scratch and the canvases are in PSRAM, the render buffers are in PSRAM (internal RAM does not fit the tight rooms, above), and the DSI scan-out takes 74 MB/s of it all the time. A burst-aware panel (do the analysis and the drawing in the sink's wait, not beside the decode, without pinning every other screen to the decode core) would get level 2's gain without its cost to the other views, and wants the update to get cheaper than the gap, about 14 ms of every 50 under JOC. That needs a cheaper update (the analysis is 4 to 6 ms and the widgets 5 to 9 under JOC) and is not done.
+- **The harness:** `panel_measure.py` reads a segment's burst between two readings, has `--views baseline`, and says each view's cost against the dark stretches around it; its tests hold both. The raw runs are in `D:\ac3bld\panel-measure\2026-10-28-tap-{c,n,p0,p1}` (the first tap, the cheaper tap, the panel on core 0 and on core 1; the core knob that made the last two is `2026-10-28-panel-task-core-knob.patch`, not in the tree) and `2026-10-28-y-{ty1,ty2,ta0,ta1,ta2}` (the unrolled tap and the policy, on the normal and the AC-4 images); `2026-10-28-asfound-image-run-{a,b}` are two runs of the board's older image (an update of 135 ms, the drawing before #1693) that were meant to be the first two and are only a record of what a flash refused for want of the bench's lock leaves behind.
 
 ## Questions for the owner (answered 2026-10-26)
 

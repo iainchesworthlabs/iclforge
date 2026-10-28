@@ -735,82 +735,10 @@ config ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES
         well; 125 is every four seconds at 48 kHz. A Sendspin stream prints a
         sendspin.progress line every N chunks, with the internal heap free.
 
-# THE SENDSPIN PLAYER - main/sendspin.hpp, over the component's player
-# (CONFIG_ICLFORGE_SENDSPIN, in the component's own menu). A build with a
-# network and the component's player has one; each of these sizes it.
-menu "Sendspin player"
-    depends on ICLFORGE_SENDSPIN
-
-config ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES
-    int "Ring of chunks between the session and the decode, bytes"
-    default 262144
-    range 8192 4194304
-    help
-        What a server may send ahead of playing it, less a little for stream
-        starts and ends, is this: 256 KB is about four and a half seconds of
-        a 448 kbit/s E-AC-3 stream's bursts, or 0.9 s of 24-bit stereo PCM.
-        In PSRAM when the part has it; a build with none (QEMU) sizes it to
-        what its internal RAM can spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
-    int "The largest chunk taken, bytes"
-    default 25600
-    range 4096 65535
-    help
-        An E-AC-3 burst at the bitstream's ceiling is 24,585 bytes with its
-        header, and 150 ms of 24-bit stereo PCM 21,613. A shape that plays
-        only small streams can take less, and the decode task's buffer for
-        one chunk shrinks with it.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
-    int "Stack for the Sendspin decode task, bytes"
-    default 32768
-    range 12288 65536
-    help
-        As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
-        Sendspin stream's bursts: the decoder's frames are most of it. The
-        page's Sendspin section says what a run left spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
-    int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
-    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
-    default 0
-    range 0 1
-    help
-        As ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM, for the task that decodes a
-        Sendspin stream's bursts. On an ESP32-S3 with Wi-Fi up no internal block
-        is over 31,744 bytes by the time the player starts, which is less than
-        the stack's default 32,768, so a stack in internal RAM fits only while
-        what was allocated before it leaves a block that size: an image that
-        started its player fitted by a few bytes, and did not after a few more
-        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
-        In PSRAM it does not depend on that, and the internal RAM is free for
-        the rest. Needs CONFIG_SPIRAM and
-        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
-        stack is internal as before.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
-    int "Stack for the Sendspin WebSocket server's task, bytes"
-    default 8192
-    range 6144 32768
-    help
-        Every session runs on this task, the Noise handshake's X25519 and
-        SHA-256 included. The page's Sendspin section says what a run left
-        spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
-    int "Longest per-output delay, milliseconds (0 = none)"
-    default 20
-    range 0 100
-    help
-        The most one speaker can be delayed against another, by a server's settings
-        or by the listener's own distances (Preferences, PUT /trim). The delay lines
-        are one buffer per output of this length: sixteen outputs of 20 ms is about
-        61 KB, in PSRAM when the part has it. 20 ms is 6.86 m of sound's travel, the
-        most the nearest and the farthest speaker can be apart; 30 ms would be 10.3 m.
-        A build with less holds a shorter span and says so (GET /trim), and a build
-        with 0 has levels only.
-
+# What the player and the board state about themselves in every build, whether or not it has a Sendspin player:
+# main/settings.cpp reads the trim and main/board_caps.cpp the two limits. They are here, outside the menu below,
+# because a symbol in a menu that depends on ICLFORGE_SENDSPIN is undeclared in a build without it, and a source
+# that names it then fails to compile (the ESP32-S3 capture-sink build of CI's QEMU leg).
 config ICLFORGE_EXAMPLE_SPEAKER_TRIM
     string "The listener's level and distance for each speaker, as a build starts with them"
     default ""
@@ -887,6 +815,82 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         0.15 to 0.25 lower, which is where 4 objects at 0.92 came from; that figure is not the
         Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP
         (planning/esp32-714-realtime.md).
+
+# THE SENDSPIN PLAYER - main/sendspin.hpp, over the component's player
+# (CONFIG_ICLFORGE_SENDSPIN, in the component's own menu). A build with a
+# network and the component's player has one; each of these sizes it.
+menu "Sendspin player"
+    depends on ICLFORGE_SENDSPIN
+
+config ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES
+    int "Ring of chunks between the session and the decode, bytes"
+    default 262144
+    range 8192 4194304
+    help
+        What a server may send ahead of playing it, less a little for stream
+        starts and ends, is this: 256 KB is about four and a half seconds of
+        a 448 kbit/s E-AC-3 stream's bursts, or 0.9 s of 24-bit stereo PCM.
+        In PSRAM when the part has it; a build with none (QEMU) sizes it to
+        what its internal RAM can spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
+    int "The largest chunk taken, bytes"
+    default 25600
+    range 4096 65535
+    help
+        An E-AC-3 burst at the bitstream's ceiling is 24,585 bytes with its
+        header, and 150 ms of 24-bit stereo PCM 21,613. A shape that plays
+        only small streams can take less, and the decode task's buffer for
+        one chunk shrinks with it.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
+    int "Stack for the Sendspin decode task, bytes"
+    default 32768
+    range 12288 65536
+    help
+        As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
+        Sendspin stream's bursts: the decoder's frames are most of it. The
+        page's Sendspin section says what a run left spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
+    int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
+    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
+    default 0
+    range 0 1
+    help
+        As ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM, for the task that decodes a
+        Sendspin stream's bursts. On an ESP32-S3 with Wi-Fi up no internal block
+        is over 31,744 bytes by the time the player starts, which is less than
+        the stack's default 32,768, so a stack in internal RAM fits only while
+        what was allocated before it leaves a block that size: an image that
+        started its player fitted by a few bytes, and did not after a few more
+        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
+        In PSRAM it does not depend on that, and the internal RAM is free for
+        the rest. Needs CONFIG_SPIRAM and
+        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
+        stack is internal as before.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
+    int "Stack for the Sendspin WebSocket server's task, bytes"
+    default 8192
+    range 6144 32768
+    help
+        Every session runs on this task, the Noise handshake's X25519 and
+        SHA-256 included. The page's Sendspin section says what a run left
+        spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
+    int "Longest per-output delay, milliseconds (0 = none)"
+    default 20
+    range 0 100
+    help
+        The most one speaker can be delayed against another, by a server's settings
+        or by the listener's own distances (Preferences, PUT /trim). The delay lines
+        are one buffer per output of this length: sixteen outputs of 20 ms is about
+        61 KB, in PSRAM when the part has it. 20 ms is 6.86 m of sound's travel, the
+        most the nearest and the farthest speaker can be apart; 30 ms would be 10.3 m.
+        A build with less holds a shorter span and says so (GET /trim), and a build
+        with 0 has levels only.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_AC4
     int "List AC-4 among the Sendspin data types (1) or not (0)"
@@ -1064,6 +1068,33 @@ config ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY
         and above the idle task. The screen is a guest: when the cores are
         busy it is drawn late rather than the audio being.
 
+config ICLFORGE_EXAMPLE_PANEL_YIELD
+    int "The audio first: 0 nothing, 1 hold the Meters view at ten a second while the decoder is busy, 2 that and the screen's task on the decode core"
+    default 1
+    range 0 2
+    help
+        A decoder that spends most of its 32 ms on a burst (a 7.1.4 object
+        stream, AC-4) is slowed by the screen's drawing and analysis running
+        beside it, whatever their priority. On the kit the Meters view cost
+        a burst 1.6 to 1.8 ms under JOC 7.1.4 and 1.5 ms under AC-4 5.1; 1
+        holds it at ten updates a second while the decoder is busy and the
+        cost falls to 0.9 to 1.2 and 1.1 ms (a steady ten, 2 to 3 % of the
+        steps without an update). 2 also makes the panel task on the decode
+        core (always: FreeRTOS here cannot move a task between cores), where
+        it can only run while the decode task sleeps: 0.5 to 0.7 and 0.65 ms,
+        but the view then misses 11 to 16 % of its steps and every other
+        view under JOC refreshes in twice the time (planning/p4x-meters-view.md,
+        "What the screen costs the audio path"). 0 leaves the screen as it
+        was. The audio comes first, so the default is 1.
+
+config ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+    int "A mean burst this long, microseconds, is a busy decoder"
+    default 14000
+    range 1000 30000
+    help
+        Read once a second from the player's mean burst; in at this, out at
+        70 % of it. A 5.1 E-AC-3 burst is 4 ms, JOC 7.1.4 21 ms, AC-4 5.1 26.
+
 config ICLFORGE_EXAMPLE_PANEL_STACK_BYTES
     int "Stack of the panel's task, bytes (PSRAM)"
     default 16384
@@ -1076,6 +1107,19 @@ config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
     help
         LVGL draws a dirty area through two buffers of this many rows of the
         panel's width, in RGB565: 80 KB each at 1024 wide and 40 rows.
+
+config ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH
+    bool "Copy each render buffer into the DSI frame buffer with the 2D-DMA"
+    default y
+    depends on ICLFORGE_EXAMPLE_PANEL_DSI
+    help
+        Without this ESP-IDF copies each rendered area into the frame buffer
+        on the CPU, line by line, PSRAM to PSRAM, and tells LVGL it is done
+        before returning: the panel task is held for the copy and the second
+        render buffer never overlaps it. With it the copy is a 2D-DMA job and
+        LVGL is told from the interrupt that ends it, so the task draws the
+        next chunk meanwhile. The jobs read and write PSRAM, as the CPU did.
+        If the DMA cannot be set up the CPU copy stays.
 
 config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT
     int "Port that serves the picture as a BMP at /panel.bmp (0 = none)"

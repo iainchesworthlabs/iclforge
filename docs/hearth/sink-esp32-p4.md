@@ -422,7 +422,8 @@ frames about to be played to a `BlockTap` (`iclforge/block_tap.hpp`), one pointe
 50 ms; the screen takes the mix, analyses it (`iclforge/dsp/spectrum.hpp`: a 2048-point transform of the signal at 12 kHz for the
 17 bands up to 800 Hz and a 1024-point one at 48 kHz above it, so that a low band is not smeared over a fifth of a second and a high
 one is not slow), averages the power over 80 ms, and lets the bars fall at 30 dB a second (meters 24). It does this twenty times a
-second whatever the frame rate, and only a bar or a tick whose pixel moved is redrawn. When the screen is dimmed or another view is
+second whatever the frame rate. The spectrum, the channel bars and the pair of meters are each one canvas, redrawn only where a bar or a tick moved, in a few rectangles (one for each run of
+neighbouring bars that move alike), so an update is a handful of invalid areas and not a hundred (a rectangle for each part of each bar, which the kit measured at 80 to 290 ms a refresh). When the screen is dimmed or another view is
 chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
 tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
 How fast it runs on the kit, and the protocol that measures it, are in
@@ -442,7 +443,11 @@ holds, how long an update's analysis, widgets and render take (last, mean, large
 tap costs the audio path for a burst of 1,536 frames. The developer view shows the same in its PERFORMANCE section. The view runs at **twenty updates
 a second when the panel's task can keep up and ten when it cannot** (`iclforge/meters_governor.hpp`): over the last 20 updates, an average cost
 above 70 % of the 50 ms step, or 4 updates started more than 15 ms later than the loop could have started them, drops it to ten; it returns to
-twenty only after 10 s at ten with the cost under 45 % and nothing late, so that it does not flip. How each room holds up on the kit, and the
+twenty only after 10 s at ten with the cost under 60 % and nothing late, so that it does not flip; the first two seconds of a view are not judged (its first draw and the
+cold code are not what it costs). The target is **20 Hz if possible, else a steady 10 Hz** (no more than
+1 % of the steps without an update, an update under half of its step), and the kit protocol says which room holds which. **The audio comes first:** while the decoder is
+busy (a mean burst of 14 ms or more of its 32: a 7.1.4 object stream, AC-4; not a 5.1 E-AC-3 room) the view is held at ten, since the drawing and the analysis beside the decoder
+cost it 1.5 to 2 ms a burst in those rooms (`ICLFORGE_EXAMPLE_PANEL_YIELD`, default 1; 2 also keeps the panel's task on the decode core, and 0 turns it off). How each room holds up on the kit, and the
 protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 

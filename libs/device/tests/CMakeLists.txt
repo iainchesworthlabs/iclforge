@@ -23,6 +23,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_log_ring.cpp
     test_meters_tap.cpp
     test_meters_view.cpp
+    test_meters_draw.cpp
     test_meters_governor.cpp
     test_panel_stats.cpp
     test_now_view.cpp

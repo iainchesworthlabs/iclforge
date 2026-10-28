@@ -167,6 +167,12 @@ inline void timing(std::string& out, std::string_view name, const Timing& t) {
     out += ',';
     number(out, "us_max_block", m.tap.us_max_block);
     out += ',';
+    fixed1(out, "us_pass_per_burst", m.tap.part_per_burst(m.tap.us_pass));
+    out += ',';
+    fixed1(out, "us_pack_per_burst", m.tap.part_per_burst(m.tap.us_pack));
+    out += ',';
+    fixed1(out, "us_per_clock_read", m.tap.us_per_clock_read());
+    out += ',';
     number(out, "reads", m.tap.reads);
     out += ',';
     number(out, "torn", m.tap.torn);

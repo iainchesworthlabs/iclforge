@@ -134,6 +134,16 @@ else()
     set(ICLFORGE_PANEL_SRCS "panel/none/panel.cpp")
 endif()
 
+# The Meters view's analysis (a 1,024- and a 512-point transform in float) and its drawing are the panel's heaviest loops, and the project's -Os does not
+# inline the transform's passes or unroll its loops: the kit measured 5 to 10 ms an update for about 100 kflops (planning/p4x-meters-view.md, "Kit
+# results"). meters_screen.cpp at -O2, as the component's player.cpp and burst_player.cpp are; and panel.cpp, where the player's tap
+# (iclforge/meters_tap.hpp, header-only, so its block() is compiled where the tap is made) runs inside the decode task's burst: the kit measured 370 to
+# 860 us a burst for it.
+if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/panel/lvgl/meters_screen.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/panel/lvgl/panel.cpp"
+                                PROPERTIES COMPILE_OPTIONS "-O2")
+endif()
+
 idf_component_register(
     SRCS "hearth_sink.cpp"
          "board_caps.cpp"

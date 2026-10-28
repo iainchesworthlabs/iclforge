@@ -21,6 +21,38 @@ See [README.md](README.md) for the project overview and
   part's 32 dynamic receive buffers could all be held by one connection's queue, so that the retransmission that would fill the
   gap had no buffer to arrive in. `sdkconfig.psram` bounds the queue at 4 pbufs, as the C6 and the P4 already have it. Read
   out on a board and written up in `planning/ac4-in-release-images.md`; soaked for three full board-suite runs.
+- **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
+  the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
+  and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has
+  no 64-bit AMO). It takes four outputs at a time, writes its ring in place and keeps 32-bit counters: 303, 355 and 307 us on the kit, the
+  same numbers bit for bit (the test holds it to the old loops). The Meters view's drawing and analysis also slow the decoder while they run
+  beside it: 0.9 to 1.2 ms a burst in a 5.1 room, 1.6 to 2.2 ms under JOC 7.1.4 and 1.5 to 2 ms in AC-4 5.1 (the glow, the pulse and a dark
+  screen cost it nothing). `ICLFORGE_EXAMPLE_PANEL_YIELD` (default 1) holds the view at ten updates a second while the mean burst is 14 ms
+  of the 32 or more (JOC, AC-4; a 5.1 E-AC-3 room is never held): 0.4 to 0.7 ms a burst back, a steady ten. Level 2 also pins the panel's
+  task to the decode core for 0.9 to 1.1 ms back, at the price of 11 to 16 % of the view's steps and twice the refresh time for the other
+  views under JOC. `panel_measure.py` had been averaging `burst_us`, which the board keeps as a mean since the stream began, so every burst
+  figure it reported (here and in the entry below) was diluted two to four times; it now reads the burst between two readings, and
+  `--views baseline` puts the dark view either side of each view. Measurements in `planning/p4x-meters-view.md`, "What the screen costs
+  the audio path".
+- **Changed: the P4X's screen copies each drawn area into the frame buffer with the 2D-DMA, not the CPU.** ESP-IDF's DSI panel copied every
+  flushed area on the CPU (line by line, PSRAM to PSRAM) and the 2D-DMA hook was never turned on. `ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH`
+  (on by default; the CPU copy stays if the DMA will not start) turns it on: on the kit the Meters view's drawing takes 6 to 11 % less
+  (0.5 to 1.6 ms an update), the audio burst, sync error and internal heap are unchanged, and the picture reads back right. The image
+  is 14.5 KB bigger. Measurements in `planning/p4x-meters-view.md`, "Kit results, 2026-10-28".
+- **Fixed: a bed's LFE was lost, and counted twice, going into Atmos from an ADM master, an IAB file or the window's object mode (#1627).**
+  An LFE cannot be an Atmos object: an object reaches the LFE as `lfe_send * gain`, and the same gain pans it into the speakers, so
+  the bridges' gain 0 / `lfe_send` 1 made it silent, and it took one of the fifteen object slots beside the encoder's own implicit LFE.
+  A 5.1.4 bed read back out of its own ADM master came out of `forge atmos-adm` with the LFE at -120 dBFS and "10 bed speaker feed(s) +
+  the bed's LFE = 11 objects"; a 9.1.6 one, fifteen feeds and an LFE, was refused as "more channels than AtmosEncoder supports". The LFE
+  is now the encoder's: `AtmosEncoder::encode_frame` takes it as an `lfe` span, added to the bed's LFE unpanned and at unity (a new
+  overload; the old one is unchanged), `forge atmos-adm` and `atmos-iab` feed it there for E-AC-3 and write it as AC-4's LFE object for
+  `codec=ac4` (where it went in as an object at -infinity dB), and `BridgeResult` and `IabBridgeResult` hold the objects to fifteen
+  without it (`lfe_count()`, `object_slot_count()`). Two LFE channels (LFE and LFE2) are added into the stream's one LFE, with a
+  warning; a source of nothing but its LFE is refused, since JOC needs an object to reconstruct. forge-gui's object mode built a channel
+  assigned to the LFE bed position the same way (silent, and counted against the fifteen) and now feeds it the same way, with the
+  count and the "Only the LFE is assigned" refusal to match. Not changed: `atmos-encode` of a plain WAV still makes every channel an
+  object, as documented, so the LFE column of a 5.1 file is panned with the rest; and a bed LFE's own gain in the master is still not
+  read (it is carried at unity).
 - **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
   layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
   you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the
@@ -63,6 +95,17 @@ See [README.md](README.md) for the project overview and
   (`planning/p4x-meters-view.md`, "Kit results"): the stream is whole in every row and the Meters view costs the decode task 0.4 to 0.8 ms a burst, but on music an
   update takes 130 to 440 ms (the step is 50), so the view falls to 10 updates a second and still does not keep up; the spectrum and the bars need to be drawn
   as a few objects, not 100 to 200 small invalid areas.
+- **Changed: the Meters view draws each chart as one canvas, and its analysis works in float.** The kit put the view's cost in its 100 to 200 small invalid areas a
+  refresh (each a pass over the object tree and a flush to the glass). The spectrum plot, the channel bars and the pair of meters are now one RGB565 canvas each, redrawn
+  only in a few rectangles around the bars that moved (`iclforge/meters_draw.hpp`, `plan_cells()`: neighbouring bars share one when that is cheaper, and the result is held bit for bit to a
+  full redraw by test), so an update flushes 6 to 7 areas and 0.7 to 1.2 million pixels a second where it flushed 58 to 118 areas (the panel preview counts them and fails above 12); the numbers under the bars change at 4 Hz; the analysis's power average, levels and ballistics are float (the P4 has no double unit), and
+  the 17 bands up to 800 Hz are analysed every other update (`Analyzer::analyze_low` and `analyze_high`, equal to the whole by test); `meters_screen.cpp` and `panel.cpp` build at -O2.
+  `GET /panel-stats` gains the tap's cost in parts (`us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`) and an exact refresh mean. `tools/hearth/panel_measure.py`
+  now judges the rate as the owner asked, **20 Hz if possible, else a steady 10 Hz**, and says which cell holds which, and names faults that are only in the first, cold opening
+  of the view. The governor does not judge the first two seconds of a view (its first draw and the cold code), rises under 60 % of a fast step and takes the resting 100 ms of its loop as the
+  allowance at ten a second; an update is charged the refreshes since the last one and not the last refresh (a still picture costs nothing). The representations and the zone colours are unchanged.
+  **Measured on the kit** (planning/p4x-meters-view.md, "Kit results, second run"): an update costs 11 to 29 ms where it cost 130 to 440, and **a stereo, 5.1, 9.1.6, JOC 7.1.4 and AC-4 5.1 stream each hold 20 updates a second** with no fall to ten, in the first opening of the
+  view and the second; the audio is whole in every music row. Open: the JOC row misses 1.7 % of its steps and an update takes 59 % of the step, and the player's tap costs 330 to 720 us a burst (more than the plan's guess of 150 to 500).
 - **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
   about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
   where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,

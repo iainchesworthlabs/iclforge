@@ -9,7 +9,7 @@
 // behind the dialog. stub.js models the routes as iclforge::Firmware answers
 // them.
 
-const { test, expect } = require('./fixtures');
+const { test, expect, holdClockAt } = require('./fixtures');
 const { appImage, defaultHardware, emptySlot, firmwareSlot, firmwareTrial } = require('./stub');
 
 const RUNNING = 'v0.10.0-beta.1-42-gee9cf4f';
@@ -368,9 +368,7 @@ test.describe('restarting and going back', () => {
         // On a held clock, so that the one poll to meet the restart is the
         // one the action makes, and down until the test brings it back.
         stub.device.restartDrops = Infinity;
-        const start = new Date('2026-09-25T12:00:00Z');
-        await page.clock.install({ time: start });
-        await page.clock.pauseAt(start);
+        await holdClockAt(page, new Date('2026-09-25T12:00:00Z'));
         await page.goto(stub.url);
         const restart = page.getByRole('button', { name: 'Restart' });
         await restart.click();
@@ -432,9 +430,7 @@ test.describe('restarting and going back', () => {
 
     test('after a restart it asked for, the page reads the firmware at each poll for a minute', async ({ page, stub }) => {
         stub.device.restartDrops = 0;
-        const start = new Date('2026-09-25T12:00:00Z');
-        await page.clock.install({ time: start });
-        await page.clock.pauseAt(start);
+        await holdClockAt(page, new Date('2026-09-25T12:00:00Z'));
         await page.goto(stub.url);
         await expect(page.locator('#fw-running')).toHaveText(RUNNING + ' in ota_0, accepted, intact');
         await page.getByRole('button', { name: 'Restart' }).click();

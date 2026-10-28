@@ -181,6 +181,8 @@ TEST_CASE("the tap counts and times what it does", "[meters-tap]") {
     // Two reads of the clock a block, 3 us apart: 3 us a block.
     REQUIRE(stats.us_total == 12 * 3);
     REQUIRE(stats.us_max_block == 3);
+    // Every sixteenth block is timed in parts: none of these twelve.
+    REQUIRE(stats.sampled_blocks == 0);
     // A burst of 1,536 frames is six blocks of 256: 18 us on that clock.
     REQUIRE(std::fabs(stats.us_per_burst() - 18.0) < 1e-9);
     // A view that opens reads its own longest block, not the board's.
@@ -209,4 +211,208 @@ TEST_CASE("the tap is asked for only while the screen wants it", "[meters-tap]")
     REQUIRE(tap->wanted());
     tap->set_wanted(false);
     REQUIRE_FALSE(tap->wants_blocks());
+}
+
+TEST_CASE("every sixteenth block is timed in its parts, and the parts add up to what a block took, less the bookkeeping", "[meters-tap]") {
+    g_now = 0;
+    auto tap = make_tap(&fake_clock);
+    for (int i = 0; i < 64; ++i) {
+        Feed feed(2, {0.1F, 0.1F}, 256);
+        tap->block(feed.span(), 256, 0b11);
+    }
+    const mt::TapStats stats = tap->stats();
+    REQUIRE(stats.blocks == 64);
+    REQUIRE(stats.sampled_blocks == 4);
+    // On a clock that moves 3 us a read: the clock's own cost is one read (3), the pass one (3 more than the read after it began), the pack one.
+    CHECK(stats.us_clock == 4 * 3);
+    CHECK(stats.us_pass == 4 * 3);
+    CHECK(stats.us_pack == 4 * 3);
+    CHECK(std::fabs(stats.us_per_clock_read() - 3.0) < 1e-9);
+    CHECK(std::fabs(stats.part_per_burst(stats.us_pass) - 18.0) < 1e-9);  // six blocks of 3 us
+    mt::TapStats none;
+    CHECK(none.part_per_burst(5) == 0.0);
+    CHECK(none.us_per_clock_read() == 0.0);
+}
+
+namespace {
+
+// The first version's loops, kept as what the tap is held to: an output at a time, a mix cleared first, the sum clamped and rounded away from zero by a
+// branch, the peaks turned to dB when a window closes. The tap now takes four outputs at a time and converts into the ring in place; the numbers must not move.
+struct FirstVersion {
+    std::array<float, mt::kTapMaxOutputs> peak{};
+    std::size_t window_frames = 0;
+    std::vector<std::int16_t> mix16;
+    std::array<float, mt::kTapMaxOutputs> published{};
+    std::size_t published_outputs = 0;
+    std::uint32_t serial = 0;
+
+    void block(std::span<const std::span<float>> outputs, std::size_t frames, std::uint32_t live) {
+        frames = std::min(frames, mt::kTapBlockFrames);
+        std::array<float, mt::kTapBlockFrames> mix{};
+        const std::size_t count = std::min(outputs.size(), mt::kTapMaxOutputs);
+        for (std::size_t o = 0; o < count; ++o) {
+            if (((live >> o) & 1U) == 0) {
+                continue;
+            }
+            float p = peak[o];
+            for (std::size_t k = 0; k < frames; ++k) {
+                const float x = outputs[o][k];
+                mix[k] += x;
+                p = std::max(p, std::fabs(x));
+            }
+            peak[o] = p;
+        }
+        const float scale = 32767.0F / static_cast<float>(1U << mt::mix_shift(count));
+        for (std::size_t k = 0; k < frames; ++k) {
+            const float v = std::clamp(mix[k] * scale, -32768.0F, 32767.0F);
+            mix16.push_back(static_cast<std::int16_t>(v >= 0.0F ? v + 0.5F : v - 0.5F));
+        }
+        window_frames += frames;
+        if (window_frames >= mt::kFastWindowFrames) {
+            for (std::size_t o = 0; o < count; ++o) {
+                published[o] = peak[o] <= 1e-6F ? mt::kTapSilentDb : 20.0F * std::log10(peak[o]);
+                peak[o] = 0.0F;
+            }
+            published_outputs = count;
+            ++serial;
+            window_frames = 0;
+        }
+    }
+};
+
+// A repeatable run of numbers (xorshift), so that a failure is the same failure on every machine.
+struct Noise {
+    std::uint32_t state = 0x9E3779B9U;
+    std::uint32_t next() {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        return state;
+    }
+    // Uniform in [-1.2, 1.2), with a sample in eight on a grid of eighths (so that sums of two land on halves of a step) and one in sixty-four a hot one that clips.
+    float sample() {
+        const std::uint32_t r = next();
+        if ((r & 63U) == 0) {
+            return ((r >> 8) & 1U) != 0 ? 3.0F : -3.0F;
+        }
+        if ((r & 7U) == 0) {
+            return static_cast<float>(static_cast<int>((r >> 8) % 17U) - 8) / 8.0F;
+        }
+        return (static_cast<float>(r >> 8) / 8388608.0F - 1.0F) * 1.2F;
+    }
+};
+
+}  // namespace
+
+TEST_CASE("the tap makes the numbers the first version made, for any count of outputs, any outputs live, and a block of any length", "[meters-tap]") {
+    for (const std::size_t outputs : {1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U, 9U, 12U, 16U}) {
+        const std::uint32_t all = outputs == 32 ? 0xFFFFFFFFU : ((1U << outputs) - 1U);
+        for (const std::uint32_t live : {all, all & 0x5555U, all & 0x2U, std::uint32_t{0}, all & ~1U}) {
+            for (const std::size_t frames : {std::size_t{256}, std::size_t{100}, std::size_t{1}}) {
+                CAPTURE(outputs, live, frames);
+                auto tap = make_tap();
+                FirstVersion first;
+                Noise noise;
+                noise.state ^= static_cast<std::uint32_t>(outputs * 977U + live * 31U + frames);
+                // Enough blocks to fill the history and close windows (a block of one frame needs 8,192 of them).
+                const std::size_t blocks = frames == 256 ? 40 : frames == 100 ? 90 : 8300;
+                for (std::size_t b = 0; b < blocks; ++b) {
+                    std::vector<std::vector<float>> data(outputs, std::vector<float>(frames));
+                    std::vector<std::span<float>> views;
+                    for (auto& channel : data) {
+                        for (float& v : channel) {
+                            v = noise.sample();
+                        }
+                        views.emplace_back(channel);
+                    }
+                    const std::span<const std::span<float>> all_views(views.data(), views.size());
+                    tap->block(all_views, frames, live);
+                    first.block(all_views, frames, live);
+                }
+                std::array<std::int16_t, mt::kTapHistory> history{};
+                REQUIRE(tap->read_history(history));
+                const std::size_t base = first.mix16.size() - mt::kTapHistory;
+                bool same = true;
+                for (std::size_t i = 0; i < mt::kTapHistory && same; ++i) {
+                    same = history[i] == first.mix16[base + i];
+                }
+                REQUIRE(same);
+                const mt::FastLevels levels = tap->fast_levels();
+                REQUIRE(levels.serial == first.serial);
+                REQUIRE(levels.outputs == first.published_outputs);
+                for (std::size_t o = 0; o < levels.outputs; ++o) {
+                    REQUIRE(levels.peak_db[o] == first.published[o]);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("a sum that is not a number is a number the meter can draw", "[meters-tap]") {
+    auto tap = make_tap();
+    const float nan = std::nanf("");
+    for (int i = 0; i < 32; ++i) {
+        Feed feed(2, {nan, 0.5F}, 256);
+        tap->block(feed.span(), 256, 0b11);
+    }
+    std::array<std::int16_t, mt::kTapHistory> history{};
+    REQUIRE(tap->read_history(history));
+    // Whatever it is, it is one of the 16 bits and the same for every sample, and the peak of the number that is not one is not the window's.
+    REQUIRE(history.front() == history.back());
+    const mt::FastLevels levels = tap->fast_levels();
+    REQUIRE(levels.serial >= 1);
+    REQUIRE(std::fabs(levels.peak_db[1] - (-6.0206F)) < 1e-3F);
+    REQUIRE(levels.peak_db[0] == mt::kTapSilentDb);
+}
+
+TEST_CASE("the ring reads across the wrap of its 32-bit count, and says what it did not have", "[meters-tap]") {
+    // 256 samples before the count wraps.
+    auto ring = std::make_unique<mt::MonoRing>(0xFFFFFF00U);
+    std::vector<std::int16_t> block(200);
+    std::int16_t next = 0;
+    for (int i = 0; i < 3; ++i) {
+        for (std::int16_t& v : block) {
+            v = next++;
+        }
+        ring->write(block);
+    }
+    // 600 samples in, 344 past the wrap: the newest 300 are 300..599, and they cross it.
+    REQUIRE(ring->written() == 344);
+    std::vector<std::int16_t> newest(300);
+    REQUIRE(ring->read_newest(newest));
+    for (std::size_t i = 0; i < newest.size(); ++i) {
+        REQUIRE(newest[i] == static_cast<std::int16_t>(300 + i));
+    }
+    // More than has been written since the wrap is a short read, for the 170 ms it takes to write that many.
+    std::vector<std::int16_t> more(400);
+    REQUIRE_FALSE(ring->read_newest(more));
+    // Torn is a difference of counts, so it does not mind the wrap either.
+    constexpr std::uint64_t kStart = 0xFFFFFF00ULL;
+    REQUIRE_FALSE(mt::MonoRing::torn(kStart, kStart + mt::MonoRing::kCapacity - mt::kTapBlockFrames));
+    REQUIRE(mt::MonoRing::torn(kStart, kStart + mt::MonoRing::kCapacity - mt::kTapBlockFrames + 1));
+}
+
+TEST_CASE("the tap's totals are the sums of what each look drained, and a look does not lose or repeat any", "[meters-tap]") {
+    g_now = 0;
+    auto tap = make_tap(&fake_clock);
+    // Fifteen blocks in all: the sixteenth is the one that is timed in parts, and costs more on this clock.
+    for (int i = 0; i < 9; ++i) {
+        Feed feed(2, {0.1F, 0.1F}, 256);
+        tap->block(feed.span(), 256, 0b11);
+    }
+    const mt::TapStats first = tap->stats();
+    REQUIRE(first.blocks == 9);
+    const mt::TapStats again = tap->stats();
+    REQUIRE(again.blocks == 9);
+    REQUIRE(again.frames == 9 * 256);
+    REQUIRE(again.us_total == 9 * 3);
+    for (int i = 0; i < 6; ++i) {
+        Feed feed(2, {0.1F, 0.1F}, 256);
+        tap->block(feed.span(), 256, 0b11);
+    }
+    const mt::TapStats last = tap->stats();
+    REQUIRE(last.blocks == 15);
+    REQUIRE(last.frames == 15 * 256);
+    REQUIRE(last.us_total == 15 * 3);
+    REQUIRE(std::fabs(last.us_per_burst() - 18.0) < 1e-9);
 }

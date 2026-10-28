@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <expected>
 #include <span>
@@ -49,8 +50,9 @@
 //     placement" bed channels already get from ADM's speakerLabel; only BedChannel::gain (§10.3.8)
 //     can legitimately vary frame to frame, so a bed channel's timeline is one keyframe per frame
 //     it is present in. An LFE bed channel (ChannelID 0xD, or 0x86/0x87's BS.2051-2 LFE1/LFE2
-//     aliases) is routed at gain 0 / lfe_send 1, the exact convention build_channel_path's own doc
-//     comment states for ADM ("Objects never reach the LFE by panning").
+//     aliases) is not an object, for the reason bridge.hpp's own top comment gives for ADM ("Objects
+//     never reach the LFE by panning"): is_lfe marks it, its PCM is for AtmosEncoder::encode_frame's
+//     `lfe` span, and its path is the same inert gain 0 / lfe_send 1.
 //   - Table 19's cinema channel vocabulary is richer than iclforge::objects::oba::BedLabel's
 //     consumer-layout one (three surround zones per side, Left/Right Center, a height layer of
 //     Center/Surround/Side Surround/Rear Surround Height, Top Surround), but a bed channel reaches
@@ -89,7 +91,8 @@ struct IabBridgeResult {
                                                 // for diagnostics - IAB has no free-text channel
                                                 // name the way ADM's audioChannelFormat::id is
     std::vector<bool> is_bed;
-    std::vector<bool> is_lfe;
+    std::vector<bool> is_lfe;                  // an LFE bed channel: not an AtmosEncoder object -
+                                                // see this header's own top comment
     std::vector<iclforge::objects::oba::ObjectPath>
         paths;  // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::vector<float>> pcm;       // owned - see this header's own top comment
@@ -103,12 +106,18 @@ struct IabBridgeResult {
                    // tolerance. Empty for a channel whose metadata is carried as written
 
     [[nodiscard]] std::size_t channel_count() const { return paths.size(); }
+    // As BridgeResult's: the LFE channels, and the rest, which are the ones AtmosEncoder takes
+    // as objects and which the cap counts.
+    [[nodiscard]] std::size_t lfe_count() const {
+        return static_cast<std::size_t>(std::ranges::count(is_lfe, true));
+    }
+    [[nodiscard]] std::size_t object_slot_count() const { return channel_count() - lfe_count(); }
 };
 
 // Bridges a whole parsed IAB frame sequence - iclforge::iab::parse_iabitstream() or
 // iclforge::iab::parse_mxf_iab()'s own return value, unmodified - onto AtmosEncoder's input shape.
-// Channel count is capped at the same 15 build() itself enforces, for the identical reason (see
-// bridge.cpp's own kMaxChannels comment).
+// The channels that become objects (every one but the LFE bed channels) are capped at the same 15
+// build() itself enforces, for the identical reason (see bridge.cpp's own kMaxChannels comment).
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<IabBridgeResult, BridgeError> build_iab(
     std::span<const iclforge::iab::IABitstreamFrame> frames);
 

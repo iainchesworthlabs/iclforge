@@ -77,6 +77,7 @@ std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_vie
     IabAtmosSource out;
     out.sample_rate = bridged->sample_rate;
     out.is_bed = bridged->is_bed;
+    out.is_lfe = bridged->is_lfe;
     out.paths = std::move(bridged->paths);
     out.pcm.reserve(bridged->pcm.size());
     for (const auto& channel : bridged->pcm) {
