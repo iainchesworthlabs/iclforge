@@ -1,13 +1,13 @@
 # AC-4 content signing (pace-ccjf1, bring your own key and chain)
 
-!!! note "Status as of 2026-10-29: phases 0 to 2 done"
+!!! note "Status as of 2026-10-29: phases 0 to 3 done; phase 4 in progress"
     | Phase | What | State |
     |---|---|---|
     | 0 | This document | Written |
     | 1 | Crypto in `libs/base`: P-256, ECDSA, DER, X.509, chain validation, key and certificate loaders | Done; evidence under [Phase 1 results](#phase-1-results) |
     | 2 | Thrift binary and `ContentSignature` build and verify | Done; evidence under [Phase 2 results](#phase-2-results) |
-    | 3 | Carrier and AC-4 integration (elementary stream, MP4) | Not started |
-    | 4 | CLI, library surface, documentation, changelog | Not started |
+    | 3 | Carrier and AC-4 integration (elementary stream, MP4) | Done; evidence under [Phase 3 results](#phase-3-results) |
+    | 4 | CLI, library surface, documentation, changelog | In progress |
     | 5 | Tamper, policy and version tests, fuzz harness, end-to-end CLI test | Not started |
 
     The specification is a clean-room interoperability description of the scheme
@@ -389,6 +389,7 @@ extra codes the specification's table lacks, marked as such in the header:
 | `kNoTrustAnchors` | extra | the trust store is empty |
 | `kNoClock` | extra | the policy has no time |
 | `kKeyChainMismatch` | extra | signing: the leaf certificate's key is not the private key's |
+| `kNoContent` | extra | signing or verifying a stream with no frames (raised by `ac4::signing` before any other check) |
 
 The code reported is the first check that fails, in this order:
 
@@ -716,6 +717,44 @@ Things the implementation settled that the plan left open:
 - **The payload size limit** is 1 MiB and the chain limit 16 certificates. A real payload is about
   3 KB.
 
+## Phase 3 results
+
+The carrier layer: a codec-blind `uuid` user box in `iclforge::containers`, the signed span and
+the sign and verify operations in `iclforge::ac4::signing`, the elementary stream carrier there, and
+the MP4 carrier in `apps/shared/media`. The tags below select this phase's tests:
+`build/bin/iclforge-containers-tests "[user_box]"` (7 cases, 3,152 assertions),
+`build/bin/iclforge-ac4-tests "[signing]"` (21 cases, 715 assertions) and
+`build/bin/iclforge-app-media-tests "[signing]"` (10 cases, 249 assertions).
+
+| Claim | Evidence |
+|---|---|
+| `mux()`, `fragment()` and `FragmentWriter` write `AudioTrack::user_boxes` as `uuid` boxes in the `trak` after `mdia`, in order; `demux()`, the incremental `Reader` (at chunk sizes 1, 5, 64 and whole) and `demux_seekable()` read them back identically; a track without them writes the same bytes as before (no `uuid` box at all) | `iclforge-containers-tests "[user_box]"`; the whole binary still passes (194 cases, 332,778 assertions) |
+| Nine boxes, or a payload one byte past 1 MiB, are `kInvalidTrack` when writing and are left out when reading, which keeps the first eight and carries on; a body shorter than a usertype is left out; a body of exactly a usertype has an empty payload; a `uuid` box in `moov` or in `mdia` is not reported; a box declaring 2 GiB does not make the reader allocate | the same |
+| The container tests can fail | fourteen changes made to the writer and the reader, then undone, each caught (a count bound dropped, a payload bound dropped or off by one, usertype and payload swapped or merged, boxes not written by `mux()` or by the init segment, boxes not validated by either writer, a short body accepted, a ninth box kept, a `uuid` box read at any depth or anywhere, boxes never reported): 1 to 6 of 7 cases failed each time |
+| The signed span is the concatenation of every frame's `raw_ac4_frame`; its digest equals SHA-256 of the same bytes laid end to end, and does not depend on how they are cut into frames | `iclforge-ac4-tests "[signing]"`, on ten frames the encoder wrote from two tones |
+| The digest of an MP4's samples is the digest of the elementary stream, and one signature verifies both | `iclforge-app-media-tests "[signing]"`: the samples demuxed from the MP4 are hashed apart from the library and compared |
+| One bit changed in the first, middle or last byte of any frame fails with `kSignatureInvalid`; a frame dropped (first, middle, last), repeated, swapped with another, appended from another stream, or a byte cut from the end fails the same way | `iclforge-ac4-tests "[signing]"` |
+| A stream with the CRC word and one without it verify under one signature: the framing is outside the signed span (register 3), and a test records that so a change to it is a decision | `iclforge-ac4-tests "[carrier]"` |
+| A stream that does not scan to its last byte is refused by the carrier and not verified on the frames that did: a tail of other bytes (`kLostSync`, at the offset), a frame cut short (`kTruncatedFrame`), leading bytes, noise | the same |
+| A stream with no signature says so; with no trust configured the operator's input is named first; a stream of no frames is `kNoContent` | the same |
+| The MP4 carrier reads the `uuid` box with the specification's UUID, ignores boxes with another usertype (one bit off), refuses two signature boxes, an AC-3 track, a file that is not an MP4 and an empty file; a truncated MP4 either is refused or reads fewer samples, and fails the signature; a fragmented file carries the box in its init segment and verifies as one file | `iclforge-app-media-tests "[signing]"` |
+| No encoder, decoder, table of contents or container source includes a signing or cryptography header; `minimal.cmake` lists no signing source; the full library lists them | `iclforge-ac4-tests "[layering]"` (a scan of 100 or more files); the first two checks were shown to fail by adding a signing include and then a cryptography include to `decoder.cpp`, and the third by adding the signing variable to `minimal.cmake` (the last check, that the full library lists the sources, was not mutated) |
+| Layering, namespaces, no `std::format`, doc paths | `python3 tools/checks/check_layering.py` (0 failures), `check_namespaces.py` (0 failures, 4 known debts), `check_no_std_format.py`, `check_doc_paths.py` (0 missing) |
+
+Things the implementation settled that the plan left open:
+
+- **`ContentSignatureError::kNoContent`** is a fourteenth code (the thirteenth extra). A stream with
+  no frames would otherwise be reported as a missing signature or a digest of nothing.
+- **The usertype of the box** is `kContentSignatureUsertype`, the UUID parsed at compile time into the
+  16 bytes RFC 4122 gives, and `static_assert`ed and tested against the bytes written out by hand.
+- **A stream that stops short is an error and not a shorter stream.** The elementary carrier does not
+  hand over the frames before a bad place, because the verdict would then pass a stream whose tail
+  nobody authenticated.
+- **A `uuid` box is read from any `trak`, and kept for the selected one.** The reader's walk reads
+  them before it knows whether the track is wanted, and the existing track selection decides.
+- **`Mp4UuidCarrier` reads the first AC-4 track** (the reader's default selection). A file whose first
+  audio track is another codec is `kNoAc4Track`.
+
 ## Decisions needing owner review
 
 1. **The carrier (the open question).** Chosen: a sidecar `<stream>.sig` for elementary streams, a
@@ -751,7 +790,9 @@ Things the implementation settled that the plan left open:
 15. **Local build flags.** GCC 13 reports false positives under `-Werror` in
     `libs/ac4/src/decoder/syntax/aspx.cpp` and `apps/shared/project/src/project_command.cpp`; the
     worktree is configured with `-Wno-error=stringop-overflow -Wno-error=maybe-uninitialized` locally
-    and neither flag is committed.
+    (the cache also carries `-Wno-error=array-bounds`, `restrict`, `free-nonheap-object`,
+    `uninitialized` and `dangling-pointer`, which GCC 13 raises in the same existing files and in
+    the standard library under the unit-test build); no flag is committed.
 16. **Unknown Thrift type codes are refused.** The reader skips unknown fields by type, but only for
     the types spec §7.2 lists. A vendor writer that added a double field would make a payload this
     reader rejects. The alternative is to skip the double (8 bytes) as well; the specification does
@@ -762,3 +803,9 @@ Things the implementation settled that the plan left open:
 18. **Several digest entries.** Entries with the standard reference must all equal the content's
     digest; entries with other references are ignored. A stricter reader would refuse unknown
     references.
+19. **Boxes the MP4 reader drops.** More than eight `uuid` boxes in a `trak`, or one with a payload past
+    1 MiB, is not an error when reading; the box is left out and the file reads on, as the reader
+    treats an oversize edit list. A signature that falls in that group is then reported as absent,
+    which a verifier treats as unsigned. A stricter reader would refuse the file.
+20. **Two signature boxes are refused** (`kAmbiguousSignature`) and not resolved by taking the first
+    or the last.
