@@ -42,6 +42,15 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+# With Wi-Fi's buffers in PSRAM ESP-IDF's Kconfig defaults this to 0, no bound, and the part's 32
+# dynamic receive buffers can all end up held by one connection's out-of-order queue: a segment is
+# lost, the segments behind it are queued and each keeps its buffer, and the retransmission that
+# would fill the gap has no buffer left to arrive in. The board then answers nothing (no ARP, no
+# ping, no HTTP) while its CPUs, lwIP's thread and the Wi-Fi association are all alive, for as long
+# as the connection is there; planning/ac4-in-release-images.md has the measurements (the Wi-Fi
+# driver's buffer table at the stall: 32 of 32 dynamic receive buffers out, 3,982 allocation
+# failures, the one TCP connection with ooseq set). The C6 and the P4 take ESP-IDF's 4.
+CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS=4
 # Not in the memory test at boot: it takes a second on 8 MB and says nothing
 # a player needs to know.
 CONFIG_SPIRAM_MEMTEST=n

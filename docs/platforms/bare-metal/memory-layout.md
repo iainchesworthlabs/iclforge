@@ -41,8 +41,7 @@ The baselines the tables cite, with the image each was recorded on (the dates ar
 - `s3-n16r8`: board S3a, `v0.10.0-beta.1-4565-gc3878ebaa`, 2026-10-12.
 - `s3-n16r8-ac4`: board S3a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
 - `c6-16mb`: the C6 board, `v0.10.0-beta.1-4738-g357812dae`, 2026-10-12.
-- `p4-rev1`: board P4a, `v0.10.0-beta.1-4565-gc3878ebaa`, 2026-10-12.
-- `p4-rev1-ac4`: board P4a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
+- `p4-rev1` (until 2026-10-29 `p4-rev1-ac4`): board P4a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
 
 `c6-4mb` and `p4-rev3` have no bench board and no baseline. The `p4-rev3` image has not run on a
 v3.x chip or on a panel: its figures are a build's, and the screen's cost was measured on a v1.3
@@ -52,7 +51,7 @@ board with no panel.
 
 | | ESP32-S3 (N16R8) | ESP32-C6 | ESP32-P4 |
 |---|---|---|---|
-| Profiles, and the release image of each | `s3-n16r8` (`hearth-sink-esp32s3`); `s3-n16r8-ac4` | `c6-4mb` (`hearth-sink-esp32c6`); `c6-16mb` (`hearth-sink-esp32c6-16mb`) | `p4-rev1` (`hearth-sink-esp32p4-rev1`); `p4-rev1-ac4`; `p4-rev3` (`hearth-sink-esp32p4-rev3`, with the panel) |
+| Profiles, and the release image of each | `s3-n16r8` (`hearth-sink-esp32s3`); `s3-n16r8-ac4` | `c6-4mb` (`hearth-sink-esp32c6`); `c6-16mb` (`hearth-sink-esp32c6-16mb`) | `p4-rev1` (`hearth-sink-esp32p4-rev1`); `p4-rev3` (`hearth-sink-esp32p4-rev3`, with the panel) |
 | Cores and decode arithmetic | two Xtensa LX7 at 240 MHz with a single-precision FPU; `float` | one RISC-V at 160 MHz with no FPU; fixed point | two RISC-V at 360 MHz (v1.x) or 400 MHz (v3.x) with a single-precision FPU; `float` |
 | Internal RAM | 512 KB | 512 KB, shared with the radio | 768 KB, and 32 KB of low-power SRAM that the profiles keep out of the heap |
 | PSRAM | 8 MB, octal, 80 MHz | none | 32 MB, hex, 200 MHz |
@@ -243,14 +242,14 @@ here is from a DFRobot FireBeetle 2, chip revision v1.3.
 
 | | Figure | Build and date |
 |---|---|---|
-| Chip revision | `p4-rev1` and `p4-rev1-ac4`: revisions v1.0 to v1.99, 360 MHz. `p4-rev3`: v3.1 to v3.99, 400 MHz, the lyric panel | `profiles.json`; `p4-rev3` has not run on a board ([The chip revision](esp32-p4.md#the-chip-revision-and-what-it-blocks)) |
+| Chip revision | `p4-rev1`: revisions v1.0 to v1.99, 360 MHz. `p4-rev3`: v3.1 to v3.99, 400 MHz, the lyric panel | `profiles.json`; `p4-rev3` has not run on a board ([The chip revision](esp32-p4.md#the-chip-revision-and-what-it-blocks)) |
 | Flash | 16 MB in QIO mode at 80 MHz (`sdkconfig.p4`). `partitions.csv`, 4 MiB slots. `p4-rev3`'s application budget is 2,900,000 bytes (raised from 2,600,000 on 2026-10-25); 473 KB of that image is fonts | QIO took 14 to 25% off an AC-4 frame and 4 to 8% off AC-3 and E-AC-3: 2026-10-02 ([Flash mode](esp32-p4.md#flash-mode)). The `p4-rev3` build was 2,469,920 bytes on 2026-10-12 |
 | Bootloader | In the 24,576 bytes from 0x2000 to the partition table. v1.x at the Info log level with QIO: 24,368 bytes, 208 to spare. v3.x is 25,152 at Info, so `p4-rev3` builds it at the Warn level: 22,448 | `sdkconfig.p4`; `sdkconfig.p4-rev3`, a build of 2026-10-12 |
 | Internal RAM | 768 KB. The footprint probe, with no network and no PSRAM, had 514,820 bytes free at boot and a largest block of 385,024 | The probe on a board, 2026-09-23 ([Memory](esp32-p4.md#memory)) |
 | The low-power SRAM | 32 KB at 0x50108000, reached with no cache: 174 to 195 cycles an access against 6 to 7 for main RAM. `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n` keeps it out of the heap, which is 32,640 bytes smaller. With it in, the 29.97 fps converter took 93.8 ms a frame; with it out, 12.0 | 2026-10-01 and 2026-10-02 ([The low-power SRAM](esp32-p4.md#the-low-power-sram), [#1176](https://github.com/iainchesworthlabs/iclforge/pull/1176)). The 8 KB of tightly coupled memory at 0x30100000 is still in the heap and was not measured |
 | Caches | A 16 KB instruction cache and a 128 KB L2 cache in 64-byte lines. The firmware is copied into PSRAM at start and runs from there (`CONFIG_SPIRAM_XIP_FROM_PSRAM`): 1.4 MB of code and 0.8 MB of constants in the AC-4 image, 14 KB more image and no internal RAM | 14 to 36% less time a frame on one core: 2026-10-11 ([The firmware in PSRAM and the second core](esp32-p4.md#the-firmware-in-psram-and-the-second-core)) |
 | Static internal RAM | 166,948 bytes for `p4-rev3`, budget 175,000. The v1.x profiles have no budget and no source gives their figure or a `.data` and `.bss` split | `idf.py size` on a build of 2026-10-12 ([the profiles plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md#profiles)) |
-| Heap at boot, Wi-Fi and the Sendspin player up | `p4-rev1`: 291,783 to 291,803 bytes free, largest block 217,088 to 221,184. `p4-rev1-ac4`: 295,671 to 312,299 free, largest 208,896 to 212,992 | Baselines `p4-rev1` and `p4-rev1-ac4` |
+| Heap at boot, Wi-Fi and the Sendspin player up | `p4-rev1`, with the AC-4 decoder since 2026-10-29: 295,671 to 312,299 free, largest 208,896 to 212,992 (without it, as the profile was before: 291,783 to 291,803 free, largest 217,088 to 221,184) | The `p4-rev1` baseline, which is the old `p4-rev1-ac4`'s |
 | What is in PSRAM | The firmware. Both rings: 32,768 and 262,144 bytes. Allocations of 16 KB and over. The SDIO link's buffers, about 31 blocks of 1,536 bytes (`CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`). The decode lane's stack (16,384). The console's last 16 KiB. A lyric document of up to 16,384 bytes of text | `profiles.json`, `sdkconfig.p4` |
 | What stays internal | The decode task's stack: 32,768 bytes, 40,960 with AC-4, of which the decoder uses 19 to 30 KB. The I2S queue: 12 descriptors of 256 frames, 24 KB at 2.0; a sixteen-slot TDM frame would be 196 KB. With AC-4, the second core's worker stack for an HTTP play: 24,576 bytes. A core dump is kept, for 3,652 bytes of static RAM | Stack use: 2026-10-02 ([What the decoder holds](esp32-p4.md#what-the-decoder-holds)). The worker's stack: `firmware/esp-idf/iclforge/src/player.cpp`. Core dump: `idf.py size`, 2026-09-25 |
 | Allocation policy | ESP-IDF's: under 16,384 bytes internal RAM first, and `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW` is 16,384 here. A 512-byte limit left 281 to 298 KB of internal RAM free and took 1.08 to 1.24 times as long a frame | The twenty plays, 2026-10-02 ([Allocation policy](esp32-p4.md#allocation-policy)) |

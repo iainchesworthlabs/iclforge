@@ -10,6 +10,17 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: the ESP32-P4 v1.x release image decodes AC-4 as well as AC-3 and E-AC-3.** `p4-rev1` takes the AC-4 decoder
+  (`sdkconfig.ac4`) that `p4-rev1-ac4` held apart, with the same locked values and the decode stacks at 40,960 bytes; the
+  profile `p4-rev1-ac4` is gone, `p4-rev1` is what it was (the same hash, so P4a's baseline stands) and its app budget
+  is 3,400,000 bytes against the 4 MiB slot. The v3.x (P4X) image is not changed: on the kit the AC-4 image left too little
+  internal RAM for the decoder's second lane (`planning/ac4-in-release-images.md`). The S3 and the C6 are unchanged: the C6
+  cannot hold the decoder beside Wi-Fi, and the S3 needs the measured configuration in the same page.
+- **Fixed: an ESP32-S3 sink could stop answering on the network, with its CPUs, lwIP and its Wi-Fi association alive, in the
+  middle of a Sendspin session.** With Wi-Fi's buffers in PSRAM ESP-IDF leaves the TCP out-of-order queue unbounded, and the
+  part's 32 dynamic receive buffers could all be held by one connection's queue, so that the retransmission that would fill the
+  gap had no buffer to arrive in. `sdkconfig.psram` bounds the queue at 4 pbufs, as the C6 and the P4 already have it. Read
+  out on a board and written up in `planning/ac4-in-release-images.md`; soaked for three full board-suite runs.
 - **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
   layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
   you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the

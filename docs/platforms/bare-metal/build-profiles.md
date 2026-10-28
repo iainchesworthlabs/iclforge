@@ -75,7 +75,8 @@ built and never played.
 A profile is per board and per codec set for three reasons:
 
 - The same fragment list can resolve to different placements when a default depends on another
-  feature. AC-4 builds are therefore profiles of their own (`s3-n16r8-ac4`, `p4-rev1-ac4`).
+  feature. AC-4 builds are therefore profiles of their own where the decoder moves a placement (`s3-n16r8-ac4`); on the P4 the AC-4 decoder
+  is in both release profiles since 2026-10-29, its values locked where the AC-4 profile held them.
   `sdkconfig.ac4` raises both decode stacks to 40,960 bytes, and on the S3 `sdkconfig.s3-dcache`
   takes 32 KB of heap for a 64 KB data cache.
 - A board's flash size and partition table cannot change over the network, so a C6 with 4 MB of
@@ -104,8 +105,7 @@ its figures, which this page leaves out.
 | `s3-n16r8-ac4` | `esp32s3` | The same board, with the AC-4 decoder | none | S3a, S3b |
 | `c6-16mb` | `esp32c6` | An ESP32-C6 with 16 MB of flash, no PSRAM | `hearth-sink-esp32c6-16mb` | C6 |
 | `c6-4mb` | `esp32c6` | Any ESP32-C6 module: 4 MB of flash | `hearth-sink-esp32c6` | none |
-| `p4-rev1` | `esp32p4` | An ESP32-P4 of chip revision v1.x, such as the FireBeetle 2 | `hearth-sink-esp32p4-rev1` | P4a, P4b |
-| `p4-rev1-ac4` | `esp32p4` | The same board, with the AC-4 decoder | none | P4a, P4b |
+| `p4-rev1` | `esp32p4` | An ESP32-P4 of chip revision v1.x, such as the FireBeetle 2, with the AC-4 decoder | `hearth-sink-esp32p4-rev1` | P4a, P4b |
 | `p4-rev3` | `esp32p4` | An ESP32-P4 of chip revision v3.x with the lyric screen: the ESP32-P4X-Function-EV-Board and its 7-inch MIPI DSI panel | `hearth-sink-esp32p4-rev3` | none |
 
 There is no AC-4 profile for the C6: the decoder does not fit beside Wi-Fi on that part
@@ -143,8 +143,7 @@ Every profile starts with `sdkconfig.defaults` and adds its `fragments` after it
 | `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` |
 | `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` |
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` |
-| `p4-rev1` | `hw`, `p4`, `sendspin` |
-| `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` |
+| `p4-rev1` | `hw`, `p4`, `sendspin`, `ac4` |
 | `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` |
 
 ESP-IDF reads the files left to right, and a later file's value replaces an earlier one's. The
@@ -208,11 +207,11 @@ The classes of key, with examples (names without `CONFIG_`):
 The keys behind the 2026-10-12 failure, as the file locks them on 2026-10-13 (names after
 `ICLFORGE_EXAMPLE_`; the file is the authority):
 
-| Key | `s3-n16r8` | `s3-n16r8-ac4` | `c6-16mb`, `c6-4mb` | `p4-rev1`, `p4-rev3` | `p4-rev1-ac4` |
+| Key | `s3-n16r8` | `s3-n16r8-ac4` | `c6-16mb`, `c6-4mb` | `p4-rev1` | `p4-rev3` |
 |---|---|---|---|---|---|
-| `DECODE_STACK_BYTES` | 32768 | 40960 | 32768 | 32768 | 40960 |
+| `DECODE_STACK_BYTES` | 32768 | 40960 | 32768 | 40960 | 32768 |
 | `DECODE_STACK_IN_PSRAM` | 1 | 1 | 0 | 0 | 0 |
-| `SENDSPIN_DECODE_STACK_BYTES` | 32768 | 40960 | 24576 | 32768 | 40960 |
+| `SENDSPIN_DECODE_STACK_BYTES` | 32768 | 40960 | 24576 | 40960 | 32768 |
 | `SENDSPIN_DECODE_STACK_IN_PSRAM` | 1 | 1 | 0 | 0 | 0 |
 | `SENDSPIN_RING_BYTES` | 262144 | 262144 | 49152 | 262144 | 262144 |
 | `PLAY_MIN_FREE_BYTES` | 0 | 0 | 160796 | 0 | 0 |
@@ -302,8 +301,7 @@ The same command with `--write` regenerates the profile table in the firmware's 
 | `s3-n16r8-ac4` | not held | 32,768 | not held |
 | `c6-16mb` | 2,000,000 | 32,768 | 117,000 |
 | `c6-4mb` | 1,966,080 | 32,768 | 117,000 |
-| `p4-rev1` | not held | 24,576 | not held |
-| `p4-rev1-ac4` | not held | 24,576 | not held |
+| `p4-rev1` | 3,400,000 | 24,576 | not held |
 | `p4-rev3` | 2,900,000 | 24,576 | 175,000 |
 
 - **The app image** is `iclforge_hearth_sink.bin` in the build directory. `c6-4mb`'s limit is the
@@ -371,7 +369,7 @@ refuses a build that is not the profile, or a profile whose image has another na
 | `c6-16mb` | `build-esp32c3` | Built, verified, packaged as `hearth-sink-esp32c6-16mb` |
 | `p4-rev1` | `build-esp32c3` | Built, verified, packaged as `hearth-sink-esp32p4-rev1` |
 | `p4-rev3` | `build-esp32c3` | Built, verified, packaged as `hearth-sink-esp32p4-rev3` |
-| `p4-rev1-ac4` | `build-esp32c3` | Built with the stage timers on, and verified |
+| `p4-rev1` (again) | `build-esp32c3` | Built with the stage timers on, and verified |
 
 The QEMU run of `s3-n16r8` is the one place CI plays a board's release configuration. It checks
 that `GET /hardware` reports the profile's id and hash, plays an AC-3 and two E-AC-3 streams over
@@ -421,7 +419,7 @@ line:
 
 ```
 kconfig: [kconfig] firmware/hearth-sink/main/Kconfig.projbuild: CONFIG_ICLFORGE_EXAMPLE_NEW_STACK_BYTES
-is new and the guard watches it, and it is in c6-16mb, c6-4mb, p4-rev1, p4-rev1-ac4, p4-rev3,
+is new and the guard watches it, and it is in c6-16mb, c6-4mb, p4-rev1, p4-rev3,
 s3-n16r8, s3-n16r8-ac4, which neither lock nor free it: lock its value in profiles.json (the hash
 moves: baselines are re-recorded or accepted, planning/esp32-platform-profiles.md 'Changing a
 profile'), or name it in `free`
@@ -586,7 +584,7 @@ moved in a list, a new default for a locked key, and a new key.
 ### Baselines
 
 `firmware/hearth-sink/baselines/` has one file for each profile a bench board runs: `s3-n16r8`,
-`s3-n16r8-ac4`, `c6-16mb`, `p4-rev1` and `p4-rev1-ac4`. A baseline is a recorded run of the board
+`s3-n16r8-ac4`, `c6-16mb` and `p4-rev1`. A baseline is a recorded run of the board
 suite (`tools/hearth/board_suite.py`): the figures of a fixed list of plays on that profile's
 image, and the board's boot line. `c6-4mb` and `p4-rev3` have none, because no bench board runs
 them. [Testing and benchmarking the ESP32 boards](board-bench.md#the-play-suite) describes the

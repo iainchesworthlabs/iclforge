@@ -1037,7 +1037,7 @@ class FoldedPin(unittest.TestCase):
 
     def test_the_folded_row_s_own_hash_is_what_the_baseline_holds_it_to(self) -> None:
         base = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",
@@ -1048,7 +1048,7 @@ class FoldedPin(unittest.TestCase):
             },
         }
         same = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",
@@ -1059,7 +1059,7 @@ class FoldedPin(unittest.TestCase):
             },
         }
         moved = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",

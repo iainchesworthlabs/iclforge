@@ -60,7 +60,7 @@ and plain defaults: say the target and the overlays.
 **Chip revision v1.x** (the FireBeetle 2, stereo, no screen):
 
 ```bash
-idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin" build
+idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.ac4" build
 idf.py -p PORT flash monitor
 ```
 
@@ -84,7 +84,10 @@ idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.h
 | `sdkconfig.panel` | LVGL's heap in PSRAM, TrueType fonts, right-to-left text |
 | `sdkconfig.panel-null` / `sdkconfig.panel-dsi` | The frame buffer with no panel, or the 7-inch MIPI DSI panel |
 
-AC-4 is `sdkconfig.ac4` after those ([ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
+AC-4 is `sdkconfig.ac4`: in the v1.x release profile since the fold of `p4-rev1-ac4` into `p4-rev1`, and not in the v3.x one, whose
+internal RAM beside the screen cannot hold the decoder's second lane
+([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
+[ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
 
 ## On the v1.x board
 

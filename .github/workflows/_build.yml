@@ -3969,14 +3969,13 @@ jobs:
             "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null" \
             build >/dev/null
 
-      # The same sink with the AC-4 decoder in it (CONFIG_ICLFORGE_AC4, sdkconfig.ac4;
-      # planning/ac4.md, D14b) and the stage timers on, built and not run, for the reason the
-      # step above gives. What CI can hold is that the AC-4 archives still compile and link into
-      # a firmware for this part - with the profile's compile options and the project's
-      # -Werror, under the RISC-V toolchain's own warnings, which the host builds do not share -
-      # and that the option's build leaves the step above's alone. No image is packaged from
-      # it: it is a measurement build, and the release images have the decoder off.
-      - name: Build hearth_sink with the AC-4 decoder for the ESP32-P4 (no emulator for this part)
+      # The release profile again, with the stage timers on (-DICLFORGE_STAGE_TIMERS=ON), built and
+      # not run, for the reason the step above gives. The AC-4 decoder is in every P4 image since the
+      # fold of p4-rev1-ac4 into p4-rev1 (planning/ac4-in-release-images.md), so the build above
+      # already holds that its archives compile and link under this part's toolchain, -Werror and
+      # profile options; what this step adds is the same image with the zone markers compiled in,
+      # which is what the platform pages' stage tables are measured with. No image is packaged from it.
+      - name: Build hearth_sink with the stage timers for the ESP32-P4 (no emulator for this part)
         if: ${{ !cancelled() }}
         shell: bash
         env:
@@ -3989,13 +3988,13 @@ jobs:
           guard=()
           if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
           dir="$RUNNER_TEMP/hearth_sink-p4-ac4"
-          defaults="$(python3 "$profile" defaults p4-rev1-ac4)"
-          read -r -a identity <<< "$(python3 "$profile" identity p4-rev1-ac4 --cmake)"
+          defaults="$(python3 "$profile" defaults p4-rev1)"
+          read -r -a identity <<< "$(python3 "$profile" identity p4-rev1 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
             "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             -DICLFORGE_STAGE_TIMERS=ON build
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
-          python3 "$profile" verify p4-rev1-ac4 --build-dir "$dir" --size-json "$dir/size.json" \
+          python3 "$profile" verify p4-rev1 --build-dir "$dir" --size-json "$dir/size.json" \
             --github "${guard[@]}"
 
       - name: Upload the C6 and P4 images for packaging
