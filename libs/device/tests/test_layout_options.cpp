@@ -396,7 +396,7 @@ TEST_CASE("every profile the project defines has an evidence row", "[device][lay
         }
         CHECK(found);
     }
-    CHECK(iclforge::kLayoutEvidence.size() == 7);
+    CHECK(iclforge::kLayoutEvidence.size() == 6);
 }
 
 TEST_CASE("GET /layout-options is the head and one object a layout, in a fixed key order", "[device][layout_options]") {

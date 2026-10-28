@@ -236,11 +236,11 @@ own, each with the spread it was measured from in a `note`.
 
 | Figure | A regression when | Profiles with their own margin |
 |---|---|---|
-| Decoder time per frame | Over the baseline by more than the larger of 5% and 5 permille | `p4-rev1-ac4`: 12% (its AC-4 rows are three or four frames, and a play varies by about 6%) |
+| Decoder time per frame | Over the baseline by more than the larger of 5% and 5 permille | `p4-rev1`: 12% (its AC-4 rows are three or four frames, and a play varies by about 6%) |
 | Decode stack free | More than 512 bytes under | |
 | Sink queue's least headroom | More than 2 ms under | |
-| Boot: largest internal block | More than 1,024 bytes under | `c6-16mb`: 12,288; `p4-rev1`, `p4-rev1-ac4`: 8,192 (the block steps by 4 KB from boot to boot) |
-| Boot: internal RAM free | More than 2,048 bytes under | `p4-rev1-ac4`: 4,096 |
+| Boot: largest internal block | More than 1,024 bytes under | `c6-16mb`: 12,288; `p4-rev1`: 8,192 (the block steps by 4 KB from boot to boot) |
+| Boot: internal RAM free | More than 2,048 bytes under | `p4-rev1`: 4,096 |
 | Glitched plays of a Sendspin row | More than one over the baseline's count | The two S3 profiles allow the E-AC-3 row two |
 | Least heap during a Sendspin play | Held only for a row that names a margin | S3: 2,048 for E-AC-3 (and AC-4 music on `s3-n16r8-ac4`); `c6-16mb`: 3,072 for E-AC-3 |
 | State, units, boot verdict, PCM hash | Any difference | |
