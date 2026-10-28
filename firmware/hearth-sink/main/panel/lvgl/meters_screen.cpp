@@ -337,6 +337,9 @@ struct State {
 
 State g;
 std::uint32_t g_opens = 0;
+// The audio comes first: while the decoder is busy the panel holds the view at ten a second (now_meters_hold_slow()). Kept here, not in
+// State, which every opening makes again.
+bool g_hold_slow = false;
 // The last opening's figures, kept when the view is closed so that a measurement can read them after the screen has gone to another view.
 ps::MetersStats g_last;
 
@@ -528,6 +531,7 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
         return false;
     }
     g = State{};
+    g.governor.set_hold_slow(g_hold_slow);
     g.heavy = new (memory) Heavy();
     g.d = dim_of(width, height);
     g.fold = fold;
@@ -659,6 +663,11 @@ void now_forget_meters() {
 }
 
 ps::MetersStats now_meters_stats() { return g.built ? snapshot() : g_last; }
+
+void now_meters_hold_slow(bool hold) {
+    g_hold_slow = hold;
+    g.governor.set_hold_slow(hold);
+}
 
 void now_meters_refresh(std::uint32_t took_us) {
     if (g.built) {

@@ -68,7 +68,10 @@ def segments(views: str, segment_s: int, cycles: int, cycle_s: int, warmup_s: in
     """The schedule of one row. `all`: speakers (glow), Meters, speakers (pulse), Meters again,
     then `cycles` times Meters and the speakers `cycle_s` seconds each, which is the leak test.
     `speakers`: the two styles only, for an image that has no Meters view (the speakers view as it
-    was, to hold the others against)."""
+    was, to hold the others against). `baseline`: the same four, each between two stretches of the
+    dark view (nothing drawn, the panel's task asleep), and no cycles: a burst's time creeps up
+    over a few minutes of a stream whatever the screen shows, so what a view costs the audio path
+    is its burst less the dark stretches either side of it, not less the stretch before."""
     base = [
         Segment("speakers-glow", "speakers", "glow", segment_s, warmup_s),
         Segment("speakers-pulse", "speakers", "pulse", segment_s, warmup_s),
@@ -76,6 +79,14 @@ def segments(views: str, segment_s: int, cycles: int, cycle_s: int, warmup_s: in
     out = [SETTLE]
     if views == "speakers":
         return out + base
+    if views == "baseline":
+        meters = [Segment(f"meters-{k}", "meters", "glow", segment_s, warmup_s) for k in "ab"]
+        shown = [base[0], meters[0], base[1], meters[1]]
+        for k, segment in enumerate(shown):
+            out.append(Segment(f"dark-{k}", "dark", "glow", segment_s, warmup_s))
+            out.append(segment)
+        out.append(Segment(f"dark-{len(shown)}", "dark", "glow", segment_s, warmup_s))
+        return out
     out += [
         base[0],
         Segment("meters-a", "meters", "glow", segment_s, warmup_s),
@@ -202,6 +213,21 @@ def timing_mean_between(first: dict[str, Any] | None, last: dict[str, Any] | Non
     return (last["mean"] * last["n"] - first["mean"] * first["n"]) / added
 
 
+BURST_WINDOW_SAMPLES = 10  # readings (a second apart) in a window of the burst's tail
+
+
+def running_mean_between(first: dict[str, Any], last: dict[str, Any]) -> float | None:
+    """The mean burst time of the bursts between two readings of the board's running mean
+    (`burst_us`, over `bursts` bursts since the stream began): (mean_b * n_b - mean_a * n_a) /
+    (n_b - n_a). The board keeps whole microseconds, so the figure is good to about n_b / (n_b -
+    n_a) of them: ten or so for a minute taken a quarter of an hour into a stream."""
+    a, b = sendspin_of(first), sendspin_of(last)
+    added = b["bursts"] - a["bursts"]
+    if added <= 0:
+        return None
+    return (b["burst_us"] * b["bursts"] - a["burst_us"] * a["bursts"]) / added
+
+
 def summarise(samples: list[dict[str, Any]], segment: Segment) -> dict[str, Any]:
     """The figures of one segment. Counters are read over the whole segment (an underrun in the
     first seconds is still an underrun), the steady-state figures after the warm-up."""
@@ -217,15 +243,36 @@ def summarise(samples: list[dict[str, Any]], segment: Segment) -> dict[str, Any]
         return out
     for key in ("underruns", "late", "dropped", "resyncs", "invalid", "bursts"):
         out[f"{key}_delta"] = delta(samples, key)
-    bursts = [
-        float(sendspin_of(s)["burst_us"])
+    # The board's burst_us is the mean of every burst since the stream began, not of the last few:
+    # the mean of its readings is a mean of the whole history, in which a view that costs 500 us for
+    # a minute moves it by a fraction of that. The segment's own mean is read between two readings.
+    timed = [
+        s
         for s in steady
         if isinstance(sendspin_of(s).get("burst_us"), (int, float))
+        and isinstance(sendspin_of(s).get("bursts"), (int, float))
     ]
-    if bursts:
-        out["burst_us_mean"] = sum(bursts) / len(bursts)
-        out["burst_us_p95"] = percentile(bursts, 0.95)
-        out["burst_us_max"] = max(bursts)
+    if len(timed) >= 2:
+        whole = running_mean_between(timed[0], timed[-1])
+        if whole is not None:
+            out["burst_us_mean"] = whole
+        # And the tail, from windows of ten seconds (a shorter one is too few bursts for the
+        # board's whole microseconds): the worst window and the 95th percentile of them.
+        windows = [
+            m
+            for m in (
+                running_mean_between(a, b)
+                for a, b in zip(
+                    timed[::BURST_WINDOW_SAMPLES],
+                    timed[BURST_WINDOW_SAMPLES::BURST_WINDOW_SAMPLES],
+                    strict=False,  # the last window has no end: it is not a window
+                )
+            )
+            if m is not None
+        ]
+        if windows:
+            out["burst_us_p95"] = percentile(windows, 0.95)
+            out["burst_us_max"] = max(windows)
     errors = [
         abs(sendspin_of(s)["error_us"])
         for s in samples
@@ -504,6 +551,7 @@ def analyse(row: Row, samples: list[dict[str, Any]], plan: list[Segment]) -> dic
         "layout": row.layout,
         "outputs": row.outputs,
         "figures": figures,
+        "dark_costs": dark_costs(figures),
         "cycles_psram_free": cycles,
         "verdicts": judge_row(row, figures, cycles),
     }
@@ -516,6 +564,28 @@ def cell(value: Any, spec: str = "") -> str:
     if value is None:
         return "-"
     return format(value, spec) if spec else str(value)
+
+
+def dark_costs(figures: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """What each view cost the audio path, in microseconds of burst: its mean burst less the mean
+    of the dark stretches either side of it (the one there is, at the ends). Empty when the
+    schedule has no dark stretch (`--views baseline` has them)."""
+    order = [(name, f.get("burst_us_mean")) for name, f in figures.items()]
+    out: list[dict[str, Any]] = []
+    for i, (name, burst) in enumerate(order):
+        if name.startswith("dark-") or burst is None:
+            continue
+        near: list[float] = []
+        for side in (range(i - 1, -1, -1), range(i + 1, len(order))):
+            for j in side:
+                if order[j][0].startswith("dark-"):
+                    if order[j][1] is not None:
+                        near.append(order[j][1])
+                    break
+        if near:
+            dark = sum(near) / len(near)
+            out.append({"segment": name, "burst": burst, "dark": dark, "cost": burst - dark})
+    return out
 
 
 def render(run: dict[str, Any]) -> str:
@@ -564,6 +634,28 @@ def render(run: dict[str, Any]) -> str:
                 + " |"
             )
         lines += ["", "Times in microseconds.", ""]
+        costs = result.get("dark_costs") or []
+        if costs:
+            darks = [
+                f["burst_us_mean"]
+                for n, f in result["figures"].items()
+                if n.startswith("dark-") and f.get("burst_us_mean") is not None
+            ]
+            lines += [
+                "| View | burst mean | dark either side | cost to the audio path |",
+                "|---|---|---|---|",
+            ]
+            for c in costs:
+                lines.append(
+                    f"| {c['segment']} | {c['burst']:.0f} | {c['dark']:.0f} | {c['cost']:+.0f} |"
+                )
+            lines += [
+                "",
+                f"The dark stretches' means run from {min(darks):.0f} to {max(darks):.0f}: that "
+                "spread is the stream's own drift, and what a view costs is read against the "
+                "stretches either side of it.",
+                "",
+            ]
         for v in result["verdicts"]:
             mark = {True: "pass", False: "**FAIL**", None: "not judged"}[v["ok"]]
             lines.append(f"- {mark}: {v['id']}: {v['text']}")
@@ -984,9 +1076,10 @@ def main(argv: list[str] | None = None) -> int:
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument(
             "--views",
-            choices=("all", "speakers"),
+            choices=("all", "speakers", "baseline"),
             default="all",
-            help="speakers: the speakers view only, for an image with no Meters view",
+            help="speakers: the speakers view only, for an image with no Meters view; "
+            "baseline: each view between two stretches of the dark view, to say what it costs",
         )
         p.add_argument(
             "--rows",

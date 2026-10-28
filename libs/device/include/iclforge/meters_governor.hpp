@@ -101,7 +101,7 @@ class RateGovernor {
                 ++stats_.falls;
                 clear();
             }
-        } else if (now_us - since_us_ >= dwell_us_ && filled_ >= kGovernorWindow && load < limits_.promote_load && bad_ == 0) {
+        } else if (!hold_slow_ && now_us - since_us_ >= dwell_us_ && filled_ >= kGovernorWindow && load < limits_.promote_load && bad_ == 0) {
             slow_ = false;
             since_us_ = now_us;
             rose_us_ = now_us;
@@ -116,6 +116,21 @@ class RateGovernor {
         clear();
         graced_from_us_ = -1;
     }
+
+    // The decoder is busy and the audio comes first: the view is held at ten a second, whatever an update costs, and does not try twenty. Taken off, it
+    // is where it was and may rise by the rules above. Holding is not a fall: the counters are the measure of the panel's own limits.
+    void set_hold_slow(bool hold) noexcept {
+        if (hold == hold_slow_) {
+            return;
+        }
+        hold_slow_ = hold;
+        if (hold && !slow_) {
+            slow_ = true;
+            since_us_ = -1;
+            clear();
+        }
+    }
+    [[nodiscard]] bool holding_slow() const noexcept { return hold_slow_; }
 
    private:
     void push(double cost, bool bad) noexcept {
@@ -148,6 +163,7 @@ class RateGovernor {
     double cost_sum_ = 0.0;
     int bad_ = 0;
     bool slow_ = false;
+    bool hold_slow_ = false;
     std::int64_t graced_from_us_ = -1;  // when the first update of this stretch ran: the grace counts from it
     std::int64_t since_us_ = -1;  // when the rate in force took effect (or the first update)
     std::int64_t rose_us_ = -1;

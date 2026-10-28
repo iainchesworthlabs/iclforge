@@ -32,6 +32,10 @@ bool now_update_meters(std::uint64_t now_us, bool dimmed);
 // figures after. With LVGL locked, as the panel's own counters are read.
 [[nodiscard]] iclforge::panelstats::MetersStats now_meters_stats();
 
+// The decoder is busy and the audio comes first (panel.cpp decides from the player's burst time): hold the view at ten updates a second, or let it
+// choose its rate again. From the panel's task, between cycles, as the update is; it outlives the view being closed and opened.
+void now_meters_hold_slow(bool hold);
+
 // LVGL finished a refresh that took `took_us` (the panel's task calls this from the refresh-ready event): counted while the view shows.
 void now_meters_refresh(std::uint32_t took_us);
 

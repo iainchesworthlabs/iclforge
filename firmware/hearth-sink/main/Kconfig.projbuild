@@ -1068,6 +1068,33 @@ config ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY
         and above the idle task. The screen is a guest: when the cores are
         busy it is drawn late rather than the audio being.
 
+config ICLFORGE_EXAMPLE_PANEL_YIELD
+    int "The audio first: 0 nothing, 1 hold the Meters view at ten a second while the decoder is busy, 2 that and the screen's task on the decode core"
+    default 1
+    range 0 2
+    help
+        A decoder that spends most of its 32 ms on a burst (a 7.1.4 object
+        stream, AC-4) is slowed by the screen's drawing and analysis running
+        beside it, whatever their priority. On the kit the Meters view cost
+        a burst 1.6 to 1.8 ms under JOC 7.1.4 and 1.5 ms under AC-4 5.1; 1
+        holds it at ten updates a second while the decoder is busy and the
+        cost falls to 0.9 to 1.2 and 1.1 ms (a steady ten, 2 to 3 % of the
+        steps without an update). 2 also makes the panel task on the decode
+        core (always: FreeRTOS here cannot move a task between cores), where
+        it can only run while the decode task sleeps: 0.5 to 0.7 and 0.65 ms,
+        but the view then misses 11 to 16 % of its steps and every other
+        view under JOC refreshes in twice the time (planning/p4x-meters-view.md,
+        "What the screen costs the audio path"). 0 leaves the screen as it
+        was. The audio comes first, so the default is 1.
+
+config ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+    int "A mean burst this long, microseconds, is a busy decoder"
+    default 14000
+    range 1000 30000
+    help
+        Read once a second from the player's mean burst; in at this, out at
+        70 % of it. A 5.1 E-AC-3 burst is 4 ms, JOC 7.1.4 21 ms, AC-4 5.1 26.
+
 config ICLFORGE_EXAMPLE_PANEL_STACK_BYTES
     int "Stack of the panel's task, bytes (PSRAM)"
     default 16384
