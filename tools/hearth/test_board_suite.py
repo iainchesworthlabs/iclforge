@@ -544,9 +544,9 @@ class Run(unittest.TestCase):
     def run_rows(self, stand_in: StandIn, profile: str, **kwargs):
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
         if "only" not in kwargs:
-            # the /play rows the stand-in has a behaviour for (every profile but the C6's has AC-4 rows
-            # now, which only the tests that name them play): a Sendspin row is played by the test
-            # server (test_suite_sendspin.py)
+            # the /play rows the stand-in has a behaviour for (every profile but the C6's has AC-4
+            # rows now, which only the tests that name them play): a Sendspin row is played by the
+            # test server (test_suite_sendspin.py)
             kwargs["only"] = [
                 row["id"]
                 for row in bs.plan(self.suite, profile)
