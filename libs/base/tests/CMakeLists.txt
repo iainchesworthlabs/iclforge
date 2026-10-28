@@ -10,6 +10,8 @@ iclforge_add_test_binary(iclforge-base-tests PROJECT base SOURCES
     test_ecdsa_der.cpp
     test_x509.cpp
     test_credentials.cpp
+    test_thrift_binary.cpp
+    test_content_signature.cpp
     test_interop.cpp
     test_expected_payload_padding.cpp
     test_number_parse.cpp

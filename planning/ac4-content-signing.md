@@ -1,11 +1,11 @@
 # AC-4 content signing (pace-ccjf1, bring your own key and chain)
 
-!!! note "Status as of 2026-10-29: phases 0 and 1 done"
+!!! note "Status as of 2026-10-29: phases 0 to 2 done"
     | Phase | What | State |
     |---|---|---|
     | 0 | This document | Written |
     | 1 | Crypto in `libs/base`: P-256, ECDSA, DER, X.509, chain validation, key and certificate loaders | Done; evidence under [Phase 1 results](#phase-1-results) |
-    | 2 | Thrift binary and `ContentSignature` build and verify | Not started |
+    | 2 | Thrift binary and `ContentSignature` build and verify | Done; evidence under [Phase 2 results](#phase-2-results) |
     | 3 | Carrier and AC-4 integration (elementary stream, MP4) | Not started |
     | 4 | CLI, library surface, documentation, changelog | Not started |
     | 5 | Tamper, policy and version tests, fuzz harness, end-to-end CLI test | Not started |
@@ -103,8 +103,9 @@ libs/base/include/iclforge/base/crypto/
   x509.hpp                 Certificate, parse_certificate, TrustStore, ChainPolicy, validate_chain
   credentials.hpp          PEM and DER loading of keys and certificates; resolution from paths and
                            environment variables
-  thrift_binary.hpp        TBinaryProtocol writer and bounded reader
-  content_signature.hpp    the pace-ccjf1 structures, sign_digest, verify_digest, error codes
+  thrift_binary.hpp        TBinaryProtocol writer and bounded reader (namespace crypto::thrift)
+  content_signature.hpp    the pace-ccjf1 structures, build_content_signature, sign_digest,
+                           verify_digest, ContentSignatureError and its failure record
 libs/base/src/crypto/
   p256_math.hpp            private: 8x32-bit limbs, Montgomery arithmetic for p and n, Jacobian points,
                            scalar multiplication, the curve constants
@@ -331,14 +332,27 @@ field header, string and binary, i32, list header, STOP) and a `ThriftReader` ov
 - a limit on nesting depth (16) and on the total element count (64 Ki) bounds work on hostile input;
 - unknown fields are skipped by type, with the same limits; a known field with the wrong type is an
   error, not a skip;
-- the encoding of the types the spec lists (spec §7.2), and an error for any other type code.
+- the encoding of the types the spec lists (spec §7.2), and an error for any other type code (the
+  double, void and unsigned codes of older Thrift are refused, not skipped, because a type this code
+  was not told about has no known size);
+- a list, set or map that claims more elements than the input can hold at the smallest size the
+  element type takes is refused before it is looped over.
 
 `content_signature.hpp` models the structures of spec §3 as value types and has
-`serialize(const ContentSignature&)` and `parse_content_signature(span)`. `sign_digest` takes the
-digest, the credentials (private key and chain), the signing time and returns the serialised
-payload. `verify_digest` takes the payload, the independently computed digest and the
-`VerifyOptions` (trust store, chain policy, leaf profile) and returns a `VerifiedSignature` or a
-`ContentSignatureError`.
+`serialize_content_signature(const ContentSignature&)` and `parse_content_signature(span)`.
+`build_content_signature` takes the digest, the `SigningCredentials` (private key and chain, from
+`credentials.hpp`) and the signing time and returns the structure; `sign_digest` serialises it.
+`verify_digest(payload, digest, trust, options)` takes the payload, the independently computed
+digest, the `TrustStore` and the `VerifyOptions` (chain policy with the clock, leaf profile, the
+allowed clock skew) and returns a `VerifiedSignature` or a `ContentSignatureFailure`: the
+`ContentSignatureError` code, a detail sentence that names what failed, and for a chain failure the
+`ChainFailure` (which check, which certificate). Tests build an invalid payload by changing the
+structure and calling `serialize_content_signature`, which writes whatever it is given.
+
+The parser treats a structure as a set of required fields. A field met twice, a field of the wrong
+type, a missing field, a list of the wrong element type and bytes after the structure are all
+errors, and each is reported with the name of the innermost structure it occurred in. A field the
+table does not know is stepped over by its type.
 
 **Field ids.** Spec §3 lists the fields of each structure and spec §7 describes how ids are
 encoded, and no id is stated anywhere. The numbering is the Thrift convention for an IDL with
@@ -362,22 +376,44 @@ extra codes the specification's table lacks, marked as such in the header:
 
 | Code | Spec | Raised when |
 |---|---|---|
-| `kBadOrMissingSignature` | §6.2 | no payload; Thrift or DER decoding fails; a required field is missing |
+| `kBadOrMissingSignature` | §6.2 | no payload; Thrift or DER decoding fails; a field is missing, repeated or of the wrong type; no certificate or digest entry |
 | `kBadContentSignaturePKStandard` | §6.2 | `pkStandardName` (chain or details) is not `secp256r1` |
 | `kBadContentSignatureDate` | §6.2 | `signedDate` is not ISO 8601 UTC, is before the leaf's `notBefore`, after its `notAfter`, or later than the verification time plus the skew |
 | `kCertNotPrivilegedToSignContent` | §6.2 | leaf key usage lacks `digitalSignature`, or the leaf profile (title, name, serial) does not match |
-| `kBadCredentialsForSigningContent` | §6.2 | the chain does not validate: link, signature, CA flags, validity, no anchor |
-| `kLibDoesntSupportContentSignature` | §6.2 | `canonicalVersion` is not 3; a method name is not the one the version defines |
+| `kBadCredentialsForSigningContent` | §6.2 | the chain does not validate: it does not parse, is longer than 16, or fails on link, signature, CA flags, validity or anchor |
+| `kLibDoesntSupportContentSignature` | §6.2 | `canonicalVersion` is not 3; a method name, the chain structure or the chain format is not the one the version defines |
 | `kCertifierNoPrivateKey` | §6.2 | signing: no private key |
 | `kSignatureInvalid` | extra | ECDSA verification fails |
-| `kDigestMismatch` | extra | no digest entry with the standard reference equals the computed digest |
+| `kDigestMismatch` | extra | no digest entry has the standard reference, or one that has it records another digest than the content's; entries with other references are ignored |
 | `kSignerSerialMismatch` | extra | `signerSerialNumber` is not the leaf's serial |
 | `kNoTrustAnchors` | extra | the trust store is empty |
 | `kNoClock` | extra | the policy has no time |
 | `kKeyChainMismatch` | extra | signing: the leaf certificate's key is not the private key's |
 
-Verification applies the checks in the order of spec §6.1, so the code reported is the first
-check that fails: payload, version and method names, chain, leaf, signature, digest.
+The code reported is the first check that fails, in this order:
+
+1. The operator's inputs: an empty trust store (`kNoTrustAnchors`), no clock (`kNoClock`). They do
+   not depend on the payload and are the operator's to fix.
+2. Structure: Thrift, the DER signature, non-empty certificate and digest lists
+   (`kBadOrMissingSignature`).
+3. Scheme: the version, the curve names, the method names, the chain structure and format
+   (`kLibDoesntSupportContentSignature`, `kBadContentSignaturePKStandard`).
+4. Chain (`kBadCredentialsForSigningContent`).
+5. Signer: the serial, the key usage, the profile (`kSignerSerialMismatch`,
+   `kCertNotPrivilegedToSignContent`).
+6. The ECDSA signature over the caller's digest (`kSignatureInvalid`).
+7. Metadata: the date, then the digest list (`kBadContentSignatureDate`, `kDigestMismatch`).
+
+Spec §6.1 puts the chain at step 3 and the method names at step 8. Steps 2 and 3 above are pulled
+forward so that a payload this code cannot read is called unsupported and not untrusted, and so that
+no signature work is done for a payload that is malformed. The two orders differ only in which of
+two simultaneous faults is named.
+
+When the content has changed, the ECDSA check (step 6) is what fails, since the signature is over
+the digest the content had. The detail sentence compares the digest the payload records with the
+caller's and says "the content changed after it was signed" when they differ; the code stays
+`kSignatureInvalid`. `kDigestMismatch` is the case where the signature verifies for the caller's
+digest and the payload's own record disagrees with it, which a signer does not produce.
 
 ## Carrier and the signed span
 
@@ -635,6 +671,51 @@ Things the implementation settled that the plan left open:
   variable, and a path that cannot be read is an error and is not skipped in favour of a variable.
   A trust file in the environment is read only when the command line named no trust.
 
+## Phase 2 results
+
+The wire layer and the content signature, in `libs/base`: `thrift_binary.hpp` (namespace
+`iclforge::base::crypto::thrift`) and `content_signature.hpp`. `iclforge-base-tests` is built by
+`/home/claude/wt/build.sh ac4-signing iclforge-base-tests`; the tags below select this phase's 44
+test cases (5,358 assertions).
+
+| Claim | Evidence |
+|---|---|
+| The writer's encodings (big-endian i32, a field header of a type byte and a signed 16-bit id, a length-prefixed string, a list header, STOP) are the ones of spec §7 | `iclforge-base-tests "[thrift]"`, with byte vectors written out by hand in `libs/base/tests/test_thrift_binary.cpp` |
+| A fixed `ContentSignature` (205 bytes, every structure of spec §3 with a list of strings and a list of structs) serialises to bytes that were laid out field by field with an independent encoder, and those bytes parse back to the same structure | `iclforge-base-tests "[wire]"` |
+| Every strict prefix of that payload is refused, so is the payload with a byte after it, and so is one over 1 MiB | the same |
+| An unknown field of each type spec §7.2 lists (bool, byte, i16, i32, i64, string, struct, map, set, list of strings, list of lists, list of structs) is stepped over at the start of the top-level struct, before the end of the chain struct and before the end of the signer struct; the same signature comes back | the same |
+| A known field with another type, a field met twice, a missing field, a list of the wrong element type are refused, each naming the structure | the same |
+| Negative and oversize lengths, a list that claims more elements than the input can hold (two billion i32s in a dozen bytes), type codes outside the table, a nest 16 deep (the 15-deep nest is read; 16 is not), a list nest, 40,000 fields and a 70,000-element byte list are refused with their own error codes and no allocation proportional to the claim | `iclforge-base-tests "[thrift]"` |
+| A payload built by `sign_digest` verifies, has the structure of spec §5.2 steps 3 to 8, and is the same bytes on a second call (RFC 6979) | `iclforge-base-tests "[content_signature]"` |
+| One flipped bit in the content digest, in the DER signature, in the signature of the intermediate, in the signature of the leaf, in the public key of each certificate, a garbage or trailing-byte certificate, a signature by another key: refused, each with the expected code | the same |
+| Wrong anchor, empty store, no clock, several anchors (the accepting one named), a trusted key, the intermediate as the anchor | the same |
+| Expired intermediate: refused strictly, accepted under `allow_expired_intermediates` with the certificate named; expired leaf and expired anchor refused under both; the anchor-on-the-signing-CA workaround for an expired root; not yet valid | the same |
+| Versions 0, 1, 2, 4, 5, -1, 255 and 65536 are `kLibDoesntSupportContentSignature`, 3 verifies; every method and structure name, both curve names; a name with a trailing space or another case | the same |
+| Serial mismatch, case and leading zeros of the serial as spelling, title, common name, serial, key usage lacking `digitalSignature`, no key usage; each profile relaxation | the same |
+| Signing date: 11 malformed forms, a fraction of a second, before and after the leaf's validity, beyond the clock skew (and with a skew of 0) | the same |
+| The digest list: empty, another digest, wrong length, other reference only, an extra entry for something else (ignored), an extra entry for the content that disagrees (refused), a repeated agreeing entry | the same |
+| The date is not authenticated by the signature (register 4): a payload with another date in range verifies | the same, as a test that records the property |
+| One bit flipped in every byte of a 1,436-byte payload except the 328 bytes of the root certificate, the date and the serial's spelling: all refused | the same |
+| The order of faults: version over chain, chain over serial, serial over signature, signature over date, date over digest | the same |
+| The tests can fail | ten changes made to the sources and undone, each caught: ECDSA verification skipped (5 cases failed), version check removed (3), recorded digest never compared (2), date lower bound removed (1), duplicate fields allowed (1), signer serial unchecked (3), string length bound removed (1, after a test was added for it), list count bound removed (1), depth limit removed (1), element limit removed (1) |
+| Hostile payloads do not crash the reader or the verifier | an ad hoc driver under GCC's ASan and UBSan (libFuzzer's runtime is not installed here) ran 120,000 mutated payloads and edit scripts (20,000 and then 100,000) through `libs/base/fuzz/fuzz_content_signature_verify.cpp` with no report; the harness is registered in `tools/fuzz/run.sh` and has not been built through it |
+
+Things the implementation settled that the plan left open:
+
+- **Field-id numbering is in one place**, the `id` namespace of `content_signature.cpp`.
+- **A chain presented in leaf-to-root order** is not recognised as such. The last certificate is
+  taken as the signer's. A reversed chain whose last certificate is the operator's anchor passes the
+  chain checks as a pinned certificate and fails on the serial number; the detail then says that
+  the first certificate has the serial, so the order may be reversed (register 7).
+- **`LeafProfile{}` is the specification's profile**, as planned; `LeafProfile::any()` drops the
+  title, name and serial but keeps the key usage requirement, which has its own switch.
+- **A leaf without a `keyUsage` extension fails** when `digitalSignature` is required: spec §6.1
+  step 4 says the key usage includes it, and an absent extension does not say so.
+- **`VerifyOptions::max_future_skew_seconds`** is 24 hours (register 12) and the CLI will expose
+  it as part of `verify-time=`'s documentation, not as an option of its own.
+- **The payload size limit** is 1 MiB and the chain limit 16 certificates. A real payload is about
+  3 KB.
+
 ## Decisions needing owner review
 
 1. **The carrier (the open question).** Chosen: a sidecar `<stream>.sig` for elementary streams, a
@@ -671,3 +752,13 @@ Things the implementation settled that the plan left open:
     `libs/ac4/src/decoder/syntax/aspx.cpp` and `apps/shared/project/src/project_command.cpp`; the
     worktree is configured with `-Wno-error=stringop-overflow -Wno-error=maybe-uninitialized` locally
     and neither flag is committed.
+16. **Unknown Thrift type codes are refused.** The reader skips unknown fields by type, but only for
+    the types spec §7.2 lists. A vendor writer that added a double field would make a payload this
+    reader rejects. The alternative is to skip the double (8 bytes) as well; the specification does
+    not list it, so it is refused.
+17. **The scheme checks (version, curve, method names) come before the chain checks**, which departs
+    from the order of spec §6.1; see "Error codes". It changes which of two simultaneous faults is
+    named and nothing else.
+18. **Several digest entries.** Entries with the standard reference must all equal the content's
+    digest; entries with other references are ignored. A stricter reader would refuse unknown
+    references.

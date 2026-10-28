@@ -1,11 +1,11 @@
 # ---------------------------------------------------------------------------
 # iclforge::base - what every codec and every service builds on and none of them owns: the MSB-first
 # bit reader and writer, the speaker vocabulary (Location, Layout), the downmix target names, the CPU
-# feature probe, the operator's signing key with SHA-256 and HMAC-SHA-256 and the P-256 ECDSA, X.509
-# and key-loading code AC-4 content signing is built on (iclforge::base::crypto),
-# the scalar building blocks the codecs' arithmetic tiers share (Fixed32, MantExp and the project's
-# own float functions), and the build-variant directories the probe, the profiling markers and the
-# SIMD kernels are selected through.
+# feature probe, the operator's signing key with SHA-256 and HMAC-SHA-256, the P-256 ECDSA, X.509,
+# key-loading and content-signature code that AC-4 content signing is built on
+# (iclforge::base::crypto), the scalar building blocks the codecs' arithmetic tiers share (Fixed32,
+# MantExp and the project's own float functions), and the build-variant directories the probe, the
+# profiling markers and the SIMD kernels are selected through.
 #
 # It knows no codec. A codec, a container or a renderer links it; it links none of them.
 #
@@ -278,6 +278,8 @@ iclforge_add_library(base
         src/crypto/ecdsa_der.cpp
         src/crypto/x509.cpp
         src/crypto/credentials.cpp
+        src/crypto/thrift_binary.cpp
+        src/crypto/content_signature.cpp
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
         "${_iclforge_profiling_dir}"

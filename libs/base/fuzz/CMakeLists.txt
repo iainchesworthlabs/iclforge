@@ -14,3 +14,12 @@ iclforge_add_fuzzer(fuzz_wav_read)
 # DER, read before the verifier has any reason to believe it.
 # Linked against iclforge::base alone: nothing here needs a codec.
 iclforge_add_container_fuzzer(fuzz_x509_parse iclforge::base)
+
+# iclforge::base::crypto's content signature (libs/base/src/crypto/content_signature.cpp and
+# thrift_binary.cpp): the Thrift payload, then the verifier's checks on a payload that parses, against
+# one fixed authority the harness builds at start-up with tests/support/test_pki.hpp (an ephemeral
+# key from a seed; nothing is read from disk and no key is committed). The AC-4 carriers that
+# bring a payload to this code are fuzzed by libs/ac4/fuzz/fuzz_ac4_signing_verify.cpp.
+iclforge_add_container_fuzzer(fuzz_content_signature_verify iclforge::base)
+target_include_directories(fuzz_content_signature_verify PRIVATE
+    "${PROJECT_SOURCE_DIR}/tests/support")
