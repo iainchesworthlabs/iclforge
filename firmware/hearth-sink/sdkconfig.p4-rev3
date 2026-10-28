@@ -43,3 +43,11 @@ CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
 # (ICLFORGE_EXAMPLE_ETH_*), so a kit on a PoE splitter is reached by the cable and falls back to
 # Wi-Fi when the cable is out. Only this profile has it: the FireBeetle boards have no PHY.
 CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y
+
+# The decode task's stack of an HTTP play (POST /play) in PSRAM, as the S3's is. The kit's internal RAM is what the
+# screen, the 16-slot TDM queue and both networks leave it: 74 KB at the start of a play, of which an AC-4 5.1 play's
+# own demand was 65 KB with a 40,960-byte stack internal (8.5 KB left at its tightest, and in about one play in ten
+# the fetch task's stack could not be made); in PSRAM the stack costs the decoders nothing measurable here (AC-3 2.0
+# 56 permille of a frame against 55 with it internal, E-AC-3 42 and 42, the 5.1 TDM row 142 and 142, on the kit,
+# 2026-10-29). planning/ac4-in-release-images.md has the plays.
+CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM=1

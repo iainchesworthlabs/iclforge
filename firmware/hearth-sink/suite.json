@@ -266,8 +266,28 @@
           "stream": "ac3-5.1",
           "layout": "9.1.6",
           "slots": 16
+        },
+        {
+          "id": "ac4-20-music",
+          "stream": "ac4-20-music"
+        },
+        {
+          "id": "ac4-20-acpl",
+          "stream": "ac4-20-acpl"
+        },
+        {
+          "id": "ac4-51-music",
+          "stream": "ac4-51-music"
+        },
+        {
+          "id": "ac4-20-companding",
+          "stream": "ac4-20-companding"
         }
-      ]
+      ],
+      "tolerance": {
+        "relative": 0.12,
+        "note": "As p4-rev1's: the AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself."
+      }
     }
   }
 }

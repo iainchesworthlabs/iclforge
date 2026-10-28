@@ -268,7 +268,7 @@ class TheFile(unittest.TestCase):
     ) -> None:
         spec = self.data["profiles"]["p4-rev3"]
         self.assertEqual(
-            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
+            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "ac4", "panel", "panel-dsi"]
         )
         self.assertEqual(spec["target"], "esp32p4")
         # The kit (chip v3.2) ran this image on 2026-10-20; it is the only board of that silicon.
@@ -344,6 +344,7 @@ class TheFile(unittest.TestCase):
         listed = {
             "s3-n16r8-ac4": ("1", "2", "25"),
             "p4-rev1": ("1", "6", "0"),
+            "p4-rev3": ("1", "6", "0"),
         }
         for ident, spec in self.data["profiles"].items():
             locked = spec["locked"]
@@ -359,7 +360,7 @@ class TheFile(unittest.TestCase):
                 self.assertEqual(got[2], "0", ident)
 
     def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
-        for ident in ("s3-n16r8-ac4", "p4-rev1"):
+        for ident in ("s3-n16r8-ac4", "p4-rev1", "p4-rev3"):
             locked = self.data["profiles"][ident]["locked"]
             self.assertEqual(
                 locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
