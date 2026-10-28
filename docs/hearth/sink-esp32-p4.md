@@ -86,8 +86,8 @@ idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.h
 
 AC-4 is `sdkconfig.ac4`, in both release profiles: since the fold of `p4-rev1-ac4` into `p4-rev1` and, on 2026-10-29, into `p4-rev3`,
 an image of either revision decodes AC-3, E-AC-3 and AC-4. The v3.x image keeps the decode task's stack of an HTTP play in PSRAM
-(`sdkconfig.p4-rev3`): the screen leaves it 74 KB of internal RAM at the start of a play, which an AC-4 5.1 play used 65 KB of with the
-stack internal ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
+(`sdkconfig.p4-rev3`): the screen leaves it 74 KB of internal RAM at the start of a play, and an AC-4 5.1 play leaves 8 to 10 KB of it at its
+tightest ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
 [ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
 
 ## On the v1.x board
