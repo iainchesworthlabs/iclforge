@@ -3263,32 +3263,6 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      # The S3 with the AC-4 decoder (profile s3-n16r8-ac4: sdkconfig.ac4, then s3-fast, then
-      # s3-dcache; planning/ac4.md D14g, decision 43), built and held to its profile, not run and
-      # not packaged: it is a board build, and the release images have the decoder off. No other
-      # step builds it, so its decode stack in PSRAM, its 64 KB data cache and its heap are
-      # otherwise only what a bench board last ran.
-      - name: Build the S3 with the AC-4 decoder and hold it to its profile
-        if: ${{ !cancelled() }}
-        shell: bash
-        env:
-          ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
-        run: |
-          set -eu
-          . "$IDF_PATH/export.sh"
-          cd firmware/hearth-sink
-          profile="$GITHUB_WORKSPACE/tools/hearth/sink_profile.py"
-          guard=()
-          if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
-          dir="$RUNNER_TEMP/hearth-sink-esp32s3-ac4"
-          defaults="$(python3 "$profile" defaults s3-n16r8-ac4)"
-          read -r -a identity <<< "$(python3 "$profile" identity s3-n16r8-ac4 --cmake)"
-          idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" build >/dev/null
-          idf.py -B "$dir" size --format json2 > "$dir/size.json"
-          python3 "$profile" verify s3-n16r8-ac4 --build-dir "$dir" --size-json "$dir/size.json" \
-            --github "${guard[@]}"
-
       # The S3 board's release shape, RUN: the profile's own fragments (s3-n16r8) with the
       # qemu-net overlay, which changes only what QEMU has no hardware for (Ethernet for Wi-Fi,
       # the capture sink for I2S, quad PSRAM for octal, the console on UART0). Every other step

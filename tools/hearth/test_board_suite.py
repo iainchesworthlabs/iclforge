@@ -825,23 +825,23 @@ class Run(unittest.TestCase):
         pin = self.pins["ac4_20_music"]
         good = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash=pin)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **good}, **{}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **good}, **{}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertEqual(results[0].findings, [])
         self.assertEqual(results[0].decoder_permille, 480)
         wrong = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0123456789abcdef")}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **wrong}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **wrong}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("is not the host's" in f for f in results[0].findings))
         zero = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0" * 16)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **zero}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **zero}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("AC4_PCM_HASH=1" in f for f in results[0].findings))

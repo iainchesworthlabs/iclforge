@@ -49,7 +49,7 @@ over its network afterwards. Then continue at [The page](#the-page).
 **To build it yourself,** in an ESP-IDF v6.1 terminal, from `firmware/hearth-sink`:
 
 ```bash
-export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.s3-fast"
+export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache"
 idf.py set-target esp32s3
 idf.py build
 idf.py -p PORT flash monitor
