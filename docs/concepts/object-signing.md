@@ -211,7 +211,8 @@ forge decode show.ec3 out.wav gate-objects signing-key=/keys/2025.key signing-ke
   play objects nothing authenticated. A stream with no object layer at all is not an error.
 - `gate-objects` and `verify-objects` cannot be combined: one says "refuse" and the other "play the
   bed".
-- Like `verify-objects`, it needs a key and is a usage error on AC-4.
+- Like `verify-objects`, it needs a key and is a usage error on AC-4, where `gate-content` is the
+  equivalent (see [content signing](content-signing.md#modes)).
 
 ### Shield app (on-device signing)
 
@@ -251,17 +252,25 @@ AC-4 objects carry no such tag in this project. The AC-4 encoder writes its EMDF
 protection bytes (`libs/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
 [AC-4](ac4.md).
 
+An AC-4 stream can be signed as a whole instead, with a certificate chain and an elliptic-curve key
+the operator brings: [AC-4 content signing](content-signing.md) (`sign-content`, `verify-content`
+and `gate-content`). It has the same modes as the table below and a different check behind each.
+The two do not mix: `sign-objects`, `verify-objects` and `gate-objects` are E-AC-3's, and the
+`-content` options are AC-4's. Giving one family's option to the other's stream is a usage error
+that names the option to use.
+
 ## Decode modes
 
-Three policies for decode into multi-channel / objects, all shipped:
+Three policies for decode into multi-channel / objects, all shipped. The third column is the AC-4
+counterpart ([content signing](content-signing.md)).
 
-| Mode | Intent | How |
-|---|---|---|
-| **Unchecked** (default) | FOSS-style: reconstruct objects without checking the tag | Omit both options |
-| **Verify** | Multi-key HMAC QC; mismatch **fails** the command | `verify-objects` with one or several `signing-key=`; `verify_atmos_stream_any` |
-| **Licensed** | AVR-like: match → reconstruct; mismatch / unsigned → **bed only**, decode continues | `gate-objects` with one or several `signing-key=`; `gate_atmos_stream` |
+| Mode | Intent | How (E-AC-3) | How (AC-4) |
+|---|---|---|---|
+| **Unchecked** (default) | FOSS-style: reconstruct objects without checking the tag | Omit both options | Omit the options |
+| **Verify** | Multi-key QC; mismatch **fails** the command | `verify-objects` with one or several `signing-key=`; `verify_atmos_stream_any` | `verify-content` with one or several `trust-anchor=` or `trust-key=`; `verify_frames` |
+| **Licensed** | AVR-like: match → reconstruct; mismatch / unsigned → **objects left out**, decode continues | `gate-objects` with one or several `signing-key=`; `gate_atmos_stream`; per syncframe, the 5.1 bed | `gate-content`; `soft_mode_config`; for the whole stream, with `skip_objects` |
 
-Sign remains single-key (`sign-objects`). Keys are always operator-provisioned; nothing here forges
+Sign remains single-key (`sign-objects`, and `sign-content` with its one key and chain). Keys are always operator-provisioned; nothing here forges
 a licensed decoder's secret.
 
 What no mode does is make a Dolby-licensed decoder accept a stream. That decoder checks its own
