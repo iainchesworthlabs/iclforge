@@ -440,6 +440,23 @@ TEST_CASE("an MP4 carries its signature in the track, from ac4-encode and from m
         REQUIRE(contains(run.log, "SignatureInvalid"));
         REQUIRE_FALSE(fs::exists(out));
     }
+    SECTION("what is in the MP4 around the samples is not covered") {
+        const fs::path mp4 = sign_mp4(signer, "mp4-outside-source");
+        Bytes bytes = read_bytes(mp4);
+        const std::string text(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        const std::size_t mvhd = text.find("mvhd");
+        REQUIRE(mvhd != std::string::npos);
+        // The movie header's creation time: 4 bytes of version and flags, then a 4-byte time in
+        // a version 0 header.
+        bytes[mvhd + 4 + 4 + 3] ^= std::byte{0x01};
+        const fs::path changed = scratch_dir() / "mp4-outside-time.mp4";
+        write_bytes(changed, bytes);
+        const fs::path out = wav_out("mp4-outside-time");
+        const Run run = forge("decode " + quoted(changed) + " " + quoted(out) + " verify-content " +
+                              signer.verify_args());
+        REQUIRE(run.exit_code == 0);
+        REQUIRE(contains(run.log, "content signature: verified"));
+    }
     SECTION(
         "fmp4 keeps it in the initialization segment, and init plus segments verify as a file") {
         const fs::path plain = scratch_dir() / "fmp4-source.ac4";
