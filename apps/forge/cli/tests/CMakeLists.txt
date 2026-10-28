@@ -78,6 +78,7 @@ target_sources(iclforge-forge-cli-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_content_signing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/mp4_signature_carrier.cpp"
     test_ac4_content_signing.cpp
+    test_cli_content_signing.cpp
     test_mp4_signature_carrier.cpp)
 target_include_directories(iclforge-forge-cli-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../src"

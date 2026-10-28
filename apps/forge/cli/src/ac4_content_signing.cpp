@@ -213,9 +213,16 @@ ContentCheck check_ac4_content(std::span<const std::byte> file, std::span<const 
         failure.detail.empty() ? std::string{crypto::describe(failure.error)} : failure.detail;
     // A chain failure says which check and which certificate, which the detail may not.
     if (failure.chain.has_value()) {
-        check.message +=
-            fmt::format(" ({}, certificate {} of the chain)",
-                        crypto::describe(failure.chain->error), failure.chain->index + 1);
+        const std::string_view which = crypto::describe(failure.chain->error);
+        // The detail often is the chain error's own sentence; saying it twice reads as two faults.
+        if (check.message.find(which) == std::string::npos) {
+            check.message += fmt::format(" ({})", which);
+        }
+        // The position, unless the detail already gave it.
+        if (check.message.find("certificate") == std::string::npos) {
+            check.message +=
+                fmt::format(" (certificate {} of the chain)", failure.chain->index + 1);
+        }
     }
     // "No signature" is the one failure that is not about the signature: the stream is unsigned.
     const bool unsigned_stream =
