@@ -176,7 +176,7 @@ free, whether lwIP's thread answers a callback posted to it, whether Wi-Fi repor
 receive counter. When the receive counter has not moved for 10 s it prints the task list, the Wi-Fi driver's own statistics
 (`esp_wifi_statis_dump`), lwIP's statistics, the heap summary and, from lwIP's thread, every TCP and UDP PCB with its
 out-of-order, unacked and mailbox state. The task's source, its configuration fragments, the soak script and the captures of
-every stall are in `D:c3bld\s28b-evidence` on the owner's machine (not in the repository).
+every stall are in `D:/ac3bld/s28b-evidence` on the owner's machine (not in the repository).
 
 **What the stalls look like.** One suite run restarts the board eight times, plays five AC-3, five E-AC-3, five AC-4 2.0 SIMPLE
 and five A-CPL streams over Sendspin, then the same over HTTP, and takes 13 to 17 minutes. A stall came 10 to 16 minutes in, at
