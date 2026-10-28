@@ -941,9 +941,10 @@ std::expected<void, DemuxError> walk(ReaderState& s, std::span<const std::byte> 
         }
 
         // A `uuid` box that is a direct child of a trak is read (and kept only if that trak is the
-        // one selected), so long as it is one the bounds allow (ReadTrack::user_boxes): a payload past the bound, a box too
-        // short for its usertype and a box that runs to the end of the file are skipped by
-        // length like any box the walk does not want, and the file reads as it would without them.
+        // one selected), so long as it is one the bounds allow (ReadTrack::user_boxes): a payload
+        // past the bound, a box too short for its usertype and a box that runs to the end of the
+        // file are skipped by length like any box the walk does not want, and the file reads as
+        // it would without them.
         const bool in_trak_box =
             box.type == kUuid && s.in_trak && !s.open.empty() && s.open.back().type == kTrak;
         const bool wanted_user_box = in_trak_box && !box.to_eof && body_bytes >= 16 &&
