@@ -540,6 +540,8 @@ std::string_view error_name(ContentSignatureError error) {
             return "NoClock";
         case ContentSignatureError::kKeyChainMismatch:
             return "KeyChainMismatch";
+        case ContentSignatureError::kNoContent:
+            return "NoContent";
     }
     return "Unknown";
 }
@@ -572,6 +574,8 @@ std::string_view describe(ContentSignatureError error) {
             return "no verification time was given, so certificate validity cannot be judged";
         case ContentSignatureError::kKeyChainMismatch:
             return "the signer's certificate does not hold the public key of the private key";
+        case ContentSignatureError::kNoContent:
+            return "there is no content to sign or to verify";
     }
     return "unknown error";
 }

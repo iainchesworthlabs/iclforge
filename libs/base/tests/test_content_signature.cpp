@@ -922,7 +922,8 @@ TEST_CASE("content signature: error codes have names and words", "[content_signa
                      E::kSignerSerialMismatch,
                      E::kNoTrustAnchors,
                      E::kNoClock,
-                     E::kKeyChainMismatch};
+                     E::kKeyChainMismatch,
+                     E::kNoContent};
     std::vector<std::string_view> names;
     for (const E e : all) {
         REQUIRE_FALSE(error_name(e).empty());
@@ -963,4 +964,23 @@ TEST_CASE("content signature: the constants are the specification's", "[content_
     REQUIRE(kSpecSignerTitle == "Code/Content Signer");
     REQUIRE(kSpecSignerCommonName == "ILok");
     REQUIRE(kSpecSignerSerialHex == "1798A2B5D62000000005");
+}
+
+TEST_CASE("content signature: the usertype is the UUID's bytes in RFC 4122 order",
+          "[content_signature]") {
+    // Written out by hand from "b715f9db-6b41-403d-8bbe-429f3209ca2e", two digits a byte.
+    const std::array<unsigned, 16> expected{0xB7, 0x15, 0xF9, 0xDB, 0x6B, 0x41, 0x40, 0x3D,
+                                            0x8B, 0xBE, 0x42, 0x9F, 0x32, 0x09, 0xCA, 0x2E};
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        REQUIRE(std::to_integer<unsigned>(kContentSignatureUsertype[i]) == expected[i]);
+    }
+    // Upper case reads the same; hyphens are optional.
+    REQUIRE(uuid_bytes("B715F9DB-6B41-403D-8BBE-429F3209CA2E") == kContentSignatureUsertype);
+    REQUIRE(uuid_bytes("b715f9db6b41403d8bbe429f3209ca2e") == kContentSignatureUsertype);
+    // Anything that is not 32 hexadecimal digits is all zeros: too few, too many, a stray letter.
+    const std::array<std::byte, 16> zeros{};
+    REQUIRE(uuid_bytes("b715f9db-6b41-403d-8bbe-429f3209ca2") == zeros);
+    REQUIRE(uuid_bytes("b715f9db-6b41-403d-8bbe-429f3209ca2e0") == zeros);
+    REQUIRE(uuid_bytes("b715f9db-6b41-403d-8bbe-429f3209ca2g") == zeros);
+    REQUIRE(uuid_bytes("") == zeros);
 }

@@ -24,6 +24,7 @@
 // trust, the method names and the version are checked for their one accepted value, and the date
 // is bounded by the leaf's validity and the verifier's clock, but it remains informative.
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -46,6 +47,42 @@ inline constexpr std::string_view kContentSignatureScheme = "pace-ccjf1";
 // Identifies the serialised ContentSignature where a carrier needs a name for it (the usertype of
 // an MP4 `uuid` box, for example). Specification section 3.12.
 inline constexpr std::string_view kContentSignatureUuid = "b715f9db-6b41-403d-8bbe-429f3209ca2e";
+
+// The 16 bytes of a UUID written in its text form, in the order RFC 4122 gives (the order an MP4
+// `uuid` box's usertype has them). Hyphens are skipped. A string that is not 32 hexadecimal digits
+// in that form gives all zeros, which a static_assert below rules out for the constant that uses it.
+[[nodiscard]] constexpr std::array<std::byte, 16> uuid_bytes(std::string_view text) noexcept {
+    std::array<std::byte, 16> out{};
+    std::size_t nibbles = 0;
+    for (const char c : text) {
+        if (c == '-') {
+            continue;
+        }
+        unsigned value = 0;
+        if (c >= '0' && c <= '9') {
+            value = static_cast<unsigned>(c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            value = static_cast<unsigned>(c - 'a') + 10U;
+        } else if (c >= 'A' && c <= 'F') {
+            value = static_cast<unsigned>(c - 'A') + 10U;
+        } else {
+            return {};
+        }
+        if (nibbles >= 32) {
+            return {};
+        }
+        std::byte& target = out[nibbles / 2];
+        target = static_cast<std::byte>((std::to_integer<unsigned>(target) << 4) | value);
+        ++nibbles;
+    }
+    return nibbles == 32 ? out : std::array<std::byte, 16>{};
+}
+
+inline constexpr std::array<std::byte, 16> kContentSignatureUsertype =
+    uuid_bytes(kContentSignatureUuid);
+static_assert(kContentSignatureUsertype[0] == std::byte{0xB7} &&
+                  kContentSignatureUsertype[15] == std::byte{0x2E},
+              "the content signature UUID must parse");
 // kSignatureValuesVersion3: the one version this code reads and writes.
 inline constexpr std::int32_t kContentSignatureVersion = 3;
 
@@ -138,6 +175,7 @@ enum class ContentSignatureError : std::uint8_t {
     kNoTrustAnchors,        // verification with an empty trust store
     kNoClock,               // verification without a time to judge validity at
     kKeyChainMismatch,      // signing: the leaf certificate's key is not the private key's
+    kNoContent,             // signing or verifying content that has no bytes (a stream of no frames)
 };
 
 // The specification's spelling ("BadOrMissingSignature") or, for the extra codes, the same form
