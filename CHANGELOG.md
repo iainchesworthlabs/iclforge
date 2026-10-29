@@ -10,6 +10,18 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: AC-4 content signing follows the owner's CS spec v2.5.** An MP4 is refused by name (`ac4-sign` and `sign-content` exit 1, the
+  second before anything is encoded): v2.5 §8.3.2 puts signing an MP4 out of scope and asks for the raw `.ac4` stream. The signature is
+  checked before the digests it holds (§6.1), so a forged signature over altered content is reported as the signature's fault and the digest
+  lines say they rest on a signature that did not verify. The signer information of §5.3 is written and reported: `ac4-sign` and
+  `sign-content` take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
+  `os-description=`; a nonce of another length than 128 bytes, a publisher UUID that is not a UUID, and one that the signing certificate's
+  subject contradicts are refused; a missing `publisher-uuid=` and a `signed-date=` far from the clock are warned about. `ac4-verify`
+  prints the publisher, product, platform and application and two findings (`signer nonce`, `publisher UUID`) that do not change the
+  verdict; `verify-content` makes them count. `check-content` now judges the certificates at the date the signature records, as the owner
+  decided (`ac4-verify` and `verify-content` still judge at the time of the check; `verify-time=` overrides both). The sample's publisher
+  UUID is in none of its four certificates, so a UUID that the certificate does not carry is reported as not compared and never refused.
+  Open questions 16 to 19 in `libs/ac4/ERRATA.md`; questions 2, 11 and 13 are answered by v2.5.
 - **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
   stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
   decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout

@@ -173,9 +173,12 @@ metadata options (any order, after the positional arguments):
                     once it is written, with content-key= and content-chain=; see
                     docs/library/signing.md
   verify-content    decode/ac4-verify: refuse unless the AC-4 content signature, its chain
-                    and a trust anchor or pin all check
+                    and a trust anchor or pin all check, and the signer information is as CS
+                    spec v2.5 section 5.3 asks: a 128 byte nonce, a publisher UUID that is
+                    there and that the signing certificate does not contradict
   check-content     decode/ac4-verify: print what the content-signature checks find and carry
-                    on. Not combinable with verify-content
+                    on, judging the certificates at the signed date unless verify-time=
+                    says otherwise. Not combinable with verify-content
   unanchored-ok     with verify-content: accept a signature that checks out against a chain
                     no trust-anchor= or pin= vouches for (still reported as unanchored)
   content-key=<path>  the operator's P-256 private key, PEM or DER (or
@@ -187,8 +190,20 @@ metadata options (any order, after the positional arguments):
                     wherever it appears in the chain; repeat for more
   leaf-title=<text|any>  the title the signing certificate must carry (default
                     Code/Content Signer)
-  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC (default now)
-  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>  when every certificate must be valid
+  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC (default now,
+                    which is what CS spec v2.5 section 5.3 asks for; another date is warned about)
+  publisher-uuid=<UUID>  ac4-sign/sign-content: the UUID of your publisher account, written as
+                    the signature's publisherUUID; refused if the signing certificate's subject
+                    carries a different UUID. Without it a warning, and verify-content refuses
+                    the signature
+  publisher-name=<text>  your legal or trade name
+  product-id=<n>    your product identifier, a whole number (default 0)
+  product-name=<text>, wrapper-name=<text>  the product and, if one is used, the PACE wrapper
+  os-name=<text>, os-version=<text>, os-description=<text>  the operating system of the
+                    signing host; informational, and bound by the signature
+  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>  when every certificate must be valid:
+                    now by default (ac4-verify, verify-content), the signed date for
+                    check-content
   verify            eac3-encode: decode every access unit as it is encoded and diff the
                     decoder's model against the encoder's own, refusing the run at the first
                     disagreement - off by default, since it roughly doubles the work

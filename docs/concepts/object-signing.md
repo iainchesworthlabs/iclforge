@@ -281,7 +281,13 @@ The rest follows this page's stance:
   nothing the operator trusts vouches for is reported as `chain unanchored` (`ac4-verify` exits 6 and
   `decode` exits 2, unless `unanchored-ok`), which says the file agrees with its own signature and nothing about who made it.
 - Certificates are judged at the time `verify-time=` names: now (the specification's, and the
-  default), the date the signer wrote (only as good as the signer), a given instant or never.
+  default of `ac4-verify` and `verify-content`), the date the signer wrote (only as good as the
+  signer, and the default of `check-content`, which reports and carries on), a given instant or never.
+- The signature names who made it (publisher UUID and name, product, platform), as CS spec v2.5
+  section 5.3 describes. `ac4-sign` takes these as options, `ac4-verify` reports them, and
+  `verify-content` also refuses a publisher UUID that is missing or that the signing certificate
+  contradicts. Only a raw `.ac4` stream is signed: signing an MP4 is out of scope (section 8.3.2) and
+  is refused by name.
 
 See [Signing](../library/signing.md#ac-4-content-signing) for the API, and `libs/ac4/ERRATA.md` for
 what was measured on a real signature and the questions still open.

@@ -140,8 +140,10 @@ namespace crypto = iclforge::base::crypto;
 auto key = crypto::load_content_key(key_path);                  // the operator's own, PEM or DER
 auto credentials = crypto::make_credentials(std::move(*key), std::move(*chain));  // key matches leaf?
 crypto::SignOptions options;
-options.signed_date = crypto::format_iso8601_utc(now);          // "YYYY-MM-DDTHH:MM:SS", UTC
+options.signed_date = crypto::format_iso8601_utc(now);          // "YYYY-MM-DDTHH:MM:SS", UTC, the time of signing
 options.chain_policy.valid_at = now;                            // refuse an expired chain now
+options.metadata.publisher_uuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";   // your publisher account's UUID
+options.metadata.publisher_name = "Example Publisher";          // CS spec v2.5 section 5.3
 auto signed_stream = iclforge::ac4::sign_stream(stream, *credentials, options);
 
 crypto::VerifyPolicy policy;
@@ -173,8 +175,11 @@ page cache and storage the file came from, swap and core dumps, any copy the cal
 key read from a source of unknown size such as a pipe, which can be copied as it grows.
 
 **Three verdicts, and one is not "valid".** `verify_stream` always returns a report: every check, in
-order (structure, versions and methods, curve, chain parsed, chain valid, signed date, signer
-information digest, content digest, signature), and a verdict. `kValid` means every check passed *and*
+order (structure, versions and methods, curve, chain parsed, chain valid, signed date, signature,
+signer information digest, content digest), and a verdict. The signature comes before the digests it
+holds because they carry weight only once it has verified (CS spec v2.5 §6.1, "verification order
+matters"); when it has not, the digest checks still run and say that they rest on a signature that
+did not verify, and the first fault is the signature's. `kValid` means every check passed *and*
 the chain leads to a `trust_anchors` certificate or a `pins` fingerprint the caller gave.
 `kChecksChainUnanchored` means every check passed and nothing the caller trusts vouches for the
 chain: the file agrees with its own signature, which says nothing about who made it.
@@ -183,7 +188,20 @@ chain: the file agrees with its own signature, which says nothing about who made
 A stream with no signature, or that is not AC-4, is an invalid report too (`BadOrMissingSignature`), so
 a caller that refuses and one that only reports share one path.
 
-**Time.** `TimeBasis::kNow` (the default, and CS spec §6.1 step 3) judges every certificate valid at
+**Who signed (CS spec v2.5 §5.3).** `SignOptions::metadata` carries the publisher (type, UUID, name),
+the product, the platform and the application, all of which the signature binds. The signature's
+nonce is 128 bytes drawn for each signature from `std::random_device` (a nonce of another length in
+`SignOptions::nonce` is refused), and `signed_date` is the time of signing, which the caller reads from
+its clock. A `publisher_uuid` that is not a UUID is refused when signing, and so is one that a UUID in
+the signer certificate's subject contradicts (`check_publisher_binding` is the comparison); the
+specification does not say which attribute binds the UUID, so a subject with no UUID in it is "not
+compared" and is not a fault. The report carries what the signature says (`publisher`, `product`,
+`platform`, `application`, escaped, and trusted no further than the signer) and, in `notes`, the
+findings on the nonce and the UUID. `VerifyPolicy::operator_metadata` chooses what they do:
+`kReport` (the default) leaves the verdict alone, `kRequire` makes a nonce that is not 128 bytes, a
+UUID that is missing or malformed, or one the certificate contradicts, an invalid report.
+
+**Time.** `TimeBasis::kNow` (the default, and CS spec §6.1 steps 3 and 4) judges every certificate valid at
 `policy.now`; `kSignedDate` judges them at the date the signature records, which is only as
 trustworthy as its signer; `kInstant` at a time the caller gives; `kIgnore` not at all. The report
 says which. A path is validated from its anchor down, so an expired certificate *above* an anchor does
@@ -202,16 +220,17 @@ frames (HLS packed audio) or any other byte run that is not a sync frame is not 
 `TrailerLocation::stray` counts those bytes, `verify_stream` names the byte where the frames stop,
 and signing, stripping and hashing refuse the stream.
 
-**What it does not do.** Raw `.ac4` only: carriage in an MP4 is not implemented (the specification
-gives it a sentence). A blob with more than one signature entry is refused, as is a chain of more
-than eight certificates. No revocation. SHA-256 and P-256 only. The
+**What it does not do.** Raw `.ac4` only: CS spec v2.5 §8.3.2 puts signing an MP4 out of scope (it
+names no box that carries a signature), and `sign_stream` refuses a stream that opens with an MP4 box
+by name (`StreamSignatureErrorKind::kContainerNotSupported`). A blob with more than one signature
+entry is refused, as is a chain of more than eight certificates. No revocation. SHA-256 and P-256 only. The
 open questions on each are the first thing in `libs/ac4/ERRATA.md`.
 
 ### In the CLI
 
 ```bash
 forge ac4-encode in.wav out.ac4 192 sign-content content-key=signer.key content-chain=chain.pem
-forge ac4-sign in.ac4 signed.ac4 content-key=signer.key content-chain=chain.pem
+forge ac4-sign in.ac4 signed.ac4 content-key=signer.key content-chain=chain.pem publisher-uuid=<your publisher UUID>
 forge ac4-verify signed.ac4 trust-anchor=root.pem                  # exit 6 unless valid and anchored
 forge decode signed.ac4 out.wav verify-content trust-anchor=root.pem   # refuses before it decodes
 ```
@@ -219,13 +238,18 @@ forge decode signed.ac4 out.wav verify-content trust-anchor=root.pem   # refuses
 `ac4-encode`, `atmos-encode`, `atmos-adm` and `atmos-iab` (with `codec=ac4`) take `sign-content`; it
 signs the file once written, after checking the key against its chain with a throwaway digest so that
 a bad key or a `signed-date=` outside the certificates' validity fails before the encode, not after.
-`decode` and `ac4-verify` take `verify-content` (exit non-zero unless valid and anchored),
-`check-content` (print what the checks find and carry on), `unanchored-ok`, `trust-anchor=` and `pin=`
-(a SHA-1 or SHA-256 fingerprint, repeatable), `verify-time=now|signed|ignore|<instant>` and
-`leaf-title=` (default `Code/Content Signer`, or `any`). `forge probe` shows the trailer without a
-key (`stream.content_signature` in the JSON, `verified` always false). An option that says how to sign
-or check, without the command that signs or checks, is refused, and so is `sign-content` for an MP4 or
-for E-AC-3 output.
+`decode` and `ac4-verify` take `verify-content` (exit non-zero unless valid and anchored, and the
+signer information as §5.3 asks), `check-content` (print what the checks find and carry on),
+`unanchored-ok`, `trust-anchor=` and `pin=` (a SHA-1 or SHA-256 fingerprint, repeatable),
+`verify-time=now|signed|ignore|<instant>` and `leaf-title=` (default `Code/Content Signer`, or
+`any`). Left out, `verify-time=` is `now` for `ac4-verify` and `verify-content` (CS spec §6.1 steps 3
+and 4) and the signed date for `check-content`; the report says which. `ac4-sign` and `sign-content`
+take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`,
+`os-name=`, `os-version=` and `os-description=`, and warn when `publisher-uuid=` is missing or
+`signed-date=` is not near the clock. `forge probe` shows the trailer without a key
+(`stream.content_signature` in the JSON, `verified` always false). An option that says how to sign
+or check, without the command that signs or checks, is refused, and so is `sign-content` for an MP4
+(out of scope in CS spec v2.5 §8.3.2; sign the raw `.ac4` stream) or for E-AC-3 output.
 
 ### The seam for other codecs
 
