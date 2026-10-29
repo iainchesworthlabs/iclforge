@@ -686,6 +686,16 @@ int run_probe(std::string_view in_path, const Options& meta) {
             }
             return forge_cli::run_truehd_probe(bytes, in_path, meta);
         }
+        // A TrueHD track in a container (Matroska's A_TRUEHD): the container reader hands over
+        // the elementary stream, which the TrueHD probe reads like a bare one. Any other
+        // container goes on to the AC-3 and AC-4 probes below, which read containers themselves.
+        const auto contained = iclforge::apps::elementary_stream_from_bytes(bytes);
+        if (contained.error.empty() && forge_cli::is_truehd_stream(contained.bytes)) {
+            if (meta.json) {
+                iclforge::cli::platform::set_stdio_binary();
+            }
+            return forge_cli::run_truehd_probe(contained.bytes, in_path, meta);
+        }
     }
     Detail detail = Detail::kNone;
     if (meta.detail.has_value()) {

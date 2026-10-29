@@ -250,6 +250,13 @@ def leg_matroska(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:
         r = run([cli, "decode", str(mkv), str(decoded)])
         gate.check(r.returncode == 0 and wav_s32(ffmpeg, decoded) == want,
                    f"{name}: forge's decode of the .mkv equals the source")
+        # probe reads the TrueHD track out of the container as decode does; the presentations
+        # it reports are those the channel count gives (2; 2 and 6; 2, 6 and 8).
+        expected = {2: [2], 6: [2, 6], 8: [2, 6, 8]}[ch]
+        got_presentations = presentations(cli, mkv)
+        gate.check(got_presentations == expected,
+                   f"{name}: forge probe of the .mkv reports presentations {expected} "
+                   f"(got {got_presentations})")
 
 
 def leg_2(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:

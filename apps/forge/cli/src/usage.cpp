@@ -194,10 +194,13 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
 constexpr std::size_t kNoteColumn = 62;
 
 void print_row(const CommandInfo& c) {
-    // Wide enough that the LONGEST command name still gets a separating
-    // space: 'strip-objects' is 13 characters, so a 13-wide field padded
-    // nothing at all and ran the name straight into its own spec.
-    std::string line = fmt::format("  forge {:<14}{}", c.name, c.spec);
+    // Wide enough that most command names still get a separating space:
+    // 'strip-objects' is 13 characters, so a 13-wide field padded nothing at
+    // all and ran the name straight into its own spec. The TrueHD Atmos
+    // commands ('truehd-atmos-encode', 19) are longer than the field, so a
+    // name that fills it gets its space by hand rather than widening every row.
+    std::string line = c.name.size() < 14 ? fmt::format("  forge {:<14}{}", c.name, c.spec)
+                                          : fmt::format("  forge {} {}", c.name, c.spec);
     // A command the platform cannot run is listed, not hidden: hiding it
     // makes 'forge play' answer "unknown command", which is a lie about a
     // command that exists and would work elsewhere. The note slot says so
@@ -1126,8 +1129,8 @@ void print_command_index(std::span<const CommandInfo> commands) {
 }
 
 void print_usage(std::span<const CommandInfo> commands) {
-    fmt::println("Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and "
-                 "AC-4 (ETSI TS 103 190) encoder/decoder");
+    fmt::println("Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52), "
+                 "AC-4 (ETSI TS 103 190) and TrueHD (MLP) encoder/decoder");
     fmt::println("");
     print_command_index(commands);
     print_unavailable_reasons(commands);

@@ -199,9 +199,9 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
-| **Codec** | Experimental TrueHD/MLP module | 🟡 | Medium | Important | Substantial work on `feature/truehd-atmos-support`; not on `main` (roadmap IM5) |
-| | Evolution frame HMAC (authenticity) | 🔴 | Medium | Important | Distinct from DD+ EMDF `iclforge::ac3::signing`; truncated HMAC-SHA-256 on Evolution frames (cf. truehdd `--evo-key`). Note on IM5 / [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
-| | Shipping TrueHD interop | 🔴 | Low | Out-of-scope | Blocked on DVD Forum reference material and clean-room ruling (IM6) |
+| **Codec** | TrueHD (MLP) codec, `iclforge::mlp` | 🟡 | Medium | Important | Decoder, lossless encoder and Atmos on branch `feature/truehd-codec`, exact against FFmpeg; not yet on `main` (roadmap IM5, [TrueHD](truehd.md)) |
+| | TrueHD content signature | 🔴 | Medium | Important | The carriage exists (an evolution payload); the scheme does not: the specification names `pace-ccjf1` ECDSA, earlier notes a truncated HMAC-SHA-256 ([TrueHD](truehd.md#content-signatures), roadmap IM5) |
+| | TrueHD interop with Dolby decoders | 🔴 | Low | Important | FFmpeg reads our streams exactly; Dolby's decoders are untried (IM6) |
 | | Passthrough device lists | 🟡 | Low | Nice-to-have | ELD / capability enums mention TrueHD; no codec on `main` |
 
 ---
@@ -404,9 +404,9 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| Branch `feature/truehd-atmos-support` | Land as experimental module (IM5) | 🟡 |
-| Evolution frame HMAC | Authenticity policy on MLP (parallel to EMDF; not `iclforge::ac3::signing`) | 🔴 |
-| DVD Forum MLP reference | Shipping interop (IM6) | 🔴 |
+| Branch `feature/truehd-codec` | Merge the TrueHD codec (IM5) | 🟡 |
+| TrueHD content signature | Choose the scheme (`pace-ccjf1` ECDSA per the specification, or the truncated HMAC-SHA-256 of earlier notes); the carriage exists (planning/truehd.md, decision 1) | 🔴 |
+| Dolby TrueHD decoders | Interoperability beyond FFmpeg: DEE streams through `tools/checks/verify_truehd_dee_gold.py`, a Dolby decoder on our streams (IM6) | 🔴 |
 
 ---
 

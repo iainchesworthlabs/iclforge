@@ -88,22 +88,29 @@ C version macros; release criteria written.
 `inline namespace v1`; make the ABI gate **required** (today advisory — see `_ci-core.yml`
 `ABI_ENFORCE`).
 
-### Library — TrueHD experimental module (was IM5, L)
+### Library — TrueHD (MLP) codec (was IM5, L)
 
-Substantial internal codec on branch `feature/truehd-atmos-support` — not on `main`. To merge:
-rebase, gate as `iclforge::mlp` / `ICLFORGE_BUILD_MLP`, remove non-redistributable PDFs, label output
-accurately (no real TrueHD decoder reads the current block layout). Forge front ends follow as a
-separate item (was UX10). Dolby Encoding Engine's TrueHD streams of known sources (2, 6 and 8
-channels, 48 and 96 kHz, 16 and 24 bits, several presentations), made by
-`tools/generators/gen_dee_gold.py` while DEE's licence runs (it ends on 2026-11-06), are kept
-locally for what the clean-room rule below allows.
+**Done (branch `feature/truehd-codec`, not yet on `main`):** `iclforge::mlp` in `libs/mlp`, behind
+`ICLFORGE_BUILD_MLP`, written fresh from the clean-room specification `truehd-spec.md` with FFmpeg
+as a black-box arbiter (the earlier internal codec on `feature/truehd-atmos-support` was not used):
+the bitstream layer, a decoder of every presentation (2, 6, 8 and 16 channels, 44.1 to 192 kHz), a
+lossless encoder (presentation downmixes, inter-channel decorrelation, FIR and IIR filter search,
+exact Huffman costing, block-size choice, a FIFO schedule against `peak_data_rate`, self-check by
+decoding) and Atmos (a 7.1 bed and up to eight objects in the 16-channel substream, OAMD in
+evolution payloads). forge has `truehd-encode`, `truehd-atmos-encode`, `truehd-atmos-decode`, and
+TrueHD in `decode`, `probe` and `transcode`, and writes and reads Matroska `A_TRUEHD`. Every
+specification problem found, and the reading taken, is in
+[planning/truehd.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)
+and `libs/mlp/ERRATA.md`. **Not done:** IEC 61937 data type 22 (MAT) and MPEG-TS stream type 0x83
+carriage (the specification gives no MAT frame syntax); the noise generator (none is specified, so
+streams that use it are refused); Forge GUI front ends (was UX10).
 
-**Authenticity note (for that branch):** TrueHD carries a separate keyed check from DD+ EMDF
-object signing — **Evolution frame protection**, a truncated HMAC-SHA-256 over the access unit
-and the Evolution frame. Open decoders (e.g. truehdd `--evo-key`) optionally verify it with an
-operator-supplied key; without a key they decode unchecked. When authenticity policy lands for
-MLP (multi-key verify / unchecked / licensed soft-gate), wire it to Evolution HMAC, not to
-`iclforge::ac3::signing`'s EMDF path. See [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution).
+**Authenticity:** the specification (section 22) says TrueHD uses the `pace-ccjf1` ECDSA content
+signature, carried as an evolution payload; earlier notes here and in
+[Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution)
+said a truncated HMAC-SHA-256 "Evolution frame protection". Neither is implemented: the codec carries
+a signature payload (`EvolutionPayloadType::kContentSignature`, `SignatureHook`) for whichever the
+owner decides (planning/truehd.md, decision 1).
 
 ### Crucible — cross-platform product (was UX12, Partial)
 
@@ -145,7 +152,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 |---|---|---|
 | **IAMF** (was IM3) | `libs/containers/src/iamf`: v2.0 reader and writer — channel-based and object-based `ipcm` elements, scalable channel reconstruction, Opus / AAC-LC / FLAC packets carried, Parameter Blocks, trimming, raw OBU streams, ISO-BMFF and fragments | Nothing planned. Known and accepted: encoding and decoding Opus, AAC-LC and FLAC (the module links no codec; packets are carried), Common Encryption (needs AES, and the module has no third-party dependency), rendering to a playback layout and mixing (section 7.4 leaves the algorithms to the Open Audio Renderer) |
 | **IAB** (was IM1) | Reader, `AudioDataDLC` decode, writer and DLC encoder, spread and zone control into the Atmos bridge, ST 2067-201 MXF Track File write | A Track File checked by an IMF packager or validator |
-| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; `verify-objects` with one or several `signing-key=` (a keyring: a frame is good under any key; hard fail); `gate-objects`, the licensed soft-gate (tag mismatch / unsigned → bed-only, decode continues); default decode reconstructs objects **unchecked** (FOSS-style) | Nothing planned. Known and accepted: this project ships no key, so a Dolby-licensed decoder accepting its objects is a personal-use path only — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
+| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; `verify-objects` with one or several `signing-key=` (a keyring: a frame is good under any key; hard fail); `gate-objects`, the licensed soft-gate (tag mismatch / unsigned → bed-only, decode continues); default decode reconstructs objects **unchecked** (FOSS-style) | Nothing planned. Known and accepted: this project ships no key, so a Dolby-licensed decoder accepting its objects is a personal-use path only — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#decode-modes). TrueHD's content signature (IM5) is carried as an evolution payload, scheme undecided, not EMDF |
 | **Multi-programme E-AC-3** | `programme2=`..`programme8=` authoring via CLI (all eight §E2.3.1.2 substreams, full per-programme `mixmdate`/`bsmod` metadata); receiver-side mixing of an associated service into the main (`AssociatedServiceMixer`, `forge decode associated=`: §E3.10's scales, per-channel trims and pan) | Playing it live in Hearth: `forge monitor associated=` mixes an associated service into the main as it plays, and Hearth does not yet — see [capabilities](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md) |
 | **Encoder reproducibility** (was VX12) | Audit done; `ilogb` fix landed; sixteen real-programme streams in the bitstream-hash gate, identical on MSVC, clang-cl, GCC 16 and Clang 22 on the x86-64 and generic kernels, Linux arm64 and macOS (libc++), after the delta-segment selection stopped depending on `std::nth_element`'s tie choice | The float32 encoder's pins, which no longer match a fresh GCC build; fixed-point transient port optional |
 | **Listening test** (was VX9) | Apparatus in `tools/listening/` | **No session run yet** — see [`tools/listening/responses/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/listening/responses/README.md) |
@@ -175,7 +182,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 
 | Item | Blocker | Was |
 |---|---|---|
-| TrueHD interoperability with shipping decoders | Non-public MLP reference material; clean-room policy (IM6) | IM6 |
+| TrueHD interoperability with Dolby's decoders | FFmpeg's decoder reads every stream `iclforge::mlp` writes, exactly (`tools/checks/verify_truehd_interop.py`); a Dolby decoder has not been tried, and the DEE streams that would test the decoder side (`tools/checks/verify_truehd_dee_gold.py`) are on the owner's machine (IM6) | IM6 |
 | macOS notarisation and Windows Authenticode | Certificates and accounts, not code (Known gap since 0.8.0-beta.2) | DR6 |
 
 ---
@@ -215,7 +222,7 @@ so old PRs and comments still resolve. Do not allocate new IDs.
 | B2 | DAMF reader | out of scope → IM1 |
 | B3 | IAMF | merged phase 1 → IM3 |
 | C1–C4 | Metering / QC / dialnorm | merged → IO*, DC* |
-| D1 | TrueHD branch | in progress → IM5 |
+| D1 | TrueHD branch | superseded: rewritten on `feature/truehd-codec` → IM5 |
 | D2–D4 | Decoder / AC-4 inspect | merged → EQ4, IM4 |
 | E1–E4 | Audio backends / CI | merged → DR*, audio |
 | F1–F6 | C API / bindings / packages / API freeze | merged or in progress → AP*, DR*, UX* |
@@ -233,11 +240,11 @@ Full ledger text preserved in git history of this file before 2026-09-17.
 | EQ | EQ1–EQ13 encoder quality work | EQ14 proposed; EQ2 out of scope |
 | DC | DC1–DC10 decoder and stream tools | Multi-programme mix metadata tail |
 | IO | IO1–IO12 containers, QC, loudness | QC report file proposed |
-| IM | IM1–IM4, IM7 | IM5 in progress; IM6 blocked; IM3/IAB tails |
+| IM | IM1–IM4, IM7 | IM5 done on its branch; IM6 blocked on Dolby decoders; IM3/IAB tails |
 | VX | VX1–VX23 except VX9/VX12 tails | VX9/VX12 partial; VX5 proposed |
 | PF | PF1–PF8 performance | — |
 | AP | AP2–AP7, AP9, AP11–AP12 | AP1 in progress; AP8/AP10 proposed |
-| UX | UX1–UX6, UX8–UX9, UX11 | UX12/UX7 partial; UX10 proposed |
+| UX | UX1–UX6, UX8–UX9, UX11 | UX12/UX7 partial; UX10 partial (CLI done, GUI not) |
 | CR | — | CR1 partial |
 | DR | DR1–DR2, DR5, DR7–DR8 | DR9 partial; DR3/DR4 proposed; DR6 blocked |
 

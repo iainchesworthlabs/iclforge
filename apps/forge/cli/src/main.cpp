@@ -420,8 +420,10 @@ constexpr std::array<Command, 49> kCommands{{
      [](const Args& x) {
          return forge_cli::run_truehd_atmos_decode(x.str(1), x.str(2), x.str(3), x.str(4), x.meta);
      }},
-    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
-     "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
+    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
+     "AC-3, E-AC-3, AC-4 or TrueHD, bare or inside a container; the stream decides. TrueHD: "
+     "lossless, to a 16 or 24-bit integer WAV (truehd-bits=16|24), the presentation chosen with "
+     "truehd-presentation=2|6|8|16 (the richest by default). AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "
      "direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and "
      "syntax-trace=<file> writes what the decoder reads. "
@@ -433,20 +435,22 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects,
      Needs::kNothing,
      [](const Args& x) { return run_decode(x.str(1), x.str(2), x.meta, x.str(3), x.str(4)); }},
-    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
-     "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 "
-     "TOC/presentations/substream groups, bare or inside a container, and what the container "
-     "says of its track; table or documented JSON",
+    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
+     "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, AC-4 "
+     "TOC/presentations/substream groups, or a TrueHD stream's presentations, rate and major "
+     "syncs, bare or inside a container, and what the container says of its track; table or "
+     "documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
-    {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
+    {"transcode", 3, "<in.ac3|in.ec3|in.ac4|in.thd> <out.ac3|out.ec3|out.ac4|out.thd> [bitrate_kbps] [layout]",
      "decode and re-encode, carrying dialnorm, compr and the mix metadata across - the "
      "DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or "
      "E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the "
      "programme, decoded without DRC and re-encoded with its drc_eac3_profile, dialnorm and "
      "downmix values; an AC-3 or E-AC-3 source's dialnorm and downmix values go to AC-4, "
      "and drc= names its DRC profile. The output codec comes from the output name's suffix, "
-     "or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4",
+     "or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4. TrueHD on either side "
+     "goes through integer PCM, into TrueHD losslessly with truehd-encode's truehd- options",
      topic::kLayout | topic::kStreamTools | topic::kAc4Decode,
      Needs::kNothing,
      [](const Args& x) {
