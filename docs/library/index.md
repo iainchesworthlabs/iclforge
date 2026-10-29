@@ -7,7 +7,7 @@ measurement. It links five libraries that know no codec: `iclforge::base`, `iclf
 `iclforge::objects`, `iclforge::render` and `iclforge::containers::iec61937`. AC-4 has libraries of its own
 beside it, which share no code with it ([AC-4](ac4.md)).
 
-Other targets provide container writing, IAB and ADM/BW64 reading, IAMF reading and writing, object signing,
+Other targets provide container writing, IAB and ADM/BW64 reading, IAMF reading and writing, object and content signing,
 platform audio, and AC-4 decoding and encoding. Build and linkage requirements differ by target.
 [Capabilities](capabilities.md) lists supported formats and limits;
 [Development status](development-status.md) is the compact done / partial / not-started companion.
@@ -27,7 +27,7 @@ main codec headers are under `libs/ac3/include/iclforge/ac3/`, and the AC-4 head
 | CMake target | Purpose |
 |---|---|
 | `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the four libraries below it |
-| `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256; the FFT, the QMF bank and the sample-rate converter |
+| `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256, and the ECDSA P-256, X.509 and Thrift code of AC-4 content signing; the FFT, the QMF bank and the sample-rate converter |
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
 | `iclforge::containers` | The codec-blind carriage, in parts: IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4 (`iclforge::containers::iec61937`, always built); the Matroska, MP4 and MPEG-TS writers and readers (`::matroska`, `::mp4`, `::mpegts`); IAMF reading and writing, as OBUs, ISO-BMFF and fragments (`::iamf`, see [IAMF](iamf.md)) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
@@ -254,7 +254,7 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   encoder's configuration, substreams and presentations; and linking (on by default).
 - [Measuring quality](quality.md) — `iclforge::ac3::quality`, the decoded-domain distortion measure and the
   tonality/masking model the encoder's decision search is judged on.
-- [Object signing](signing.md) — `iclforge::ac3::signing`, the EMDF protection tag.
+- [Object signing](signing.md) — `iclforge::ac3::signing`, the EMDF protection tag, and `iclforge::ac4::signing`, the AC-4 content signature.
 - [Header map](header-map.md) — the headers a caller normally reaches for, and what lives in each.
 - [API stability](api-stability.md) — the v1.0 freeze plan: header tiers, SemVer and deprecation
   policy, and what's decided versus still deliberately deferred.

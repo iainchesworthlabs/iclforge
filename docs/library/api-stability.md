@@ -72,7 +72,9 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
 | `iclforge/base/crypto/signing_key.hpp`, `iclforge/ac3/signing/emdf_atmos_signer.hpp` | Public. |
-| `iclforge/base/crypto/sha256.hpp`, `hmac_sha256.hpp` | Internal — the hash and the MAC the signer computes its tag with, installed with `iclforge::base`; a caller signs and verifies through `emdf_atmos_signer.hpp`. |
+| `iclforge/base/crypto/sha256.hpp`, `hmac_sha256.hpp` | Internal — the hash and the MAC the signer computes its tag with, installed with `iclforge::base`; a caller signs and verifies through `emdf_atmos_signer.hpp`. `Sha256` is exported so the AC-4 content digest can hash a stream one frame at a time, and is still Internal. |
+| `iclforge/base/crypto/content_signature.hpp`, `credentials.hpp`, `iclforge/ac4/signing/content_signing.hpp`, `carrier.hpp` | **Experimental** — AC-4 content signing (pace-ccjf1): the Thrift `ContentSignature`, `sign_digest` and `verify_digest`, the operator's key and chain loaders, and the frames-to-signature layer over them. The specification gives no bit syntax for where the signature sits, so the carriers and the signed span are this project's choices, and nothing has been checked against another implementation. They stay out of the `v1.0.0` freeze until that changes. |
+| `iclforge/base/crypto/p256.hpp`, `ecdsa_der.hpp`, `x509.hpp`, `thrift_binary.hpp`, `sha1.hpp`, `secure_zero.hpp` | Internal — the curve, the signature encoding, the certificate reader, the wire format, the fingerprint hash and the scrubber that `content_signature.hpp` is built from, installed with `iclforge::base`; a caller signs and verifies through `content_signature.hpp` or `content_signing.hpp`. |
 
 **The `detail` namespace convention is unaffected by a header's tier.** Five public headers
 (`silent_frame.hpp`, `meta/drc.hpp`, `core/tables.hpp`, `core/window.hpp`, `core/crc16.hpp`)

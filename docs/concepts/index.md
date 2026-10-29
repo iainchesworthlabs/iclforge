@@ -82,6 +82,9 @@ than to wrap or extend existing tooling.
 - [Object signing](object-signing.md) — the keyed EMDF protection tag a licensed decoder checks
   before reconstructing objects, why the algorithm is in-tree but the key isn't, and how to turn
   it on.
+- [Content signing](content-signing.md) — AC-4's counterpart: an ECDSA signature over a whole
+  stream, with the signer's X.509 chain, where you bring both the key and the chain, and what a
+  verifier does with a signature it can read.
 - [AC-4](ac4.md) — a separate codec: frames and presentations, its coding tools, and what the
   library decodes and encodes.
 

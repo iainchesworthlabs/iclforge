@@ -309,7 +309,7 @@ the machine they were written on, and no libFuzzer run, with or without findings
 here. What ran in its place is an ad hoc mutation driver under GCC's ASan and UBSan with the
 harness's own `LLVMFuzzerTestOneInput`: 300,000 inputs through the readers of
 `fuzz_x509_parse`, 120,000 through `fuzz_content_signature_verify`, and for
-`fuzz_ac4_signing_verify` the committed seeds and mutations of them (bit flips, byte
+`fuzz_ac4_signing_verify` the committed seeds and 30,000 mutations of them (bit flips, byte
 substitutions, inserts, deletions, truncation, and edits to the flags and the length), with no
 report. That driver is not in the repository. The first run of `tools/fuzz/run.sh` on a machine
 with libFuzzer is the evidence these harnesses are owed.

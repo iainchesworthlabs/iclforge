@@ -10,6 +10,22 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: AC-4 content signing, with a key and certificate chain you bring.** `forge ac4-encode`, `mp4`, `fmp4` and `atmos-encode`
+  with `codec=ac4` take `sign-content` (with `signing-key=` and `signing-chain=`) and write a pace-ccjf1 `ContentSignature`: a SHA-256
+  over the stream's frames, an ECDSA P-256 signature over that digest, and the signer's X.509 chain, in a `<stream>.sig` file beside an
+  elementary stream or in a `uuid` box of the MP4 track (`init.mp4` for `fmp4`). `forge decode` and `monitor` take `verify-content`
+  (refuse a stream that is unsigned, altered or signed by someone not trusted) and `decode` takes `gate-content` (decode it without its
+  object audio instead), against `trust-anchor=` or `trust-key=` or `ICLFORGE_CONTENT_TRUST_FILE`; a verifying run with nothing to trust
+  is refused. `probe` reports a signature's signer, date and the chain's SHA-1 fingerprints without a key, as `content_signature` in the
+  JSON (null for an unsigned stream and for AC-3 and E-AC-3). None is on by default, a signed stream decodes like an unsigned one without
+  them, and no key, certificate or trust anchor ships. The library side is `iclforge::ac4::signing` and `iclforge::base::crypto` (P-256
+  ECDSA, DER, X.509 chain validation, Thrift binary, written from the standards with no dependency), the MP4 writer and reader carry
+  codec-blind `uuid` boxes, and `docs/concepts/content-signing.md` says what the signature covers. The specification gives no bit
+  syntax for where the signature sits or which bytes are hashed, so the carriers and the signed span are this project's choices, and no
+  signed stream from another implementation has been verified against them. The specification's Master CA certificate ended on
+  2025-11-13, so a chain through it verifies only under `allow-expired-intermediates`. Three fuzz harnesses
+  (`fuzz_ac4_signing_verify`, `fuzz_content_signature_verify`, `fuzz_x509_parse`) are in `tools/fuzz/run.sh`'s list; they have run under an
+  ASan and UBSan driver and not yet through libFuzzer. Design and decisions for review: `planning/ac4-content-signing.md`.
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

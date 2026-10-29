@@ -33,6 +33,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::containers::iec61937::BurstReader`, `iclforge::containers::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
 | Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
+| AC-4 content signatures: the sidecar, the Thrift payload and the certificates it carries, and the key files an operator supplies | `iclforge::ac4::signing::verify_frames` and `ElementaryCarrier`, `iclforge::base::crypto::parse_content_signature`, `verify_digest`, `parse_certificate`, `validate_chain` and the key and certificate loaders; the MP4 box carrier in `forge` | yes — `fuzz_ac4_signing_verify`, `fuzz_content_signature_verify` and `fuzz_x509_parse`; the box is found by the MP4 reader, which `fuzz_mp4_demux` presses |
 | Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
 | MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`, `iclforge::containers::mp4::demux_seekable` | yes |
 | MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
@@ -102,8 +103,8 @@ is a set of specific properties rather than a language guarantee:
 
 What runs against it:
 
-- **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
-  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `tools/fuzz/run.sh`'s
+- **Twenty-seven libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
+  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-four are in `tools/fuzz/run.sh`'s
   default list and drive the entry points in the table above for crashes and undefined
   behaviour — format sniffing and the metadata edit and insert (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
   `fuzz_mp4_demux`, `fuzz_mpegts_demux`), the AC-3 and E-AC-3 decoders (`fuzz_ac3_decode`,
@@ -111,7 +112,8 @@ What runs against it:
   (`fuzz_wav_read`), IEC 61937 burst de-framing (`fuzz_iec61937_unwrap`), the IAB reader
   (`fuzz_iab_parse`), the three object/metadata parsers behind the skip field
   (`fuzz_emdf_parse`, `fuzz_oamd_parse`, `fuzz_joc_parse`), the signature verifier
-  (`fuzz_signing_verify`), the OSC parser (`fuzz_osc_parse`) and Sendspin's four
+  (`fuzz_signing_verify`), AC-4 content signing's carrier, payload and certificate readers
+  (`fuzz_ac4_signing_verify`, `fuzz_content_signature_verify`, `fuzz_x509_parse`), the OSC parser (`fuzz_osc_parse`) and Sendspin's four
   (`fuzz_sendspin_json`, `fuzz_sendspin_handshake`, `fuzz_sendspin_messages`,
   `fuzz_sendspin_frames`) — and `fuzz_ac4_encode`, which runs the AC-4 encoder over the
   configurations and input it takes and holds it to the decoder. Two more
@@ -344,7 +346,7 @@ libadm and libbw64, plus Boost headers. That means:
   CI job that runs it — `Fuzz ADM Nightly` — is schedule/dispatch-only and `continue-on-error`,
   because a vcpkg restore plus the libbw64/libadm `FetchContent` pulls cost more than the mutation
   budget and most of what the harness reaches is third-party code. It is not one of the
-  twenty-one harnesses in `tools/fuzz/run.sh`'s default list, which run on every push. The resource
+  twenty-four harnesses in `tools/fuzz/run.sh`'s default list, which run on every push. The resource
   limits above do not apply here either way: there
   is no document-size cap, no entity-expansion limit and no element-count limit; an enormous or
   deeply nested ADM document is bounded by nothing this project controls.
@@ -393,6 +395,44 @@ A stream with no container at all has nothing to verify — see
 [Object signing](concepts/object-signing.md). Verification is opt-in
 (`forge decode ... verify-objects`, or `gate-objects` to play the bed where it does not verify); a
 signed-but-unchecked stream decodes exactly like an unsigned one. This project ships no key.
+
+### AC-4 content signatures: what a verified stream means
+
+`forge decode ... verify-content` (and `gate-content`, which decodes without object audio instead of
+refusing) check an ECDSA P-256 signature over the SHA-256 of an AC-4 stream's frames, and the X.509
+chain that vouches for the signing key, against the anchors or public keys the operator names. A
+verified result says that a holder of a key the operator trusts signed exactly these frames. It does
+not say who that holder is beyond what the operator chose to trust, and it says nothing about
+anything outside the frames.
+
+- **What is outside the signature.** The sync word, the frame size and the CRC of an elementary
+  stream; every part of an MP4 except the samples (a changed `mvhd` or `stts` still verifies); the
+  signed date, which the signer writes and the signature does not cover; and any sidecar file's
+  name or pairing. Frame boundaries are authenticated only through the frames they delimit.
+- **Trust is the operator's.** With no `trust-anchor=`, `trust-key=` or `ICLFORGE_CONTENT_TRUST_FILE`
+  a verifying run is refused before it reads the stream. A `trust-key=` accepts its signer
+  without validating the rest of the chain, which is its purpose and is also a way to trust more
+  than intended; use an anchor to have the chain checked. `allow-expired-intermediates` accepts an
+  intermediate past its dates (and says so), and exists because the specification's own Master CA
+  certificate ended on 2025-11-13.
+- **A signature that travels beside a stream can be left behind.** A copy of an elementary stream
+  without its `.sig` is an unsigned stream, which `verify-content` refuses and an ordinary decode
+  accepts. `gate-content` treats unsigned content as unverified. Re-wrapping with `mp4`, `fmp4`,
+  `demux`, `remux` or `ts` does not carry a signature to the new file.
+- **The code reading hostile input** is the carrier (the frame walk of an elementary stream), the
+  Thrift reader, the DER readers for the signature and the certificates, and the PEM and key
+  loaders, which read operator-supplied files. Each refuses what it cannot interpret instead of
+  guessing, and the three fuzz harnesses above press them. The private key is read once, scrubbed
+  from memory when it is no longer needed, and never written. ECDSA signing is written to take
+  the same time whatever the key is, and `tools/checks/check_p256_constant_time.py` runs it under
+  valgrind with the scalar marked secret; it allows four reports, each a branch on an event of
+  probability 2^-32 or less or on a public fact, and one compiler at one optimisation level is all
+  it sees. It is an offline signer for a key the operator holds, and no substitute for an HSM.
+- **What has not been checked.** No signed stream from another implementation has been verified, and
+  the specification does not say where the signature sits or what exactly is hashed; those two
+  choices are this project's ([Content signing](concepts/content-signing.md#what-has-not-been-established)).
+  The fuzz harnesses have been run through an ASan and UBSan driver and have not yet been built
+  through libFuzzer.
 
 ### OSC live-position input has no authentication or encryption
 

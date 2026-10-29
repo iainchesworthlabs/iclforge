@@ -169,6 +169,38 @@ metadata options (any order, after the positional arguments):
                     ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give
                     verify-objects and gate-objects several keys - a frame is good under any
                     of them; sign-objects takes one
+  sign-content      ac4-encode, mp4 and fmp4 (AC-4 input), and atmos-encode/atmos-adm/
+                    atmos-iab with codec=ac4: sign the output with an ECDSA P-256 key and
+                    certificate chain you bring (needs signing-key= and signing-chain=). The
+                    signature goes in a uuid box of an MP4's track, or beside a raw stream
+                    as <out>.sig; fmp4 puts it in init.mp4. See docs/concepts/content-signing.md
+  verify-content    decode/monitor: refuse the command unless the AC-4 stream's content
+                    signature verifies under the trust given. An unsigned stream is refused too
+  gate-content      decode: content that does not verify (unsigned, altered, signed by someone
+                    else) decodes without its object audio, for the whole stream, and the
+                    decode carries on. A presentation of object audio alone then has nothing to
+                    play and is refused. Not combinable with verify-content
+  signing-key=<path>  with sign-content: the private key, PEM (PKCS#8 or SEC1) or DER, or
+                    ICLFORGE_CONTENT_SIGNING_KEY_FILE, or the PEM itself in
+                    ICLFORGE_CONTENT_SIGNING_KEY. Read as an EC key here, where sign-objects
+                    reads an HMAC key from the same option
+  signing-chain=<path>  the certificates, PEM or DER: the leaf and its issuers in any order, the
+                    root included or not (or ICLFORGE_CONTENT_SIGNING_CHAIN_FILE)
+  sign-time=<ISO 8601 UTC>  the signed date to record (default: the system clock); the
+                    signature does not cover it
+  trust-anchor=<path>  a certificate you trust (PEM or DER); repeat for more. The chain must lead
+                    to one
+  trust-key=<path>  a public key (PEM SPKI) or a certificate whose key you trust directly,
+                    whatever the chain says; repeat for more. With neither of these,
+                    ICLFORGE_CONTENT_TRUST_FILE; with none anywhere the command is refused
+  content-signature=<path>  the file holding an elementary stream's signature (default
+                    <stream>.sig); an MP4 carries its own
+  verify-time=<ISO 8601 UTC>  the time the chain's validity is judged at (default: the system
+                    clock)
+  allow-expired-intermediates  accept an intermediate certificate past its notAfter, and say so
+  signer-profile=spec|any  what the signer's certificate must look like: spec (default) is the
+                    specification's title, common name and serial; any checks none of them
+  signer-title=, signer-cn=, signer-serial=  replace one part of that profile
   verify            eac3-encode: decode every access unit as it is encoded and diff the
                     decoder's model against the encoder's own, refusing the run at the first
                     disagreement - off by default, since it roughly doubles the work
@@ -1044,7 +1076,7 @@ presentation the same way; the rest belong to the three that play or write the d
 E-AC-3 read (`drc=`, `heavy`, `ltrt-phase=`, `fast-imdct`, `mode=`, `programme=`, `bed-only`,
 `joc-domain=`) are named and ignored by `decode` for an AC-4 stream, and `bap-census=`,
 `verify-objects` and `gate-objects` refuse it; AC-4's own are named and ignored for AC-3 and E-AC-3, and
-`channels=5.1` and `syntax-trace=` refuse them.
+`channels=5.1`, `syntax-trace=`, `verify-content` and `gate-content` refuse them.
 
 **Writing AC-4.** `ac4-encode` takes every key below; the other commands that write AC-4 take the
 few noted in the last rows.
@@ -1373,6 +1405,14 @@ Optional positional arguments, when omitted:
   `ICLFORGE_SIGNING_KEY_FILE` / `ICLFORGE_SIGNING_KEY` instead of `signing-key=`. The key is never
   stored by the tool; the algorithm is in-tree but the key is yours to provision. Full details in
   [Object signing](../../concepts/object-signing.md).
+- **`sign-content`**, **`verify-content`** and **`gate-content`**: the AC-4 counterparts of
+  `sign-objects`, `verify-objects` and `gate-objects`. An AC-4 stream has no EMDF container to
+  tag, so these sign the stream as a whole, with an ECDSA P-256 key and an X.509 chain you bring
+  (`signing-key=`, `signing-chain=`) and check it against trust you name (`trust-anchor=`,
+  `trust-key=`). Nothing is on by default, nothing ships a key, and a verifying run with no trust
+  given is refused. Every option, the carriers, the exit codes and the output are under
+  [AC-4 content signing](commands.md#ac-4-content-signing); the scheme is
+  [Content signing](../../concepts/content-signing.md).
 - **`fast-mdct=off`**: every encode runs the §7.9.4 fast forward MDCT by default (the quality
   evidence that made it the default: ~3e-12 max relative coefficient error against the direct
   form, 331 dB direct-vs-fast end-to-end SNR, 0.000 dB SNR delta against an independent oracle
