@@ -198,6 +198,54 @@ TEST_CASE("a signed AC-4 stream verifies, and changes to either part are caught"
     CHECK(iclforge::ac4::verify_stream(extended, f.policy()).verdict == crypto::Verdict::kInvalid);
 }
 
+TEST_CASE("a stream with a signature, or with junk, after its frames is not signed over",
+          "[ac4][signing]") {
+    const Fixture f;
+    const std::vector<std::byte> stream = synthetic_stream();
+    const auto signed_stream = iclforge::ac4::sign_stream(stream, f.credentials, f.options());
+    REQUIRE(signed_stream.has_value());
+
+    // A second signature over a signed stream: said to be a signature already there.
+    const auto again = iclforge::ac4::sign_stream(*signed_stream, f.credentials, f.options());
+    REQUIRE_FALSE(again.has_value());
+    CHECK(again.error().kind == iclforge::ac4::StreamSignatureErrorKind::kAlreadySigned);
+    CHECK(again.error().message.find("already carries a content signature") != std::string::npos);
+
+    // Bytes that are not a signature: said to be trailing data, with how many.
+    std::vector<std::byte> junk = stream;
+    for (int i = 0; i < 40; ++i) {
+        junk.push_back(static_cast<std::byte>(i));
+    }
+    const auto refused = iclforge::ac4::sign_stream(junk, f.credentials, f.options());
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().kind == iclforge::ac4::StreamSignatureErrorKind::kTrailingData);
+    CHECK(refused.error().message.find("40 byte(s) follow the last sync frame") !=
+          std::string::npos);
+    CHECK(refused.error().message.find("already") == std::string::npos);
+}
+
+TEST_CASE("what a signature says about itself is escaped in the summary", "[ac4][signing]") {
+    const Fixture f;
+    crypto::SignOptions options = f.options();
+    options.metadata.publisher_name = "Pub\x1b[2J\nsigner ok";
+    options.metadata.application_name = "App\r\xE2\x80\xAE";
+    const std::vector<std::byte> stream = synthetic_stream();
+    const auto signed_stream = iclforge::ac4::sign_stream(stream, f.credentials, options);
+    REQUIRE(signed_stream.has_value());
+    const iclforge::ac4::SignatureSummary summary =
+        iclforge::ac4::summarise_signature(*signed_stream);
+    REQUIRE(summary.readable);
+    for (const std::string& text : {summary.publisher, summary.application, summary.signer,
+                                    summary.signed_date, summary.signing_method}) {
+        CHECK(std::none_of(text.begin(), text.end(), [](char c) {
+            const auto u = static_cast<unsigned char>(c);
+            return u < 0x20 || u == 0x7F;
+        }));
+    }
+    CHECK(summary.publisher == "Pub\\x1B[2J\\x0Asigner ok");
+    CHECK(summary.application == "App\\x0D\\u{202E}");
+}
+
 TEST_CASE("an unsigned or foreign stream is reported, not mistaken", "[ac4][signing]") {
     const Fixture f;
     const std::vector<std::byte> stream = synthetic_stream();

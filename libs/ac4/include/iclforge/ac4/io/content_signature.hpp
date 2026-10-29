@@ -30,6 +30,7 @@ enum class StreamSignatureErrorKind : std::uint8_t {
     kNotAnAc4Stream,  // does not begin with an AC-4 sync frame
     kTruncated,       // the last sync frame is cut off, or bytes too few to be a trailer follow
     kAlreadySigned,   // there is a trailer already; strip it or sign the unsigned stream
+    kTrailingData,    // bytes follow the last sync frame and are not a content signature
     kSigning,         // the signature could not be made; `fault` says why
 };
 

@@ -190,6 +190,34 @@ TEST_CASE("ac4-sign leaves the frames alone and ac4-verify accepts the result ag
     CHECK(contains(report, "anchored by"));
 }
 
+TEST_CASE("ac4-sign says whether a stream already has a signature or has junk after its frames",
+          "[cli][ac4][content-signature]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "resign.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("resign_plain");
+    const fs::path signed_file = dir / "resign_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(signed_file) +
+                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                    log) == 0);
+
+    CHECK(run_cli("ac4-sign " + quoted(signed_file) + " " + quoted(dir / "resign_twice.ac4") +
+                      key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                  log) == kExitUsage);
+    CHECK(contains(read_log(log), "already carries a content signature"));
+
+    std::vector<std::byte> junk = read_bytes(plain);
+    junk.insert(junk.end(), 30, std::byte{0x55});
+    const fs::path junk_file = dir / "resign_junk.ac4";
+    write_bytes(junk_file, junk);
+    CHECK(run_cli("ac4-sign " + quoted(junk_file) + " " + quoted(dir / "resign_junk_out.ac4") +
+                      key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                  log) == kExitInput);
+    const std::string text = read_log(log);
+    CHECK(contains(text, "30 byte(s) follow the last sync frame"));
+    CHECK_FALSE(contains(text, "already"));
+}
+
 TEST_CASE("ac4-verify does not call a signature valid that no trust anchor vouches for",
           "[cli][ac4][content-signature]") {
     const auto dir = scratch_dir();

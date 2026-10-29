@@ -12,6 +12,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 
 namespace iclforge::ac4 {
 namespace {
@@ -72,8 +73,17 @@ std::expected<std::vector<std::byte>, StreamSignatureError> sign_stream(
         return std::unexpected(located.error());
     }
     if (located->present) {
-        return failure(StreamSignatureErrorKind::kAlreadySigned,
-                       "the stream already carries a content signature");
+        // Bytes after the last sync frame are either a signature, which is not signed over, or
+        // something else, which is not signed over either but is not a signature to strip.
+        if (base::crypto::parse_content_signature(located->blob).has_value()) {
+            return failure(StreamSignatureErrorKind::kAlreadySigned,
+                           "the stream already carries a content signature; strip it or sign the "
+                           "unsigned stream");
+        }
+        return failure(StreamSignatureErrorKind::kTrailingData,
+                       std::to_string(located->blob.size()) +
+                           " byte(s) follow the last sync frame and are not a content signature; "
+                           "remove them first");
     }
     const std::array<std::byte, 32> digest = base::crypto::sha256(stream);
     auto blob = base::crypto::sign_content_digest(digest, credentials, options);
@@ -88,6 +98,23 @@ std::expected<std::vector<std::byte>, StreamSignatureError> sign_stream(
     out.reserve(stream.size() + blob->size());
     out.insert(out.end(), stream.begin(), stream.end());
     out.insert(out.end(), blob->begin(), blob->end());
+
+    // Read back what was just made, with the signature checks and no trust anchor and no clock: a
+    // signature that does not verify is a fault in the signer, and is reported here and not left
+    // for whoever checks the file.
+    base::crypto::VerifyPolicy own;
+    own.time_basis = base::crypto::TimeBasis::kIgnore;
+    own.required_leaf_title.clear();
+    own.require_digital_signature = false;
+    const base::crypto::VerifyReport readback = verify_stream(out, own);
+    if (readback.verdict == base::crypto::Verdict::kInvalid) {
+        StreamSignatureError error;
+        error.kind = StreamSignatureErrorKind::kSigning;
+        error.message = "the signature just made does not verify: " +
+                        (readback.fault ? readback.fault->message : std::string("no reason given"));
+        error.fault = readback.fault;
+        return std::unexpected(std::move(error));
+    }
     return out;
 }
 
@@ -133,8 +160,8 @@ SignatureSummary summarise_signature(std::span<const std::byte> stream) {
         return summary;
     }
     summary.readable = true;
-    summary.signed_date = parsed->signed_date;
-    summary.signing_method = parsed->signing_method;
+    summary.signed_date = base::crypto::escape_text(parsed->signed_date);
+    summary.signing_method = base::crypto::escape_text(parsed->signing_method);
     summary.certificates = parsed->chain.size();
     if (!parsed->chain.empty()) {
         summary.signer = parsed->chain.back().subject.text;
@@ -142,8 +169,8 @@ SignatureSummary summarise_signature(std::span<const std::byte> stream) {
     } else {
         summary.problem = parsed->chain_error;
     }
-    summary.publisher = parsed->signer.publisher_name;
-    summary.application = parsed->signer.application_name;
+    summary.publisher = base::crypto::escape_text(parsed->signer.publisher_name);
+    summary.application = base::crypto::escape_text(parsed->signer.application_name);
     return summary;
 }
 
