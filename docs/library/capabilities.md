@@ -159,7 +159,7 @@ cost of one branch per occurrence when it is not set.
 ### TrueHD and MLP
 
 `iclforge::truehd` reads and decodes TrueHD and MLP elementary streams losslessly ([TrueHD and MLP](truehd.md)). It is written
-from the owner's TrueHD (MLP) Reference Specification v3.3; `libs/truehd/ERRATA.md` records where that and the streams disagree.
+from the owner's TrueHD (MLP) Reference Specification v3.5; `libs/truehd/ERRATA.md` records where that and the streams disagree.
 
 | Capability | Status | Checked against |
 |---|---|---|
@@ -167,7 +167,8 @@ from the owner's TrueHD (MLP) Reference Specification v3.3; `libs/truehd/ERRATA.
 | Substreams 0 to 2 (up to 8 channels), 44.1 to 192 kHz, 16 and 24 bits, MLP and TrueHD | decoded | FFmpeg: 12 fixtures, sample for sample |
 | FIR prediction, Huffman and raw residuals, one matrix set, quantiser step, output shift, lossless check | decoded | FFmpeg |
 | IIR filter, LSB bypass, several matrices, a permuted `ch_assign`, block data check, extra data, DRC word, end-of-stream marker in every unit, 16-channel substream 3 | decoded | **none**: hand-built streams only |
-| Noise generation (`0x31EB`), heavy DRC in the restart header | refused / not read | the specification gives neither |
+| Noise generator 0 (`0x31EA`): two noise channels through matrix coefficients | decoded | **none**: a hand-built stream only |
+| Noise generator 1 (`0x31EB`), heavy DRC in the restart header | refused / not read | the specification gives neither generator 1's table nor heavy DRC's place in the header |
 | Encoder, Atmos object audio metadata, evolution frame, containers | not built | phase T2 |
 
 ### Inspection

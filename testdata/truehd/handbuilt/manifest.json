@@ -55,6 +55,22 @@
       "pcm_sha256": "30167119ba28821123ab6cc56bc21dc93c618995920ad46a9f7e55257063f1ed"
     },
     {
+      "name": "hb_noise_generator_0",
+      "file": "hb_noise_generator_0.thd",
+      "description": "noise generator 0: two noise channels through matrix coefficients",
+      "features": [
+        "noise_generator_0"
+      ],
+      "oracle": "none",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "448b500c0af82c6101adee44dc7b9b568f77f2fb25256fd16f80c5a99e9abf1d",
+      "pcm_sha256": "e15ae5189f998050eea6c10aa85078e705752ac7572a680c5e20139081fbdad6"
+    },
+    {
       "name": "hb_data_check",
       "file": "hb_data_check.thd",
       "description": "data_check_present: block_data_bits and the CRC byte",

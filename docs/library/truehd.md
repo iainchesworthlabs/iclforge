@@ -3,7 +3,7 @@
 `iclforge/truehd/decoder/decoder.hpp`, with the bitstream layer under it in `iclforge/truehd/core/` and
 `iclforge/truehd/io/`, all in the library `iclforge::truehd`. A reader and a lossless decoder for Dolby
 TrueHD (`0xF8726FBA`, Blu-ray and HD DVD) and MLP (`0xF8726FBB`, DVD-Audio) elementary streams, written
-from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.3 ("TH spec" in the code). The library links
+from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5 ("TH spec" in the code). The library links
 `iclforge::base` and nothing else; the encoder, the Atmos substream and the object metadata are phase T2
 ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)).
 
@@ -78,16 +78,18 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 |---|---|---|
 | FFmpeg's strict decode (`-err_detect crccheck+bitstream+buffer+explode`) of the streams its `truehd` and `mlp` encoders write | 12 fixtures in `testdata/truehd/`: 1, 2 and 6 channels, 44.1, 48, 96 and 192 kHz, 16 and 24 bits, TrueHD and MLP; 19 more while the decoder was written | FFmpeg: sample for sample |
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 12, and the hand-built streams | none beyond the two readings agreeing |
-| Hand-built streams, `tools/references/truehd_writer.py` | an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one | **none**: held to the signal each was built from |
+| Hand-built streams, `tools/references/truehd_writer.py` | an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one | **none**: held to the signal each was built from |
 | DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent | the sources |
 
-FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, noise generation, the Atmos substream or extra
-data, so those have no external oracle. [Validation](../verification.md#truehd-and-mlp) says what that leaves.
+FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient, the Atmos substream or
+extra data, so those have no external oracle. [Validation](../verification.md#truehd-and-mlp) says what that leaves.
 
 ## What it does not do
 
-- Noise generation: restart sync `0x31EB` and a matrix that draws on a noise channel are refused with
-  `ErrorKind::kUnsupported` (the specification gives the seed and the shift and no generator).
+- Noise generator 1: restart sync `0x31EB` is refused with `ErrorKind::kUnsupported`, because its 256-entry
+  table is not in the specification yet (§17.4). Generator 0, the default (`0x31EA`), is decoded from the
+  specification's LFSR: two noise channels follow the matrix channels and enter through ordinary matrix
+  coefficients. No stream FFmpeg writes uses a non-zero noise coefficient, so that has no external oracle.
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.
 - The block data CRC is not checked, only the length it follows.
 - The evolution frame and the object audio metadata in the extra data are carried as bytes, not read.

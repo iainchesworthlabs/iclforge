@@ -17,7 +17,8 @@ features work together, and that nothing regresses.
     truehd_writer.py check [DIR]             # decode them with truehd_syntax.py and compare
 
 Not written: restart_header's heavy DRC (TH spec 12.2, 7.1), whose place among the header's bits
-the streams do not show (ERRATA 7), and noise generation."""
+the streams do not show (ERRATA 7), and noise generator 1 (sync 0x31EB), whose table is not
+available."""
 
 import argparse
 import hashlib
@@ -92,6 +93,8 @@ class Substream:
         out_shift=None,
         sync=0x31EA,
         data_check=False,
+        noise_shift=0,
+        noise_seed=0,
     ):
         self.min_chan, self.max_chan, self.mm = min_chan, max_chan, mm
         self.channels = channels  # {ch: Channel}
@@ -103,6 +106,8 @@ class Substream:
         self.out_shift = out_shift or [0] * (mm + 1)
         self.sync = sync
         self.data_check = data_check
+        self.noise_shift = noise_shift
+        self.noise_seed = noise_seed
 
 
 class Stream:
@@ -226,8 +231,8 @@ def write_restart_header(sub, check, timing=0):
     w.put(sub.min_chan, 4)
     w.put(sub.max_chan, 4)
     w.put(sub.mm, 4)
-    w.put(0, 4)  # noise_shift
-    w.put(0, 23)  # noisegen_seed
+    w.put(sub.noise_shift, 4)
+    w.put(sub.noise_seed, 23)
     w.put(0, 19)  # max_shift, max_lsbs, max_bits, max_bits_repeat (ERRATA 7)
     w.put(1 if sub.data_check else 0, 1)
     w.put(check, 8)
@@ -614,10 +619,50 @@ def case_sixteen():
     )
 
 
+def noise_sequences(count, interval, seed, shift):
+    """Generator 0's two noise channels (TH spec 17.2); the state restarts with each interval."""
+    first, second = [], []
+    state = seed
+    for n in range(count):
+        if n % interval == 0:
+            state = seed
+        shr7 = state >> 7
+        first.append(ref.int8(state >> 15) * (1 << shift))
+        second.append(ref.int8(shr7) * (1 << shift))
+        state = ((state << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
+    return first, second
+
+
+def case_noise():
+    n = 40 * 40
+    s0, s1 = tone(n, 60), tone(n, 61)
+    seed, shift, c, d = 0x2A5F31, 3, 77, -45
+    first, second = noise_sequences(n, 16 * 40, seed, shift)
+    coded0 = [x - ((v * d) >> 8) for x, v in zip(s0, second, strict=True)]
+    coded1 = [x - ((v * c) >> 8) for x, v in zip(s1, first, strict=True)]
+    # Noise channel 1 is matrix coefficient mm + 1 = 2 and channel 2 is 3.
+    matrices = [(1, 8, False, {1: 256, 2: c}), (0, 8, False, {0: 256, 3: d})]
+    channels = {0: Channel(fir=([64], 6)), 1: Channel(huff_type=2)}
+    sub = Substream(
+        0,
+        1,
+        1,
+        channels,
+        list(zip(s0, s1, strict=True)),
+        {0: coded0, 1: coded1},
+        matrices=matrices,
+        noise_shift=shift,
+        noise_seed=seed,
+    )
+    description = "noise generator 0: two noise channels through matrix coefficients"
+    return Stream([sub], n), description, ["noise_generator_0"]
+
+
 CASES = {
     "hb_filters": case_filters,
     "hb_lsb_bypass": case_bypass,
     "hb_matrices": case_matrices,
+    "hb_noise_generator_0": case_noise,
     "hb_data_check": case_data_check,
     "hb_marker_last": case_marker_last,
     "hb_marker_every": case_marker_every,

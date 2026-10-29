@@ -141,9 +141,10 @@ TEST_CASE("a whole built stream decodes through the elementary reader", "[truehd
     CHECK(decoded == 8);
 }
 
-TEST_CASE("noise generation is refused, not guessed", "[truehd][decoder]") {
-    // TH spec 17 gives the seed and the shift and no generator (ERRATA open question 5): restart sync 0x31EB
-    // is kUnsupported, with the decoder left waiting for another restart.
+TEST_CASE("noise generator 1 is refused until its table is available", "[truehd][decoder]") {
+    // TH spec 17.3 needs a 256-entry table that 17.4 does not give (ERRATA open question 5):
+    // restart sync 0x31EB is kUnsupported, with the decoder left waiting for another restart.
+    // Generator 0 (0x31EA) is decoded: see the hand-built stream hb_noise_generator_0.
     Decoder decoder;
     auto refused = decoder.decode(stereo_unit(true, 0, kRestartSyncNoise));
     REQUIRE_FALSE(refused.has_value());

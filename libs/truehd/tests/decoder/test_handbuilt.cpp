@@ -64,7 +64,7 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
     std::ifstream manifest_file(dir() + "/manifest.json");
     REQUIRE(manifest_file.good());
     const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
-    REQUIRE(manifest["fixtures"].size() >= 10);
+    REQUIRE(manifest["fixtures"].size() >= 11);
     for (const nlohmann::json& fixture : manifest["fixtures"]) {
         const std::string name = fixture["name"];
         DYNAMIC_SECTION(name) {

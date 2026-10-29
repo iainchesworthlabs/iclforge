@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # iclforge::truehd - the Dolby TrueHD and MLP codec's bitstream and decoder, written from the owner's
-# Dolby TrueHD (MLP) Reference Specification (v3.3) and checked against the streams FFmpeg's encoder
+# Dolby TrueHD (MLP) Reference Specification (v3.5) and checked against the streams FFmpeg's encoder
 # writes and FFmpeg's decoder (planning/truehd.md). The layers are the ones iclforge::ac3 and
 # iclforge::ac4 have: core (the constants, the CRCs and parities, the syntax of the restart and block
 # headers, the codebooks), io (the major sync, the access unit, the elementary stream) and decoder.

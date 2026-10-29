@@ -1,7 +1,7 @@
 # iclforge::truehd
 
 The Dolby TrueHD and MLP bitstream and a lossless decoder, written from the owner's *Dolby TrueHD (MLP) Reference
-Specification* v3.3 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
+Specification* v3.5 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
 [planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
 

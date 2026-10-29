@@ -56,8 +56,10 @@ struct MatrixPlan {
     int out = 0;
     bool lsb_bypass = false;
     int count = 0;
-    std::array<std::uint8_t, kMaxChannels> channel{};
-    std::array<std::int32_t, kMaxChannels> coeff{};  // scaled to 2^-14
+    // The row columns the matrix reads and the coefficients for them, scaled to 2^-14: the matrix
+    // channels, then the two noise channels (columns kMaxChannels and kMaxChannels + 1).
+    std::array<std::uint8_t, kRowStride> channel{};
+    std::array<std::int32_t, kRowStride> coeff{};
 };
 
 struct SubstreamState {
@@ -74,6 +76,9 @@ struct SubstreamState {
     // anything.
     std::uint32_t interval_fold = 0;
     bool interval_open = false;
+    // TH spec §17.2: generator 0's running state, loaded from the restart header and carried
+    // across the blocks of the restart interval.
+    std::uint32_t noise_seed = 0;
 };
 
 struct SegmentResult {
@@ -218,8 +223,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     }
     if (header->noise_type()) {
         return std::unexpected(make_error(ErrorKind::kUnsupported,
-                                          "restart sync 0x31EB (noise_type 1): the noise generator "
-                                          "is not defined (TH spec §17)"));
+                                          "restart sync 0x31EB (noise_type 1): the 256-entry noise "
+                                          "table of generator 1 is not available (TH spec §17.4)"));
     }
     const bool is_mlp = major_sync && major_sync->kind == StreamKind::kMlp;
     const int limit = index >= kObjectSubstream
@@ -253,6 +258,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.max_matrix_chan = header->max_matrix_chan;
     state.context.noise_type = false;
     state.context.presence_flags = presence::kAll;
+    state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
     return {};
 }
@@ -278,19 +284,17 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
-            for (int c = 0; c < restart.matrix_channels(); ++c) {
+            // The coefficients go to the matrix channels, then to the two noise channels (TH spec
+            // §17.2), whose samples are in the last two columns of a row.
+            for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
                 const auto index = static_cast<std::size_t>(c);
                 if (spec.present[index] && spec.coeff[index] != 0) {
                     const auto slot = static_cast<std::size_t>(plan.count++);
-                    plan.channel[slot] = static_cast<std::uint8_t>(c);
+                    const int column = c < restart.matrix_channels()
+                                           ? c
+                                           : kMaxChannels + (c - restart.matrix_channels());
+                    plan.channel[slot] = static_cast<std::uint8_t>(column);
                     plan.coeff[slot] = spec.coeff[index] * (1 << (kMatrixShift - spec.frac_bits));
-                }
-            }
-            for (int n = 0; n < kNoiseChannels; ++n) {
-                if (spec.present[static_cast<std::size_t>(restart.matrix_channels() + n)]) {
-                    return std::unexpected(
-                        make_error(ErrorKind::kUnsupported,
-                                   "a matrix that draws on a noise channel (TH spec §17)"));
                 }
             }
         }
@@ -489,6 +493,23 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                   channel.fir_history.begin() + block + kHistoryPad, channel.fir_history.begin());
         std::copy(channel.iir_history.begin() + block,
                   channel.iir_history.begin() + block + kHistoryPad, channel.iir_history.begin());
+    }
+
+    // TH spec §17.2: generator 0's two noise channels, one step of the LFSR a sample whether or not
+    // a matrix draws on them, so that the sequence runs on across blocks and units.
+    {
+        std::uint32_t seed = state.noise_seed;
+        const int shift = restart.noise_shift;
+        for (int i = 0; i < block; ++i) {
+            std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            const std::uint32_t shr7 = seed >> 7U;
+            row[kMaxChannels] =
+                static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << shift);
+            row[kMaxChannels + 1] =
+                static_cast<std::int32_t>(static_cast<std::int8_t>(shr7)) * (1 << shift);
+            seed = (seed << 16U) ^ shr7 ^ (shr7 << 5U);
+        }
+        state.noise_seed = seed;
     }
 
     // The primitive matrices (TH spec §10), in the order the block header listed them.

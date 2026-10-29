@@ -1,7 +1,7 @@
 # iclforge::truehd: where the specification and the streams disagree
 
-"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.3 (planning/truehd.md says what it is and
-how it is used). Every entry below is a place where the specification is silent, contradicts itself or disagrees
+"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5 (planning/truehd.md says what it is and
+how it is used; section numbers are v3.3's, except §16.3.3 (v3.4) and §17 (v3.5)). Every entry below is a place where the specification is silent, contradicts itself or disagrees
 with the streams FFmpeg 6.1.1's `truehd` and `mlp` encoders write (and its decoder reads). The streams decide:
 FFmpeg's decoder decodes them, and the codec is lossless, so a reading that decodes all of them sample for sample
 is the reading in use. Where a reading is forced by the streams and the specification is silent, it is marked
@@ -14,10 +14,13 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
 
 ## Open questions for the owner
 
-1. **The evolution payload (TH spec §16.3, §16.6).** The payload is described as a signature container (the AC-4
-   `ContentSignature` Thrift structure, `pace-ccjf1`) and also as carrying typed payload entries with the object
-   audio metadata (§16.3.2). A signature container cannot hold the bytes its own digest covers, and the Thrift
-   structure of the AC-4 signing specification has no field for them. What is on the wire? Until this is answered
+1. **The evolution payload (TH spec §16.3, §16.6).** Since v3.4 the payload is an outer Thrift container that carries
+   the typed payload entries (the object audio metadata, §16.3.2) and a nested `ContentSignature` (`pace-ccjf1`).
+   §16.3.3 then lists as **not yet confirmed**: the outer container's field IDs ("are the payload entries a list
+   field alongside the ContentSignature, or a field within it using higher field IDs?"), the digest scope ("it
+   likely covers the serialized payload entries only ... The exact scope needs confirmation"), and whether each
+   frame carries its own full ContentSignature or the certificate chain is sent once. The specification's owner
+   does not know these either, so the answer has to come from a stream or from the encoder. What is on the wire? Until this is answered
    the library carries the extra data as bytes (`DecodedAccessUnit::extra_data`) and phase T2b writes nothing.
 2. **The 16-channel extension of the channel meaning (§14.2).** `extra_channel_meaning_length` has no unit and the
    section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
@@ -31,10 +34,12 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
    stream with or without them.
 4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
    default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
-5. **Noise generation (§17).** The specification gives `noise_shift` and `noisegen_seed` and no generator, and the
-   noise channels a matrix can draw on (entry 8) have no definition. The library refuses restart sync 0x31EB
-   (`noise_type` 1) and a matrix that uses a noise channel with `ErrorKind::kUnsupported`. Please supply the
-   generator, or a DEE stream that uses it.
+5. **Noise generator 1 (§17.3, §17.4).** Generator 0 (`noise_type` 0, sync 0x31EA) is decoded from §17.2 (entry 23). For
+   generator 1 (sync 0x31EB) the specification gives the LFSR and `matrix_noise_shift` but not the 256-entry `int8`
+   noise table: §17.4 says the values are "pending extraction from the DEE binary". The library refuses 0x31EB with
+   `ErrorKind::kUnsupported` and waits for the table from the owner; it does not take the values from anywhere else.
+   Also asked, for generator 0: is `seed_shr7` in §17.2 a 32-bit or a 16-bit value? The recurrence gives different
+   sequences (bits 16 and up of the new state), and no stream here has a non-zero noise coefficient to say.
 6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The streams
    cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
    `ch_assign` is the identity. The library shifts by the output position. **Provisional, owner to confirm.**
@@ -52,6 +57,11 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
     sets the bit may be longer than any stream here. The library reads the 16 bits as `tail` and writes nothing for
     heavy DRC; the directory's standard DRC word (§12.1) is read and carried (entry 18). Please give the layout, or
     a DEE stream that sets `heavy_drc_present`.
+11. **Where a bypassed LSB comes from (§10.2, §17.1, §17.5).** v3.5 says that with `lsb_bypass` set "the matrix output
+    LSB comes from noise" ("rather than the coefficient computation"). No stream sets `lsb_bypass`, and the block data
+    syntax (§8.1) has no field for it. The library reads one bit a sample, for each matrix with the flag, from the
+    sample data (before the channels' residuals) and adds it to the matrix output; that reading is not in the
+    specification (**provisional, owner to confirm**). Which noise channel, which bit, and does the stream carry it?
 
 ## Entries
 
@@ -97,8 +107,8 @@ Whether `heavy_drc_present` makes the header longer cannot be seen in streams th
 The streams send one for each of the `max_matrix_chan + 1` matrix channels and then two more, the noise channels
 (the walk of entry 9 stays aligned with the block data only with `max_matrix_chan + 1 + 2` presence bits). Each coefficient is `frac_bits + 2` bits, signed. The value is scaled by
 `2^(14 - frac_bits)`; the matrix output is `(sum >> 14)` masked to the output channel's quantiser step, plus the
-bypassed LSB when `lsb_bypass` is set. The noise channel coefficients are zero in every stream; a matrix that uses
-one is refused (Q5).
+bypassed LSB when `lsb_bypass` is set (Q11). The noise channel coefficients are zero in every stream; entry 23 is what a
+non-zero one does.
 
 **9. The FIR filter's state flag (§9.2).** The specification sends `new_states` for the IIR filter only. The streams
 send the bit for the FIR filter as well, always clear (a FIR filter that sets it is refused). Evidence: with the bit
@@ -174,6 +184,10 @@ every channel is `huff_type` 0 with `huff_lsbs` 24. The bit that gives each pres
 255/256 of the code space (the codes are prefix-free: checked at compile time), so an unused 9-bit prefix is an error
 (`ErrorKind::kBadBlockData`).
 
+**21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
+the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as
+this reads (**no oracle**).
+
 **22. Extra data (§16.1) and the terminators written by `tools/references/truehd_writer.py`.** Read and written as
 the specification lays them out: a header word (`header_check_nibble`, `extra_data_length`), a word with
 `evo_reserved` and `evo_frame_byte_length`, the payload, zero padding, and the parity byte; the length is taken as the
@@ -182,6 +196,11 @@ is carried as opaque bytes. `terminatorB` (0x1234) is read right after the last 
 has either (**no oracle**; `testdata/truehd/handbuilt/`). Every hand-built stream is expected to decode to the signal
 it was made from; none has an external decoder.
 
-**21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
-the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as
-this reads (**no oracle**).
+**23. Noise generator 0 (§17.2, v3.5).** The two noise channels sit after the matrix channels in the coefficient order
+(coefficient indices `max_matrix_chan + 1` and `+ 2`, which entry 8 found in the streams). Each sample, in order:
+`shr7 = seed >> 7`; channel 1 is `int8(seed >> 15) << noise_shift`; channel 2 is `int8(shr7) << noise_shift`; then
+`seed = (seed << 16) ^ shr7 ^ (shr7 << 5)` in 32 bits. The seed is loaded from `noisegen_seed` at each restart and
+runs on across blocks and units; it takes one step for every sample, whether or not a matrix draws on the noise.
+`matrix_noise_shift` is not sent for sync 0x31EA (the reader sends it for 0x31EB, §10.2). No stream FFmpeg writes has a
+non-zero noise coefficient: the decode is checked on one hand-built stream (`hb_noise_generator_0`) only (**no oracle**);
+`seed_shr7` is read as the 32-bit value the text shows (Q5).

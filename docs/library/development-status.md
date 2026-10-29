@@ -201,8 +201,9 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 |---|---|---|---|---|---|
 | **Codec** | TrueHD and MLP decoder (`iclforge::truehd`) | 🟢 | Medium | Important | Substreams 0 to 2 and a generic 16-channel substream 3, FIR and IIR, matrices with LSB bypass, Huffman and raw residuals, every check; bit-exact with FFmpeg on 12 fixtures. [TrueHD and MLP](truehd.md) |
 | | TrueHD and MLP encoder | 🔴 | Medium | Important | Phase T2a of [the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md); the syntax writers it builds on exist |
-| | IIR, LSB bypass, block data check, extra data, 16-channel substream | 🟡 | Medium | Important | Decoded; no external oracle (FFmpeg's encoders do not write them): ten hand-built streams, held to the signal each was built from |
-| | Noise generation, heavy DRC | 🔴 | Low | Nice-to-have | Refused (`kUnsupported`) or not read: the specification gives no generator, and the streams do not show where heavy DRC's bits sit (ERRATA open questions 5 and 10) |
+| | IIR, LSB bypass, block data check, extra data, 16-channel substream | 🟡 | Medium | Important | Decoded; no external oracle (FFmpeg's encoders do not write them): eleven hand-built streams, held to the signal each was built from |
+| | Noise generator 0 | 🟡 | Low | Nice-to-have | Decoded from the specification's LFSR (§17.2); no external oracle (one hand-built stream) |
+| | Noise generator 1, heavy DRC | 🔴 | Low | Nice-to-have | Refused (`kUnsupported`) or not read: generator 1's 256-entry table is not in the specification yet, and the streams do not show where heavy DRC's bits sit (ERRATA open questions 5 and 10) |
 | | `forge decode` and `forge probe` | 🟢 | Medium | Important | `.thd` and `.mlp`; 24-bit WAV in the stream's channel order, strict or lenient |
 | | Evolution frame HMAC (authenticity) | 🔴 | Medium | Important | Distinct from DD+ EMDF `iclforge::ac3::signing`; truncated HMAC-SHA-256 on Evolution frames (cf. truehdd `--evo-key`). Note on IM5 / [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
 | | Shipping TrueHD interop | 🟡 | Low | Out-of-scope | FFmpeg's streams and decoder agree with this one; DEE's streams are scored on the owner's machine; the clean-room ruling (IM6) is the owner's |
@@ -408,7 +409,7 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder landed (T1); ten questions for the specification's owner | 🟡 |
+| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder landed (T1); eleven questions for the specification's owner | 🟡 |
 | Evolution frame HMAC | Authenticity policy on MLP (parallel to EMDF; not `iclforge::ac3::signing`) | 🔴 |
 | DVD Forum MLP reference | Shipping interop (IM6) | 🔴 |
 

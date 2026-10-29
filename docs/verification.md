@@ -2058,15 +2058,15 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    of a stream whose length is not a multiple of the unit carries a 32-bit marker with the number of padding samples,
    which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
-   do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign` and an output shift, the block
-   data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. **None has
+   do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
+   block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. **None has
    an external oracle.** They are held to the signal each was made from, so a decoder that is wrong shows; but the writer
    follows ERRATA.md's reading of the specification, and a misreading is in the writer and in both decoders alike.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
    is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream.
 
-Not covered: noise generation and heavy DRC (refused or not read), and the block data CRC (the length is checked, the
+Not covered: noise generator 1 (its table is not available) and heavy DRC (refused or not read), and the block data CRC (the length is checked, the
 algorithm is not known).
 
 ## What untrusted input is checked against
