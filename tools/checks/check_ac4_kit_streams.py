@@ -181,6 +181,8 @@ def window_rms_db(x, rate: int, seconds: float = 0.1):
     """RMS in dBFS of each non-overlapping window, shape [windows, channels]."""
     win = int(rate * seconds)
     n = len(x) // win
+    if n == 0:  # shorter than one window: no window to measure
+        return np.zeros((0, x.shape[1]))
     rms = np.sqrt((x[: n * win].reshape(n, win, -1) ** 2).mean(axis=1))
     return 20.0 * np.log10(np.maximum(rms, 1e-9))
 
@@ -189,6 +191,8 @@ def activity(x, rate: int, below_peak_db: float = ACTIVE_BELOW_PEAK_DB):
     """Boolean [windows, channels]: a channel is active in a window when it is within
     below_peak_db of the loudest window of any channel."""
     db = window_rms_db(x, rate)
+    if db.size == 0:
+        return np.zeros(db.shape, dtype=bool)
     return db > db.max() - below_peak_db
 
 

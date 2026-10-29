@@ -235,6 +235,11 @@ class Measurements(unittest.TestCase):
         self.assertFalse(active[10:, 0].any())
         self.assertFalse(active[:, 1].any())
 
+    def test_a_decode_shorter_than_one_window_has_no_windows(self):
+        x = np.column_stack([tone(0.04, 440.0, 0.5)] * 2)
+        self.assertEqual(checker.window_rms_db(x, RATE).shape, (0, 2))
+        self.assertEqual(checker.activity(x, RATE).shape, (0, 2))
+
     def test_high_band_fraction_separates_an_lfe_from_a_full_band_signal(self):
         low = tone(1.0, 60.0, 0.5)
         mixed = low + tone(1.0, 5000.0, 0.5)
