@@ -311,6 +311,19 @@ jobs:
           preset: ${{ matrix.preset }}
           persist-quality-trend: ${{ inputs.persist_quality_trend }}
 
+      # The TrueHD (MLP) interoperability gate beside it (tools/checks/verify_truehd_interop.py,
+      # planning/truehd.md): forge's TrueHD streams decoded by FFmpeg, FFmpeg's committed masters
+      # (testdata/truehd/ffmpeg) decoded by forge, round trips and the Atmos leg, every check
+      # exact because TrueHD is lossless. One leg, as for mode=reference below: the codec's
+      # arithmetic is integer and platform-independent, so another leg would prove nothing new.
+      # --quick keeps it to one rate per family here; interop.yml runs the full matrix.
+      - name: TrueHD interop gate
+        if: matrix.gold_reference && matrix.preset == 'linux-gcc'
+        shell: bash
+        env:
+          MATRIX_PRESET: ${{ matrix.preset }}
+        run: python3 tools/checks/verify_truehd_interop.py --quick --cli "build/config-${MATRIX_PRESET}/bin/forge"
+
       # The same gate a second time, on the spec's own direct transform
       # evaluations instead of the fast paths (reference-mode end-to-end gate). 0.9.0 flipped
       # both transform defaults, and from then until this step existed every

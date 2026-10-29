@@ -69,6 +69,13 @@ on:
       - 'libs/ac3/src/decoder/**'
       - 'libs/ac3/include/iclforge/ac3/decoder/**'
       - 'apps/forge/cli/src/commands/decode.cpp'
+      # The TrueHD gate (truehd-interop below): the codec, forge's TrueHD commands, the scripts
+      # and the committed masters they read.
+      - 'libs/mlp/**'
+      - 'apps/forge/cli/src/commands/truehd.cpp'
+      - 'tools/checks/verify_truehd_interop.py'
+      - 'tools/checks/verify_truehd_dee_gold.py'
+      - 'testdata/truehd/**'
   workflow_dispatch:
 
 concurrency:
@@ -190,6 +197,66 @@ jobs:
       # built survive for the next attempt (actions/cache's own post-job save
       # runs only on success). continue-on-error: a cache that cannot be saved
       # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
+  # TrueHD (MLP), planning/truehd.md: tools/checks/verify_truehd_interop.py's full matrix against
+  # the pinned FFmpeg (forge encode then FFmpeg decode, FFmpeg's committed masters through forge,
+  # round trips, every lower presentation, and the Atmos leg), and the committed subset of the
+  # Dolby Encoding Engine's TrueHD masters when there is one (verify_truehd_dee_gold.py
+  # --committed, which says it skipped when testdata/truehd/dee is absent). Every check is exact:
+  # TrueHD is lossless. Nothing is fetched; the masters are in the repository.
+  truehd-interop:
+    name: TrueHD Interop (FFmpeg, exact)
+    needs: toolchain-versions
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Bootstrap container
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          attempt=1
+          until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+            build-essential ca-certificates cmake curl git gnupg lsb-release \
+            ninja-build pkg-config python3 software-properties-common \
+            tar unzip wget zip \
+            ffmpeg=7:8.0.1-3ubuntu2
+          do
+            echo "::warning title=apt-get::attempt $attempt of 3 failed"
+            [ "$attempt" -lt 3 ] || exit 1
+            attempt=$((attempt + 1))
+            sleep 30
+          done
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install LLVM 21
+        run: bash .github/toolchain/03-llvm-toolchain.sh
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          vcpkg-commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
+
+      - name: Report ffmpeg version
+        run: ffmpeg -version | head -1
+
+      - name: Configure
+        run: cmake --preset config-linux-llvm
+
+      - name: Build forge
+        run: cmake --build --preset build-linux-llvm --target forge -- -k 0
+
+      - name: TrueHD interop gate (full matrix)
+        run: python3 tools/checks/verify_truehd_interop.py --cli build/config-linux-llvm/bin/forge
+
+      - name: DEE TrueHD masters (committed subset)
+        run: python3 tools/checks/verify_truehd_dee_gold.py --cli build/config-linux-llvm/bin/forge --committed
+
       - name: Save vcpkg caches
         if: always()
         continue-on-error: true
