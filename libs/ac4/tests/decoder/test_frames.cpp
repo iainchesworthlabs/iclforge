@@ -901,11 +901,30 @@ void new_block(BitWriter& w, int x) {
     w.flag(false);                            // b_add_table_data
 }
 
+// One object_info_block() of a dynamic object in a frame that is not an I-frame, reusing its basic and
+// render info from the block before.
+void reuse_block(BitWriter& w) {
+    w.flag(false);  // b_object_not_active
+    w.flag(true);   // b_basic_info_reuse
+    w.flag(true);   // b_render_info_reuse
+    w.flag(false);  // b_add_table_data
+}
+
+// What the ajoc_dmx_de_data() of ajoc_audio() sends.
+enum class DialogueData {
+    kConfigNoObjects,  // b_dmx_de_cfg 1 with no dialogue objects
+    kNothing,          // b_dmx_de_cfg 0, b_keep_dmx_de_coeffs 0
+    kConfigOneObject,  // b_dmx_de_cfg 1 with one dialogue object and its coefficient
+    kCoefficient,      // b_dmx_de_cfg 0, b_keep_dmx_de_coeffs 0 and one coefficient
+};
+
 // An A-JOC substream of one downmix signal and one object: a SIMPLE
 // var_channel_element(), the timing and dynamic data of both OAMD portions,
 // ajoc() with one data point of one parameter band at the dry matrix's centre
-// (0), and ajoc_dmx_de_data() with no dialogue objects.
-std::vector<std::byte> ajoc_audio() {
+// (0), and ajoc_dmx_de_data() as asked (no dialogue objects by default). Where `b_iframe` is false
+// the objects' blocks reuse what the block before them sent.
+std::vector<std::byte> ajoc_audio(DialogueData dialogue = DialogueData::kConfigNoObjects,
+                                  bool b_iframe = true) {
     BitWriter w;
     w.put(0, 15);  // audio_size_value, rewritten below
     w.flag(false);
@@ -918,7 +937,7 @@ std::vector<std::byte> ajoc_audio() {
     w.put(1, 3);    // num_obj_info_blocks
     w.put(0, 6);    // block_offset_factor
     w.put(0, 2);    // ramp_duration_code
-    new_block(w, 31);
+    b_iframe ? new_block(w, 31) : reuse_block(w);
     w.flag(false);  // b_oamd_extension_present
     w.put(0, 3);    // ajoc_num_decorr
     w.flag(true);   // ajoc_object_present
@@ -932,13 +951,20 @@ std::vector<std::byte> ajoc_audio() {
     const iclforge::ac4::detail::HuffCode centre =
         iclforge::ac4::detail::tables::kAjocHcbDryCoarseF0Codes[25];
     w.put(centre.code, centre.bits);  // ajoc_hcw
-    w.flag(true);                     // b_dmx_de_cfg
+    const bool config = dialogue == DialogueData::kConfigNoObjects ||
+                        dialogue == DialogueData::kConfigOneObject;
+    w.flag(config);                   // b_dmx_de_cfg
     w.flag(false);                    // b_keep_dmx_de_coeffs
-    w.put(0, 2);                      // de_max_gain
-    w.put(0, 1);                      // de_main_dlg_flag[]: no dialogue objects
+    if (config) {
+        w.put(0, 2);  // de_max_gain
+        w.put(dialogue == DialogueData::kConfigOneObject ? 1 : 0, 1);  // de_main_dlg_flag[]
+    }
+    if (dialogue == DialogueData::kConfigOneObject || dialogue == DialogueData::kCoefficient) {
+        w.put(0b10111, 5);  // de_dlg_dmx_coeff_idx: 8/15
+    }
     w.flag(false);                    // b_umx_timing
     w.flag(true);                     // b_derive_timing_from_dmx
-    new_block(w, 62);
+    b_iframe ? new_block(w, 62) : reuse_block(w);
     const std::size_t audio_bits = w.size() - start;
     while ((w.size() - start) % 8 != 0) {
         w.flag(false);  // fill_bits
@@ -1048,48 +1074,64 @@ std::vector<std::byte> oamd_substream() {
     return w.bytes();
 }
 
-}  // namespace
-
-TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads each to its end",
-          "[ac4][decoder][frames]") {
+// The frame of an A-JOC substream (`n_dmx_signals` downmix signals, one object), a direct-coded
+// substream, their OAMD substream and the presentation substream. `b_iframe` is the audio
+// substreams' b_audio_ndot, which is what makes one of them an I-frame (Part 1 4.3.3.2.7).
+std::vector<std::byte> object_group_frame(bool b_iframe,
+                                          const std::vector<std::vector<std::byte>>& substreams,
+                                          int sequence_counter = 1, int md_compat = 0,
+                                          int n_dmx_signals = 1, bool b_lfe = false,
+                                          bool with_object = true) {
     BitWriter toc;
-    ac4_toc_test::toc_start(toc, {});
+    ac4_toc_test::toc_start(toc, {.sequence_counter = sequence_counter, .b_iframe_global = b_iframe});
     PresV1 p;
     p.presentation_substream = 3;
+    p.md_compat = md_compat;
     ac4_toc_test::presentation_v1(toc, p);
     toc.flag(true);   // b_substreams_present
     toc.flag(false);  // b_hsf_ext
-    toc.flag(false);  // b_single_substream
-    toc.put(0, 2);    // two substreams
+    toc.flag(!with_object);  // b_single_substream
+    if (with_object) {
+        toc.put(0, 2);  // two substreams
+    }
     toc.flag(false);  // b_channel_coded
     toc.flag(true);   // b_oamd_substream
     toc.flag(true);   // b_oamd_ndot
     ac4_toc_test::substream_index(toc, 2);
     toc.flag(true);   // b_ajoc
-    toc.flag(false);  // b_lfe
+    toc.flag(b_lfe);  // b_lfe
     toc.flag(false);  // b_static_dmx
-    toc.put(0, 4);    // n_fullband_dmx_signals_minus1: one signal
+    toc.put(static_cast<std::uint64_t>(n_dmx_signals - 1), 4);  // n_fullband_dmx_signals_minus1
     toc.flag(true);   // bed_dyn_obj_assignment(): b_dyn_objects_only
     toc.flag(false);  // b_oamd_common_data_present
     toc.put(0, 4);    // n_fullband_upmix_signals_minus1: one object
     toc.flag(true);   // b_dyn_objects_only
     toc.flag(false);  // b_sf_multiplier
     toc.flag(false);  // b_bitrate_info
-    toc.flag(true);   // b_audio_ndot
+    toc.flag(b_iframe);  // b_audio_ndot: the substream is an I-frame
     ac4_toc_test::substream_index(toc, 0);
-    toc.flag(false);  // b_ajoc: a direct-coded substream
-    toc.put(1, 3);    // n_objects_code: one object
-    toc.flag(true);   // b_dynamic_objects
-    toc.flag(false);  // b_lfe
-    toc.flag(false);  // b_sf_multiplier
-    toc.flag(false);  // b_bitrate_info
-    toc.flag(true);   // b_audio_ndot
-    ac4_toc_test::substream_index(toc, 1);
+    if (with_object) {
+        toc.flag(false);  // b_ajoc: a direct-coded substream
+        toc.put(1, 3);    // n_objects_code: one object
+        toc.flag(true);   // b_dynamic_objects
+        toc.flag(false);  // b_lfe
+        toc.flag(false);  // b_sf_multiplier
+        toc.flag(false);  // b_bitrate_info
+        toc.flag(b_iframe);  // b_audio_ndot: the substream is an I-frame
+        ac4_toc_test::substream_index(toc, 1);
+    }
     toc.flag(false);  // b_content_type
-    const std::vector<std::vector<std::byte>> substreams = {
-        ajoc_audio(), object_audio(), oamd_substream(), presentation(1, true)};
     ac4_toc_test::index_table(toc, ac4_toc_test::sizes_of(substreams));
     toc.align();
+    return ac4_toc_test::assemble(toc, substreams);
+}
+
+}  // namespace
+
+TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads each to its end",
+          "[ac4][decoder][frames]") {
+    const std::vector<std::vector<std::byte>> substreams = {
+        ajoc_audio(), object_audio(), oamd_substream(), presentation(1, true)};
 
     std::vector<iclforge::ac4::SyntaxRecord> records;
     // A named callable: the sink refers to it and does not own it.
@@ -1099,7 +1141,7 @@ TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads e
     iclforge::ac4::DecoderConfig config;
     config.syntax = keep;
     iclforge::ac4::Decoder decoder(config);
-    const auto report = decoder.parse(ac4_toc_test::assemble(toc, substreams));
+    const auto report = decoder.parse(object_group_frame(true, substreams));
     REQUIRE(report.has_value());
     REQUIRE(report->substreams.size() == 4);
     check_read(find(*report, 0), SubstreamReport::Kind::kAudio);
@@ -1148,6 +1190,73 @@ TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads e
     CHECK(value_of(0, "pos3D_X", 1) == 62);
     CHECK(value_of(0, "ajoc_hcw") == 25);
     CHECK(value_of(0, "b_derive_timing_from_dmx") == 1);
+}
+
+namespace {
+
+// A frame of the group with ajoc_audio(`dialogue`), an I-frame or not. Each frame of a stream
+// counts on from the one before (a repeated sequence_counter is taken for a change of source,
+// which forgets what the stream carried).
+std::vector<std::byte> ajoc_frame(bool b_iframe, DialogueData dialogue) {
+    static int counter = 0;
+    counter = counter % 1020 + 1;
+    return object_group_frame(
+        b_iframe,
+        {ajoc_audio(dialogue, b_iframe), object_audio(), oamd_substream(), presentation(1, true)},
+        counter);
+}
+
+}  // namespace
+
+TEST_CASE("an I-frame that sends no dialogue objects leaves the frames after it none to read",
+          "[ac4][decoder][frames]") {
+    // Spott's A-JOC streams send b_dmx_de_cfg in no frame and b_keep_dmx_de_coeffs 0 in all: with no
+    // dialogue objects the loop of 6.2.3.5 has nothing to read, in an I-frame and in the frames after
+    // it. libs/ac4/ERRATA.md, "A-JOC's dialogue enhancement data across frames".
+    iclforge::ac4::Decoder decoder;
+    const auto first = decoder.parse(ajoc_frame(true, DialogueData::kNothing));
+    REQUIRE(first.has_value());
+    check_read(find(*first, 0), SubstreamReport::Kind::kAudio);
+    for (int i = 0; i < 3; ++i) {
+        INFO("frame " << i + 1 << " after the I-frame");
+        const auto next = decoder.parse(ajoc_frame(false, DialogueData::kNothing));
+        REQUIRE(next.has_value());
+        check_read(find(*next, 0), SubstreamReport::Kind::kAudio);
+    }
+}
+
+TEST_CASE("a frame that sends dialogue coefficients with no I-frame before it is refused as missing it",
+          "[ac4][decoder][frames]") {
+    iclforge::ac4::Decoder decoder;
+    const auto first = decoder.parse(ajoc_frame(false, DialogueData::kNothing));
+    REQUIRE(first.has_value());
+    check_refused(find(*first, 0), DecodeError::kMissingIFrame);
+    // The I-frame that follows is read, and so is the frame after it.
+    const auto i_frame = decoder.parse(ajoc_frame(true, DialogueData::kNothing));
+    REQUIRE(i_frame.has_value());
+    check_read(find(*i_frame, 0), SubstreamReport::Kind::kAudio);
+    const auto p_frame = decoder.parse(ajoc_frame(false, DialogueData::kNothing));
+    REQUIRE(p_frame.has_value());
+    check_read(find(*p_frame, 0), SubstreamReport::Kind::kAudio);
+}
+
+TEST_CASE("a configuration with one dialogue object holds for the frames after it, and an I-frame clears it",
+          "[ac4][decoder][frames]") {
+    iclforge::ac4::Decoder decoder;
+    const auto first = decoder.parse(ajoc_frame(true, DialogueData::kConfigOneObject));
+    REQUIRE(first.has_value());
+    check_read(find(*first, 0), SubstreamReport::Kind::kAudio);
+    // One dialogue object and one downmix signal: the frame sends one coefficient, and is read to its end.
+    const auto next = decoder.parse(ajoc_frame(false, DialogueData::kCoefficient));
+    REQUIRE(next.has_value());
+    check_read(find(*next, 0), SubstreamReport::Kind::kAudio);
+    // An I-frame without a configuration leaves none, so the same frame sends no coefficient after it.
+    const auto cleared = decoder.parse(ajoc_frame(true, DialogueData::kNothing));
+    REQUIRE(cleared.has_value());
+    check_read(find(*cleared, 0), SubstreamReport::Kind::kAudio);
+    const auto after = decoder.parse(ajoc_frame(false, DialogueData::kNothing));
+    REQUIRE(after.has_value());
+    check_read(find(*after, 0), SubstreamReport::Kind::kAudio);
 }
 
 TEST_CASE("a substream named by two object elements is read as the first names it",
@@ -1280,4 +1389,79 @@ TEST_CASE("an A-JOC substream of more upmix signals than the decoder describes i
         constexpr std::uint32_t kIntMax = std::numeric_limits<int>::max();
         CHECK(ajoc.n_fullband_upmix_signals == static_cast<int>(std::min(c.signals, kIntMax)));
     }
+}
+
+namespace {
+
+// The presentation substream of an A-JOC presentation with a 5.1 downmix, as Dolby's level 4
+// streams write it: an object presentation (b_obj_loud_corr 1) that also reads the core's custom
+// downmix flag and loudness corrections.
+std::vector<std::byte> core_presentation() {
+    BitWriter w;
+    w.flag(false);  // b_additional_data
+    w.put(20, 7);   // dialnorm_bits
+    w.flag(false);  // b_further_loudness_info
+    w.put(1, 5);    // drc_metadata_size_value
+    w.flag(false);  // b_more_bits
+    w.flag(false);  // b_drc_present
+    w.flag(false);  // b_associated
+    w.flag(false);  // b_stereo_dmx_coeff: custom_dmx_data() of a presentation with a core
+    w.flag(true);   // b_obj_loud_corr
+    w.flag(false);  // b_corr_for_immersive_out
+    w.flag(true);   // b_loro_loud_comp
+    w.put(8, 5);    // loro_dmx_loud_corr
+    w.flag(false);  // b_ltrt_loud_comp
+    w.flag(false);  // b_loud_comp: loud_corr_5_X
+    w.flag(false);  // b_loud_comp: loud_corr_core_5_X
+    w.flag(false);  // b_loud_comp: loud_corr_core_loro and _ltrt
+    w.flag(false);  // b_loud_comp: loud_corr_9_X_4
+    w.align();
+    return w.bytes();
+}
+
+// The frame of a presentation of `md_compat` over an adaptive A-JOC substream of five downmix
+// signals and an LFE alone in its group (a direct-coded object beside it would leave no core,
+// Part 2 pseudocode 26), parsed with its records.
+iclforge::ac4::FrameReport parse_core_presentation(int md_compat,
+                                                   std::vector<iclforge::ac4::SyntaxRecord>& records) {
+    const auto keep = [&records](const iclforge::ac4::SyntaxRecord& record) {
+        records.push_back(record);
+    };
+    iclforge::ac4::DecoderConfig config;
+    config.syntax = keep;
+    iclforge::ac4::Decoder decoder(config);
+    const auto report = decoder.parse(object_group_frame(
+        true, {ajoc_audio(), object_audio(), oamd_substream(), core_presentation()}, 1, md_compat, 5,
+        true, false));
+    REQUIRE(report.has_value());
+    return *report;
+}
+
+long named_records(const std::vector<iclforge::ac4::SyntaxRecord>& records, int substream,
+                   std::string_view name) {
+    return std::count_if(records.begin(), records.end(), [&](const iclforge::ac4::SyntaxRecord& r) {
+        return r.substream == substream && r.name == name;
+    });
+}
+
+}  // namespace
+
+TEST_CASE("a level 4 presentation over a 5.1 A-JOC downmix has a core, so its presentation substream reads the core's fields",
+          "[ac4][decoder][frames]") {
+    // Dolby's OBI level 4 streams (md_compat 4, five downmix signals and an LFE) end every
+    // presentation substream with these fields, which ETSI TS 103 190-2 V1.3.1 reads only where the
+    // downmix is static. libs/ac4/ERRATA.md, "md_compat 4".
+    std::vector<iclforge::ac4::SyntaxRecord> records;
+    const iclforge::ac4::FrameReport report = parse_core_presentation(4, records);
+    check_read(find(report, 3), SubstreamReport::Kind::kPresentation);
+    CHECK(named_records(records, 3, "b_stereo_dmx_coeff") == 1);
+    CHECK(named_records(records, 3, "loro_dmx_loud_corr") == 1);
+}
+
+TEST_CASE("a presentation below level 4 over the same downmix has no core, as Part 2 says",
+          "[ac4][decoder][frames]") {
+    std::vector<iclforge::ac4::SyntaxRecord> records;
+    const iclforge::ac4::FrameReport report = parse_core_presentation(3, records);
+    CHECK(find(report, 3).kind == SubstreamReport::Kind::kPresentation);
+    CHECK(named_records(records, 3, "b_stereo_dmx_coeff") == 0);
 }

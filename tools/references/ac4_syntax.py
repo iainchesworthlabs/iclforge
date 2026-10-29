@@ -1963,14 +1963,12 @@ def ajoc_dmx_de_data(r, ctx, num_dmx_signals, num_umx_signals):
         flags = _field(r, num_umx_signals, 'de_main_dlg_flag')
         st['ajoc_dlg_obj'] = bin(flags).count('1')
     elif ctx.b_iframe:
-        st.pop('ajoc_dlg_obj', None)
+        st['ajoc_dlg_obj'] = 0
     if not b_keep:
         num_dlg_obj = st.get('ajoc_dlg_obj')
         if num_dlg_obj is None:
-            if not ctx.b_iframe:
-                raise SyntaxFail('de_dlg_dmx_coeff_idx needs a dialogue configuration no I-frame '
-                                 'has sent')
-            return
+            raise SyntaxFail('de_dlg_dmx_coeff_idx needs the dialogue objects of an I-frame, and '
+                             'none has been read')
         for _ in range(num_dlg_obj * num_dmx_signals):
             _dlg_dmx_coeff_idx(r)
 
@@ -3203,7 +3201,11 @@ def presentation_context(toc, p):
                     top_pairs = max(top_pairs, 2 if tcp == 3 else 1 if tcp in (1, 2) else 0)
             else:
                 obj = 1
-                if s['kind'] == 'ajoc' and info['b_static_dmx']:
+                # md_compat 4 is Dolby's level 4: an adaptive A-JOC substream of five downmix
+                # signals has a core there (libs/ac4/ERRATA.md, "md_compat 4").
+                if s['kind'] == 'ajoc' and (
+                        info['b_static_dmx']
+                        or (p.get('md_compat') == 4 and info['n_fullband_dmx_signals'] == 5)):
                     pcmc = superset(pcmc, 4 if info['b_lfe'] else 3, _CORE_SETS)
                 else:
                     adaptive = 1
