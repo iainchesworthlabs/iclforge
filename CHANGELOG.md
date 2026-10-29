@@ -10,6 +10,19 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: the AC-4 decoder refused Dolby's immersive stereo test streams ("sect_cb 12 to 15 name no codebook").** Immersive stereo
+  (`presentation_version` 2) is signalled with `channel_mode` 0b1111000, or 0b1111001 when it is made from Dolby Atmos content (Dolby's
+  AC-4 in MPEG-DASH specification, in the Online Delivery Kit). The decoder read only the first as stereo, and read the second as 7.1
+  (3/4/0.1), so the presentation substream ran past its end and the audio failed in its section data. Both codes are stereo now, in the C++
+  decoder and in `tools/references/ac4_syntax.py`; the regression test sets the second code's bit in a DEE stream and needs nothing of
+  Dolby's. Reading and evidence in `libs/ac4/ERRATA.md`.
+- **Added: `tools/checks/check_ac4_kit_streams.py` holds the decoder to Dolby's AC-4 Online Delivery Kit streams.** The kit's 12 AC-4
+  elementary streams have no reference PCM, so the check measures what they make checkable (every frame decodes, CRCs, sample count at
+  the exact frame rate, channel names and order, the LFE's band, the heights of 5.1.4, BS.1770-4 loudness against the declared LKFS, the
+  25 and 29.97 fps versions, the two languages, the DD+ version) and that none carries a content signature. It reads the kit from
+  `ICLFORGE_DOLBY_AC4_KIT_STREAMS` and prints SKIP without it; the kit's DASH, HLS fMP4 and MP4 versions decode to the same samples as
+  the elementary streams, and its HLS packed-audio files (ID3v2 tags) are not read yet. See "Dolby's Online Delivery Kit streams" in
+  `docs/verification.md`.
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has
