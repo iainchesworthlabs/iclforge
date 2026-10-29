@@ -725,9 +725,8 @@ frame, and the owner has not said that §15.4 and not §16.3 is what real stream
   every other unit, on one with a wrong check nibble and a wrong parity byte, on a frame written in the letter of §15.4 (only that reading
   reads it cleanly), on the hand-built stream whose extra data is opaque, and on a stream with no extra data; 13 mutations of the survey
   were tried and 11 fail the tests (the two that do not change what is chosen only when both readings read the same bytes cleanly). The
-  JSON of a stream inside Matroska, MP4 or a transport stream is still invalid for the reason `planning/truehd-parity-forge.md` R3 gives
-  (the `container` key is written twice, before and after this change; not touched here): with that key repaired the `evolution` object is
-  valid in all three.
+  JSON of a stream inside Matroska, MP4 or a transport stream is still invalid, as it was before this change (the probe writes the `container`
+  key twice, a defect being fixed on another branch and not touched here): with that key repaired the `evolution` object is valid in all three.
 - What this does not show: that any TrueHD stream looks like this. The vectors, the Python transcription and the C++ reader share one
   author's reading of §15.4; the E-AC-3 reader does not, and is why `kEmdf` is the default.
 

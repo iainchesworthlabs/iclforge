@@ -10,8 +10,8 @@ FFmpeg on its fixtures, the rest held to hand-built streams, which FFmpeg's deco
 
 ## Sources, and what they are
 
-- **The specification.** The owner supplied *Dolby TrueHD (MLP) Reference Specification* (versions 3.0 to 3.5, 2026-10-28 and
-  29; v3.5 is the one used) and says parts of it derive from analysis of the Dolby Encoding Engine (DEE) and of FFmpeg, and
+- **The specification.** The owner supplied *Dolby TrueHD (MLP) Reference Specification* (versions 3.0 to 3.6, 2026-10-28 and
+  29; v3.6 is the one used, and it changes §15 only) and says parts of it derive from analysis of the Dolby Encoding Engine (DEE) and of FFmpeg, and
   takes responsibility for that. It is not in the tree. Code and docs cite it as "TH spec §n" (section) or "TH spec App. X".
   It contradicts itself and the streams in places and is silent in others: every such place is a numbered entry in
   [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md), and the ones that need the owner are listed first there.
@@ -41,7 +41,7 @@ the codec's name, as [layout.md](layout.md) decision 12 recommends. The ROADMAP'
 |---|---|---|
 | T1 | The library skeleton wired into the build; the syntax layer (access units, major sync, substream directory, restart header, block header, filters, matrices, the CRCs and parities), both directions; an elementary stream reader; the lossless decoder for substreams 0 to 2 and a generic 16-channel substream 3 with its extra data carried as opaque bytes; an independent Python transcription; bit-exact interoperability with FFmpeg's encoder and decoder. | Done; noise generator 1 and heavy DRC are not decoded |
 | T2a | The encoder: matrices, prediction filters, codebook and offset choice, restart cadence, the FIFO and `input_timing` rate control, the 2ch and 6ch downmix substreams, verification by decoding. | Done except the opt-in tools: bit-exact with FFmpeg's strict decode in 43 cases and a fuzzer; IIR, LSB bypass, a negative output shift and heavy DRC are not written, and nothing outside the library reads the downmix presentations. Streams are 0.95 times FFmpeg's size |
-| T2b | Atmos: the sixteen-channel substream, the evolution frame, object audio metadata (ETSI TS 103 420, `iclforge::objects`), and an optional operator-keyed check of the frame in the style of [object signing](../docs/concepts/object-signing.md). Blocked on the owner's answers about the evolution payload (ERRATA.md, open questions). | Not started |
+| T2b | Atmos: the sixteen-channel substream, the evolution frame, object audio metadata (ETSI TS 103 420, `iclforge::objects`), and an optional operator-keyed check of the frame in the style of [object signing](../docs/concepts/object-signing.md). The read side (the extra data into plain structures, the evolution frame under two readings, `forge probe`'s report) is built and provisional, from TH spec v3.6; the write side is planned in [truehd-atmos.md](truehd-atmos.md) and waits on the owner's answers about the container and the time base (ERRATA.md, "Atmos, spec v3.6", questions 20 to 37). | Read side done (provisional); write side not started |
 | T2c | Containers (MP4 `mlpa`, Matroska `A_TRUEHD`, MPEG-TS, IEC 61937 and MAT), the `forge` commands, C API and Python bindings, the FFmpeg legs of `run_codec_matrix.sh` and the gold-reference gate, and the DEE scoring harness. T1 adds the minimum `forge decode` and `forge probe` for `.thd` and `.mlp` that its interoperability check needs. | Done except the bindings: the containers (T2c1); `forge` on every command that reads an AC-3 family stream and `truehd-encode`, the C API (decode and encode), the matrix, the gold-reference gate, the workflows and `score_truehd_decode.py` with its instructions (T2c2). Python, JavaScript and Rust bindings: see below |
 
 ### Not done in T2c
@@ -89,7 +89,8 @@ channel shift, negative output shifts, IIR state, the block data CRC, heavy DRC,
 1. What the evolution payload holds on the wire (TH spec §16.3, §16.6). Since v3.4 it is an outer Thrift container with the typed
    payload entries (the object audio metadata) and a nested `ContentSignature`, and §16.3.3 lists the outer field IDs, the digest scope
    and per-frame or per-stream signing as unconfirmed on the specification's side too. T1 carries the extra data as opaque bytes and
-   T2b writes nothing until the owner has these.
+   T2b writes nothing until the owner has these. v3.6 adds a second description of the same bytes (a bit-level container, §15.4);
+   ERRATA.md question 20 asks which real streams carry, and `forge probe` on a real Atmos track answers it.
 2. The unit and meaning of `extra_channel_meaning_length` and the size of a major sync that carries it (TH spec §14.2).
    The decoder finds the size by the CRC.
 3. Whether the terminators of TH spec §16.5 (`0xD234E`, `0x348D3`, `0x1234`) are written. FFmpeg's encoder writes none, and
