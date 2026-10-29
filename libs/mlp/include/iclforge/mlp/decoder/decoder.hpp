@@ -65,7 +65,11 @@ struct DrcMetadata {
 struct DecodedAccessUnit {
     std::uint32_t sample_rate = 0;
     int channels = 0;
-    int samples = 0;                // per channel
+    int samples = 0;  // per channel, padding dropped
+    // Samples at the end of the access unit that its termination word marks as padding (P7),
+    // dropped from `pcm`: a stream's last access unit holds the rest of a source that is not a
+    // whole number of access units long.
+    int padding = 0;
     std::vector<std::int32_t> pcm;  // interleaved, channels * samples
     std::uint16_t input_timing = 0;
     bool major_sync = false;  // this access unit carried a major sync

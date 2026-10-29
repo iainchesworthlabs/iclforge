@@ -23,7 +23,11 @@ using detail::LosslessCheck;
 // filters' 32-bit state can hold (P32).
 constexpr std::int64_t kPredictionLimit = std::int64_t{1} << 31;
 
-// The termination word some streams end a segment with (3.5, P7), accepted and skipped.
+// The termination word that ends the last access unit of a stream (3.5, P7): its top 20 bits are
+// 0xD234E and its low 12 the number of samples at the end of the access unit that are padding,
+// which the decoder drops. FFmpeg writes 0xD234E017 after a source 17 samples into its last
+// 40-sample access unit.
+constexpr std::uint32_t kTerminationMask = 0xFFFFF000U;
 constexpr std::uint32_t kTerminationWord = 0xD234E000U;
 
 // Section 10.3 and Appendix A: a 16-channel (0x31EC) substream may hold up to 15 primitive
@@ -79,7 +83,8 @@ struct Decoder::State {
                                               std::span<const std::byte> seg);
     std::expected<void, Error> apply(SubstreamState& st, const BlockHeader& b);
     std::expected<int, Error> segment(int index, const detail::Segment& seg, int samples_per_au,
-                                      std::vector<std::int32_t>* out, bool& restarted);
+                                      std::vector<std::int32_t>* out, bool& restarted,
+                                      int& padding);
 };
 
 std::expected<void, Error> Decoder::State::restart_header(SubstreamState& st, BitReader& r,
@@ -190,11 +195,13 @@ std::expected<void, Error> Decoder::State::apply(SubstreamState& st, const Block
 
 std::expected<int, Error> Decoder::State::segment(int index, const detail::Segment& seg,
                                                   int samples_per_au,
-                                                  std::vector<std::int32_t>* out, bool& restarted) {
+                                                  std::vector<std::int32_t>* out, bool& restarted,
+                                                  int& padding) {
     SubstreamState& st = substreams[static_cast<std::size_t>(index)];
     BitReader r(seg.bytes);
     int total = 0;
     restarted = false;
+    padding = 0;
     for (;;) {
         if (r.read_flag("block_header_exists")) {
             if (r.read_flag("restart_header_exists")) {
@@ -333,8 +340,13 @@ std::expected<int, Error> Decoder::State::segment(int index, const detail::Segme
     if (pos + 32U + checks == end) {
         BitReader term(seg.bytes);
         term.seek(pos);
-        if (term.read(32) == kTerminationWord) {
+        const std::uint32_t word = term.read(32);
+        if ((word & kTerminationMask) == kTerminationWord) {
             pos += 32U;
+            padding = static_cast<int>(word & ~kTerminationMask);
+            if (padding > total) {
+                return std::unexpected(Error::kTooManySamples);
+            }
         }
     }
     if (pos + checks != end) {
@@ -419,8 +431,9 @@ std::expected<DecodedAccessUnit, Error> Decoder::decode(std::span<const std::byt
             out.assign(static_cast<std::size_t>(spa) * kMaxChannels, 0);
         }
         bool restarted = false;
+        int padding = 0;
         auto got = s.segment(i, layout->segments[static_cast<std::size_t>(i)], spa,
-                             emit ? &out : nullptr, restarted);
+                             emit ? &out : nullptr, restarted, padding);
         if (!got) {
             return fail(got.error());
         }
@@ -430,13 +443,15 @@ std::expected<DecodedAccessUnit, Error> Decoder::decode(std::span<const std::byt
         samples = *got;
         if (emit) {
             result.restart = restarted;
+            result.padding = padding;
         }
     }
     const SubstreamState& st = s.substreams[static_cast<std::size_t>(top)];
     result.channels = st.restart.max_matrix_chan + 1;
-    result.samples = samples;
+    result.samples = samples - result.padding;
     // The segment wrote rows of `channels` samples from the start of `out`.
-    out.resize(static_cast<std::size_t>(result.channels) * static_cast<std::size_t>(samples));
+    out.resize(static_cast<std::size_t>(result.channels) *
+               static_cast<std::size_t>(result.samples));
     result.pcm = std::move(out);
     result.substreams_decoded = top + 1;
     const auto& entry = layout->segments[static_cast<std::size_t>(top)].entry;
