@@ -142,6 +142,7 @@ Documentation depends on these, and each belongs to another task.
 4. `cmake/InstallLibrary.cmake` describes `truehd` as "reader and lossless decoder" and says it is left out of the vcpkg port and the Conan recipe "until a program that ships links it"; `forge` links it now.
 5. No fixture or test covers a protected `mlpa` track.
 6. `docs/hearth/sink-*.md` and the ESP32 pages are measurement pages; whether they should carry a TrueHD row is for the ESP32 audit.
+7. The one-line descriptions in package metadata name E-AC-3 and AC-4 and call the project clean-room: the root `CMakeLists.txt` and `vcpkg.json`, the vcpkg port, the Homebrew formula and cask, the winget manifests (one per released version, so they are records), `bindings/python/pyproject.toml`, `bindings/rust/iclforge/Cargo.toml` and `bindings/js/package.json`. How to word TrueHD in them, given that it is not clean-room in the sense the other codecs are, is the owner's call (question 1 in the report of this round).
 
 ## Round 2
 
