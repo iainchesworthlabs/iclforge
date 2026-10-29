@@ -519,6 +519,70 @@ TEST_CASE("an unsigned or foreign stream is reported, not mistaken", "[ac4][sign
     CHECK(refused.error().fault->code == crypto::SignatureError::kCertifierNoPrivateKey);
 }
 
+// CS spec v2.5 §8.3.2: signing an MP4 is out of scope and a signer shall refuse it. The refusal
+// names the reason (the kind is its own, not "not AC-4": the samples inside may well be AC-4) and
+// the stream that can be signed.
+TEST_CASE("an MP4 is refused by name, not signed and not taken for a damaged AC-4 stream",
+          "[ac4][signing]") {
+    const Fixture f;
+    // The first box of an MP4 file or a bare segment: 32-bit size, a four-character type, then
+    // whatever the box holds (here the sync frames of a valid stream, to show that what is inside
+    // does not matter: the container is what cannot carry the signature).
+    const auto with_box = [](const char* type, std::size_t size) {
+        std::vector<std::byte> out{std::byte{0}, std::byte{0}, static_cast<std::byte>(size >> 8),
+                                   static_cast<std::byte>(size & 0xFF)};
+        for (int i = 0; i < 4; ++i) {
+            out.push_back(static_cast<std::byte>(type[i]));
+        }
+        const std::vector<std::byte> frames = synthetic_stream();
+        out.insert(out.end(), frames.begin(), frames.end());
+        return out;
+    };
+    for (const char* type : {"ftyp", "styp", "moov", "moof", "mdat"}) {
+        INFO(type);
+        const std::vector<std::byte> mp4 = with_box(type, 24);
+
+        const auto located = iclforge::ac4::locate_signature_trailer(mp4);
+        REQUIRE_FALSE(located.has_value());
+        CHECK(located.error().kind ==
+              iclforge::ac4::StreamSignatureErrorKind::kContainerNotSupported);
+
+        const auto refused = iclforge::ac4::sign_stream(mp4, f.credentials, f.options());
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error().kind ==
+              iclforge::ac4::StreamSignatureErrorKind::kContainerNotSupported);
+        // The reason, the clause and what to do instead.
+        CHECK(refused.error().message.find("MP4") != std::string::npos);
+        CHECK(refused.error().message.find("8.3.2") != std::string::npos);
+        CHECK(refused.error().message.find("out of scope") != std::string::npos);
+        CHECK(refused.error().message.find("raw .ac4 elementary stream") != std::string::npos);
+
+        // Nor is anything made of it by the other entry points.
+        CHECK_FALSE(iclforge::ac4::strip_signature(mp4).has_value());
+        CHECK_FALSE(iclforge::ac4::signed_content_digest(mp4).has_value());
+        const crypto::VerifyReport report = iclforge::ac4::verify_stream(mp4, f.policy());
+        CHECK(report.verdict == crypto::Verdict::kInvalid);
+        REQUIRE(report.fault.has_value());
+        CHECK(report.fault->message.find("MP4") != std::string::npos);
+    }
+
+    // What is not a box stays what it was: bytes that are neither sync frames nor an MP4's first
+    // box are "not an AC-4 stream", and a stream that opens with a sync word is not an MP4 however
+    // its fourth to eighth bytes read.
+    std::vector<std::byte> other = with_box("ftyq", 24);
+    const auto not_a_box = iclforge::ac4::sign_stream(other, f.credentials, f.options());
+    REQUIRE_FALSE(not_a_box.has_value());
+    CHECK(not_a_box.error().kind == iclforge::ac4::StreamSignatureErrorKind::kNotAnAc4Stream);
+    std::vector<std::byte> ac4 = synthetic_stream();
+    for (int i = 0; i < 4; ++i) {
+        ac4[static_cast<std::size_t>(4 + i)] = static_cast<std::byte>("ftyp"[i]);
+    }
+    const auto still_ac4 = iclforge::ac4::locate_signature_trailer(ac4);
+    // Mangled payload bytes only change what the frames hold; the walk still reads them as frames.
+    REQUIRE(still_ac4.has_value());
+    CHECK_FALSE(still_ac4->present);
+}
+
 TEST_CASE("a real AC-4 stream signs, plays as it did, and verifies", "[ac4][signing]") {
     const Fixture f;
     const std::vector<std::byte> stream =

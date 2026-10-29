@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -37,6 +38,29 @@ bool begins_as_content_signature(std::span<const std::byte> bytes) {
     return true;
 }
 
+// An ISO base media file (MP4, fragmented MP4, CMAF) has no magic number: it opens with a box whose
+// first four bytes are its length and the next four its type. The types a file or a bare segment
+// opens with in practice are the ones listed (ISO/IEC 14496-12 §4.3 'ftyp', 'styp' for a segment,
+// and the others tools write when they leave 'ftyp' out). A stream that opens with a sync word,
+// 0xAC40 or 0xAC41, is AC-4 whatever its next bytes spell: as a box size that would be 2.8 GB.
+bool begins_as_iso_bmff(std::span<const std::byte> bytes) {
+    constexpr std::array<std::string_view, 5> kLeadingTypes{"ftyp", "styp", "moov", "moof", "mdat"};
+    if (bytes.size() < 8) {
+        return false;
+    }
+    if (bytes[0] == std::byte{0xAC} &&
+        (bytes[1] == std::byte{0x40} || bytes[1] == std::byte{0x41})) {
+        return false;
+    }
+    const std::string_view type{reinterpret_cast<const char*>(bytes.data()) + 4, 4};
+    for (const std::string_view known : kLeadingTypes) {
+        if (type == known) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Why the bytes after the framing are not a trailer, for a message.
 std::string stray_message(std::span<const std::byte> stream, const TrailerLocation& location) {
     const std::span<const std::byte> rest = stream.subspan(location.framing_ends);
@@ -58,6 +82,16 @@ std::string stray_message(std::span<const std::byte> stream, const TrailerLocati
 
 std::expected<TrailerLocation, StreamSignatureError> locate_signature_trailer(
     std::span<const std::byte> stream) {
+    if (begins_as_iso_bmff(stream)) {
+        // Said by name, not as "not AC-4": the stream may well be AC-4, in a container that cannot
+        // carry a signature.
+        return failure(
+            StreamSignatureErrorKind::kContainerNotSupported,
+            "this is an MP4 (ISO base media) file. A content signature is carried only as a "
+            "trailer after the last sync frame of a raw .ac4 stream. CS spec v2.5 section 8.3.2 "
+            "puts signing an MP4 out of scope: it names no box that carries one, so no verifier "
+            "would know where to look");
+    }
     const ScanResult scanned = scan(stream);
     if (scanned.frames.empty()) {
         return failure(StreamSignatureErrorKind::kNotAnAc4Stream,
@@ -107,7 +141,11 @@ std::expected<std::vector<std::byte>, StreamSignatureError> sign_stream(
     const base::crypto::SignOptions& options) {
     const auto located = locate_signature_trailer(stream);
     if (!located.has_value()) {
-        return std::unexpected(located.error());
+        StreamSignatureError error = located.error();
+        if (error.kind == StreamSignatureErrorKind::kContainerNotSupported) {
+            error.message += "; sign the raw .ac4 elementary stream instead";
+        }
+        return std::unexpected(std::move(error));
     }
     if (located->present) {
         // Bytes that begin as a signature do: a signature that reads is already there, and one
