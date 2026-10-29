@@ -38,9 +38,10 @@ constexpr int kLatencyMs = 75;  // TH spec §3.4, §18.1
     return EncodeError{kind, detail};
 }
 
-// TH spec §7.3, ERRATA.md entry 12: the value a restart interval's samples fold to.
-[[nodiscard]] std::uint8_t fold_to_check(std::uint32_t fold) noexcept {
-    return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
+// The matrix channel output channel `c` of a stage takes: the encoder writes the identity ch_assign
+// (restart header and fold both read it here).
+[[nodiscard]] constexpr std::uint8_t stage_ch_assign(int c) noexcept {
+    return static_cast<std::uint8_t>(c);
 }
 
 [[nodiscard]] bool is_sample_rate(std::uint32_t rate) noexcept {
@@ -1104,10 +1105,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 const auto value =
                     static_cast<std::uint32_t>(stage.outputs[static_cast<std::size_t>(k)][t])
                     << output_shift;
-                fold ^= (value & 0xFFFFFFU) << k;
+                fold = lossless_fold_step(fold, value, stage_ch_assign(k));
             }
         }
-        stage.check = fold_to_check(fold);
+        stage.check = lossless_check_of(fold);
     }
 
     // --- the access units --------------------------------------------------------------------
@@ -1183,8 +1184,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         restart.data_check_present = false;
                         restart.lossless_check = previous_check[s];
                         for (int c = 0; c <= stage.spec.last_row; ++c) {
-                            restart.ch_assign[static_cast<std::size_t>(c)] =
-                                static_cast<std::uint8_t>(c);
+                            restart.ch_assign[static_cast<std::size_t>(c)] = stage_ch_assign(c);
                         }
                         write_restart_header(w, restart);
                     }

@@ -40,9 +40,13 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
    `ErrorKind::kUnsupported` and waits for the table from the owner; it does not take the values from anywhere else.
    Also asked, for generator 0: is `seed_shr7` in §17.2 a 32-bit or a 16-bit value? The recurrence gives different
    sequences (bits 16 and up of the new state), and no stream here has a non-zero noise coefficient to say.
-6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The streams
-   cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
-   `ch_assign` is the identity. The library shifts by the output position. **Provisional, owner to confirm.**
+6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The FFmpeg-made
+   streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
+   `ch_assign` is the identity. FFmpeg's decoder shifts by `ch_assign[output channel]`: its strict decode of a stream
+   built with a permuted `ch_assign` and the position shift says `Lossless check failed - expected 23, calculated ec`
+   (the old `hb_matrices.thd`, patched as `verify_truehd_interop.py` does), and 0xEC is the fold shifted by the matrix
+   channel. The library follows FFmpeg, in decoder and encoder through one helper (`lossless_fold_step`). Does the
+   specification mean the matrix channel? **Provisional, owner to confirm.**
 7. **Negative `output_shift` (§8.2).** The field is signed; the specification allows no negative value and the
    streams have none. The library shifts right (arithmetically) for a negative value (**no oracle**).
 8. **IIR state (§9.2, §9.5).** The streams never send `new_states`. The library loads `state[i]` as the history at
@@ -155,12 +159,14 @@ whose `params_for_this_chan` bit is set, not under their own presence bits. Same
 
 **12. The lossless check (§7.3).** The specification XORs the three low bytes of each sample. The streams: for every
 sample of every output channel of the substream, `acc ^= (sample & 0xFFFFFF) << channel` (32-bit), and the check is
-`acc ^ acc>>8 ^ acc>>16 ^ acc>>24` in its low byte. It covers the output of the substream after the output shift, from
+`acc ^ acc>>8 ^ acc>>16 ^ acc>>24` in its low byte, where "channel" is the matrix channel the output channel takes
+(`ch_assign[output channel]`; the output position until the FFmpeg evidence of open question 6 corrected it). It covers the output of the substream after the output shift, from
 the restart header before to the one after (the header carries the check of the interval that *ends* at it; the first
 header's value checks nothing). `explore27.py set/m51_48.thd 1000 1`: stored 129, 8, 13, 125, 180, 146 and the
 channel-shifted fold gives 129, 8, 13, 125, 180, 146; the plain byte fold gives 17, 41, 214, 201, 40, 103. The library's
 decode checks every interval of every FFmpeg stream tried (19 exploration streams and the 12 fixtures) (`m51_48.thd`: 298 intervals, 149 for each of its two
-substreams, none failing). The shift (Q6) is provisional.
+substreams, none failing). Those streams have an identity `ch_assign`. The shift by `ch_assign` (Q6) is provisional: it
+is FFmpeg's, found with a stream that permutes it (`python3 tools/checks/verify_truehd_interop.py --handbuilt`, `hb_matrices`).
 
 **13. The FIR and IIR histories (§9.4, §9.5).** The FIR filter predicts from the channel's previous *outputs*. The
 "IIR" filter predicts from its previous *residuals* (`output - prediction`), not from previous outputs. The

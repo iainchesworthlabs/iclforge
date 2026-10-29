@@ -305,11 +305,13 @@ def write_light_block_header(w, sub, size):
         w.put(0, 1)
 
 
-def lossless_fold(rows):
+def lossless_fold(rows, ch_assign):
+    """The check of the interval whose output rows these are: each sample shifted by the matrix channel
+    its output channel takes (ERRATA 12, provisional)."""
     fold = 0
     for row in rows:
         for ch, value in enumerate(row):
-            fold ^= (value & 0xFFFFFF) << ch
+            fold ^= (value & 0xFFFFFF) << ch_assign[ch]
             fold &= 0xFFFFFFFF
     return ref.fold_check(fold)
 
@@ -356,7 +358,7 @@ def build_stream(stream):
                 w.put(1 if restart_here else 0, 1)
                 if restart_here:
                     previous = list(range(first - interval, first)) if unit else []
-                    check = lossless_fold([sub.output[i] for i in previous]) if previous else 0
+                    check = lossless_fold([sub.output[i] for i in previous], sub.ch_assign) if previous else 0
                     w.append(write_restart_header(sub, check))
                     write_full_block_header(w, sub, coding, size)
                 else:

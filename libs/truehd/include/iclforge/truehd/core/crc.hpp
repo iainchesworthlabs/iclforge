@@ -44,4 +44,23 @@ namespace iclforge::truehd {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::uint8_t extra_data_check_nibble(
     std::uint32_t extra_data_length) noexcept;
 
+// TH spec §7.3, ERRATA.md entry 12: the lossless check of a restart interval. The decoder and the
+// encoder fold the samples the same way, through these two functions, so that they cannot disagree.
+//
+// One output sample enters the fold masked to its low 24 bits and shifted left by the *matrix
+// channel* the output channel takes (`ch_assign[output channel]`), not by the output channel's
+// position. In a stream whose ch_assign is the identity the two are the same, which is every stream
+// FFmpeg's encoder writes; FFmpeg's decoder shifts by the matrix channel (`hb_matrices.thd`,
+// ERRATA entry 12). **Provisional, owner to confirm** (open question 6).
+[[nodiscard]] constexpr std::uint32_t lossless_fold_step(std::uint32_t fold, std::uint32_t sample,
+                                                         unsigned matrix_channel) noexcept {
+    return matrix_channel >= 32 ? fold : fold ^ ((sample & 0xFFFFFFU) << matrix_channel);
+}
+
+// The 8-bit value a restart header carries for the interval whose samples folded to `fold`: the
+// four bytes of the 32-bit fold XORed together.
+[[nodiscard]] constexpr std::uint8_t lossless_check_of(std::uint32_t fold) noexcept {
+    return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
+}
+
 }  // namespace iclforge::truehd

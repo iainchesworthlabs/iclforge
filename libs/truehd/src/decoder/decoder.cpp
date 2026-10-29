@@ -93,13 +93,6 @@ struct SegmentResult {
     return static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << 8U) >> 8;
 }
 
-// The 8-bit value a restart interval's fold is checked against: the fold XORs each sample masked to
-// 24 bits and shifted left by its channel, then folds the 32-bit result onto its low byte
-// (ERRATA.md).
-[[nodiscard]] std::uint8_t fold_to_check(std::uint32_t fold) noexcept {
-    return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
-}
-
 Error make_error(ErrorKind kind, std::string_view detail) {
     return Error{kind, detail};
 }
@@ -236,7 +229,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
 
     // TH spec §7.3: this header carries the check of the interval that ends here.
     if (state.running && state.interval_open) {
-        if (fold_to_check(state.interval_fold) == header->lossless_check) {
+        if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
         } else {
             ++counters.lossless_check_failures;
@@ -568,7 +561,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
-            state.interval_fold ^= (static_cast<std::uint32_t>(output) & 0xFFFFFFU) << ch;
+            state.interval_fold =
+                lossless_fold_step(state.interval_fold, static_cast<std::uint32_t>(output),
+                                   restart.ch_assign[static_cast<std::size_t>(ch)]);
             if (emit) {
                 pcm_base[static_cast<std::ptrdiff_t>(i) * out_channels + ch] =
                     sign_extend_24(output);

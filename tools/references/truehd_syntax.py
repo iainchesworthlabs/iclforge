@@ -415,7 +415,8 @@ def decode_block(sub, bits, rows, first):
         if sub.interval is None:
             sub.interval = 0
         for ch, value in enumerate(out_row):
-            sub.interval ^= (value & 0xFFFFFF) << ch
+            # The shift is the matrix channel the output channel takes (ERRATA 12, provisional).
+            sub.interval ^= (value & 0xFFFFFF) << sub.ch_assign[ch]
             sub.interval &= 0xFFFFFFFF
     return output_rows
 

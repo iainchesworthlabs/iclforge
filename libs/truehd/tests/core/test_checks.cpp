@@ -88,3 +88,24 @@ TEST_CASE("channel assignments list their speakers in stream order", "[truehd][f
     CHECK(channel_count_of_mlp_arrangement(12) == 6);
     CHECK(channel_count_of_mlp_arrangement(31) == -1);
 }
+
+TEST_CASE("the lossless fold shifts a sample by the matrix channel its output channel takes",
+          "[truehd][checks]") {
+    // ERRATA entry 12 (provisional): not by the output channel's position. With the identity
+    // ch_assign of every stream FFmpeg's encoder writes the two are the same; with ch_assign
+    // {1, 0} they are not.
+    std::uint32_t by_assign = 0;
+    by_assign = lossless_fold_step(by_assign, 0x000001, 1);
+    by_assign = lossless_fold_step(by_assign, 0x000200, 0);
+    CHECK(by_assign == 0x000202U);
+    std::uint32_t by_position = 0;
+    by_position = lossless_fold_step(by_position, 0x000001, 0);
+    by_position = lossless_fold_step(by_position, 0x000200, 1);
+    CHECK(by_position == 0x000401U);
+    CHECK(lossless_check_of(by_assign) != lossless_check_of(by_position));
+    // Only the low 24 bits of a sample count, and a shift of 32 or more contributes nothing.
+    CHECK(lossless_fold_step(0, 0xFF000001U, 0) == 0x000001U);
+    CHECK(lossless_fold_step(7, 0x000001, 32) == 7U);
+    // The four bytes of the fold are XORed into one.
+    CHECK(lossless_check_of(0x01020408U) == (0x01 ^ 0x02 ^ 0x04 ^ 0x08));
+}

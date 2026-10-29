@@ -110,6 +110,31 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
     }
 }
 
+TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
+          "[truehd][handbuilt][ffmpeg-derived]") {
+    // ERRATA entry 12: the fold shifts by ch_assign[output channel]. The stream's first writer
+    // shifted by the output position and stored 0x23 for its second restart interval; FFmpeg's
+    // decode of it said "Lossless check failed - expected 23, calculated ec". The stream carries
+    // 0xEC now, and tools/checks/verify_truehd_interop.py's FFmpeg leg decodes it without that
+    // message.
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_matrices.thd");
+    ElementaryReader reader(stream);
+    std::vector<int> checks;
+    while (const auto unit = reader.next()) {
+        auto parsed = parse_access_unit(*unit, 1);
+        REQUIRE(parsed.has_value());
+        iclforge::BitReader bits(parsed->segments[0]);
+        if (bits.read(1) == 1 && bits.read(1) == 1) {  // block_header_exists, restart_header_exists
+            auto restart = read_restart_header(bits, parsed->segments[0], true);
+            REQUIRE(restart.has_value());
+            checks.push_back(restart->lossless_check);
+        }
+    }
+    REQUIRE(checks.size() >= 2);
+    CHECK(checks[0] == 0);  // the first header's value checks nothing
+    CHECK(checks[1] == 0xEC);
+}
+
 TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused when one has",
           "[truehd][handbuilt][no-external-oracle]") {
     // Restart sync 0x31EB, generator 1 (TH spec 17.3): its table is not available, so a matrix with
