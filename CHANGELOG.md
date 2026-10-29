@@ -10,18 +10,19 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-- **Changed: AC-4 content signing follows the owner's CS spec v2.5.** An MP4 is refused by name (`ac4-sign` and `sign-content` exit 1, the
-  second before anything is encoded): v2.5 §8.3.2 puts signing an MP4 out of scope and asks for the raw `.ac4` stream. The signature is
+- **Changed: AC-4 content signing follows the owner's CS spec v2.5 and v2.6.** An MP4 is refused by name (`ac4-sign` and `sign-content` exit
+  1, the second before anything is encoded): §8.3.2 puts signing an MP4 out of scope and asks for the raw `.ac4` stream. The signature is
   checked before the digests it holds (§6.1), so a forged signature over altered content is reported as the signature's fault and the digest
   lines say they rest on a signature that did not verify. The signer information of §5.3 is written and reported: `ac4-sign` and
   `sign-content` take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
-  `os-description=`; a nonce of another length than 128 bytes, a publisher UUID that is not a UUID, and one that the signing certificate's
-  subject contradicts are refused; a missing `publisher-uuid=` and a `signed-date=` far from the clock are warned about. `ac4-verify`
-  prints the publisher, product, platform and application and two findings (`signer nonce`, `publisher UUID`) that do not change the
-  verdict; `verify-content` makes them count. `check-content` now judges the certificates at the date the signature records, as the owner
-  decided (`ac4-verify` and `verify-content` still judge at the time of the check; `verify-time=` overrides both). The sample's publisher
-  UUID is in none of its four certificates, so a UUID that the certificate does not carry is reported as not compared and never refused.
-  Open questions 16 to 19 in `libs/ac4/ERRATA.md`; questions 2, 11 and 13 are answered by v2.5.
+  `os-description=`; a nonce of another length than 128 bytes and a publisher UUID that is not a UUID are refused; a missing
+  `publisher-uuid=` and a `signed-date=` far from the clock are warned about. `ac4-verify` prints the publisher, product, platform and
+  application and two findings (`signer nonce`, `publisher UUID`) that do not change the verdict; `verify-content` makes them count. v2.6
+  withdraws v2.5's rule that the publisher UUID match the signing certificate: it is the PACE publisher account's, carried out of band, and
+  is in none of the sample's four certificates. It is not compared with the certificate; `expect-publisher-uuid=` (repeat for more) names the
+  accounts to accept, and a signature naming another is a finding in `ac4-verify` and a refusal with `verify-content`. `check-content` now
+  judges the certificates at the date the signature records, as the owner decided (`ac4-verify` and `verify-content` still judge at the
+  time of the check; `verify-time=` overrides both). Open questions 17 to 19 in `libs/ac4/ERRATA.md`; questions 2, 11, 13 and 16 are answered.
 - **Added: Hearth decodes and plays TrueHD and MLP.** The desktop player opens `.thd` and `.mlp` files and the TrueHD track of an MP4,
   Matroska or MPEG-TS file, decodes them with `iclforge::truehd` (presentation `best`, strict checks) and plays the PCM to local
   outputs and to a network group. The 25 FFmpeg-made fixtures and the hand-built streams the library decodes come out of the engine's

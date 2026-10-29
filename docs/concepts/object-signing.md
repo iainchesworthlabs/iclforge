@@ -283,11 +283,12 @@ The rest follows this page's stance:
 - Certificates are judged at the time `verify-time=` names: now (the specification's, and the
   default of `ac4-verify` and `verify-content`), the date the signer wrote (only as good as the
   signer, and the default of `check-content`, which reports and carries on), a given instant or never.
-- The signature names who made it (publisher UUID and name, product, platform), as CS spec v2.5
-  section 5.3 describes. `ac4-sign` takes these as options, `ac4-verify` reports them, and
-  `verify-content` also refuses a publisher UUID that is missing or that the signing certificate
-  contradicts. Only a raw `.ac4` stream is signed: signing an MP4 is out of scope (section 8.3.2) and
-  is refused by name.
+- The signature names who made it (publisher UUID and name, product, platform), as CS spec v2.6
+  section 5.3 describes. `ac4-sign` takes these as options and `ac4-verify` reports them. The
+  publisher UUID is the PACE account's and is not in the signing certificate, so it is compared with
+  nothing unless `expect-publisher-uuid=` names the accounts you accept; `verify-content` refuses a
+  UUID that is missing or that is none of them. Only a raw `.ac4` stream is signed: signing an MP4 is
+  out of scope (section 8.3.2) and is refused by name.
 
 See [Signing](../library/signing.md#ac-4-content-signing) for the API, and `libs/ac4/ERRATA.md` for
 what was measured on a real signature and the questions still open.

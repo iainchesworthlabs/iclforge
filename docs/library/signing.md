@@ -143,7 +143,7 @@ crypto::SignOptions options;
 options.signed_date = crypto::format_iso8601_utc(now);          // "YYYY-MM-DDTHH:MM:SS", UTC, the time of signing
 options.chain_policy.valid_at = now;                            // refuse an expired chain now
 options.metadata.publisher_uuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";   // your publisher account's UUID
-options.metadata.publisher_name = "Example Publisher";          // CS spec v2.5 section 5.3
+options.metadata.publisher_name = "Example Publisher";          // CS spec v2.6 section 5.3
 auto signed_stream = iclforge::ac4::sign_stream(stream, *credentials, options);
 
 crypto::VerifyPolicy policy;
@@ -177,7 +177,7 @@ key read from a source of unknown size such as a pipe, which can be copied as it
 **Three verdicts, and one is not "valid".** `verify_stream` always returns a report: every check, in
 order (structure, versions and methods, curve, chain parsed, chain valid, signed date, signature,
 signer information digest, content digest), and a verdict. The signature comes before the digests it
-holds because they carry weight only once it has verified (CS spec v2.5 §6.1, "verification order
+holds because they carry weight only once it has verified (CS spec v2.6 §6.1, "verification order
 matters"); when it has not, the digest checks still run and say that they rest on a signature that
 did not verify, and the first fault is the signature's. `kValid` means every check passed *and*
 the chain leads to a `trust_anchors` certificate or a `pins` fingerprint the caller gave.
@@ -188,18 +188,20 @@ chain: the file agrees with its own signature, which says nothing about who made
 A stream with no signature, or that is not AC-4, is an invalid report too (`BadOrMissingSignature`), so
 a caller that refuses and one that only reports share one path.
 
-**Who signed (CS spec v2.5 §5.3).** `SignOptions::metadata` carries the publisher (type, UUID, name),
+**Who signed (CS spec v2.6 §5.3).** `SignOptions::metadata` carries the publisher (type, UUID, name),
 the product, the platform and the application, all of which the signature binds. The signature's
 nonce is 128 bytes drawn for each signature from `std::random_device` (a nonce of another length in
 `SignOptions::nonce` is refused), and `signed_date` is the time of signing, which the caller reads from
-its clock. A `publisher_uuid` that is not a UUID is refused when signing, and so is one that a UUID in
-the signer certificate's subject contradicts (`check_publisher_binding` is the comparison); the
-specification does not say which attribute binds the UUID, so a subject with no UUID in it is "not
-compared" and is not a fault. The report carries what the signature says (`publisher`, `product`,
-`platform`, `application`, escaped, and trusted no further than the signer) and, in `notes`, the
-findings on the nonce and the UUID. `VerifyPolicy::operator_metadata` chooses what they do:
-`kReport` (the default) leaves the verdict alone, `kRequire` makes a nonce that is not 128 bytes, a
-UUID that is missing or malformed, or one the certificate contradicts, an invalid report.
+its clock. A `publisher_uuid` that is not a UUID is refused when signing. The UUID is the PACE publisher
+account's, carried out of band and copied into the signer information; it is not in the signing
+certificate (the owner's sample names one that none of its four certificates carries), so it is never
+compared with the certificate and a verifier must not require it there. `check_publisher_uuid` compares
+it with the accounts the caller expects (`VerifyPolicy::expected_publisher_uuids`), which is all a
+verifier may do. The report carries what the signature says (`publisher`, `product`, `platform`,
+`application`, escaped, and trusted no further than the signer) and, in `notes`, the findings on the
+nonce and the UUID. `VerifyPolicy::operator_metadata` chooses what they do: `kReport` (the default)
+leaves the verdict alone; `kRequire` makes a nonce that is not 128 bytes, a UUID that is missing or
+malformed, or (when expected accounts are given) one that is none of them, an invalid report.
 
 **Time.** `TimeBasis::kNow` (the default, and CS spec §6.1 steps 3 and 4) judges every certificate valid at
 `policy.now`; `kSignedDate` judges them at the date the signature records, which is only as
@@ -220,7 +222,7 @@ frames (HLS packed audio) or any other byte run that is not a sync frame is not 
 `TrailerLocation::stray` counts those bytes, `verify_stream` names the byte where the frames stop,
 and signing, stripping and hashing refuse the stream.
 
-**What it does not do.** Raw `.ac4` only: CS spec v2.5 §8.3.2 puts signing an MP4 out of scope (it
+**What it does not do.** Raw `.ac4` only: CS spec v2.6 §8.3.2 puts signing an MP4 out of scope (it
 names no box that carries a signature), and `sign_stream` refuses a stream that opens with an MP4 box
 by name (`StreamSignatureErrorKind::kContainerNotSupported`). A blob with more than one signature
 entry is refused, as is a chain of more than eight certificates. No revocation. SHA-256 and P-256 only. The
@@ -246,10 +248,11 @@ signer information as §5.3 asks), `check-content` (print what the checks find a
 and 4) and the signed date for `check-content`; the report says which. `ac4-sign` and `sign-content`
 take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`,
 `os-name=`, `os-version=` and `os-description=`, and warn when `publisher-uuid=` is missing or
-`signed-date=` is not near the clock. `forge probe` shows the trailer without a key
+`signed-date=` is not near the clock; `ac4-verify` and `decode` take `expect-publisher-uuid=` (repeat
+it) for the publisher accounts to accept. `forge probe` shows the trailer without a key
 (`stream.content_signature` in the JSON, `verified` always false). An option that says how to sign
 or check, without the command that signs or checks, is refused, and so is `sign-content` for an MP4
-(out of scope in CS spec v2.5 §8.3.2; sign the raw `.ac4` stream) or for E-AC-3 output.
+(out of scope in CS spec v2.6 §8.3.2; sign the raw `.ac4` stream) or for E-AC-3 output.
 
 ### The seam for other codecs
 

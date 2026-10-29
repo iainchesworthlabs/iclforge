@@ -701,14 +701,15 @@ TrueHD MAT, so reading MAT has no oracle at all, and no receiver or disc player 
 **The AC-4 content signature** has an oracle for its cryptography and none for its meaning.
 OpenSSL checks what it can check without forge: that the certificates the blob carries parse and
 chain, that the ECDSA signature verifies over the bytes of the signed information, that it does not
-verify over the content digest (the reading CS spec v2.5 gives; v2.3 said the content digest), and that one changed bit is
+verify over the content digest (the reading CS spec v2.6 gives; v2.3 said the content digest), and that one changed bit is
 refused (`tools/checks/check_content_signature_openssl.py`, on a signature forge wrote and on the
 owner's sample blob, kept out of the repository and read through
-`ICLFORGE_CONTENT_SIGNATURE_SAMPLE`). What v2.5 added is held by signatures written by hand in the
-library tests (the signer information of §5.3 with a nonce, a publisher UUID and a certificate in every
-combination; the signature checked before the digests; every wire version field 1) and by the CLI tests, each
+`ICLFORGE_CONTENT_SIGNATURE_SAMPLE`). What v2.5 and v2.6 added is held by signatures written by hand in the
+library tests (the signer information of §5.3 with a nonce, a publisher UUID and the accounts a verifier
+expects in every combination, and a certificate that carries another UUID or none; the signature checked before the digests; every wire version field 1) and by the CLI tests, each
 with a mutation that fails it; the sample is held to what v2.5 states of it (version fields, nonce, raw `r` and `s`)
-and to not being refused for a publisher UUID that none of its certificates carries. What no oracle reaches is whether a Dolby verifier accepts
+and to not being refused for a publisher UUID that none of its certificates carries (it passes with its own
+UUID as the expected account and is refused with another). What no oracle reaches is whether a Dolby verifier accepts
 what forge writes: the structure is that of one sample and one specification
 ([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
 and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
