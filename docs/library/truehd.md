@@ -123,6 +123,13 @@ left alone every field is zero, as in FFmpeg's streams, so a configuration that 
 **Provisional, no oracle until the DEE set:** the units, the presentation that applies when and what a control bit gates are open
 (`libs/truehd/ERRATA.md`, questions 51 to 55).
 
+`iclforge/truehd/io/metadata_edit.hpp` changes the same fields in a finished stream: `edit_channel_meaning(stream, edit)` takes a
+`ChannelMeaningEdit` (each member optional, range-checked by `apply_edit()`), finds the major syncs as `ElementaryReader` finds the access
+units, sets the named fields in every one and re-stamps its CRC-16. No other check covers the major sync, so no other byte changes and a
+decoder gives the same samples; bytes that are not an access unit, units without a major sync and the 16-channel extension are left as they
+are. An MLP stream (its bytes at that place are not described), a stream with no major sync and a value outside its field's width are errors,
+and then nothing is written. `forge metadata` and `forge normalize` are the commands over it.
+
 The stream is held to the peak data rate it declares (18 Mbps by default, Blu-ray's) and to the 75 ms latency of the
 specification's FIFO model: a stream that cannot be sent in time is `EncodeErrorKind::kRateExceeded`, or with
 `allow_rate_violations` is written and counted. `verify` decodes every unit with this library's decoder as it is

@@ -178,7 +178,8 @@ from the owner's TrueHD (MLP) Reference Specification v3.9; `libs/truehd/ERRATA.
 | Encoder: IIR filter, LSB bypass, negative output shift, heavy DRC, noise, MLP | refused with a reason | no oracle |
 | Containers: MP4, Matroska, MPEG-TS (Blu-ray), IEC 61937 MAT | written and read | FFmpeg's muxers and demuxers, bit-exact; MAT reading has none |
 | `forge`: `decode`, `probe`, `levels`, `loudness`, `mkv`, `mp4`, `ts`, `spdif`, `unspdif`, `demux`, `remux`, `truehd-encode` | built | the codec matrix, the gold-reference gate and FFmpeg Validate, against FFmpeg's strict decode |
-| `forge`: `transcode`, `qc`, `fmp4`, `monitor`, `play`; MLP encoding; the project file | refused (exit 1) or not named | no oracle |
+| `forge`: `metadata`, `normalize`, `qc` and `probe`'s channel meaning, `truehd-encode`'s channel meaning options (TH spec §14) | built, provisional | FFmpeg's strict decode for "the audio is the same"; no oracle for what the values mean until the DEE set |
+| `forge`: `transcode`, `fmp4`, `monitor`, `play`; MLP encoding; the project file | refused (exit 1) or not named | no oracle |
 | C API: decode and encode | `iclforge_truehd_*` | the fixtures through the C API, to FFmpeg's SHA-256 |
 | Atmos substream (16 channels) and object audio metadata, the evolution frame | the 16 channel substream is decoded as 16 channels; the evolution frame is read into plain structures, provisionally, and the object audio metadata in it is handed out as bytes; nothing renders the objects and no Atmos stream is written | phase T2b, blocked on the owner's answers ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)) |
 | Content signing of the evolution frame | not built; `iclforge::base::crypto` is the codec-neutral core it would use | none; the specification lists the frame's layout and the digest scope as unconfirmed ([Signing](signing.md#the-seam-for-other-codecs)) |
