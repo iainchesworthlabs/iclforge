@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -27,6 +28,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/pem.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 
 namespace fs = std::filesystem;
 namespace pki = iclforge::test::pki;
@@ -143,6 +145,34 @@ Files write_credentials() {
 std::string key_chain_options(const Files& files) {
     return " content-key=" + quoted(files.key) + " content-chain=" + quoted(files.chain);
 }
+
+// The same credentials with the signer certificate issued again, to the same key, carrying `uuid`
+// in a subject attribute: a certificate that binds a publisher UUID, which the chain above does
+// not (CS spec v2.5 section 5.3 does not say where one is bound; any attribute will do here).
+Files write_uuid_credentials(const std::string& uuid) {
+    Files files = write_credentials();
+    const pki::TestChain chain = pki::make_chain();
+    pki::CertSpec leaf;
+    leaf.subject = pki::Name{"ICL Forge Test Content Signer", "Code/Content Signer", uuid};
+    leaf.serial_hex = "0A0004B5D62000000005";
+    leaf.not_before = "2022-06-09T21:56:24";
+    leaf.not_after = "2042-06-09T21:56:24";
+    leaf.ca = true;
+    leaf.key_usage = 1U << 0;
+    const pki::Bytes reissued =
+        pki::issue(leaf, chain.leaf_key, chain.names[2], pki::key_for("icl-forge-test-issuing"));
+    std::string bundle;
+    for (std::size_t i = 0; i < 3; ++i) {
+        bundle += iclforge::base::crypto::pem_encode("CERTIFICATE", chain.certificates[i]);
+    }
+    bundle += iclforge::base::crypto::pem_encode("CERTIFICATE", reissued);
+    files.chain = scratch_dir() / "uuid_chain.pem";
+    write_text(files.chain, bundle);
+    return files;
+}
+
+constexpr std::string_view kPublisherUuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";
+constexpr std::string_view kOtherUuid = "0F0E0D0C-0B0A-4908-8706-050403020100";
 
 // An unsigned AC-4 stream, made by the encoder.
 fs::path plain_stream(const std::string& name) {
@@ -348,8 +378,10 @@ TEST_CASE("decode checks a content signature before it plays anything, when aske
     const Files files = write_credentials();
     const fs::path plain = plain_stream("decode_plain");
     const fs::path signed_file = dir / "decode_signed.ac4";
+    // Signed with a publisher UUID, which the strict check (verify-content) asks of a signature.
     REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(signed_file) +
-                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid} +
+                        " publisher-uuid=" + std::string{kPublisherUuid},
                     log) == 0);
 
     // A signed file decodes as the unsigned one, with no verification asked for and no warning of
@@ -456,12 +488,17 @@ TEST_CASE("sign-content signs what an encoder writes, and finds a bad request be
         CHECK(contains(read_log(log), "not valid before"));
         CHECK_FALSE(fs::exists(out));
     }
-    SECTION("an MP4 has no trailer to carry it") {
+    SECTION(
+        "an MP4 is out of scope (CS spec v2.5 section 8.3.2), and the message says what to do") {
         const fs::path out = dir / "encode_signed.mp4";
         fs::remove(out);
         CHECK(run_cli(encode + quoted(out) + " 192 sign-content" + key_chain_options(files), log) ==
               kExitUsage);
-        CHECK(contains(read_log(log), "MP4"));
+        const std::string text = read_log(log);
+        CHECK(contains(text, "sign-content does not sign an MP4"));
+        CHECK(contains(text, "out of scope"));
+        CHECK(contains(text, "8.3.2"));
+        CHECK(contains(text, "raw .ac4"));
         CHECK_FALSE(fs::exists(out));
     }
     SECTION("E-AC-3 output is not signed here") {
@@ -483,6 +520,267 @@ TEST_CASE("sign-content signs what an encoder writes, and finds a bad request be
                           " verify-time=signed",
                       log) == 0);
     }
+}
+
+TEST_CASE("ac4-verify reports who signed, and verify-content makes the signer information count",
+          "[cli][ac4][content-signature][v25]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "described.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("described_plain");
+    const std::string anchor = " trust-anchor=" + quoted(files.anchor);
+
+    // CS spec v2.5 section 5.3: whom the signature names, taken from the options.
+    const fs::path described = dir / "described_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(described) +
+                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid} +
+                        " publisher-uuid=" + std::string{kPublisherUuid} +
+                        " publisher-name=\"Example Publisher\" product-id=7"
+                        " product-name=\"Example Product\" wrapper-name=\"Example Wrapper\""
+                        " os-name=\"Example OS\" os-version=2.1 os-description=\"Example OS 2.1\"",
+                    log) == 0);
+    SECTION("ac4-verify says what the signature claims, and the findings on it") {
+        REQUIRE(run_cli("ac4-verify " + quoted(described) + anchor + " verify-time=signed", log) ==
+                0);
+        const std::string text = read_log(log);
+        CHECK(contains(text, "publisher   Example Publisher (UUID " + std::string{kPublisherUuid}));
+        CHECK(contains(text, "product     Example Product (wrapper Example Wrapper)"));
+        CHECK(contains(text, "platform    Example OS 2.1 (Example OS 2.1)"));
+        CHECK(contains(text, "application ICL Forge forge"));
+        CHECK(contains(text, "ok   signer nonce: 128 bytes"));
+        // The test certificate binds no UUID, so the one the signature names cannot be compared.
+        CHECK(contains(text, "note publisher UUID"));
+        CHECK(contains(text, "was not compared"));
+    }
+    SECTION("verify-content accepts a well formed UUID that nothing contradicts") {
+        CHECK(run_cli(
+                  "ac4-verify " + quoted(described) + anchor + " verify-content verify-time=signed",
+                  log) == 0);
+        CHECK(contains(read_log(log), ": valid"));
+    }
+    SECTION("a signature without a publisher UUID is warned about when made") {
+        const fs::path bare = dir / "described_bare.ac4";
+        REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(bare) +
+                            key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                        log) == 0);
+        const std::string made = read_log(log);
+        CHECK(contains(made, "warning: ac4-sign has no publisher-uuid="));
+        CHECK(contains(made, "verify-content"));
+
+        // ac4-verify reports the gap and still passes; verify-content refuses the same file.
+        REQUIRE(run_cli("ac4-verify " + quoted(bare) + anchor + " verify-time=signed", log) == 0);
+        const std::string reported = read_log(log);
+        CHECK(contains(reported, ": valid"));
+        CHECK(contains(reported, "note publisher UUID"));
+        CHECK(contains(reported, "publisherUUID is empty"));
+        CHECK(run_cli("ac4-verify " + quoted(bare) + anchor + " verify-content verify-time=signed",
+                      log) == kQcGate);
+        const std::string refused = read_log(log);
+        CHECK(contains(refused, "INVALID"));
+        CHECK(contains(refused, "FAIL publisher UUID"));
+        // On decode, verify-content stops before anything is written; check-content plays on.
+        const fs::path out = dir / "described_decoded.wav";
+        fs::remove(out);
+        CHECK(run_cli("decode " + quoted(bare) + " " + quoted(out) + " verify-content" + anchor +
+                          " verify-time=signed",
+                      log) == kExitInput);
+        CHECK_FALSE(fs::exists(out));
+        CHECK(run_cli("decode " + quoted(bare) + " " + quoted(out) + " check-content" + anchor +
+                          " verify-time=signed",
+                      log) == 0);
+        CHECK(fs::exists(out));
+    }
+}
+
+TEST_CASE("the publisher UUID is held to the signing certificate when the certificate carries one",
+          "[cli][ac4][content-signature][v25]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "bound.log";
+    const Files files = write_uuid_credentials(std::string{kPublisherUuid});
+    const fs::path plain = plain_stream("bound_plain");
+    const std::string when = " signed-date=" + std::string{kWhenAllValid};
+    const std::string anchor = " trust-anchor=" + quoted(files.anchor) + " verify-time=signed";
+
+    // The certificate's own UUID (in the other case): signs, and verify-content accepts it.
+    const fs::path signed_file = dir / "bound_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(signed_file) +
+                        key_chain_options(files) + when +
+                        " publisher-uuid=3b9c1f52-7a4e-4d08-b6a1-2f0e9d7c5a84",
+                    log) == 0);
+    CHECK_FALSE(contains(read_log(log), "no publisher-uuid="));
+    CHECK(run_cli("ac4-verify " + quoted(signed_file) + anchor + " verify-content", log) == 0);
+    const std::string text = read_log(log);
+    CHECK(contains(text, "ok   publisher UUID"));
+    CHECK(contains(text, "is the one the signer certificate's subject carries"));
+
+    // Another UUID is refused when the signature is made, before anything is written, and the
+    // same for sign-content before the encode runs.
+    const fs::path refused = dir / "bound_refused.ac4";
+    fs::remove(refused);
+    CHECK(run_cli("ac4-sign " + quoted(plain) + " " + quoted(refused) + key_chain_options(files) +
+                      when + " publisher-uuid=" + std::string{kOtherUuid},
+                  log) == kExitInput);
+    CHECK(contains(read_log(log), "BadCredentialsForSigningContent"));
+    CHECK(contains(read_log(log), std::string{kPublisherUuid}));
+    CHECK_FALSE(fs::exists(refused));
+    const fs::path encoded = dir / "bound_encoded.ac4";
+    fs::remove(encoded);
+    CHECK(run_cli("ac4-encode " + quoted(stereo_wav("bound_in.wav")) + " " + quoted(encoded) +
+                      " 192 sign-content" + key_chain_options(files) + when +
+                      " publisher-uuid=" + std::string{kOtherUuid},
+                  log) == kExitInput);
+    CHECK_FALSE(fs::exists(encoded));
+}
+
+TEST_CASE("check-content judges the certificates at the signed date, the strict checks now",
+          "[cli][ac4][content-signature][v25]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "check_time.log";
+    const Files files = write_credentials();
+    const fs::path signed_file = dir / "check_time_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain_stream("check_time_plain")) + " " +
+                        quoted(signed_file) + key_chain_options(files) +
+                        " signed-date=" + std::string{kWhenAllValid},
+                    log) == 0);
+    const std::string common =
+        "ac4-verify " + quoted(signed_file) + " trust-anchor=" + quoted(files.anchor);
+
+    // The chain's second certificate expired on 2025-11-13; the signature is dated before that.
+    // Strict (the default of ac4-verify, and verify-content): judged now, refused, and said so.
+    CHECK(run_cli(common, log) == kQcGate);
+    CHECK(contains(read_log(log), "expired"));
+    CHECK(contains(read_log(log), "(now)"));
+    CHECK(run_cli(common + " verify-content", log) == kQcGate);
+    CHECK(contains(read_log(log), "(now)"));
+
+    // check-content reports and carries on, judged at the signed date: the chain checks, and the
+    // report names the time and the reason for it.
+    CHECK(run_cli(common + " check-content", log) == 0);
+    const std::string reported = read_log(log);
+    CHECK(contains(reported, "judged at " + std::string{kWhenAllValid}));
+    CHECK(contains(reported, "(signed, the default of check-content)"));
+    CHECK(contains(reported, ": valid"));
+    CHECK_FALSE(contains(reported, "expired"));
+
+    // An explicit verify-time= wins over the default, in either mode.
+    CHECK(run_cli(common + " check-content verify-time=now", log) == 0);
+    CHECK(contains(read_log(log), "expired"));
+    CHECK(contains(read_log(log), "INVALID"));
+    // verify-content is the strict reading of the signer information too, and this signature names
+    // no publisher UUID: the time is not what refuses it.
+    CHECK(run_cli(common + " verify-content verify-time=signed", log) == kQcGate);
+    CHECK(contains(read_log(log), "FAIL publisher UUID"));
+    CHECK_FALSE(contains(read_log(log), "expired"));
+
+    // decode, the same: check-content plays on and says what it judged by.
+    const fs::path out = dir / "check_time.wav";
+    CHECK(run_cli("decode " + quoted(signed_file) + " " + quoted(out) + " check-content" +
+                      " trust-anchor=" + quoted(files.anchor),
+                  log) == 0);
+    CHECK(contains(read_log(log), "(signed, the default of check-content)"));
+}
+
+TEST_CASE("the signer information options are checked, and refused where nothing signs",
+          "[cli][ac4][content-signature][v25]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "signer_options.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("signer_options_plain");
+    const fs::path out = dir / "signer_options_out.ac4";
+    const std::string sign =
+        "ac4-sign " + quoted(plain) + " " + quoted(out) + key_chain_options(files);
+
+    for (const char* bad :
+         {"publisher-uuid=not-a-uuid",
+          "publisher-uuid=", "publisher-uuid=3B9C1F527A4E4D08B6A12F0E9D7C5A84", "product-id=-1",
+          "product-id=seven", "product-id=", "product-id=99999999999", "publisher-name=",
+          "product-name=", "wrapper-name=", "os-name=", "os-version=", "os-description="}) {
+        INFO(bad);
+        fs::remove(out);
+        CHECK(run_cli(sign + " " + bad, log) == kExitUsage);
+        CHECK_FALSE(fs::exists(out));
+    }
+    CHECK(run_cli(sign + " publisher-uuid=not-a-uuid", log) == kExitUsage);
+    CHECK(contains(read_log(log), "publisher-uuid="));
+
+    // Where nothing is signed, they are not dropped.
+    const fs::path in = stereo_wav("signer_options_in.wav");
+    for (const char* option :
+         {"publisher-uuid=3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84", "publisher-name=Someone",
+          "product-id=3", "product-name=Thing", "wrapper-name=Wrap", "os-name=OS", "os-version=1",
+          "os-description=D"}) {
+        INFO(option);
+        CHECK(run_cli(
+                  "encode " + quoted(in) + " " + quoted(dir / "signer_options.ac3") + " " + option,
+                  log) == kExitUsage);
+        CHECK(contains(read_log(log), "sign AC-4 output"));
+        CHECK(run_cli("ac4-verify " + quoted(plain) + " " + option, log) == kExitUsage);
+        CHECK(run_cli("ac4-encode " + quoted(in) + " " + quoted(dir / "signer_options_e.ac4") +
+                          " 192 " + option,
+                      log) == kExitUsage);
+        CHECK(contains(read_log(log), "unless sign-content asks"));
+    }
+}
+
+TEST_CASE("a signed-date that is not the time of signing is warned about, and one that is is not",
+          "[cli][ac4][content-signature][v25]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "signed_date_warning.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("signed_date_warning_plain");
+    const fs::path out = dir / "signed_date_warning_out.ac4";
+
+    // A date months away: signed, with the warning that says what section 5.3 asks.
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(out) + key_chain_options(files) +
+                        " signed-date=" + std::string{kWhenAllValid},
+                    log) == 0);
+    const std::string warned = read_log(log);
+    CHECK(contains(warned, "warning: signed-date=" + std::string{kWhenAllValid}));
+    CHECK(contains(warned, "not the time of signing"));
+    CHECK(contains(warned, "v2.5 section 5.3"));
+
+    // The present moment is the time of signing: no warning. (The test chain's second certificate
+    // has expired, so the signature itself is refused, which is after the warning would have been.)
+    const auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                         std::chrono::system_clock::now().time_since_epoch())
+                         .count();
+    run_cli("ac4-sign " + quoted(plain) + " " + quoted(dir / "signed_date_now.ac4") +
+                key_chain_options(files) +
+                " signed-date=" + iclforge::base::crypto::format_iso8601_utc(now),
+            log);
+    CHECK_FALSE(contains(read_log(log), "not the time of signing"));
+    // Left out: the clock, and no warning either.
+    run_cli("ac4-sign " + quoted(plain) + " " + quoted(dir / "signed_date_default.ac4") +
+                key_chain_options(files),
+            log);
+    CHECK_FALSE(contains(read_log(log), "not the time of signing"));
+}
+
+TEST_CASE("ac4-sign refuses an MP4 input, names the reason, and writes nothing",
+          "[cli][ac4][content-signature]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "sign_mp4.log";
+    const Files files = write_credentials();
+    const fs::path mp4 = dir / "sign_mp4_in.mp4";
+    REQUIRE(run_cli("ac4-encode " + quoted(stereo_wav("sign_mp4.wav")) + " " + quoted(mp4) + " 192",
+                    log) == 0);
+    const fs::path out = dir / "sign_mp4_out.mp4";
+    fs::remove(out);
+
+    CHECK(run_cli("ac4-sign " + quoted(mp4) + " " + quoted(out) + key_chain_options(files) +
+                      " signed-date=" + std::string{kWhenAllValid},
+                  log) == kExitUsage);
+    const std::string text = read_log(log);
+    CHECK(contains(text, "MP4"));
+    CHECK(contains(text, "out of scope"));
+    CHECK(contains(text, "8.3.2"));
+    CHECK(contains(text, "raw .ac4 elementary stream"));
+    CHECK_FALSE(contains(text, "does not begin with an AC-4 sync frame"));
+    CHECK_FALSE(fs::exists(out));
+
+    // Checking an MP4 says the same thing and does not call it a damaged AC-4 stream.
+    CHECK(run_cli("ac4-verify " + quoted(mp4), log) == kExitInput);
+    CHECK(contains(read_log(log), "MP4"));
 }
 
 TEST_CASE("the content-signature options are refused on commands they do not belong to",

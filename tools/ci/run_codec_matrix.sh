@@ -1279,7 +1279,9 @@ if command -v openssl >/dev/null 2>&1; then
     openssl x509 -req -in cs/signer.csr -CA cs/root.pem -CAkey cs/root.key -CAcreateserial \
         -sha256 -days 30 -extfile cs/signer.ext -out cs/signer.pem
     cat cs/signer.pem cs/root.pem > cs/chain.pem
-    run ac4-sign ac4_stereo_192.ac4 cs/signed.ac4 content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-sign ac4_stereo_192.ac4 cs/signed.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        publisher-uuid=3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84
+    run ac4-sign ac4_stereo_192.ac4 cs/anonymous.ac4 content-key=cs/signer.key content-chain=cs/chain.pem
     run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem
     run ac4-verify cs/signed.ac4 unanchored-ok
     run ac4-verify cs/signed.ac4 check-content
@@ -1311,6 +1313,39 @@ if command -v openssl >/dev/null 2>&1; then
         echo "ac4-verify does not report the signed-date $signed_when" >&2
         exit 1
     fi
+    # CS spec v2.5: the signer information of section 5.3 (who signed, with what product and on what
+    # platform), reported by ac4-verify; verify-content, the strict reading, refuses a signature
+    # without a publisher UUID and takes one with a well formed UUID; and check-content judges the
+    # certificates at the signed date, which the report says.
+    run ac4-sign ac4_stereo_192.ac4 cs/described.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        publisher-uuid=3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84 publisher-name="Matrix Publisher" \
+        product-id=7 product-name="Matrix Product" wrapper-name="Matrix Wrapper" \
+        os-name="Matrix OS" os-version=1.0 os-description="Matrix OS 1.0 test host"
+    described_report=$("$CLI" ac4-verify cs/described.ac4 trust-anchor=cs/root.pem)
+    for expected in "publisher   Matrix Publisher (UUID 3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84)" \
+        "product     Matrix Product (wrapper Matrix Wrapper)" \
+        "platform    Matrix OS 1.0 (Matrix OS 1.0 test host)" "ok   signer nonce: 128 bytes"; do
+        if [[ "$described_report" != *"$expected"* ]]; then
+            echo "ac4-verify does not report '$expected'" >&2
+            exit 1
+        fi
+    done
+    run ac4-verify cs/described.ac4 trust-anchor=cs/root.pem verify-content
+    run ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem
+    run_fails 6 ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem verify-content
+    run_fails 2 decode cs/anonymous.ac4 cs/refused_strict.wav verify-content trust-anchor=cs/root.pem
+    check_report=$("$CLI" ac4-verify cs/signed.ac4 check-content)
+    if [[ "$check_report" != *"(signed, the default of check-content)"* ]]; then
+        echo "ac4-verify check-content does not say it judged the certificates at the signed date" >&2
+        exit 1
+    fi
+    # Signing an MP4 is out of scope (section 8.3.2): both ways in are refused, naming the reason.
+    run ac4-encode "$FIXTURES/reference_stereo.wav" cs/in.mp4 192
+    run_fails 1 ac4-sign cs/in.mp4 cs/in_signed.mp4 content-key=cs/signer.key content-chain=cs/chain.pem
+    run_fails 1 ac4-encode "$FIXTURES/reference_stereo.wav" cs/out.mp4 192 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run_fails 1 ac4-sign ac4_stereo_192.ac4 cs/bad_uuid.ac4 content-key=cs/signer.key \
+        content-chain=cs/chain.pem publisher-uuid=not-a-uuid
     # What must be refused: no anchor, nothing signed, a changed byte, a key nobody asked for, a chain
     # judged at a time it has expired by, a leaf of another title, and a pin that matches nothing.
     run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=2099-01-01T00:00:00

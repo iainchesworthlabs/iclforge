@@ -438,12 +438,25 @@ struct Options {
     // leaf-title=<title|any>: the `title` the signer certificate must carry (default
     // "Code/Content Signer", CS spec v2.3 §6.1 step 4); "any" checks none. Unset: the default.
     std::optional<std::string> leaf_title;
-    // signed-date=<YYYY-MM-DDTHH:MM:SS>: the date written into a signature, UTC; unset: now.
+    // signed-date=<YYYY-MM-DDTHH:MM:SS>: the date written into a signature, UTC; unset: now. CS spec
+    // v2.5 §5.3 says signedDate is the time of signing, so a date that is not that is warned about.
     std::optional<std::string> signed_date;
+    // The signer information of CS spec v2.5 §5.3, for ac4-sign and sign-content: whom the
+    // signature names as its publisher and product, and the platform it was made on. Unset: left
+    // empty (publisher-uuid= is the one the specification asks for; its absence is warned about).
+    std::string publisher_uuid;  // publisher-uuid=<UUID>
+    std::string publisher_name;  // publisher-name=<text>
+    std::optional<int> product_id;  // product-id=<n>
+    std::string product_name;       // product-name=<text>
+    std::string wrapper_name;       // wrapper-name=<text>
+    std::string os_name;            // os-name=<text>
+    std::string os_version;         // os-version=<text>
+    std::string os_description;     // os-description=<text>
     // verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>: the instant every certificate must be
-    // valid at. "now" (the default) is CS spec v2.3 §6.1 step 3; "signed" trusts the date the
-    // signer wrote, which is only as good as the signer.
-    std::string verify_time = "now";
+    // valid at. Unset, it depends on how the signature is being checked: "now", CS spec v2.5 §6.1
+    // steps 3 and 4, for ac4-verify and verify-content (the strict checks), and "signed", the date
+    // the signer wrote (only as good as the signer), for check-content, which reports and carries on.
+    std::optional<std::string> verify_time;
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.

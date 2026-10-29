@@ -33,6 +33,9 @@ namespace {
 
 namespace crypto = iclforge::base::crypto;
 
+// signed-date= within this of the clock is taken for the time of signing and not warned about.
+constexpr std::int64_t kSignedDateToleranceSeconds = 300;
+
 std::int64_t now_epoch() {
     return std::chrono::duration_cast<std::chrono::seconds>(
                std::chrono::system_clock::now().time_since_epoch())
@@ -124,19 +127,67 @@ std::expected<SigningMaterial, int> load_signing_material(const Options& meta,
     material.options.chain_policy.valid_at =
         crypto::parse_iso8601_utc(material.options.signed_date);
     material.options.chain_policy.required_leaf_title = required_title(meta);
-    material.options.metadata.application_name = "ICL Forge forge";
-    material.options.metadata.application_version = std::string(iclforge::base::version_string);
+
+    // The signer information of CS spec v2.5 section 5.3. The application is this program, named
+    // and numbered as it is built; the publisher, product and platform are the operator's to give.
+    crypto::SignerMetadata& info = material.options.metadata;
+    info.application_name = "ICL Forge forge";
+    info.application_version = std::string(iclforge::base::version_string);
+    info.build_hash = std::string(iclforge::base::git_commit);
+    info.publisher_uuid = meta.publisher_uuid;
+    info.publisher_name = meta.publisher_name;
+    info.product_id = meta.product_id.value_or(0);
+    info.product_name = meta.product_name;
+    info.wrapper_name = meta.wrapper_name;
+    info.os_name = meta.os_name;
+    info.os_version = meta.os_version;
+    info.os_description = meta.os_description;
     return material;
+}
+
+// What the operator should know before a signature is made, said once and not refused: the
+// specification's "shall" about the publisher UUID and the signing time, where the signature can be
+// made and a strict verifier may not take it.
+void warn_about_signer_information(const Options& meta, std::string_view option,
+                                   std::string_view signed_date) {
+    if (meta.publisher_uuid.empty()) {
+        fmt::println(stderr,
+                     "warning: {} has no publisher-uuid=: CS spec v2.5 section 5.3 asks for the "
+                     "UUID of your publisher account, and a verifier that requires it (forge's "
+                     "verify-content does) refuses a signature without one",
+                     option);
+    }
+    if (meta.signed_date.has_value()) {
+        const auto given = crypto::parse_iso8601_utc(signed_date);
+        const std::int64_t now = now_epoch();
+        if (!given.has_value() || *given > now + kSignedDateToleranceSeconds ||
+            *given < now - kSignedDateToleranceSeconds) {
+            fmt::println(stderr,
+                         "warning: signed-date={} is not the time of signing ({} UTC now): CS spec "
+                         "v2.5 section 5.3 says signedDate shall be the actual signing time, and a "
+                         "verifier may refuse a signature whose date it does not accept",
+                         signed_date, crypto::format_iso8601_utc(now));
+        }
+    }
 }
 
 // Everything verification needs from the command line, loaded once. The policy borrows from the
 // vectors here, so it is built where it is used and not copied.
+//
+// Two ways of checking, as the owner decided for the time: the strict one, which refuses what does
+// not check (ac4-verify, and verify-content on decode), judges the certificates at the time of the
+// check, as CS spec v2.5 section 6.1 steps 3 and 4 say; check-content, which reports what it finds
+// and carries on, judges them at the date the signature records unless verify-time= says otherwise.
+// verify-content is also the strict reading of the operator metadata of section 5.3 (the signature
+// nonce and the publisher UUID decide the verdict); everywhere else they are reported.
 struct VerifyMaterial {
     std::vector<crypto::Certificate> anchors;
     std::vector<crypto::CertificatePin> pins;
     crypto::TimeBasis basis = crypto::TimeBasis::kNow;
     std::int64_t instant = 0;
     std::string title;
+    std::string time_name = "now";  // what the report calls the time it judged at
+    bool require_metadata = false;
 
     [[nodiscard]] crypto::VerifyPolicy policy() const {
         crypto::VerifyPolicy p;
@@ -146,6 +197,8 @@ struct VerifyMaterial {
         p.now = now_epoch();
         p.instant = instant;
         p.required_leaf_title = title;
+        p.operator_metadata = require_metadata ? crypto::OperatorMetadata::kRequire
+                                               : crypto::OperatorMetadata::kReport;
         return p;
     }
 };
@@ -168,17 +221,22 @@ std::expected<VerifyMaterial, int> load_verify_material(const Options& meta) {
         }
         m.pins.push_back(crypto::CertificatePin{std::move(*bytes)});
     }
-    if (meta.verify_time == "now") {
+    const std::string time = meta.verify_time.value_or(meta.check_content ? "signed" : "now");
+    m.time_name = meta.verify_time.has_value() ? time
+                  : meta.check_content         ? "signed, the default of check-content"
+                                               : "now";
+    if (time == "now") {
         m.basis = crypto::TimeBasis::kNow;
-    } else if (meta.verify_time == "signed") {
+    } else if (time == "signed") {
         m.basis = crypto::TimeBasis::kSignedDate;
-    } else if (meta.verify_time == "ignore") {
+    } else if (time == "ignore") {
         m.basis = crypto::TimeBasis::kIgnore;
     } else {
         m.basis = crypto::TimeBasis::kInstant;
-        m.instant = crypto::parse_iso8601_utc(meta.verify_time).value_or(0);
+        m.instant = crypto::parse_iso8601_utc(time).value_or(0);
     }
     m.title = required_title(meta);
+    m.require_metadata = meta.verify_content;
     return m;
 }
 
@@ -203,6 +261,20 @@ void print_report(FILE* out, std::string_view name, const crypto::VerifyReport& 
     if (!report.signed_date.empty()) {
         status_println(out, "  signed      {} (UTC)", report.signed_date);
     }
+    // What the signature says about whoever made it: bound by the signature, and no more
+    // trustworthy than the signer. The findings on it are the notes below.
+    if (!report.publisher.empty()) {
+        status_println(out, "  publisher   {}", report.publisher);
+    }
+    if (!report.product.empty()) {
+        status_println(out, "  product     {}", report.product);
+    }
+    if (!report.platform.empty()) {
+        status_println(out, "  platform    {}", report.platform);
+    }
+    if (!report.application.empty()) {
+        status_println(out, "  application {}", report.application);
+    }
     if (report.verified_at != 0) {
         status_println(out, "  validity    judged at {} ({})",
                        crypto::format_iso8601_utc(report.verified_at), time_basis);
@@ -212,6 +284,10 @@ void print_report(FILE* out, std::string_view name, const crypto::VerifyReport& 
     }
     for (const crypto::CheckResult& check : report.checks) {
         status_println(out, "  {:<4} {}: {}", check.ok ? "ok" : "FAIL", check.name, check.detail);
+    }
+    // Findings that did not decide the verdict (verify-content makes them decide it).
+    for (const crypto::CheckResult& note : report.notes) {
+        status_println(out, "  {:<4} {}: {}", note.ok ? "ok" : "note", note.name, note.detail);
     }
     if (report.verdict == crypto::Verdict::kChecksChainUnanchored) {
         status_println(out,
@@ -283,12 +359,14 @@ int run_ac4_sign(std::string_view in_path, std::string_view out_path, const Opti
     if (!material.has_value()) {
         return material.error();
     }
+    warn_about_signer_information(meta, "ac4-sign", material->options.signed_date);
     auto signed_stream =
         iclforge::ac4::sign_stream(stream, material->credentials, material->options);
     if (!signed_stream.has_value()) {
         fmt::println(stderr, "error: {}: {}", in_path, signed_stream.error().message);
         switch (signed_stream.error().kind) {
             case iclforge::ac4::StreamSignatureErrorKind::kAlreadySigned:
+            case iclforge::ac4::StreamSignatureErrorKind::kContainerNotSupported:
                 return kExitUsage;
             default:
                 return kExitInput;
@@ -329,7 +407,7 @@ int run_ac4_verify(std::string_view in_path, const Options& meta) {
     }
     const crypto::VerifyReport report = iclforge::ac4::verify_stream(stream, material->policy());
     FILE* out = stdout;
-    print_report(out, in_path, report, meta.verify_time);
+    print_report(out, in_path, report, material->time_name);
     if (meta.check_content) {
         return kExitOk;
     }
@@ -366,14 +444,17 @@ int check_sign_content_request(std::string_view out_path, const Options& meta, b
     }
     if (iclforge::apps::ac4_output_names_mp4(out_path)) {
         fmt::println(stderr,
-                     "error: sign-content signs a raw .ac4 stream (a trailer after the last sync "
-                     "frame); carrying a content signature in an MP4 is not implemented");
+                     "error: sign-content does not sign an MP4: CS spec v2.5 section 8.3.2 puts "
+                     "that out of scope, because it names no box that carries a content "
+                     "signature. Write a raw .ac4 file (name the output *.ac4), whose signature "
+                     "is a trailer after its last sync frame, and sign that");
         return kExitUsage;
     }
     auto material = load_signing_material(meta, "sign-content");
     if (!material.has_value()) {
         return material.error();
     }
+    warn_about_signer_information(meta, "sign-content", material->options.signed_date);
     // Sign a throwaway digest, so that a key that does not belong to its chain, or a signed-date
     // outside the certificates' validity, is found now and not after the encode has run.
     const std::array<std::byte, 32> trial_digest{};
@@ -426,7 +507,7 @@ int check_content_before_decode(std::span<const std::byte> stream, std::string_v
         return material.error();
     }
     const crypto::VerifyReport report = iclforge::ac4::verify_stream(stream, material->policy());
-    print_report(status, in_path, report, meta.verify_time);
+    print_report(status, in_path, report, material->time_name);
     if (meta.check_content || accepted(report, meta)) {
         return kExitOk;
     }

@@ -408,11 +408,14 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
-    {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path>",
+    {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path> [publisher-uuid=<uuid>]",
      "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
      "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
      "operator's own; none is built in. The sync frames are not touched, so a signed file plays as "
-     "the unsigned one. leaf-title= and signed-date= adjust what is written and checked",
+     "the unsigned one. An MP4 is refused: CS spec v2.5 puts signing one out of scope. "
+     "publisher-uuid= (your publisher account's UUID), publisher-name=, product-id=, "
+     "product-name=, wrapper-name=, os-name=, os-version= and os-description= say who signed and "
+     "where; leaf-title= and signed-date= adjust what is written and checked",
      topic::kStdio | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_sign(x.str(1), x.str(2), x.meta); }},
@@ -420,7 +423,9 @@ constexpr std::array<Command, 49> kCommands{{
      "check a raw AC-4 stream's content signature: the digests, the ECDSA signature, the chain and "
      "its validity, and the leaf's title. Exit 0 only when it is valid and a trust-anchor= or pin= "
      "vouches for its certificates (unanchored-ok accepts one that checks but has no anchor); "
-     "check-content prints the checks and exits 0 whatever they find",
+     "check-content prints the checks and exits 0 whatever they find, judging the certificates at "
+     "the signed date unless verify-time= says otherwise; verify-content also refuses a signature "
+     "whose signer nonce or publisher UUID is not as CS spec v2.5 section 5.3 asks",
      topic::kStdio | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_verify(x.str(1), x.meta); }},

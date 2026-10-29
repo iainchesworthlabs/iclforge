@@ -60,6 +60,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
@@ -3426,6 +3427,43 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.signed_date = std::string{value};
             continue;
         }
+        if (key == "publisher-uuid") {
+            if (!iclforge::base::crypto::is_uuid(value)) {
+                fmt::println(stderr,
+                             "error: publisher-uuid= is the UUID of your publisher account, as "
+                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (got '{}')",
+                             token);
+                return false;
+            }
+            out.publisher_uuid = std::string{value};
+            continue;
+        }
+        if (key == "publisher-name" || key == "product-name" || key == "wrapper-name" ||
+            key == "os-name" || key == "os-version" || key == "os-description") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: {}= needs text, or leave the option out", key);
+                return false;
+            }
+            std::string& field = key == "publisher-name"  ? out.publisher_name
+                                 : key == "product-name"  ? out.product_name
+                                 : key == "wrapper-name"  ? out.wrapper_name
+                                 : key == "os-name"       ? out.os_name
+                                 : key == "os-version"    ? out.os_version
+                                                          : out.os_description;
+            field = std::string{value};
+            continue;
+        }
+        if (key == "product-id") {
+            int id = 0;
+            if (!parse_index(value, std::numeric_limits<int>::max(), id)) {
+                fmt::println(stderr,
+                             "error: product-id= is a whole number from 0 (the default) (got '{}')",
+                             token);
+                return false;
+            }
+            out.product_id = id;
+            continue;
+        }
         if (key == "verify-time") {
             if (value != "now" && value != "signed" && value != "ignore" &&
                 !iclforge::base::crypto::parse_iso8601_utc(value).has_value()) {
@@ -3512,15 +3550,21 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                                    command == "atmos-adm" || command == "atmos-iab" ||
                                    command == "ac4-sign";
         const bool checks_content = command == "decode" || command == "ac4-verify";
+        const bool signer_info_given =
+            !out.publisher_uuid.empty() || !out.publisher_name.empty() || out.product_id.has_value() ||
+            !out.product_name.empty() || !out.wrapper_name.empty() || !out.os_name.empty() ||
+            !out.os_version.empty() || !out.os_description.empty();
         const bool signing_given = out.sign_content || !out.content_key.empty() ||
-                                   !out.content_chains.empty() || out.signed_date.has_value();
+                                   !out.content_chains.empty() || out.signed_date.has_value() ||
+                                   signer_info_given;
         const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
                                     !out.trust_anchors.empty() || !out.pins.empty() ||
-                                    out.verify_time != "now";
+                                    out.verify_time.has_value();
         if (signing_given && !signs_content) {
             fmt::println(stderr,
-                         "error: sign-content, content-key=, content-chain= and signed-date= sign "
-                         "AC-4 output: ac4-encode, atmos-encode codec=ac4 and ac4-sign take them");
+                         "error: sign-content, content-key=, content-chain=, signed-date= and the "
+                         "publisher-, product-, wrapper- and os- options sign AC-4 output: "
+                         "ac4-encode, atmos-encode codec=ac4 and ac4-sign take them");
             return false;
         }
         if (checking_given && !checks_content) {
@@ -3550,8 +3594,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             (signing_given || (out.leaf_title.has_value() && !checks_content))) {
             fmt::println(
                 stderr,
-                "error: content-key=, content-chain=, signed-date= and leaf-title= say how "
-                "to sign, and nothing is signed unless sign-content asks for it");
+                "error: content-key=, content-chain=, signed-date=, leaf-title= and the "
+                "publisher-, product-, wrapper- and os- options say how to sign, and nothing is "
+                "signed unless sign-content asks for it");
             return false;
         }
         if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {

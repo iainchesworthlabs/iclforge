@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 133> kOptionTokens{{
+constexpr std::array<OptionToken, 141> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -51,16 +51,24 @@ constexpr std::array<OptionToken, 133> kOptionTokens{{
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"sign-content", "ac4-encode/atmos-encode: sign the AC-4 file with the operator's own key and chain (needs content-key=, content-chain=)"},
-    {"verify-content", "decode/ac4-verify: refuse unless the AC-4 content signature, its chain and an anchor all check"},
-    {"check-content", "decode/ac4-verify: print what the AC-4 content signature checks find and carry on"},
+    {"verify-content", "decode/ac4-verify: refuse unless the AC-4 content signature, its chain and an anchor all check, and the signer information is as CS spec 5.3 asks (a 128 byte nonce, a publisher UUID the certificate does not contradict)"},
+    {"check-content", "decode/ac4-verify: print what the AC-4 content signature checks find and carry on; the certificates are judged at the signed date unless verify-time= says otherwise"},
     {"unanchored-ok", "with verify-content: accept a signature that checks out against a chain no trust-anchor= or pin= vouches for"},
     {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
     {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
     {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
     {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
     {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
-    {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now)"},
-    {"verify-time=", "when every certificate must be valid: now (default), signed, ignore, or YYYY-MM-DDTHH:MM:SS UTC"},
+    {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now, which is what CS spec 5.3 asks for; another date is warned about)"},
+    {"publisher-uuid=", "ac4-sign/sign-content: the UUID of your publisher account, written as the signature's publisherUUID (CS spec 5.3; refused if the signing certificate's subject carries a different UUID)"},
+    {"publisher-name=", "ac4-sign/sign-content: your legal or trade name, written as the signature's publisherName"},
+    {"product-id=", "ac4-sign/sign-content: your product identifier, a whole number (default 0)"},
+    {"product-name=", "ac4-sign/sign-content: the product name associated with the signing credentials"},
+    {"wrapper-name=", "ac4-sign/sign-content: the name of the PACE wrapper binary, if one is in use"},
+    {"os-name=", "ac4-sign/sign-content: the operating system of the signing host, written as the signature's osName"},
+    {"os-version=", "ac4-sign/sign-content: the operating system version of the signing host"},
+    {"os-description=", "ac4-sign/sign-content: a description of the operating system of the signing host"},
+    {"verify-time=", "when every certificate must be valid: now (default; signed for check-content), signed, ignore, or YYYY-MM-DDTHH:MM:SS UTC"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"karaoke", "decode/monitor: an AC-3 or E-AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
@@ -814,9 +822,15 @@ void print_content_signature_topic() {
     fmt::println("ICLFORGE_CONTENT_KEY and ICLFORGE_CONTENT_CHAIN_FILE) and are never stored.");
     fmt::println("A signature that checks out against a chain no trust-anchor= or pin= vouches");
     fmt::println("for is reported as that, not as valid. Every certificate must be valid when");
-    fmt::println("the file is checked unless verify-time= says otherwise; signed trusts the date");
-    fmt::println("the signer wrote, which is only as good as the signer. This is not an object");
-    fmt::println("signature (sign-objects is E-AC-3's); see docs/concepts/object-signing.md.");
+    fmt::println("the file is checked (ac4-verify, verify-content) unless verify-time= says");
+    fmt::println("otherwise; check-content judges them at the date the signer wrote, which is");
+    fmt::println("only as good as the signer. A signature names its publisher (publisher-uuid=,");
+    fmt::println("publisher-name=), product and platform, as CS spec v2.5 section 5.3 describes;");
+    fmt::println("ac4-verify reports them, and verify-content also refuses a nonce that is not");
+    fmt::println("128 bytes and a publisher UUID that is missing or that the signing certificate");
+    fmt::println("contradicts. Only a raw .ac4 stream is signed; an MP4 is refused (section");
+    fmt::println("8.3.2 puts it out of scope). This is not an object signature (sign-objects is");
+    fmt::println("E-AC-3's); see docs/concepts/object-signing.md.");
 }
 
 // The per-topic sections, in the order both the full listing and a single
@@ -1096,8 +1110,11 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  sign-content      ac4-encode/atmos-encode: sign the file once it is written; "
                      "needs content-key= and content-chain=");
         fmt::println("  verify-content    decode: stop (exit 2) unless the signature, its chain and an "
-                     "anchor all check; ac4-verify exits 6 for the same");
-        fmt::println("  check-content     decode: report what the checks find and play on");
+                     "anchor all check; ac4-verify exits 6 for the same. Also refuses a signer "
+                     "nonce that is not 128 bytes and a publisher UUID that is missing or that the "
+                     "signing certificate contradicts (CS spec v2.5 section 5.3)");
+        fmt::println("  check-content     decode: report what the checks find and play on; the "
+                     "certificates are judged at the signed date unless verify-time= says otherwise");
         fmt::println("  unanchored-ok     with verify-content: a signature that checks out but whose "
                      "chain reaches no trust-anchor= or pin= also passes; it is still reported as "
                      "unanchored, never as valid");
@@ -1112,10 +1129,19 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "
                      "Code/Content Signer)");
         fmt::println("  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC "
-                     "(default now)");
+                     "(default now, the time of signing that CS spec v2.5 section 5.3 asks for; "
+                     "another date is warned about)");
+        fmt::println("  publisher-uuid=<UUID>   ac4-sign, sign-content: the UUID of your publisher "
+                     "account (section 5.3); refused if the signing certificate's subject carries "
+                     "another UUID; without it a warning, and verify-content refuses the result");
+        fmt::println("  publisher-name=<text>   your legal or trade name");
+        fmt::println("  product-id=<n>, product-name=<text>, wrapper-name=<text>   the product and, "
+                     "if one is used, the PACE wrapper (product-id defaults to 0)");
+        fmt::println("  os-name=<text>, os-version=<text>, os-description=<text>   the operating "
+                     "system of the signing host, for whoever audits the signature");
         fmt::println("  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>");
-        fmt::println("                    when every certificate must be valid; now is the default, "
-                     "signed uses the date the signer wrote");
+        fmt::println("                    when every certificate must be valid; now is the default "
+                     "(signed for check-content), signed uses the date the signer wrote");
     }
 }
 
