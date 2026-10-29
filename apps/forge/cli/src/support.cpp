@@ -3400,6 +3400,27 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                          "check-content only reports it - give one, not both");
             return false;
         }
+        // Where signing or checking has to be asked for, the options that only say how are not
+        // taken for the asking: a key given to an encoder that was not told sign-content would
+        // otherwise be dropped, and an unsigned file reads exactly like a signature that failed.
+        const bool signing_asked = out.sign_content || command == "ac4-sign";
+        const bool checking_asked =
+            out.verify_content || out.check_content || command == "ac4-verify";
+        if (signs_content && !signing_asked &&
+            (signing_given || (out.leaf_title.has_value() && !checks_content))) {
+            fmt::println(stderr,
+                         "error: content-key=, content-chain=, signed-date= and leaf-title= say how "
+                         "to sign, and nothing is signed unless sign-content asks for it");
+            return false;
+        }
+        if (checks_content && !checking_asked &&
+            (checking_given || out.leaf_title.has_value())) {
+            fmt::println(stderr,
+                         "error: trust-anchor=, pin=, unanchored-ok, verify-time= and leaf-title= "
+                         "say how to check, and nothing is checked unless verify-content or "
+                         "check-content asks for it");
+            return false;
+        }
     }
     // One says "refuse the command on a mismatch", the other "play the bed on
     // one": asking for both has no answer, and silently preferring either
