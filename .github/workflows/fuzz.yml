@@ -28,7 +28,9 @@
 #                      separate rather than folded into fuzz-short (it needs
 #                      ffmpeg on PATH and is much slower per-exec, a real
 #                      FFmpeg process per comparable input). Required, not
-#                      experimental (promoted fuzz jobs).
+#                      experimental (promoted fuzz jobs), except the TrueHD
+#                      harness, which has steps of its own that cannot fail the
+#                      job until it has a clean record on these runners.
 #   fuzz-nightly       A longer bounded mutation budget (10 min/target by
 #                      default) on a daily schedule, plus workflow_dispatch
 #                      for an on-demand deeper run with a custom budget. Since
@@ -330,13 +332,30 @@ jobs:
       # divergence a past run minimized into libs/ac3/fuzz/regressions/ must still
       # not reproduce before spending the mutation budget below.
       - name: Replay differential regression corpus (no mutation)
-        run: bash tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode fuzz_differential_truehd_decode
+        run: bash tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 
       - name: Fuzz differential (bounded mutation budget)
-        run: bash tools/fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode fuzz_differential_truehd_decode
+        run: bash tools/fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+
+      # The TrueHD differential harness is new. It has run against FFmpeg 6.1.1 only, and this job
+      # installs the Ubuntu package (8.0.1 on 26.04), whose warnings and rounding it has not met,
+      # so until it has a clean record on these runners neither step can fail the job: same
+      # convention as fuzz-nightly's continue-on-error, here on the steps. A divergence still
+      # uploads its input. Promote it by deleting the two continue-on-error lines and the
+      # `truehd` ids' use in the upload step; fuzz-nightly runs it meanwhile (libs/truehd/fuzz/
+      # differential_oracle.hpp has the rule).
+      - name: Replay TrueHD differential regression corpus (experimental)
+        id: truehd_regress
+        continue-on-error: true
+        run: bash tools/fuzz/run.sh regress fuzz_differential_truehd_decode
+
+      - name: Fuzz TrueHD differential (experimental, bounded mutation budget)
+        id: truehd_fuzz
+        continue-on-error: true
+        run: bash tools/fuzz/run.sh run fuzz_differential_truehd_decode
 
       - name: Upload divergent/crashing inputs
-        if: failure()
+        if: ${{ failure() || steps.truehd_regress.outcome == 'failure' || steps.truehd_fuzz.outcome == 'failure' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-differential-artifacts

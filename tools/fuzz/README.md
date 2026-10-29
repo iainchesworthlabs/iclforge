@@ -301,14 +301,11 @@ keeps the input.
 
 `fuzz_ac4_content_signature` and `fuzz_content_signature` (an AC-4 stream's content signature, which
 arrives with the file it signs) were added without a libFuzzer run: the machine they were written
-on had Clang without the libFuzzer and sanitizer runtimes. They compile under GCC 13 with the
-project's warning set, and were run there under AddressSanitizer and UndefinedBehaviorSanitizer
-with a coverage-blind replay driver (the seeds and regression inputs, then mutants of them with a
-fixed seed: 300,000 for `fuzz_content_signature`, 20,000 for `fuzz_ac4_content_signature`, whose
-every execution runs the verifier eight times) with nothing found. That shows the corpus is clean
-and says little about what coverage-guided mutation would reach, so the first `tools/fuzz/run.sh`
-run of each is still owed. Their `regressions/` hold hand-built boundary inputs (the walk that finds the trailer,
-Thrift counts and lengths past the blob, DER lengths past the end), not crashes.
+on had Clang without the libFuzzer and sanitizer runtimes. They were then run under AddressSanitizer
+and UndefinedBehaviorSanitizer with a coverage-blind replay driver, and had their first libFuzzer
+runs on 2026-10-29 ("Status: the TrueHD harnesses ..." below). Their `regressions/` hold hand-built
+boundary inputs (the walk that finds the trailer, Thrift counts and lengths past the blob, DER
+lengths past the end), not crashes.
 
 The corpus `tools/fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
 `tools/checks/ac4_syntax_differential.py` (`--inputs <directory>`), which reads
@@ -317,6 +314,68 @@ every frame of each file through both syntax transcriptions, the decoder's and
 the script compares them on mutated DEE frames and on synthetic tables of
 contents; the nightly SonarCloud workflow runs it so, and it does not gate a
 merge.
+
+## Status: the TrueHD harnesses, MAT, the demuxers and the signing harnesses
+
+On 2026-10-29 these harnesses were built under Clang 18 with AddressSanitizer and UndefinedBehaviorSanitizer
+(`RelWithDebInfo`, `tools/fuzz/run.sh`'s configuration; libFuzzer from `libclang-rt-18-dev`, with
+`__cpp_concepts` raised to 202002 on the command line because libstdc++ 13 gates `<expected>` on it and
+Clang 18 reports 201907) and each run for 600 seconds from the committed seeds and dictionary, with the
+flags `run.sh` uses (`-rss_limit_mb=2048 -timeout=10`), `nice -n 15`, two processes at a time. CI uses
+LLVM 22 on Ubuntu 26.04, which has not run them. Executions are the 600-second totals; coverage is
+libFuzzer's edges and features, when the seeds had been loaded and at the end; new entries are the files
+the run added to its corpus beyond the seeds.
+
+| Harness | Executions | per second | Edges | Features | New entries | Found |
+|---|---:|---:|---:|---:|---:|---|
+| `fuzz_truehd_parse` | 3,190,685 | 5,308 | 259 to 527 | 569 to 2,985 | 803 | nothing |
+| `fuzz_truehd_decode` | 114,754 | 190 | 570 to 817 | 1,314 to 4,439 | 1,011 | nothing |
+| `fuzz_truehd_encode` | 27,014 | 44 | 1,531 to 1,601 | 5,469 to 9,193 | 642 | nothing |
+| `fuzz_mat_unwrap` | 1,638,742 | 2,726 | 113 to 159 | 147 to 399 | 52 | nothing |
+| `fuzz_matroska_demux` | 6,123,051 | 10,188 | 233 to 498 | 269 to 2,181 | 649 | nothing |
+| `fuzz_mpegts_demux` | 1,138,506 | 1,894 | 185 to 281 | 254 to 1,251 | 344 | nothing |
+| `fuzz_mp4_demux` | 1,163,860 | 1,936 | 713 to 1,023 | 953 to 3,060 | 741 | nothing |
+| `fuzz_content_signature` | 605,132 | 1,006 | 1,395 to 2,095 | 3,686 to 7,674 | 1,253 | nothing |
+| `fuzz_ac4_content_signature` | 120,110 | 199 | 1,165 to 1,703 | 1,847 to 4,076 | 505 | nothing |
+| `fuzz_differential_truehd_decode` | 973,729 | 1,620 | 897 to 1,147 | 2,175 to 4,524 | 707 | nothing, after the three below |
+
+The decode and encode harnesses are slow because each input is decoded ten times (five presentations,
+strict and lenient) and the encoder verifies every unit it writes. The decode and differential rows are
+the runs on the final library and oracle; the first run of `fuzz_truehd_decode`, before the `ch_assign`
+fix below, was clean too (89,988 executions, 149 a second, 925 new entries). Most differential inputs
+never reach FFmpeg: the library refuses them, and an FFmpeg process is spent only on a stream it reads
+whole.
+
+The differential harness found three things, each within its first ten minutes (the table's row is its run
+on the code with all three dealt with):
+
+- **An MLP stream of 16-bit words has bits below the word.** `mlp_st44_s16.mlp` with two bytes of audio
+  changed gave a right channel of 80256 in the library and 80128 in FFmpeg. FFmpeg writes a 16-bit
+  MLP stream as 16-bit samples; the library returns the 24-bit value. The oracle now compares at
+  FFmpeg's width, and `libs/truehd/ERRATA.md` question 40 asks whether the library should do it.
+  Regression: `mlp-16-bit-words-bit-7-set-in-a-channel`.
+- **`ch_assign` read the wrong way round.** `truehd_c40_s16.thd` with one `ch_assign` value changed
+  decoded to other channels in the library than in FFmpeg. The specification's sentence reads the field as a
+  map from matrix channels to output channels, FFmpeg does, and the library read its inverse; the two are
+  the same for the identity and for a swap, which is all the fixtures hold. The decoder now reads it as
+  the specification does (`ERRATA.md` entry 42), refuses a value that repeats (question 41), and
+  `libs/truehd/tests/decoder/test_channel_assignment.cpp` holds it with streams of a cyclic assignment.
+  Regression: `ch-assign-repeats-an-output-channel`.
+- **A changed major sync resets the library's filter histories and not FFmpeg's.** `hb_marker_last.thd`
+  with the channel assignment word of its second major sync changed: same rate, same channel count,
+  other samples from that unit on, FFmpeg's and the Python transcription's agreeing with each other. The
+  library treats a major sync that changes the stream's kind, format word or substream count as a new
+  stream and starts its substreams from zero histories; FFmpeg does not tell the two apart. This is
+  `ERRATA.md` question 18 in a corner, and question 42 asks it. The oracle skips such a stream.
+  Regression: `major-sync-format-info-changes-mid-stream`.
+
+What the mutator bought, for `fuzz_truehd_decode`: from the same seeds, dictionary and engine seed, 20,000
+executions reach 768 edges and 3,678 features (671 new files) with it and 751 and 3,491 (585) without it. That
+is a small gain, 2% of the edges and 5% of the features, and not the order of magnitude a checksum repair
+gives where every mutation otherwise dies at it. The harness decodes in lenient mode as well as strict, and a
+lenient decode counts a failed check and reads on; `ElementaryReader` finds a unit by its major sync and its
+length word, so a mutation in a unit it keeps (one that passes the nibble and the major sync CRC) is read
+either way. What the repair adds there is the strict path to the restart header and the blocks.
 
 ## Status: the ADM harness, instrumented
 
@@ -726,7 +785,10 @@ for them. A TrueHD stream the strict library decode accepts needs five checks an
 check of every restart interval to hold, so without the repair a mutation almost never leaves one,
 and the harness would spend its budget on inputs the first rule skips. Whatever the repair leaves
 for FFmpeg is a mutation in the fields that decode to the same samples or in the last interval,
-which nothing checks.
+which nothing checks. Measured over 4,000 executions from the seeds with one engine seed: with the
+mutator 139 inputs reached FFmpeg and 124 were compared and equal (the library refused the other
+3,860); without it 40 reached FFmpeg and 37 were compared (3,959 refused). The repair makes three and
+a half times as many comparisons, and about 97% of the inputs are still refused by the library.
 
 ## The other direction: the encoder's input space
 
@@ -1103,6 +1165,10 @@ gitignored; `tools/fuzz/run.sh` creates it on demand.
   per comparable input), so sharing a budget with the crash-only harnesses
   would have starved them of iterations. Also replays
   `fuzz/regressions/fuzz_differential_*` first, same shape as `fuzz-regress`.
+  The TrueHD harness runs in steps of its own with `continue-on-error`, so that it cannot
+  fail the job: it has run against FFmpeg 6.1.1 only and the runners install the Ubuntu
+  package, whose warnings and rounding it has not met. Promote it the way `fuzz-short` was,
+  by deleting those two lines once it has a clean record.
 - `fuzz-nightly` - a 10-minute-per-harness mutation budget (the
   `seconds_per_target` input, default 600) on a daily schedule (03:17 UTC), plus
   `workflow_dispatch` with a configurable budget for an on-demand deeper run.

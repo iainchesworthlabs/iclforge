@@ -122,7 +122,7 @@ lane builds or runs the TrueHD, crypto or signing code; the other words say what
 | Windows MSVC, clang-cl, macOS | Not run here. Read: five sources lacked the per-file `/wd4996` the project uses for `getenv` and `fopen` (added). The new library sources compile with Clang 18 at MSVC's constexpr step limit and `-Wconversion -Wsign-conversion` clean. Nothing assumes GCC or Linux. |
 | CodeQL, MSVC analysis | Covered: both build the full preset. |
 | clang-tidy | Not covered, and not for AC-4 either: `static-analysis.yml` lists `ac3`, `objects`, `render`, `base`, `dsp`, parts of `containers` and the CLI. `libs/ac4` and `libs/truehd` are in none of them. |
-| Fuzz regress, short and nightly | Not covered: `tools/fuzz/run.sh` lists no TrueHD harness (the three have no seeds yet). The fuzzing task's. |
+| Fuzz regress, short and nightly | Covered (2026-10-29). `tools/fuzz/run.sh` lists the TrueHD reader, decoder and encoder and the MAT unwrapper, with seeds made from `testdata/truehd`, a dictionary, and a mutator that puts the stream's checks right; `fuzz_differential_truehd_decode` holds the library's strict decode to FFmpeg's sample for sample in `fuzz-differential` (steps that cannot fail the job yet) and `fuzz-nightly`. `tools/checks/check_fuzz_harnesses.py` holds the lists in the static job. The signing and protected-MP4 harnesses have grown seeds. Ten-minute runs of each under Clang 18 found three things, all in `libs/truehd/ERRATA.md` (question 40, entry 42 with question 41, question 42); `tools/fuzz/README.md` has the table. |
 
 Open, for the owner:
 
@@ -132,6 +132,15 @@ Open, for the owner:
    one, or refuse it in the root as `ICLFORGE_BUILD_AC4=OFF` is?
 4. The AC-4 and TrueHD libraries are outside clang-tidy's list. Add them (a first nightly with findings), or leave them to CodeQL and Sonar?
 5. Forge writes the TrueHD WAV through `std::ofstream` with a narrow path, as the rest of the CLI writes its outputs; Windows reads a narrow path in the ANSI code page, so a non-ASCII path needs a wide one. Is that a fix for all of the CLI's outputs, or for none?
+
+Open from the fuzzing task, for the owner (the first three are `libs/truehd/ERRATA.md` questions 40 to 42, with their evidence):
+
+6. An MLP stream that declares 16-bit words but codes a bit below them: the library returns the 24-bit value, FFmpeg 16 bits (question 40).
+7. A `ch_assign` that repeats a value: refused, where FFmpeg gives the unassigned output matrix channel 0 (question 41; the direction of the field is entry 42, found by the same harness and fixed).
+8. A major sync that changes the channel assignment words: the library resets the filter histories, FFmpeg keeps them (question 42, a corner of question 18).
+9. `fuzz_iamf_parse` is built and has no seeds and no place in the run list, like the TrueHD harnesses were. `check_fuzz_harnesses.py` names it as a known gap. Give it seeds (the IAMF examples make streams) and a place in `BASE_TARGETS`?
+10. The TrueHD differential harness is in the required `fuzz-differential` job in steps that cannot fail it, because it has not run against the FFmpeg of the runners (8.0.1). Promote it after a clean week, or leave it to the nightly job?
+11. Should a stream with a cyclic `ch_assign` join `testdata/truehd/handbuilt`? The decoder's tests build one, and FFmpeg's strict decode agrees with it, but the fixtures are the fixtures task's.
 
 ## Not in scope here
 
