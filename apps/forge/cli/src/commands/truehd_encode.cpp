@@ -4,7 +4,6 @@
 // use.
 
 #include <fmt/base.h>
-#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -15,6 +14,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <optional>
 #include <span>
 #include <string>
@@ -24,6 +24,7 @@
 #include "../exit_codes.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
+#include "iclforge/base/wav.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "truehd.hpp"
@@ -237,6 +238,8 @@ bool write_raw(std::string_view out_path, std::span<const std::byte> bytes) {
     }
     out.write(reinterpret_cast<const char*>(bytes.data()),
               static_cast<std::streamsize>(bytes.size()));
+    // A file that fits the stream's buffer reaches the kernel only here; a full disk shows now.
+    out.flush();
     if (!out) {
         fmt::println(stderr, "error: write failed for {}", out_path);
         return false;

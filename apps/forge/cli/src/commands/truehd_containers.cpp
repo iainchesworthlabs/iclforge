@@ -1,7 +1,6 @@
 #include <fmt/base.h>
 #include <fmt/format.h>
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,9 +22,11 @@
 #include "iclforge/containers/matroska/matroska.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
+#include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "truehd.hpp"
 
 // TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
@@ -108,6 +109,8 @@ bool write_file(std::string_view out_path, std::span<const std::byte> bytes) {
     }
     out.write(reinterpret_cast<const char*>(bytes.data()),
               static_cast<std::streamsize>(bytes.size()));
+    // A file that fits the stream's buffer reaches the kernel only here; a full disk shows now.
+    out.flush();
     if (!out) {
         fmt::println(stderr, "error: write failed for {}", out_path);
         return false;

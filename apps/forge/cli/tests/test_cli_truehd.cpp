@@ -1181,3 +1181,58 @@ TEST_CASE("qc, transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][
         }
     }
 }
+
+// --- a write that fails ------------------------------------------------------------------------
+// The streams are buffered, and a TrueHD file this small is still in the buffer when the last write
+// call returns: the kernel sees it only when the stream is flushed or closed. A command that checks
+// the write calls and not the flush reports success for a file that was never written.
+
+TEST_CASE("truehd-encode reports an output that could not be written", "[forge-cli][truehd][truehd-encode]") {
+    std::error_code ec;
+    if (!fs::is_character_file("/dev/full", ec)) {
+        SKIP("no /dev/full character device here");
+    }
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "full.log";
+    const fs::path source = dir / "full_source.wav";
+    std::vector<std::int32_t> samples;
+    for (std::int32_t i = 0; i < 2 * 2400; ++i) {
+        samples.push_back((i * 37) % 64 - 32);
+    }
+    write_wav(source, 48000, 2, 0x3, samples);
+
+    // The same encode to a file of its own: small enough for one buffer, and a good one.
+    const fs::path good = dir / "full_good.thd";
+    REQUIRE(run_cli("truehd-encode \"" + source.string() + "\" \"" + good.string() + "\"", log) == 0);
+    REQUIRE(fs::file_size(good) < 4096);
+
+    // A link of this test's own to /dev/full for each name the encode writes: the open succeeds and
+    // every write the kernel sees fails with ENOSPC.
+    for (const std::string container : {"thd", "mkv", "mp4", "ts"}) {
+        CAPTURE(container);
+        const fs::path link = dir / ("full_device." + container);
+        fs::remove(link, ec);
+        fs::create_symlink("/dev/full", link, ec);
+        if (ec) {
+            SKIP("cannot create a symlink here");
+        }
+        CHECK(run_cli("truehd-encode \"" + source.string() + "\" \"" + link.string() + "\"", log) !=
+              0);
+        CHECK(read_text(log).find("write failed") != std::string::npos);
+        fs::remove(link, ec);
+    }
+
+    // The container commands, from the stream that was just written.
+    for (const std::string command : {"mkv", "mp4", "ts"}) {
+        CAPTURE(command);
+        const fs::path link = dir / ("full_convert." + command);
+        fs::remove(link, ec);
+        fs::create_symlink("/dev/full", link, ec);
+        if (ec) {
+            SKIP("cannot create a symlink here");
+        }
+        CHECK(run_cli(command + " \"" + good.string() + "\" \"" + link.string() + "\"", log) != 0);
+        CHECK(read_text(log).find("write failed") != std::string::npos);
+        fs::remove(link, ec);
+    }
+}
