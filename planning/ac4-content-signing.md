@@ -1,14 +1,14 @@
 # AC-4 content signing (pace-ccjf1, bring your own key and chain)
 
-!!! note "Status as of 2026-10-29: phases 0 to 3 done; phase 4 in progress"
+!!! note "Status as of 2026-10-29: phases 0 to 5 done; open items listed under the results"
     | Phase | What | State |
     |---|---|---|
     | 0 | This document | Written |
     | 1 | Crypto in `libs/base`: P-256, ECDSA, DER, X.509, chain validation, key and certificate loaders | Done; evidence under [Phase 1 results](#phase-1-results) |
     | 2 | Thrift binary and `ContentSignature` build and verify | Done; evidence under [Phase 2 results](#phase-2-results) |
     | 3 | Carrier and AC-4 integration (elementary stream, MP4) | Done; evidence under [Phase 3 results](#phase-3-results) |
-    | 4 | CLI, library surface, documentation, changelog | In progress |
-    | 5 | Tamper, policy and version tests, fuzz harness, end-to-end CLI test | Not started |
+    | 4 | CLI, library surface, documentation, changelog | Done; evidence under [Phase 4 results](#phase-4-results) |
+    | 5 | Tamper, policy and version tests, fuzz harness, end-to-end CLI test | Done, except that no harness has been built through libFuzzer; see [Phase 5 results](#phase-5-results) |
 
     The specification is a clean-room interoperability description of the scheme
     (`ac4-content-signing-spec.md`, version 2.0, 2026-10-29). Section numbers below cite it as
@@ -757,6 +757,63 @@ Things the implementation settled that the plan left open:
 - **`Mp4UuidCarrier` reads the first AC-4 track** (the reader's default selection). A file whose first
   audio track is another codec is `kNoAc4Track`.
 
+## Phase 4 results
+
+The command line (`sign-content`, `verify-content`, `gate-content` and their options), the library
+surface, the documentation and the changelog. The tests drive the built `forge` binary through
+`iclforge-forge-cli-tests "[content_signing]"` (13 cases, 252 assertions), which writes a throwaway
+authority with `tests/support/test_pki.hpp` into the test scratch directory for each case and commits
+no key.
+
+| Claim | Evidence |
+|---|---|
+| `ac4-encode ... sign-content` writes `<out>.sig` beside a raw stream and a `uuid` box in an MP4; `decode ... verify-content` accepts both and prints who signed | `[content_signing]`, the first and sixth cases; and by hand with a chain made by `openssl` (the scratchpad `e2e` run) |
+| `verify-content` refuses, exits 2 and writes no output file for: an unsigned stream, a changed frame, a stream that stops short, a signer the operator does not trust, a signature file named and absent, and nothing to trust | `[content_signing]`, the second case |
+| The key, the chain and the trust are read from the environment only when no path is named; the key can be PEM in a variable | the third and fourth cases |
+| `sign-content` names what is missing before it encodes (no key, no chain, a chain for another key, two keys) | the fifth case |
+| A changed sample of an MP4 is caught; the MP4's metadata around the samples is not covered, which the test records so that a change is a decision | the sixth case |
+| An expired intermediate is refused unless `allow-expired-intermediates`, which does not excuse a root | the seventh case |
+| `verify-time=` is the time the chain is judged at: 2030 passes, 2040 and 2023 are refused, where the system clock would pass all three | the eighth case, added after a mutation survived |
+| The leaf profile is the specification's unless `signer-profile=any` or one of `signer-title=`, `signer-cn=`, `signer-serial=` changes it | the ninth case |
+| `gate-content` decodes a stream that does not verify and says the object audio was left out; a verified stream is decoded as it is; with nothing to trust it is refused. On a four-object A-JOC stream, a verified signature plays the objects, and one that does not verify stops the decode (exit 2, no file) because a presentation of object audio alone has nothing to play without them | the tenth case, whose object section was added after a mutation survived |
+| The options that do not fit are usage errors (exit 1) that name the option to use: `verify-content` with `gate-content`; `sign-content` with `sign-objects`, on a command that writes no AC-4, on `atmos-encode` without `codec=ac4`, on an E-AC-3 stream; `sign-objects` on `ac4-encode`; `verify-objects` on AC-4 and `verify-content` on E-AC-3; options without the mode that reads them; a time that is not ISO 8601 UTC; a profile that is neither `spec` nor `any` | the eleventh case |
+| `probe` reports a signature without a key as a table block and as `content_signature` in the JSON, reports one that does not parse and goes on, and says nothing for an unsigned stream; the JSON member is null for an unsigned stream and for AC-3 | the twelfth case |
+| A stream read from standard input is verified against a named signature file | the thirteenth case |
+| The tests can fail | ten changes made to forge's content signing, then undone, each caught (scratchpad `p4/mutate_cli.py`): verify-content proceeding on a failure, gate-content treating an unverified stream as verified, a named signature file that is absent taken as unsigned, several signing keys accepted, `verify-content` accepted on a command that does not read it, a trust option accepted without its mode, an AC-3 stream let through `verify-content`, `sign-time=` ignored, `verify-time=` ignored, a sidecar written beside an MP4. Two of the ten survived the first version of the tests; the last two cases and the `gate-content` assertions were written for them, and both are caught now |
+| The `uuid` box and the MP4 carrier keep working through `forge` | `iclforge-forge-cli-tests "[signing]"` (21 cases, 538 assertions); the whole binary passes (383 cases, 3,341,609 assertions) |
+| The documentation builds and every link it adds resolves | `mkdocs build --strict` (exit 0); a script over the 13 changed pages checked each relative link and anchor against the built site (0 broken); `python3 tools/checks/check_doc_paths.py` (0 missing); `generate_project_pages.py --check` and `generate_support_matrices.py --check` (current) |
+
+## Phase 5 results
+
+| Claim | Evidence |
+|---|---|
+| The foreign-input surface has a harness: `fuzz_ac4_signing_verify` takes the carrier, the digest and the verifier on a stream and a sidecar, and holds four properties (the frames lie inside the input; a stream with no sidecar never verifies; a stream signed by the fixed authority verifies and stops verifying when a bit of a chosen frame changes; an empty stream does not verify, not even under a signature over the digest of nothing) | `libs/ac4/fuzz/fuzz_ac4_signing_verify.cpp`; 30,000 mutated inputs and the 11 seeds under GCC 13 with ASan and UBSan through an ad hoc driver (the scratchpad `fuzzac4`), no report |
+| The harness can fail | five changes made to `libs/ac4/src/signing/content_signing.cpp`, then undone, each stopped by it: a digest that leaves out the last frame, one that leaves out the last byte of each frame, a verifier that passes a missing signature, a verifier that does not refuse a stream with no frames, a signer that signs no frames. (The first and second were stopped only after the tamper was made to pick any frame and either end of it.) |
+| The three harnesses are registered | `libs/ac4/fuzz/CMakeLists.txt`, `libs/base/fuzz/CMakeLists.txt`, `tools/fuzz/run.sh`; configuring the fuzz build with `clang++-18` succeeded (`cmake -DICLFORGE_BUILD_FUZZERS=ON ...`) |
+| Tamper, policy and version tests are in `libs/base/tests` and `libs/ac4/tests/signing`; the end-to-end test is the Phase 4 one | `iclforge-base-tests "[content_signature]"` (26 cases, 4,508 assertions), `"[p256]"` (13, 5,005), `"[x509]"` (13, 858), `"[interop]"` (1 case, 4,565 assertions, against OpenSSL), `iclforge-ac4-tests "[signing]"` (21 cases, 719 assertions) |
+| Whole test binaries | `iclforge-base-tests` 119 cases, 118 passed, 1 skipped (no locale with a decimal comma is installed); `iclforge-containers-tests` 194 cases, 332,778 assertions; `iclforge-ac4-tests` 577 cases, 573 passed, 4 skipped (each needs a path in an environment variable); `iclforge-app-media-tests` 92 cases, 48,827 assertions; `iclforge-forge-cli-tests` 383 cases, 3,341,609 assertions |
+| Repository checks | `check_layering.py` 0 failures; `check_namespaces.py` 0 failures, 4 known debts; `check_no_std_format.py` 0 uses; `check_doc_paths.py` 0 missing; `check_workflow_paths.py` 0 problems; `check_patch_attribution.py --range 8f2d70b..HEAD` 18 commits, 0 violations; `clang-format-diff-18` over every changed line of C++ since `8f2d70b`: the only difference is the order of an existing include block in `ac4_encode.cpp`, left as it was |
+
+A latent test fault surfaced in this phase. `libs/base/tests/test_interop.cpp` judged a version 1
+certificate that `openssl x509 -req` made when the test ran at the script's fixed `NOW`
+(2026-10-29T00:00:00Z); the certificate's validity starts when the test runs, so the test failed from the
+moment the clock passed that instant. It now judges the certificate at a time inside its own dates.
+
+Not done, or not shown:
+
+- **No libFuzzer run.** Decision 26.
+- **No LLVM build.** The machine has `clang++-18` with libstdc++ 13, in which `<expected>` is unavailable
+  (`std::expected` is guarded by a concepts feature macro that this clang does not set), so nothing
+  in the tree that uses it can be compiled with it; the work was built with GCC 13 only and written to the
+  rules for GCC 13 and LLVM 21 (no `std::print`, no `std::ranges::to`).
+- **No Windows or MSVC build.**
+- **The CI version of `clang-format`** was not available; `clang-format-18` was used.
+- **`ctest -L base`** reports two failures here, both the locale test that skips for want of a locale
+  (once for the library test and once for the libc variant of it); neither file is touched by this branch.
+- **`monitor`** (decision 27) and **re-wrapping** (decision 23).
+- **No interoperability check** against a signed stream from another implementation: none is available,
+  and the specification publishes no test vector for a whole file (register items 1 to 4).
+
 ## Decisions needing owner review
 
 1. **The carrier (the open question).** Chosen: a sidecar `<stream>.sig` for elementary streams, a
@@ -818,3 +875,34 @@ Things the implementation settled that the plan left open:
     `base` types through an `ac4` header. Neither was done. The cost is that Hearth and Crucible, which
     compile `app-media`, do not get the carrier; if either should verify content, the layering row is
     the decision.
+22. **Header tiers.** `base/crypto/content_signature.hpp`, `credentials.hpp` and
+    `ac4/signing/content_signing.hpp`, `carrier.hpp` are **Experimental** in
+    `docs/library/api-stability.md`, outside the `v1.0.0` freeze, because the carrier and the signed
+    span are this project's choices and nothing has been checked against another implementation.
+    `p256.hpp`, `ecdsa_der.hpp`, `x509.hpp`, `thrift_binary.hpp`, `sha1.hpp` and `secure_zero.hpp`
+    are **Internal**. Promoting the two entry points to Public is a decision for after an interoperability check.
+23. **Re-wrapping does not carry a signature, and does not say so.** `mp4`, `fmp4`, `demux`, `remux` and
+    `ts` write a new container, and the new file is signed only if `sign-content` is given. A
+    signature in an MP4 input, or `<input>.sig` beside an elementary stream, is dropped without a
+    notice. This fails safe (`verify-content` then refuses the output as unsigned) and is documented in
+    `docs/forge/cli/commands.md`, but a user can lose a signature without being told. A notice, or
+    copying the box when the samples are unchanged (`mp4 in.mp4 out.mp4` without `programme=`), would
+    close it. Not done.
+24. **`iclforge.probe/1` gains a `content_signature` member**, null for an unsigned stream, a stream
+    in a container that cannot carry one, and every AC-3 and E-AC-3 stream. It is additive, which the
+    contract in `docs/forge/cli/commands.md` allows within a version, and the AC-3 path writes the null
+    so that no member is omitted. `probe` reports the signature without a key or any trust, so the
+    signer, the date and the fingerprints it prints are what the file says and nothing it has checked.
+25. **The libs/ac4 fuzz harness does not reach the MP4 box carrier**, which lives in `apps/forge/cli/src`
+    (decision 21). The box is found by the MP4 reader (`fuzz_mp4_demux` presses it, user boxes
+    included), and the selection among boxes is covered by unit tests. A harness for the carrier would
+    sit under `apps/forge`, where no fuzz directory exists.
+26. **No libFuzzer run.** The three harnesses were exercised by an ad hoc driver under GCC's ASan and
+    UBSan, because libFuzzer's runtime is not installed on this machine. They are registered in
+    `tools/fuzz/run.sh` and have not been built through it, and a first run under Clang is owed.
+27. **`monitor` verification is untested here.** `verify-content` is wired into `monitor` through the
+    same helper `decode` uses, and this machine's build has no audio backend, so `monitor` returns
+    "unavailable" before it reaches the check; the refusal of `gate-content` on `monitor` was run by hand, and no test covers `monitor` itself.
+28. **A seed carries a foreign authority's public certificates.** `libs/ac4/fuzz/seeds/fuzz_ac4_signing_verify/
+    tiny-with-foreign-sidecar.*` holds a sidecar signed with a throwaway openssl chain. No private key was
+    committed or kept; the files hold certificates and a signature only.
