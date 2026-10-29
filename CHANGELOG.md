@@ -20,7 +20,9 @@ See [README.md](README.md) for the project overview and
   a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90); decryption is not supported`; `forge demux`, `decode` and the other commands exit 2 and write
   nothing, `probe` exits 1 as it does for every failure. A protected track beside a readable one is listed under `container.other_tracks`
   with a new `protection` member (an object, or `null` for a clear track; the schema stays `iclforge.probe/1`). Nothing decrypts, and a
-  key is not read: the read side is a plan in `planning/cenc-read-side.md`. The documents now say that the EMDF `protection` field is an
+  key is not read: the read side is a plan in `planning/cenc-read-side.md`. The Matroska reader no longer reads a track that declares
+  `ContentEncryption` as clear (`kEncryptedTrack`), and the MPEG-TS reader stops at an audio packet with `transport_scrambling_control` set
+  (`kScrambled`); both were read as audio with exit code 0 (audit M11). The documents now say that the EMDF `protection` field is an
   authenticity tag and has nothing to do with content protection. The reader gains `DemuxError::kProtectedTrack`, `Protection`,
   `describe_refusal()`, `Reader::refused_tracks()` and `list_refused_tracks()`; three small protected files from
   `tools/generators/gen_cenc_reader_fixtures.py` are the MP4 fuzz harness's seeds and the tests' input.

@@ -94,6 +94,12 @@ as `SimpleBlock`, several tracks, 32-bit as well as 64-bit `SamplingFrequency`, 
 left at EBML's unknown size rather than only the Segment. A file truncated mid-cluster returns
 every whole frame before the cut rather than an error — that is how a live recording ends.
 
+An audio track whose `TrackEntry` carries a `ContentEncodings` with a `ContentEncryption` is
+encrypted with Matroska's own scheme. Nothing else in the entry marks its frames as ciphertext, so
+the reader never selects it and returns `kEncryptedTrack` when it was the only candidate; it does
+not decrypt. (A `ContentEncodings` that holds only compression is not applied either, and is read
+as before.)
+
 **Untrusted input.** Every length in an EBML file is self-declared, and a container arrives from
 a rip, a capture or a download rather than from this project's own writer. `ReadOptions` bounds
 the element size the reader will hold (16 MiB by default; anything larger that it does not need
@@ -427,6 +433,12 @@ still emit: the unbounded PES form ends only at the next
 `payload_unit_start_indicator` or at end of input, so the last payload of a capture is only
 complete here.
 
+A packet of the audio PID whose `transport_scrambling_control` bits are not 00 carries a scrambled
+payload (conditional access, not Common Encryption). The PES parse would take it for audio, so the
+reader stops at the first one with `kScrambled`; payloads delivered before it were clear packets.
+The PMT's `conditional_access_descriptor` is not read: it says a stream may be scrambled, and the
+packet bits say whether this one is. Nothing descrambles.
+
 **Untrusted input, and more so than the sibling formats.** A transport stream is designed to be
 tuned into mid-flight and to survive bit errors, so "malformed" is the ordinary case here, not
 the exceptional one. Every PSI section's CRC-32 (the non-reflected CRC-32/MPEG-2 variant,
@@ -680,9 +692,9 @@ its own `describe()` overload beside `MuxError`'s:
 
 | Enum | Values |
 |---|---|
-| `iclforge::containers::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`). |
-| `iclforge::containers::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`). |
-| `iclforge::containers::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`). |
+| `iclforge::containers::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`); `kProtectedTrack` (the audio track has a protected sample entry, see above). |
+| `iclforge::containers::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`); `kEncryptedTrack` (the audio track declares `ContentEncryption`; see its demuxing section). |
+| `iclforge::containers::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`); `kScrambled` (a packet of the audio PID has `transport_scrambling_control` set). |
 
 ## Bitstream sinks (`iclforge::audio`)
 

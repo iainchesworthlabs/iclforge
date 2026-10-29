@@ -46,6 +46,13 @@
 // Reed-Solomon parity after each, so 204. The grid size is detected from the
 // sync-byte spacing rather than assumed.
 //
+// SCRAMBLED STREAMS ARE REFUSED, NOT READ. The two transport_scrambling_control bits of a packet
+// header say the payload is scrambled (ISO/IEC 13818-1 section 2.4.3.2; conditional access, not
+// Common Encryption). A scrambled packet of the audio PID is ciphertext that the PES parse would
+// take for audio, so the reader stops at the first one with kScrambled. Payloads delivered before
+// it were clear packets. The PMT's conditional_access_descriptor is not read: it says a stream may
+// be scrambled, and the packet bits say whether this one is. Nothing here descrambles.
+//
 // UNTRUSTED INPUT. A transport stream is the format most likely to arrive
 // damaged - it is designed to be tuned into mid-flight and to survive bit
 // errors - so "malformed" is the normal case rather than the exceptional
@@ -69,6 +76,7 @@ enum class DemuxError : std::uint8_t {
     kNoAudioStream,       // the PMT held no AC-3/E-AC-3 elementary stream
     kMalformed,           // a PES or section layout that cannot be parsed
     kLimitExceeded,       // a PES or section beyond ReadOptions
+    kScrambled,           // a packet of the audio PID has transport_scrambling_control set
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);

@@ -38,6 +38,12 @@
 // Both run the same EBML walker (libs/containers/src/matroska/reader.cpp); the only
 // difference is where the bytes come from and where the frames point.
 //
+// ENCRYPTED TRACKS ARE REFUSED, NOT READ. A TrackEntry that holds a ContentEncodings with a
+// ContentEncryption declares that its frames are encrypted (Matroska's own scheme, which is not
+// Common Encryption). The reader would otherwise hand those frames back as audio, since nothing
+// else in the entry changes; it never selects such a track, and reports kEncryptedTrack when it
+// was the only candidate. Nothing here decrypts or reads a key.
+//
 // UNTRUSTED INPUT. A container arrives from a disc rip, a broadcast capture
 // or an HTTP download - not from this project's own writer. Every length in
 // an EBML file is self-declared, so a malformed or hostile one can claim an
@@ -58,11 +64,12 @@ struct ReaderState;
 }  // namespace detail
 
 enum class DemuxError : std::uint8_t {
-    kNotMatroska,    // no EBML header where one has to be
-    kTruncated,      // the input ends before a track was ever described
-    kMalformed,      // a vint, element or block layout that cannot be parsed
-    kNoAudioTrack,   // Tracks held no track this reader could use
-    kLimitExceeded,  // an element size or nesting depth beyond ReadOptions
+    kNotMatroska,     // no EBML header where one has to be
+    kTruncated,       // the input ends before a track was ever described
+    kMalformed,       // a vint, element or block layout that cannot be parsed
+    kNoAudioTrack,    // Tracks held no track this reader could use
+    kLimitExceeded,   // an element size or nesting depth beyond ReadOptions
+    kEncryptedTrack,  // the audio track declares ContentEncryption: its frames are ciphertext
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);

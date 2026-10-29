@@ -49,8 +49,9 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
   (M4, M5), so full-sample audio is the first target: no subsample map, pattern 1:0 or 0:0.
 - Per-sample IVs of 8 or 16 bytes from `senc`, a constant IV from `tenc`, `saiz` and `saio` read to
   check `senc` and never trusted over it (section 5.3).
-- Key choice by KID, from the track's `tenc` default and, in phase 3, a `seig` override.
-- A clear lead-in: a second sample entry, or a `seig` group with `isProtected` 0 (section 5.4).
+- Key choice by KID, from the track's `tenc` default and, in phase 4, a `seig` override.
+- A clear lead-in (phase 4): a second sample entry, or a `seig` group with `isProtected` 0
+  (section 5.4).
 
 **A stated limit, not a gap to hide.**
 
@@ -59,8 +60,8 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
   will not write one, and Shaka Packager applies patterns to video only [seen: Shaka raw-key page,
   fetch]. Nobody can say what a 1:9 audio file means until the standard is read.
 - A `senc` with a subsample map is parsed (a reader must accept one) and refused with a message in
-  phase 1. Applying it is a small addition, but no audio producer examined writes one (M3, M7),
-  there is no fixture, and the CBC rules at a subsample boundary are [recalled] only. Phase 3
+  phase 2. Applying it is a small addition, but no audio producer examined writes one (M3, M7),
+  there is no fixture, and the CBC rules at a subsample boundary are [recalled] only. Phase 4
   revisits it if a producer turns up.
 - Video (`encv`) and other tracks are neither decrypted nor read; they stay in the skipped list.
 
@@ -71,8 +72,9 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
   non-goal. `pssh` is parsed only to expose the SystemID and KIDs.
 - Keys: the project ships none, derives none, guesses none and fetches none (section 6).
 - Writing protected files (G13 to G19). The AES in `libs/base` would serve a writer later.
-- Matroska `ContentEncodings`, MPEG-TS scrambling, HLS `SAMPLE-AES` in segment formats other than
-  fMP4, TrueHD (G24).
+- Matroska `ContentEncodings` and MPEG-TS scrambling (neither is Common Encryption; both readers
+  refuse such a track today and would go on refusing it), HLS `SAMPLE-AES` in segment formats other
+  than fMP4, TrueHD (G24).
 - Playing decrypted bitstreams to a receiver from Hearth or Crucible (G25): see decision D5.
 
 ## 4. What exists
@@ -81,6 +83,7 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
 |---|---|
 | `libs/containers/src/mp4/reader.cpp` | Reads `sinf`, `frma`, `schm`, `schi`, `tenc` of an `enca` or `encv` entry into `mp4::Protection` and refuses the track with `DemuxError::kProtectedTrack`. Reads no `senc`, `saiz`, `saio`, `sgpd`, `sbgp` or `pssh`. Selects no track by KID. |
 | `libs/base/src/crypto` | SHA-256, HMAC-SHA-256 and `SigningKey` (operator-supplied, zeroized, loaded from a path or the environment). No AES. |
+| `libs/containers/src/matroska`, `libs/containers/src/mpegts` | A Matroska audio track with a `ContentEncryption` is refused (`kEncryptedTrack`) and so is an MPEG-TS audio PID with scrambled packets (`kScrambled`). Neither is Common Encryption and neither is in this plan. |
 | `tools/checks/projects.json` | `containers` may use `base` only. mbedTLS is linked by `libs/sendspin`, behind Hearth's vcpkg feature. |
 | `tools/generators/cenc_make_protected.py` | Writes protected fragmented MP4 in all four schemes and the clear-lead and rotation layouts; checked against GPAC and FFmpeg (M5 to M7). Needs the `cryptography` package. |
 | Docs | [IAMF](../docs/library/iamf.md) already states the precedent: Common Encryption would be the module's first third-party dependency, so a protected IA track is refused. |
@@ -180,7 +183,7 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
   why GPAC's fragmented files are the hard case for the oracle and not for the parse.
 - `sgpd` and `sbgp` with grouping type `seig`: an entry carries a crypt and skip pair, the
   protected flag, the IV size, a KID and, when the protected flag is 1 and the IV size 0, a
-  constant IV [recalled]. A fragment-local `sgpd` is indexed above `0x10000` [recalled]. Phase 3.
+  constant IV [recalled]. A fragment-local `sgpd` is indexed above `0x10000` [recalled]. Phase 4.
 - `pssh` v0 and v1 in `moov` and `moof`: SystemID, KIDs and data exposed as plain data. The reader
   does nothing with them (G12).
 
@@ -207,7 +210,7 @@ track" and exits as an input error. A test with a wrong key proves it.
 ### 5.4 Clear lead-in and key rotation
 
 Today the reader refuses a track whose `stsd` holds any protected entry, whatever the other entries are,
-because the reader cannot tell the lead-in from the rest. With keys, phase 3 reads
+because the reader cannot tell the lead-in from the rest. With keys, phase 4 reads
 `sample_description_index` per sample (`stsc`, `tfhd`, `trex`) and `seig` per sample, hands clear
 samples through untouched, decrypts the protected ones and picks the key by the sample's KID. The
 oracles split here: GPAC decrypts `leader_entry`, `leader_entry_rev`, `leader_seig` and `rotate`;
@@ -265,9 +268,8 @@ lines, env variables), the more the project reads as a decryption tool and the l
 inspection tool, and each later request (a key server client, a `pssh` parser that feeds a CDM,
 decrypted passthrough in Hearth) is a step along that road. Mitigations: the section 6 boundary in
 the documents and in the code review checklist; the analysis commands only (D5); no DRM interface
-at all. Other open-source tools (FFmpeg, GPAC, Shaka Packager) ship decryption with user-supplied
-keys [measured for FFmpeg and GPAC, M4; recalled for Shaka Packager]; that is a precedent for the
-practice and not legal advice. Anti-circumvention law differs by country and this author cannot
+at all. Other open-source tools ship decryption with user-supplied keys (FFmpeg and GPAC both decrypt the
+audit's files given the key, M3 and M4); that is a precedent for the practice and not legal advice. Anti-circumvention law differs by country and this author cannot
 assess it [recalled: DMCA section 1201 and Article 6 of the EU Copyright Directive 2001/29/EC]. The
 owner should decide, and take advice, before phase 2.
 

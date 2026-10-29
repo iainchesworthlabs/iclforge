@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <span>
 #include <string>
@@ -475,4 +477,41 @@ TEST_CASE("elementary_stream_from_bytes reports an MP4's edit list as a trim",
     CHECK(whole.bytes == stream);
     CHECK(whole.trim.start == 0);
     CHECK_FALSE(whole.trim.length.has_value());
+}
+
+TEST_CASE("elementary_stream_from_bytes names a protected MP4 track and reads nothing of it",
+          "[containers][io2][protected]") {
+    // The three protected files the MP4 fuzz harness seeds with (tools/generators/
+    // gen_cenc_reader_fixtures.py). The first has a clear sample entry beside the protected one,
+    // which used to be read as clear, ciphertext and all.
+    const std::string kid = "a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90";
+    const auto read = [](const std::string& name) {
+        std::ifstream in{std::string{ICLFORGE_MP4_SEED_DIR} + "/" + name, std::ios::binary};
+        REQUIRE(in.good());
+        const std::vector<char> raw{std::istreambuf_iterator<char>{in},
+                                    std::istreambuf_iterator<char>{}};
+        Bytes bytes(raw.size());
+        std::ranges::transform(raw, bytes.begin(),
+                               [](char c) { return static_cast<std::byte>(c); });
+        return bytes;
+    };
+
+    const auto mixed =
+        iclforge::apps::elementary_stream_from_bytes(read("cenc-clear-entry-then-enca.mp4"));
+    CHECK(mixed.bytes.empty());
+    CHECK(mixed.error ==
+          "MP4 file this build cannot demux: track 1 mixes a clear sample entry with a protected "
+          "one, entry 2 (cenc, original format ec-3, default KID " +
+              kid + "), and is refused whole; decryption is not supported");
+
+    const auto plain = iclforge::apps::elementary_stream_from_bytes(read("cenc-enca-only.mp4"));
+    CHECK(plain.bytes.empty());
+    CHECK(plain.error ==
+          "MP4 file this build cannot demux: track 1 is protected (cenc, original format ec-3, "
+          "default KID " +
+              kid + "); decryption is not supported");
+
+    const auto cbcs = iclforge::apps::elementary_stream_from_bytes(read("cbcs-enca-only.mp4"));
+    CHECK(cbcs.bytes.empty());
+    CHECK(cbcs.error.find("track 1 is protected (cbcs, original format ec-3") != std::string::npos);
 }

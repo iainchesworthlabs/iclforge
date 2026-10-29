@@ -1113,3 +1113,50 @@ TEST_CASE("probe lists the tracks of a Matroska karaoke video that it does not r
         CHECK(json_field(document, "track") == "3");
     }
 }
+
+TEST_CASE("probe and demux refuse a Matroska audio track that declares ContentEncryption",
+          "[cli][probe][demux][container][encrypted]") {
+    // The audio is a real AC-3 stream in one block, as above, and the TrackEntry carries a
+    // ContentEncodings > ContentEncoding > ContentEncryption (AES). Nothing else marks the frames
+    // as ciphertext; before the reader looked, `forge demux` wrote them out as audio, exit 0.
+    const auto audio_path = make_ac3("encrypted_audio.ac3", "1 448 1000 50 51");
+    std::ifstream in{audio_path, std::ios::binary};
+    const std::vector<unsigned char> audio{std::istreambuf_iterator<char>{in},
+                                           std::istreambuf_iterator<char>{}};
+    REQUIRE_FALSE(audio.empty());
+
+    const auto rate = ebml_element(0xB5, {0x47, 0x3B, 0x80, 0x00});
+    const auto master = ebml_element(0xE1, ebml_cat({rate, ebml_uint(0x9F, 6)}));
+    const auto encryption = ebml_element(0x5035, ebml_cat({ebml_uint(0x47E1, 5)}));
+    const auto encoding = ebml_element(0x6240, ebml_cat({ebml_uint(0x5031, 0), ebml_uint(0x5032, 1),
+                                                         ebml_uint(0x5033, 1), encryption}));
+    const auto entry = ebml_element(
+        0xAE, ebml_cat({ebml_uint(0xD7, 1), ebml_uint(0x83, 2), ebml_text(0x86, "A_AC3"),
+                        ebml_text(0x22B59C, "eng"), master, ebml_element(0x6D80, encoding)}));
+    std::vector<unsigned char> block{0x81, 0x00, 0x00, 0x80};  // track 1, timestamp 0, keyframe
+    block.insert(block.end(), audio.begin(), audio.end());
+    const auto cluster = ebml_cat({ebml_uint(0xE7, 0), ebml_element(0xA3, block)});
+    const auto segment =
+        ebml_cat({ebml_element(0x1654AE6B, entry), ebml_element(0x1F43B675, cluster)});
+    const auto file = ebml_cat({ebml_element(0x1A45DFA3, ebml_text(0x4282, "matroska")),
+                                ebml_element(0x18538067, segment)});
+    const auto path = scratch_dir() / "encrypted.mkv";
+    {
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(file.data()),
+                  static_cast<std::streamsize>(file.size()));
+    }
+
+    const auto log = scratch_dir() / "encrypted_mkv.log";
+    CHECK(run_cli("probe \"" + path.string() + "\"", log) == 1);
+    const auto probed = read_log(log);
+    INFO(probed);
+    CHECK(probed.find("Matroska/WebM file this build cannot demux (the audio track is encrypted") !=
+          std::string::npos);
+
+    const auto out = scratch_dir() / "encrypted_mkv.ac3";
+    fs::remove(out);
+    CHECK(run_cli("demux \"" + path.string() + "\" \"" + out.string() + "\"", log) == 2);
+    CHECK(read_log(log).find("the audio track is encrypted") != std::string::npos);
+    CHECK_FALSE(fs::exists(out));
+}

@@ -46,6 +46,11 @@ iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_objects_core.cpp")
 target_include_directories(iclforge-app-media-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+# test_container_input.cpp reads the protected MP4s that are also the MP4 fuzz harness's seeds
+# (tools/generators/gen_cenc_reader_fixtures.py), by path for the reason the CLI tests' seed
+# directories are.
+target_compile_definitions(iclforge-app-media-tests PRIVATE
+    "ICLFORGE_MP4_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/containers/fuzz/seeds/fuzz_mp4_demux\"")
 target_link_libraries(iclforge-app-media-tests
     PRIVATE
         iclforge::ac3

@@ -1,6 +1,7 @@
 # Common Encryption (ISO/IEC 23001-7): conformance audit
 
-Status: **audit, nothing built.** Written 2026-10-29 against `main` at 8f2d70b5. It answers one
+Status: **audit; G1 to G5 fixed, the rest not built.** Written 2026-10-29 against `main` at 8f2d70b5; the
+fixes are noted under section 5. The read side is planned in [cenc-read-side.md](cenc-read-side.md). It answers one
 question from the owner: does ICL Forge conform to ISO/IEC 23001-7 (Common Encryption, "CENC"), which
 the owner takes to govern how protected Atmos JOC streams are encrypted and decrypted across DRM
 systems? Nothing here starts the work. Status lives in [ROADMAP.md](../ROADMAP.md).
@@ -115,6 +116,13 @@ Effort: S an afternoon, M a day or two, L a focused week (the scale in ROADMAP.m
 is blocking for the direction chosen (read, write or both); see section 8, decision D1.
 
 ### A. Gaps in conformance: behaviour that is wrong or unsafe today
+
+*Fixed on 2026-10-29; the rows keep what the audit found.* G1: the MP4 reader refuses a track that has
+a protected sample entry, whole, whatever its other entries are (`DemuxError::kProtectedTrack`), rather than
+reading the index per sample. G2: the refusal names the track, scheme, original format and default KID. G3: the
+header comment of `reader.hpp`, the library and CLI pages and the roadmap say what happens. G4: the Matroska
+reader refuses an audio track with a `ContentEncryption` (`kEncryptedTrack`). G5: the MPEG-TS reader stops at an
+audio packet with `transport_scrambling_control` set (`kScrambled`); the PMT's CA descriptor is still unread.
 
 | ID | Gap | Standard area | Severity | Effort | Depends on | Oracle that would verify a fix |
 |---|---|---|---|---|---|---|

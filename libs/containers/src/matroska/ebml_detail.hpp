@@ -70,6 +70,15 @@ inline constexpr std::uint32_t kAttachments = 0x1941A469;
 inline constexpr std::uint32_t kChapters = 0x1043A770;
 inline constexpr std::uint32_t kTags = 0x1254C367;
 
+// Read-side only: ContentEncodings, the TrackEntry child that declares how a track's frames were
+// transformed before they were stored, one ContentEncoding each, as compression or as encryption
+// (ContentEncryption, which holds the algorithm and key ID). The writer emits none. The ids are
+// the Matroska specification's, [recalled] and not checked against the text; a track that has a
+// ContentEncryption is encrypted, whatever else its encodings say.
+inline constexpr std::uint32_t kContentEncodings = 0x6D80;
+inline constexpr std::uint32_t kContentEncoding = 0x6240;
+inline constexpr std::uint32_t kContentEncryption = 0x5035;
+
 inline constexpr std::uint8_t kTrackTypeAudio = 0x02;
 inline constexpr std::uint64_t kTimestampScaleNs = 1'000'000;  // one tick == 1 ms
 

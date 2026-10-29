@@ -141,6 +141,9 @@ std::string_view describe(DemuxError error) {
             return "malformed PES or PSI section layout";
         case DemuxError::kLimitExceeded:
             return "a PES packet or PSI section beyond the reader's limits";
+        case DemuxError::kScrambled:
+            return "the audio stream is scrambled (a packet has transport_scrambling_control "
+                   "set): its payload is ciphertext and descrambling is not supported";
     }
     return "unknown error";
 }
@@ -489,7 +492,13 @@ std::expected<void, DemuxError> parse_packet(ReaderState& s, std::span<const std
         return {};
     }
 
-    // The audio PID.
+    // The audio PID. transport_scrambling_control is the top two bits of the fourth header byte:
+    // 00 is clear and anything else says the payload of this packet is scrambled
+    // (ISO/IEC 13818-1 section 2.4.3.2; DVB uses 10 and 11 for the even and odd key). The PES
+    // parse below would take those bytes for audio, so the stream is refused here, before them.
+    if ((byte_at(packet, 3) >> 6U) != 0) {
+        return std::unexpected(DemuxError::kScrambled);
+    }
     if (unit_start) {
         // A new PES starts here, which is also what ends the previous one
         // when it used the unbounded length form.

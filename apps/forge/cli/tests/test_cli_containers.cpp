@@ -1742,3 +1742,47 @@ TEST_CASE("probe and demux read the clear track of an MP4 and list the protected
         CHECK(document.find("\"protection\"") == std::string::npos);
     }
 }
+
+TEST_CASE("demux and probe refuse an MPEG-TS whose audio packets are scrambled",
+          "[cli][demux][ts][scrambled]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "scrambled.log";
+    const auto source = dir / "scrambled.ac3";
+    const auto clear = dir / "scrambled_clear.ts";
+    REQUIRE(run_cli("sine " + quoted(source) + " 1 448 440 60 51", log) == 0);
+    REQUIRE(run_cli("ts " + quoted(source) + " " + quoted(clear), log) == 0);
+
+    // transport_scrambling_control is the top two bits of header byte 3; 10 is "scrambled, even
+    // key". The writer's audio PID is 0x0100. The payload is left as it is: only the bits are read.
+    auto bytes = read_file(clear);
+    std::size_t flagged = 0;
+    for (std::size_t at = 0; at + 188 <= bytes.size(); at += 188) {
+        const auto pid = static_cast<std::uint32_t>(
+            ((std::to_integer<std::uint32_t>(bytes[at + 1]) & 0x1FU) << 8U) |
+            std::to_integer<std::uint32_t>(bytes[at + 2]));
+        if (pid == 0x0100) {
+            bytes[at + 3] =
+                static_cast<std::byte>((std::to_integer<unsigned>(bytes[at + 3]) & 0x3FU) | 0x80U);
+            ++flagged;
+        }
+    }
+    REQUIRE(flagged > 0);
+    const auto scrambled = dir / "scrambled.ts";
+    write_bytes(scrambled, bytes);
+
+    const auto out = dir / "scrambled.back";
+    fs::remove(out);
+    CHECK(run_cli("demux " + quoted(scrambled) + " " + quoted(out), log) == 2);
+    CHECK(read_log(log).find("the audio stream is scrambled") != std::string::npos);
+    CHECK_FALSE(fs::exists(out));
+
+    CHECK(run_cli("probe " + quoted(scrambled), log) == 1);
+    CHECK(read_log(log).find(
+              "Transport Stream this build cannot demux (the audio stream is scrambled") !=
+          std::string::npos);
+
+    // The same stream, clear, still demuxes to the source.
+    const auto back = dir / "scrambled_clear.back";
+    REQUIRE(run_cli("demux " + quoted(clear) + " " + quoted(back), log) == 0);
+    CHECK(read_file(back) == read_file(source));
+}
