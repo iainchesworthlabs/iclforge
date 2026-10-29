@@ -40,7 +40,7 @@ AUDIO = REPO / "testdata" / "audio"
 STRICT = ["-v", "error", "-xerror", "-err_detect", "crccheck+bitstream+buffer+explode"]
 # FFmpeg returns the channels of a layout in the order of its own channel bits: for a 7 or 8 channel
 # TrueHD stream (L R C [LFE] Ls Rs Lrs Rrs) the back pair comes before the side pair. Entry k lists
-# the stream channel FFmpeg's output column k holds (ERRATA.md, entry 25).
+# the stream channel FFmpeg's output column k holds (ERRATA.md, entry 33).
 FFMPEG_ORDER = {7: [0, 1, 2, 5, 6, 3, 4], 8: [0, 1, 2, 3, 6, 7, 4, 5]}
 
 
