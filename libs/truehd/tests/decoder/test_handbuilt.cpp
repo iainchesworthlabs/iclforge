@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -210,11 +211,15 @@ TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
     CHECK(checks[1] == 0xEC);
 }
 
-TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused when one has",
-          "[truehd][handbuilt]") {
-    // Restart sync 0x31EB, generator 1 (TH spec 17.3): its table is not available, so a matrix with
-    // a non-zero noise shift is kUnsupported (ERRATA entry 32). With every shift zero nothing
-    // draws on it and the stream decodes: the fixture hb_noise_type1 is in the manifest's list.
+TEST_CASE("the noise_type 1 streams are under restart sync 0x31EB and decode with noise and LSB bypass",
+          "[truehd][handbuilt][ffmpeg-derived]") {
+    // Restart sync 0x31EB, generator 1 (TH spec §17.3, §17.4, ERRATA.md, noise generator 1). The
+    // first test of this file holds each of these streams to the signal it was built from, which
+    // includes what its matrices add from the table; the Python writer computes that
+    // independently of the library, and FFmpeg 6.1.1's strict decode returns the same signal for
+    // each (tools/checks/verify_truehd_interop.py --handbuilt). Here: that each one is a
+    // noise_type stream, that the ones with a matrix noise shift have matrices, and that LSB
+    // bypass under 0x31EB is read (TH spec §10.2.1).
     const auto restart_of = [](const std::vector<std::byte>& stream) {
         ElementaryReader reader(stream);
         const auto unit = reader.next();
@@ -229,28 +234,39 @@ TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused 
         return *restart;
     };
 
-    const std::vector<std::byte> plain = read_file(dir() + "/hb_noise_type1.thd");
-    CHECK(restart_of(plain).noise_type());
-
     std::ifstream manifest_file(dir() + "/manifest.json");
     const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
-    REQUIRE(manifest["refused"].size() >= 1);
-    for (const nlohmann::json& fixture : manifest["refused"]) {
-        DYNAMIC_SECTION(std::string(fixture["name"])) {
-            const std::vector<std::byte> stream =
-                read_file(dir() + "/" + std::string(fixture["file"]));
-            CHECK(hex(iclforge::base::crypto::sha256(stream)) ==
-                  fixture["stream_sha256"].get<std::string>());
-            CHECK(restart_of(stream).noise_type());
-            ElementaryReader reader(stream);
-            Decoder decoder;
-            const auto unit = reader.next();
-            REQUIRE(unit.has_value());
-            auto refused = decoder.decode(*unit);
-            REQUIRE_FALSE(refused.has_value());
-            CHECK(refused.error().kind == ErrorKind::kUnsupported);
+    int shifted = 0;
+    int bypassed = 0;
+    for (const nlohmann::json& fixture : manifest["fixtures"]) {
+        const auto& features = fixture["features"];
+        if (std::find(features.begin(), features.end(), "noise_type_1") == features.end()) {
+            continue;
+        }
+        const std::string name = fixture["name"];
+        CAPTURE(name);
+        const std::vector<std::byte> stream = read_file(dir() + "/" + std::string(fixture["file"]));
+        CHECK(restart_of(stream).noise_type());
+        Decoder decoder;
+        ElementaryReader reader(stream);
+        while (const auto unit = reader.next()) {
+            auto decoded = decoder.decode(*unit);
+            REQUIRE(decoded.has_value());
+            REQUIRE(decoded->has_value());
+        }
+        CHECK(decoder.counters().lossless_check_failures == 0);
+        CHECK(decoder.counters().lossless_checks_ok > 0);
+        if (std::find(features.begin(), features.end(), "matrix_noise_shift") != features.end()) {
+            CHECK(decoder.counters().matrix_headers > 0);
+            ++shifted;
+        }
+        if (std::find(features.begin(), features.end(), "lsb_bypass") != features.end()) {
+            CHECK(decoder.counters().lsb_bypass_matrices > 0);
+            ++bypassed;
         }
     }
+    CHECK(shifted >= 5);  // the stereo stream, the three rates, the LSB bypass stream
+    CHECK(bypassed >= 1);
 }
 
 TEST_CASE("the end-of-stream marker removes its padding samples", "[truehd][handbuilt]") {

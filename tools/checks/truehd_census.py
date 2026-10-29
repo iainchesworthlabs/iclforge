@@ -36,6 +36,8 @@ class Census:
         self.matrix_counts = set()
         self.frac_bits = set()
         self.lsb_bypass = False
+        self.lsb_bypass_noise_type = False  # LSB bypass in a substream under restart sync 0x31EB
+        self.matrix_noise_shift = False  # a non-zero matrix_noise_shift (noise generator 1)
         self.noise_coefficients = False
         self.output_shifts = False
         self.quant_steps = set()
@@ -99,8 +101,10 @@ def census_of(data):
 
     def read_matrices(self, bits):
         matrices = original["read_matrices"](self, bits)
-        for _out, coeffs, lsb_bypass in matrices:
+        for _out, coeffs, lsb_bypass, noise_shift in matrices:
             c.lsb_bypass |= bool(lsb_bypass)
+            c.lsb_bypass_noise_type |= bool(lsb_bypass) and self.noise_type
+            c.matrix_noise_shift |= noise_shift != 0
             c.noise_coefficients |= any(coeffs[self.max_matrix_chan + 1 : self.max_matrix_chan + 3])
         return matrices
 
@@ -186,6 +190,8 @@ def _syntax_facts(c):
         "huff_offsets": c.huff_offsets,
         "matrix_counts": sorted(c.matrix_counts),
         "lsb_bypass": c.lsb_bypass,
+        "lsb_bypass_noise_type": c.lsb_bypass_noise_type,
+        "matrix_noise_shift": c.matrix_noise_shift,
         "noise_coefficients": c.noise_coefficients,
         "output_shifts": c.output_shifts,
         "quant_steps": sorted(c.quant_steps),

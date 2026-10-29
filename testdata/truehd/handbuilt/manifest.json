@@ -124,6 +124,111 @@
       "pcm_sha256": "8bc998f43ee5f534cb998c92513b3d9da00576e13eed189d1b5dc907c65a9d83"
     },
     {
+      "name": "hb_noise_type1_shift",
+      "file": "hb_noise_type1_shift.thd",
+      "description": "noise_type 1 with a matrix noise shift of 3: the smallest stream that draws on it",
+      "features": [
+        "noise_type_1",
+        "noise_generator_1",
+        "matrix_noise_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "2e70512c8cd9810f91ef9837021fb12cb46ccdbe29ed005496bc82b26cd3f028",
+      "pcm_sha256": "43e0f35327df92344a4e466b5f126cf2a9aa6fff72af84ba8c0ce75900d13bb3"
+    },
+    {
+      "name": "hb_noise_type1_lsb_bypass",
+      "file": "hb_noise_type1_lsb_bypass.thd",
+      "description": "LSB bypass under restart sync 0x31EB, the matrix drawing noise as well",
+      "features": [
+        "noise_type_1",
+        "lsb_bypass",
+        "matrix_noise_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "9af16bf76680bd07050d5c8e65a78c0e582aa6eff763fdcf67e1d189275dfbed",
+      "pcm_sha256": "f6071455cd3b4754c181347249d7a4d742729e9c5fb68a3b5601f7e5d643c334"
+    },
+    {
+      "name": "hb_noise_generator_1",
+      "file": "hb_noise_generator_1.thd",
+      "description": "noise generator 1 at 48 kHz: three matrices, noise shifts [3, 0, 12]",
+      "features": [
+        "noise_type_1",
+        "noise_generator_1",
+        "matrix_noise_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 4,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "1f54496137518b9a83711c0d79384e665ab43940f576b5d82609b9dfca894e99",
+      "pcm_sha256": "edb44d1d6624d1b4c80a595a39db1d6bc6cc7db55446d86688f553910832860c"
+    },
+    {
+      "name": "hb_noise_generator_1_96k",
+      "file": "hb_noise_generator_1_96k.thd",
+      "description": "noise generator 1 at 96 kHz: three matrices, noise shifts [7, 2, 15]",
+      "features": [
+        "noise_type_1",
+        "noise_generator_1",
+        "matrix_noise_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 96000,
+      "channels": 4,
+      "access_units": 40,
+      "pcm_samples": 3200,
+      "stream_sha256": "07e7705d5e4aa96ad570001456c3f17b2a740117fa52bb8a04bb4e0d1ffcf0bb",
+      "pcm_sha256": "db04ac377938d4b0f351caa49dcdeeaebce33b7f94e6f27b79c5fc89663306f1"
+    },
+    {
+      "name": "hb_noise_generator_1_192k",
+      "file": "hb_noise_generator_1_192k.thd",
+      "description": "noise generator 1 at 192 kHz: three matrices, noise shifts [1, 4, 9]",
+      "features": [
+        "noise_type_1",
+        "noise_generator_1",
+        "matrix_noise_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 192000,
+      "channels": 4,
+      "access_units": 40,
+      "pcm_samples": 6400,
+      "stream_sha256": "ecaccf4731dce2687e348dd9c46e1bcda3c794a592cb0c7f8216660857968ed2",
+      "pcm_sha256": "a45874c294104708e10ba6b79c55380f04537a27f08d0ff913a2f1516bcff177"
+    },
+    {
       "name": "hb_data_check",
       "file": "hb_data_check.thd",
       "description": "data_check_present: block_data_bits and the CRC byte",
@@ -345,22 +450,5 @@
       "pcm_sha256": "616e6835a6dec24256eb9569f071ce1f215f29126a3d90af7dffd10f2a90cd11"
     }
   ],
-  "refused": [
-    {
-      "name": "hb_noise_type1_shift",
-      "file": "hb_noise_type1_shift.thd",
-      "description": "noise_type 1 with a non-zero matrix noise shift: refused, generator 1 has no table",
-      "features": [
-        "noise_type_1",
-        "matrix_noise_shift"
-      ],
-      "oracle": "ffmpeg-only",
-      "ffmpeg": {
-        "outcome": "decodes",
-        "note": "the library refuses a non-zero matrix noise shift under 0x31EB (question 5)"
-      },
-      "error": "kUnsupported",
-      "stream_sha256": "17888200747b6ec4d8be2810e05609c966982eec8995dadf89f4219efc8aab8b"
-    }
-  ]
+  "refused": []
 }

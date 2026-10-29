@@ -27,6 +27,26 @@ END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
 NOISE_CHANNELS = 2
 MATRIX_SHIFT = 14
 
+# TH spec 17.4: generator 1's noise table, indexed by the seed's bits 15 to 22.
+NOISE_TABLE = (
+    30, 51, 22, 54, 3, 7, -4, 38, 14, 55, 46, 81, 22, 58, -3, 2,
+    52, 31, -7, 51, 15, 44, 74, 30, 85, -17, 10, 33, 18, 80, 28, 62,
+    10, 32, 23, 69, 72, 26, 35, 17, 73, 60, 8, 56, 2, 6, -2, -5,
+    51, 4, 11, 50, 66, 76, 21, 44, 33, 47, 1, 26, 64, 48, 57, 40,
+    38, 16, -10, -28, 92, 22, -18, 29, -10, 5, -13, 49, 19, 24, 70, 34,
+    61, 48, 30, 14, -6, 25, 58, 33, 42, 60, 67, 17, 54, 17, 22, 30,
+    67, 44, -9, 50, -11, 43, 40, 32, 59, 82, 13, 49, -14, 55, 60, 36,
+    48, 49, 31, 47, 15, 12, 4, 65, 1, 23, 29, 39, 45, -2, 84, 69,
+    0, 72, 37, 57, 27, 41, -15, -16, 35, 31, 14, 61, 24, 0, 27, 24,
+    16, 41, 55, 34, 53, 9, 56, 12, 25, 29, 53, 5, 20, -20, -8, 20,
+    13, 28, -3, 78, 38, 16, 11, 62, 46, 29, 21, 24, 46, 65, 43, -23,
+    89, 18, 74, 21, 38, -12, 19, 12, -19, 8, 15, 33, 4, 57, 9, -8,
+    36, 35, 26, 28, 7, 83, 63, 79, 75, 11, 3, 87, 37, 47, 34, 40,
+    39, 19, 20, 42, 27, 34, 39, 77, 13, 42, 59, 64, 45, -1, 32, 37,
+    45, -5, 53, -6, 7, 36, 50, 23, 6, 32, 9, -21, 18, 71, 27, 52,
+    -25, 31, 35, 42, -1, 68, 63, 52, 26, 43, 66, 37, 41, 25, 40, 70,
+)  # fmt: skip
+
 # TH spec App. C: (symbol, code, bits) of the three codebooks.
 CODEBOOKS = {
     1: [
@@ -231,6 +251,8 @@ class Substream:
         self.running = False
         self.noise_type = False
         self.interval = None  # the fold of the output since the last restart
+        self.noise_buffer = None  # generator 1's values for this access unit (TH spec 17.3)
+        self.noise_size = 64  # access_unit_size_pow2: 64, 128 or 256 (ERRATA, noise generator 1)
 
     def restart(self, bits, segment):
         start = bits.pos
@@ -258,9 +280,8 @@ class Substream:
         stored = bits.read(8)
         if crc8_restart(segment, start, crc_bit) != stored:
             raise StreamError("restart header CRC")
-        # Restart sync 0x31EB is noise_type 1 (generator 1, whose table is not available). Its
-        # matrices have no noise coefficients, so a stream that draws on no noise decodes; one that
-        # does (a non-zero matrix noise shift, LSB bypass) is refused in read_matrices (ERRATA 32).
+        # Restart sync 0x31EB is noise_type 1: generator 1 (TH spec 17.3) and matrices with no noise
+        # coefficients but a noise shift each (ERRATA 32).
         self.noise_type = sync == 0x31EB
         if self.running and self.interval is not None:
             if fold_check(self.interval) != lossless_check:
@@ -323,18 +344,11 @@ class Substream:
                 coeffs.append(
                     bits.signed(frac_bits + 2) << (MATRIX_SHIFT - frac_bits) if bits.read(1) else 0
                 )
+            noise_shift = 0
             if self.noise_type:
                 coeffs.extend([0] * NOISE_CHANNELS)
-                if bits.read(4) != 0:
-                    raise StreamError(
-                        "noise_type 1: a non-zero matrix noise shift needs generator 1's table, "
-                        "which is not available"
-                    )
-                if lsb_bypass:
-                    raise StreamError(
-                        "noise_type 1: LSB bypass needs generator 1's table, which is not available"
-                    )
-            matrices.append((out, coeffs, lsb_bypass))
+                noise_shift = bits.read(4)
+            matrices.append((out, coeffs, lsb_bypass, noise_shift))
         return matrices
 
 
@@ -375,9 +389,7 @@ def decode_block(sub, bits, rows, first):
                 row[column] = 0
     bypass = []
     for i in range(size):
-        bits_for_sample = [
-            bits.read(1) if lsb_bypass else 0 for _out, _coeffs, lsb_bypass in sub.matrices
-        ]
+        bits_for_sample = [bits.read(1) if matrix[2] else 0 for matrix in sub.matrices]
         bypass.append(bits_for_sample)
         for ch in range(sub.min_chan, sub.max_chan + 1):
             rows[first + i][ch] = residual(bits, sub.channels[ch], sub.quant[ch])
@@ -399,22 +411,40 @@ def decode_block(sub, bits, rows, first):
             channel.fir_history = [output, *channel.fir_history[:7]]
             channel.iir_history = [s32(output - prediction), *channel.iir_history[:7]]
             rows[first + i][ch] = output
-    # Generator 0 (TH spec 17.2, ERRATA 23): two noise channels, one step of the LFSR a sample.
-    seed = sub.noise_seed
-    for i in range(size):
-        shr7 = (seed >> 7) & 0xFFFF  # 16 bits, as FFmpeg reads it (ERRATA 23, provisional)
-        rows[first + i][16] = int8(seed >> 15) * (1 << sub.noise_shift)
-        rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
-        seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
-    sub.noise_seed = seed
+    if sub.noise_type:
+        # Generator 1 (TH spec 17.3): a buffer filled once for the access unit, from the seed the
+        # restart header loaded and the units before this one have run on.
+        if sub.noise_buffer is None:
+            sub.noise_buffer = []
+            seed = sub.noise_seed
+            for _ in range(sub.noise_size):
+                table_index = (seed >> 15) & 0xFF
+                sub.noise_buffer.append(NOISE_TABLE[table_index])
+                seed = ((seed << 8) ^ table_index ^ (table_index << 5)) & 0xFFFFFFFF
+            sub.noise_seed = seed
+    else:
+        # Generator 0 (TH spec 17.2, ERRATA 23): two noise channels, one step of the LFSR a sample.
+        seed = sub.noise_seed
+        for i in range(size):
+            shr7 = (seed >> 7) & 0xFFFF  # 16 bits, as FFmpeg reads it (ERRATA 23, provisional)
+            rows[first + i][16] = int8(seed >> 15) * (1 << sub.noise_shift)
+            rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
+            seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
+        sub.noise_seed = seed
     # The primitive matrices (ERRATA 8).
-    for index, (out, coeffs, _lsb_bypass) in enumerate(sub.matrices):
+    for index, (out, coeffs, _lsb_bypass, noise_shift) in enumerate(sub.matrices):
         keep = s32((-1 << sub.quant[out]) & 0xFFFFFFFF) if out <= sub.max_chan else -1
+        # Generator 1's noise (TH spec 17.3): the matrix starts the unit at the index of the
+        # matrices left (this one included) and steps by twice that, plus one, a sample.
+        left = len(sub.matrices) - index
         for i in range(size):
             row = rows[first + i]
             total = sum(row[c] * coeffs[c] for c in range(sub.max_matrix_chan + 1))
             for noise in range(NOISE_CHANNELS):  # the noise channels follow the matrix channels
                 total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
+            if noise_shift:
+                slot = (left + (first + i) * (2 * left + 1)) % sub.noise_size
+                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7))
             row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
     # output shift (ERRATA 12).
@@ -445,6 +475,7 @@ def decode_segment(sub, entry, segment, rows):
     bits = Bits(payload)
     out = []
     first = 0
+    sub.noise_buffer = None
     while True:
         if bits.read(1):
             if bits.read(1):
@@ -501,6 +532,8 @@ def decode_stream(data, presentation="best"):
             format_info = int.from_bytes(unit[offset + 4 : offset + 8], "big")
             ratebits = format_info >> 28 if unit[offset + 3] == 0xBA else (format_info >> 20) & 0xF
             rate = (48000 << ratebits) if ratebits <= 2 else (44100 << (ratebits - 8))
+            for substream in substreams:
+                substream.noise_size = 64 << (ratebits & 3)
             count = unit[offset + 16] >> 4
             offset += 28
         directory_start = offset

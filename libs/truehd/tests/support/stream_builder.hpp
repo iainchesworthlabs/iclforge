@@ -31,6 +31,8 @@ constexpr std::array<std::uint32_t, kBuiltBlockSize> kSecondChannelRaw{5, 9, 2, 
 constexpr std::uint32_t raw_residual(int ch, int i) {
     return ch == 0 ? static_cast<std::uint32_t>(i) : kSecondChannelRaw[static_cast<std::size_t>(i)];
 }
+// The bit a built stream with a bypass matrix sends for sample i, before that sample's residuals.
+constexpr std::array<std::uint32_t, kBuiltBlockSize> kBuiltBypassBit{1, 0, 0, 1, 1, 0, 1, 1};
 constexpr std::int32_t expected_sample(int ch, int i) {
     return static_cast<std::int32_t>(raw_residual(ch, i)) - 8;
 }
@@ -68,6 +70,7 @@ inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = tr
         context.min_chan = 0;
         context.max_chan = 1;
         context.max_matrix_chan = 1;
+        context.noise_type = sync == kRestartSyncNoise;  // the matrices carry a noise shift then
         BlockHeaderSpec block;
         block.block_size = kBuiltBlockSize;
         if (bypass_matrix) {
@@ -90,6 +93,9 @@ inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = tr
         writer.put(0, 1);  // no block header: the parameters carry on
     }
     for (int i = 0; i < kBuiltBlockSize; ++i) {
+        if (bypass_matrix) {
+            writer.put(kBuiltBypassBit[static_cast<std::size_t>(i)], 1);  // TH spec §10.2.1
+        }
         for (int ch = 0; ch < 2; ++ch) {
             writer.put(raw_residual(ch, i), kBuiltLsbs);
         }

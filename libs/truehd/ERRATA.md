@@ -50,15 +50,14 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    substream's segments (section H).
 4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
    default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
-5. **Noise generator 1 (§17.3, §17.4).** Generator 0 (`noise_type` 0, sync 0x31EA) is decoded from §17.2 (entry 23). For
-   generator 1 (sync 0x31EB) the specification gives the LFSR and `matrix_noise_shift` but not the 256-entry `int8`
-   noise table: §17.4 says the values are "pending extraction from the DEE binary". The library refuses 0x31EB with
-   `ErrorKind::kUnsupported` and waits for the table from the owner; it does not take the values from anywhere else.
-   Also asked, for generator 0: is `seed_shr7` in §17.2 a 32-bit or a 16-bit value? The recurrence gives different
-   sequences (bits 16 and up of the new state). FFmpeg's decoder reads it as 16 bits: on the hand-built
-   `hb_noise_generator_0` its strict decode equals the library's over the whole stream (3200 values, the first
-   restart interval's 1280 among them) with `shr7 = (seed >> 7) & 0xFFFF`, while the 32-bit reading diverged at the third noise sample. The library
-   reads 16 bits. **Provisional, owner to confirm.** Evidence: `python3 tools/checks/verify_truehd_interop.py
+5. **Noise generator 1 (§17.3, §17.4).** Answered by TH spec v3.7 §17.4 (2026-10-29), which supplies the 256-entry table. The decoder
+   now decodes restart sync 0x31EB, matrix noise shifts included, and LSB bypass under it (entry 44 says how, and which details v3.7
+   leaves open: question 43). Generator 0 (`noise_type` 0, sync 0x31EA) is decoded from §17.2 (entry 23). Also asked, for generator 0:
+   is `seed_shr7` in §17.2 a 32-bit or a 16-bit value? The recurrence gives different sequences (bits 16 and up of the new state).
+   FFmpeg's decoder reads it as 16 bits: on the hand-built `hb_noise_generator_0` its strict decode equals the library's over the whole
+   stream (3200 values, the first restart interval's 1280 among them) with `shr7 = (seed >> 7) & 0xFFFF`, while the 32-bit reading
+   diverged at the third noise sample. The library reads 16 bits. TH spec v3.7 §17.2 says the same (`seed_shr7` is 16 bits, TH-5):
+   confirmed by TH spec v3.7 §17.2; awaiting the DEE score. Evidence: `python3 tools/checks/verify_truehd_interop.py
    --handbuilt` (`hb_noise_generator_0`).
 6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The FFmpeg-made
    streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
@@ -84,15 +83,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     heavy DRC; the directory's standard DRC word (§12.1) is read and carried (entry 18). Please give the layout, or
     a DEE stream that sets `heavy_drc_present`. A disc's stream shows whether the 16 bits that end the fixed part are ever non-zero:
     `forge probe DISC detail=structure` (section H).
-11. **Where a bypassed LSB comes from (§10.2, §17.1, §17.5).** v3.5 says that with `lsb_bypass` set "the matrix output
-    LSB comes from noise" ("rather than the coefficient computation"). The twelve FFmpeg streams whose matrix sets the flag
-    (every 24 bit stereo stream; `python3 tools/checks/check_truehd_coverage.py --list`) carry one bit a sample for it and
-    decode exactly as FFmpeg's decoder does, so the reading below has that oracle; what is not known is the specification's
-    word "noise". The block data
-    syntax (§8.1) has no field for it. The library reads one bit a sample, for each matrix with the flag, from the
-    sample data (before the channels' residuals) and adds it to the matrix output; that reading is not in the
-    specification (**provisional, owner to confirm**). Which noise channel, which bit, and does the stream carry it? On a disc's stream with such matrices, `forge probe DISC
-    detail=structure` counts them and the restart intervals whose lossless check passes or fails (section H).
+11. **Where a bypassed LSB comes from (§10.2, §17.1, §17.5).** Answered by TH spec v3.7 §10.2.1 and §17.5 (2026-10-29): with
+    `lsb_bypass` set the block data carries one explicit LSB per sample for that matrix, read in sample order, and it has nothing to do
+    with the noise generators or `noise_type`. That is the reading the library had (one bit a sample, for each matrix with the flag, from
+    the sample data before the channels' residuals, added to the matrix output after the quantiser mask), now confirmed by TH spec
+    v3.7 §10.2.1 and also decoded under restart sync 0x31EB, which it used to refuse (`hb_noise_type1_lsb_bypass`). The twelve FFmpeg
+    streams whose matrix sets the flag (every 24 bit stereo stream; `python3 tools/checks/check_truehd_coverage.py --list`) decode
+    exactly as FFmpeg's decoder does.
 12. **The scale of `peak_data_rate` (§4.4, ERRATA 30).** The specification says raw x 200 x a rate multiplier; FFmpeg's
     streams hold raw values that make raw x rate / 16 equal 9.6 Mbps at every rate. The encoder writes raw =
     peak_data_rate_bps x 16 / rate (18 Mbps by default, Blu-ray's) and keeps the stream within it. Which scale does a
@@ -206,6 +203,12 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     carry the histories otherwise, as FFmpeg does and as the library does for a restart (question 18). Until the owner decides
     the differential harness skips a stream whose major syncs differ. Evidence:
     `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/major-sync-format-info-changes-mid-stream`.
+
+43. **The details of noise generator 1 that §17.3 leaves out (entry 44).** `access_unit_size_pow2`, the starting index (`index_orig`) and
+    the unit the buffer is filled for are not defined in v3.7. The library takes 64 << the rate factor entries, one buffer for every access
+    unit of the substream (a unit with no noise draw too), and for matrix `k` of `N` the start index `N - k` with stride `2 (N - k) + 1`,
+    which is what FFmpeg 6.1.1 does on hand-built streams. Does DEE do the same? **Recommendation:** keep it; every DEE leg with a
+    non-zero matrix noise shift is the check. **Provisional, owner to confirm.**
 
 ## Entries
 
@@ -388,12 +391,11 @@ substream whose last row is above 5, with a zero seed, zero shifts and no matrix
 accepts a `noise_type` restart and refuses only the matrices that need generator 1's table (below; the table is still
 not available, Q5). **Provisional, owner to confirm.**
 
-As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects
-noise from generator 1's table, which is not available. The decoder refuses it (`ErrorKind::kUnsupported`), as it
-refuses LSB bypass under that sync, and decodes the restart when every shift is zero. `hb_noise_type1` (decodes) and
-`hb_noise_type1_shift` (refused) hold both outcomes, in the decoder and in `tools/references/truehd_syntax.py`.
-FFmpeg's strict decode of `hb_noise_type1` equals the library's; it also decodes `hb_noise_type1_shift`, with a noise table
-of its own that this library does not have (`verify_truehd_interop.py --handbuilt`, outcome `decodes`).
+As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects noise from
+generator 1's table. Until TH spec v3.7 supplied the table (§17.4) the decoder refused such a matrix, and LSB bypass under that sync
+(`ErrorKind::kUnsupported`); entry 44 is the decoding now. `hb_noise_type1` (every shift zero) and `hb_noise_type1_shift` (a shift of 3)
+both decode, in the decoder, in `tools/references/truehd_syntax.py` and in FFmpeg's strict decode (`verify_truehd_interop.py
+--handbuilt`).
 
 **33. FFmpeg's channel order and the six channel field.** For 7 and 8 channel streams FFmpeg's decode returns the channels
 in the order of its own layout bits: a stream in the order L R C LFE Ls Rs Lrs Rrs comes back as L R C LFE Lrs Rrs Ls Rs
@@ -501,6 +503,26 @@ position, the second and third substreams fail every interval. The streams that 
 encoder's, the hand-built ones) cannot tell the two apart, which is why no fixture caught it. `test_channel_assignment.cpp` and
 `test_kernels.cpp` hold both; `tools/references/truehd_syntax.py` reads it the same way. The encoder writes one shift for all channels
 and is unchanged. **Provisional, owner to confirm** (the specification's §8.2 does not say which index).
+**44. Noise generator 1 (§17.3, §17.4; TH spec v3.7).** Restart sync 0x31EB is `noise_type` 1. Under it a substream fills a buffer of
+int8 values for every access unit from the table of §17.4, indexed by `seed >> 15` (low 8 bits), with `seed = (seed << 8) ^ index ^ (index
+<< 5)` in 32 bits, and a matrix with a non-zero `matrix_noise_shift` adds `buffer[index] * 2^(shift + 7)` to its sum before the sum is
+shifted down by 14 (the quantiser mask and the explicit LSB of `lsb_bypass`, entry 11, come after). The table, the recurrence and the
+scale are v3.7's. Three details v3.7 does not give (it names `access_unit_size_pow2` and `index_orig` and defines neither; question 43):
+
+- The buffer has 64 entries at 44.1 and 48 kHz, 128 at 88.2 and 96, 256 at 176.4 and 192 (64 << the rate factor).
+- One buffer is filled for each access unit of each substream under `noise_type` 1, whether or not a matrix of it draws noise: the seed
+  the restart header loads runs on by that many steps for every unit, so the unit after a unit with no noise shift still starts where
+  the buffer fill left it. A restart header loads the seed again. The restart header's own `noise_shift` is generator 0's alone.
+- Matrix `k` of `N` (counting from 0 in the order the block header lists them) starts each access unit at buffer index `N - k` and takes
+  `2 * (N - k) + 1` as its stride, one stride for every sample of the unit, wrapping at the buffer size; the index runs on across the
+  blocks of a unit and starts again at the next unit. A matrix whose shift is zero draws nothing but still counts in `N`.
+
+All three were measured, not read: FFmpeg 6.1.1's strict decode of hand-built streams (`hb_noise_generator_1`, `_96k`, `_192k`,
+`hb_noise_type1_shift`, `hb_noise_type1_lsb_bypass`), whose expected samples `tools/references/truehd_writer.py` computes from the table
+and the three rules above independently of the decoders, equals those samples in FFmpeg, in `tools/references/truehd_syntax.py` and in the
+library, at 48, 96 and 192 kHz, with 1 to 3 matrices, shifts from 1 to 15, a quantised output channel and a restart interval that loads the
+seed three times. **Provisional, owner to confirm** (question 43). Held by `libs/truehd/tests/decoder/test_handbuilt.cpp`, `test_kernels.cpp`
+and `tools/checks/test_truehd_noise_table.py` (the table typed twice).
 
 ## Atmos, spec v3.6
 

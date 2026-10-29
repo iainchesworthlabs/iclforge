@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include "iclforge/truehd/decoder/decoder.hpp"
@@ -141,30 +142,42 @@ TEST_CASE("a whole built stream decodes through the elementary reader", "[truehd
     CHECK(decoded == 8);
 }
 
-TEST_CASE("restart sync 0x31EB decodes unless a matrix needs generator 1's noise",
-          "[truehd][decoder]") {
+TEST_CASE("restart sync 0x31EB decodes, with LSB bypass as with 0x31EA", "[truehd][decoder]") {
     // FFmpeg's streams of more than 6 channels use 0x31EB without any noise (ERRATA entry 32): the
     // matrices of such a restart have no noise coefficients, so nothing draws on the generator.
-    // Only LSB bypass, whose bits come from the noise, needs the 256-entry table that TH spec 17.4
-    // does not give (ERRATA open question 5): that is kUnsupported, with the decoder left waiting
-    // for another restart. Generator 0 (0x31EA) is decoded: see the hand-built stream
-    // hb_noise_generator_0.
+    // LSB bypass is one explicit bit per sample from the block data and has nothing to do with the
+    // noise generators (TH spec §10.2.1, §17.5): the same bits decode to the same samples under
+    // either sync. The generators themselves are held by the hand-built streams
+    // hb_noise_generator_0 and hb_noise_generator_1 and test_handbuilt.cpp.
     Decoder decoder;
     auto plain = decoder.decode(stereo_unit(true, 0, kRestartSyncNoise));
     REQUIRE(plain.has_value());
     REQUIRE(plain->has_value());
     check_built_samples(**plain);
 
-    Decoder refusing;
-    auto refused = refusing.decode(stereo_unit(true, 0, kRestartSyncNoise, true));
-    REQUIRE_FALSE(refused.has_value());
-    CHECK(refused.error().kind == ErrorKind::kUnsupported);
-    auto waiting = refusing.decode(stereo_unit(false));
-    REQUIRE(waiting.has_value());
-    CHECK_FALSE(waiting->has_value());
-    auto restarted = refusing.decode(stereo_unit(true));
-    REQUIRE(restarted.has_value());
-    CHECK(restarted->has_value());
+    Decoder bypassing;
+    auto noise_type = bypassing.decode(stereo_unit(true, 0, kRestartSyncNoise, true));
+    if (!noise_type) {
+        UNSCOPED_INFO(std::string(noise_type.error().detail));
+    }
+    REQUIRE(noise_type.has_value());
+    REQUIRE(noise_type->has_value());
+    CHECK(bypassing.counters().lsb_bypass_matrices == 1);
+    Decoder standard;
+    auto reference = standard.decode(stereo_unit(true, 0, kRestartSyncStandard, true));
+    REQUIRE(reference.has_value());
+    REQUIRE(reference->has_value());
+    REQUIRE((*noise_type)->pcm.size() == (*reference)->pcm.size());
+    for (std::size_t i = 0; i < (*reference)->pcm.size(); ++i) {
+        CHECK((*noise_type)->pcm[i] == (*reference)->pcm[i]);
+    }
+    // The matrix passes channel 0 through (coefficient 1 at frac_bits 0, no step): its output is
+    // the channel's own value and the stream's explicit bit, added at the bottom (TH spec §10.2.1).
+    for (int i = 0; i < kBuiltBlockSize; ++i) {
+        CHECK((*noise_type)->pcm[static_cast<std::size_t>(2 * i)] ==
+              expected_sample(0, i) + static_cast<std::int32_t>(kBuiltBypassBit[static_cast<std::size_t>(i)]));
+        CHECK((*noise_type)->pcm[static_cast<std::size_t>(2 * i + 1)] == expected_sample(1, i));
+    }
 }
 
 TEST_CASE("the sixteen-channel restart sync decodes like the others", "[truehd][decoder]") {

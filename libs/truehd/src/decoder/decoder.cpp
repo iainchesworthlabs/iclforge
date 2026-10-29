@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "core/huffman.hpp"
+#include "core/noise.hpp"
 #include "decoder/kernels.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/detail/profiling.hpp"
@@ -59,6 +60,7 @@ struct ChannelState {
 struct MatrixPlan {
     int out = 0;
     bool lsb_bypass = false;
+    int noise_shift = 0;  // matrix_noise_shift, sent under restart sync 0x31EB (TH spec §10.2)
     int count = 0;
     // The row columns the matrix reads and the coefficients for them, scaled to 2^-14: the matrix
     // channels, then the two noise channels (columns kMaxChannels and kMaxChannels + 1).
@@ -83,9 +85,12 @@ struct SubstreamState {
     // anything.
     std::uint32_t interval_fold = 0;
     bool interval_open = false;
-    // TH spec §17.2: generator 0's running state, loaded from the restart header and carried
-    // across the blocks of the restart interval.
+    // TH spec §17.2, §17.3: the running state of the noise generator, loaded from the restart
+    // header and carried across the blocks of the restart interval. Generator 0 steps it a sample;
+    // generator 1 (restart sync 0x31EB) fills `noise_buffer` from it once in every access unit.
     std::uint32_t noise_seed = 0;
+    std::array<std::int8_t, detail::kMaxNoiseBuffer> noise_buffer{};
+    bool noise_filled = false;  // `noise_buffer` holds this access unit's values
 };
 
 struct SegmentResult {
@@ -286,9 +291,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.max_chan = header->max_chan;
     state.context.max_matrix_chan = header->max_matrix_chan;
     // TH spec §10.2: a restart with noise_type set adds a noise shift to every matrix, and its
-    // matrices have no coefficients for the noise channels (ERRATA.md entry 32), so no matrix
-    // draws on them: FFmpeg's streams of more than 6 channels set the flag and decode here without
-    // the noise table of generator 1 (§17.4).
+    // matrices have no coefficients for the noise channels (ERRATA.md entry 32): the noise they
+    // draw is generator 1's (§17.3).
     state.context.noise_type = header->noise_type();
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;
@@ -347,21 +351,7 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
-            if (spec.noise_shift != 0 && state.context.noise_type) {
-                return std::unexpected(make_error(
-                    ErrorKind::kUnsupported,
-                    "a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type "
-                    "1): "
-                    "its noise comes from generator 1, whose 256-entry table is not available "
-                    "(TH spec §17.3, §17.4)"));
-            }
-            if (spec.lsb_bypass && state.context.noise_type) {
-                return std::unexpected(make_error(
-                    ErrorKind::kUnsupported,
-                    "LSB bypass under restart sync 0x31EB (noise_type 1): the bypassed bits come "
-                    "from "
-                    "generator 1, whose 256-entry table is not available (TH spec §17.4)"));
-            }
+            plan.noise_shift = spec.noise_shift;
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
@@ -539,11 +529,20 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
 
-    // TH spec §17.2: generator 0's two noise channels (kernels::generate_noise says how).
+    // TH spec §17.2: generator 0's two noise channels (kernels::generate_noise says how), or
+    // §17.3: generator 1's buffer, filled once for the access unit (ERRATA.md, noise generator 1).
+    const std::size_t noise_size = detail::noise_buffer_size(
+        major_sync ? std::max(rate_factor(major_sync->ratebits()), 0) : 0);
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_noise");
-        kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base, kRowStride,
-                                kMaxChannels);
+        if (!state.context.noise_type) {
+            kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base,
+                                    kRowStride, kMaxChannels);
+        } else if (!state.noise_filled) {
+            state.noise_seed =
+                detail::fill_noise_buffer(state.noise_seed, noise_size, state.noise_buffer.data());
+            state.noise_filled = true;
+        }
     }
 
     // The primitive matrices (TH spec §10), in the order the block header listed them. They work
@@ -561,9 +560,20 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                     ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
                         1U)
                     : 0xFFFFFFFFU;
+            // TH spec §17.3: the matrix draws noise at a stride of 2 * index + 1 from the index
+            // (the number of matrices left, this one included) it starts the access unit at.
+            kernels::NoiseDraw noise;
+            if (plan.noise_shift != 0 && state.context.noise_type) {
+                const auto first = static_cast<unsigned>(state.matrix_count - m);
+                noise.buffer = state.noise_buffer.data();
+                noise.shift = plan.noise_shift;
+                noise.stride = 2U * first + 1U;
+                noise.first = first + noise.stride * static_cast<unsigned>(position);
+                noise.mask = static_cast<unsigned>(noise_size - 1U);
+            }
             kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
                                   plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride);
+                                  kRowStride, noise);
         }
     }
 
@@ -612,6 +622,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     BitReader reader(payload);
     SegmentResult result;
     bool first_block = true;
+    state.noise_filled = false;
     while (true) {
         if (reader.read(1) != 0) {
             if (reader.read(1) != 0) {

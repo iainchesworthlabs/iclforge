@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../encoder/encoder_support.hpp"
+#include "core/noise.hpp"
 #include "decoder/kernels.hpp"
 #include "encoder/coding.hpp"
 #include "iclforge/base/bitwriter.hpp"
@@ -198,6 +199,77 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         // Without a PCM buffer it is the same fold.
         REQUIRE(kernels::assign_output(kBlock, 3, assign.data(), shift.data(), base.data(), kStride,
                                        nullptr, 0x5A5A5AU) == fold);
+    }
+
+    SECTION("a matrix adds generator 1's value, scaled, to its sum before the shift") {
+        // TH spec §17.3: sum += buffer[index] * 2^(shift + 7), the index (first + i * stride) & mask.
+        std::array<std::int8_t, 64> buffer{};
+        for (std::size_t k = 0; k < buffer.size(); ++k) {
+            buffer[k] = static_cast<std::int8_t>(static_cast<int>(k * 7) % 61 - 30);
+        }
+        auto rows = base;
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::int32_t, 2> coeff = {16384, -8192};
+        const std::array<std::uint16_t, kBlock> bypass{};
+        kernels::NoiseDraw noise;
+        noise.buffer = buffer.data();
+        noise.shift = 3;
+        noise.first = 2;
+        noise.stride = 5;
+        noise.mask = 63;
+        kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), rows.data(), kStride, noise);
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t draw =
+                std::int64_t{buffer[(2U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << 10);
+            const std::int64_t sum =
+                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192 + draw;
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 14));
+        }
+        // No shift, no draw: the same matrix without noise gives the sum without it.
+        auto plain = base;
+        noise.shift = 0;
+        kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), plain.data(), kStride, noise);
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t sum =
+                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192;
+            REQUIRE(plain[row + 4] == static_cast<std::int32_t>(sum >> 14));
+        }
+    }
+
+    SECTION("generator 1 fills its buffer from the table by the seed's bits 15 to 22") {
+        // TH spec §17.3, §17.4: buffer[i] = table[seed >> 15 & 0xFF], then
+        // seed = (seed << 8) ^ index ^ (index << 5). A seed with index k in bits 15 to 22 reads
+        // table[k] first, so the 256 seeds read every entry of the table.
+        for (std::uint32_t k = 0; k < 256; ++k) {
+            std::array<std::int8_t, 1> one{};
+            const std::uint32_t after = detail::fill_noise_buffer(k << 15U, 1, one.data());
+            REQUIRE(one[0] == detail::kNoiseTable[k]);
+            const std::uint32_t expected_after = ((k << 15U) << 8U) ^ k ^ (k << 5U);
+            REQUIRE(after == expected_after);
+        }
+        std::array<std::int8_t, 64> buffer{};
+        std::uint32_t seed = 0x2A5F31U;
+        const std::uint32_t after = detail::fill_noise_buffer(seed, buffer.size(), buffer.data());
+        for (std::size_t i = 0; i < buffer.size(); ++i) {
+            const std::uint32_t index = (seed >> 15U) & 0xFFU;
+            REQUIRE(buffer[i] == detail::kNoiseTable[index]);
+            seed = (seed << 8U) ^ index ^ (index << 5U);
+        }
+        REQUIRE(after == seed);
+        // The table's ends and a few of its values as TH spec §17.4 prints them.
+        REQUIRE(detail::kNoiseTable[0] == 30);
+        REQUIRE(detail::kNoiseTable[67] == -28);
+        REQUIRE(detail::kNoiseTable[68] == 92);
+        REQUIRE(detail::kNoiseTable[240] == -25);
+        REQUIRE(detail::kNoiseTable[255] == 70);
+        // 64, 128 and 256 entries at the three rate factors.
+        REQUIRE(detail::noise_buffer_size(0) == 64);
+        REQUIRE(detail::noise_buffer_size(1) == 128);
+        REQUIRE(detail::noise_buffer_size(2) == 256);
     }
 
     SECTION("the noise generator is generator 0 and runs on across blocks") {

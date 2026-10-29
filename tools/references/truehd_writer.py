@@ -21,8 +21,7 @@ agree, that the features work together, and that nothing regresses.
     truehd_writer.py check [DIR]             # decode them with truehd_syntax.py and compare
 
 Not written: restart_header's heavy DRC (TH spec 12.2, 7.1), whose place among the header's bits
-the streams do not show (ERRATA 7), and noise generator 1 (sync 0x31EB), whose table is not
-available."""
+the streams do not show (ERRATA 7)."""
 
 import argparse
 import hashlib
@@ -106,7 +105,9 @@ class Substream:
         self.output = output
         self.coded = coded  # {ch: [samples]}
         self.ch_assign = ch_assign or list(range(mm + 1))
-        self.matrices = list(matrices)  # (out, frac_bits, lsb_bypass, {channel: coefficient})
+        # (out, frac_bits, lsb_bypass, {channel: coefficient}[, noise shift]); the noise shift is
+        # the matrix's own under noise_type 1 and defaults to `matrix_noise_shift`
+        self.matrices = list(matrices)
         self.bypass = bypass or {}  # {matrix index: [bit per sample]}
         self.out_shift = out_shift or [0] * (mm + 1)
         self.sync = sync
@@ -154,6 +155,10 @@ class Stream:
     @property
     def per_unit(self):
         return 40 << {0: 0, 1: 1, 2: 2, 8: 0, 9: 1, 10: 2}[self.rate_code]
+
+    @property
+    def sample_rate(self):
+        return {0: 48000, 1: 96000, 2: 192000, 8: 44100, 9: 88200, 10: 176400}[self.rate_code]
 
     @property
     def units(self):
@@ -266,7 +271,7 @@ def write_full_block_header(w, sub, params, size):
     if sub.matrices:
         w.put(1, 1)
         w.put(len(sub.matrices), 4)
-        for out, frac_bits, lsb_bypass, coeffs in sub.matrices:
+        for out, frac_bits, lsb_bypass, coeffs, *noise in sub.matrices:
             w.put(out, 4)
             w.put(frac_bits, 4)
             w.put(1 if lsb_bypass else 0, 1)
@@ -280,7 +285,7 @@ def write_full_block_header(w, sub, params, size):
                 else:
                     w.put(0, 1)
             if noise_type:
-                w.put(sub.matrix_noise_shift, 4)
+                w.put(noise[0] if noise else sub.matrix_noise_shift, 4)
     else:
         w.put(0, 1)
     w.put(1, 1)
@@ -384,8 +389,8 @@ def build_stream(stream):
                     write_light_block_header(w, sub, size)
                 body = BitWriter()
                 for i in range(position, position + size):
-                    for m, (_out, _frac, lsb_bypass, _coeffs) in enumerate(sub.matrices):
-                        if lsb_bypass:
+                    for m, matrix in enumerate(sub.matrices):
+                        if matrix[2]:
                             body.put(sub.bypass[m][i], 1)
                     for ch in range(sub.min_chan, sub.max_chan + 1):
                         lsbs, offset = coding[ch]
@@ -800,10 +805,9 @@ def case_noise():
     return Stream([sub], n), description, ["noise_generator_0"]
 
 
-def case_noise_type1(shift=0):
-    """Restart sync 0x31EB (noise_type 1), one matrix, no noise coefficients. With every matrix
-    noise shift zero nothing draws on generator 1, whose table is not available, and the stream
-    decodes; with a non-zero shift it has to be refused."""
+def case_noise_type1():
+    """Restart sync 0x31EB (noise_type 1), one matrix, no noise coefficients and a matrix noise
+    shift of zero: nothing draws on generator 1."""
     n = 40 * 40
     s0, s1 = tone(n, 70), tone(n, 71)
     c = 77
@@ -818,19 +822,156 @@ def case_noise_type1(shift=0):
         {0: s0, 1: coded1},
         matrices=[(1, 8, False, {0: c, 1: 256})],
         sync=0x31EB,
-        matrix_noise_shift=shift,
     )
-    if shift:
-        description = (
-            "noise_type 1 with a non-zero matrix noise shift: refused, generator 1 has no table"
-        )
-        return Stream([sub], n), description, ["noise_type_1", "matrix_noise_shift"]
     description = "noise_type 1 (restart sync 0x31EB) with every matrix noise shift zero"
     return Stream([sub], n), description, ["noise_type_1"]
 
 
-def case_noise_type1_shift():
-    return case_noise_type1(3)
+def noise1_terms(samples, per_unit, rate_code, interval_units, seed, shifts):
+    """What each matrix adds to its sum for each sample under noise generator 1 (TH spec 17.3):
+    terms[k][n] is table value * 2^(shift + 7), or 0 where matrix k's shift is 0. A buffer of
+    64 << rate factor values is filled for every access unit from the seed, which each restart
+    header loads and each unit runs on; matrix k of `count` starts the unit at index `count - k`
+    and steps by twice that plus one (ERRATA, noise generator 1)."""
+    size = 64 << (rate_code & 3)
+    count = len(shifts)
+    terms = [[0] * samples for _ in shifts]
+    state = seed
+    for unit in range(samples // per_unit):
+        if unit % interval_units == 0:
+            state = seed
+        buffer = []
+        for _ in range(size):
+            index = (state >> 15) & 0xFF
+            buffer.append(ref.NOISE_TABLE[index])
+            state = ((state << 8) ^ index ^ (index << 5)) & 0xFFFFFFFF
+        for k, shift in enumerate(shifts):
+            if not shift:
+                continue
+            left = count - k
+            for i in range(per_unit):
+                slot = (left + i * (2 * left + 1)) % size
+                terms[k][unit * per_unit + i] = buffer[slot] << (shift + 7)
+    return terms
+
+
+def case_noise1(rate_code=0, shifts=(3, 0, 12), seed=0x2A5F31, label="48 kHz"):
+    """Noise generator 1: three matrices on a four-channel substream, the first with a noise shift
+    of 3 (a sum that is not a multiple of 2^14), the second with none at 48 kHz (it still counts
+    for the start index of the others), the third with 12 and a quantised output channel. The
+    signal is 24 bit; the coded channels are the signal less what the matrices will add."""
+    per_unit = 40 << (rate_code & 3)
+    n = per_unit * 40
+    src = [tone(n, 90 + c, 2**21) for c in range(4)]
+    src[3] = [v & ~1 for v in src[3]]  # the output channel of the third matrix has a step of 2
+    terms = noise1_terms(n, per_unit, rate_code, 16, seed, shifts)
+    a, b, d = 77, -45, 91
+    coded = [list(column) for column in src]
+    # matrix 0: row 1 += (row 0 * a + noise) >> 14 ; matrix 1: row 2 += row 1 * b >> 8 ;
+    # matrix 2: row 3 += (row 0 * d + noise) >> 14, kept to a multiple of 2.
+    coded[1] = [
+        x1 - (((x0 * a << 6) + t) >> 14)
+        for x0, x1, t in zip(src[0], src[1], terms[0], strict=True)
+    ]
+    coded[2] = [
+        x2 - (((x1 * b << 6) + t) >> 14)
+        for x1, x2, t in zip(src[1], src[2], terms[1], strict=True)
+    ]
+    coded[3] = [
+        x3 - ((((x0 * d << 6) + t) >> 14) & ~1)
+        for x0, x3, t in zip(src[0], src[3], terms[2], strict=True)
+    ]
+    matrices = [
+        (1, 8, False, {0: a, 1: 256}, shifts[0]),
+        (2, 8, False, {1: b, 2: 256}, shifts[1]),
+        (3, 8, False, {0: d, 3: 256}, shifts[2]),
+    ]
+    channels = {
+        0: Channel(fir=filt([48], 6)),
+        1: Channel(huff_type=2),
+        2: Channel(huff_type=1),
+        3: Channel(huff_type=0, quant=1),
+    }
+    output = [tuple(src[c][i] for c in range(4)) for i in range(n)]
+    sub = Substream(
+        0,
+        3,
+        3,
+        channels,
+        output,
+        dict(enumerate(coded)),
+        matrices=matrices,
+        sync=0x31EB,
+        noise_seed=seed,
+    )
+    description = f"noise generator 1 at {label}: three matrices, noise shifts {list(shifts)}"
+    return (
+        Stream([sub], n, rate_code=rate_code),
+        description,
+        ["noise_type_1", "noise_generator_1", "matrix_noise_shift"],
+    )
+
+
+def case_noise1_96k():
+    return case_noise1(1, (7, 2, 15), 0x5A3C71, "96 kHz")
+
+
+def case_noise1_192k():
+    return case_noise1(2, (1, 4, 9), 0x0F00D1, "192 kHz")
+
+
+def case_noise1_shift():
+    """One matrix with a noise shift of 3 on a stereo substream: the smallest stream that draws on
+    generator 1."""
+    n = 40 * 40
+    s0, s1 = tone(n, 72), tone(n, 73)
+    c, seed, shift = 77, 0x13579B, 3
+    terms = noise1_terms(n, 40, 0, 16, seed, [shift])
+    coded1 = [b - (((a * c << 6) + t) >> 14) for a, b, t in zip(s0, s1, terms[0], strict=True)]
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(huff_type=2)}
+    sub = Substream(
+        0,
+        1,
+        1,
+        channels,
+        list(zip(s0, s1, strict=True)),
+        {0: s0, 1: coded1},
+        matrices=[(1, 8, False, {0: c, 1: 256}, shift)],
+        sync=0x31EB,
+        noise_seed=seed,
+    )
+    description = "noise_type 1 with a matrix noise shift of 3: the smallest stream drawing on it"
+    features = ["noise_type_1", "noise_generator_1", "matrix_noise_shift"]
+    return Stream([sub], n), description, features
+
+
+def case_noise1_bypass():
+    """LSB bypass under restart sync 0x31EB: the bypassed bit is one explicit bit a sample from the
+    block data (TH spec 10.2.1), whatever the noise type; here the matrix draws noise as well."""
+    n = 40 * 40
+    s0, s1 = tone(n, 74), tone(n, 75)
+    k, seed, shift = 77, 0x2468AC, 5
+    terms = noise1_terms(n, 40, 0, 16, seed, [shift])
+    coded1, bits = [], []
+    for a, x, t in zip(s0, s1, terms[0], strict=True):
+        step = ((a * k << 6) + t) >> 14
+        coded1.append((x & ~1) - (step & ~1))
+        bits.append(x & 1)
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(quant=1, fir=filt([32], 6))}
+    sub = Substream(
+        0,
+        1,
+        1,
+        channels,
+        list(zip(s0, s1, strict=True)),
+        {0: s0, 1: coded1},
+        matrices=[(1, 8, True, {0: k, 1: 256}, shift)],
+        bypass={0: bits},
+        sync=0x31EB,
+        noise_seed=seed,
+    )
+    description = "LSB bypass under restart sync 0x31EB, the matrix drawing noise as well"
+    return Stream([sub], n), description, ["noise_type_1", "lsb_bypass", "matrix_noise_shift"]
 
 
 CASES = {
@@ -840,6 +981,11 @@ CASES = {
     "hb_matrices": case_matrices,
     "hb_noise_generator_0": case_noise,
     "hb_noise_type1": case_noise_type1,
+    "hb_noise_type1_shift": case_noise1_shift,
+    "hb_noise_type1_lsb_bypass": case_noise1_bypass,
+    "hb_noise_generator_1": case_noise1,
+    "hb_noise_generator_1_96k": case_noise1_96k,
+    "hb_noise_generator_1_192k": case_noise1_192k,
     "hb_data_check": case_data_check,
     "hb_marker_last": case_marker_last,
     "hb_marker_every": case_marker_every,
@@ -852,9 +998,8 @@ CASES = {
 
 
 # Streams a decoder has to refuse: written and listed in the manifest, but not decoded to a signal.
-REFUSED = {
-    "hb_noise_type1_shift": case_noise_type1_shift,
-}
+# None at present: the streams generator 1's missing table made a decoder refuse decode now.
+REFUSED = {}
 
 # What FFmpeg's strict decode does with a stream, where it is not "the signal it was built from,
 # whole", as seen with FFmpeg 6.1.1 (tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg
@@ -886,10 +1031,6 @@ FFMPEG = {
     "hb_substream3_limits": {
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
-    },
-    "hb_noise_type1_shift": {
-        "outcome": "decodes",
-        "note": "the library refuses a non-zero matrix noise shift under 0x31EB (question 5)",
     },
 }
 ORACLE = {"equal": "ffmpeg", "short": "ffmpeg-short", "refused": "none", "decodes": "ffmpeg-only"}
@@ -937,7 +1078,7 @@ def generate(out):
                     "oracle": ORACLE[outcome["outcome"]],
                     "ffmpeg": outcome,
                     "presentation": presentation,
-                    "sample_rate": 48000,
+                    "sample_rate": stream.sample_rate,
                     "channels": len(rows[0]),
                     "access_units": stream.units,
                     "pcm_samples": len(rows),

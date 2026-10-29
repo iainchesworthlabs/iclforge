@@ -7,8 +7,8 @@ with it without any test failing. This reads every stream in testdata/truehd (th
 and testdata/truehd/handbuilt) with tools/references/truehd_syntax.py (tools/checks/
 truehd_census.py), and fails when a feature in REQUIRED appears in none of them: a sample rate, a
 channel count, a restart interval, every FIR and IIR order, each residual codebook, matrices, a
-permuted channel assignment, an output shift, LSB bypass, noise generator 0, the block data check,
-the end-of-stream marker, extra data, the directory's DRC word, a 20 bit source, and so on.
+permuted channel assignment, an output shift, LSB bypass, noise generators 0 and 1, the block data
+check, the end-of-stream marker, extra data, the directory's DRC word, a 20 bit source, and so on.
 
 KNOWN_GAPS lists what no committed stream carries and why; a gap that closes is reported so that
 it moves to REQUIRED.
@@ -66,6 +66,16 @@ REQUIRED.update(
         "one matrix": lambda r: 1 in r["matrix_counts"],
         "three matrices": lambda r: 3 in r["matrix_counts"],
         "LSB bypass": lambda r: r["lsb_bypass"],
+        "LSB bypass under restart sync 0x31EB": lambda r: r["lsb_bypass_noise_type"],
+        "a matrix noise shift (noise generator 1) at 48 kHz": lambda r: (
+            r["matrix_noise_shift"] and r["sample_rate"] == 48000
+        ),
+        "a matrix noise shift (noise generator 1) at 96 kHz": lambda r: (
+            r["matrix_noise_shift"] and r["sample_rate"] == 96000
+        ),
+        "a matrix noise shift (noise generator 1) at 192 kHz": lambda r: (
+            r["matrix_noise_shift"] and r["sample_rate"] == 192000
+        ),
         "a matrix coefficient on a noise channel": lambda r: r["noise_coefficients"],
         "an output shift": lambda r: r["output_shifts"],
         "a quantiser step": lambda r: bool(r["quant_steps"]),
@@ -106,7 +116,7 @@ def census_all(directory=FIXTURES):
                 path.read_bytes()
             )
         except truehd_census.ref.StreamError:
-            continue  # a stream the reference refuses (hb_noise_type1_shift) has no census
+            continue  # a stream the reference refuses has no census
     return records
 
 

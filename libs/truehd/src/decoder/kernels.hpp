@@ -128,19 +128,38 @@ inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift
     seed_state = seed;
 }
 
+// TH spec §17.3: what a matrix draws from generator 1's noise buffer. The matrix with a non-zero
+// `shift` adds buffer[index] * 2^(shift + 7) to its sum, for the sample at position i of the
+// block the index (first + i * stride) & mask (the stride and the first index are those of the
+// matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
+struct NoiseDraw {
+    const std::int8_t* buffer = nullptr;
+    int shift = 0;
+    unsigned first = 0;
+    unsigned stride = 1;
+    unsigned mask = 0;
+};
+
 // TH spec §10: one primitive matrix over one block. Row[out] becomes the sum over the `count`
-// channels it reads of channel times coefficient (the coefficients are scaled to 2^-14), shifted
-// down by 14, with the quantiser step's low bits cleared (`keep`); with LSB bypass the bit the
-// stream sent for this matrix (`bypass`, bit `matrix_index`) is added back.
+// channels it reads of channel times coefficient (the coefficients are scaled to 2^-14), plus the
+// matrix's noise (TH spec §17.3) if it draws any, shifted down by 14, with the quantiser step's low
+// bits cleared (`keep`); with LSB bypass the bit the stream sent for this matrix (`bypass`, bit
+// `matrix_index`) is added back.
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
                          int matrix_index, const std::uint16_t* bypass, std::int32_t* rows,
-                         std::ptrdiff_t stride) {
+                         std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
+    const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + 7);
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         std::int64_t sum = 0;
         for (int k = 0; k < count; ++k) {
             sum += std::int64_t{row[channel[k]]} * coeff[k];
+        }
+        if (noise.shift != 0) {
+            sum += std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
+                                             noise.mask]} *
+                   noise_scale;
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
         if (lsb_bypass) {
