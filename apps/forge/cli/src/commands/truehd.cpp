@@ -14,6 +14,7 @@
 #include "../json.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
@@ -234,6 +235,64 @@ bool is_truehd_stream(std::span<const std::byte> stream) noexcept {
     return stream.size() >= 8 && th::starts_with_major_sync(stream.subspan(4));
 }
 
+std::optional<CoreStrip> strip_ac3_core(std::span<const std::byte> stream) {
+    CoreStrip out;
+    int substreams = 0;  // from the first major sync; 0 until one has been seen
+    std::size_t pos = 0;
+    while (pos + 4 <= stream.size()) {
+        const auto rest = stream.subspan(pos);
+        if (std::to_integer<std::uint8_t>(rest[0]) == 0x0B &&
+            std::to_integer<std::uint8_t>(rest[1]) == 0x77) {
+            const auto frame = iclforge::ac3::io::read_frame_header(rest);
+            if (frame && frame->kind == iclforge::ac3::io::StreamKind::kAc3 &&
+                frame->bytes <= rest.size()) {
+                ++out.frames;
+                out.frame_bytes += frame->bytes;
+                pos += frame->bytes;
+                continue;
+            }
+        }
+        const std::size_t length = th::access_unit_length_bytes(rest);
+        const bool major_sync = rest.size() >= 8 && th::starts_with_major_sync(rest.subspan(4));
+        if (length >= 4 && length <= rest.size() && (substreams > 0 || major_sync)) {
+            if (const auto unit = th::parse_access_unit(rest.first(length), substreams, true)) {
+                if (unit->major_sync) {
+                    substreams = unit->major_sync->num_substreams;
+                }
+                out.bytes.insert(out.bytes.end(), rest.begin(),
+                                 rest.begin() + static_cast<std::ptrdiff_t>(length));
+                pos += length;
+                continue;
+            }
+        }
+        if (substreams == 0) {
+            ++out.leading_bytes;
+            ++pos;
+            continue;
+        }
+        out.bytes.insert(out.bytes.end(), rest.begin(), rest.end());
+        pos = stream.size();
+    }
+    if (out.frames == 0) {
+        return std::nullopt;
+    }
+    return out;
+}
+
+bool starts_with_ac3_core_then_truehd(std::span<const std::byte> stream) {
+    std::size_t pos = 0;
+    while (pos + 2 <= stream.size() && std::to_integer<std::uint8_t>(stream[pos]) == 0x0B &&
+           std::to_integer<std::uint8_t>(stream[pos + 1]) == 0x77) {
+        const auto frame = iclforge::ac3::io::read_frame_header(stream.subspan(pos));
+        if (!frame || frame->kind != iclforge::ac3::io::StreamKind::kAc3 ||
+            pos + frame->bytes > stream.size()) {
+            return false;
+        }
+        pos += frame->bytes;
+    }
+    return pos != 0 && is_truehd_stream(stream.subspan(pos));
+}
+
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
                       std::string_view out_path, const Options& meta) {
     const auto presentation = parse_presentation(meta.truehd_presentation);
@@ -345,17 +404,19 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
 }
 
 int run_probe_truehd(std::string_view in_path, const Options& meta) {
-    const auto stream = read_elementary_stream(in_path);
+    std::size_t ac3_core_frames = 0;
+    const auto stream = read_elementary_stream(in_path, &ac3_core_frames);
     if (stream.empty()) {
         return kExitUsage;
     }
-    return run_probe_truehd_stream(stream, in_path, meta, {}, {});
+    return run_probe_truehd_stream(stream, in_path, meta, {}, {}, ac3_core_frames);
 }
 
 int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view in_path,
                             const Options& meta,
                             const std::function<void(iclforge::apps::JsonSink&)>& container_json,
-                            const std::function<void()>& container_text) {
+                            const std::function<void()>& container_text,
+                            std::size_t ac3_core_frames) {
     const auto info = th::probe_stream(stream);
     if (!info) {
         fmt::println(stderr, "error: {}: {}", in_path, error_text(info.error()));
@@ -370,12 +431,16 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     std::uint64_t segments = 0;
     std::uint64_t segment_failures = 0;
     int substreams = 0;
+    std::uint64_t extra_data_units = 0;
     while (const auto unit = reader.next()) {
         const auto parsed = th::parse_access_unit(*unit, substreams, true);
         if (!parsed) {
             continue;
         }
         ++units;
+        if (parsed->extra_data) {
+            ++extra_data_units;
+        }
         if (parsed->major_sync) {
             ++major_syncs;
             substreams = parsed->major_sync->num_substreams;
@@ -412,10 +477,11 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("schema", "iclforge.probe/1");
         json.member("generator", iclforge::ac3::version_full);
         json.member("file", in_path);
-        json.key("container");
+        // container_json writes the member's key and value, as write_container does for AC-3 and AC-4.
         if (container_json) {
             container_json(json);
         } else {
+            json.key("container");
             json.value_null();
         }
         json.key("truehd");
@@ -435,6 +501,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("variable_rate", major_sync.is_vbr);
         json.member("peak_data_rate", static_cast<std::uint64_t>(major_sync.peak_data_rate));
         json.member("object_substream", info->has_object_substream);
+        json.member("extra_data_units", extra_data_units);
+        json.member("ac3_core_frames", static_cast<std::uint64_t>(ac3_core_frames));
         json.member("major_syncs", major_syncs);
         json.member("segments_checked", segments);
         json.member("segment_failures", segment_failures);
@@ -459,6 +527,14 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         if (info->has_object_substream) {
             fmt::println("{:<16}present (read as a 16-channel substream, not rendered)",
                          "object substream");
+        }
+        if (extra_data_units != 0) {
+            fmt::println("{:<16}{} access unit(s) carry extra data (carried, not read)",
+                         "extra data", extra_data_units);
+        }
+        if (ac3_core_frames != 0) {
+            fmt::println("{:<16}{} AC-3 frame(s) between the access units, set aside", "ac3 core",
+                         ac3_core_frames);
         }
         fmt::println(
             "{:<16}{} of {} segment(s) pass their parity and CRC; {} unreadable unit(s); {} "

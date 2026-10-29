@@ -734,7 +734,8 @@ int run_probe(std::string_view in_path, const Options& meta) {
         // A TrueHD or MLP stream starts with an access unit whose major sync follows its four header
         // bytes; run_probe_truehd reads the file itself.
         if (kind == iclforge::apps::ContainerKind::kUnknown &&
-            is_truehd_stream(std::as_bytes(std::span{head}).first(got))) {
+            (is_truehd_stream(std::as_bytes(std::span{head}).first(got)) ||
+             starts_with_ac3_core_then_truehd(std::as_bytes(std::span{head}).first(got)))) {
             return run_probe_truehd(in_path, meta);
         }
         if (kind != iclforge::apps::ContainerKind::kUnknown) {
@@ -745,6 +746,16 @@ int run_probe(std::string_view in_path, const Options& meta) {
                 return 1;
             }
             container = std::move(result.container);
+            // A Blu-ray transport stream's TrueHD track may carry an AC-3 core between its access
+            // units (support.cpp, read_elementary_stream); the access units are what is probed.
+            std::size_t ac3_core_frames = 0;
+            if (container.kind == iclforge::apps::ContainerKind::kMpegTs &&
+                container.stream_type == 0x83) {
+                if (auto stripped = strip_ac3_core(result.bytes)) {
+                    ac3_core_frames = stripped->frames;
+                    result.bytes = std::move(stripped->bytes);
+                }
+            }
             // A TrueHD or MLP track (MP4 'mlpa', Matroska A_TRUEHD, TS 0x83) gives up whole
             // access units, which the TrueHD probe reads with what the container said of the
             // track beside them.
@@ -754,7 +765,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
                     [&container](iclforge::apps::JsonSink& sink) {
                         write_container(sink, container);
                     },
-                    [&container] { print_container(container); });
+                    [&container] { print_container(container); }, ac3_core_frames);
             }
             demuxed.str(std::string{reinterpret_cast<const char*>(result.bytes.data()),
                                     result.bytes.size()});

@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 #include "../support.hpp"
 
@@ -20,6 +22,29 @@ namespace forge_cli::commands {
 // True when `stream` begins with an access unit that carries a major sync.
 [[nodiscard]] bool is_truehd_stream(std::span<const std::byte> stream) noexcept;
 
+// A TrueHD stream with the frames of its AC-3 compatibility core taken out. A Blu-ray's TrueHD
+// track is said to carry the core in the same stream as the access units (libs/containers/ERRATA.md,
+// C9, which says what is and is not known of the layout); a decoder that meets an AC-3 frame
+// between two access units does not read it as one.
+struct CoreStrip {
+    std::vector<std::byte> bytes;  // the access units, back to back
+    std::size_t frames = 0;        // AC-3 syncframes set aside
+    std::size_t frame_bytes = 0;
+    std::size_t leading_bytes = 0;  // bytes dropped before the first access unit with a major sync
+};
+
+// Walks `stream` from its start taking, at each boundary, an AC-3 syncframe (a valid header, bsid
+// at most 10, the whole frame in the data) or a TrueHD access unit that reads, and nothing else:
+// the first byte that begins neither, once the first major sync has been seen, ends the walk and
+// the rest of the stream is copied as it is for the elementary reader to resynchronise in. Before
+// the first major sync, bytes that begin neither are dropped (a capture starts anywhere).
+// std::nullopt when no AC-3 frame was found, so that a stream without a core is not copied.
+[[nodiscard]] std::optional<CoreStrip> strip_ac3_core(std::span<const std::byte> stream);
+
+// True when `stream` opens with one or more AC-3 syncframes and then an access unit with a major
+// sync: a TrueHD file saved with its core, whose first bytes are the core's.
+[[nodiscard]] bool starts_with_ac3_core_then_truehd(std::span<const std::byte> stream);
+
 // Decodes `stream` to a 24-bit PCM WAV at `out_path` ("-" is stdout), the channels in the order the
 // stream carries them. Options: truehd-presentation= (best, 2ch, 6ch, 8ch, all) and truehd-check=
 // (strict, the default, stops with kExitInput at the first failed check or damaged unit; lenient
@@ -32,12 +57,13 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
 int run_probe_truehd(std::string_view in_path, const Options& meta);
 
 // The same over a stream already read, which a container gave up. `container_json` writes the
-// document's "container" member's value and `container_text` prints what the container said of the
+// document's "container" member (key and value) and `container_text` prints what the container said of the
 // track; both empty for a bare stream.
 int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view in_path,
                             const Options& meta,
                             const std::function<void(iclforge::apps::JsonSink&)>& container_json,
-                            const std::function<void()>& container_text);
+                            const std::function<void()>& container_text,
+                            std::size_t ac3_core_frames = 0);
 
 // --- containers and transports (truehd_containers.cpp) ---------------------------------------
 // Each takes the elementary stream (a TrueHD or MLP stream, container already removed) and writes

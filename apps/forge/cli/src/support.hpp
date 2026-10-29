@@ -1196,7 +1196,11 @@ std::vector<std::byte> read_all(std::string_view path);
 // caller's `if (stream.empty()) { ...; return kExitInput; }` guard already
 // does the right thing with an empty result regardless of which of those it
 // was.
-[[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path);
+// For a TrueHD transport stream (stream_type 0x83), or a file that opens with an AC-3 core and then
+// TrueHD, the AC-3 frames between the access units are set aside; `ac3_core_frames`, when given,
+// receives how many, and the stream says so on stderr.
+[[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path,
+                                                            std::size_t* ac3_core_frames = nullptr);
 
 // Wraps iclforge::ac3::io::read_wav to honor the "-" stdin convention (is_stdio_path
 // above): "-" reads the WAV from stdin, binary mode set first, instead of

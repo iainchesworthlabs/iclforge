@@ -49,6 +49,12 @@ repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]`
 8. **TrueHD in a transport stream is Blu-ray's alone (`forge ts`).** The command writes TrueHD with `stream_type` 0x83 and the
    `HDMV` registration, and refuses the `dvb` and `atsc` profiles with a usage error, because neither defines TrueHD carriage in
    anything found for this work (C8 is about the same stream_type). Does DVB or ATSC define one?
+9. **A disc's AC-3 core (C9).** Blu-ray TrueHD tracks are said to carry an AC-3 compatibility core in the same stream as
+   the access units. TH spec §21.2 says only "stream type 0x83, aligned to access unit boundaries", so how the core is laid
+   out (its own PES packets, the same PES packets, a PES extension that tells them apart) is not in a document here, and no
+   disc was available. The reader assumes only that, in the stream the PES payloads add up to, whole AC-3 frames and whole
+   TrueHD access units follow one another. Does a disc lay the two out that way? `tools/checks/verify_truehd_local_streams.py`
+   prints the layout of a transport stream's TrueHD PID (structure only) for the owner's discs: please send that back.
 
 ## MP4 (`mlpa`, `dmlp`)
 
@@ -154,3 +160,22 @@ whether a receiver tests it, is not known.
 x.spdif -c copy -f truehd` ends "Output file does not contain any stream"), so the only oracle for reading is the
 bytes FFmpeg writes: the unwrap of FFmpeg's bursts returns the raw stream's units, and the wrap of the same units
 returns FFmpeg's bursts exactly. The script skips the "ours -> FFmpeg" leg and says why.
+
+## An AC-3 core between the access units (C9)
+
+**C9.** A TrueHD stream saved with its core, or a Blu-ray transport stream whose type 0x83 track carries one, has AC-3
+syncframes between the access units. The reader hands the PES payloads back as they are (they add up to that stream);
+`forge decode`, `probe`, `levels` and `loudness` set the AC-3 frames aside before reading access units
+(`strip_ac3_core`, `apps/forge/cli/src/commands/truehd.cpp`): at each boundary a frame that begins `0x0B77` and has a valid
+AC-3 header with bsid up to 10 and fits the data is taken as a core frame, an access unit that reads is kept, and the first
+byte that is neither (after the first major sync) ends the walk, the rest being copied for the elementary reader to
+resynchronise in. Before the first major sync, bytes that begin neither are dropped. A file that opens with core frames and
+then an access unit is read the same way. The access units come out unchanged, and `note:` on stderr and
+`ac3_core_frames` in the probe JSON say how many frames were set aside. `forge demux` writes the payloads as they are,
+core included.
+
+What is tested: transport streams built by `tools/checks/truehd_standins.py` with AC-3 frames from FFmpeg's encoder, once
+in PES packets of their own and once at the front of the packet that carries the access units after them, decode to the
+fixture's samples (`tools/checks/verify_truehd_local_streams.py --self-test`; the old `forge decode` reads the same files
+as AC-3 and stops with "no 0x0B77 sync word where a frame should begin"). What is not known is any real disc's layout:
+that is open question 9.

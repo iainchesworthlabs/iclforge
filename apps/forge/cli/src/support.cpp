@@ -69,6 +69,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "associated_mix.hpp"
 #include "code_pages.hpp"
+#include "commands/truehd.hpp"
 #include "container_input.hpp"
 #include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
@@ -4623,7 +4624,8 @@ std::vector<std::byte> read_all(std::string_view path) {
     return bytes;
 }
 
-std::vector<std::byte> read_elementary_stream(std::string_view in_path) {
+std::vector<std::byte> read_elementary_stream(std::string_view in_path,
+                                              std::size_t* ac3_core_frames) {
     auto bytes = read_all(in_path);
     if (bytes.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
@@ -4633,6 +4635,32 @@ std::vector<std::byte> read_elementary_stream(std::string_view in_path) {
     if (!result.error.empty()) {
         fmt::println(stderr, "error: {} is a {}", in_path, result.error);
         return {};
+    }
+    if (ac3_core_frames != nullptr) {
+        *ac3_core_frames = 0;
+    }
+    // A TrueHD track of a Blu-ray transport stream may carry an AC-3 core between its access units.
+    const bool transport_truehd =
+        result.container.kind == iclforge::apps::ContainerKind::kMpegTs &&
+        result.container.stream_type == 0x83;
+    const bool bare_with_core =
+        result.container.kind == iclforge::apps::ContainerKind::kUnknown &&
+        commands::starts_with_ac3_core_then_truehd(result.bytes);
+    if (transport_truehd || bare_with_core) {
+        if (auto stripped = commands::strip_ac3_core(result.bytes)) {
+            fmt::println(stderr,
+                         "note: {}: set aside {} AC-3 frame(s) ({} bytes) between the TrueHD "
+                         "access units{}",
+                         in_path, stripped->frames, stripped->frame_bytes,
+                         stripped->leading_bytes != 0
+                             ? fmt::format(" and {} byte(s) before the first major sync",
+                                           stripped->leading_bytes)
+                             : std::string{});
+            if (ac3_core_frames != nullptr) {
+                *ac3_core_frames = stripped->frames;
+            }
+            return std::move(stripped->bytes);
+        }
     }
     return std::move(result.bytes);
 }
