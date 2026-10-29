@@ -130,11 +130,23 @@ struct ReadStream {
     std::optional<ServiceInfo> service = std::nullopt;
 };
 
+// The codecs the reader may take the programme's stream from. A stream of a codec left false is
+// passed over as if the PMT did not list it, so the next one that is wanted is taken. Every codec
+// this reader selects is on by default, which is what the reader did before a caller could say.
+struct AutoSelect {
+    bool ac3 = true;
+    bool eac3 = true;
+    bool ac4 = true;
+    bool truehd = true;
+};
+
 struct ReadOptions {
     // The programme to extract. 0 takes the first one whose PMT names an
     // AC-3/E-AC-3 stream, which for a single-programme capture is the only
     // one there is.
     std::uint16_t program_number = 0;
+    // Which codecs the first stream of the programme may be of.
+    AutoSelect auto_select{};
     // The largest PES packet the reader will assemble. PES_packet_length is
     // 16 bits, so a bounded PES cannot exceed 64 KiB - but the UNBOUNDED
     // form (length 0) has no ceiling of its own and ends only at the next

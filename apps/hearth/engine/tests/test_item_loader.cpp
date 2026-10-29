@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
@@ -8,6 +9,7 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <numbers>
 #include <optional>
 #include <span>
@@ -26,6 +28,7 @@
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "container_input.hpp"
 #include "item_loader.hpp"
+#include "multi_track_files.hpp"
 
 // make_file_item_loader() and list_folder_items() (apps/hearth/ui/src/item_loader.cpp)
 // against files on disk: the elementary streams it always read, and the MP4, Matroska and
@@ -177,6 +180,35 @@ std::expected<LoadedItem, std::string> load(const std::string& path) {
     return iclforge::hearth::ui::make_file_item_loader()(path);
 }
 
+namespace mt = iclforge::test::multi_track;
+
+// A TrueHD file FFmpeg made (testdata/truehd), read whole.
+std::vector<std::byte> truehd_fixture(const std::string& name) {
+    std::ifstream in(std::string{ICLFORGE_GOLDEN_TRUEHD_DIR} + "/" + name, std::ios::binary);
+    REQUIRE(in.good());
+    const std::vector<char> raw((std::istreambuf_iterator<char>(in)),
+                                std::istreambuf_iterator<char>());
+    std::vector<std::byte> bytes(raw.size());
+    std::transform(raw.begin(), raw.end(), bytes.begin(),
+                   [](char c) { return static_cast<std::byte>(c); });
+    return bytes;
+}
+
+// The three containers a Blu-ray remux comes in, each built with two or more audio tracks.
+struct Remux {
+    const char* file_name;
+    std::vector<std::byte> (*build)(std::span<const mt::Track>);
+    ContainerKind kind;
+};
+
+constexpr Remux kRemuxes[] = {
+    {"remux.mkv", &mt::matroska_file, ContainerKind::kMatroska},
+    {"remux.mp4", &mt::mp4_file, ContainerKind::kMp4},
+    {"remux.ts", &mt::mpegts_file, ContainerKind::kMpegTs},
+};
+
+constexpr const char* kTruehdNotPlayed = "TrueHD is not played by Hearth yet";
+
 }  // namespace
 
 TEST_CASE("item loader: a raw stream is read byte for byte", "[hearth][item-loader]") {
@@ -319,4 +351,92 @@ TEST_CASE("item loader: a folder lists every file it opens, in any case and in o
                extension == ".mp4" || extension == ".mkv" || extension == ".ts"));
     }
     CHECK(iclforge::hearth::ui::list_folder_items(folder.root() + "/nowhere").empty());
+}
+
+// A Blu-ray remux has its TrueHD track first and an AC-3 or E-AC-3 track after it. Hearth played
+// the second before the containers' readers took TrueHD tracks, and then took the first, which it
+// cannot play, so the file failed to open.
+TEST_CASE("item loader: a file with TrueHD first plays the AC-3 or E-AC-3 track after it",
+          "[hearth][item-loader]") {
+    const Folder folder;
+    const std::vector<std::byte> truehd_stream = truehd_fixture("truehd_m51_s24.thd");
+    const std::vector<std::byte> ac3 = ac3_stream(kFrames);
+    const std::vector<std::byte> eac3 = eac3_stream(kFrames);
+    const auto truehd_units = mt::split_truehd(truehd_stream);
+    REQUIRE(truehd_units.size() > 3);
+
+    for (const Remux& remux : kRemuxes) {
+        for (const bool use_eac3 : {false, true}) {
+            const std::vector<std::byte>& wanted = use_eac3 ? eac3 : ac3;
+            const auto scanned = iclforge::ac3::io::scan(wanted);
+            REQUIRE(scanned.has_value());
+            const std::array<mt::Track, 2> tracks{
+                mt::Track{.codec = mt::Codec::kTruehd, .units = truehd_units},
+                mt::Track{.codec = use_eac3 ? mt::Codec::kEac3 : mt::Codec::kAc3,
+                          .units = scanned->access_units}};
+            const std::string path = folder.write(
+                std::string{use_eac3 ? "eac3-" : "ac3-"} + remux.file_name, remux.build(tracks));
+            CAPTURE(path);
+
+            const auto loaded = load(path);
+            REQUIRE(loaded.has_value());
+            CHECK(loaded->bytes == wanted);
+            CHECK(loaded->container.kind == remux.kind);
+            if (remux.kind == ContainerKind::kMpegTs) {
+                CHECK(loaded->container.stream_type == (use_eac3 ? 0x87 : 0x81));
+            } else {
+                // The TrueHD track is the one passed over, and the file says so.
+                CHECK(loaded->container.track == 2);
+                REQUIRE(loaded->container.other_tracks.size() == 1);
+                CHECK(loaded->container.other_tracks[0].id == 1);
+            }
+        }
+    }
+}
+
+TEST_CASE("item loader: a file whose only audio is TrueHD is not played, and says why",
+          "[hearth][item-loader]") {
+    const Folder folder;
+    const std::vector<std::byte> truehd_stream = truehd_fixture("truehd_st48_s24.thd");
+    const auto truehd_units = mt::split_truehd(truehd_stream);
+    REQUIRE(truehd_units.size() > 3);
+    const std::array<mt::Track, 1> tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 2, .units = truehd_units}};
+
+    for (const Remux& remux : kRemuxes) {
+        const std::string path = folder.write(remux.file_name, remux.build(tracks));
+        CAPTURE(path);
+        REQUIRE(iclforge::apps::sniff_container(remux.build(tracks)) == remux.kind);
+        const auto loaded = load(path);
+        REQUIRE_FALSE(loaded.has_value());
+        CHECK(loaded.error() == kTruehdNotPlayed);
+    }
+
+    // The same stream bare, in a file named for another codec: no container to ask, and no
+    // AC-3, E-AC-3 or AC-4 syncframe in it for the session to find.
+    for (const char* name : {"misnamed.ac3", "misnamed.ec3", "misnamed.ac4"}) {
+        const auto loaded = load(folder.write(name, truehd_stream));
+        REQUIRE_FALSE(loaded.has_value());
+        CHECK(loaded.error() == kTruehdNotPlayed);
+    }
+}
+
+TEST_CASE("item loader: a file with E-AC-3 first still plays the E-AC-3 track",
+          "[hearth][item-loader]") {
+    // E-AC-3 ahead of the TrueHD track was never broken; it must stay the one taken.
+    const Folder folder;
+    const std::vector<std::byte> truehd_stream = truehd_fixture("truehd_st48_s24.thd");
+    const auto truehd_units = mt::split_truehd(truehd_stream);
+    const std::vector<std::byte> eac3 = eac3_stream(kFrames);
+    const auto scanned = iclforge::ac3::io::scan(eac3);
+    REQUIRE(scanned.has_value());
+    const std::array<mt::Track, 2> tracks{
+        mt::Track{.codec = mt::Codec::kEac3, .units = scanned->access_units},
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 2, .units = truehd_units}};
+
+    for (const Remux& remux : kRemuxes) {
+        const auto loaded = load(folder.write(remux.file_name, remux.build(tracks)));
+        REQUIRE(loaded.has_value());
+        CHECK(loaded->bytes == eac3);
+    }
 }

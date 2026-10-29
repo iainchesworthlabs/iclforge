@@ -27,6 +27,10 @@ padding the encoder added. **Add folder…** lists those six kinds of file, and 
 added or dropped. The queue marks a file it cannot read as not playable, with the reason, when it
 reaches it, and skips it or stops there as Settings > Playback > **An item fails** says.
 
+Hearth does not play TrueHD yet. A TrueHD track in a container is passed over for the next AC-3,
+E-AC-3 or AC-4 track, as in a Blu-ray remux that has the TrueHD track first; a file whose audio is
+TrueHD alone is marked not playable, with the reason "TrueHD is not played by Hearth yet".
+
 The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 
 | Page | What it holds |

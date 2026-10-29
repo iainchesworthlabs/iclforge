@@ -636,12 +636,13 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
                     s.refused.push_back(skipped_of(s.pending));
                 }
             } else if (s.in_trak && !s.track_found && s.pending.has_entry) {
-                const bool wanted = options.track_id != 0
-                                        ? s.pending.track_id == options.track_id
-                                        : (s.pending.entry_type == kAc3Entry ||
-                                           s.pending.entry_type == kEc3Entry ||
-                                           s.pending.entry_type == kAc4Entry ||
-                                           s.pending.entry_type == kMlpaEntry);
+                const bool wanted =
+                    options.track_id != 0
+                        ? s.pending.track_id == options.track_id
+                        : ((s.pending.entry_type == kAc3Entry && options.auto_select.ac3) ||
+                           (s.pending.entry_type == kEc3Entry && options.auto_select.eac3) ||
+                           (s.pending.entry_type == kAc4Entry && options.auto_select.ac4) ||
+                           (s.pending.entry_type == kMlpaEntry && options.auto_select.truehd));
                 if (wanted) {
                     s.track = ReadTrack{
                         .track_id = s.pending.track_id,

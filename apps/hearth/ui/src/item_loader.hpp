@@ -11,9 +11,13 @@
 // It reads a raw `.ac3`/`.ec3`/`.ac4` elementary stream from disk, or an MP4,
 // Matroska or MPEG-TS file, whose first AC-3, E-AC-3 or AC-4 track it demuxes
 // through apps/shared/media/src/container_input.hpp. A container is told by its
-// first bytes and not by its name. An MP4 edit list's priming and padding come
-// back as LoadedItem::skip_samples/play_samples, and what the container said
-// about the track as LoadedItem::container. A path this loader does not read -
+// first bytes and not by its name. A TrueHD track is passed over, so a file
+// with TrueHD first and AC-3 or E-AC-3 after it plays the second; a file whose
+// audio is TrueHD alone (in a container, or a bare stream named for another
+// codec) comes back as the error "TrueHD is not played by Hearth yet". An MP4
+// edit list's priming and padding come back as
+// LoadedItem::skip_samples/play_samples, and what the container said about the
+// track as LoadedItem::container. A path this loader does not read -
 // another extension, a file that cannot be opened, a container with no such
 // track - is not a crash: it comes back as an error, which Session::open()
 // turns into the item's unplayable reason, so the queue lists the file and says

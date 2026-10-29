@@ -337,6 +337,17 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
         }
 
         if (matched) {
+            // A codec the caller left out of ReadOptions::auto_select is passed over, as if the
+            // PMT did not list the stream: the loop goes on to the next one.
+            const AutoSelect& allowed = s.options.auto_select;
+            const bool codec_allowed = truehd ? allowed.truehd
+                                       : ac4  ? allowed.ac4
+                                       : eac3 ? allowed.eac3
+                                              : allowed.ac3;
+            if (!codec_allowed) {
+                at = descriptors_at + es_info_length;
+                continue;
+            }
             // The loop above only IDENTIFIES the codec: ATSC's own
             // stream_type match never even looks at the descriptor loop
             // (matched is already true, so the `!matched` guard on that

@@ -35,6 +35,14 @@ constexpr std::array<std::string_view, 6> kMediaExtensions{".ac3", ".ec3", ".ac4
            kMediaExtensions.end();
 }
 
+// The codecs a file's track may be in for Hearth to play it. TrueHD is left out: Hearth does not
+// decode or pass it through yet, so a file with TrueHD first and AC-3 or E-AC-3 after it (a
+// Blu-ray remux) plays the second track, and a file with TrueHD alone says so.
+constexpr iclforge::apps::CodecSet kPlayedCodecs{
+    .ac3 = true, .eac3 = true, .ac4 = true, .truehd = false};
+
+constexpr std::string_view kTruehdNotPlayed = "TrueHD is not played by Hearth yet";
+
 }  // namespace
 
 iclforge::hearth::ItemLoader make_file_item_loader() {
@@ -64,9 +72,15 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         // be named ".ac3"), so a bare stream goes through whatever its
         // extension says, without a second copy of it.
         if (iclforge::apps::sniff_container(bytes) == iclforge::apps::ContainerKind::kUnknown) {
+            if (iclforge::apps::looks_like_truehd(bytes)) {
+                return std::unexpected(std::string{kTruehdNotPlayed});
+            }
             return LoadedItem{.bytes = std::move(bytes)};
         }
-        auto stream = iclforge::apps::elementary_stream_from_bytes(bytes);
+        auto stream = iclforge::apps::elementary_stream_from_bytes(bytes, kPlayedCodecs);
+        if (stream.declined_codec == iclforge::apps::TrackCodec::kTruehd) {
+            return std::unexpected(std::string{kTruehdNotPlayed});
+        }
         if (!stream.error.empty()) {
             return std::unexpected(std::move(stream.error));
         }

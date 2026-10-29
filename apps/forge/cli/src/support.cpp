@@ -4631,7 +4631,10 @@ std::vector<std::byte> read_elementary_stream(std::string_view in_path,
         fmt::println(stderr, "error: cannot read {}", in_path);
         return {};
     }
-    auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
+    // forge reads TrueHD tracks (each command below says what it does with one), so the first
+    // track of any codec the readers select is the one taken.
+    auto result = iclforge::apps::elementary_stream_from_bytes(
+        bytes, iclforge::apps::CodecSet{.truehd = true});
     if (!result.error.empty()) {
         fmt::println(stderr, "error: {} is a {}", in_path, result.error);
         return {};

@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -21,6 +22,7 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mp4/reader.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
+#include "multi_track_files.hpp"
 
 namespace {
 
@@ -514,4 +516,197 @@ TEST_CASE("elementary_stream_from_bytes names a protected MP4 track and reads no
     const auto cbcs = iclforge::apps::elementary_stream_from_bytes(read("cbcs-enca-only.mp4"));
     CHECK(cbcs.bytes.empty());
     CHECK(cbcs.error.find("track 1 is protected (cbcs, original format ec-3") != std::string::npos);
+}
+
+// Which track a file with several is read as. A Blu-ray remux has TrueHD first and AC-3 or E-AC-3
+// after it; the readers took the first track of a codec they read, and once they read TrueHD that
+// was the TrueHD one for every caller, including those that cannot play it. The tracks here are
+// real streams: the access units of a TrueHD file FFmpeg made and of a 5.1 E-AC-3 file.
+namespace {
+
+namespace mt = iclforge::test::multi_track;
+
+Bytes read_stream(const std::string& path) {
+    std::ifstream in{path, std::ios::binary};
+    REQUIRE(in.good());
+    const std::vector<char> raw{std::istreambuf_iterator<char>{in},
+                                std::istreambuf_iterator<char>{}};
+    Bytes bytes(raw.size());
+    std::ranges::transform(raw, bytes.begin(), [](char c) { return static_cast<std::byte>(c); });
+    return bytes;
+}
+
+Bytes joined(std::span<const std::span<const std::byte>> units) {
+    Bytes out;
+    for (const auto& unit : units) {
+        out.insert(out.end(), unit.begin(), unit.end());
+    }
+    return out;
+}
+
+// The two streams, kept for the length of the test: the tracks hold views into them.
+struct TwoStreams {
+    Bytes truehd_bytes =
+        read_stream(std::string{ICLFORGE_GOLDEN_TRUEHD_DIR} + "/truehd_m51_s24.thd");
+    Bytes eac3_bytes = read_stream(std::string{ICLFORGE_GOLDEN_AUDIO_DIR} +
+                                   "/reference_51_eac3_448k_cplbndstrce0.ec3");
+    mt::Track truehd{};
+    mt::Track eac3{};
+    Bytes truehd_stream{};
+    Bytes eac3_stream{};
+
+    TwoStreams() {
+        truehd.codec = mt::Codec::kTruehd;
+        truehd.units = mt::split_truehd(truehd_bytes);
+        eac3.codec = mt::Codec::kEac3;
+        const auto scanned = iclforge::ac3::io::scan(eac3_bytes);
+        REQUIRE(scanned.has_value());
+        eac3.units = scanned->access_units;
+        REQUIRE(truehd.units.size() > 3);
+        REQUIRE(eac3.units.size() > 3);
+        truehd_stream = joined(truehd.units);
+        eac3_stream = joined(eac3.units);
+    }
+    TwoStreams(const TwoStreams&) = delete;
+    TwoStreams& operator=(const TwoStreams&) = delete;
+};
+
+using Build = Bytes (*)(std::span<const mt::Track>);
+
+struct ContainerCase {
+    const char* name;
+    Build build;
+    iclforge::apps::ContainerKind kind;
+    // What the container calls the E-AC-3 track and the TrueHD one.
+    const char* eac3_id;
+    const char* truehd_id;
+};
+
+constexpr ContainerCase kContainers[] = {
+    {"Matroska", &mt::matroska_file, iclforge::apps::ContainerKind::kMatroska, "A_EAC3",
+     "A_TRUEHD"},
+    {"MP4", &mt::mp4_file, iclforge::apps::ContainerKind::kMp4, "ec-3", "mlpa"},
+    // MPEG-TS names a stream by its stream_type, not a string.
+    {"MPEG-TS", &mt::mpegts_file, iclforge::apps::ContainerKind::kMpegTs, "", ""},
+};
+
+}  // namespace
+
+TEST_CASE("elementary_stream_from_bytes takes the first track whose codec the caller can use",
+          "[containers][io2][tracks]") {
+    using iclforge::apps::CodecSet;
+    using iclforge::apps::TrackCodec;
+    const TwoStreams streams;
+
+    for (const ContainerCase& container : kContainers) {
+        SECTION(container.name) {
+            const std::array<mt::Track, 2> truehd_first{streams.truehd, streams.eac3};
+            const std::array<mt::Track, 2> eac3_first{streams.eac3, streams.truehd};
+            const Bytes with_truehd_first = container.build(truehd_first);
+            const Bytes with_eac3_first = container.build(eac3_first);
+            REQUIRE(iclforge::apps::sniff_container(with_truehd_first) == container.kind);
+
+            // A caller that does not say gets what every caller got before TrueHD was read: the
+            // E-AC-3 track, which here is the second.
+            const auto by_default = iclforge::apps::elementary_stream_from_bytes(with_truehd_first);
+            CHECK(by_default.error.empty());
+            CHECK_FALSE(by_default.declined_codec.has_value());
+            CHECK(by_default.bytes == streams.eac3_stream);
+            CHECK(by_default.container.kind == container.kind);
+            if (container.kind == iclforge::apps::ContainerKind::kMpegTs) {
+                CHECK(by_default.container.stream_type == 0x87);
+                CHECK(by_default.container.track == 0x101);
+            } else {
+                CHECK(by_default.container.codec_id == container.eac3_id);
+                CHECK(by_default.container.track == 2);
+                // The track passed over is listed beside it.
+                REQUIRE(by_default.container.other_tracks.size() == 1);
+                CHECK(by_default.container.other_tracks[0].id == 1);
+                CHECK(by_default.container.other_tracks[0].codec_id == container.truehd_id);
+            }
+
+            // A caller that reads TrueHD, as forge does, gets the first track of the file.
+            const auto reads_truehd = iclforge::apps::elementary_stream_from_bytes(
+                with_truehd_first, CodecSet{.truehd = true});
+            CHECK(reads_truehd.error.empty());
+            CHECK(reads_truehd.bytes == streams.truehd_stream);
+            if (container.kind == iclforge::apps::ContainerKind::kMpegTs) {
+                CHECK(reads_truehd.container.stream_type == 0x83);
+            } else {
+                CHECK(reads_truehd.container.codec_id == container.truehd_id);
+            }
+
+            // First in the file, not first in the codec list: E-AC-3 ahead of TrueHD is taken
+            // whichever of the two the caller allows.
+            const auto either = iclforge::apps::elementary_stream_from_bytes(
+                with_eac3_first, CodecSet{.truehd = true});
+            CHECK(either.bytes == streams.eac3_stream);
+
+            // Leaving E-AC-3 out as well leaves the TrueHD track the only choice.
+            const auto only_truehd = iclforge::apps::elementary_stream_from_bytes(
+                with_truehd_first, CodecSet{.eac3 = false, .truehd = true});
+            CHECK(only_truehd.bytes == streams.truehd_stream);
+        }
+    }
+}
+
+TEST_CASE("elementary_stream_from_bytes says when a file's audio is in no codec the caller can use",
+          "[containers][io2][tracks]") {
+    using iclforge::apps::CodecSet;
+    using iclforge::apps::TrackCodec;
+    const TwoStreams streams;
+
+    for (const ContainerCase& container : kContainers) {
+        SECTION(container.name) {
+            const std::array<mt::Track, 1> truehd_only{streams.truehd};
+            const Bytes file = container.build(truehd_only);
+
+            const auto declined = iclforge::apps::elementary_stream_from_bytes(file);
+            CHECK(declined.bytes.empty());
+            REQUIRE(declined.declined_codec.has_value());
+            CHECK(*declined.declined_codec == TrackCodec::kTruehd);
+            CHECK(declined.error.find("whose audio is TrueHD, which this program does not read") !=
+                  std::string::npos);
+            // The track the reader would have taken is described, for a caller that shows it.
+            CHECK(declined.container.kind == container.kind);
+            if (container.kind == iclforge::apps::ContainerKind::kMpegTs) {
+                CHECK(declined.container.stream_type == 0x83);
+            } else {
+                CHECK(declined.container.codec_id == container.truehd_id);
+            }
+
+            // The same file for a caller that reads TrueHD.
+            const auto read = iclforge::apps::elementary_stream_from_bytes(
+                file, CodecSet{.truehd = true});
+            CHECK(read.error.empty());
+            CHECK_FALSE(read.declined_codec.has_value());
+            CHECK(read.bytes == streams.truehd_stream);
+
+            // TrueHD is not special: a codec the set leaves out is reported the same way, and one
+            // it allows is read.
+            const std::array<mt::Track, 1> eac3_only{streams.eac3};
+            const auto fine =
+                iclforge::apps::elementary_stream_from_bytes(container.build(eac3_only));
+            CHECK(fine.error.empty());
+            CHECK(fine.bytes == streams.eac3_stream);
+            const auto no_eac3 = iclforge::apps::elementary_stream_from_bytes(
+                container.build(eac3_only), CodecSet{.eac3 = false});
+            REQUIRE(no_eac3.declined_codec.has_value());
+            CHECK(*no_eac3.declined_codec == TrackCodec::kEac3);
+        }
+    }
+}
+
+TEST_CASE("looks_like_truehd tells a bare TrueHD or MLP stream from the other streams",
+          "[containers][io2][tracks]") {
+    const TwoStreams streams;
+    CHECK(iclforge::apps::looks_like_truehd(streams.truehd_bytes));
+    CHECK(iclforge::apps::looks_like_truehd(
+        read_stream(std::string{ICLFORGE_GOLDEN_TRUEHD_DIR} + "/mlp_st48_s24.mlp")));
+    CHECK_FALSE(iclforge::apps::looks_like_truehd(streams.eac3_bytes));
+    CHECK_FALSE(iclforge::apps::looks_like_truehd(std::span<const std::byte>{}));
+    CHECK_FALSE(iclforge::apps::looks_like_truehd(
+        std::span<const std::byte>{streams.truehd_bytes}.first(7)));
+    CHECK(iclforge::apps::codec_name(iclforge::apps::TrackCodec::kTruehd) == "TrueHD");
+    CHECK(iclforge::apps::codec_name(iclforge::apps::TrackCodec::kEac3) == "E-AC-3");
 }

@@ -740,7 +740,8 @@ int run_probe(std::string_view in_path, const Options& meta) {
         }
         if (kind != iclforge::apps::ContainerKind::kUnknown) {
             const auto bytes = read_all(in_path);
-            auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
+            auto result = iclforge::apps::elementary_stream_from_bytes(
+                bytes, iclforge::apps::CodecSet{.truehd = true});
             if (!result.error.empty()) {
                 fmt::println(stderr, "error: {} is a {}", in_path, result.error);
                 return 1;

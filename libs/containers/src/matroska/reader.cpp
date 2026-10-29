@@ -344,11 +344,12 @@ enum class Lacing : std::uint8_t { kNone, kXiph, kFixed, kEbml };
 
 // --- track selection -------------------------------------------------------
 
-// Auto-selection accepts the two CodecID strings the writer declares. This
-// is the only codec-aware line in the module, and a caller naming a
-// TrackNumber explicitly bypasses it entirely (see ReadOptions).
-[[nodiscard]] bool is_selectable_codec(std::string_view codec_id) {
-    return codec_id == kCodecEac3 || codec_id == kCodecAc3 || codec_id == kCodecTruehd;
+// Auto-selection accepts the CodecID strings the writer declares, the ones `allowed` leaves on.
+// This is the only codec-aware code in the module, and a caller naming a TrackNumber explicitly
+// bypasses it entirely (see ReadOptions).
+[[nodiscard]] bool is_selectable_codec(std::string_view codec_id, const AutoSelect& allowed) {
+    return (codec_id == kCodecEac3 && allowed.eac3) || (codec_id == kCodecAc3 && allowed.ac3) ||
+           (codec_id == kCodecTruehd && allowed.truehd);
 }
 
 // How many tracks a file may have listed beside the one that is read: a hostile Tracks declares as
@@ -477,9 +478,10 @@ void close_finished(ReaderState& s) {
         if (top.id == kTrackEntry) {
             bool selected_now = false;
             if (s.in_track_entry && !s.track_found && s.pending_has_number && s.pending_is_audio) {
-                const bool wanted = s.options.track_number != 0
-                                        ? s.pending.track_number == s.options.track_number
-                                        : is_selectable_codec(s.pending.codec_id);
+                const bool wanted =
+                    s.options.track_number != 0
+                        ? s.pending.track_number == s.options.track_number
+                        : is_selectable_codec(s.pending.codec_id, s.options.auto_select);
                 // An encrypted track holds ciphertext that nothing else in its entry marks, so it
                 // is never selected: read as audio it would be noise with exit code 0.
                 if (wanted && s.pending_encrypted) {

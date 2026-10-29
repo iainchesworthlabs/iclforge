@@ -184,11 +184,49 @@ struct StreamTrim {
     std::optional<std::uint64_t> length = std::nullopt;
 };
 
+// An audio codec a container's track can be in, as far as choosing a track goes.
+enum class TrackCodec : std::uint8_t { kAc3, kEac3, kAc4, kTruehd };
+
+// The codecs a caller can use, which decides the track taken from a file that holds several
+// (a Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it): the first audio track whose
+// codec is in the set. A codec left out is passed over as if its tracks were not in the file.
+// Matroska has no CodecID for AC-4 in use here, so `ac4` has no effect on a Matroska file.
+//
+// What a caller that does not say gets is what every caller got before TrueHD tracks were read
+// at all: AC-3, E-AC-3 and AC-4. A caller that handles TrueHD (forge's decode, probe and the
+// commands that carry it) says so with `.truehd = true`; one that cannot play it (Hearth) leaves
+// it out.
+struct CodecSet {
+    bool ac3 = true;
+    bool eac3 = true;
+    bool ac4 = true;
+    bool truehd = false;
+
+    [[nodiscard]] constexpr bool contains(TrackCodec codec) const {
+        switch (codec) {
+            case TrackCodec::kAc3: return ac3;
+            case TrackCodec::kEac3: return eac3;
+            case TrackCodec::kAc4: return ac4;
+            case TrackCodec::kTruehd: return truehd;
+        }
+        return false;
+    }
+};
+
+// The name of a codec as a person reads it: "AC-3", "E-AC-3", "AC-4" or "TrueHD".
+[[nodiscard]] std::string_view codec_name(TrackCodec codec);
+
+// Whether `head` opens a bare TrueHD or MLP elementary stream: an access unit's four header bytes
+// and then a major sync (TH spec section 4.2). Such a stream is not a container, and
+// sniff_container calls it ContainerKind::kUnknown; a caller that cannot play it uses this to say
+// so.
+[[nodiscard]] bool looks_like_truehd(std::span<const std::byte> head);
+
 // `file`'s elementary stream: `file` itself, unchanged, if it does not sniff
-// as one of the three containers this build reads, or the first AC-3/E-AC-3
-// track demuxed out of one - the same three readers `forge demux` already
-// streams through, run here in their batch/zero-copy form since every caller
-// already holds the whole file in memory.
+// as one of the three containers this build reads, or the first track of a
+// codec in the caller's CodecSet demuxed out of one - the same three readers
+// `forge demux` already streams through, run here in their batch/zero-copy
+// form since every caller already holds the whole file in memory.
 struct ElementaryStreamResult {
     std::vector<std::byte> bytes;
     // Empty on success (including the "not a container at all" case, where
@@ -198,6 +236,11 @@ struct ElementaryStreamResult {
     // "malformed MP4" and "no AC-3 track" want different messages than "file
     // not found" does.
     std::string error;
+    // Set with `error` when the container is sound and its audio is in a codec outside the
+    // caller's CodecSet: the codec of the track the reader would have taken had the set allowed
+    // it, so that a caller can say what the file holds ("TrueHD") in its own words. `container`
+    // then describes that track, and `bytes` is empty.
+    std::optional<TrackCodec> declined_codec = std::nullopt;
     // From an MP4 track's edit list, when it has the shape an audio encoder
     // writes: any empty edits (a delay before the track, which is not audio),
     // then one edit at normal speed. Decoding does not apply it; a player
@@ -212,7 +255,8 @@ struct ElementaryStreamResult {
     ContainerFacts container{};
 };
 
-[[nodiscard]] ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file);
+[[nodiscard]] ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file,
+                                                                  const CodecSet& codecs = {});
 
 // The trim an MP4 track's edit list describes, as elementary_stream_from_bytes
 // reads it: whole, with `note` empty, for a track with no edit list or only

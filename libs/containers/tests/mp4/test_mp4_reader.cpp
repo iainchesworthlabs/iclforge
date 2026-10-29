@@ -15,6 +15,7 @@
 
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mp4/reader.hpp"
+#include "multi_track_files.hpp"
 
 // Two halves, the same split the Matroska reader's tests make.
 //
@@ -2813,5 +2814,83 @@ TEST_CASE("MP4 refuses protected files laid out like Dolby's OTT reference audio
         const auto init = init_segment_of(file);
         REQUIRE(init.size() < file.size());
         check_refused_everywhere(init, expected);
+    }
+}
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// track of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("MP4 auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[mp4][reader][truehd]") {
+    using iclforge::containers::mp4::AutoSelect;
+    using iclforge::containers::mp4::ReadOptions;
+    namespace mt = iclforge::test::multi_track;
+    const Bytes truehd_a = frame_of(80, 0x31);
+    const Bytes truehd_b = frame_of(96, 0x33);
+    const Bytes eac3_a = frame_of(120, 0x32);
+    const Bytes eac3_b = frame_of(130, 0x34);
+    const std::array<mt::Track, 3> tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 8, .units = {truehd_a, truehd_b}},
+        mt::Track{.codec = mt::Codec::kEac3, .channels = 6, .units = {eac3_a, eac3_b}},
+        mt::Track{.codec = mt::Codec::kAc3, .channels = 6, .units = {eac3_b}}};
+    const Bytes file = mt::mp4_file(tracks);
+
+    SECTION("by default the first track is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::mp4::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_id == 1);
+        CHECK(out->track.codec_id == "mlpa");
+        CHECK(owned(out->samples) == std::vector<Bytes>{truehd_a, truehd_b});
+    }
+
+    SECTION("without TrueHD the next track is taken, and the other two are listed") {
+        const auto out = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_id == 2);
+        CHECK(out->track.codec_id == "ec-3");
+        CHECK(owned(out->samples) == std::vector<Bytes>{eac3_a, eac3_b});
+        REQUIRE(out->skipped.size() == 2);
+        CHECK(out->skipped[0].track_id == 1);
+        CHECK(out->skipped[0].codec_id == "mlpa");
+        CHECK(out->skipped[1].track_id == 3);
+        CHECK(out->skipped[1].codec_id == "ac-3");
+
+        // The streaming reader makes the same choice.
+        iclforge::containers::mp4::Reader reader{
+            ReadOptions{.auto_select = AutoSelect{.truehd = false}}};
+        std::vector<Bytes> got;
+        const auto sink = [&got](std::span<const std::byte> sample) {
+            got.emplace_back(sample.begin(), sample.end());
+        };
+        for (std::size_t offset = 0; offset < file.size(); offset += 11) {
+            REQUIRE(reader
+                        .push(std::span<const std::byte>{file}.subspan(
+                                  offset, std::min<std::size_t>(11, file.size() - offset)),
+                              sink)
+                        .has_value());
+        }
+        REQUIRE(reader.finish().has_value());
+        CHECK(got == std::vector<Bytes>{eac3_a, eac3_b});
+    }
+
+    SECTION("each codec can be left out in turn") {
+        const auto without_eac3 = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE(without_eac3.has_value());
+        CHECK(without_eac3->track.codec_id == "ac-3");
+        const auto nothing = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.ac3 = false,
+                                                        .eac3 = false,
+                                                        .ac4 = false,
+                                                        .truehd = false}});
+        REQUIRE_FALSE(nothing.has_value());
+        CHECK(nothing.error() == iclforge::containers::mp4::DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("naming a track_id is not narrowed by it") {
+        const auto out = iclforge::containers::mp4::demux(
+            file, ReadOptions{.track_id = 1, .auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.codec_id == "mlpa");
     }
 }

@@ -1054,3 +1054,62 @@ TEST_CASE("Matroska refuses an audio track that declares ContentEncryption",
         CHECK(out->frames.size() == 2);
     }
 }
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// track of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("Matroska auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[matroska][reader][truehd]") {
+    using iclforge::containers::matroska::AutoSelect;
+    using iclforge::containers::matroska::ReadOptions;
+    const Bytes truehd_frame = frame_of(80, 0x31);
+    const Bytes eac3_frame = frame_of(120, 0x32);
+    const auto file = file_of({TrackSpec{.number = 1, .codec_id = "A_TRUEHD", .channels = 8},
+                               TrackSpec{.number = 2, .codec_id = "A_EAC3", .channels = 6}},
+                              {{1, truehd_frame}, {2, eac3_frame}, {1, truehd_frame}});
+
+    SECTION("by default the first track is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 1);
+        CHECK(out->track.codec_id == "A_TRUEHD");
+        CHECK(out->frames.size() == 2);
+    }
+
+    SECTION("without TrueHD the E-AC-3 track after it is taken, and the other is listed") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 2);
+        CHECK(out->track.codec_id == "A_EAC3");
+        CHECK(owned(out->frames) == std::vector<Bytes>{eac3_frame});
+        REQUIRE(out->skipped.size() == 1);
+        CHECK(out->skipped[0].track_number == 1);
+        CHECK(out->skipped[0].kind == iclforge::containers::matroska::TrackKind::kAudio);
+        CHECK(out->skipped[0].codec_id == "A_TRUEHD");
+
+        // The streaming reader makes the same choice.
+        CHECK(read_in_chunks(file, 7, ReadOptions{.auto_select = AutoSelect{.truehd = false}}) ==
+              std::vector<Bytes>{eac3_frame});
+    }
+
+    SECTION("without E-AC-3 the first track stays the one taken") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 1);
+    }
+
+    SECTION("with nothing left to take there is no audio track") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == iclforge::containers::matroska::DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("naming a track number is not narrowed by it") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.track_number = 1, .auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.codec_id == "A_TRUEHD");
+    }
+}

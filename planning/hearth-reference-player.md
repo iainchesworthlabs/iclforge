@@ -116,6 +116,13 @@ installed or packaged.*
   readers return neither timestamps nor a track list, `mp4::Reader` needs `moov` before `mdat`,
   and MPEG-TS yields PES payloads that have to be re-split. WAV carrying IEC 61937 is readable
   through `BurstReader` but is not sniffed.
+- Which track of a file with several: the first, in file order, whose codec the caller says it can
+  use (`CodecSet` in `container_input.hpp`). Hearth says AC-3, E-AC-3 and AC-4, so a TrueHD track
+  is passed over for the AC-3 or E-AC-3 track after it (a Blu-ray remux has TrueHD first), and a
+  file whose audio is TrueHD alone is not playable: "TrueHD is not played by Hearth yet". Open:
+  whether a later round chooses by language, by the container's default flag, by what the output
+  takes (TrueHD where it takes MAT), or with a picker; until then the first track the player can
+  play is the rule.
 - AC-4 (`.ac4`, and AC-4 in MP4 or TS) is listed with its bitstream information from `libs/ac4`
   and marked as not playable until [chip D](#chip-d-the-ac-4-decoder) delivers a decoder.
   *As built, chip D delivered it and AC-4 plays.*

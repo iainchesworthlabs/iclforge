@@ -11,6 +11,7 @@
 
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "iclforge/containers/mpegts/reader.hpp"
+#include "multi_track_files.hpp"
 
 // The same two halves the Matroska and MP4 reader tests have.
 //
@@ -1456,5 +1457,72 @@ TEST_CASE("MPEG-TS refuses an audio PID whose packets are scrambled",
         const auto out = iclforge::containers::mpegts::demux(file);
         REQUIRE(out.has_value());
         CHECK(concat(out->payloads) == concat(frames));
+    }
+}
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// stream of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("MPEG-TS auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[mpegts][reader][truehd]") {
+    using iclforge::containers::mpegts::AutoSelect;
+    using iclforge::containers::mpegts::ReadOptions;
+    namespace mt = iclforge::test::multi_track;
+    const Bytes truehd_a = frame_of(80, 0x31);
+    const Bytes truehd_b = frame_of(96, 0x33);
+    const Bytes eac3_a = frame_of(120, 0x32);
+    const Bytes eac3_b = frame_of(130, 0x34);
+    const std::array<mt::Track, 3> tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 8, .units = {truehd_a, truehd_b}},
+        mt::Track{.codec = mt::Codec::kEac3, .channels = 6, .units = {eac3_a, eac3_b}},
+        mt::Track{.codec = mt::Codec::kAc3, .channels = 6, .units = {eac3_b}}};
+    const Bytes file = mt::mpegts_file(tracks);
+
+    SECTION("by default the first stream is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::mpegts::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->stream.elementary_pid == 0x100);
+        CHECK(out->stream.truehd);
+        CHECK(concat(out->payloads) == concat(std::vector<Bytes>{truehd_a, truehd_b}));
+    }
+
+    SECTION("without TrueHD the next stream is taken") {
+        const ReadOptions options{.auto_select = AutoSelect{.truehd = false}};
+        const auto out = iclforge::containers::mpegts::demux(file, options);
+        REQUIRE(out.has_value());
+        CHECK(out->stream.elementary_pid == 0x101);
+        CHECK_FALSE(out->stream.truehd);
+        CHECK(out->stream.eac3);
+        CHECK(concat(out->payloads) == concat(std::vector<Bytes>{eac3_a, eac3_b}));
+
+        // The streaming reader makes the same choice.
+        iclforge::containers::mpegts::Reader reader{options};
+        Bytes got;
+        const auto sink = [&got](std::span<const std::byte> payload) {
+            got.insert(got.end(), payload.begin(), payload.end());
+        };
+        for (std::size_t offset = 0; offset < file.size(); offset += 97) {
+            REQUIRE(reader
+                        .push(std::span<const std::byte>{file}.subspan(
+                                  offset, std::min<std::size_t>(97, file.size() - offset)),
+                              sink)
+                        .has_value());
+        }
+        REQUIRE(reader.finish(sink).has_value());
+        CHECK(got == concat(std::vector<Bytes>{eac3_a, eac3_b}));
+    }
+
+    SECTION("each codec can be left out in turn") {
+        const auto without_eac3 = iclforge::containers::mpegts::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE(without_eac3.has_value());
+        CHECK(without_eac3->stream.elementary_pid == 0x102);
+        CHECK_FALSE(without_eac3->stream.eac3);
+        const auto nothing = iclforge::containers::mpegts::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.ac3 = false,
+                                                        .eac3 = false,
+                                                        .ac4 = false,
+                                                        .truehd = false}});
+        REQUIRE_FALSE(nothing.has_value());
+        CHECK(nothing.error() == iclforge::containers::mpegts::DemuxError::kNoAudioStream);
     }
 }

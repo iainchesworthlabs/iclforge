@@ -255,13 +255,27 @@ struct SkippedTrack {
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string describe_refusal(
     std::span<const SkippedTrack> refused);
 
+// The codecs automatic track selection may take. A codec left false is passed over as if its
+// tracks were not in the file (they are listed in Demuxed::skipped), so the next audio track that
+// is wanted is taken. Every codec this reader selects is on by default, which is what the reader
+// did before a caller could say.
+struct AutoSelect {
+    bool ac3 = true;     // 'ac-3'
+    bool eac3 = true;    // 'ec-3'
+    bool ac4 = true;     // 'ac-4'
+    bool truehd = true;  // 'mlpa'
+};
+
 // Bounds on what the reader will do for one file - defences against a
 // hostile container, not tuning knobs.
 struct ReadOptions {
-    // The track to extract. 0 auto-selects the first 'ac-3'/'ec-3'/'ac-4' track that is not
-    // protected; any other value names a track_ID explicitly. A protected track is never
-    // extracted: naming one gives kProtectedTrack.
+    // The track to extract. 0 auto-selects the first 'ac-3'/'ec-3'/'ac-4'/'mlpa' track that
+    // auto_select allows and that is not protected; any other value names a track_ID explicitly
+    // (auto_select does not apply to it). A protected track is never extracted: naming one gives
+    // kProtectedTrack.
     std::uint32_t track_id = 0;
+    // Which codecs track_id 0 may take.
+    AutoSelect auto_select{};
     // The largest single box the reader will hold. A box it does not need is
     // skipped without ever being buffered, however large.
     std::uint64_t max_box_bytes = 64U << 20;  // 64 MiB

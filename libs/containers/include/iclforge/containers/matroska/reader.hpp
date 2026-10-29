@@ -21,8 +21,9 @@
 // for, and hands each frame back as opaque bytes. It has NO dependency on
 // iclforge::ac3 and no knowledge of AC-3 - what comes out is whatever the muxer
 // put in. The one place it names a codec is track auto-selection
-// (kCodecAc3/kCodecEac3, the same two CodecID strings the writer already
-// declares); a caller that wants some other track says so by number.
+// (kCodecAc3/kCodecEac3/kCodecTruehd, the CodecID strings the writer already
+// declares, narrowed by ReadOptions::auto_select); a caller that wants some
+// other track says so by number.
 //
 // Two shapes, mirroring the write side exactly:
 //
@@ -120,6 +121,16 @@ struct SkippedTrack {
     std::string language{"und"};
 };
 
+// The codecs automatic track selection may take. A codec left false is passed over as if its
+// tracks were not in the file (they are listed in Demuxed::skipped), so the next audio track
+// that is wanted is taken. Every codec this reader selects is on by default, which is what the
+// reader did before a caller could say.
+struct AutoSelect {
+    bool ac3 = true;     // kCodecAc3
+    bool eac3 = true;    // kCodecEac3
+    bool truehd = true;  // kCodecTruehd
+};
+
 // Bounds on what the reader will do for one file - defences against a
 // hostile container rather than tuning knobs (see the header comment). The
 // defaults sit far above anything a real AC-3/E-AC-3 file reaches (the
@@ -127,10 +138,13 @@ struct SkippedTrack {
 // would exhaust a machine.
 struct ReadOptions {
     // The track to extract. 0 auto-selects: the first audio TrackEntry whose
-    // CodecID is kCodecEac3 or kCodecAc3. Any other value names a
-    // TrackNumber explicitly and accepts whatever CodecID it carries, which
-    // is how a caller reads a track this module has no opinion about.
+    // CodecID is kCodecEac3, kCodecAc3 or kCodecTruehd and which auto_select
+    // allows. Any other value names a TrackNumber explicitly and accepts
+    // whatever CodecID it carries, which is how a caller reads a track this
+    // module has no opinion about; auto_select does not apply to it.
     std::uint64_t track_number = 0;
+    // Which codecs track_number 0 may take.
+    AutoSelect auto_select{};
     // The largest single element the reader will hold. Elements bigger than
     // this that it does not need (an attachment, a cue index) are skipped
     // without ever being buffered; one it does need is kLimitExceeded.

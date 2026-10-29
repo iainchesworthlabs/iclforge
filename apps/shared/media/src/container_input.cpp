@@ -4,12 +4,14 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/matroska/reader.hpp"
 #include "iclforge/containers/mp4/reader.hpp"
@@ -58,22 +60,6 @@ constexpr std::array<std::string_view, 5> kIsobmffLeadingTypes{"ftyp", "styp", "
     const std::string_view id{reinterpret_cast<const char*>(head.data()), 4};
     const std::string_view form{reinterpret_cast<const char*>(head.data()) + 8, 4};
     return (id == "RIFF" || id == "RF64" || id == "BW64") && form == "WAVE";
-}
-
-// A TrueHD or MLP elementary stream opens with an access unit: four header bytes (check nibble,
-// length, timing) and then, when the unit carries one, a major sync 0xF8726FBA or 0xF8726FBB (TH
-// spec §4.2). A stream cut at an access-unit boundary opens that way, and so does every file
-// `forge` writes. Recognised by that major sync before the packet grid below for the reason AC-3
-// is: a steady signal repeats bytes at a fixed period, and the grid test only counts recurrence.
-[[nodiscard]] bool has_truehd_major_sync(std::span<const std::byte> head) {
-    if (head.size() < 8) {
-        return false;
-    }
-    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
-           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
-           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
-           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
-            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
 }
 
 // A transport stream has no header at all - it is a bare repeating grid of
@@ -288,7 +274,77 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     return facts;
 }
 
+// The codec a reader names a track's codec by, in the reader's own words: Matroska's CodecID,
+// MP4's sample entry type and MPEG-TS's stream type (reported as the flags ReadStream has).
+[[nodiscard]] std::optional<TrackCodec> codec_of_matroska(std::string_view codec_id) {
+    namespace mkv = iclforge::containers::matroska;
+    if (codec_id == mkv::kCodecAc3) return TrackCodec::kAc3;
+    if (codec_id == mkv::kCodecEac3) return TrackCodec::kEac3;
+    if (codec_id == mkv::kCodecTruehd) return TrackCodec::kTruehd;
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<TrackCodec> codec_of_mp4(std::string_view codec_id) {
+    namespace mp4 = iclforge::containers::mp4;
+    if (codec_id == mp4::kCodecAc3) return TrackCodec::kAc3;
+    if (codec_id == mp4::kCodecEac3) return TrackCodec::kEac3;
+    if (codec_id == mp4::kCodecAc4) return TrackCodec::kAc4;
+    if (codec_id == mp4::kCodecTruehd) return TrackCodec::kTruehd;
+    return std::nullopt;
+}
+
+[[nodiscard]] TrackCodec codec_of_mpegts(const iclforge::containers::mpegts::ReadStream& stream) {
+    if (stream.truehd) return TrackCodec::kTruehd;
+    if (stream.ac4) return TrackCodec::kAc4;
+    return stream.eac3 ? TrackCodec::kEac3 : TrackCodec::kAc3;
+}
+
+// Every codec the readers select is allowed, so a track a demux did not find is not one the
+// caller's set left out.
+[[nodiscard]] bool allows_every_codec(const CodecSet& codecs) {
+    return codecs.ac3 && codecs.eac3 && codecs.ac4 && codecs.truehd;
+}
+
+// The result for a container whose audio is all in codecs the caller's set leaves out: no bytes,
+// and an error that names what the file holds, which is what this file's callers print after "is
+// a" ("x.mkv is a Matroska/WebM file whose audio is TrueHD, ...").
+[[nodiscard]] ElementaryStreamResult declined(std::string_view container, TrackCodec codec,
+                                              ContainerFacts facts) {
+    return {.bytes = {},
+            .error = std::string{container} + " file whose audio is " +
+                     std::string{codec_name(codec)} + ", which this program does not read",
+            .declined_codec = codec,
+            .container = std::move(facts)};
+}
+
 }  // namespace
+
+// A TrueHD or MLP elementary stream opens with an access unit: four header bytes (check nibble,
+// length, timing) and then, when the unit carries one, a major sync 0xF8726FBA or 0xF8726FBB (TH
+// spec §4.2). A stream cut at an access-unit boundary opens that way, and so does every file
+// `forge` writes. sniff_container recognises it by that major sync before the packet grid for the
+// reason AC-3 is: a steady signal repeats bytes at a fixed period, and the grid test only counts
+// recurrence.
+bool looks_like_truehd(std::span<const std::byte> head) {
+    if (head.size() < 8) {
+        return false;
+    }
+    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
+           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
+           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
+           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
+            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
+}
+
+std::string_view codec_name(TrackCodec codec) {
+    switch (codec) {
+        case TrackCodec::kAc3: return "AC-3";
+        case TrackCodec::kEac3: return "E-AC-3";
+        case TrackCodec::kAc4: return "AC-4";
+        case TrackCodec::kTruehd: return "TrueHD";
+    }
+    return "";
+}
 
 std::string_view container_token(ContainerKind kind) {
     switch (kind) {
@@ -374,7 +430,7 @@ ContainerKind sniff_container(std::span<const std::byte> head) {
     if (has_riff_wave_magic(sniffed)) {
         return ContainerKind::kUnknown;
     }
-    if (has_truehd_major_sync(sniffed)) {
+    if (looks_like_truehd(sniffed)) {
         return ContainerKind::kUnknown;
     }
     if (has_ts_packet_grid(sniffed)) {
@@ -383,12 +439,27 @@ ContainerKind sniff_container(std::span<const std::byte> head) {
     return ContainerKind::kUnknown;
 }
 
-ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file) {
+ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file,
+                                                    const CodecSet& codecs) {
     switch (sniff_container(file)) {
         case ContainerKind::kUnknown:
             return {.bytes = std::vector<std::byte>(file.begin(), file.end()), .error = {}};
         case ContainerKind::kMatroska: {
-            const auto demuxed = iclforge::containers::matroska::demux(file);
+            namespace mkv = iclforge::containers::matroska;
+            const auto demuxed = mkv::demux(
+                file, mkv::ReadOptions{.auto_select = {.ac3 = codecs.ac3,
+                                                       .eac3 = codecs.eac3,
+                                                       .truehd = codecs.truehd}});
+            if (!demuxed && demuxed.error() == mkv::DemuxError::kNoAudioTrack &&
+                !allows_every_codec(codecs)) {
+                // Nothing in a codec the caller can use: look again with every codec allowed,
+                // to say what the file holds.
+                const auto every = mkv::demux(file);
+                const auto codec = every ? codec_of_matroska(every->track.codec_id) : std::nullopt;
+                if (codec) {
+                    return declined("Matroska/WebM", *codec, facts_of(*every));
+                }
+            }
             if (!demuxed) {
                 return {.bytes = {},
                         .error =
@@ -401,7 +472,20 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
                     .container = facts_of(*demuxed)};
         }
         case ContainerKind::kMp4: {
-            const auto demuxed = iclforge::containers::mp4::demux(file);
+            namespace mp4 = iclforge::containers::mp4;
+            const auto demuxed = mp4::demux(
+                file, mp4::ReadOptions{.auto_select = {.ac3 = codecs.ac3,
+                                                       .eac3 = codecs.eac3,
+                                                       .ac4 = codecs.ac4,
+                                                       .truehd = codecs.truehd}});
+            if (!demuxed && demuxed.error() == mp4::DemuxError::kNoAudioTrack &&
+                !allows_every_codec(codecs)) {
+                const auto every = mp4::demux(file);
+                const auto codec = every ? codec_of_mp4(every->track.codec_id) : std::nullopt;
+                if (codec) {
+                    return declined("MP4", *codec, facts_of(*every));
+                }
+            }
             if (!demuxed) {
                 if (demuxed.error() == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
                     // Which track, and with what scheme and KID, is what a person needs to hear
@@ -456,7 +540,20 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
                     .container = facts_of(*demuxed)};
         }
         case ContainerKind::kMpegTs: {
-            const auto demuxed = iclforge::containers::mpegts::demux(file);
+            namespace ts = iclforge::containers::mpegts;
+            const auto demuxed = ts::demux(
+                file, ts::ReadOptions{.auto_select = {.ac3 = codecs.ac3,
+                                                      .eac3 = codecs.eac3,
+                                                      .ac4 = codecs.ac4,
+                                                      .truehd = codecs.truehd}});
+            if (!demuxed && demuxed.error() == ts::DemuxError::kNoAudioStream &&
+                !allows_every_codec(codecs)) {
+                const auto every = ts::demux(file);
+                if (every) {
+                    return declined("Transport Stream", codec_of_mpegts(every->stream),
+                                    facts_of(*every));
+                }
+            }
             if (!demuxed) {
                 return {
                     .bytes = {},
