@@ -13,6 +13,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -758,6 +759,74 @@ TEST_CASE("forge probe json=1 of a TrueHD or MLP stream is valid JSON in every c
                 CHECK(document["truehd"]["codec"] == item["codec"]);
                 CHECK(document["truehd"]["access_units"] == item["access_units"]);
                 CHECK(document["truehd"]["sample_rate"] == item["sample_rate"]);
+            }
+        }
+    }
+}
+
+namespace {
+
+// Whether any object of the document names a key twice. nlohmann::json keeps the last of two and
+// says nothing, so the parser's callback watches the keys of each object as they arrive.
+bool repeats_a_key(const std::string& text) {
+    std::vector<std::set<std::string>> keys;
+    bool repeated = false;
+    const nlohmann::json::parser_callback_t callback =
+        [&keys, &repeated](int, nlohmann::json::parse_event_t event, nlohmann::json& parsed) {
+            switch (event) {
+                case nlohmann::json::parse_event_t::object_start:
+                    keys.emplace_back();
+                    break;
+                case nlohmann::json::parse_event_t::key:
+                    repeated = !keys.back().insert(parsed.get<std::string>()).second || repeated;
+                    break;
+                case nlohmann::json::parse_event_t::object_end:
+                    keys.pop_back();
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        };
+    const nlohmann::json parsed = nlohmann::json::parse(text, callback);
+    return repeated || parsed.is_discarded();
+}
+
+}  // namespace
+
+TEST_CASE("forge probe json=1 of a stream with evolution frames is valid JSON in every container",
+          "[forge-cli][truehd][evolution]") {
+    // The container member is written by the probe's container writer and the evolution report by
+    // the TrueHD report; detail=evolution, structure and format add members of their own. Each
+    // document has to parse, name no key twice, and carry both objects.
+    REQUIRE(repeats_a_key(R"({"container": null, "container": {"format": "mp4"}})"));
+    REQUIRE_FALSE(repeats_a_key(R"({"a": {"a": 1}, "b": [{"a": 1}, {"a": 2}], "c": {"a": 3}})"));
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "container_evolution_json.log";
+    const std::array<std::pair<std::string, fs::path>, 2> streams{
+        {{"atmos_like", write_atmos_like_stream(dir)},
+         {"signed_like", write_signed_like_stream(dir)}}};
+    for (const auto& [name, stream] : streams) {
+        for (const std::string container : {"thd", "mkv", "mp4", "ts"}) {
+            fs::path input = stream;
+            if (container != "thd") {
+                input = dir / (name + "_evolution." + container);
+                REQUIRE(run_cli(container + " \"" + stream.string() + "\" \"" + input.string() +
+                                    "\"",
+                                log) == 0);
+            }
+            for (const std::string detail : {"", " detail=evolution", " detail=structure",
+                                             " detail=format"}) {
+                DYNAMIC_SECTION(name + " in " + container + detail) {
+                    REQUIRE(run_cli("probe \"" + input.string() + "\" json=1" + detail, log) == 0);
+                    const std::string text = read_text(log);
+                    CHECK_FALSE(repeats_a_key(text));
+                    const auto document = nlohmann::json::parse(text);
+                    CHECK(document["container"].is_object() == (container != "thd"));
+                    REQUIRE(document["truehd"]["evolution"].is_object());
+                    CHECK(document["truehd"]["evolution"]["regions"] == 6);
+                    CHECK(document["truehd"]["evolution"]["provisional"] == true);
+                }
             }
         }
     }

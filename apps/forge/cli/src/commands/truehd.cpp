@@ -263,6 +263,13 @@ std::string_view key_of_spelling(std::string_view spelling) {
     return spelling.ends_with('=') ? spelling.substr(0, spelling.size() - 1) : spelling;
 }
 
+// Whether the spelling names one value of an option ("detail=evolution"), which applies that value and
+// no other, and not the option ("json=").
+bool spells_a_value(std::string_view spelling) {
+    const auto equals = spelling.find('=');
+    return equals != std::string_view::npos && equals + 1 < spelling.size();
+}
+
 // Choices between ways of computing a transform. TrueHD has no transform, so none of these can
 // change a stream or a verdict, and they are warned about, not refused.
 constexpr std::array<std::string_view, 3> kTransformChoices{"fast-mdct", "fast-imdct", "mode"};
@@ -297,8 +304,9 @@ int check_options_applied(const Options& meta, std::initializer_list<std::string
     for (const std::string& token : meta.given) {
         const std::string_view key = key_of(token);
         if (key == "quiet" || key == "verbose" ||
-            std::ranges::any_of(applied, [key](std::string_view spelling) {
-                return key_of_spelling(spelling) == key;
+            std::ranges::any_of(applied, [&token, key](std::string_view spelling) {
+                return spells_a_value(spelling) ? spelling == token
+                                                : key_of_spelling(spelling) == key;
             })) {
             continue;
         }
@@ -530,8 +538,11 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void(iclforge::apps::JsonSink&)>& container_json,
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
-    // detail= asks for per-unit lines this report does not have; it is refused until it has them.
-    if (const int refused = check_options_applied(meta, {"json="}); refused != kExitOk) {
+    // detail=frames and detail=blocks ask for per-unit lines this report does not have, and are
+    // refused; detail=evolution, structure and format are its own.
+    if (const int refused = check_options_applied(
+            meta, {"json=", "detail=evolution", "detail=structure", "detail=format"});
+        refused != kExitOk) {
         return refused;
     }
     const auto info = th::probe_stream(stream);

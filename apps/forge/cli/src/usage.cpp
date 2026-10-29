@@ -735,7 +735,8 @@ void print_probe_topic() {
     fmt::println("       enhancement and stereo downmix values.");
     fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
     fmt::println("       the substreams and their channels, and how many segments pass their");
-    fmt::println("       parity and CRC; detail= is refused for it, since it has no such dump.");
+    fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
+    fmt::println("       it has no such dump, and detail=evolution, structure and format are its own.");
 }
 
 void print_mkv_topic() {

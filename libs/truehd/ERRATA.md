@@ -157,7 +157,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     is a stream that is not what was asked for. E-AC-3 refuses `verify-content` and `syntax-trace=` by name instead. The rule
     now applied, **provisionally**: a TrueHD or MLP run refuses by name, with a usage error (exit 1), every option it does
     not apply, and says which it does (`decode`, `levels` and `loudness` apply `truehd-presentation=` and `truehd-check=`;
-    `truehd-encode` its `truehd-*` options and `verify`; `probe` `json=`, and `detail=` has no TrueHD form yet; `mkv`,
+    `truehd-encode` its `truehd-*` options and `verify`; `probe` `json=` and `detail=evolution`, `structure` and `format` (`detail=frames` and `blocks` have no TrueHD form yet); `mkv`,
     `mp4`, `ts`, `spdif` and `remux` none; `quiet` and `verbose` always). `decode` also refuses an objects directory and an ADM
     path, which would never be written. The only options warned about are the choices between ways of computing a transform
     (`fast-mdct`, `fast-imdct`, `mode=`), which cannot change the output or any verdict of a codec that has no transform, and
