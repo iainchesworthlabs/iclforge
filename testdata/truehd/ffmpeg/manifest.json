@@ -1,0 +1,139 @@
+{
+  "_comment": "TrueHD golden masters written by FFmpeg's experimental truehd encoder, made by tools/generators/gen_truehd_ffmpeg_gold.py (never run in CI). Each stream must decode to its source WAV sample for sample.",
+  "gold_version": 1,
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "legs": [
+    {
+      "name": "stereo-48k-16",
+      "channels": 2,
+      "sample_rate": 48000,
+      "bits": 16,
+      "frames": 9600,
+      "source": "stereo-48k-16.wav",
+      "source_sha256": "3efec117e8eb87ffcb698a962e33fa0b8bee4134e69752a20ca4239ca5ab86ae",
+      "stream": "stereo-48k-16.thd",
+      "stream_sha256": "1b4a45fedce60b84d14292f42296720382a7907ac951185b26851c8e029edf86",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-48k-16.wav -af aformat=sample_fmts=s16:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-48k-16.thd"
+    },
+    {
+      "name": "stereo-48k-24",
+      "channels": 2,
+      "sample_rate": 48000,
+      "bits": 24,
+      "frames": 9600,
+      "source": "stereo-48k-24.wav",
+      "source_sha256": "fea15cb17bd416e1873bee5af12a901e695af03ac64da2dee38529c0d86020e8",
+      "stream": "stereo-48k-24.thd",
+      "stream_sha256": "531a13a72302d1087c8a64f8b31a9c0e5c60943ff5525edee5c98aaeacb3995a",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-48k-24.wav -af aformat=sample_fmts=s32:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-48k-24.thd"
+    },
+    {
+      "name": "stereo-96k-16",
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits": 16,
+      "frames": 19200,
+      "source": "stereo-96k-16.wav",
+      "source_sha256": "64f0485e2496baa730cc1ab181e7e48dacce1df08c05643cd6cb8cc0d9501f67",
+      "stream": "stereo-96k-16.thd",
+      "stream_sha256": "a5765aa17178f7cc93a2da2620f4ba0b5774aa8b97e4321c83dbd16f18f82e48",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-96k-16.wav -af aformat=sample_fmts=s16:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-96k-16.thd"
+    },
+    {
+      "name": "stereo-96k-24",
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits": 24,
+      "frames": 19200,
+      "source": "stereo-96k-24.wav",
+      "source_sha256": "5955c0d8f26efd459b2839e55dfbd19b951934d9d5aef92f46403ee4879c7e00",
+      "stream": "stereo-96k-24.thd",
+      "stream_sha256": "e545cdb3f9e70945fbceeb005453cb55172c04ab9282242dd4dc86352624645c",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-96k-24.wav -af aformat=sample_fmts=s32:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-96k-24.thd"
+    },
+    {
+      "name": "51-48k-16",
+      "channels": 6,
+      "sample_rate": 48000,
+      "bits": 16,
+      "frames": 9600,
+      "source": "51-48k-16.wav",
+      "source_sha256": "b96f2b16847e0e8fec1b7ab619dc0f89fdc9156ff7d52030f91aaa1a0fd870ad",
+      "stream": "51-48k-16.thd",
+      "stream_sha256": "87b46a15981bcedb0de6cd44a3f3bff3b6187a24f98cf23c0b1d22ea8367c513",
+      "command": "ffmpeg -hide_banner -v error -y -i 51-48k-16.wav -af aformat=sample_fmts=s16:channel_layouts=5.1(side) -c:a truehd -strict -2 -f truehd 51-48k-16.thd"
+    },
+    {
+      "name": "51-48k-24",
+      "channels": 6,
+      "sample_rate": 48000,
+      "bits": 24,
+      "frames": 9600,
+      "source": "51-48k-24.wav",
+      "source_sha256": "ff3da83b685c6fadfe7c1a3e45280861ca36f01b10b6818a32694c38eac46bb4",
+      "stream": "51-48k-24.thd",
+      "stream_sha256": "68e4451051dad4ef16ea11cefb6d34e19fd1312b756cea0d0b0779832da613d0",
+      "command": "ffmpeg -hide_banner -v error -y -i 51-48k-24.wav -af aformat=sample_fmts=s32:channel_layouts=5.1(side) -c:a truehd -strict -2 -f truehd 51-48k-24.thd"
+    },
+    {
+      "name": "51-96k-16",
+      "channels": 6,
+      "sample_rate": 96000,
+      "bits": 16,
+      "frames": 19200,
+      "source": "51-96k-16.wav",
+      "source_sha256": "3c8f73240cd6380f7116f3d6fbbc9bbb1f549b4cef030f44a882e560c3c55c1b",
+      "stream": "51-96k-16.thd",
+      "stream_sha256": "bd4dc93f84ef67e45a23585c14d167ea83e3b30bf5b5a46db874a34121cb6e0c",
+      "command": "ffmpeg -hide_banner -v error -y -i 51-96k-16.wav -af aformat=sample_fmts=s16:channel_layouts=5.1(side) -c:a truehd -strict -2 -f truehd 51-96k-16.thd"
+    },
+    {
+      "name": "51-96k-24",
+      "channels": 6,
+      "sample_rate": 96000,
+      "bits": 24,
+      "frames": 19200,
+      "source": "51-96k-24.wav",
+      "source_sha256": "fda1c657ba5db6d60d60c938eb99aa6f997ae1216e1abd7a262554c25f607813",
+      "stream": "51-96k-24.thd",
+      "stream_sha256": "771703840ebd26be19eb0acf99769f0393834bd01974797dd395fd578043465b",
+      "command": "ffmpeg -hide_banner -v error -y -i 51-96k-24.wav -af aformat=sample_fmts=s32:channel_layouts=5.1(side) -c:a truehd -strict -2 -f truehd 51-96k-24.thd"
+    },
+    {
+      "name": "stereo-44k-16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "bits": 16,
+      "frames": 8800,
+      "source": "stereo-44k-16.wav",
+      "source_sha256": "51c98beceee26bc7df8061a18e4538ec933b206692fcbfae03f10ccc2b565d0b",
+      "stream": "stereo-44k-16.thd",
+      "stream_sha256": "7cc9c0db01cd4d3988a23d327ad5db495fb265bb1d5c984457ebab889ac2e644",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-44k-16.wav -af aformat=sample_fmts=s16:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-44k-16.thd"
+    },
+    {
+      "name": "stereo-192k-24",
+      "channels": 2,
+      "sample_rate": 192000,
+      "bits": 24,
+      "frames": 38400,
+      "source": "stereo-192k-24.wav",
+      "source_sha256": "956c055608a4c1046d8c1b928ec384a61d51df7a78b79a9687a01bdc03ed7c2c",
+      "stream": "stereo-192k-24.thd",
+      "stream_sha256": "bcaaf215afc33587ec999fb965a56a6a485b50522da599bcd57bdbfb69068be8",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-192k-24.wav -af aformat=sample_fmts=s32:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-192k-24.thd"
+    },
+    {
+      "name": "stereo-48k-24-odd",
+      "channels": 2,
+      "sample_rate": 48000,
+      "bits": 24,
+      "frames": 9617,
+      "source": "stereo-48k-24-odd.wav",
+      "source_sha256": "6d38e7e695a7dfdfdbc516506de5746ccca0772b7fb5c4c3dfc03564b20e7468",
+      "stream": "stereo-48k-24-odd.thd",
+      "stream_sha256": "94cf532e030cdf25ca750e611ae4e146cb0acab9b864659a453cce5d0581e02b",
+      "command": "ffmpeg -hide_banner -v error -y -i stereo-48k-24-odd.wav -af aformat=sample_fmts=s32:channel_layouts=stereo -c:a truehd -strict -2 -f truehd stereo-48k-24-odd.thd"
+    }
+  ]
+}
