@@ -256,12 +256,13 @@ def _xor(a: bytes, b: bytes) -> bytes:
 
 
 def _ctr_keystream(key: bytes, iv: bytes, blocks: int) -> bytes:
-    # An 8-byte IV is the high half of the counter block; the low half counts from 0.
-    counter = int.from_bytes(iv + b"\x00" * (16 - len(iv)), "big")
-    ecb = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
-    return b"".join(
-        ecb.update(((counter + i) % (1 << 128)).to_bytes(16, "big")) for i in range(blocks)
-    )
+    # An 8-byte IV is the high half of the counter block; the low half counts from 0. AES-CTR adds
+    # one to the whole 128-bit block, big-endian, for each block, which is the counter the
+    # schemes use. (An earlier version built this from AES-ECB, block by block; CodeQL's
+    # py/weak-cryptographic-algorithm reports any use of ECB, and this is the same stream.)
+    counter_block = iv + b"\x00" * (16 - len(iv))
+    keystream = Cipher(algorithms.AES(key), modes.CTR(counter_block)).encryptor()
+    return keystream.update(b"\x00" * (16 * blocks))
 
 
 def _pattern_blocks(length: int, crypt: int, skip: int) -> list[int]:
