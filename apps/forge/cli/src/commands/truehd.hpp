@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <functional>
 #include <optional>
+#include <initializer_list>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -102,5 +103,24 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
 
 // Says that `command` does not read TrueHD or MLP and returns kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path);
+
+// --- options a TrueHD run does not apply -----------------------------------------------------------
+// PROVISIONAL, until the owner answers question 7 of planning/truehd-parity-forge.md (and the entry
+// in libs/truehd/ERRATA.md): an option that a run on TrueHD or MLP does not apply is refused by name
+// with a usage error, as E-AC-3 refuses verify-content, and is never accepted and dropped. A
+// verification flag (verify-content, check-content, verify-objects, syntax-trace= and the like) must
+// never succeed without verifying. The only options warned about instead are the choices between
+// ways of computing a transform (fast-mdct, fast-imdct, mode=), which cannot change the output or
+// any verdict of a codec that has no transform.
+
+// `applied` is what the command does with TrueHD or MLP, spelled as the help spells it
+// ("truehd-presentation=", "verify"); quiet and verbose are always applied. Returns kExitOk, or
+// names every other option the line carries (Options::given) on stderr and returns kExitUsage.
+[[nodiscard]] int check_options_applied(const Options& meta,
+                                        std::initializer_list<std::string_view> applied);
+
+// The warning a command that also reads other streams gives when truehd-presentation= or
+// truehd-check= is given and `stream_path` is not TrueHD or MLP: neither can change anything there.
+void warn_truehd_options_unused(const Options& meta, std::string_view stream_path);
 
 }  // namespace forge_cli::commands

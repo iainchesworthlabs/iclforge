@@ -1282,15 +1282,42 @@ Omitting `preset=` entirely leaves `qc` in measure-and-report mode — every num
 just no PASS/FAIL verdict and nothing to gate on. See [Commands → `qc`](commands.md#decoding-inspection) for the
 full report format and the exit-code convention this drives.
 
-## TrueHD and MLP options (`decode`)
+## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`)
 
 ```text
-decode of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
+decode, levels and loudness of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
   truehd-presentation=best|2ch|6ch|8ch|all
                     the substreams read; best (default) is the highest of substreams 0 to 2
   truehd-check=strict|lenient
                     strict (default) stops with exit status 2 at the first failed check;
                     lenient counts failed checks and decodes on
+```
+
+A TrueHD or MLP run refuses every other option it is given, by name, with exit status 1: `decode` applies these two,
+`levels` and `loudness` the same two, and `mkv`, `mp4`, `ts`, `spdif` and `remux` none. `truehd-encode` applies its own
+options and `verify`:
+
+```text
+truehd-encode (after the positional arguments):
+  truehd-downmix=none|standard
+                    none (default): the first two channels are substream 0 as they are;
+                    standard: a stereo and 5.1 downmix, undone exactly by the later substreams
+  truehd-downmix-gains=C,S,LFE,R
+                    four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs
+                    folded into the downmix (default -3,-3,off,-3)
+  truehd-restart=N  access units between restart headers, 1 or 8 to 4096 (default 128)
+  truehd-peak-rate=KBPS
+                    the rate the stream is declared not to exceed, kbit/s (default 18000)
+  truehd-rate-check=strict|lenient
+                    strict (default) refuses a stream that cannot be sent within the peak rate;
+                    lenient writes it and counts
+  truehd-fir-order=0..8
+                    the largest FIR prediction order tried (default 8)
+  truehd-matrix=on|off
+                    decorrelate channel pairs with a primitive matrix (default on)
+  truehd-stereo-mode=stereo|ltrt|headphone
+                    the 2 channel mode the stream declares (default stereo)
+  verify            decode every access unit as it is coded and compare it with the input
 ```
 
 ## Probe options (`probe`): `json=`, `detail=`

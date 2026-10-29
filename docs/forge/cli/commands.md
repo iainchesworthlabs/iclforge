@@ -1001,6 +1001,16 @@ options, each only here:
 
 The status line gives the access units, restart intervals, bytes, the percentage of the PCM, and the substreams.
 
+**Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
+`truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the
+output stage (`channels=`, `downmix=`, `mix-lfe`), `drc=` and `drcmode=`, `programme=`, the object outputs (`objects_dir`,
+`adm_out`, `bed-only`) and the verification flags (`verify-content`, `check-content`, `verify-objects`, `syntax-trace=`),
+which never succeed without checking something. `levels` and `loudness` take the same two options, `truehd-encode` its own
+and `verify` (the metadata, layout and multi-source options of the other encoders, such as `dialnorm=`, `layout=`, `src=` and
+`map=`, are refused), `probe` takes `json=` (`detail=` has no TrueHD form), and `mkv`, `mp4`, `ts`, `spdif` and `remux` take
+none (`mainid=`, `asvc=` and `programme=` describe a service of the AC-3 family). `quiet` and `verbose` apply everywhere. The
+transform choices `fast-mdct`, `fast-imdct` and `mode=` change nothing for a codec with no transform, and are warned about.
+
 ### AC-4 content signing: `ac4-sign`, `ac4-verify`
 
 An AC-4 stream can carry one signature over the whole stream, made with the operator's own P-256 key

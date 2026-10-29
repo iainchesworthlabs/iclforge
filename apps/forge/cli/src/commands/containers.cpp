@@ -267,6 +267,9 @@ int run_mkv(std::string_view in_path, std::string_view out_path, const Options& 
     }
     // TrueHD and MLP: A_TRUEHD, one access unit a block (truehd_containers.cpp).
     if (is_truehd_stream(raw)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
         return run_mkv_truehd(raw, in_path, out_path);
     }
     if (!apply_programme_option(raw, meta, in_path)) {
@@ -360,6 +363,9 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
     }
     // TrueHD and MLP: the 'mlpa' sample entry and its 'dmlp' box (truehd_containers.cpp).
     if (is_truehd_stream(raw)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
         return run_mp4_truehd(raw, in_path, out_path);
     }
     if (!apply_programme_option(raw, meta, in_path)) {
@@ -962,6 +968,10 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
     // TrueHD and MLP: Blu-ray's stream_type 0x83, the only transport profile that carries them
     // (TH spec §21.2); the dvb and atsc profiles of the other codecs do not apply.
     if (is_truehd_stream(raw)) {
+        // mainid=, asvc= and programme= describe a service of the AC-3 family; none is written here.
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
         return run_ts_truehd(raw, in_path, out_path, profile_name);
     }
     iclforge::containers::mpegts::BroadcastProfile profile =

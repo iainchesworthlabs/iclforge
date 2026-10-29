@@ -132,8 +132,14 @@ struct Options {
     // pays one null pointer and no per-block work. See the header for why this
     // has to exist before any masked comparison does.
     std::string bap_census_path;
-    // 'decode' of TrueHD and MLP only: the substreams to read (best, 2ch, 6ch, 8ch or all; empty is
-    // best), and whether a failed check is counted instead of stopping the decode.
+    // The command the options were given to, and every option token of the line in the order given,
+    // as parse_options read them. A run that reads TrueHD or MLP applies few options, and says which
+    // of the others it was given and refuses them (commands/truehd.hpp, check_options_applied)
+    // where it would otherwise accept them and drop them.
+    std::string command;
+    std::vector<std::string> given;
+    // 'decode', 'levels' and 'loudness' of TrueHD and MLP only: the substreams to read (best, 2ch,
+    // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
     bool truehd_lenient = false;
     // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's

@@ -108,6 +108,8 @@ command's own help (or the full listing when no command was named).
 - **Metadata options** (`drc=`, `heavy`, `dialnorm=`, `cmixlev=`, …) can follow the positional
   arguments of any encoding command, in any order — see
   [Options & grammars](metadata-options.md), including which commands ignore which options.
+  A TrueHD or MLP run applies few options and refuses the rest by name with exit status 1, rather
+  than accepting and dropping them; [TrueHD and MLP](commands.md#truehd-and-mlp) lists which.
 - **PCM-carrying commands report per-channel peak/RMS levels when they finish**; `record` meters
   live. With `-` as the output path, every encode and decode path sends that report (and the rest
   of its status text — `dialnorm=auto`'s measurement line and the `src=`/`map=` multi-source

@@ -142,6 +142,23 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     is that told? Recommendation: keep the strict stop, since one file holding two streams is not a disc's stream, and
     document `truehd-check=lenient` for it. Evidence: `python3 tools/checks/verify_truehd_interop.py --forge forge`.
 
+21. **An option that a TrueHD run does not apply (`forge`; planning/truehd-parity-forge.md, question 7).** `forge` has one
+    option vocabulary for every command, and a run on TrueHD or MLP applies few of the options in it. The rest were accepted
+    and dropped with exit 0: on `decode` `channels=2`, `drc=0.5`, `programme=3`, `verify-content` and the objects directory,
+    on `truehd-encode` `src=`, `dialnorm=` and `map=`, on `ts`, `mkv`, `mp4` and `spdif` `mainid=`, `asvc=` and
+    `programme=`. A verification flag that is dropped passes without verifying anything, and a second source that is dropped
+    is a stream that is not what was asked for. E-AC-3 refuses `verify-content` and `syntax-trace=` by name instead. The rule
+    now applied, **provisionally**: a TrueHD or MLP run refuses by name, with a usage error (exit 1), every option it does
+    not apply, and says which it does (`decode`, `levels` and `loudness` apply `truehd-presentation=` and `truehd-check=`;
+    `truehd-encode` its `truehd-*` options and `verify`; `probe` `json=`, and `detail=` has no TrueHD form yet; `mkv`,
+    `mp4`, `ts`, `spdif` and `remux` none; `quiet` and `verbose` always). `decode` also refuses an objects directory and an ADM
+    path, which would never be written. The only options warned about are the choices between ways of computing a transform
+    (`fast-mdct`, `fast-imdct`, `mode=`), which cannot change the output or any verdict of a codec that has no transform, and
+    the two `truehd-` options on a stream that is not TrueHD, as before. Not covered: `demux`, `unspdif` and the positional
+    arguments a command does not read, which `forge` ignores for every codec. Refuse, warn, or refuse only some? Recommendation:
+    refuse, and warn only where the option cannot change the output or any verdict, so that a verification flag or a second
+    source is never dropped. **Provisional, owner to confirm.**
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".

@@ -96,6 +96,9 @@ channel shift, negative output shifts, IIR state, the block data CRC, heavy DRC,
    the decoder accepts streams with or without them.
 4. Which presentation a plain `forge decode` gives for a stream with the sixteen-channel substream.
    (T1: `best`, substreams 0 to 2; `truehd-presentation=all` reads substream 3.)
+5. Whether a `forge` run on TrueHD or MLP refuses an option it does not apply or warns about it (ERRATA.md question 21). It
+   refuses today, by name with a usage error, and warns only where the option cannot change the output or any verdict, which is the
+   audit's recommendation (planning/truehd-parity-forge.md, question 7) and **provisional** until the owner answers.
 
 ## CI: what each lane holds for TrueHD, and what is open
 

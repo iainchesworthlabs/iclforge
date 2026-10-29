@@ -1504,12 +1504,25 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // TrueHD and MLP have no sync word at the start: the first access unit's four header bytes come
     // before its major sync (0xF8726FBA, 0xF8726FBB).
     if (is_truehd_stream(stream)) {
+        // What decode does not apply to it is refused by name (check_options_applied): the output
+        // stage, the DRC options, the programme choice, the object outputs and every verification
+        // flag, none of which a TrueHD decode reads. verify-content passing here would pass
+        // without verifying anything.
+        if (const int refused =
+                check_options_applied(requested, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
+        if (!objects_dir.empty() || !adm_out.empty()) {
+            fmt::println(stderr,
+                         "error: {} is TrueHD or MLP, whose object layer this build does not "
+                         "decode, so decode writes no objects: leave out '{}'",
+                         in_path, !objects_dir.empty() ? objects_dir : adm_out);
+            return kExitUsage;
+        }
         return run_decode_truehd(stream, in_path, out_path, requested);
     }
-    if (!requested.truehd_presentation.empty() || requested.truehd_lenient) {
-        fmt::println(stderr, "warning: {} is not TrueHD or MLP: truehd-presentation= and truehd-check= are ignored",
-                     in_path);
-    }
+    warn_truehd_options_unused(requested, in_path);
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where
     // AC-3's and E-AC-3's is 0x0B77; the first two bytes decide which decoder
     // reads the stream, before anything below reads it as AC-3.

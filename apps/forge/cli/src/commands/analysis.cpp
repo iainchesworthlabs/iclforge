@@ -1714,6 +1714,9 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
         return kExitInput;
     }
     if (is_truehd_stream(stream)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
         return run_spdif_truehd(stream, in_path, out_path);
     }
     // associated= names a second programme to mix into the main, and this

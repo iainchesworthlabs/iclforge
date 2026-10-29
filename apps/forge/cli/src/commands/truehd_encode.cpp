@@ -247,6 +247,16 @@ bool write_raw(std::string_view out_path, std::span<const std::byte> bytes) {
 }  // namespace
 
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta) {
+    // The metadata, layout and multi-source options of the other encoders are not applied here:
+    // refused by name, so that a second source or a dialnorm is not dropped from a run that exits 0.
+    if (const int refused = check_options_applied(
+            meta,
+            {"truehd-downmix=", "truehd-downmix-gains=", "truehd-restart=", "truehd-peak-rate=",
+             "truehd-rate-check=", "truehd-fir-order=", "truehd-matrix=", "truehd-stereo-mode=",
+             "verify"});
+        refused != kExitOk) {
+        return refused;
+    }
     const Options::TruehdEncode& opts = meta.thdenc;
     const Output kind = output_kind(out_path);
     if (kind == Output::kUnknown) {

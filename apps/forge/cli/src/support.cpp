@@ -1576,12 +1576,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
     // play's bitstream legs hand a stream on or place it undecoded and say so.
     const bool takes_karaoke = command == "decode" || command == "monitor" || command == "play" ||
                                command == "spdif" || command == "spatial";
+    out.command = std::string{command};
     for (char* raw : tokens) {
         const std::string_view token{raw};
         const auto eq = token.find('=');
         const std::string_view key = token.substr(0, eq);
         const std::string_view value =
             eq == std::string_view::npos ? std::string_view{} : token.substr(eq + 1);
+        out.given.emplace_back(token);
 
         // 'decode' reads these for one format only; run_decode says which it
         // ignores once it knows what the stream is. drcmode=line and rf, and

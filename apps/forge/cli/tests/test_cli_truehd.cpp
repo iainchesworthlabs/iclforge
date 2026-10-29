@@ -643,3 +643,160 @@ TEST_CASE("forge probe reads a TrueHD or MLP stream from stdin", "[forge-cli][tr
         CHECK(run_cli("probe - < " + cli_arg(empty), log) == kExitUsage);
     }
 }
+
+namespace {
+
+constexpr std::size_t kToneFrames = 48000;  // a second: loudness needs more than one 400 ms block
+// Each channel of the tone is a 1 kHz sine at this share of full scale. 48 samples make a cycle and
+// sample 12 is its peak, so every channel's peak, and its RMS (the peak less 3.01 dB), are known
+// without measuring them.
+constexpr std::array<double, 6> kToneShare{0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625};
+constexpr double kPi = 3.14159265358979323846;
+
+std::vector<std::int32_t> tone_samples() {
+    std::vector<std::int32_t> samples;
+    for (std::size_t n = 0; n < kToneFrames; ++n) {
+        for (const double share : kToneShare) {
+            samples.push_back(static_cast<std::int32_t>(std::lround(
+                share * 8388608.0 * std::sin(2.0 * kPi * static_cast<double>(n % 48) / 48.0))));
+        }
+    }
+    return samples;
+}
+
+struct ToneFiles {
+    fs::path dir;
+    fs::path wav;  // L R C LFE Ls Rs, with the mask `decode` writes
+    fs::path thd;  // truehd-encode of it
+};
+
+// The tone as a WAV and as a TrueHD stream, made once.
+const ToneFiles& tone_files() {
+    static const ToneFiles files = [] {
+        ToneFiles made;
+        made.dir = scratch_dir() / "commands";
+        fs::create_directories(made.dir);
+        made.wav = made.dir / "tone.wav";
+        made.thd = made.dir / "tone.thd";
+        write_wav(made.wav, 48000, 6, 0x60F, tone_samples());
+        REQUIRE(run_cli("truehd-encode \"" + made.wav.string() + "\" \"" + made.thd.string() +
+                            "\" verify",
+                        made.dir / "make.log") == 0);
+        return made;
+    }();
+    return files;
+}
+
+}  // namespace
+
+TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropped",
+          "[forge-cli][truehd][options]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "refused_options.log";
+    const fs::path out_wav = tone.dir / "refused_options.wav";
+    const std::string in = cli_arg(tone.thd);
+    const std::string out = cli_arg(out_wav);
+
+    SECTION("decode") {
+        // Each of these was accepted, exit 0, and left the output as it would have been.
+        for (const std::string option :
+             {"channels=2", "downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
+              "mix-lfe", "programme=3", "bed-only", "verify-objects", "gate-objects",
+              "dialnorm=27", "syntax-trace=trace.txt", "verify-content", "check-content",
+              "heavy"}) {
+            DYNAMIC_SECTION(option) {
+                fs::remove(out_wav);
+                CHECK(run_cli("decode " + in + out + "\"" + option + "\"", log) == kExitUsage);
+                const std::string text = read_text(log);
+                CHECK(text.find("does not apply") != std::string::npos);
+                CHECK(text.find(option) != std::string::npos);
+                CHECK(text.find("refused, not dropped") != std::string::npos);
+                CHECK_FALSE(fs::exists(out_wav));
+            }
+        }
+        SECTION("a verification flag says that nothing was verified") {
+            CHECK(run_cli("decode " + in + out + "verify-content", log) == kExitUsage);
+            CHECK(read_text(log).find("Nothing was verified") != std::string::npos);
+        }
+        SECTION("every option the line carries is named") {
+            CHECK(run_cli("decode " + in + out + "drc=0.5 truehd-check=lenient channels=2", log) ==
+                  kExitUsage);
+            const std::string text = read_text(log);
+            CHECK(text.find("drc=0.5, channels=2") != std::string::npos);
+            CHECK(text.find("truehd-check=lenient, ") == std::string::npos);
+        }
+        SECTION("the objects directory and the ADM path are not dropped either") {
+            const fs::path objects = tone.dir / "objects_dir";
+            CHECK(run_cli("decode " + in + out + cli_arg(objects), log) == kExitUsage);
+            CHECK(read_text(log).find("writes no objects") != std::string::npos);
+            CHECK_FALSE(fs::exists(out_wav));
+        }
+        SECTION("the options it does apply, and a transform choice it warns about") {
+            CHECK(run_cli("decode " + in + out + "truehd-presentation=2ch truehd-check=strict quiet",
+                          log) == 0);
+            CHECK(run_cli("decode " + in + out + "verbose", log) == 0);
+            REQUIRE(run_cli("decode " + in + out + "fast-imdct", log) == 0);
+            const std::string text = read_text(log);
+            CHECK(text.find("warning: fast-imdct has no effect on TrueHD or MLP") !=
+                  std::string::npos);
+        }
+    }
+    SECTION("truehd-encode") {
+        const fs::path stream = tone.dir / "refused_options.thd";
+        const fs::path other = tone.dir / "refused_other.wav";
+        fs::copy_file(tone.wav, other, fs::copy_options::overwrite_existing);
+        const std::vector<std::string> options{
+            "src=" + other.string(), "map=0:0", "offset=0:5", "layout=stereo", "dialnorm=27",
+            "drc=film-standard", "bsmod=0", "programme2=" + other.string(), "lfemix=off",
+            "heavy", "couple", "annexd"};
+        for (const std::string& option : options) {
+            DYNAMIC_SECTION(option) {
+                fs::remove(stream);
+                CHECK(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(stream) + "\"" +
+                                  option + "\"",
+                              log) == kExitUsage);
+                const std::string text = read_text(log);
+                CHECK(text.find("does not apply") != std::string::npos);
+                CHECK(text.find(option) != std::string::npos);
+                CHECK_FALSE(fs::exists(stream));
+            }
+        }
+        SECTION("its own options, quiet and a transform choice") {
+            REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(stream) +
+                                "truehd-restart=8 truehd-matrix=off verify quiet fast-mdct",
+                            log) == 0);
+            CHECK(read_text(log).find("warning: fast-mdct has no effect") != std::string::npos);
+            CHECK(fs::exists(stream));
+        }
+    }
+    SECTION("mkv, mp4, ts and spdif") {
+        // mainid=, asvc= and programme= describe a service of the AC-3 family.
+        const std::array<std::pair<std::string, std::string>, 4> commands{
+            std::pair{"mkv", "refused_options.mkv"}, std::pair{"mp4", "refused_options.mp4"},
+            std::pair{"ts", "refused_options.ts"}, std::pair{"spdif", "refused_options_mat.wav"}};
+        for (const auto& [command, file] : commands) {
+            for (const std::string option : {"mainid=1", "asvc=1", "programme=1", "dialnorm=27"}) {
+                DYNAMIC_SECTION(command + " " + option) {
+                    const fs::path target = tone.dir / file;
+                    fs::remove(target);
+                    CHECK(run_cli(command + " " + in + cli_arg(target) + option, log) == kExitUsage);
+                    CHECK(read_text(log).find("does not apply " + option) != std::string::npos);
+                    CHECK_FALSE(fs::exists(target));
+                }
+            }
+        }
+        SECTION("remux names itself") {
+            const fs::path mkv = tone.dir / "refused_remux_in.mkv";
+            REQUIRE(run_cli("mkv " + in + cli_arg(mkv), log) == 0);
+            CHECK(run_cli("remux " + cli_arg(mkv) + cli_arg(tone.dir / "refused_remux.ts") +
+                              "mainid=1",
+                          log) == kExitUsage);
+            CHECK(read_text(log).find("remux does not apply mainid=1") != std::string::npos);
+        }
+    }
+    SECTION("probe") {
+        CHECK(run_cli("probe " + in + "detail=frames", log) == kExitUsage);
+        CHECK(read_text(log).find("probe does not apply detail=frames") != std::string::npos);
+        CHECK(run_cli("probe " + in + "json=1", log) == 0);
+    }
+}

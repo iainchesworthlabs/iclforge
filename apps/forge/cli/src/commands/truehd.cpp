@@ -6,8 +6,11 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../exit_codes.hpp"
@@ -229,7 +232,96 @@ const char* codec_name(const th::MajorSync& major_sync) {
     return major_sync.kind == th::StreamKind::kTrueHd ? "TrueHD" : "MLP";
 }
 
+// The option a token sets, without its value ("drc" for "drc=0.5"), and the same for a spelling the
+// help prints ("truehd-check=" is "truehd-check").
+std::string_view key_of(std::string_view token) {
+    return token.substr(0, token.find('='));
+}
+
+std::string_view key_of_spelling(std::string_view spelling) {
+    return spelling.ends_with('=') ? spelling.substr(0, spelling.size() - 1) : spelling;
+}
+
+// Choices between ways of computing a transform. TrueHD has no transform, so none of these can
+// change a stream or a verdict, and they are warned about, not refused.
+constexpr std::array<std::string_view, 3> kTransformChoices{"fast-mdct", "fast-imdct", "mode"};
+
+// Options that assert something about a stream (or record what was read of it). One that is not
+// applied would let the run pass without having checked anything.
+constexpr std::array<std::string_view, 9> kVerifications{
+    "verify-content", "check-content", "unanchored-ok", "trust-anchor", "pin",
+    "verify-time",    "verify-objects", "gate-objects", "syntax-trace"};
+
+// The tokens, `separator` between them.
+std::string join(std::span<const std::string_view> tokens, std::string_view separator) {
+    std::string out;
+    for (const std::string_view token : tokens) {
+        out += out.empty() ? "" : separator;
+        out += token;
+    }
+    return out;
+}
+
+template <typename Range>
+bool contains(const Range& range, std::string_view key) {
+    return std::ranges::find(range, key) != std::ranges::end(range);
+}
+
 }  // namespace
+
+int check_options_applied(const Options& meta, std::initializer_list<std::string_view> applied) {
+    std::vector<std::string_view> ignorable;
+    std::vector<std::string_view> refused;
+    bool verification = false;
+    for (const std::string& token : meta.given) {
+        const std::string_view key = key_of(token);
+        if (key == "quiet" || key == "verbose" ||
+            std::ranges::any_of(applied, [key](std::string_view spelling) {
+                return key_of_spelling(spelling) == key;
+            })) {
+            continue;
+        }
+        if (contains(kTransformChoices, key)) {
+            ignorable.emplace_back(token);
+            continue;
+        }
+        refused.emplace_back(token);
+        verification = verification || contains(kVerifications, key);
+    }
+    if (!ignorable.empty()) {
+        fmt::println(stderr,
+                     "warning: {} has no effect on TrueHD or MLP, which has no transform; "
+                     "ignored",
+                     join(ignorable, ", "));
+    }
+    if (refused.empty()) {
+        return kExitOk;
+    }
+    std::string takes;
+    for (const std::string_view spelling : applied) {
+        takes += fmt::format("{}, ", spelling);
+    }
+    fmt::println(stderr,
+                 "error: {} does not apply {} to TrueHD or MLP, and an option that is not applied "
+                 "is refused, not dropped. For TrueHD or MLP it takes {}quiet and verbose{}",
+                 meta.command, join(refused, ", "), takes,
+                 verification ? ". Nothing was verified" : "");
+    return kExitUsage;
+}
+
+void warn_truehd_options_unused(const Options& meta, std::string_view stream_path) {
+    std::vector<std::string_view> given;
+    for (const std::string& token : meta.given) {
+        const std::string_view key = key_of(token);
+        if (key == "truehd-presentation" || key == "truehd-check") {
+            given.emplace_back(token);
+        }
+    }
+    if (!given.empty()) {
+        fmt::println(stderr, "warning: {} is not TrueHD or MLP: {} {} ignored", stream_path,
+                     join(given, " and "), given.size() == 1 ? "is" : "are");
+    }
+}
 
 bool is_truehd_stream(std::span<const std::byte> stream) noexcept {
     return stream.size() >= 8 && th::starts_with_major_sync(stream.subspan(4));
@@ -417,6 +509,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void(iclforge::apps::JsonSink&)>& container_json,
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
+    // detail= asks for per-unit lines this report does not have; it is refused until it has them.
+    if (const int refused = check_options_applied(meta, {"json="}); refused != kExitOk) {
+        return refused;
+    }
     const auto info = th::probe_stream(stream);
     if (!info) {
         fmt::println(stderr, "error: {}: {}", in_path, error_text(info.error()));
