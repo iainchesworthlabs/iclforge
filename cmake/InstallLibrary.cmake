@@ -202,6 +202,15 @@ if(ICLFORGE_BUILD_AC4)
         REQUIRES iclforge-base)
 endif()
 
+# The TrueHD and MLP codec (libs/truehd, iclforge::truehd): the bitstream layer and the decoder. Like the
+# components above it is optional (ICLFORGE_BUILD_TRUEHD), and it is left out of the vcpkg port and the
+# Conan recipe until a program that ships links it.
+if(ICLFORGE_BUILD_TRUEHD)
+    iclforge_install_library(truehd
+        DESCRIPTION "TrueHD and MLP bitstream reader and lossless decoder"
+        REQUIRES iclforge-base)
+endif()
+
 # iclforge::c is an optional component (ICLFORGE_BUILD_CAPI, see the root CMakeLists.txt). Roadmap
 # item F1's whole point is a stable C-callable surface for OTHER toolchains, so its header
 # (iclforge_c/iclforge.h) installs to its own include/iclforge_c/ subdirectory - a C or non-C++
