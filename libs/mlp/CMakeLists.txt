@@ -33,13 +33,20 @@ set(_mlp_io_sources
     src/io/elementary.cpp
     src/io/extra_data.cpp)
 
+# Atmos: the 16-channel substream's objects, their render into the bed, and their metadata in
+# evolution payloads through iclforge::objects' OAMD serialiser.
+set(_mlp_atmos_sources
+    src/atmos/atmos.cpp)
+
+# base: the bit reader's syntax trace; objects: the OAMD model the Atmos headers name.
 iclforge_add_library(mlp
-    DEPENDS base
+    DEPENDS base objects
     SOURCES
         ${_mlp_core_sources}
         ${_mlp_decoder_sources}
         ${_mlp_encoder_sources}
         ${_mlp_io_sources}
+        ${_mlp_atmos_sources}
     PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
     # The bit reader and writer are header-only; base's public headers carry them.
     LINK_PRIVATE "$<BUILD_INTERFACE:iclforge::base_headers>")
