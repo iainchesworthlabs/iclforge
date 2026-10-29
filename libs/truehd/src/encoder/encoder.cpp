@@ -823,7 +823,13 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
                            "a sample is outside the range of EncoderConfig::bits"));
         }
     }
-    impl.pending.reserve(impl.pending.size() + pcm.size());
+    // Geometric growth, not an exact reserve on every call: libstdc++ reserves exactly what it is
+    // asked for, so a caller that gives less than an interval a call (one access unit at a time, as
+    // a live caller does) would copy the whole of the pending input 128 times an interval, which
+    // measured 7.5 times the time of one call with the lot (tests/performance, truehd_51_encode).
+    if (const std::size_t needed = impl.pending.size() + pcm.size(); needed > impl.pending.capacity()) {
+        impl.pending.reserve(std::max(needed, 2 * impl.pending.capacity()));
+    }
     for (const std::int32_t sample : pcm) {
         impl.pending.push_back(static_cast<std::int32_t>(static_cast<std::uint32_t>(sample) << up));
     }
