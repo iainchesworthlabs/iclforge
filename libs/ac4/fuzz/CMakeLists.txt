@@ -48,3 +48,21 @@ endif()
 if(ICLFORGE_BUILD_AC4)
     iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4)
 endif()
+
+# iclforge::ac4::signing::ElementaryCarrier::read and verify_frames (libs/ac4/src/signing): an
+# AC-4 stream taken apart for the frames a content signature covers, and a sidecar judged against
+# them under one fixed authority the harness builds at start-up with tests/support/test_pki.hpp (an
+# ephemeral key from a seed; nothing is read from disk and no key is committed). In its oracle mode
+# it signs the stream it was given and requires the signature to verify, and to stop verifying once
+# a bit of a frame changes. The Thrift payload and the certificate chain are
+# libs/base/fuzz/fuzz_content_signature_verify.cpp's and fuzz_x509_parse.cpp's, and the MP4 box
+# carrier is in the forge command line, which a libs/ac4 harness cannot link (the box is found by
+# the MP4 reader, which fuzz_mp4_demux presses). The input is [flags][u16 stream length][stream]
+# [sidecar], which no other harness's corpus has, so it has seeds of its own: three of
+# fuzz_ac4_parse's streams in each mode and one short stream with a sidecar a different authority
+# signed (public certificates only; the key that made it was never kept).
+if(ICLFORGE_BUILD_AC4)
+    iclforge_add_fuzzer(fuzz_ac4_signing_verify iclforge::ac4)
+    target_include_directories(fuzz_ac4_signing_verify PRIVATE
+        "${PROJECT_SOURCE_DIR}/tests/support")
+endif()

@@ -299,6 +299,30 @@ its own, four so far:
 `fuzz_ac4_encode` has no regression inputs: a violation aborts, and libFuzzer
 keeps the input.
 
+## Status: the content-signing harnesses
+
+`fuzz_x509_parse`, `fuzz_content_signature_verify` (`libs/base/fuzz`) and
+`fuzz_ac4_signing_verify` (`libs/ac4/fuzz`) are in `tools/fuzz/run.sh`'s default list. They
+are the foreign-input surface of AC-4 content signing (`docs/concepts/content-signing.md`), and
+none of them has been built through `tools/fuzz/run.sh`: libFuzzer's runtime is not installed on
+the machine they were written on, and no libFuzzer run, with or without findings, is claimed
+here. What ran in its place is an ad hoc mutation driver under GCC's ASan and UBSan with the
+harness's own `LLVMFuzzerTestOneInput`: 300,000 inputs through the readers of
+`fuzz_x509_parse`, 120,000 through `fuzz_content_signature_verify`, and for
+`fuzz_ac4_signing_verify` the committed seeds and mutations of them (bit flips, byte
+substitutions, inserts, deletions, truncation, and edits to the flags and the length), with no
+report. That driver is not in the repository. The first run of `tools/fuzz/run.sh` on a machine
+with libFuzzer is the evidence these harnesses are owed.
+
+`fuzz_ac4_signing_verify` also checks properties, and the properties were tried against
+deliberately broken copies of `libs/ac4/src/signing/content_signing.cpp`: a digest that leaves
+out the last frame, one that leaves out the last byte of each frame, a verifier that treats a
+missing signature as a pass, a verifier that accepts a stream with no frames, and a signer that
+signs none. Each was stopped by the harness. Its seeds are its own, in
+`libs/ac4/fuzz/seeds/fuzz_ac4_signing_verify/`: three of `fuzz_ac4_parse`'s streams in each of
+the oracle, tamper and unsigned modes, and one short stream with a sidecar that a different
+authority signed (public certificates only; the key that made it was not kept).
+
 The corpus `tools/fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
 `tools/checks/ac4_syntax_differential.py` (`--inputs <directory>`), which reads
 every frame of each file through both syntax transcriptions, the decoder's and
@@ -463,6 +487,7 @@ way the fixed findings used to.
 | `fuzz_signing_verify`  | `iclforge::ac3::signing::verify_atmos_stream` + `verify_atmos_frame` - operator-supplied stream, operator-supplied key, no CRC check in front of either |
 | `fuzz_x509_parse`      | `iclforge::base::crypto`'s readers of operator-supplied key material and of the certificates a signed stream carries: `parse_certificate` and `validate_chain` (as a one-certificate chain under both settings of the expired-intermediate policy, as an anchor and as a trusted key), `decode_pem`, `parse_private_key`, `parse_public_keys`, `parse_certificates` with `order_chain`, `parse_subject_public_key_info` and `decode_ecdsa_der`, all on the same bytes. Every length is self-declared DER, read before the verifier has any reason to believe it. The input's first two bytes set the time chains are judged at |
 | `fuzz_content_signature_verify` | `iclforge::base::crypto::parse_content_signature` and `verify_digest` - the pace-ccjf1 Thrift payload as a verifier meets it in a sidecar or an MP4 box. The first input byte picks the leaf profile and the expired-intermediate policy and whether the harness verifies against the signed digest; the rest is either the payload itself or a script of byte edits applied to a payload that a fixed test authority (an ephemeral key built at start-up) signed, so the date and digest checks after the ECDSA signature are reached. A payload that parses must serialise to bytes that parse to the same structure |
+| `fuzz_ac4_signing_verify` | `iclforge::ac4::signing::ElementaryCarrier::read` and `verify_frames` - an AC-4 elementary stream taken apart for the frames a content signature covers, and the file beside it judged against them. The input is `[flags][u16 stream length][stream][sidecar]`. The flags pick the leaf profile and the expired-intermediate policy; with the oracle bit the harness signs the stream's own frames with a fixed test authority (an ephemeral key built at start-up), requires the signature to verify, and requires it to stop verifying when one bit of a chosen frame changes. A stream with no sidecar must never verify, and neither must an empty stream under a valid signature over the digest of nothing. The MP4 `uuid` box carrier is in the forge command line, which a `libs/ac4` harness cannot link, and is covered by `fuzz_mp4_demux` and the forge unit tests |
 | `fuzz_osc_parse`       | `iclforge::objects::oba::parse_osc_packet` - the OSC 1.0 wire form of a live object-position update (live OSC object positions), reached straight from a UDP datagram by `iclforge::audio::LivePositionSource` whenever `positions=osc:<port>` is in play. No CRC, no container, no bitstream ahead of it at all - this project's first NETWORK-facing input rather than a file or capture-device one; see `docs/threat-model.md` |
 | `fuzz_adm_parse`       | `iclforge::adm::parse_bw64(std::istream&)` - BW64/RF64 chunks plus an arbitrary ADM XML document. Opt-in, see below |
 | `fuzz_sendspin_json`   | `iclforge::sendspin::json::Document::parse` - the JSON of every Sendspin message, the first code a network peer's bytes reach on hearth's server and on a sink. Every accessor runs on every value parsed, and the document is written back out and parsed again, which must give the same text; `TokenStorage` and `count_tokens` must agree with a parse into fixed storage |
