@@ -8,7 +8,8 @@ is the reading in use. Where a reading is forced by the streams and the specific
 **provisional, owner to confirm**. Where no stream has the feature the library implements the specification as
 written and says so (**no oracle**).
 
-The scripts quoted as evidence are the exploration scripts of the T1 work; the checks that stay in the tree are
+The scripts quoted as evidence (`explore27.py`, `dumpms.py`, `endmark.py`, `dump_struct.py`, `tail.py` and the like) are the
+exploration scripts of the T1 work and are not in the tree; the checks that stay are
 `tools/references/truehd_syntax.py` (the independent Python transcription) and
 `tools/checks/verify_truehd_interop.py` (FFmpeg's strict decode against this library's, on the FFmpeg-made fixtures and,
 with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg does with each).
@@ -113,6 +114,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     survive, or does a restart zero it and FFmpeg differ from the reference decoder? **Provisional, owner to confirm.**
     Evidence: `python3 tools/checks/verify_truehd_interop.py --handbuilt` (the FFmpeg leg for the hand-built set).
 
+19. **The length of the extra data (§16.1, §16.2, §16.8).** `extra_data_length` is "in 16-bit words" (§16.1, §16.2). §16.8's
+    capacity rule, `(extra_data_length + 1) x 16 >= evo_frame_byte_length x 8 + 40`, reads as the words of the whole extra data
+    less one (a frame of 3 words carries 2), and the encoder and the hand-built writer write that; the writer first wrote the
+    whole count. FFmpeg ignores the field: its strict decode of `hb_extra_data` returns the same samples with the length changed
+    by -1 and +5 and with a wrong check nibble (`python3 tools/checks/probe_truehd_extra_length.py`), so no oracle decides it.
+    Is it the words less one? **Provisional, owner to confirm.**
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -172,8 +180,8 @@ whose `params_for_this_chan` bit is set, not under their own presence bits. Same
 **11. Sample reconstruction (§11.3).** The residual is `(symbol << lsb_bits) + raw`, then a centring term, then
 `huff_offset`, then `<< quant_step`. The centring term is `-(1 << (lsb_bits + 2 - huff_type))` for a Huffman channel
 (when the exponent is not negative) and `-(1 << (lsb_bits - 1))` for `huff_type` 0, with
-`lsb_bits = huff_lsbs - quant_step`; §11.3 has only the second. The Huffman symbol is signed (-7 upward, App. C). All
-11 TrueHD and 5 MLP streams decode exactly with these.
+`lsb_bits = huff_lsbs - quant_step`; §11.3 has only the second. The Huffman symbol is signed (-7 upward, App. C). Every
+FFmpeg stream tried (19 exploration streams and the 12 fixtures, TrueHD and MLP) decodes exactly with these.
 
 **12. The lossless check (§7.3).** The specification XORs the three low bytes of each sample. The streams: for every
 sample of every output channel of the substream, `acc ^= (sample & 0xFFFFFF) << channel` (32-bit), and the check is
@@ -248,7 +256,7 @@ the flag. FFmpeg accepts a zero CRC byte (question 9), so the CRC has no oracle.
 **22. Extra data (§16.1) and the terminators written by `tools/references/truehd_writer.py`.** Read and written as
 the specification lays them out: a header word (`header_check_nibble`, `extra_data_length`), a word with
 `evo_reserved` and `evo_frame_byte_length`, the payload, zero padding, and the parity byte; the length is taken as the
-words of the whole extra data (§16.2 says only "in 16-bit words"), and the decoder does not depend on it. The payload
+words of the whole extra data less one (question 19), and the decoder does not depend on it. The payload
 is carried as opaque bytes. `terminatorB` (0x1234) is read right after the last block's flag of substream 3. No stream
 FFmpeg writes has either. FFmpeg's strict decode of `hb_extra_data` returns the samples and no payload, so the extra data's
 layout has no oracle; `terminatorB` is in `hb_sixteen_channels`, whose restart sync 0x31EC FFmpeg refuses
@@ -348,3 +356,29 @@ and the interval is counted in `EncoderStats::downmix_reduced_intervals`. FFmpeg
 substream only, so its strict decode of these streams checks that the full presentation comes back exactly and nothing
 about the downmix; the library's tests read the 2 and 6 channel presentations back and compare them with the formula
 (**provisional, owner to confirm the gains and the limiter**; open question 13).
+
+**39. Channel assignment codes (§13.1, §13.2).** §13.2 lists 0x0B as 5.1 and 0x0F as 7.1. §13.1's bit table, which the
+streams follow, makes 0x0F L R, C, LFE, Ls Rs (bits 0 to 3: 5.1), 7.1 0x4F (with Lrs Rrs, bit 6) and 0x0B L R C Ls Rs
+(5.0). FFmpeg's 5.1 streams carry 0xF, and its strict decode of this library's 7.1 streams (0x4F) is exact. The library
+follows §13.1. 0x13 ("additional heights") and 0x17 ("full Atmos configuration") name no layout the bit table can say and are
+not used. **Provisional, owner to confirm.**
+
+**40. Blocks per access unit (§3.3, §8.1, §8.4).** The specification says an access unit holds 40 samples and 8 blocks (§3.3,
+§8.1), and §8.4 a block of 40 samples and "8 blocks per access unit = 320 samples": the three cannot all hold. FFmpeg's streams
+have one block of the whole unit in an access unit without a restart header and two (8 samples, then the rest) in one with it
+(entry 19). The encoder writes the same, and the decoder reads any sequence of blocks of 8 to 160 samples that adds up to at
+most 255 in a unit.
+
+**41. What the library does not check or model.** Rules the specification states that the decoder does not enforce: §11.4's detection of positive and negative saturation, its
+29-bit limit for a Huffman sample and its ninth bit; §9.2 and §9.3's coeff_q of at least 8, `coeff_bits + coeff_shift` of at
+most 16, the ban on a coefficient of -32768, the range of `state_bits` and of the state, and the range of a filter's output;
+`output_shift` above `max_shift`; §16.8's `extra_data_length` within the unit, its capacity rule and `evo_reserved` zero; §8.4's
+two blocks per restart interval and at most two blocks per segment with two substreams; §7.5's restart-gap rules, and §3.3's
+minimum of 16 samples per unit. The decoder does refuse more than 4 substreams, a FIR and IIR order above 8 together,
+FIR and IIR filters with different coeff_q, and more than 255 samples in a unit. The encoder keeps §9.2 and §9.3's filter limits
+(`libs/truehd/tests/encoder/test_coding.cpp`) and writes extra data that fits §16.8; the hand-built writer keeps coeff_q at 8 or more. Two
+rules the encoder does not keep: it writes a restart interval of 1 unit throughout when asked (`restart_interval_units` 1),
+which §7.5's non-splice rule forbids (a gap under 8 must be followed by one of 8 or more), and FFmpeg's strict decode reads
+such a stream exactly (the quick matrix of `verify_truehd_encode_interop.py` has the case); and neither the encoder nor the
+decoder models §18.1's 30,000-byte FIFO, the encoder keeping the peak rate unit by unit (entry 37), a weaker rule than the
+buffer.

@@ -101,6 +101,11 @@ std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> da
     if (num_substreams < 1) {
         return std::unexpected(Error{ErrorKind::kNeedsRestart, "no major sync seen yet"});
     }
+    if (num_substreams > kMaxSubstreams) {
+        // Only a caller's `inherited_substreams` can be above 4; a major sync's count is read from
+        // 4 bits, and parse_major_sync refuses what a stream cannot have.
+        return std::unexpected(Error{ErrorKind::kBadParameter, "more than 4 substreams"});
+    }
     unit.num_substreams = num_substreams;
 
     // TH spec §6.1: the directory. An entry that sends its extra word is two words long.

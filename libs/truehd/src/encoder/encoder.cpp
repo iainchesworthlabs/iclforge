@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "encoder/coding.hpp"
+#include "encoder/verify.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
@@ -813,13 +814,17 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
     const std::int32_t lowest = -(std::int32_t{1} << (bits - 1));
     const std::int32_t highest = (std::int32_t{1} << (bits - 1)) - 1;
     const int up = 24 - bits;
-    impl.pending.reserve(impl.pending.size() + pcm.size());
+    // The whole call is checked before any of it is kept, so that a refused call leaves the
+    // encoder as it was.
     for (const std::int32_t sample : pcm) {
         if (sample < lowest || sample > highest) {
             return std::unexpected(
                 make_error(EncodeErrorKind::kBadInput,
                            "a sample is outside the range of EncoderConfig::bits"));
         }
+    }
+    impl.pending.reserve(impl.pending.size() + pcm.size());
+    for (const std::int32_t sample : pcm) {
         impl.pending.push_back(static_cast<std::int32_t>(static_cast<std::uint32_t>(sample) << up));
     }
     impl.stats.input_samples += pcm.size() / channels;
@@ -1319,25 +1324,12 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
             const DecodedAccessUnit& got = **decoded;
             const int expected_samples = nominal - unit.padding_samples;
-            if (got.channels != channels || got.samples != expected_samples) {
-                return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed,
-                                                  "the decoded unit has a different shape"));
-            }
             const std::size_t base =
                 static_cast<std::size_t>(au) * static_cast<std::size_t>(nominal);
-            for (int t = 0; t < expected_samples; ++t) {
-                for (int c = 0; c < channels; ++c) {
-                    const std::int32_t want =
-                        original[static_cast<std::size_t>(c)][base + static_cast<std::size_t>(t)];
-                    const std::int32_t have =
-                        got.pcm[static_cast<std::size_t>(t) * static_cast<std::size_t>(channels) +
-                                static_cast<std::size_t>(c)];
-                    if (want != have) {
-                        return std::unexpected(
-                            make_error(EncodeErrorKind::kVerifyFailed,
-                                       "the decoded PCM differs from the input"));
-                    }
-                }
+            if (const auto mismatch =
+                    detail::verify_mismatch(got, channels, expected_samples, original, base);
+                !mismatch.empty()) {
+                return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed, mismatch));
             }
             ++stats.verified_units;
         }

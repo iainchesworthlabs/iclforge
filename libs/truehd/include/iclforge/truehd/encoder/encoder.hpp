@@ -14,7 +14,7 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 
 // A TrueHD / MLP lossless encoder, written from the owner's Dolby TrueHD (MLP) Reference
-// Specification (v3.3, "TH spec") and held to two decoders: this library's and FFmpeg's strict
+// Specification (v3.5, "TH spec") and held to two decoders: this library's and FFmpeg's strict
 // decode must both give back the PCM that went in, sample for sample. libs/truehd/ERRATA.md
 // records every place the specification and the streams disagree.
 //
@@ -181,7 +181,9 @@ class ICLFORGE_TRUEHD_EXPORT Encoder {
 
     // Takes interleaved PCM, `channels` values per frame, and returns the access units that are
     // complete. Most calls return nothing: the encoder keeps the input until a whole restart
-    // interval is there.
+    // interval is there. kBadInput (a sample outside the range of `bits`, or PCM that is not whole
+    // frames) is found before anything is kept and leaves the encoder as it was. After any other
+    // error the encoder's stream state is not defined: destroy it and make another.
     [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> encode(
         std::span<const std::int32_t> pcm);
 

@@ -428,8 +428,9 @@ def build_stream(stream):
             frame += b"\x00"  # the parity byte, below
             frame[-1] = parity_extra(frame)
             words = len(frame) // 2
-            nibble = ((words >> 8) ^ (words >> 4) ^ words) & 0xF
-            frame[0:2] = ((nibble << 12) | words).to_bytes(2, "big")
+            length = words - 1  # extra_data_length: the words less one (TH spec 16.8)
+            nibble = ((length >> 8) ^ (length >> 4) ^ length) & 0xF
+            frame[0:2] = ((nibble << 12) | length).to_bytes(2, "big")
             extra = bytes(frame)
         major_sync = write_major_sync(stream) if is_restart else b""
         length = (4 + len(major_sync) + len(directory) + len(body) + len(extra)) // 2
@@ -476,6 +477,12 @@ def write_major_sync(stream):
 # --- the signals and the cases -----------------------------------------------------------------
 
 
+def filt(coefficients, shift):
+    """A filter whose coeff_q is 8 (TH spec 9.3 says at least 8) and whose prediction is that of
+    `coefficients` at `shift`: the coefficients scaled up by the difference."""
+    return [c << (8 - shift) for c in coefficients], 8
+
+
 def tone(count, seed, amplitude=2**21):
     rng = random.Random(seed)
     parts = [
@@ -491,8 +498,8 @@ def case_filters():
     n = 40 * 48
     s0, s1 = tone(n, 1), tone(n, 2)
     channels = {
-        0: Channel(fir=([96, -32], 6), huff_type=1),
-        1: Channel(fir=([48], 6), iir=([20, -8], 6), huff_type=3),
+        0: Channel(fir=filt([96, -32], 6), huff_type=1),
+        1: Channel(fir=filt([48], 6), iir=filt([20, -8], 6), huff_type=3),
     }
     sub = Substream(0, 1, 1, channels, list(zip(s0, s1, strict=True)), {0: s0, 1: s1})
     return (
@@ -515,7 +522,7 @@ def case_bypass():
             c += 1
         coded1.append(c)
         bits.append(x & 1)
-    channels = {0: Channel(fir=([64], 6)), 1: Channel(quant=1, fir=([32], 6))}
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(quant=1, fir=filt([32], 6))}
     matrices = [(1, 8, True, {0: k, 1: 256})]
     sub = Substream(
         0,
@@ -556,7 +563,7 @@ def case_matrices():
     ]
     huff = [0, 2, 0, 1, 3, 0]
     channels = {
-        c: Channel(fir=([40], 6) if c % 2 == 0 else None, huff_type=huff[c]) for c in range(6)
+        c: Channel(fir=filt([40], 6) if c % 2 == 0 else None, huff_type=huff[c]) for c in range(6)
     }
     output = [tuple(sources[j][i] for j in range(6)) for i in range(n)]
     sub = Substream(
@@ -580,7 +587,7 @@ def case_matrices():
 def case_data_check():
     n = 40 * 24
     s0, s1 = tone(n, 20), tone(n, 21)
-    channels = {0: Channel(fir=([64], 6)), 1: Channel()}
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel()}
     sub = Substream(
         0, 1, 1, channels, list(zip(s0, s1, strict=True)), {0: s0, 1: s1}, data_check=True
     )
@@ -589,7 +596,7 @@ def case_data_check():
 
 def stereo_stream(seed, n, **options):
     s0, s1 = tone(n, seed), tone(n, seed + 1)
-    channels = {0: Channel(fir=([64], 6)), 1: Channel(fir=([32], 6))}
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(fir=filt([32], 6))}
     sub = Substream(0, 1, 1, channels, list(zip(s0, s1, strict=True)), {0: s0, 1: s1})
     return Stream([sub], n, **options)
 
@@ -632,7 +639,7 @@ def case_sixteen():
 
     def sub_for(lo, hi, sync=0x31EA):
         channels = {
-            c: Channel(fir=([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
+            c: Channel(fir=filt([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
             for c in range(lo, hi + 1)
         }
         rows = [tuple(src[c][i] for c in range(hi + 1)) for i in range(n)]
@@ -672,7 +679,7 @@ def case_noise():
     coded1 = [x - ((v * c) >> 8) for x, v in zip(s1, first, strict=True)]
     # Noise channel 1 is matrix coefficient mm + 1 = 2 and channel 2 is 3.
     matrices = [(1, 8, False, {1: 256, 2: c}), (0, 8, False, {0: 256, 3: d})]
-    channels = {0: Channel(fir=([64], 6)), 1: Channel(huff_type=2)}
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(huff_type=2)}
     sub = Substream(
         0,
         1,
@@ -696,7 +703,7 @@ def case_noise_type1(shift=0):
     s0, s1 = tone(n, 70), tone(n, 71)
     c = 77
     coded1 = [b - ((a * c) >> 8) for a, b in zip(s0, s1, strict=True)]
-    channels = {0: Channel(fir=([64], 6)), 1: Channel(huff_type=2)}
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(huff_type=2)}
     sub = Substream(
         0,
         1,

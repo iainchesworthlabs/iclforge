@@ -20,7 +20,7 @@
       "channels": 2,
       "access_units": 48,
       "pcm_samples": 1920,
-      "stream_sha256": "bd9644605434fcb0f1adf5f3765210eab2d09afee0b7b7c1926a8cd36e95c4be",
+      "stream_sha256": "7843f8d7f463e144b41dbc82c332a61e7091627c0619f50bfbefc1f4be46bf01",
       "pcm_sha256": "1f2df0476ae28f3e60a2bfc0645b6ff7dcf8982bb4271c03ac2cc1fbbad41a85"
     },
     {
@@ -40,7 +40,7 @@
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "630e2e084cbf7d7a5ddbc31ecb2f6de3abfaba7727cccf1de210e6b9d060338c",
+      "stream_sha256": "5ff03cd64be50b0485a975b471159bd47e88f7f51798946900d7395649737ad9",
       "pcm_sha256": "72625756323164510321469f26131a2e3729f272e953b22fc990c1ecaef32dd3"
     },
     {
@@ -61,7 +61,7 @@
       "channels": 6,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "911a2f5e1f52b57e379715591d25cef9a3e202d4d67cfad17e6bb488038587a2",
+      "stream_sha256": "e8daad174f68ab30f93f04da9e04ffbab8c3b3d5d6b77fc647b3406053347d05",
       "pcm_sha256": "30167119ba28821123ab6cc56bc21dc93c618995920ad46a9f7e55257063f1ed"
     },
     {
@@ -80,7 +80,7 @@
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "3597223c12a7e3ac42c1e70107a84d484218889e415110400dc2a4522509ed11",
+      "stream_sha256": "b71d4f0dbfcf63fdca434d043dcc4e38ce8a6d55551c9222c99c1b354560ab06",
       "pcm_sha256": "e15ae5189f998050eea6c10aa85078e705752ac7572a680c5e20139081fbdad6"
     },
     {
@@ -99,7 +99,7 @@
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "5b3c0f847360d31bc82428dfc05656c68dda4ab237041eb160fb0f0a883ccbfe",
+      "stream_sha256": "08579807e09aae1b2622858b4c3b95b0d5853db2d678dfaee13e668fa644d775",
       "pcm_sha256": "8bc998f43ee5f534cb998c92513b3d9da00576e13eed189d1b5dc907c65a9d83"
     },
     {
@@ -118,7 +118,7 @@
       "channels": 2,
       "access_units": 24,
       "pcm_samples": 960,
-      "stream_sha256": "001fca6d18b585d37df624994851412d85561313a8db8ceb41745915f55dafb8",
+      "stream_sha256": "21c0fcf4eb42595da0f07382de8b2cdfac0936ad4d17af7bf02478bba6b4821c",
       "pcm_sha256": "505c8a16abe33e11558f9900fbbba60b7d93e2194a550895fe9e3010ffcf41fe"
     },
     {
@@ -137,7 +137,7 @@
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 783,
-      "stream_sha256": "c96e38cca1117d755b399d2b29995a9d773d4e69901cd4b450709471823935fb",
+      "stream_sha256": "06d8597317093beeafd6cf428ba1325ed8a2fddbb3709df033dfbd60f4675962",
       "pcm_sha256": "c62f27281b93ab9371ef00b3796dee0d0f761080e96cd07d606ad08901185b60"
     },
     {
@@ -160,7 +160,7 @@
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 791,
-      "stream_sha256": "2dbe0ca19cf17a6d77c240a266f5c09546504c44f418fa546a899a0a951fbb1a",
+      "stream_sha256": "fa6144c988ee67fdab6807b0f09030f96191e7092992a078a7fb1c339bffd07a",
       "pcm_sha256": "bb84cb950e2b48e7e883fbb196e07f84f56a3395b7d1ff65c6db4cbcd5d2c497"
     },
     {
@@ -179,7 +179,7 @@
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 800,
-      "stream_sha256": "3acd5db6c447a8cad68a2e5d6101641e7f188344e9b251d9b656415cb285da92",
+      "stream_sha256": "4c9d9d305fff41a2704ca912166279733a53f48397cbe1ce83c7faf94db1b9d2",
       "pcm_sha256": "ee66d6c23db2b05d3f267baa5c454c09c60d89e27c1e0423f52487bea5df8838",
       "extra_data_first_hex": "0001020304"
     },
@@ -199,7 +199,7 @@
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 800,
-      "stream_sha256": "b8eb00832d0577b13ebcd3d96c163579191786518d7e2d44c3c065ee83b439d2",
+      "stream_sha256": "d8043c99cc0c063e9b7701a10e578605642145d3a92872f753f9b7e187f17a46",
       "pcm_sha256": "1b55125d8c66048a63390856e312abe89ba8578b8993861b08ce1ac8c2fcb892"
     },
     {
@@ -220,7 +220,7 @@
       "channels": 16,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "b498d42b61c3c83803324c1875eeccdc413c6ca2ec99aecda437bfd3b1e62d97",
+      "stream_sha256": "c88716c5a282af63896af978b4038efd7aac7604d5dd5d681a8d7a863f59c0f6",
       "pcm_sha256": "a4332898a5fa61ce7df96d0f2e0b9ddabb33ad91dea19b4cba410203dd159a16"
     },
     {
@@ -241,7 +241,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "b498d42b61c3c83803324c1875eeccdc413c6ca2ec99aecda437bfd3b1e62d97",
+      "stream_sha256": "c88716c5a282af63896af978b4038efd7aac7604d5dd5d681a8d7a863f59c0f6",
       "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
     }
   ],
@@ -260,7 +260,7 @@
         "note": "the library refuses a non-zero matrix noise shift under 0x31EB (question 5)"
       },
       "error": "kUnsupported",
-      "stream_sha256": "9c1504dcae09bf1a0f9ae5f706f100477aad76b54f7fab95e2095bba3c1ec616"
+      "stream_sha256": "17888200747b6ec4d8be2810e05609c966982eec8995dadf89f4219efc8aab8b"
     }
   ]
 }

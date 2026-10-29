@@ -790,8 +790,9 @@ status = iclforge_truehd_encoder_flush(encoder, &encoded);
 `iclforge_truehd_default_channel_assignment()`), `restart_interval_units`, `peak_data_rate_bps` and `allow_rate_violations`,
 `downmix` (`ICLFORGE_TRUEHD_DOWNMIX_NONE` or `_STANDARD`) with its four gains, `stereo_mode`, `max_fir_order` and
 `matrix_search`. A stream that cannot be sent within the peak rate is `ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED` unless
-violations are allowed, and then `iclforge_truehd_encoder_stats()` counts them beside the unit, byte and interval counts. After
-an error the encoder should be destroyed.
+violations are allowed, and then `iclforge_truehd_encoder_stats()` counts them beside the unit, byte and interval counts. A call refused with
+`ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT` (a sample outside the range of `bits`) has kept
+nothing and the encoder carries on; after any other error the encoder should be destroyed.
 [`examples/capi_encode_truehd.c`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_truehd.c) encodes a
 tone, decodes it with the functions above and compares, and ctest runs it; the encoder cases of `test_capi_truehd.cpp` encode every
 TrueHD fixture's PCM and decode it again to the manifest's SHA-256.

@@ -171,6 +171,10 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
 
 ## What it does not do
 
+- Several rules the specification states are not checked: saturation in Huffman decoding, `coeff_q` below 8, the range of
+  filter coefficients and states, `output_shift` above `max_shift`, the extra data's length against the unit, the restart-gap
+  rules. The encoder does not model the 30,000-byte FIFO of §18.1 and writes a restart interval of 1 unit throughout when
+  asked, which §7.5 forbids. `libs/truehd/ERRATA.md` entry 41 lists them.
 - Noise generator 1: LSB bypass, or a matrix with a non-zero noise shift, under restart sync `0x31EB` is refused with
   `ErrorKind::kUnsupported`, because the 256-entry table the noise comes from is not in the specification yet (§17.4).
   A `0x31EB` restart with neither decodes: FFmpeg's streams of more than 6 channels use it, and its matrices carry no

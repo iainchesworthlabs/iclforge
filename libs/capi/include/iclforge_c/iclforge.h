@@ -2748,7 +2748,9 @@ ICLFORGE_C_EXPORT void iclforge_truehd_encoder_destroy(iclforge_truehd_encoder_t
 
 /* Takes interleaved PCM, `frames` x config.channels values, and writes the access units that are
  * complete to `*out_encoded`: a new handle, or NULL when none is yet (the usual answer). On an error
- * `*out_encoded` is left untouched; after one the encoder should be destroyed. */
+ * `*out_encoded` is left untouched. ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT (a sample outside the
+ * range of `bits`) is found before anything is kept and leaves the encoder as it was; after any
+ * other error the encoder's stream state is not defined and it should be destroyed. */
 ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_encode(
     iclforge_truehd_encoder_t* encoder, const int32_t* pcm, size_t frames,
     iclforge_truehd_encoded_t** out_encoded);
