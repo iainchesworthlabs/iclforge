@@ -918,12 +918,25 @@ random payloads, reach the rest.
 
 - **Where:** Part 2 §6.2.2.2 passes `channel_mode` to `metadata()`, and its NOTE 2: "If channel_mode has not
   been set by a preceding info element, it shall be considered undefined and be represented by a negative
-  numeric value"; the object substreams' info elements set none.
-- **Reading:** negative for every A-JOC and direct-coded substream, whatever an earlier
-  `ac4_substream_info_chan()` of the table of contents set: `basic_metadata()` then reads none of its
-  channel-mode branches, `extended_metadata()`'s `pan_dialog` the branch for "not mono" (two pans and
-  `pan_signal_selector`), and `dialog_enhancement()` no simulcast data.
-- **Evidence:** Text. Chromium's stream sends no dialogue or downmix metadata in its substream.
+  numeric value"; the object substreams' info elements set none. §6.2.3.2 `audio_data_objs()` does:
+  `channel_mode = objs_to_channel_mode(n_objects)` (§6.2.3.3: 1 object mono, 2 stereo, 3 the 3.0 mode, 5
+  the 5.0 mode, any other count none) before it reads the element, and nothing unsets it.
+- **Reading:** negative for an A-JOC substream, whatever an earlier `ac4_substream_info_chan()` of the
+  table of contents set: `basic_metadata()` then reads none of its channel-mode branches, `extended_metadata()`'s
+  `pan_dialog` the branch for "not mono" (two pans and `pan_signal_selector`), and `dialog_enhancement()` no
+  simulcast data. For a direct-coded substream it is the mode `audio_data_objs()` assigned, so a substream of
+  two objects is read as stereo (`b_prev_dmx_info` in `basic_metadata()`), one object as mono (one
+  `pan_dialog`), three as 3.0 and five as 5.0; a count it gives no mode, or an LFE alone, leaves it negative.
+- **A first reading that was wrong:** the decoder took it negative for direct-coded substreams too. Dolby's
+  OTT00234 (`ac-4.02.01.01`, four presentations over one pair of dialogue objects) sends `b_prev_dmx_info`
+  in the I-frame's metadata of that pair, so the size field read where the next flag was and the frame
+  failed with "tools_metadata_size does not match": the whole stream stopped at frame 1. The frames after
+  the I-frame send `b_more_basic_metadata` 0 and read either way.
+- **Evidence:** Text for the rule; Observation for the fault: with the pair read as stereo, the I-frame's
+  metadata reads to the end of its substream and agrees with the P-frames', and all 1,861 frames
+  decode. Chromium's stream sends no dialogue or downmix metadata in its A-JOC substream. The encoder
+  writes `b_more_basic_metadata` 0 and no dialogue for object substreams, which both readings take alike.
+  `test_frames.cpp` builds a pair and a single object with the fields that tell the two readings apart.
 
 #### Prefix codes in the trace
 

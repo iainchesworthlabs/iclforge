@@ -1465,3 +1465,99 @@ TEST_CASE("a presentation below level 4 over the same downmix has no core, as Pa
     CHECK(find(report, 3).kind == SubstreamReport::Kind::kPresentation);
     CHECK(named_records(records, 3, "b_stereo_dmx_coeff") == 0);
 }
+
+namespace {
+
+// The frame of a group of one direct-coded substream of `n_objects` dynamic objects and no OAMD
+// substream, with the presentation substream after it.
+std::vector<std::byte> direct_coded_frame(int n_objects, const std::vector<std::byte>& audio) {
+    BitWriter toc;
+    ac4_toc_test::toc_start(toc, {});
+    PresV1 p;
+    p.presentation_substream = 1;
+    ac4_toc_test::presentation_v1(toc, p);
+    toc.flag(true);   // b_substreams_present
+    toc.flag(false);  // b_hsf_ext
+    toc.flag(true);   // b_single_substream
+    toc.flag(false);  // b_channel_coded
+    toc.flag(false);  // b_oamd_substream
+    toc.flag(false);  // b_ajoc: a direct-coded substream
+    toc.put(static_cast<std::uint64_t>(n_objects), 3);  // n_objects_code
+    toc.flag(true);   // b_dynamic_objects
+    toc.flag(false);  // b_lfe
+    toc.flag(false);  // b_sf_multiplier
+    toc.flag(false);  // b_bitrate_info
+    toc.flag(true);   // b_audio_ndot
+    ac4_toc_test::substream_index(toc, 0);
+    toc.flag(false);  // b_content_type
+    const std::vector<std::vector<std::byte>> substreams = {audio, presentation(1, true)};
+    ac4_toc_test::index_table(toc, ac4_toc_test::sizes_of(substreams));
+    toc.align();
+    return ac4_toc_test::assemble(toc, substreams);
+}
+
+}  // namespace
+
+TEST_CASE("the metadata of two direct-coded objects is read as stereo's, as audio_data_objs() sets the channel mode",
+          "[ac4][decoder][frames]") {
+    // Part 2 6.2.3.2 assigns channel_mode = objs_to_channel_mode(n_objects) and 6.2.2.2 passes it to
+    // metadata(): two objects are a stereo pair, so basic_metadata() reads b_prev_dmx_info. Dolby's
+    // OTT00234 sends it in its I-frame. libs/ac4/ERRATA.md, "The channel_mode of a direct-coded
+    // substream's metadata".
+    BitWriter w;
+    w.put(4, 15);  // audio_size_value: 4 bytes
+    w.flag(false);
+    w.put(0, 2);   // stereo_codec_mode: SIMPLE
+    w.flag(true);  // b_enable_mdct_stereo_proc
+    w.flag(true);  // b_long_frame
+    w.put(0, 6);   // max_sfb
+    w.put(0, 2);   // sap_mode
+    w.put(0, 9);   // sf_data()
+    w.put(0, 9);   // sf_data()
+    w.put(0, 2);   // fill_bits
+    w.flag(true);  // b_more_basic_metadata
+    w.flag(false); // b_substream_loudness_info
+    w.flag(true);  // b_prev_dmx_info: stereo's
+    w.put(0, 3);   // pre_dmixtyp_2ch
+    w.put(0, 2);   // phase90_info_2ch
+    w.flag(true);  // b_dc_blocking
+    w.flag(true);  // dc_block_on
+    w.flag(true);  // b_dialog
+    w.flag(false); // b_dialog_max_gain
+    w.flag(false); // b_pan_dialog_present
+    w.flag(false); // b_channels_classifier
+    w.flag(false); // b_event_probability
+    w.put(1, 7);   // tools_metadata_size_value
+    w.flag(false); // b_more_bits
+    w.flag(false); // b_de_data_present
+    w.flag(false); // b_emdf_payloads_substream
+    w.align();
+    const auto report = decode(direct_coded_frame(2, w.bytes()));
+    check_read(find(report, 0), SubstreamReport::Kind::kAudio);
+}
+
+TEST_CASE("the metadata of one direct-coded object is read as mono's: one pan_dialog",
+          "[ac4][decoder][frames]") {
+    BitWriter w;
+    w.put(3, 15);  // audio_size_value: 3 bytes
+    w.flag(false);
+    w.put(0, 1);   // mono_codec_mode: SIMPLE
+    mono_track(w);
+    while (w.size() < 16 + 24) {
+        w.flag(false);  // fill_bits
+    }
+    w.flag(false); // b_more_basic_metadata
+    w.flag(true);  // b_dialog
+    w.flag(false); // b_dialog_max_gain
+    w.flag(true);  // b_pan_dialog_present
+    w.put(0x55, 8);  // pan_dialog: mono's one
+    w.flag(false); // b_channels_classifier
+    w.flag(false); // b_event_probability
+    w.put(1, 7);   // tools_metadata_size_value
+    w.flag(false); // b_more_bits
+    w.flag(false); // b_de_data_present
+    w.flag(false); // b_emdf_payloads_substream
+    w.align();
+    const auto report = decode(direct_coded_frame(1, w.bytes()));
+    check_read(find(report, 0), SubstreamReport::Kind::kAudio);
+}
