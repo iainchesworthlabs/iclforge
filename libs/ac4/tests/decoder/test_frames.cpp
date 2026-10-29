@@ -1437,8 +1437,8 @@ iclforge::ac4::FrameReport parse_core_presentation(int md_compat,
     return *report;
 }
 
-long named_records(const std::vector<iclforge::ac4::SyntaxRecord>& records, int substream,
-                   std::string_view name) {
+std::ptrdiff_t named_records(const std::vector<iclforge::ac4::SyntaxRecord>& records, int substream,
+                             std::string_view name) {
     return std::count_if(records.begin(), records.end(), [&](const iclforge::ac4::SyntaxRecord& r) {
         return r.substream == substream && r.name == name;
     });

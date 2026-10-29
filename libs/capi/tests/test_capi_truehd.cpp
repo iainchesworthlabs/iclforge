@@ -28,9 +28,10 @@
 
 // The text a macro expands to, or the macro's own name when it is not defined: how a test reads
 // whether version.h #cmakedefine'd ICLFORGE_HAS_TRUEHD without a preprocessor conditional
-// (tools/checks/check_platform_macros.ps1 allows none in tests).
+// (tools/checks/check_platform_macros.ps1 allows none in tests). #cmakedefine writes a macro with
+// no value, which would be an empty argument (MSVC warns, C4003), so the text carries a "|" after it.
 #define ICLFORGE_TEST_STRINGIFY_VALUE(x) #x
-#define ICLFORGE_TEST_STRINGIFY(x) ICLFORGE_TEST_STRINGIFY_VALUE(x)
+#define ICLFORGE_TEST_STRINGIFY(x) ICLFORGE_TEST_STRINGIFY_VALUE(x |)
 
 namespace {
 
@@ -127,7 +128,7 @@ iclforge_truehd_decoder_config_t config_for(iclforge_truehd_presentation_t prese
 }  // namespace
 
 TEST_CASE("version.h says the TrueHD surface is built into this library", "[capi][truehd]") {
-    CHECK(std::string_view(ICLFORGE_TEST_STRINGIFY(ICLFORGE_HAS_TRUEHD)).empty());
+    CHECK(std::string_view(ICLFORGE_TEST_STRINGIFY(ICLFORGE_HAS_TRUEHD)) == "|");
 }
 
 TEST_CASE("iclforge_truehd_decoder_config_init gives the C++ defaults", "[capi][truehd]") {
