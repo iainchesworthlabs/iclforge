@@ -24,7 +24,10 @@ std::expected<std::vector<std::uint16_t>, Error> Schedule::place(
     double next_start = 1e300;
     for (std::size_t k = count; k-- > 0;) {
         const double n = static_cast<double>(next_ + static_cast<std::int64_t>(k));
-        latest[k] = std::min({(n - 1.0) * t_, n * t_ - duration[k], next_start - duration[k]});
+        // The next unit starts no sooner than this one's end and a quarter unit after its start
+        // (3.4), so this one starts at least that much before it.
+        latest[k] = std::min(
+            {(n - 1.0) * t_, n * t_ - duration[k], next_start - std::max(duration[k], t_ / 4.0)});
         next_start = latest[k];
     }
     std::vector<std::uint16_t> out(count);

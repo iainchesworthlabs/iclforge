@@ -11,6 +11,7 @@
 
 #include "iclforge/mlp/decoder/decoder.hpp"
 #include "iclforge/mlp/encoder/encoder.hpp"
+#include "iclforge/mlp/io/elementary.hpp"
 #include "support/pcm_wav.hpp"
 
 // The encoder's lossless property: encode, decode, and the samples are the input's, exactly. The
@@ -162,4 +163,68 @@ TEST_CASE("mlp encoder round-trips 7.1 under each matrix option", "[mlp][encoder
                            (decorrelate ? "-decorrelated" : ""));
         }
     }
+}
+
+TEST_CASE("mlp rate control schedules against the peak rate and refuses what cannot fit",
+          "[mlp][encoder][rate]") {
+    // Two channels of full-scale noise: about 2.3 Mbit/s however it is coded.
+    std::mt19937 rng(18U);
+    std::vector<std::int32_t> pcm(48000 / 4 * 2);
+    for (auto& s : pcm) {
+        s = std::uniform_int_distribution<std::int32_t>(-8388608, 8388607)(rng);
+    }
+    EncoderConfig config;
+    config.channels = 2;
+    EncoderStats stats;
+    // At the Blu-ray ceiling it fits, and no access unit is delivered faster than the peak.
+    auto fits = encode_stream(pcm, config, &stats);
+    REQUIRE(fits.has_value());
+    CHECK(stats.peak_bits_per_second <= config.peak_data_rate);
+    CHECK(stats.mean_bits_per_second > 2'000'000U);
+    auto decoded = decode_stream(*fits);
+    REQUIRE(decoded.has_value());
+    CHECK(decoded->pcm == pcm);
+    // Below the stream's mean rate nothing can schedule it: kRateExceeded, not a stream that
+    // overruns the decoder's buffer.
+    config.peak_data_rate = 1'500'000;
+    auto refused = encode_stream(pcm, config);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error() == Error::kRateExceeded);
+}
+
+TEST_CASE("mlp rate control lends a loud access unit the slack of quiet ones",
+          "[mlp][encoder][rate]") {
+    // Mostly silence, with a burst of noise in one access unit: at a peak just above the mean the
+    // burst's unit is larger than its own slot, and the schedule starts it early.
+    std::mt19937 rng(19U);
+    std::vector<std::int32_t> pcm(40 * 64 * 2, 0);
+    for (std::size_t i = 40 * 30 * 2; i < 40 * 31 * 2; ++i) {
+        pcm[i] = std::uniform_int_distribution<std::int32_t>(-8388608, 8388607)(rng);
+    }
+    EncoderConfig config;
+    config.channels = 2;
+    config.restart_interval = 64;
+    EncoderStats loose;
+    auto first = encode_stream(pcm, config, &loose);
+    REQUIRE(first.has_value());
+    // The burst's unit alone, at its own slot's rate (40 samples at 48 kHz), would need about
+    // 40 * 2 * 25 * 1200 bits a second; give the schedule a third of that.
+    config.peak_data_rate = 800'000;
+    EncoderStats tight;
+    auto second = encode_stream(pcm, config, &tight);
+    REQUIRE(second.has_value());
+    CHECK(tight.peak_bits_per_second <= config.peak_data_rate);
+    auto decoded = decode_stream(*second);
+    REQUIRE(decoded.has_value());
+    CHECK(decoded->pcm == pcm);
+    // The burst's unit starts before its nominal slot: some input timing step is shorter than an
+    // access unit.
+    const auto walk = scan(*second);
+    bool early = false;
+    for (std::size_t k = 1; k < walk.units.size(); ++k) {
+        const auto step =
+            static_cast<std::uint16_t>(walk.units[k].input_timing - walk.units[k - 1].input_timing);
+        early = early || step < 40;
+    }
+    CHECK(early);
 }
