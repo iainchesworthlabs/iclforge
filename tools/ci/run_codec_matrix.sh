@@ -1292,7 +1292,30 @@ if command -v openssl >/dev/null 2>&1; then
     run atmos-encode bootstrap_51.wav cs/atmos.ac4 256 6 codec=ac4 sign-content \
         content-key=cs/signer.key content-chain=cs/chain.pem
     run ac4-verify cs/atmos.ac4 trust-anchor=cs/root.pem
-    # What must be refused: no anchor, nothing signed, a changed byte, a key nobody asked for.
+    # The remaining options of the family: the root pinned by its SHA-256 and by its SHA-1 instead of
+    # named as an anchor, the three readings of when the chain must be valid, the title the leaf must
+    # carry, and the date a new signature records (a day ahead, inside the chain's validity, which
+    # verify-time=signed then judges it at: the output must say so).
+    root_pin=$(openssl x509 -in cs/root.pem -noout -fingerprint -sha256 | sed 's/.*=//; s/://g')
+    root_pin1=$(openssl x509 -in cs/root.pem -noout -fingerprint -sha1 | sed 's/.*=//; s/://g')
+    run ac4-verify cs/signed.ac4 pin="$root_pin"
+    run ac4-verify cs/signed.ac4 pin="$root_pin1"
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=signed
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=ignore
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem leaf-title=any
+    signed_when=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S"))')
+    run ac4-sign ac4_stereo_192.ac4 cs/dated.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        signed-date="$signed_when"
+    dated_report=$("$CLI" ac4-verify cs/dated.ac4 trust-anchor=cs/root.pem verify-time=signed)
+    if [[ "$dated_report" != *"signed      $signed_when (UTC)"* ]]; then
+        echo "ac4-verify does not report the signed-date $signed_when" >&2
+        exit 1
+    fi
+    # What must be refused: no anchor, nothing signed, a changed byte, a key nobody asked for, a chain
+    # judged at a time it has expired by, a leaf of another title, and a pin that matches nothing.
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=2099-01-01T00:00:00
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem leaf-title=Nobody
+    run_fails 6 ac4-verify cs/signed.ac4 pin=0000000000000000000000000000000000000000
     run_fails 6 ac4-verify cs/signed.ac4
     run_fails 6 ac4-verify ac4_stereo_192.ac4 trust-anchor=cs/root.pem
     run_fails 1 ac4-encode "$FIXTURES/reference_stereo.wav" cs/unasked.ac4 192 content-key=cs/signer.key
@@ -1308,6 +1331,11 @@ if command -v openssl >/dev/null 2>&1; then
     # OpenSSL's reading of the same signature (tools/checks/check_content_signature_openssl.py).
     python3 "$CHECKS_DIR/check_content_signature_openssl.py" --forge "$CLI"
     rm -rf cs
+elif [[ "${ICLFORGE_REQUIRE_OPENSSL:-0}" = "1" ]]; then
+    # A job that is meant to run this section says so, so that a runner image without the openssl
+    # program fails here and does not pass having checked nothing.
+    echo "openssl not found, and ICLFORGE_REQUIRE_OPENSSL=1 asks for the AC-4 content signing section" >&2
+    exit 1
 else
     echo "openssl not found: skipping AC-4 content signing (ac4-sign, ac4-verify, sign-content, verify-content)"
 fi
@@ -1437,9 +1465,18 @@ run_truehd_container_check() {
     }
 }
 
-for fixture in truehd_mono48_s24.thd truehd_st44_s24.thd truehd_st48_s16.thd truehd_st48_s24.thd \
-    truehd_st96_s24.thd truehd_st192_s24.thd truehd_m51_s16.thd truehd_m51_s24.thd \
-    mlp_st44_s16.mlp mlp_st48_s24.mlp mlp_st96_s24.mlp mlp_m51_s24.mlp; do
+# Every stream of the fixtures' manifest, so that a fixture added to testdata/truehd has these legs the
+# day it lands. The manifest's `spliced` streams are not among them: the library's strict decode
+# stops at the join by design (libs/truehd/ERRATA.md, question 20), and the interop script holds those.
+mapfile -t truehd_streams < <(python3 -c '
+import json, sys
+for fixture in json.load(open(sys.argv[1]))["fixtures"]:
+    print(fixture["file"])' "$TRUEHD_FIXTURES/manifest.json")
+if [[ "${#truehd_streams[@]}" -lt 25 ]]; then
+    echo "testdata/truehd/manifest.json lists ${#truehd_streams[@]} streams, fewer than the 25 it held" >&2
+    exit 1
+fi
+for fixture in "${truehd_streams[@]}"; do
     name="${fixture%.*}"
     case "$fixture" in
         *.mlp) codec=mlp ;;
