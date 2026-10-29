@@ -7,7 +7,8 @@ on — so a change here is a change to the ground truth every measurement sits
 on, not an implementation detail.
 
 Three scripts are the exception. `gen_dee_gold.py` and `gen_ac4_baseline.py --gold-set`
-write sets that stay on a local disk. `gen_conformance_vectors.py` builds the
+write sets that stay on a local disk (a few TrueHD legs of the first are committed, under
+`testdata/truehd-dee/`: see below). `gen_conformance_vectors.py` builds the
 conformance vector bundle that a release publishes, and it is the only script CI
 runs: the `linux-gcc` leg builds the bundle, and a release run builds it twice
 with `--check-determinism`.
@@ -145,7 +146,7 @@ All of these are run from the repo root.
 | `gen_gui_resample_test_wav.py` | `libs/base/fuzz/seeds/fuzz_wav_read/resample-44100.wav`, which the GUI's resample-on-load QML test also loads | stdlib only |
 | `gen_programme_fixtures.py` | both programme fixtures + `corpus.json` | needs `--source-dir` and `ffmpeg` |
 | `gen_external_baseline.py` | `testdata/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
-| `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, never committed | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
+| `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, not committed except a subset of the TrueHD legs (`testdata/truehd-dee/`, `--fixtures-out`) | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
 | `gen_dee_tpn_fixture.py` | `testdata/external-baseline/eac3-transient-stereo-128/` | needs the local DEE golden-master set (`--gold`) |
 | `gen_object_fixture.py` | `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes, and `dee_joc_714.ec3` / `dee_joc_916.ec3` from 7.1.4 and 9.1.6 beds that play one channel at a time | needs **Dolby DEE** and numpy |
 | `gen_ac4_baseline.py` | the committed AC-4 set: `testdata/external-baseline/ac4-*/dee.ac4`, `ac4-manifest.json` and the syntax digests under `testdata/ac4/`. With `--gold-set DIR`, a local set that is never committed | needs **Dolby DEE** (its licence ends 2026-11-06), numpy, `ffmpeg` and a built `forge` (`--cli`) |
@@ -187,7 +188,12 @@ it writes is consumed.
 `gen_dee_gold.py` writes a set that is not committed: it makes DEE's golden
 masters for AC-3, E-AC-3, E-AC-3 JOC and TrueHD while DEE's licence runs (it ends
 on 2026-11-06), a set of about 1,100 streams kept on a local disk with a
-manifest, each rebuildable from the committed programme fixtures.
+manifest, each rebuildable from the committed programme fixtures. The set is not
+committed, except that the `truehd-fixtures` legs (0.25 s streams of 7.1, three
+substreams, 96 kHz and 16 and 20 bits) and four short length legs are, with their
+sources and DEE's logs, under `testdata/truehd-dee/`; `--fixtures-out DIR` writes that
+copy from a set, laid out so that `tools/checks/score_truehd_decode.py --set` reads it.
+The `truehd-long` group (300 s programmes) is made in a second set directory.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
 writes the short streams under `testdata/external-baseline/` that CI reads.
 
