@@ -21,6 +21,39 @@ std::unexpected<StreamSignatureError> failure(StreamSignatureErrorKind kind, std
     return std::unexpected(StreamSignatureError{kind, std::move(message), std::nullopt});
 }
 
+// A ContentSignature opens with its version (i32 field 1) and schema version (i32 field 2), the two
+// fields every measured blob begins with: 08 00 01 <4 bytes> 08 00 02. A byte run that does not
+// begin so is not a signature, damaged or not.
+bool begins_as_content_signature(std::span<const std::byte> bytes) {
+    constexpr std::array<int, 10> kPattern = {0x08, 0x00, 0x01, -1, -1, -1, -1, 0x08, 0x00, 0x02};
+    if (bytes.size() < kPattern.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < kPattern.size(); ++i) {
+        if (kPattern[i] >= 0 && std::to_integer<int>(bytes[i]) != kPattern[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Why the bytes after the framing are not a trailer, for a message.
+std::string stray_message(std::span<const std::byte> stream, const TrailerLocation& location) {
+    const std::span<const std::byte> rest = stream.subspan(location.framing_ends);
+    std::string text = "the sync frames stop at byte " + std::to_string(location.framing_ends) +
+                       " and the " + std::to_string(location.stray) +
+                       " byte(s) after it are not a content signature";
+    if (rest.size() >= 3 && rest[0] == std::byte{'I'} && rest[1] == std::byte{'D'} &&
+        rest[2] == std::byte{'3'}) {
+        text +=
+            " (an ID3v2 tag sits between the frames, as in HLS packed audio; a content signature "
+            "covers a stream of sync frames, so the tags have to be taken out first)";
+    } else {
+        text += " (a damaged frame, or data that is not AC-4)";
+    }
+    return text;
+}
+
 }  // namespace
 
 std::expected<TrailerLocation, StreamSignatureError> locate_signature_trailer(
@@ -41,18 +74,19 @@ std::expected<TrailerLocation, StreamSignatureError> locate_signature_trailer(
                             last.raw_ac4_frame.size() + (last.sync_word == 0xAC41 ? 2U : 0U);
     TrailerLocation location;
     location.content_size = end;
+    location.framing_ends = end;
     if (end == stream.size()) {
         return location;  // no trailer
     }
     // The walk stopped on bytes that are not a sync word (kLostSync), or fewer than the four a sync
-    // frame header needs remained. A signature is kilobytes; three bytes are damage.
-    if (stream.size() - end < 4) {
-        return failure(StreamSignatureErrorKind::kTruncated,
-                       std::to_string(stream.size() - end) +
-                           " byte(s) follow the last sync frame, too few for a signature");
+    // frame header needs remained. What follows is a trailer only if it begins as a signature does.
+    const std::span<const std::byte> rest = stream.subspan(end);
+    if (begins_as_content_signature(rest)) {
+        location.present = true;
+        location.blob = rest;
+    } else {
+        location.stray = rest.size();
     }
-    location.present = true;
-    location.blob = stream.subspan(end);
     return location;
 }
 
@@ -61,6 +95,9 @@ std::expected<std::array<std::byte, 32>, StreamSignatureError> signed_content_di
     const auto located = locate_signature_trailer(stream);
     if (!located.has_value()) {
         return std::unexpected(located.error());
+    }
+    if (located->stray != 0) {
+        return failure(StreamSignatureErrorKind::kTrailingData, stray_message(stream, *located));
     }
     return base::crypto::sha256(stream.first(located->content_size));
 }
@@ -73,17 +110,22 @@ std::expected<std::vector<std::byte>, StreamSignatureError> sign_stream(
         return std::unexpected(located.error());
     }
     if (located->present) {
-        // Bytes after the last sync frame are either a signature, which is not signed over, or
-        // something else, which is not signed over either but is not a signature to strip.
-        if (base::crypto::parse_content_signature(located->blob).has_value()) {
+        // Bytes that begin as a signature do: a signature that reads is already there, and one
+        // that does not is damage to be removed. Neither is signed over.
+        const auto existing = base::crypto::parse_content_signature(located->blob);
+        if (existing.has_value()) {
             return failure(StreamSignatureErrorKind::kAlreadySigned,
                            "the stream already carries a content signature; strip it or sign the "
                            "unsigned stream");
         }
         return failure(StreamSignatureErrorKind::kTrailingData,
                        std::to_string(located->blob.size()) +
-                           " byte(s) follow the last sync frame and are not a content signature; "
-                           "remove them first");
+                           " byte(s) after the last sync frame begin as a content signature but "
+                           "do not read as one (" +
+                           existing.error().message + "); remove them first");
+    }
+    if (located->stray != 0) {
+        return failure(StreamSignatureErrorKind::kTrailingData, stray_message(stream, *located));
     }
     const std::array<std::byte, 32> digest = base::crypto::sha256(stream);
     auto blob = base::crypto::sign_content_digest(digest, credentials, options);
@@ -124,8 +166,12 @@ base::crypto::VerifyReport verify_stream(std::span<const std::byte> stream,
     if (!located.has_value() || !located->present) {
         base::crypto::VerifyReport report;
         report.verdict = base::crypto::Verdict::kInvalid;
-        const std::string message = located.has_value() ? "the stream carries no content signature"
-                                                        : located.error().message;
+        std::string message = "the stream carries no content signature";
+        if (!located.has_value()) {
+            message = located.error().message;
+        } else if (located->stray != 0) {
+            message = "the stream carries no content signature: " + stray_message(stream, *located);
+        }
         report.fault = base::crypto::SignatureFault{
             base::crypto::SignatureError::kBadOrMissingSignature, message};
         report.checks.push_back(base::crypto::CheckResult{"structure", false, message});
@@ -141,6 +187,9 @@ std::expected<std::vector<std::byte>, StreamSignatureError> strip_signature(
     const auto located = locate_signature_trailer(stream);
     if (!located.has_value()) {
         return std::unexpected(located.error());
+    }
+    if (located->stray != 0) {
+        return failure(StreamSignatureErrorKind::kTrailingData, stray_message(stream, *located));
     }
     const auto prefix = stream.first(located->content_size);
     return std::vector<std::byte>(prefix.begin(), prefix.end());

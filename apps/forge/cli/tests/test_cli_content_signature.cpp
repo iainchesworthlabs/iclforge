@@ -214,7 +214,7 @@ TEST_CASE("ac4-sign says whether a stream already has a signature or has junk af
                       key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
                   log) == kExitInput);
     const std::string text = read_log(log);
-    CHECK(contains(text, "30 byte(s) follow the last sync frame"));
+    CHECK(contains(text, "the 30 byte(s) after it are not a content signature"));
     CHECK_FALSE(contains(text, "already"));
 }
 

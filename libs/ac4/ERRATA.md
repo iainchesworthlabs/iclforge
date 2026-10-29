@@ -30,7 +30,12 @@ owner decides; none of them blocks the rest.
    track, using the MP4 muxer infrastructure" and gives no box, no payload layout and no digest
    boundary beyond "the raw bitstream in `mdat`". `sign-content` therefore refuses an MP4 and says so;
    only the raw `.ac4` trailer of §8.3.1 is implemented. Which box, and does the digest cover the
-   samples as the muxer stores them, or the sync frames they came from?
+   samples as the muxer stores them, or the sync frames they came from? §8.2 says the digest is
+   over "all sync-wrapped or raw frames as they exist prior to the signing step", which cannot be
+   both: an MP4 sample is the raw frame alone, with no sync word, size or CRC, so the sync-wrapped
+   bytes a raw-file signer hashed cannot be rebuilt from an MP4 (the sync word, 0xAC40 or
+   0xAC41, is not recorded in it). A signature made over one cannot be checked over the other
+   unless the spec says which bytes are hashed.
 3. **What goes in the signer information of a signature made with an operator's own key?** The
    sample names a publisher (type, UUID, name, role), a product, a platform and an application. We
    write a random 128-byte nonce, publisher type 1 with no name, and the application as "ICL Forge
@@ -64,14 +69,35 @@ owner decides; none of them blocks the rest.
 10. **What is an acceptable `signedDate`?** `BadContentSignatureDate` is "outside acceptable range"
     (§6.2) with no range. We require `YYYY-MM-DDTHH:MM:SS`, a date inside the signer certificate's
     validity unless `verify-time=ignore`, and accept a date in the future without complaint.
-11. **The DER fallback scan of §8.5 and the DER step of §9.2.** v2.3 stores `r` and `s` raw in a map,
-    so no DER pattern follows in a signed file and the fallback finds nothing. We do not implement
-    it. Delete it from the specification, or say what it is for.
+11. **The DER fallback scan of §8.5 and the DER steps of §1.2 and §9.2.** v2.3 stores `r` and `s`
+    raw in a map (§2.3, §3.13), but §1.2 step 4 ("Encode signature as DER"), the fallback scan of
+    §8.5 and §9.2's "DER encoding of (r, s)" still describe a DER signature. No DER pattern follows
+    in a signed file, so the fallback finds nothing. We do not implement it. Delete these from the
+    specification, or say what they are for.
 12. **Keep the specification's error names, or use neutral ones?** The names in §6.2
     (`CertifierNoPrivateKey`, `BadCredentialsForSigningContent`, `CertNotPrivilegedToSignContent`,
     `LibDoesntSupportContentSignature`, ...) come from the owner's table. They are the library's
     `SignatureError` values and are printed in `forge` output (`fault: DigestMismatch: ...`) and
     in the documentation. They are kept; say if neutral names are wanted instead.
+13. **The trailer walk of §8.5 does not mention the frame-size escape.** It says to read each sync
+    word and `frame_length` and advance. In the Dolby kit's streams six of twelve write every
+    frame's size with the escape (0xFFFF in the 16-bit field, then a 24-bit size) on frames of 61 to
+    1425 bytes, in both sync words, so a walk that reads only 16 bits misreads them. The walk here
+    follows the escape (it is `iclforge::ac4::scan`'s), and signing, finding and verifying a
+    signature work on all twelve. Add the escape to §8.5, or say that a signed stream may not use
+    it.
+14. **Non-frame bytes between frames.** HLS packed-audio files carry ID3v2 tags between frames,
+    which stop a sync-word walk. We take bytes after the walk's end as a trailer only if they begin
+    as a ContentSignature does (version and schema version fields); anything else is reported with
+    the byte where the frames stop (and, for a tag, that it is an ID3v2 tag), and nothing is
+    signed, stripped or hashed past it. Should a signer hash a stream with tags in it (the spec
+    says "every byte before the trailer"), and where is its trailer then?
+15. **A damaged frame mid-stream.** The walk stops at it, so a trailer cannot be told from the rest
+    of the stream by looking for the first non-sync byte alone: the damaged frame and every frame
+    after it would be "the trailer". We do not take them for one; verification reports `no content
+    signature` with the byte where the frames stop, and a flipped payload byte (the framing holds)
+    is reported as a digest mismatch. A signature found by its own structure at the end of the file
+    would give the better message (digest mismatch) at the cost of a search; say if that is wanted.
 
 ### Measured corrections
 
@@ -156,6 +182,21 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
    ```
    forge's `decode` reads the same 50 frames from both and produces identical PCM
    (`tools/ci/run_codec_matrix.sh`, "AC-4 content signing").
+10. **What Dolby's kit streams show about the trailer walk.** Twelve AC-4 elementary streams from
+    the kit (never committed; `ICLFORGE_DOLBY_AC4_KIT_STREAMS=<directory>`): 800 to 2552 frames
+    each, both sync words, six with every frame's size written with the escape (open question 13),
+    none with a trailer or anything after the last frame. Each one signs, verifies against the
+    signing root (exit 0) and reads back byte for byte after stripping; the signed prefix is the
+    stream, and `probe` on the unsigned stream reports no trailer and no parse error. An AAC and an
+    E-AC-3 stream in the same directory are refused as not AC-4.
+    ```
+    ICLFORGE_DOLBY_AC4_KIT_STREAMS=<directory> ctest -R "kit streams"     # Passed, not Skipped
+    ```
+    What is done about bytes that are not frames: only bytes that begin as a ContentSignature do
+    are a trailer; others are stray, named with the byte where the frames stop (open questions 14
+    and 15). The unit tests build the cases the kit does not contain: escaped sizes mixed with plain
+    ones (up to 70 000 bytes), a damaged frame followed by a valid signature, an ID3v2 tag between
+    frames.
 
 ### Where the code differs from the specification without a measurement behind it
 

@@ -41,12 +41,20 @@ struct StreamSignatureError {
 };
 
 // Where a stream's signature trailer starts, found as CS spec v2.2 §8.5 describes: walk the
-// syncframes forward by their sizes; the bytes from the first position that is not a sync word
-// (0xAC40 or 0xAC41) to the end are the trailer.
+// syncframes forward by their sizes (the 0xFFFF escape to a 24-bit size included); when the walk
+// stops, the bytes from there to the end are the trailer if they begin as a content signature does.
+// Bytes that do not (an ID3v2 tag between frames, a damaged frame, data that is not AC-4) are not a
+// trailer: they are `stray`, and nothing is signed, stripped or hashed past them.
 struct TrailerLocation {
+    // A trailer that begins as a content signature does is there. It may still be damaged: whether
+    // it reads is for parse_content_signature / verify_stream to say.
     bool present = false;
     std::size_t content_size = 0;  // the stream's length without the trailer: the signed prefix
     std::span<const std::byte> blob;
+    // Where the sync-frame walk stopped, and how many bytes follow that are neither framed nor a
+    // trailer (0 for a clean stream and for a signed one).
+    std::size_t framing_ends = 0;
+    std::size_t stray = 0;
 };
 
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::expected<TrailerLocation, StreamSignatureError>
