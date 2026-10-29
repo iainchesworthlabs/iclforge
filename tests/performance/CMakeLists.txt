@@ -144,3 +144,14 @@ target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_D
 # mantissa-cost numbers real program material never produces.
 target_compile_definitions(iclforge-kernelbench PRIVATE
     "ICLFORGE_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
+
+# ---------------------------------------------------------------------------
+# iclforge-cryptobench - SHA-256 and HMAC-SHA-256, the portable compression function against the
+# CPU's SHA instructions (iclforge/base/detail/sha256_impl.hpp), and the keyed hash the EMDF Atmos
+# signer computes per frame. Not ctest-registered, same reasoning as iclforge-kernelbench: it asserts
+# nothing (libs/base/tests/test_crypto.cpp holds the two paths bit-for-bit equal), and its JSON has
+# the same shape, so it can feed the same trend tables. Needs no audio fixture and links only the
+# foundation library.
+# ---------------------------------------------------------------------------
+add_executable(iclforge-cryptobench crypto_bench.cpp)
+target_link_libraries(iclforge-cryptobench PRIVATE iclforge::base iclforge::warnings iclforge::fmt)

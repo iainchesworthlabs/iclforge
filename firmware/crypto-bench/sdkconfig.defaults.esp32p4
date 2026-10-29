@@ -1,0 +1,11 @@
+# The Hearth P4 boards that are pre-production silicon (revision 1.x): the chip revision, a CPU clock
+# that does not crash it (360 MHz; 400 MHz is for revision 3), QIO flash and PSRAM
+# (firmware/hearth-sink/sdkconfig.p4, sdkconfig.p4-rev3 for the revision-3 kit).
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+CONFIG_PM_SLEEP_CLK_ICG_ENABLE=n
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n

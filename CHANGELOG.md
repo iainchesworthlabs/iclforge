@@ -10,6 +10,19 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Changed: SHA-256 and HMAC-SHA-256 in `iclforge::base` run on the CPU's SHA instructions where it has them: 6.5 times faster on x86-64
+  SHA-NI, and the Atmos signer's per-frame tag 7 times faster.** `Sha256` picks, once per process, between the x86-64 SHA extensions, the
+  ARMv8 SHA2 instructions and the portable code it always had, so a binary built with a kernel still runs on a CPU without it. On a Ryzen 9
+  5950X the compression runs at 2,154 MB/s against 334, a 64-byte block 2.9 times faster, and the HMAC over a 2,304-byte frame takes 1.3 us
+  instead of 9.6. `update()` also hands whole blocks straight from the caller's buffer and `finish()` writes its padding in one step, which
+  made the portable path about 15 % faster too. The kernel is the one file built with `-msha` (or `-march=armv8-a+crypto`); CMake picks it and
+  a probe per compiler or OS from `libs/base/src/crypto/hw/`, with no `#ifdef`. The tests hold the hardware compression to the portable
+  one over 2,000 random states and the whole hash to an independent framing at every length to 600; the ARMv8 kernel has so far run only
+  against a model of its instructions and is first run on an Arm CPU by CI. Nothing changes on the ESP32 boards, whose hashing already goes
+  through PSA to the SHA peripheral: measured there it is 30 to 45 times the portable code at 64 KiB, with a fixed 25 to 29 us a call. New:
+  `iclforge-cryptobench` (`tests/performance/crypto_bench.cpp`), `firmware/crypto-bench` (the same measurements on a board, with the
+  procedure for putting one back as found) and `tools/hearth/crypto_bench_report.py`; the results, and what they say about the P4's crypto
+  clock, SHA busy flag and DMA, are in `planning/crypto-hardware-offload.md`.
 - **Changed: the ESP32-P4 v1.x release image decodes AC-4 as well as AC-3 and E-AC-3.** `p4-rev1` takes the AC-4 decoder
   (`sdkconfig.ac4`) that `p4-rev1-ac4` held apart, with the same locked values and the decode stacks at 40,960 bytes; the
   profile `p4-rev1-ac4` is gone, `p4-rev1` is what it was (the same hash, so P4a's baseline stands) and its app budget

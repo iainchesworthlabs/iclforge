@@ -1,7 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <span>
@@ -17,6 +19,7 @@
 // libs/base/tests/CMakeLists.txt), the same way the alsa backend's internal header is.
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/base/detail/sha256_impl.hpp"
 
 namespace {
 
@@ -41,6 +44,47 @@ std::string to_hex(std::span<const std::byte> b) {
     return out;
 }
 
+// A fixed pseudo-random sequence for message and state material: the same bytes every run, so a
+// failure names the same input every time.
+struct Lcg {
+    std::uint32_t state = 0x9e3779b9U;
+    std::uint32_t next() {
+        state = state * 1664525U + 1013904223U;
+        return state;
+    }
+    std::uint8_t byte() { return static_cast<std::uint8_t>(next() >> 24); }
+};
+
+constexpr std::array<std::uint32_t, 8> kSha256Initial = {0x6a09e667, 0xbb67ae85, 0x3c6ef372,
+                                                         0xa54ff53a, 0x510e527f, 0x9b05688c,
+                                                         0x1f83d9ab, 0x5be0cd19};
+
+// SHA-256 of `message` from the portable compression function and FIPS 180-4 section 5.1.1's
+// padding written out here, so it shares no code with Sha256's update() and finish() or with the
+// hardware kernel: the oracle the dispatching hash is held to.
+std::array<std::byte, 32> reference_sha256(std::span<const std::uint8_t> message) {
+    std::vector<std::uint8_t> framed(message.begin(), message.end());
+    framed.push_back(0x80);
+    while (framed.size() % 64 != 56) {
+        framed.push_back(0);
+    }
+    const std::uint64_t bits = static_cast<std::uint64_t>(message.size()) * 8;
+    for (int shift = 56; shift >= 0; shift -= 8) {
+        framed.push_back(static_cast<std::uint8_t>(bits >> shift));
+    }
+
+    std::array<std::uint32_t, 8> h = kSha256Initial;
+    iclforge::internal::crypto::sha256_compress_portable(h.data(), framed.data(),
+                                                         framed.size() / 64);
+    std::array<std::byte, 32> digest{};
+    for (std::size_t i = 0; i < 8; ++i) {
+        for (std::size_t j = 0; j < 4; ++j) {
+            digest[i * 4 + j] = static_cast<std::byte>(h[i] >> (24 - 8 * j));
+        }
+    }
+    return digest;
+}
+
 }  // namespace
 
 // --- Crypto known-answer vectors (FIPS 180-4 / RFC 4231) -------------------
@@ -55,6 +99,69 @@ TEST_CASE("SHA-256 matches FIPS test vectors", "[signing][sha256]") {
     CHECK(to_hex(iclforge::base::crypto::sha256(
               as_bytes("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))) ==
           "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    // FIPS 180-4's long message, a million 'a': 15,625 blocks through the multi-block path.
+    const std::string million(1000000, 'a');
+    CHECK(to_hex(iclforge::base::crypto::sha256(as_bytes(million))) ==
+          "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+}
+
+// The CPU's SHA instructions are checked against the code that needs none. Skipped on a build or a
+// CPU without a kernel - which the portable-vs-reference case below still covers.
+TEST_CASE("SHA-256 hardware compression equals the portable one", "[signing][sha256][hardware]") {
+    if (!iclforge::internal::crypto::sha256_hardware_supported()) {
+        SKIP("no SHA-256 hardware kernel in this build, or this CPU lacks the instructions");
+    }
+    Lcg rng;
+    for (int trial = 0; trial < 2000; ++trial) {
+        const std::size_t blocks = 1 + static_cast<std::size_t>(trial % 9);
+        std::vector<std::uint8_t> data(blocks * 64);
+        std::ranges::generate(data, [&] { return rng.byte(); });
+        std::array<std::uint32_t, 8> portable{};
+        std::ranges::generate(portable, [&] { return rng.next(); });
+        std::array<std::uint32_t, 8> hardware = portable;
+
+        iclforge::internal::crypto::sha256_compress_portable(portable.data(), data.data(), blocks);
+        iclforge::internal::crypto::sha256_compress_hardware(hardware.data(), data.data(), blocks);
+
+        CAPTURE(trial, blocks);
+        REQUIRE(hardware == portable);
+    }
+}
+
+// Sha256 itself - whichever compression function it dispatches to - at every length across the
+// padding boundaries (55, 56, 63, 64, 119, 120, 128 ...) and for any way of splitting the input.
+TEST_CASE("SHA-256 matches an independent framing at every length", "[signing][sha256]") {
+    Lcg rng;
+    for (std::size_t length = 0; length <= 600; ++length) {
+        std::vector<std::uint8_t> message(length);
+        std::ranges::generate(message, [&] { return rng.byte(); });
+        const std::array<std::byte, 32> expected = reference_sha256(message);
+        const std::span<const std::byte> bytes = std::as_bytes(std::span(message));
+
+        CAPTURE(length);
+        CHECK(iclforge::base::crypto::sha256(bytes) == expected);
+
+        // Three updates that cut the message at awkward places, including mid-block.
+        iclforge::base::crypto::Sha256 split;
+        const std::size_t first = length / 3;
+        const std::size_t second = length / 3;
+        split.update(bytes.first(first));
+        split.update(bytes.subspan(first, second));
+        split.update(bytes.subspan(first + second));
+        std::array<std::byte, 32> split_digest{};
+        split.finish(split_digest);
+        CHECK(split_digest == expected);
+    }
+}
+
+TEST_CASE("Sha256 is reusable after finish", "[signing][sha256]") {
+    iclforge::base::crypto::Sha256 hash;
+    std::array<std::byte, 32> digest{};
+    hash.update(as_bytes("a message that is not the next one"));
+    hash.finish(digest);
+    hash.update(as_bytes("abc"));
+    hash.finish(digest);
+    CHECK(to_hex(digest) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 }
 
 TEST_CASE("HMAC-SHA-256 matches RFC 4231 test vectors", "[signing][hmac]") {

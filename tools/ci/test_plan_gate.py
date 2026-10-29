@@ -356,6 +356,7 @@ class ProjectTable(unittest.TestCase):
                 "js",
                 "esp-idf",
                 "hearth-sink",
+                "crypto-bench",
                 "esphome",
                 "baremetal",
             },
