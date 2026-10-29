@@ -5,8 +5,9 @@ For each case of a matrix of rates, channel counts, widths and signals (real mus
 5.1 programme material from testdata/audio, tones, noise, silence, full-scale squares, impulses):
 
   * the source PCM is written as a WAV file and encoded by the program given with --encoder (run
-    as `PROGRAM in.wav out.thd [ARGS]`; iclforge-truehd-encode-tool is one), with its own
-    verification on (the in-repo decoder reads every unit back);
+    as `PROGRAM in.wav out.thd [ARGS]`; iclforge-truehd-encode-tool is one) or by `forge
+    truehd-encode`, given with --forge, with its own verification on (the in-repo decoder reads
+    every unit back);
   * FFmpeg's strict decode of the stream (-v error -xerror -err_detect
     crccheck+bitstream+buffer+explode) must give back the source samples exactly. The codec is
     lossless, so this is a comparison of bytes, not an SNR;
@@ -59,6 +60,29 @@ def write_wav(path, rate, samples, container_bits):
                                     channels * width, container_bits)
     header += b"data" + struct.pack("<I", len(body))
     path.write_bytes(header + body)
+
+
+# The encoder tool's key=value arguments, as `forge truehd-encode` spells them. `bits=` has no
+# counterpart: forge reads the width from the WAV file (a 20 bit source is a 24 bit file whose low
+# bits are clear, which the encoder sends as an output shift).
+FORGE_ARGUMENTS = {"downmix=standard": ["truehd-downmix=standard"],
+                   "rate-violations=1": ["truehd-rate-check=lenient"]}
+FORGE_PREFIXES = {"restart=": "truehd-restart=", "order=": "truehd-fir-order="}
+
+
+def forge_arguments(extra):
+    out = []
+    for argument in extra:
+        if argument in FORGE_ARGUMENTS:
+            out += FORGE_ARGUMENTS[argument]
+            continue
+        for prefix, forge_prefix in FORGE_PREFIXES.items():
+            if argument.startswith(prefix):
+                out.append(forge_prefix + argument[len(prefix):])
+                break
+        else:
+            raise ValueError(f"no forge counterpart for the encoder argument {argument!r}")
+    return out
 
 
 def ffmpeg_decode(path):
@@ -225,8 +249,9 @@ def find_permutation(expected, got, channels):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--encoder", required=True,
+    parser.add_argument("--encoder",
                         help="program run as PROGRAM in.wav out.thd [ARGS] (iclforge-truehd-encode-tool)")
+    parser.add_argument("--forge", help="the forge executable: run as `forge truehd-encode in.wav out.thd`")
     parser.add_argument("--full", action="store_true", help="the longer matrix")
     parser.add_argument("--only", action="append", default=[], help="run only cases whose name contains this")
     parser.add_argument("--max-size-ratio", type=float, default=0.0,
@@ -237,6 +262,8 @@ def main():
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
 
+    if bool(args.encoder) == bool(args.forge):
+        parser.error("give exactly one of --encoder and --forge")
     if shutil.which("ffmpeg") is None:
         if args.require_ffmpeg:
             sys.exit("verify_truehd_encode_interop: ffmpeg is required and not installed")
@@ -266,7 +293,11 @@ def main():
                 write_wav(wav, rate, source, 16)
             else:
                 write_wav(wav, rate, source << (24 - bits), 24)
-            command = [*args.encoder.split(), str(wav), str(stream), "verify=1", f"bits={bits}", *extra]
+            if args.forge:
+                command = [args.forge, "truehd-encode", str(wav), str(stream), "verify",
+                           *forge_arguments(extra)]
+            else:
+                command = [*args.encoder.split(), str(wav), str(stream), "verify=1", f"bits={bits}", *extra]
             run = subprocess.run(command, capture_output=True, check=False)
             if run.returncode != 0:
                 problems.append("encoder failed: " + run.stderr.decode(errors="replace").strip())

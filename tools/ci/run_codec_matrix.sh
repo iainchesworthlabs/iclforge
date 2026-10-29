@@ -1488,6 +1488,131 @@ for refused in "transcode th_truehd_st48_s24.thd th_refused.ac3 192" \
     }
 done
 
+# --- TrueHD encoding (iclforge::truehd::Encoder, planning/truehd.md phase T2a) -------------------
+# FFmpeg makes the sources, a different sine in each channel, with the speaker mask of the layout
+# (forge reads the channels' meaning from it: 7.1 is FL FR FC LFE BL BR SL SR, which forge codes as
+# L R C LFE Lrs Rrs Ls Rs; ERRATA 33 says how FFmpeg orders such a stream). Every stream is
+# held to three readings of the same samples: FFmpeg's read of the source WAV, FFmpeg's strict
+# decode of forge's stream, and forge's own decode of it. The codec is lossless, so each pair is
+# equal byte for byte. `verify` makes the encoder decode every access unit as it writes it.
+thd_sines() { # out.wav rate channels layout pcm_codec
+    local out="$1" rate="$2" channels="$3" layout="$4" pcm="$5" c merge=""
+    local -a inputs=()
+    for ((c = 0; c < channels; c++)); do
+        inputs+=(-f lavfi -i "sine=frequency=$((300 + 110 * c)):sample_rate=$rate:duration=2")
+        merge+="[$c]"
+    done
+    if [[ "$channels" -eq 1 ]]; then
+        ffmpeg -v error -y "${inputs[@]}" -af "aformat=sample_fmts=s32" -c:a "$pcm" "$out"
+    else
+        ffmpeg -v error -y "${inputs[@]}" -filter_complex \
+            "${merge}amerge=inputs=${channels},aformat=sample_fmts=s32:channel_layouts=${layout}" \
+            -c:a "$pcm" "$out"
+    fi
+}
+
+# forge's decode writes a stream's channels in stream order; FFmpeg returns a 7.1 stream in the
+# order of its own layout (back pair before side pair): $3 maps the one to the other.
+truehd_reorder_pcm() { # file.wav "map" (e.g. 0|1|2|3|6|7|4|5), as s32le on stdout
+    if [[ -z "$2" ]]; then
+        ffmpeg -v error -i "$1" -f s32le -
+    else
+        ffmpeg -v error -i "$1" -af "channelmap=map=$2" -f s32le -
+    fi
+}
+
+run_truehd_encode_case() { # name rate channels layout pcm_codec channelmap [forge options...]
+    local name="te_$1" rate="$2" channels="$3" layout="$4" pcm="$5" map="$6"
+    shift 6
+    thd_sines "$name.wav" "$rate" "$channels" "$layout" "$pcm"
+    run truehd-encode "$name.wav" "$name.thd" verify "$@"
+    run probe "$name.thd"
+    count=$((count + 1))
+    echo "[$count] truehd encode $name: ffmpeg's strict decode and forge's decode equal the source"
+    ffmpeg -v error -y -i "$name.wav" -f s32le "$name.src.s32"
+    truehd_ffmpeg_pcm "$name.thd" -f truehd >"$name.ffmpeg.s32"
+    cmp -s "$name.src.s32" "$name.ffmpeg.s32" || {
+        echo "ffmpeg's strict decode of $name.thd differs from the source samples" >&2
+        exit 1
+    }
+    run decode "$name.thd" "$name.dec.wav"
+    truehd_reorder_pcm "$name.dec.wav" "$map" >"$name.dec.s32"
+    cmp -s "$name.dec.s32" "$name.ffmpeg.s32" || {
+        echo "forge's decode of $name.thd differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+}
+
+run_truehd_encode_case st44_s24 44100 2 stereo pcm_s24le ""
+run_truehd_encode_case st48_s24 48000 2 stereo pcm_s24le ""
+run_truehd_encode_case st48_s16 48000 2 stereo pcm_s16le ""
+run_truehd_encode_case st96_s24 96000 2 stereo pcm_s24le ""
+run_truehd_encode_case st192_s24 192000 2 stereo pcm_s24le ""
+run_truehd_encode_case mono48_s24 48000 1 mono pcm_s24le ""
+run_truehd_encode_case m51_48_s24 48000 6 5.1 pcm_s24le ""
+run_truehd_encode_case m51_48_s16 48000 6 5.1 pcm_s16le ""
+run_truehd_encode_case m51_96_s24 96000 6 5.1 pcm_s24le ""
+run_truehd_encode_case m71_48_s24 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5"
+run_truehd_encode_case m71_96_s16 96000 8 7.1 pcm_s16le "0|1|2|3|6|7|4|5"
+
+# Every encoder option once, on a stream each of which is read back as above: the restart interval,
+# the prediction order, the matrix search, the 2-channel mode, the downmix presentations and their
+# gains, and a peak rate the stream is allowed to break.
+run_truehd_encode_case opt_restart 48000 2 stereo pcm_s24le "" truehd-restart=8 truehd-fir-order=0 \
+    truehd-matrix=off truehd-stereo-mode=ltrt
+run_truehd_encode_case opt_headphone 48000 2 stereo pcm_s24le "" truehd-restart=1 truehd-stereo-mode=headphone
+run_truehd_encode_case opt_downmix 48000 6 5.1 pcm_s24le "" truehd-downmix=standard \
+    truehd-downmix-gains=-6,-6,off,-6
+run_truehd_encode_case opt_downmix71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" truehd-downmix=standard
+run_truehd_encode_case opt_rate 48000 6 5.1 pcm_s24le "" truehd-peak-rate=18000 truehd-rate-check=lenient \
+    truehd-downmix=none
+
+# The streams forge wrote, in the containers forge writes: encode straight into each, read it back
+# with demux byte for byte, and by FFmpeg to the PCM the bare stream gives. The bare stream on
+# stdout is the file's bytes.
+for case in st48_s24 m51_48_s24 m71_48_s24; do
+    bare="te_$case.thd"
+    for container in mkv mp4 ts; do
+        run truehd-encode "te_$case.wav" "te_$case.$container"
+        run demux "te_$case.$container" "te_$case.$container.thd"
+        cmp -s "$bare" "te_$case.$container.thd" || {
+            echo "forge's truehd-encode into te_$case.$container did not carry the bare stream's units" >&2
+            exit 1
+        }
+        run_truehd_container_check "te_$case.$container" "$bare" truehd
+    done
+    run spdif "$bare" "te_$case.mat"
+    run unspdif "te_$case.mat" "te_$case.mat.thd"
+    cmp -s "$bare" "te_$case.mat.thd" || {
+        echo "unspdif of te_$case.mat did not reproduce $bare byte for byte" >&2
+        exit 1
+    }
+done
+count=$((count + 1))
+echo "[$count] truehd-encode to stdout is the file's bytes"
+"$CLI" truehd-encode te_st48_s24.wav - quiet >te_stdout.thd
+cmp -s te_st48_s24.thd te_stdout.thd || {
+    echo "forge truehd-encode to stdout differs from the file it writes" >&2
+    exit 1
+}
+
+# What the encoder does not write, and an output it has no name for, are usage errors (exit 1).
+count=$((count + 1))
+echo "[$count] truehd-encode refuses an MLP name, an unknown output and an unsupported rate"
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:sample_rate=32000:duration=1" -c:a pcm_s24le te_32k.wav
+for refused in "truehd-encode te_st48_s24.wav te_refused.mlp" "truehd-encode te_st48_s24.wav te_refused.wav" \
+    "truehd-encode te_32k.wav te_refused.thd"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    [[ "$refused_status" -eq 1 ]] || {
+        echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
+        exit 1
+    }
+done
+
 # --- A Forge project file, run as the commands it stands for (apps/shared/project) --------------
 # `forge project` reads a .forgeproj and runs the line the Forge GUI's command bar shows for it, so
 # its own code is the file's reader and the translation, and everything after is the encoder this
