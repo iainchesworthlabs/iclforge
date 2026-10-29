@@ -50,6 +50,15 @@ std::optional<StreamLoudness> measure_stream_loudness(std::span<const std::byte>
 std::optional<StreamLoudness> measure_ac4_loudness(std::span<const std::byte> stream,
                                                    std::string_view in_path, const Options& meta);
 
+// The preset gates of `qc` (iclforge::ac3::meta::qc_preset): checks the measured integrated
+// loudness and true peak against the preset `preset_arg` names (or all of them for "all") and
+// prints each verdict under a "gates:" heading prefixed with `heading`. True when every requested
+// gate passed or none was requested. `qc` of every codec ends here, so that a preset judges a
+// stream of any of them the same way.
+bool report_qc_gates(const std::string& heading, std::optional<double> integrated_lkfs,
+                     std::optional<double> true_peak_dbtp,
+                     const std::optional<std::string>& preset_arg);
+
 // qc reads its own options off `meta`: preset= (Options::qc_preset); layout=bed,
 // the default, or layout=rendered (Options::qc_rendered_layout); programme=,
 // the §E2.3.1.2 substreamid of the independent substream whose programme to

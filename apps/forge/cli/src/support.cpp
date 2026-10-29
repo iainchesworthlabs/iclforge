@@ -2413,7 +2413,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
         // something else.
-        const bool reads_truehd = command == "decode" || command == "levels" || command == "loudness";
+        const bool reads_truehd = command == "decode" || command == "levels" ||
+                                  command == "loudness" || command == "qc";
         if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);

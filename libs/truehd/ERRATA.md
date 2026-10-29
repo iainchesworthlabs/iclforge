@@ -325,6 +325,19 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     given. **Built, provisional:** raw, in the stated ranges (-32 to 31 and -64 to 63); nothing applies them (the decoder does not apply
     the directory's DRC word either, entry 18). **Recommendation:** raw until the DEE set; then decide with the owner whether `decode`
     should apply them, which is a separate decision.
+56. **What `forge qc` of a TrueHD stream fails (TH spec §7.3, §12.5, §18).** Built, as the parity audit recommended (question 2 of
+    `planning/truehd-parity-forge.md`): an integrity gate and the existing loudness presets, exit 6 when either fails. The integrity gate fails on
+    a byte the reader does not take for an access unit, a failed check (nibble, major sync CRC, restart header CRC, parity, segment CRC),
+    a restart interval whose lossless check fails, and a unit that cannot be sent within the declared peak rate and 75 ms by the encoder's own
+    model (the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the model is the
+    encoder's, so the gate is as provisional as the model is). Left, because each needs a decision: (a) whether a dialogue
+    norm that differs from the measurement by more than some tolerance fails a stream: E-AC-3's `qc` reports the difference and does not
+    gate it, and for TrueHD the field is all zero in every stream FFmpeg writes with its control bit clear, so a gate would fail them all;
+    (b) the rate check's tolerance (question 12 settled the scale: the field is in bits per second), and whether `input_timing` (§3.4) should be held to its three
+    constraints (FFmpeg's streams were not checked against them); (c) a minimum count of lossless checks, since a stream shorter than
+    one restart interval has none to make; (d) whether a join of two streams (question 20) should be a failure, as it is now, or a note.
+    **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
+    presentation whose control bit is set.
 
 ## Entries
 
@@ -429,9 +442,10 @@ have a stereo downmix in substream 0 and the six channels in substream 1; `Prese
 **16. The channel meaning (§14.1).** The widths in the specification add up to 64 bits (6+1+1+1+1+7+6+6+5+6+5+5+6+6+1+1);
 all of them are zero in the streams FFmpeg writes (**no oracle**). The library now writes them (`EncoderConfig::channel_meaning`,
 `forge truehd-encode`), rewrites them in a finished stream (`edit_channel_meaning`, `forge metadata`), shows them (`forge probe`) and
-sets the dialogue norm from a measurement (`forge normalize`), all provisional and all as raw numbers in the widths given here;
-the open points are questions 51 to 55. The field order and widths are from the specification alone, so a mistake in reading them
-would be in the encoder and in every decoder of this library alike. The 8 bytes after `substream_info` of an MLP major
+sets the dialogue norm from a measurement (`forge normalize`) and compares it with one (`forge qc`), all provisional and all as raw numbers in the widths given here;
+the open points are questions 51 to 56. The field order and widths are from the specification alone, so a mistake in reading them
+would be in the encoder and in every decoder of this library alike. The extension that follows when `extra_present` is set (§14.2) is read
+as question 44 describes; the encoder does not write it and `forge metadata` keeps it, byte for byte, under the new CRC. The 8 bytes after `substream_info` of an MLP major
 sync are not described: FFmpeg writes `56 3f 00 00 80 80 00 00` (5.1) and `56 03 00 00 80 80 00 1b` (stereo) and
 the library carries them as bytes. FFmpeg's MLP stream also has `flags` 0x4000 (§4.1 says bit 14 shall be clear) and
 `format_info` 0x2F0F0001 for stereo (group 1 word length code 2, 24 bits; group 2 code 0xF, absent).

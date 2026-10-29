@@ -982,64 +982,7 @@ bool report_qc_programme(const QcProgrammeResult& p, const std::optional<std::st
                      implied == p.dialnorm ? " (matches)" : fmt::format(", not {}", p.dialnorm));
     }
 
-    if (!preset_arg) {
-        return true;
-    }
-    bool all_pass = true;
-    fmt::println("{}gates:", heading);
-    const auto check_one = [&](iclforge::ac3::meta::QcPresetId id) {
-        const auto preset = iclforge::ac3::meta::qc_preset(id);
-        const auto name = iclforge::ac3::meta::qc_preset_name(id);
-        const auto verdict = iclforge::ac3::meta::evaluate_qc_gate(preset, p.integrated_lkfs, p.true_peak_dbtp);
-        fmt::println("  {}:  [{}]", name, preset.source);
-        // A band preset prints its tolerance; a ceiling preset has none to
-        // print, and showing "+/-0.0" would read as an impossibly tight band
-        // rather than as the one-sided limit the source actually states.
-        const std::string loudness_limit =
-            preset.loudness_limit == iclforge::ac3::meta::QcLoudnessLimit::kCeiling
-                ? fmt::format("limit  <= {:+.1f} LKFS", preset.target_lkfs)
-                : fmt::format("target {:+.1f} +/-{:.1f} LKFS", preset.target_lkfs,
-                              preset.tolerance_lu);
-        if (p.integrated_lkfs.has_value()) {
-            fmt::println("    loudness   {}   measured {:+.2f} LKFS   delta {:+.2f} LU   {}",
-                         loudness_limit, *p.integrated_lkfs, *verdict.loudness_delta_lu,
-                         verdict.loudness_pass ? "PASS" : "FAIL");
-        } else {
-            fmt::println("    loudness   {}   measured n/a   FAIL", loudness_limit);
-        }
-        if (p.true_peak_dbtp.has_value()) {
-            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured {:+.2f} dBTP        "
-                         "{}",
-                         preset.max_true_peak_dbtp, *p.true_peak_dbtp,
-                         verdict.true_peak_pass ? "PASS" : "FAIL");
-        } else {
-            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured n/a   FAIL",
-                         preset.max_true_peak_dbtp);
-        }
-        fmt::println("    verdict: {}", verdict.pass() ? "PASS" : "FAIL");
-        if (!verdict.pass()) {
-            all_pass = false;
-        }
-    };
-    if (*preset_arg == "all") {
-        for (const auto id : iclforge::ac3::meta::kQcPresetIds) {
-            check_one(id);
-        }
-    } else {
-        iclforge::ac3::meta::QcPresetId id{};
-        if (iclforge::ac3::meta::parse_qc_preset(*preset_arg, id)) {
-            check_one(id);
-        } else {
-            // parse_options already validates preset= against
-            // kQcPresetNames/"all" before dispatch ever reaches here (see
-            // its own "preset" handling) - kept as a defensive fallback
-            // rather than an assert, since main.cpp has no
-            // exception-based unreachable() convention of its own.
-            fmt::println(stderr, "error: unknown qc preset '{}'", *preset_arg);
-            all_pass = false;
-        }
-    }
-    return all_pass;
+    return report_qc_gates(heading, p.integrated_lkfs, p.true_peak_dbtp, preset_arg);
 }
 
 // E-AC-3's own level report. The rendered layout is a chanmap rather than an
@@ -1188,6 +1131,71 @@ bool wrap_eac3_units(std::span<const std::span<const std::byte>> units, std::uin
 
 }  // namespace
 
+bool report_qc_gates(const std::string& heading, std::optional<double> integrated_lkfs,
+                     std::optional<double> true_peak_dbtp,
+                     const std::optional<std::string>& preset_arg) {
+    if (!preset_arg) {
+        return true;
+    }
+    bool all_pass = true;
+    fmt::println("{}gates:", heading);
+    const auto check_one = [&](iclforge::ac3::meta::QcPresetId id) {
+        const auto preset = iclforge::ac3::meta::qc_preset(id);
+        const auto name = iclforge::ac3::meta::qc_preset_name(id);
+        const auto verdict =
+            iclforge::ac3::meta::evaluate_qc_gate(preset, integrated_lkfs, true_peak_dbtp);
+        fmt::println("  {}:  [{}]", name, preset.source);
+        // A band preset prints its tolerance; a ceiling preset has none to
+        // print, and showing "+/-0.0" would read as an impossibly tight band
+        // rather than as the one-sided limit the source actually states.
+        const std::string loudness_limit =
+            preset.loudness_limit == iclforge::ac3::meta::QcLoudnessLimit::kCeiling
+                ? fmt::format("limit  <= {:+.1f} LKFS", preset.target_lkfs)
+                : fmt::format("target {:+.1f} +/-{:.1f} LKFS", preset.target_lkfs,
+                              preset.tolerance_lu);
+        if (integrated_lkfs.has_value()) {
+            fmt::println("    loudness   {}   measured {:+.2f} LKFS   delta {:+.2f} LU   {}",
+                         loudness_limit, *integrated_lkfs, *verdict.loudness_delta_lu,
+                         verdict.loudness_pass ? "PASS" : "FAIL");
+        } else {
+            fmt::println("    loudness   {}   measured n/a   FAIL", loudness_limit);
+        }
+        if (true_peak_dbtp.has_value()) {
+            fmt::println(
+                "    true peak  limit  <= {:+.1f} dBTP        measured {:+.2f} dBTP        "
+                "{}",
+                preset.max_true_peak_dbtp, *true_peak_dbtp,
+                verdict.true_peak_pass ? "PASS" : "FAIL");
+        } else {
+            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured n/a   FAIL",
+                         preset.max_true_peak_dbtp);
+        }
+        fmt::println("    verdict: {}", verdict.pass() ? "PASS" : "FAIL");
+        if (!verdict.pass()) {
+            all_pass = false;
+        }
+    };
+    if (*preset_arg == "all") {
+        for (const auto id : iclforge::ac3::meta::kQcPresetIds) {
+            check_one(id);
+        }
+    } else {
+        iclforge::ac3::meta::QcPresetId id{};
+        if (iclforge::ac3::meta::parse_qc_preset(*preset_arg, id)) {
+            check_one(id);
+        } else {
+            // parse_options already validates preset= against
+            // kQcPresetNames/"all" before dispatch ever reaches here (see
+            // its own "preset" handling) - kept as a defensive fallback
+            // rather than an assert, since main.cpp has no
+            // exception-based unreachable() convention of its own.
+            fmt::println(stderr, "error: unknown qc preset '{}'", *preset_arg);
+            all_pass = false;
+        }
+    }
+    return all_pass;
+}
+
 std::optional<StreamLoudness> measure_stream_loudness(std::span<const std::byte> stream) {
     const auto bsid = iclforge::ac3::stream_bsid(stream);
     if (!bsid.has_value()) {
@@ -1265,8 +1273,9 @@ int run_qc(std::string_view in_path, const Options& meta) {
         return kExitInput;
     }
     if (is_truehd_stream(stream)) {
-        return refuse_truehd("qc", in_path);
+        return run_qc_truehd(stream, in_path, meta);
     }
+    warn_truehd_options_unused(meta, in_path);
     std::optional<QcResult> result;
     std::optional<QcProgrammeResult> object_result;
     if (is_ac4_stream(stream)) {

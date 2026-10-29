@@ -118,10 +118,10 @@ struct PresentationLoudness {
 };
 
 // TH spec §18: the stream must be sendable within the declared peak data rate and 75 ms. The
-// declared rate is the field read as raw x sample rate / 16 (ERRATA.md entry 30, provisional), and
-// the model is the encoder's: a unit starts to arrive when its slot opens, when the previous unit
-// has arrived and one unit duration after the previous started, and takes bytes x 8 / rate to
-// arrive.
+// declared rate is MajorSync::peak_data_rate_bps(), bits per second as TH spec v3.9 section 4.4
+// gives it (ERRATA.md question 12), and the model is the encoder's: a unit starts to arrive when its
+// slot opens, when the previous unit has arrived and one unit duration after the previous started,
+// and takes bytes x 8 / rate to arrive.
 struct RateReport {
     std::uint64_t declared_bps = 0;
     std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
@@ -162,6 +162,16 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
 // that presentation's field in every major sync. No gain is applied, since the stream is lossless.
 int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
                          std::string_view out_path, const Options& meta);
+
+// `qc` of a TrueHD stream (truehd_tools.cpp): an integrity gate (the lossless check of every
+// restart interval, the check nibbles, major sync, restart header, parity and CRC of every unit,
+// and TH spec section 18's data-rate model against the peak rate the stream declares) and the
+// loudness of each presentation, with the dialogue norm it carries beside the measurement and the
+// preset= gates applied to the presentation truehd-presentation= names (the largest by default).
+// Exit 6 when the integrity gate or a preset gate fails. The dialogue norm's meaning is provisional,
+// no oracle until the DEE set (libs/truehd/ERRATA.md, questions 51 to 56), and so is the rate model,
+// which is the encoder's own (no player has been asked).
+int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path, const Options& meta);
 
 // `truehd-encode`: the PCM in a WAV, coded losslessly as TrueHD (iclforge::truehd::Encoder) into a
 // bare .thd, or wrapped as .mkv, .mp4 or a Blu-ray .ts. The WAV's channel mask names its speakers

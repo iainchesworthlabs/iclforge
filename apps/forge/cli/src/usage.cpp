@@ -109,7 +109,7 @@ constexpr std::array<OptionToken, 155> kOptionTokens{{
     {"dialogue-enhancement=", "decode of AC-4: raise the dialogue by 0 to 12 dB, capped by the stream"},
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
-    {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all"},
+    {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all; qc: the presentation the preset gates judge, best, 2ch, 6ch or 8ch"},
     {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
@@ -571,8 +571,14 @@ void print_truehd_topic() {
     fmt::println("       by name with a usage error instead of accepting and dropping them; a");
     fmt::println("       verification flag such as verify-content never succeeds without verifying.");
     fmt::println("       fast-mdct, fast-imdct and mode= choose a transform, which TrueHD has not,");
-    fmt::println("       and are warned about. cut, cat, qc, transcode, fmp4,");
-    fmt::println("       play and monitor do not read TrueHD or MLP and say so.");
+    fmt::println("       and are warned about. qc gates a TrueHD or MLP stream's integrity (the");
+    fmt::println("       lossless check of every restart interval, the check nibbles, CRCs and");
+    fmt::println("       parity, and TH spec section 18's data rate against the peak rate the");
+    fmt::println("       stream declares) and meters each presentation, shows the dialogue norm");
+    fmt::println("       it carries beside the measurement, and judges preset= on the presentation");
+    fmt::println("       truehd-presentation= names (the largest by default); exit 6 when a gate");
+    fmt::println("       fails. cut, cat, transcode, fmp4, play and monitor do not read TrueHD or");
+    fmt::println("       MLP and say so.");
 }
 
 void print_ac4_decode_topic() {

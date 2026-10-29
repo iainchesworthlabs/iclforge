@@ -515,12 +515,15 @@ constexpr std::array<Command, 49> kCommands{{
      Needs::kNothing,
      [](const Args& x) { return run_loudness(x.str(1), x.meta); }},
     {"qc", 2,
-     "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [preset=<name>|all] [layout=bed|rendered] "
-     "[objects=<71|512|514|714>]",
+     "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [preset=<name>|all] "
+     "[layout=bed|rendered] [objects=<71|512|514|714>]",
      "bitstream-aware loudness QC: measured loudness vs. embedded dialnorm/compr, optional "
      "preset gate, optional BS.1770-5 Annex 4 object re-render; an AC-4 presentation as coded, "
-     "against its dialnorm and the loudness it states",
-     topic::kQc | topic::kProgramme | topic::kAc4Decode,
+     "against its dialnorm and the loudness it states; a TrueHD or MLP stream's integrity gate "
+     "(lossless check, CRCs and parity, TH spec section 18's data rate) and the loudness of "
+     "each presentation beside its dialogue norm, the preset judged on truehd-presentation= "
+     "(the largest by default); exit 6 when a gate fails",
+     topic::kQc | topic::kProgramme | topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing, [](const Args& x) { return run_qc(x.str(1), x.meta); }},
     {"spdif", 3, "<in.ac3|in.ec3|in.ac4|in.thd> <out.wav>",
      "IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream "

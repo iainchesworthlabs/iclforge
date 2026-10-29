@@ -1544,6 +1544,7 @@ for fixture in "${truehd_streams[@]}"; do
     run decode "th_$fixture" "th_$name.wav"
     run_truehd_bitexact_check "th_$name.wav" "th_$fixture" "$codec"
     run levels "th_$fixture"
+    run qc "th_$fixture" # the integrity gate: every FFmpeg-made stream passes it
     run decode "th_$fixture" "th_${name}_lenient.wav" truehd-check=lenient
     cmp -s "th_$name.wav" "th_${name}_lenient.wav" || {
         echo "a lenient decode of the undamaged th_$fixture differs from the strict one" >&2
@@ -1648,14 +1649,14 @@ done
 # monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
 # this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by cut, cat, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata and normalize refuse E-AC-3's options)"
+echo "[$count] truehd is refused by cut, cat, transcode and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options)"
 th_in=th_truehd_st48_s24.thd
 for refused in "cut $th_in th_refused.thd 0.05 0.1" \
     "cat th_refused.thd $th_in $th_in" \
     "metadata $th_in th_refused.thd dialnorm=27" \
     "normalize $th_in th_refused.thd dialnorm=27" \
     "transcode $th_in th_refused.ac3 192" \
-    "qc $th_in" "fmp4 $th_in th_refused_fmp4 24" \
+    "qc $th_in layout=rendered" "fmp4 $th_in th_refused_fmp4 24" \
     "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
     "remux th_truehd_st48_s24.mkv th_refused.ts dvb" \
     "decode $th_in th_refused.wav verify-content" "decode $th_in th_refused.wav check-content" \
@@ -1835,6 +1836,38 @@ import json, sys
 presentations = json.load(sys.stdin)["truehd"]["channel_meaning"]["presentations"]
 present = [p for p in ("2ch", "6ch", "8ch") if presentations[p]["in_stream"]]
 sys.exit(0 if present and all(1 <= presentations[p]["dialogue_norm"] <= 31 for p in present) else 1)'
+done
+
+# `qc` of a TrueHD stream: the integrity gate passes forge's own streams (the FFmpeg-made ones pass it
+# above), a preset gate it cannot meet is exit 6, and so is a flipped bit, which the lenient decode
+# counts and the CRC and parity checks name. The spliced fixture fails the lossless check at its join
+# by design (libs/truehd/ERRATA.md, question 20), which the gate reports.
+for stream in te_st48_s24.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    run qc "$stream"
+done
+python3 - <<'PYEOF'
+import pathlib
+data = bytearray(pathlib.Path("te_m51_48_s24.thd").read_bytes())
+offset = 0
+for _ in range(10):
+    offset += ((data[offset] & 0xF) << 8 | data[offset + 1]) * 2
+data[offset + 60] ^= 0x04
+pathlib.Path("te_m51_48_s24_damaged.thd").write_bytes(data)
+PYEOF
+cp "$TRUEHD_FIXTURES/truehd_cat_st48_s24.thd" th_truehd_cat_st48_s24.thd
+count=$((count + 1))
+echo "[$count] truehd qc exits 6 for a preset the stream misses, a flipped bit and a join, and not for forge's own stream"
+for failing in "te_m51_48_s24.thd preset=ebu-r128-s2" "te_m51_48_s24_damaged.thd" "th_truehd_cat_st48_s24.thd"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" qc $failing >/dev/null 2>&1
+    qc_status=$?
+    set -e
+    echo "  forge qc $failing -> exit $qc_status"
+    [[ "$qc_status" -eq 6 ]] || {
+        echo "forge qc $failing should exit 6 (a gate failed), exited $qc_status" >&2
+        exit 1
+    }
 done
 
 # The streams forge wrote, in the containers forge writes: encode straight into each, read it back

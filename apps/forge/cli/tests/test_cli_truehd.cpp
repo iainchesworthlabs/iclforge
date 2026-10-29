@@ -1191,9 +1191,10 @@ TEST_CASE("a command that does not read TrueHD takes the track after a TrueHD on
         CHECK(written[1] == std::byte{0x77});
     }
 
-    SECTION("a file with TrueHD alone is refused by name") {
-        CHECK(run_cli("qc \"" + truehd_only.string() + "\"", log) == kExitUsage);
-        CHECK(read_text(log).find("which 'qc' does not read") != std::string::npos);
+    SECTION("a file with TrueHD alone is checked by qc and refused by name by transcode") {
+        CHECK(run_cli("qc \"" + truehd_only.string() + "\"", log) == 0);
+        CHECK(read_text(log).find("(TrueHD,") != std::string::npos);
+        CHECK(read_text(log).find("integrity verdict: PASS") != std::string::npos);
         CHECK(run_cli("transcode \"" + truehd_only.string() + "\" \"" +
                           (dir / "refused.ac3").string() + "\"",
                       log) == kExitUsage);
@@ -1987,7 +1988,225 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("qc, transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][truehd][refusals]") {
+namespace {
+
+// The tone scaled so that its 6 channel integrated loudness is `target` LKFS, as 24-bit samples.
+std::vector<std::int32_t> tone_at(double target) {
+    using iclforge::base::Speaker;
+    const std::array<Speaker, 6> bed{Speaker::kLeft,         Speaker::kRight,
+                                     Speaker::kCentre,       Speaker::kLfe,
+                                     Speaker::kLeftSurround, Speaker::kRightSurround};
+    const std::vector<std::int32_t> tone = tone_samples();
+    const double gain = std::pow(10.0, (target - meter_lkfs(tone, bed, 6)) / 20.0);
+    std::vector<std::int32_t> scaled;
+    for (const std::int32_t sample : tone) {
+        scaled.push_back(
+            static_cast<std::int32_t>(std::lround(static_cast<double>(sample) * gain)));
+    }
+    return scaled;
+}
+
+// White noise at full scale, six channels, a second of it: more bits than a rate of a few Mbit/s.
+std::vector<std::int32_t> noise_samples() {
+    std::vector<std::int32_t> samples;
+    std::uint32_t state = 12345;
+    for (std::size_t i = 0; i < kToneFrames * 6; ++i) {
+        state = (state * 1664525U) + 1013904223U;
+        samples.push_back(static_cast<std::int32_t>(state >> 8U) - 8388608);
+    }
+    return samples;
+}
+
+}  // namespace
+
+TEST_CASE(
+    "qc of a TrueHD stream holds its integrity, measures each presentation and compares the "
+    "dialogue norm",
+    "[forge-cli][truehd][qc]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "qc.log";
+    using iclforge::base::Speaker;
+    const std::array<Speaker, 6> bed{Speaker::kLeft,         Speaker::kRight,
+                                     Speaker::kCentre,       Speaker::kLfe,
+                                     Speaker::kLeftSurround, Speaker::kRightSurround};
+    const double lkfs_6ch = meter_lkfs(tone_samples(), bed, 6);
+
+    SECTION("a sound stream passes, and the report names every check and presentation") {
+        REQUIRE(run_cli("qc " + cli_arg(tone.thd), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("qc: ") != std::string::npos);
+        CHECK(text.find("(TrueHD, L R C LFE Ls Rs, 48000 Hz, 1200 access unit(s)") !=
+              std::string::npos);
+        CHECK(text.find("integrity (TH spec 6.2 parity and CRC, 7.3 lossless check, 18 data "
+                        "rate):") != std::string::npos);
+        CHECK(text.find("access units         1200 read, 0 byte(s) skipped, 0 unreadable  PASS") !=
+              std::string::npos);
+        CHECK(text.find(" 0 failed (check nibble, major sync, restart header, parity, segment "
+                        "CRC)  PASS") != std::string::npos);
+        CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
+        CHECK(text.find("data rate            18.00 Mbit/s declared") != std::string::npos);
+        CHECK(text.find("provisional") != std::string::npos);
+        CHECK(text.find("integrity verdict: PASS") != std::string::npos);
+        CHECK(text.find("2ch (L R):") != std::string::npos);
+        CHECK(text.find("6ch (L R C LFE Ls Rs), the presentation the gates are judged on:") !=
+              std::string::npos);
+        CHECK(text.find(fmt::format("integrated loudness  {:>+8.2f} LKFS", lkfs_6ch)) !=
+              std::string::npos);
+        // Nothing is gated without a preset.
+        CHECK(text.find("gates:") == std::string::npos);
+        // A container carries the same stream and gives the same report.
+        const fs::path mkv = tone.dir / "qc_tone.mkv";
+        REQUIRE(run_cli("mkv " + cli_arg(tone.thd) + cli_arg(mkv), log) == 0);
+        REQUIRE(run_cli("qc " + cli_arg(mkv), log) == 0);
+        CHECK(after_first_line(read_text(log)) == after_first_line(text));
+    }
+    SECTION("the dialogue norm it carries is compared with the measurement") {
+        // The stream as it was written: no norm, so the claim is far from the measurement.
+        REQUIRE(run_cli("qc " + cli_arg(tone.thd), log) == 0);
+        const std::string before = read_text(log);
+        CHECK(before.find("measurement-derived dialogue norm would be " +
+                          std::to_string(dialnorm_of(lkfs_6ch)) + ", not 0") != std::string::npos);
+        CHECK(before.find("control-enabled bit is off, so a decoder may not apply it") !=
+              std::string::npos);
+        CHECK(before.find("embedded metadata (provisional, no oracle until the DEE set") !=
+              std::string::npos);
+        // Normalised, with the control bit on: the same value, and the claim matches.
+        const fs::path set = tone.dir / "qc_normalized.thd";
+        REQUIRE(run_cli("normalize " + cli_arg(tone.thd) + cli_arg(set), log) == 0);
+        const fs::path on = tone.dir / "qc_normalized_on.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(set) + cli_arg(on) + "truehd-control-6ch=on", log) ==
+                0);
+        REQUIRE(run_cli("qc " + cli_arg(on), log) == 0);
+        const std::string after = read_text(log);
+        CHECK(after.find("(matches)") != std::string::npos);
+        CHECK(after.find("control on, dialogue norm " + std::to_string(dialnorm_of(lkfs_6ch))) !=
+              std::string::npos);
+        CHECK(after.find("claimed              " +
+                         fmt::format("{:>+8.2f}", 0.0 - dialnorm_of(lkfs_6ch))) !=
+              std::string::npos);
+        // The delta is the measurement less the claim.
+        CHECK(after.find(fmt::format("delta                {:>+8.2f} dB",
+                                     lkfs_6ch + dialnorm_of(lkfs_6ch))) != std::string::npos);
+    }
+    SECTION(
+        "the preset gates judge the largest presentation, or the one truehd-presentation= "
+        "names") {
+        // The tone is far above -23 LKFS: EBU R 128 s2 fails and the exit status says a gate
+        // failed.
+        CHECK(run_cli("qc " + cli_arg(tone.thd) + "preset=ebu-r128-s2", log) == 6);
+        const std::string failing = read_text(log);
+        CHECK(failing.find("gates:") != std::string::npos);
+        CHECK(failing.find("ebu-r128-s2") != std::string::npos);
+        CHECK(failing.find("verdict: FAIL") != std::string::npos);
+        CHECK(failing.find("integrity verdict: PASS") != std::string::npos);
+        // Scaled to -23.0 LKFS and clear of -1 dBTP, the 6 channel presentation passes.
+        const fs::path wav = tone.dir / "qc_minus23.wav";
+        const fs::path thd = tone.dir / "qc_minus23.thd";
+        write_wav(wav, 48000, 6, 0x60F, tone_at(-23.0));
+        REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(thd), log) == 0);
+        CHECK(run_cli("qc " + cli_arg(thd) + "preset=ebu-r128-s2", log) == 0);
+        CHECK(read_text(log).find("verdict: PASS") != std::string::npos);
+        // The 2 channel presentation of that stream measures differently (its first two channels
+        // only), and the same preset judged on it is a different verdict.
+        run_cli("qc " + cli_arg(thd) + "preset=ebu-r128-s2 truehd-presentation=2ch", log);
+        const std::string two = read_text(log);
+        CHECK(two.find("2ch (L R), the presentation the gates are judged on:") !=
+              std::string::npos);
+        CHECK(two.find("6ch (L R C LFE Ls Rs):") != std::string::npos);
+    }
+    SECTION("what it is not asked to judge, or cannot, is refused by name") {
+        for (const std::string option : {"layout=rendered", "objects=514", "programme=1",
+                                         "truehd-check=lenient", "dialnorm=27"}) {
+            DYNAMIC_SECTION(option) {
+                CHECK(run_cli("qc " + cli_arg(tone.thd) + option, log) == kExitUsage);
+                CHECK(read_text(log).find("qc does not apply " + option) != std::string::npos);
+            }
+        }
+        CHECK(run_cli("qc " + cli_arg(tone.thd) + "verify-content", log) == kExitUsage);
+        CHECK(run_cli("qc " + cli_arg(tone.thd) + "truehd-presentation=all", log) == kExitUsage);
+        CHECK(run_cli("qc " + cli_arg(tone.thd) + "truehd-presentation=8ch", log) == kExitUsage);
+        CHECK(read_text(log).find("has no 8ch presentation") != std::string::npos);
+    }
+    SECTION("E-AC-3 and AC-3 are judged as before, and the TrueHD option is warned about there") {
+        const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
+        REQUIRE(run_cli("qc " + cli_arg(ec3) + "truehd-presentation=2ch", log) == 0);
+        CHECK(read_text(log).find("is not TrueHD or MLP") != std::string::npos);
+        CHECK(read_text(log).find("dialnorm check:") != std::string::npos);
+    }
+    SECTION("an MLP stream is checked, and says it has no channel meaning") {
+        REQUIRE(run_cli("qc " + cli_arg(fixture("mlp_st48_s24.mlp")), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("(MLP, ") != std::string::npos);
+        CHECK(text.find("integrity verdict: PASS") != std::string::npos);
+        CHECK(text.find("embedded metadata: none described for MLP") != std::string::npos);
+    }
+}
+
+TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and a rate it breaks",
+          "[forge-cli][truehd][qc]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "qc_fail.log";
+
+    SECTION("a flipped bit is counted, not a reason to stop") {
+        const fs::path bad = damaged_copy("truehd_st48_s24.thd", tone.dir);
+        CHECK(run_cli("qc " + cli_arg(bad), log) == 6);
+        const std::string text = read_text(log);
+        CHECK(text.find("integrity verdict: FAIL") != std::string::npos);
+        CHECK(text.find("(check nibble, major sync, restart header, parity, segment CRC)  FAIL") !=
+              std::string::npos);
+    }
+    SECTION("bytes between units that are not a unit are counted") {
+        std::vector<std::byte> bytes = read_bytes(fixture("truehd_st48_s24.thd"));
+        std::size_t offset = 0;
+        for (int unit = 0; unit < 10; ++unit) {
+            offset += (((std::to_integer<std::size_t>(bytes[offset]) & 0xFU) << 8U) |
+                       std::to_integer<std::size_t>(bytes[offset + 1])) *
+                      2;
+        }
+        bytes.insert(bytes.begin() + static_cast<std::ptrdiff_t>(offset), 9, std::byte{0x5A});
+        const fs::path junk = tone.dir / "qc_junk.thd";
+        {
+            std::ofstream out{junk, std::ios::binary};
+            out.write(reinterpret_cast<const char*>(bytes.data()),
+                      static_cast<std::streamsize>(bytes.size()));
+        }
+        CHECK(run_cli("qc " + cli_arg(junk), log) == 6);
+        CHECK(read_text(log).find("byte(s) skipped") != std::string::npos);
+        CHECK(read_text(log).find("0 byte(s) skipped") == std::string::npos);
+    }
+    SECTION("two streams joined end to end fail the lossless check at the join") {
+        // ERRATA.md question 20: the second stream's first restart header checks nothing.
+        CHECK(run_cli("qc " + cli_arg(fixture("truehd_cat_st48_s24.thd")), log) == 6);
+        CHECK(read_text(log).find("interval(s) ok, 1 failed  FAIL") != std::string::npos);
+    }
+    SECTION("a stream that cannot be sent within its declared peak rate") {
+        const fs::path wav = tone.dir / "qc_noise.wav";
+        const fs::path fits = tone.dir / "qc_noise_fits.thd";
+        const fs::path late = tone.dir / "qc_noise_late.thd";
+        write_wav(wav, 48000, 6, 0x60F, noise_samples());
+        REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(fits), log) == 0);
+        REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(late) +
+                            "truehd-peak-rate=2000 truehd-rate-check=lenient",
+                        log) == 0);
+        CHECK(run_cli("qc " + cli_arg(fits), log) == 0);
+        CHECK(run_cli("qc " + cli_arg(late), log) == 6);
+        const std::string text = read_text(log);
+        CHECK(text.find("data rate            2.00 Mbit/s declared") != std::string::npos);
+        CHECK(text.find("unit(s) late  FAIL") != std::string::npos);
+        CHECK(text.find(" 0 unit(s) late") == std::string::npos);
+        // Everything else about that stream is sound.
+        CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
+    }
+    SECTION("nothing to read is an input error, not a failed gate") {
+        const fs::path empty = tone.dir / "qc_empty.thd";
+        { std::ofstream{empty, std::ios::binary}; }
+        const int status = run_cli("qc " + cli_arg(empty), log);
+        CHECK(status != 0);
+        CHECK(status != 6);
+    }
+}
+
+TEST_CASE("transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][truehd][refusals]") {
     const ToneFiles& tone = tone_files();
     const fs::path log = tone.dir / "refusals.log";
     const fs::path out = tone.dir / "refused_out";
@@ -1996,7 +2215,6 @@ TEST_CASE("qc, transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][
         std::string args;
     };
     const std::vector<Refusal> refusals{
-        {"qc", cli_arg(tone.thd)},
         {"transcode", cli_arg(tone.thd) + cli_arg(out.string() + ".ac3")},
         {"fmp4", cli_arg(tone.thd) + cli_arg(out)},
     };

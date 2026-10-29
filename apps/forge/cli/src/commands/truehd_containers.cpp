@@ -596,8 +596,8 @@ class RateModel {
             started_ = true;
             rate_ = first_sync->sample_rate();
             nominal_ = th::nominal_samples_per_access_unit(first_sync->ratebits());
-            // ERRATA.md entry 30: raw x rate / 16, the reading FFmpeg's streams fit.
-            report_.declared_bps = std::uint64_t{first_sync->peak_data_rate} * rate_ / 16U;
+            // TH spec v3.9 section 4.4 (ERRATA.md question 12): bits per second.
+            report_.declared_bps = first_sync->peak_data_rate_bps();
             limit_ = static_cast<std::int64_t>(rate_) * 75 / 1000;
         }
         if (report_.declared_bps == 0 || nominal_ <= 0) {

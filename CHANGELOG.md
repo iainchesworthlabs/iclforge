@@ -10,6 +10,18 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge qc` reads a TrueHD or MLP stream: an integrity gate, the loudness of each presentation, the dialogue norm beside the
+  measurement, and the preset gates; exit 6 when one fails.** It was refused by name. The integrity gate counts, over a lenient decode
+  of every substream, the units and bytes the reader does not take for an access unit, the failed check nibbles, major sync and restart
+  header CRCs, parities and segment CRCs, the restart intervals whose lossless check fails (a join of two streams does, by design), and
+  the units that cannot be sent within the peak rate the stream declares and TH spec §18's 75 ms by the model the encoder keeps itself
+  to. All 20 FFmpeg-made TrueHD fixtures and six MLP ones pass; a flipped bit, stray bytes, a join, and a stream encoded to break a
+  declared 2 Mbit/s fail with exit 6. Each presentation (2, 6 and 8 channels for one, two and three substreams) is metered with the
+  BS.1770-5 Annex 3 weights `forge loudness` uses and shown beside the dialogue norm it carries, with the difference and the norm the
+  measurement implies; `preset=` judges the largest presentation, or `truehd-presentation=` names one. Provisional, with no oracle until
+  the DEE set: the rate model (the encoder's own; the peak-rate field is bits per second, TH spec v3.9 section 4.4, ERRATA question 12) and the dialogue norm's meaning (questions 51 and 54). Left for the owner,
+  because each is a decision: whether a dialogue norm that differs from the measurement by some tolerance fails the stream (E-AC-3's
+  `qc` reports it and does not fail it), and what tolerance the rate check should be held to. The audit's R14.
 - **Added: `forge normalize` sets a TrueHD stream's dialogue norms from the loudness of each presentation, without changing the audio.** It
   decodes each presentation the stream has (2, 6 and 8 channels for one, two and three substreams), measures its integrated loudness with the
   BS.1770-5 Annex 3 weights `forge loudness` uses, maps it to a dialogue norm the way E-AC-3's `normalize` does (ATSC A/85 §8: the loudness

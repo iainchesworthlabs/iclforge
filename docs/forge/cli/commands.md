@@ -42,7 +42,7 @@ Usage:
   forge cat           <out.ac3|out.ec3> <in1> <in2> [in3...]  (join streams end to end (output FIRST, since the input list is variadic); refuses inputs whose codec, rate, layout or substream shape differ)
   forge levels        <in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> (per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded (truehd-presentation=, truehd-check=))
   forge loudness      <in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> (BS.1770-4 loudness -> dialnorm, beside a stream's own: an AC-3 or E-AC-3 stream's first programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB; a TrueHD or MLP stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights; truehd-presentation=, truehd-check=))
-  forge qc            <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [preset=<name>|all] [layout=bed|rendered] [objects=<71|512|514|714>] (bitstream-aware loudness QC: measured loudness vs. embedded dialnorm/compr, optional preset gate, optional BS.1770-5 Annex 4 object re-render; an AC-4 presentation as coded, against its dialnorm and the loudness it states)
+  forge qc            <in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [preset=<name>|all] [layout=bed|rendered] [objects=<71|512|514|714>] (bitstream-aware loudness QC: measured loudness vs. embedded dialnorm/compr, optional preset gate, optional BS.1770-5 Annex 4 object re-render; an AC-4 presentation as coded, against its dialnorm and the loudness it states; a TrueHD or MLP stream's integrity gate (lossless check, CRCs and parity, TH spec section 18's data rate) and the loudness of each presentation beside its dialogue norm, the preset judged on truehd-presentation= (the largest by default); exit 6 when a gate fails)
   forge spdif         <in.ac3|in.ec3|in.ac4|in.thd> <out.wav> (IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream (programme=); AC-4 in IEC 61937-14's bursts; TrueHD in MAT bursts (an eight-channel WAV, or the raw bursts when the output is not .wav))
   forge unspdif       <in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|out.thd|-> (the inverse: recover the elementary stream from IEC 61937 bursts, as captured from an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end)
   forge project       <project.forgeproj> [out] [print]       (encode what a Forge project file says, by running the commands it stands for: the line the Forge GUI's command bar shows for the same settings. out is where the result goes (beside the project, named for it, by default); print shows the commands and runs none of them)
@@ -1008,12 +1008,12 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 profile writes that Blu-ray one for TrueHD and MLP, as it writes DVB's for AC-3, E-AC-3 and AC-4. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream (below). `cut`, `cat`, `transcode`, `qc`, `fmp4`,
-`monitor` and `play` do not read TrueHD and say so by name (exit status 1); `cut` and `cat` would start and join only at an access unit
-that carries a major sync. In a file with
+reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut`, `cat`,
+`transcode`, `fmp4`, `monitor` and `play` do not read TrueHD and say so by name (exit status 1); `cut` and `cat` would start and join only
+at an access unit that carries a major sync. In a file with
 several audio tracks the commands that read TrueHD take the first, and `transcode`, `qc`, `fmp4`, `monitor` and `play` take the
 first of another codec, so a Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD
-alone is refused. The layouts
+alone is refused by `transcode`, `fmp4`, `monitor` and `play`, and read by `qc`. The layouts
 are FFmpeg's, a single oracle in each direction, and nothing has been played into a receiver or a disc player
 ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
 
@@ -1531,6 +1531,32 @@ case $? in
   *) echo "qc could not run at all" ;;
 esac
 ```
+
+**`qc` of a TrueHD or MLP stream** has an integrity gate where the other codecs have a clean decode, and the same preset gates on the
+loudness. The stream is decoded leniently so that every failure is counted and reported, not only the first:
+
+```text
+integrity (TH spec 6.2 parity and CRC, 7.3 lossless check, 18 data rate):
+  access units         2400 read, 0 byte(s) skipped, 0 unreadable  PASS
+  checks               0 failed (check nibble, major sync, restart header, parity, segment CRC)  PASS
+  lossless check       36 interval(s) ok, 0 failed  PASS
+  data rate            18.00 Mbit/s declared (field 6000, ...), largest unit 3.30 Mbit/s, slowest delivery 0.2 ms of 75 ms, 0 unit(s) late  PASS
+  integrity verdict: PASS
+```
+
+It fails on a unit or a byte the reader does not take for an access unit, on any failed check of any substream, on a restart interval
+whose lossless check fails (two streams joined end to end fail at the join: `libs/truehd/ERRATA.md`, question 20), and on a stream that
+cannot be sent within the peak rate it declares and TH spec section 18's 75 ms, by the model the encoder keeps itself to. The declared
+rate is the peak-rate field in bits per second, `(raw x sample rate + 8) >> 4` (TH spec v3.9 section 4.4, ERRATA question 12); **the rate
+check is provisional** all the same, since the model is the encoder's own and no player has been asked. Then, for each presentation the stream has (2, 6 and 8 channels for one,
+two and three substreams), the integrated loudness, loudness range and true peak with the BS.1770-5 Annex 3 weights `loudness` uses, and
+the dialogue norm the stream carries beside the measurement (as E-AC-3's `qc` does: the claim, the difference, and the norm the
+measurement implies, noting a presentation whose control-enabled bit is off). `preset=` judges the largest presentation, or the one
+`truehd-presentation=2ch|6ch|8ch` names; the others are reported and not gated. The comparison of the dialogue norm with the measurement
+is a report and not a gate, as it is for E-AC-3, and it is provisional with no oracle until the DEE set (`libs/truehd/ERRATA.md`,
+questions 51 to 55). The exit status is 6 when the integrity gate or a preset gate fails, 2 when nothing reads as a TrueHD stream, and 0
+otherwise. `layout=`, `objects=`, `programme=` and the rest are refused by name. An MLP stream is checked and measured too; its bytes
+at the channel meaning's place are not described, and the report says so.
 
 ### Stream tools — an encoded stream in, an encoded stream out
 
