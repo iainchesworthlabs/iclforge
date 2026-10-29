@@ -254,7 +254,8 @@
         "ICLFORGE_BUILD_IAB": "OFF",
         "ICLFORGE_BUILD_IAMF": "OFF",
         "ICLFORGE_BUILD_CAPI": "OFF",
-        "ICLFORGE_BUILD_AC4": "OFF"
+        "ICLFORGE_BUILD_AC4": "OFF",
+        "ICLFORGE_BUILD_TRUEHD": "OFF"
       }
     },
 
@@ -417,7 +418,8 @@
         "ICLFORGE_BUILD_IAB": "OFF",
         "ICLFORGE_BUILD_IAMF": "OFF",
         "ICLFORGE_BUILD_CAPI": "OFF",
-        "ICLFORGE_BUILD_AC4": "OFF"
+        "ICLFORGE_BUILD_AC4": "OFF",
+        "ICLFORGE_BUILD_TRUEHD": "OFF"
       }
     },
     {
