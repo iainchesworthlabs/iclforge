@@ -20,6 +20,11 @@ encoder made it.
   ALTER  the decoder succeeded, and the leg's DEE options alter the audio (loudness correction,
          the surround attenuation, --optimize-data-rate), so the decode is not expected to be
          the source; the figures say how far it is
+  UNEXPLAINED
+         the decoder succeeded and the stream's own lossless check passed (at least one interval,
+         none failed), but the decode is not the source and no option of the leg says why. The
+         decode is what the encoder coded, so the difference arose before coding; it is listed
+         for the owner and does not fail the run
   FAIL   the decoder failed (strict checks, a CRC, the lossless check), or a lossless leg
          decodes to something else
   SKIP   no stream or source on disk, or a source longer than --max-seconds
@@ -34,6 +39,7 @@ passes. Exit status 1 if any leg FAILs.
 import argparse
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,6 +50,7 @@ except ImportError:  # pragma: no cover
     np = None
 
 MANIFEST = "dee-gold-manifest.json"
+LOSSLESS_CHECK = re.compile(r"lossless check: (\d+) interval\(s\) ok, (\d+) failed")
 PROBE_SAMPLES = 1000
 MAX_DELAY = 8192
 
@@ -102,7 +109,7 @@ def compare(decoded, source):
     probe = min(PROBE_SAMPLES, len(source))
     for offset in range(MAX_DELAY):
         length = min(len(decoded) - offset, len(source))
-        if length <= probe:
+        if length < probe:
             break
         mapping, used = [], set()
         for c in range(source.shape[1]):
@@ -152,7 +159,7 @@ def decode(command, stream, out):
         [*command, str(stream), str(out)], capture_output=True, check=False, timeout=3600
     )
     text = (result.stderr + result.stdout).decode("utf-8", "replace").strip().splitlines()
-    return result.returncode, (text[-1] if text else "")
+    return result.returncode, (text[-1] if text else ""), "\n".join(text)
 
 
 def score_leg(name, entry, root, command, scratch, max_seconds, manifest):
@@ -165,7 +172,7 @@ def score_leg(name, entry, root, command, scratch, max_seconds, manifest):
     if max_seconds and seconds > max_seconds:
         return {"status": "SKIP", "why": f"the source is {seconds:g} s, over --max-seconds"}
     wav = scratch / f"{name}.wav"
-    code, message = decode(command, stream, wav)
+    code, message, transcript = decode(command, stream, wav)
     if code != 0 or not wav.is_file():
         return {"status": "FAIL", "why": f"the decoder exited {code}: {message[:300]}"}
     try:
@@ -177,11 +184,20 @@ def score_leg(name, entry, root, command, scratch, max_seconds, manifest):
         wav.unlink(missing_ok=True)
     result = compare(decoded, reference)
     result["ffmpeg_lossless"] = (entry.get("ffmpeg") or {}).get("lossless")
+    check = LOSSLESS_CHECK.search(transcript)
+    if check:
+        result["lossless_check"] = {"ok": int(check.group(1)), "failed": int(check.group(2))}
     altered = entry.get("audio_altered")
     if altered:
         result.update({"status": "ALTER", "why": altered})
     elif result["lossless"]:
         result["status"] = "PASS"
+    elif check and int(check.group(1)) > 0 and int(check.group(2)) == 0:
+        result["status"] = "UNEXPLAINED"
+        result["why"] = (
+            "the decode passes the stream's own lossless check "
+            f"({check.group(1)} intervals) but is not the source"
+        )
     else:
         result["status"] = "FAIL"
         result["why"] = "the decode is not the source"
@@ -240,7 +256,7 @@ def main():
         sys.exit("score_truehd_decode: numpy is required")
     command = [str(args.forge), "decode"] if args.forge else args.decoder.split()
 
-    results, counts = {}, {"PASS": 0, "ALTER": 0, "FAIL": 0, "SKIP": 0}
+    results, counts = {}, {"PASS": 0, "ALTER": 0, "UNEXPLAINED": 0, "FAIL": 0, "SKIP": 0}
     with tempfile.TemporaryDirectory() as scratch_name:
         scratch = pathlib.Path(scratch_name)
         for name in sorted(legs):
@@ -250,14 +266,14 @@ def main():
             results[name] = result
             counts[result["status"]] += 1
             detail = result.get("why", "")
-            if result["status"] == "ALTER" and "mismatched_values" in result:
+            if result["status"] in ("ALTER", "UNEXPLAINED") and "mismatched_values" in result:
                 detail += f" ({result['mismatched_values']} values differ)"
             if result["status"] == "FAIL" and result.get("ffmpeg_lossless") is False:
                 detail += " (FFmpeg's decode is not the source either)"
             print(f"{result['status']:5} {name}" + (f": {detail}" if detail else ""), flush=True)
     print(
         f"{len(results)} legs: {counts['PASS']} pass, {counts['ALTER']} altered by DEE's options, "
-        f"{counts['FAIL']} fail, {counts['SKIP']} skipped"
+        f"{counts['UNEXPLAINED']} unexplained, {counts['FAIL']} fail, {counts['SKIP']} skipped"
     )
     if args.report:
         args.report.write_text(

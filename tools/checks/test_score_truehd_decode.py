@@ -64,6 +64,9 @@ if (stream.parent / "undecodable").exists():
     print("error: access unit 3: BadParity", file=sys.stderr)
     sys.exit(2)
 shutil.copy(stream.parent / "decoded.wav", out)
+check = stream.parent / "lossless_check.txt"
+if check.exists():
+    print(check.read_text(), file=sys.stderr)
 """
 
 
@@ -158,6 +161,36 @@ class Scorer(unittest.TestCase):
         status, text = self.run_scorer()
         self.assertEqual(status, 0, text)
         self.assertIn("ALTER altered", text)
+
+    def test_a_decode_that_passes_the_streams_own_check_but_is_not_the_source_is_not_failed(self):
+        altered = self.pcm.copy()
+        altered[100:200, 0] += 1
+        self.leg("unexplained", altered)
+        (self.root / "streams" / "unexplained" / "lossless_check.txt").write_text(
+            "  3 restart header(s); lossless check: 2 interval(s) ok, 0 failed"
+        )
+        status, text = self.run_scorer()
+        self.assertEqual(status, 0, text)
+        self.assertIn("UNEXPLAINED unexplained", text)
+        self.assertIn("1 unexplained", text)
+
+    def test_a_decode_that_fails_the_streams_own_check_fails_the_leg(self):
+        wrong = self.pcm.copy()
+        wrong[100:200, 0] += 1
+        self.leg("check_failed", wrong)
+        (self.root / "streams" / "check_failed" / "lossless_check.txt").write_text(
+            "  3 restart header(s); lossless check: 1 interval(s) ok, 1 failed"
+        )
+        status, text = self.run_scorer()
+        self.assertEqual(status, 1, text)
+        self.assertIn("FAIL  check_failed", text)
+
+    def test_a_source_shorter_than_the_probe_is_compared_whole(self):
+        short = self.pcm[:41]
+        self.leg("short", short, source=short)
+        status, text = self.run_scorer()
+        self.assertEqual(status, 0, text)
+        self.assertIn("PASS  short", text)
 
     def test_legs_that_are_refused_missing_or_too_long_are_not_scored(self):
         self.leg("long", self.pcm, seconds=300)

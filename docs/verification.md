@@ -2408,8 +2408,12 @@ content and a delay of the first samples is allowed, because DEE's channel order
 - **PASS** when the decode succeeds and equals the source bit for bit;
 - **ALTER** when the leg's DEE options change the audio (loudness correction, the surround attenuation,
   `--optimize-data-rate`), so the decode is held to nothing but succeeding, and the number of values that differ is shown;
-- **FAIL** when the decoder stops on a check, or a lossless leg decodes to something else (the report says whether FFmpeg's
-  decode is the source either);
+- **UNEXPLAINED** when the decode is not the source and no option of the leg says why, but the stream's own lossless check
+  passes on every restart interval (and on at least one): the decoder returned what the encoder coded, so the difference
+  arose before coding. The leg is listed and does not fail the run; the report keeps the check's counts and whether FFmpeg's
+  decode is the source;
+- **FAIL** when the decoder stops on a check, a lossless check fails, or a lossless leg decodes to something else (the report
+  says whether FFmpeg's decode is the source either);
 - **SKIP** when a stream or source is not on disk, or the source is over `--max-seconds` (120; the 300 s soak programmes).
 
 The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
