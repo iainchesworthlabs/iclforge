@@ -201,7 +201,7 @@ The sections below contain the complete change list and fixes.
   run under libFuzzer. **Measured on the owner's sample, against the specification:** the signature is over the bytes of the signed
   information and not the content digest; the signer-information digest is over the bytes as received; the certificates carry a
   `40 82 LL LL` wrapper; a CA in the chain had expired before the signature was made (so "valid now" rejects a genuine signature, and
-  `verify-time=` exists); the signer's certificate is `CA:TRUE`; byte lists are lists of BYTE; `r` and `s` are raw. Eleven open
+  `verify-time=` exists); the signer's certificate is `CA:TRUE`; byte lists are lists of BYTE; `r` and `s` are raw. Fifteen open
   questions for the owner, among them the validity-time default and MP4 carriage, are at the top of `libs/ac4/ERRATA.md`. Not
   implemented: carriage in an MP4, a second signature entry (a blob with one is refused), revocation, digests other than
   SHA-256; a chain is at most eight certificates. See

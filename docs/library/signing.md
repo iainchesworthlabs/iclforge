@@ -194,6 +194,13 @@ specification asks for neither; so one valid signature can be rewritten as anoth
 content digest, not the signature's bytes, is what identifies what was signed, and nothing here uses
 the signature bytes as an identifier. A caller that does should normalise `s` itself.
 
+**Where the signature is.** The trailer is found by walking the sync frames by their sizes (a size
+written with the 0xFFFF escape to 24 bits included), and the bytes after the last one are a
+trailer only if they begin as a content signature does. A damaged frame, an ID3v2 tag between
+frames (HLS packed audio) or any other byte run that is not a sync frame is not mistaken for one:
+`TrailerLocation::stray` counts those bytes, `verify_stream` names the byte where the frames stop,
+and signing, stripping and hashing refuse the stream.
+
 **What it does not do.** Raw `.ac4` only: carriage in an MP4 is not implemented (the specification
 gives it a sentence). A blob with more than one signature entry is refused, as is a chain of more
 than eight certificates. No revocation. SHA-256 and P-256 only. The
