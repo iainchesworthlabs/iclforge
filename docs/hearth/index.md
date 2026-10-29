@@ -543,8 +543,9 @@ at 360 MHz takes 2.0 and 5.1 in real time and states 6 channels
 ESP32-S3 with the 64 KB data cache takes 2.0 and states 2 channels and 25 frames a second
 ([on the S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). Neither decodes a
 presentation's objects, and the desktop player decodes what is past a sink's limits and sends it
-PCM. The published firmware images have the decoder off and list `ac3` and `eac3` alone, and an
-ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes as PCM.
+PCM. The published ESP32-P4 (v1.x and v3.x) and ESP32-S3 images carry the decoder and list `ac4` (since 2026-10-29; what it cost each
+board is measured in `planning/ac4-in-release-images.md`), and an ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4
+programmes as PCM.
 
 ## Where it runs
 
@@ -575,9 +576,9 @@ the build, the pairing, the screens and what has been run.
 
 ## What it does not do
 
-- **Send AC-4 as it is to a sink running a published firmware image.** Those images have no AC-4
-  decoder, so such a sink gets PCM decoded here; a board built with the decoder takes the stream
-  itself. [ESP32 sinks](#esp32-sinks) has the detail.
+- **Send AC-4 as it is to an ESP32-C6 running a published firmware image.** That image has no AC-4
+  decoder, so such a sink gets PCM decoded here; the P4 and S3 images take the stream
+  themselves. [ESP32 sinks](#esp32-sinks) has the detail.
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.

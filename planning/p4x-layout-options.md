@@ -89,7 +89,7 @@ a new hardware variant is a profile and a row.
 | Profile | Widest play measured keeping up | Source |
 |---|---|---|
 | `p4-rev3` (the P4X kit) | 16 slots: AC-3 5.1 onto `9.1.6`, sixteen 32-bit TDM slots, 142 permille of a frame, no underruns | `baselines/p4-rev3.json`, row `ac3-5.1-tdm16`, recorded 2026-10-20 |
-| `s3-n16r8`, `s3-n16r8-ac4` | 2 (the suite plays 2.0 only). A 7.1.4 Atmos stream took 1.08 of real time with Wi-Fi up, so 12 slots and wider say so | `baselines/`, [`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md) Matrix 1 |
+| `s3-n16r8` | 2 (the suite plays 2.0 only). A 7.1.4 Atmos stream took 1.08 of real time with Wi-Fi up, so 12 slots and wider say so | `baselines/`, [`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md) Matrix 1 |
 | `c6-16mb`, `c6-4mb` | 2; the build decodes two coded channels and a server decodes anything wider and sends it narrower (a 5.1 stream aborted the board in 10 to 12 s on 2026-09-22) | `sdkconfig.sendspin-c6`, the Kconfig help of `SENDSPIN_MAX_CODED_CHANNELS` |
 | `p4-rev1`, `p4-rev1-ac4` | 2; TDM does not open above stereo on v1.x silicon | `esp32-platform-profiles.md` (PR 11), `hardware_info.hpp` |
 

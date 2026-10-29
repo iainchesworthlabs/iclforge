@@ -294,6 +294,45 @@ See [README.md](README.md) for the project overview and
   channel matching by content, a delay allowed, legs whose DEE options alter the audio reported, not failed), with a unit test,
   and `docs/verification.md` gives the commands to run before DEE's licence ends on 2026-11-06.
 
+- **Changed: SHA-256 and HMAC-SHA-256 in `iclforge::base` run on the CPU's SHA instructions where it has them: 6.5 times faster on x86-64
+  SHA-NI, and the Atmos signer's per-frame tag 7 times faster.** `Sha256` picks, once per process, between the x86-64 SHA extensions, the
+  ARMv8 SHA2 instructions and the portable code it always had, so a binary built with a kernel still runs on a CPU without it. On a Ryzen 9
+  5950X the compression runs at 2,154 MB/s against 334, a 64-byte block 2.9 times faster, and the HMAC over a 2,304-byte frame takes 1.3 us
+  instead of 9.6. `update()` also hands whole blocks straight from the caller's buffer and `finish()` writes its padding in one step, which
+  made the portable path about 15 % faster too. The kernel is the one file built with `-msha` (or `-march=armv8-a+crypto`); CMake picks it and
+  a probe per compiler or OS from `libs/base/src/crypto/hw/`, with no `#ifdef`. The tests hold the hardware compression to the portable
+  one over 2,000 random states and the whole hash to an independent framing at every length to 600; the ARMv8 kernel has so far run only
+  against a model of its instructions and is first run on an Arm CPU by CI. Nothing changes on the ESP32 boards, whose hashing already goes
+  through PSA to the SHA peripheral: measured there it is 30 to 45 times the portable code at 64 KiB, with a fixed 25 to 29 us a call. New:
+  `iclforge-cryptobench` (`tests/performance/crypto_bench.cpp`), `firmware/crypto-bench` (the same measurements on a board, with the
+  procedure for putting one back as found) and `tools/hearth/crypto_bench_report.py`; the results, and what they say about the P4's crypto
+  clock, SHA busy flag and DMA, are in `planning/crypto-hardware-offload.md`.
+- **Changed: the ESP32-P4 v1.x release image decodes AC-4 as well as AC-3 and E-AC-3.** `p4-rev1` takes the AC-4 decoder
+  (`sdkconfig.ac4`) that `p4-rev1-ac4` held apart, with the same locked values and the decode stacks at 40,960 bytes; the
+  profile `p4-rev1-ac4` is gone, `p4-rev1` is what it was (the same hash, so P4a's baseline stands) and its app budget
+  is 3,400,000 bytes against the 4 MiB slot. The v3.x (P4X) and S3 images follow in the next entry; the C6 cannot hold the
+  decoder beside Wi-Fi (`planning/ac4-in-release-images.md`).
+- **Changed: the ESP32-S3 and the ESP32-P4X (v3.x) release images decode AC-4 as well as AC-3 and E-AC-3.** `s3-n16r8` takes the
+  decoder and the 64 KB data cache (`sdkconfig.ac4`, `sdkconfig.s3-dcache`) and keeps its 4 KB allocation limit: the image is 2,621,600
+  bytes (budget 2,750,000), the board boots with 75 KB of internal RAM free in place of 110, an E-AC-3 stream leaves 44 KB, and E-AC-3 JOC
+  7.1.4, 9.1.6 and 5.1.4 plays have 60 KB free at the end of their lap; its baseline is re-recorded on S3a and the AC-4 profile `s3-n16r8-ac4` is gone. `p4-rev3`
+  takes the decoder with the HTTP play's decode stack in PSRAM: 3,811,472 bytes (budget 3,950,000, slot 4,194,304), AC-4 5.1 at 0.68 of a
+  frame's duration on the kit with the PCM the host pins, AC-3, E-AC-3 and the 9.1.6 TDM row as fast as before; its baseline is re-recorded
+  on the kit. The C6 stays AC-3 and E-AC-3 only.
+- **Fixed: a play could not start on a board whose internal RAM is short, though PSRAM was free.** The player placed the decode task's
+  stack, and the AC-4 decoder's second lane its stack, in internal RAM and gave up when no block held it (on the P4X, after the I2S queue,
+  the largest block is 37,888 bytes: an AC-3 play with a 40,960-byte stack could not start its decode task and an AC-4 5.1 play ran on
+  one core at 1.3 to 1.4 of real time). Each reads the largest internal block first and takes PSRAM when it is too small; where the stack fits
+  it stays internal, as the baselines were measured.
+- **Fixed: `GET /log` lost the tail of every console line over 128 bytes on a board with no host on its USB console.** The
+  USB-Serial-JTAG console fails every write with EIO while no host is on the port, and the log's tee passed that failure to stdio, which then dropped
+  the rest of the line it was writing: the ring held `...decoder_us=89608 decoder` where the line goes on to its PCM hash, and the board suite
+  could not read an AC-4 play's figures. The write is reported whole (the console stays best effort).
+- **Fixed: an ESP32-S3 sink could stop answering on the network, with its CPUs, lwIP and its Wi-Fi association alive, in the
+  middle of a Sendspin session.** With Wi-Fi's buffers in PSRAM ESP-IDF leaves the TCP out-of-order queue unbounded, and the
+  part's 32 dynamic receive buffers could all be held by one connection's queue, so that the retransmission that would fill the
+  gap had no buffer to arrive in. `sdkconfig.psram` bounds the queue at 4 pbufs, as the C6 and the P4 already have it. Read
+  out on a board and written up in `planning/ac4-in-release-images.md`; soaked for three full board-suite runs.
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

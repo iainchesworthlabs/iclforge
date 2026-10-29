@@ -102,7 +102,7 @@ page in Hearth are a follow-up in `libs/sendspin` and the app.
 |---|---|---|
 | `p4-rev3` (the P4X kit) | 2,607,392 B | main's 2,604,624 B built the same way, so +2,768 B. Both are over the profile's 2,600,000 B budget: main was already over it, so the budget gate's verdict does not come from this change. |
 | `s3-n16r8` | 1,593,232 B | budget 1,600,000 B |
-| `s3-n16r8-ac4`, `p4-rev1-ac4` | link | the two profiles that compile `ac4_stream.cpp`, where the AC-4 half of this change lives (the published profiles have the AC-4 decoder off) |
+| `s3-n16r8`, `p4-rev1`, `p4-rev3` | link | the profiles that compile `ac4_stream.cpp` (they were `s3-n16r8-ac4` and `p4-rev1-ac4` until 2026-10-29), where the AC-4 half of this change lives |
 
 ## The Preferences entry
 

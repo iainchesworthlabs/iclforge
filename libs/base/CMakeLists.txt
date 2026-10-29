@@ -175,6 +175,57 @@ else()
     set(ICLFORGE_CPU_PROBE_DIR "builtin")
 endif()
 
+# SHA-256's compression function has a hardware kernel for the architecture (src/crypto/hw/x86_64:
+# SHA-NI; hw/aarch64: ARMv8 SHA2), and a probe for the compiler or OS that can ask the running CPU
+# whether it has the instructions. hw/none is the portable build: ICLFORGE_SIMD=generic, or an
+# architecture or OS the others do not cover. Directories chosen here, never an #ifdef, as for the
+# AVX2 probe above. Which of kernel and portable code runs is decided once per process
+# (iclforge/base/detail/sha256_impl.hpp), so a binary built with the kernel still runs on a CPU
+# that lacks the instructions.
+set(ICLFORGE_SHA256_HW_PROBE "")
+set(ICLFORGE_SHA256_HW_KERNEL "")
+set(ICLFORGE_SHA256_HW_OPTIONS "")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    # clang-cl takes a Clang driver option behind /clang:
+    set(_sha256_flag_prefix "/clang:")
+else()
+    set(_sha256_flag_prefix "")
+endif()
+if(ICLFORGE_SIMD_RESOLVED STREQUAL "x86_64")
+    if(ICLFORGE_IS_MSVC_LIKE)
+        set(ICLFORGE_SHA256_HW_PROBE "x86_64-msvc")
+    else()
+        set(ICLFORGE_SHA256_HW_PROBE "x86_64-builtin")
+    endif()
+    set(ICLFORGE_SHA256_HW_KERNEL "src/crypto/hw/x86_64/sha256_kernel.cpp")
+    # MSVC's SHA intrinsics are not gated on a flag; everyone else's are.
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        set(ICLFORGE_SHA256_HW_OPTIONS
+            "${_sha256_flag_prefix}-msha" "${_sha256_flag_prefix}-msse4.1"
+            "${_sha256_flag_prefix}-mssse3")
+    endif()
+elseif(ICLFORGE_SIMD_RESOLVED STREQUAL "aarch64")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(ICLFORGE_SHA256_HW_PROBE "aarch64-windows")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(ICLFORGE_SHA256_HW_PROBE "aarch64-macos")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+        set(ICLFORGE_SHA256_HW_PROBE "aarch64-linux")
+    endif()
+    if(ICLFORGE_SHA256_HW_PROBE)
+        set(ICLFORGE_SHA256_HW_KERNEL "src/crypto/hw/aarch64/sha256_kernel.cpp")
+        if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            set(ICLFORGE_SHA256_HW_OPTIONS "${_sha256_flag_prefix}-march=armv8-a+crypto")
+        endif()
+    endif()
+endif()
+if(ICLFORGE_SHA256_HW_PROBE)
+    set(ICLFORGE_SHA256_HW_SOURCES
+        "src/crypto/hw/${ICLFORGE_SHA256_HW_PROBE}/sha256_probe.cpp" "${ICLFORGE_SHA256_HW_KERNEL}")
+else()
+    set(ICLFORGE_SHA256_HW_SOURCES "src/crypto/hw/none/sha256_hw.cpp")
+endif()
+
 # libs/base/tests/CMakeLists.txt compiles cpu_features.cpp a SECOND time, directly into iclforge-tests, against these
 # directories - exposed unconditionally, since has_avx2() correctly answering "false" on a generic or
 # AVX2-disabled build is as worth testing as it answering "true".
@@ -281,6 +332,10 @@ iclforge_add_library(base
         src/crypto/thrift_binary.cpp
         src/crypto/content_signature.cpp
         src/crypto/signing_key.cpp
+        ${ICLFORGE_SHA256_HW_SOURCES}
+    PRIVATE_INCLUDES
+        # "crypto/sha256_hw.hpp" and "crypto/sha256_constants.hpp": private to the hash
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
         "${_iclforge_profiling_dir}"
@@ -302,4 +357,13 @@ if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(src/cpu_features.cpp src/crypto/signing_key.cpp
         src/crypto/credentials.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()
+
+# The one file in the library compiled for the SHA instructions (see ICLFORGE_SHA256_HW_KERNEL above).
+# Nothing else may be: the rest has to run on a CPU that does not have them. No interprocedural
+# optimisation is enabled anywhere in this project, so the kernel cannot be inlined into a caller
+# built without the flag; if that ever changes, this file needs the carve-out the AVX2 kernels have.
+if(ICLFORGE_SHA256_HW_KERNEL AND ICLFORGE_SHA256_HW_OPTIONS)
+    set_source_files_properties("${ICLFORGE_SHA256_HW_KERNEL}"
+        PROPERTIES COMPILE_OPTIONS "${ICLFORGE_SHA256_HW_OPTIONS}")
 endif()

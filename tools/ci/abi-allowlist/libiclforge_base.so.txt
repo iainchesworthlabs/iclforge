@@ -139,3 +139,6 @@ iclforge::base::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&
 iclforge::base::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>, unsigned int)
 iclforge::base::write_wav_pcm16_raw(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::byte const, 18446744073709551615ul>, unsigned int, unsigned short)
 iclforge::internal::cpu::has_avx2()
+iclforge::internal::crypto::sha256_compress_hardware(unsigned int*, unsigned char const*, unsigned long)
+iclforge::internal::crypto::sha256_compress_portable(unsigned int*, unsigned char const*, unsigned long)
+iclforge::internal::crypto::sha256_hardware_supported()
