@@ -1,0 +1,1223 @@
+{
+  "_comment": "The TrueHD fixtures of tools/generators/gen_dee_gold.py (GOLD_VERSION 2), cut from the 2026-10-29 gold set to the legs below and their sources: DEE's streams, each with its source and DEE's log. The set's root is '.', the logs lose the lines that name the machine, its user or its entitlement, and MediaInfo's and DEE's own report digests are left out. They are test inputs, decoded and compared with their sources and not analysed (docs/verification.md, \"Scoring DEE's TrueHD streams\").",
+  "gold_version": 2,
+  "made": "2026-10-29T11:03:57Z",
+  "updated": "2026-10-29T11:15:35Z",
+  "dee_version": "This tool belongs to the Dolby Encoding Engine version 6.5.4-dme+b56bc97e",
+  "mediainfo_version": "MediaInfo Command line, MediaInfoLib - v26.05",
+  "ffmpeg_version": "ffmpeg version 8.0.1-full_build-www.gyan.dev",
+  "forge": "iclforge 0.10.0-beta.1+5678 release: v0.10.0-beta.1-5678-g79b9118fe0 commit:  79b9118fe02f94f839522e36fe91a8e6cc80f471",
+  "groups": {
+    "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+    "truehd-fixtures": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits"
+  },
+  "sources": {
+    "fx_tones_71": {
+      "layout": "71",
+      "speakers": [
+        "L",
+        "R",
+        "C",
+        "LFE",
+        "Ls",
+        "Rs",
+        "Lrs",
+        "Rrs"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "one tone per channel, L R C LFE Ls Rs Lrs Rrs: 331, 457, 613, 47, 787, 953, 1777, 1933 Hz at -20 dBFS, 48 kHz",
+      "size_bytes": 288044,
+      "sha256": "89a43b2eed7cf7da38335d6dd383f3c4c5a7109222c14d32446d67234891f6fb"
+    },
+    "fx_music_51": {
+      "layout": "51",
+      "speakers": [
+        "L",
+        "R",
+        "C",
+        "LFE",
+        "Ls",
+        "Rs"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "music_51 for 0.25 s",
+      "size_bytes": 216044,
+      "sha256": "ee5c354cac693d0c1501a00330add6b7f18e5df99dbd805cd3c9605bb74fe3d6"
+    },
+    "fx_music_20": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "music_20 for 0.25 s",
+      "size_bytes": 72044,
+      "sha256": "85ec5da5f0314ad706a81715d91b3ba506333443bde0a150c87a7a1cfd02f212"
+    },
+    "fx_music_20_96k": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 96000,
+      "bits": 24,
+      "description": "music_20_96k for 0.25 s",
+      "size_bytes": 144044,
+      "sha256": "993294ab1015fb66ec7aa4ae460db34b85025bffc317334e6eaf5ce248f5e138"
+    },
+    "fx_tones_71_96k": {
+      "layout": "71",
+      "speakers": [
+        "L",
+        "R",
+        "C",
+        "LFE",
+        "Ls",
+        "Rs",
+        "Lrs",
+        "Rrs"
+      ],
+      "seconds": 0.125,
+      "sample_rate": 96000,
+      "bits": 24,
+      "description": "one tone per channel, L R C LFE Ls Rs Lrs Rrs: 331, 457, 613, 47, 787, 953, 1777, 1933 Hz at -20 dBFS, 96 kHz",
+      "size_bytes": 288044,
+      "sha256": "a08dd4e71152ee8eac007fabd2da5d74b064df44e27edf968ded5aefa9723f11"
+    },
+    "fx_tones_20_16": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 16,
+      "description": "fx_tones_20 rounded to 16 bits",
+      "size_bytes": 48044,
+      "sha256": "2b7b7a3760f1905e575facad388a8305ff73dcf3f14201fa38c7bfd572a38fb4"
+    },
+    "fx_tones_20_b20": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "fx_tones_20 rounded to 20 bits",
+      "size_bytes": 72044,
+      "sha256": "08fb8aab50ab28ec5c1d02241edbc3cd83bd35b6f12af3d70e05dbc8129593f7"
+    },
+    "tones_20_n12000": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "one tone per channel, L R: 331, 457 Hz at -20 dBFS, 48 kHz, exactly 12000 samples",
+      "size_bytes": 72044,
+      "sha256": "1ce481b904d62e47a49c326978c53daf56b7cf4cd7e476bc1d5c7b7db37db7de"
+    },
+    "tones_20_n12001": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.25002083333333336,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "one tone per channel, L R: 331, 457 Hz at -20 dBFS, 48 kHz, exactly 12001 samples",
+      "size_bytes": 72050,
+      "sha256": "833b89176a7a6e41f0cb5ac954b8b21d08f68355f87f7decde58f8f38e6504c1"
+    },
+    "tones_20_n12039": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.2508125,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "one tone per channel, L R: 331, 457 Hz at -20 dBFS, 48 kHz, exactly 12039 samples",
+      "size_bytes": 72278,
+      "sha256": "20afa4bc3a9153e7a1a8b47877eaf602ab63b351fae1bc86d44a5330e50c8285"
+    },
+    "tones_20_n4001": {
+      "layout": "20",
+      "speakers": [
+        "L",
+        "R"
+      ],
+      "seconds": 0.08335416666666666,
+      "sample_rate": 48000,
+      "bits": 24,
+      "description": "one tone per channel, L R: 331, 457 Hz at -20 dBFS, 48 kHz, exactly 4001 samples",
+      "size_bytes": 24050,
+      "sha256": "bf711175c3a6febbd9d29feab6803ff0798b10f968f2582772ff86925caa8f9d"
+    }
+  },
+  "legs": {
+    "thd-fx-8ch-tones-48k24-dmx6-dmx2": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_tones_71",
+      "sources": [
+        "fx_tones_71.wav"
+      ],
+      "source_sha256": [
+        "89a43b2eed7cf7da38335d6dd383f3c4c5a7109222c14d32446d67234891f6fb"
+      ],
+      "options": [
+        "--presentation",
+        "8ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_tones_71}",
+        "--presentation",
+        "6ch",
+        "--presentation",
+        "2ch"
+      ],
+      "command": "dee_dthd_encoder --presentation 8ch --input-format wav -i ./sources/fx_tones_71.wav --presentation 6ch --presentation 2ch -o ./streams/thd-fx-8ch-tones-48k24-dmx6-dmx2/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-8ch-tones-48k24-dmx6-dmx2",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 108146,
+      "sha256": "cfcb5a7c3f99d58feb6d1feab3d46c8892d1798ea6f5be7e5b7f88089fdf518a",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 3,
+        "channels": [
+          2,
+          6,
+          8
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 899,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 900,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-8ch-tones-48k24-dmx6-dmx2\\dee.mlp: access unit 0: unsupported: a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type 1): its noise comes from generator 1, whose 256-entry table is not available (TH spec \u00a717.3, \u00a717.4)",
+      "forge_presentations": {
+        "2ch": "ok: 2 channels, 12000 samples",
+        "6ch": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-8ch-tones-48k24-dmx6-dmx2\\dee.mlp: access unit 128: lossless check: lossless check of the restart interval",
+        "8ch": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-8ch-tones-48k24-dmx6-dmx2\\dee.mlp: access unit 0: unsupported: a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type 1): its noise comes from generator 1, whose 256-entry table is not available (TH spec \u00a717.3, \u00a717.4)",
+        "all": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-8ch-tones-48k24-dmx6-dmx2\\dee.mlp: access unit 0: unsupported: a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type 1): its noise comes from generator 1, whose 256-entry table is not available (TH spec \u00a717.3, \u00a717.4)"
+      },
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 8,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "cfcb5a7c3f99d58feb6d1feab3d46c8892d1798ea6f5be7e5b7f88089fdf518a",
+        "dee_output.txt": "6fcd41dc35a76242b90d3e95b0114f08922046ab7843dce3ddb6f36267ff745e"
+      }
+    },
+    "thd-fx-6ch-music-48k24": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_music_51",
+      "sources": [
+        "fx_music_51.wav"
+      ],
+      "source_sha256": [
+        "ee5c354cac693d0c1501a00330add6b7f18e5df99dbd805cd3c9605bb74fe3d6"
+      ],
+      "options": [
+        "--presentation",
+        "6ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_music_51}"
+      ],
+      "command": "dee_dthd_encoder --presentation 6ch --input-format wav -i ./sources/fx_music_51.wav -o ./streams/thd-fx-6ch-music-48k24/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-6ch-music-48k24",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-12.4",
+          "true_peak": "-12.4"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 58688,
+      "sha256": "794eb5838688fd00979c72d43108bb4bbe33c2655a98560740d9d7fd804c127d",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 2,
+        "channels": [
+          2,
+          6
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 487,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 600,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-6ch-music-48k24\\dee.mlp: access unit 0: unsupported: a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type 1): its noise comes from generator 1, whose 256-entry table is not available (TH spec \u00a717.3, \u00a717.4)",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 6,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "794eb5838688fd00979c72d43108bb4bbe33c2655a98560740d9d7fd804c127d",
+        "dee_output.txt": "f606bc5a1b52a70bd82ca82d71042b99f67a6afb05205d1c618c1a93803b0308"
+      }
+    },
+    "thd-fx-2ch-music-48k24": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_music_20",
+      "sources": [
+        "fx_music_20.wav"
+      ],
+      "source_sha256": [
+        "85ec5da5f0314ad706a81715d91b3ba506333443bde0a150c87a7a1cfd02f212"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_music_20}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/fx_music_20.wav -o ./streams/thd-fx-2ch-music-48k24/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-music-48k24",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-19.5",
+          "true_peak": "-19.5"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 16384,
+      "sha256": "d8db6bf554eff63d7859bbe85dce9bc17058bb97990394460da80d0c4ea057b1",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 136,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "d8db6bf554eff63d7859bbe85dce9bc17058bb97990394460da80d0c4ea057b1",
+        "dee_output.txt": "5026bfd1cf6af2ef3f9a7fcc28170ab629badfab76ff4d7943264f561a3c6ba5"
+      }
+    },
+    "thd-fx-2ch-music-96k24": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_music_20_96k",
+      "sources": [
+        "fx_music_20_96k.wav"
+      ],
+      "source_sha256": [
+        "993294ab1015fb66ec7aa4ae460db34b85025bffc317334e6eaf5ce248f5e138"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_music_20_96k}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/fx_music_20_96k.wav -o ./streams/thd-fx-2ch-music-96k24/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-music-96k24",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-19.5",
+          "true_peak": "-19.5"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 47602,
+      "sha256": "87055d81a768b909a981006b7798ee738c9b8db55a27430b99b602dccab7f06a",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 96000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 80,
+        "variable_rate": true,
+        "peak_data_rate": 197,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 24000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 96000,
+        "decoded_samples": 24000,
+        "source_samples": 24000,
+        "lossless": false,
+        "channel_map": [
+          0,
+          1
+        ],
+        "error_db_per_channel": [
+          -46.5,
+          -47.3
+        ],
+        "max_abs_error_24bit": 51167
+      },
+      "files": {
+        "dee.mlp": "87055d81a768b909a981006b7798ee738c9b8db55a27430b99b602dccab7f06a",
+        "dee_output.txt": "18a504217536862c03043eb530a882ca795b79b1c1b5afadab6cc2f583556021"
+      }
+    },
+    "thd-fx-8ch-tones-96k24": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_tones_71_96k",
+      "sources": [
+        "fx_tones_71_96k.wav"
+      ],
+      "source_sha256": [
+        "a08dd4e71152ee8eac007fabd2da5d74b064df44e27edf968ded5aefa9723f11"
+      ],
+      "options": [
+        "--presentation",
+        "8ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_tones_71_96k}"
+      ],
+      "command": "dee_dthd_encoder --presentation 8ch --input-format wav -i ./sources/fx_tones_71_96k.wav -o ./streams/thd-fx-8ch-tones-96k24/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-8ch-tones-96k24",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 87880,
+      "sha256": "e1d2775d5be66a6b71cedc834246904c402c0161d903819f6ee196418905a481",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 96000,
+        "substreams": 3,
+        "channels": [
+          2,
+          6,
+          8
+        ],
+        "access_units": 150,
+        "samples_per_access_unit": 80,
+        "variable_rate": true,
+        "peak_data_rate": 591,
+        "object_substream": false,
+        "major_syncs": 2,
+        "segments_checked": 450,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-8ch-tones-96k24\\dee.mlp: access unit 0: unsupported: a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type 1): its noise comes from generator 1, whose 256-entry table is not available (TH spec \u00a717.3, \u00a717.4)",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 8,
+        "decoded_rate": 96000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": false,
+        "channel_map": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "error_db_per_channel": [
+          -48.6,
+          -48.3,
+          -47.8,
+          -49.1,
+          -47.1,
+          -46.5,
+          -44.0,
+          -43.6
+        ],
+        "max_abs_error_24bit": 105769
+      },
+      "files": {
+        "dee.mlp": "e1d2775d5be66a6b71cedc834246904c402c0161d903819f6ee196418905a481",
+        "dee_output.txt": "428a26327902d0f82c30e5105e95e8cdd89ba618c5828f595089b7f2f3026aa7"
+      }
+    },
+    "thd-fx-2ch-tones-48k16": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_tones_20_16",
+      "sources": [
+        "fx_tones_20_16.wav"
+      ],
+      "source_sha256": [
+        "2b7b7a3760f1905e575facad388a8305ff73dcf3f14201fa38c7bfd572a38fb4"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_tones_20_16}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/fx_tones_20_16.wav -o ./streams/thd-fx-2ch-tones-48k16/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-tones-48k16",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 9140,
+      "sha256": "f808c562b7962dd645a830cb8475b4500a4ea57da78a2ae7d819c66549362ac2",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 76,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "f808c562b7962dd645a830cb8475b4500a4ea57da78a2ae7d819c66549362ac2",
+        "dee_output.txt": "2e6f89f1f03b6b2883fe07aad0cb1a51431acebe401fa686deaa39f726dc2258"
+      }
+    },
+    "thd-fx-2ch-tones-48k20": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_tones_20_b20",
+      "sources": [
+        "fx_tones_20_b20.wav"
+      ],
+      "source_sha256": [
+        "08fb8aab50ab28ec5c1d02241edbc3cd83bd35b6f12af3d70e05dbc8129593f7"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_tones_20_b20}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/fx_tones_20_b20.wav -o ./streams/thd-fx-2ch-tones-48k20/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-tones-48k20",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 16298,
+      "sha256": "010a9f937a8ea565d56d5c654275a0ae37b792a61b867c245368bbc7d43778f7",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 136,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "010a9f937a8ea565d56d5c654275a0ae37b792a61b867c245368bbc7d43778f7",
+        "dee_output.txt": "0614e7e2aafa7f6337cd076ce8d793876de6278aba048b7f64033af5485cc265"
+      }
+    },
+    "thd-fx-2ch-music-48k24-drc-film_standard": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_music_20",
+      "sources": [
+        "fx_music_20.wav"
+      ],
+      "source_sha256": [
+        "85ec5da5f0314ad706a81715d91b3ba506333443bde0a150c87a7a1cfd02f212"
+      ],
+      "options": [
+        "--presentation",
+        "2ch:drc_profile=film_standard",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_music_20}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch:drc_profile=film_standard --input-format wav -i ./sources/fx_music_20.wav -o ./streams/thd-fx-2ch-music-48k24-drc-film_standard/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-music-48k24-drc-film_standard",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-19.5",
+          "true_peak": "-19.5"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 16384,
+      "sha256": "d717b082daf67523529ac46ab2556b49fb47591534960cc31321b933646dabba",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 136,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "d717b082daf67523529ac46ab2556b49fb47591534960cc31321b933646dabba",
+        "dee_output.txt": "c3e70e1c6cd9b61e207e210fd8d3b79b20100e9296c0d8553e789d7ae7c1439b"
+      }
+    },
+    "thd-fx-2ch-music-48k24-timecode": {
+      "group": "truehd-fixtures",
+      "for": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "fx_music_20",
+      "sources": [
+        "fx_music_20.wav"
+      ],
+      "source_sha256": [
+        "85ec5da5f0314ad706a81715d91b3ba506333443bde0a150c87a7a1cfd02f212"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{fx_music_20}",
+        "--embed-timecode",
+        "01:00:00:00",
+        "--timecode-frame-rate",
+        "25"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/fx_music_20.wav --embed-timecode 01:00:00:00 --timecode-frame-rate 25 -o ./streams/thd-fx-2ch-music-48k24-timecode/dee.mlp --overwrite 1 --temp-dir ./streams/thd-fx-2ch-music-48k24-timecode",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-19.5",
+          "true_peak": "-19.5"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 16400,
+      "sha256": "3d3bded2346fbc4f0f03dd54ee2e282fb494a3f6aa9a3ebee2b64a6719ea49e7",
+      "forge_probe": {
+        "error": "exit 1: error: lost sync: expected 0x0B77 at byte 0"
+      },
+      "forge_decode": "exit 2: error: D:\\ac3bld\\dee-gold\\streams\\thd-fx-2ch-music-48k24-timecode\\dee.mlp: no 0x0B77 sync word where a frame should begin",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "3d3bded2346fbc4f0f03dd54ee2e282fb494a3f6aa9a3ebee2b64a6719ea49e7",
+        "dee_output.txt": "39015bd238f05809a45952de818f7a298c92811083011456db86b730cf54734e"
+      }
+    },
+    "thd-len-2ch-48k-12000": {
+      "group": "truehd-open",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "tones_20_n12000",
+      "sources": [
+        "tones_20_n12000.wav"
+      ],
+      "source_sha256": [
+        "1ce481b904d62e47a49c326978c53daf56b7cf4cd7e476bc1d5c7b7db37db7de"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{tones_20_n12000}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/tones_20_n12000.wav -o ./streams/thd-len-2ch-48k-12000/dee.mlp --overwrite 1 --temp-dir ./streams/thd-len-2ch-48k-12000",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 25574,
+      "sha256": "68ef5f5b6f9dc2cb73c6d333f7830a303d509747abead989eba03ede496c5aae",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 300,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 213,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 300,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12000 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12000,
+        "source_samples": 12000,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "68ef5f5b6f9dc2cb73c6d333f7830a303d509747abead989eba03ede496c5aae",
+        "dee_output.txt": "7d3e94392755532ac3593b0a0c7e865fcb792f9bce828616d796bb6728ad5868"
+      }
+    },
+    "thd-len-2ch-48k-12001": {
+      "group": "truehd-open",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "tones_20_n12001",
+      "sources": [
+        "tones_20_n12001.wav"
+      ],
+      "source_sha256": [
+        "833b89176a7a6e41f0cb5ac954b8b21d08f68355f87f7decde58f8f38e6504c1"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{tones_20_n12001}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/tones_20_n12001.wav -o ./streams/thd-len-2ch-48k-12001/dee.mlp --overwrite 1 --temp-dir ./streams/thd-len-2ch-48k-12001",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 25100,
+      "sha256": "63c94cc66ac06f154db87313cd1d9f5973ebced9ca52a26f81102cd0ce5954a3",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 301,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 208,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 301,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12001 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12001,
+        "source_samples": 12001,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "63c94cc66ac06f154db87313cd1d9f5973ebced9ca52a26f81102cd0ce5954a3",
+        "dee_output.txt": "5777bf14c01182cec4d60669def698b54ff4c7c4323b45a7468e143755f58df9"
+      }
+    },
+    "thd-len-2ch-48k-12039": {
+      "group": "truehd-open",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "tones_20_n12039",
+      "sources": [
+        "tones_20_n12039.wav"
+      ],
+      "source_sha256": [
+        "20afa4bc3a9153e7a1a8b47877eaf602ab63b351fae1bc86d44a5330e50c8285"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{tones_20_n12039}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/tones_20_n12039.wav -o ./streams/thd-len-2ch-48k-12039/dee.mlp --overwrite 1 --temp-dir ./streams/thd-len-2ch-48k-12039",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 24980,
+      "sha256": "ff56c2697c3af0c478b936f11becca420110683fdfe7dbb6e5c8bc6b7c102ef8",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 301,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 207,
+        "object_substream": false,
+        "major_syncs": 3,
+        "segments_checked": 301,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 12039 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 12039,
+        "source_samples": 12039,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "ff56c2697c3af0c478b936f11becca420110683fdfe7dbb6e5c8bc6b7c102ef8",
+        "dee_output.txt": "0fb800dcf8522a8ddd8a9015db3d3d23e859a34b48877f42b3167d91730e9e6e"
+      }
+    },
+    "thd-len-2ch-48k-4001": {
+      "group": "truehd-open",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "encoder": "dee_dthd_encoder",
+      "codec": "truehd",
+      "source": "tones_20_n4001",
+      "sources": [
+        "tones_20_n4001.wav"
+      ],
+      "source_sha256": [
+        "bf711175c3a6febbd9d29feab6803ff0798b10f968f2582772ff86925caa8f9d"
+      ],
+      "options": [
+        "--presentation",
+        "2ch",
+        "--input-format",
+        "wav",
+        "-i",
+        "{tones_20_n4001}"
+      ],
+      "command": "dee_dthd_encoder --presentation 2ch --input-format wav -i ./sources/tones_20_n4001.wav -o ./streams/thd-len-2ch-48k-4001/dee.mlp --overwrite 1 --temp-dir ./streams/thd-len-2ch-48k-4001",
+      "use_note": "A test input only (the user's decision, 2026-09-26): decode it, pass it through and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.",
+      "dee_warnings": [],
+      "dee_loudness": {
+        "Source loudness": {
+          "measured_loudness": "-120.0",
+          "gating": "ungated",
+          "speech_percentage": "0.0",
+          "dialogue_loudness": "measurement_disabled",
+          "itu_loudness": "measurement_disabled",
+          "loudness_range": "measurement_disabled",
+          "sample_peak": "-20.0",
+          "true_peak": "-20.0"
+        }
+      },
+      "stream": "dee.mlp",
+      "size_bytes": 10152,
+      "sha256": "7b69bfd7ba84362354bc5c5cc0e9df6b32fb9d46b502dfcf539bb33580ead8c6",
+      "forge_probe": {
+        "codec": "truehd",
+        "sample_rate": 48000,
+        "substreams": 1,
+        "channels": [
+          2
+        ],
+        "access_units": 101,
+        "samples_per_access_unit": 40,
+        "variable_rate": true,
+        "peak_data_rate": 172,
+        "object_substream": false,
+        "major_syncs": 1,
+        "segments_checked": 101,
+        "segment_failures": 0,
+        "unreadable_units": 0,
+        "skipped_bytes": 0
+      },
+      "forge_decode": "ok: 2 channels, 4001 samples",
+      "ffmpeg": {
+        "demuxer": "truehd",
+        "strict": "ok",
+        "decode": "ok",
+        "decoded_channels": 2,
+        "decoded_rate": 48000,
+        "decoded_samples": 4001,
+        "source_samples": 4001,
+        "lossless": true,
+        "offset": 0,
+        "channel_map": [
+          0,
+          1
+        ],
+        "mismatched_samples": 0
+      },
+      "files": {
+        "dee.mlp": "7b69bfd7ba84362354bc5c5cc0e9df6b32fb9d46b502dfcf539bb33580ead8c6",
+        "dee_output.txt": "5446eebaaef7a36d5aac54d84f93569d5ed53519ebe7fd4471b6b64c2f367717"
+      }
+    }
+  }
+}

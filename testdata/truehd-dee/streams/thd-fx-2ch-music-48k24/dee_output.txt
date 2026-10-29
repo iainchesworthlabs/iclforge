@@ -1,0 +1,28 @@
+dee_dthd_encoder --presentation 2ch --input-format wav -i .\sources\fx_music_20.wav -o .\streams\thd-fx-2ch-music-48k24\dee.mlp --overwrite 1 --temp-dir .\streams\thd-fx-2ch-music-48k24
+
+
+[2026-10-29 22:12:51.854] Resolving 'auto' framerate option...
+[2026-10-29 22:12:51.854] Framerate information is not present in the input file. Value 'not_indicated' will be used.
+[2026-10-29 22:12:51.887] Step 1/2 : 2-channel preprocessing and measurement
+[2026-10-29 22:12:51.900] [Source loudness] 2-channel results:
+[2026-10-29 22:12:51.900] [Source loudness] measured_loudness=-120.0
+[2026-10-29 22:12:51.900] [Source loudness] gating=ungated
+[2026-10-29 22:12:51.900] [Source loudness] speech_percentage=0.0
+[2026-10-29 22:12:51.900] [Source loudness] dialogue_loudness=measurement_disabled
+[2026-10-29 22:12:51.900] [Source loudness] itu_loudness=measurement_disabled
+[2026-10-29 22:12:51.900] [Source loudness] loudness_range=measurement_disabled
+[2026-10-29 22:12:51.900] [Source loudness] sample_peak=-19.5
+[2026-10-29 22:12:51.900] [Source loudness] true_peak=-19.5
+[2026-10-29 22:12:51.911] 2-channel preprocessing info:
+[2026-10-29 22:12:51.911]   Read samples: 12000
+[2026-10-29 22:12:51.911]   Sample rate: 48000
+[2026-10-29 22:12:51.911]   Dialnorm: -31
+[2026-10-29 22:12:51.923] Step 2/2 : Encoding
+[2026-10-29 22:12:51.985] Encoding info: 
+[2026-10-29 22:12:51.985]   Encoded access units:300
+[2026-10-29 22:12:51.985]   Average data rate: 524 kbps
+[2026-10-29 22:12:51.985]   Peak data rate: 408 kbps
+[2026-10-29 22:12:51.985]   Max latency: 73.1 ms
+
+Execution time: 0.780293 seconds
+Exit code: 0
