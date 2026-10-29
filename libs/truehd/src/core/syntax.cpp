@@ -15,7 +15,9 @@ using detail::put_field;
 using detail::put_signed;
 using detail::read_signed;
 
-constexpr Error truncated(std::string_view what) { return Error{ErrorKind::kTruncated, what}; }
+constexpr Error truncated(std::string_view what) {
+    return Error{ErrorKind::kTruncated, what};
+}
 
 // --- TH spec §9.2, filter_params() ---
 
@@ -23,7 +25,8 @@ constexpr Error truncated(std::string_view what) { return Error{ErrorKind::kTrun
     FilterSpec filter;
     filter.order = static_cast<std::uint8_t>(reader.read(4));
     if (filter.order > max_order) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "filter order above the limit (TH spec §9.3)"});
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "filter order above the limit (TH spec §9.3)"});
     }
     if (filter.order == 0) {
         return filter;
@@ -32,10 +35,12 @@ constexpr Error truncated(std::string_view what) { return Error{ErrorKind::kTrun
     filter.coeff_bits = static_cast<std::uint8_t>(reader.read(5));
     filter.coeff_shift = static_cast<std::uint8_t>(reader.read(3));
     if (filter.coeff_bits < 1 || filter.coeff_bits > 16) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "filter coefficient width outside 1..16"});
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "filter coefficient width outside 1..16"});
     }
     for (int i = 0; i < filter.order; ++i) {
-        filter.coeff[static_cast<std::size_t>(i)] = read_signed(reader, filter.coeff_bits) * (1 << filter.coeff_shift);
+        filter.coeff[static_cast<std::size_t>(i)] =
+            read_signed(reader, filter.coeff_bits) * (1 << filter.coeff_shift);
     }
     // The state flag is sent for both filters (TH spec §9.2 says the IIR's alone; ERRATA.md).
     filter.has_state = reader.read(1) != 0;
@@ -44,7 +49,9 @@ constexpr Error truncated(std::string_view what) { return Error{ErrorKind::kTrun
         filter.state_shift = static_cast<std::uint8_t>(reader.read(4));
         for (int i = 0; i < filter.order; ++i) {
             filter.state[static_cast<std::size_t>(i)] =
-                filter.state_bits == 0 ? 0 : read_signed(reader, filter.state_bits) * (1 << filter.state_shift);
+                filter.state_bits == 0
+                    ? 0
+                    : read_signed(reader, filter.state_bits) * (1 << filter.state_shift);
         }
     }
     return filter;
@@ -60,29 +67,32 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     put_field(writer, filter.coeff_shift, 3);
     for (int i = 0; i < filter.order; ++i) {
         // The value is stored shifted left; the stream carries it shifted back.
-        put_signed(writer, filter.coeff[static_cast<std::size_t>(i)] >> filter.coeff_shift, filter.coeff_bits);
+        put_signed(writer, filter.coeff[static_cast<std::size_t>(i)] >> filter.coeff_shift,
+                   filter.coeff_bits);
     }
     put_field(writer, filter.has_state ? 1U : 0U, 1);
     if (filter.has_state) {
         put_field(writer, filter.state_bits, 4);
         put_field(writer, filter.state_shift, 4);
         for (int i = 0; i < filter.order && filter.state_bits > 0; ++i) {
-            put_signed(writer, filter.state[static_cast<std::size_t>(i)] >> filter.state_shift, filter.state_bits);
+            put_signed(writer, filter.state[static_cast<std::size_t>(i)] >> filter.state_shift,
+                       filter.state_bits);
         }
     }
 }
 
 // --- TH spec §10.2, matrix_parameters() ---
 
-[[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader, const BlockContext& context) {
+[[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,
+                                                            const BlockContext& context) {
     const unsigned count = reader.read(4);
     if (count > kMaxMatrices) {
         return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
     }
     MatrixSet set;
     set.count = static_cast<std::uint8_t>(count);
-    // The streams carry a coefficient for each of the matrix channels and the two noise channels, where TH spec
-    // §10.2 lists max_chan + 1 (ERRATA.md).
+    // The streams carry a coefficient for each of the matrix channels and the two noise channels,
+    // where TH spec §10.2 lists max_chan + 1 (ERRATA.md).
     const int coefficients = context.max_matrix_chan + 1 + kNoiseChannels;
     for (unsigned m = 0; m < count; ++m) {
         MatrixSpec& matrix = set.items[m];
@@ -90,7 +100,8 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
         matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
         matrix.lsb_bypass = reader.read(1) != 0;
         if (matrix.out_ch > context.max_matrix_chan) {
-            return std::unexpected(Error{ErrorKind::kBadParameter, "matrix output channel above max_matrix_chan"});
+            return std::unexpected(
+                Error{ErrorKind::kBadParameter, "matrix output channel above max_matrix_chan"});
         }
         if (matrix.frac_bits > 14) {
             return std::unexpected(Error{ErrorKind::kBadParameter, "matrix frac_bits above 14"});
@@ -153,14 +164,16 @@ HuffmanCode huffman_code(int huff_type, int symbol) noexcept {
     }
 }
 
-std::expected<RestartHeader, Error> read_restart_header(BitReader& reader, std::span<const std::byte> data,
+std::expected<RestartHeader, Error> read_restart_header(BitReader& reader,
+                                                        std::span<const std::byte> data,
                                                         bool verify_crc) {
     const std::size_t start = reader.bit_position();
     RestartHeader header;
     header.sync = static_cast<std::uint16_t>(reader.read(14));
     if (header.sync != kRestartSyncStandard && header.sync != kRestartSyncNoise &&
         header.sync != kRestartSyncAtmos) {
-        return std::unexpected(Error{ErrorKind::kBadRestartSync, "restart sync is not 0x31EA, 0x31EB or 0x31EC"});
+        return std::unexpected(
+            Error{ErrorKind::kBadRestartSync, "restart sync is not 0x31EA, 0x31EB or 0x31EC"});
     }
     header.output_timing = static_cast<std::uint16_t>(reader.read(16));
     header.min_chan = static_cast<std::uint8_t>(reader.read(4));
@@ -187,11 +200,13 @@ std::expected<RestartHeader, Error> read_restart_header(BitReader& reader, std::
         return std::unexpected(Error{ErrorKind::kBadRestartCrc, "restart header CRC"});
     }
     if (header.min_chan > header.max_chan || header.max_chan > header.max_matrix_chan) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "restart header channel range (TH spec §7.4)"});
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "restart header channel range (TH spec §7.4)"});
     }
     for (int ch = 0; ch <= header.max_matrix_chan; ++ch) {
         if (header.ch_assign[static_cast<std::size_t>(ch)] > header.max_matrix_chan) {
-            return std::unexpected(Error{ErrorKind::kBadParameter, "ch_assign above max_matrix_chan (TH spec §7.4)"});
+            return std::unexpected(
+                Error{ErrorKind::kBadParameter, "ch_assign above max_matrix_chan (TH spec §7.4)"});
         }
     }
     return header;
@@ -222,7 +237,8 @@ void write_restart_header(BitWriter& writer, const RestartHeader& header) {
     writer.append(bits);
 }
 
-std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader, const BlockContext& context) {
+std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
+                                                        const BlockContext& context) {
     BlockHeaderSpec header;
     std::uint8_t flags = context.presence_flags;
     if (reader.read(1) != 0) {
@@ -266,7 +282,8 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader, const
                     return std::unexpected(fir.error());
                 }
                 if (fir->has_state) {
-                    return std::unexpected(Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
+                    return std::unexpected(
+                        Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
                 }
                 update.fir = *fir;
             }
@@ -290,7 +307,8 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader, const
     return header;
 }
 
-void write_block_header(BitWriter& writer, const BlockContext& context, const BlockHeaderSpec& header) {
+void write_block_header(BitWriter& writer, const BlockContext& context,
+                        const BlockHeaderSpec& header) {
     std::uint8_t flags = context.presence_flags;
     put_field(writer, header.presence_flags ? 1U : 0U, 1);
     if (header.presence_flags) {

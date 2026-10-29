@@ -1,0 +1,172 @@
+# iclforge::truehd: where the specification and the streams disagree
+
+"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.3 (planning/truehd.md says what it is and
+how it is used). Every entry below is a place where the specification is silent, contradicts itself or disagrees
+with the streams FFmpeg 6.1.1's `truehd` and `mlp` encoders write (and its decoder reads). The streams decide:
+FFmpeg's decoder decodes them, and the codec is lossless, so a reading that decodes all of them sample for sample
+is the reading in use. Where a reading is forced by the streams and the specification is silent, it is marked
+**provisional, owner to confirm**. Where no stream has the feature the library implements the specification as
+written and says so (**no oracle**).
+
+The scripts quoted as evidence are the exploration scripts of the T1 work; the checks that stay in the tree are
+`tools/references/truehd_syntax.py` (the independent Python transcription) and
+`tools/checks/verify_truehd_interop.py` (FFmpeg's strict decode against this library's).
+
+## Open questions for the owner
+
+1. **The evolution payload (TH spec §16.3, §16.6).** The payload is described as a signature container (the AC-4
+   `ContentSignature` Thrift structure, `pace-ccjf1`) and also as carrying typed payload entries with the object
+   audio metadata (§16.3.2). A signature container cannot hold the bytes its own digest covers, and the Thrift
+   structure of the AC-4 signing specification has no field for them. What is on the wire? Until this is answered
+   the library carries the extra data as bytes (`DecodedAccessUnit::extra_data`) and phase T2b writes nothing.
+2. **The 16-channel extension of the channel meaning (§14.2).** `extra_channel_meaning_length` has no unit and the
+   section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
+   ... bytes) and reads the fields as written, with "extended_substream" taken to mean `extended_substream_info != 0`.
+   No stream has it (**no oracle**). Is the length in bits, bytes or words, and is the CRC placed after padding to
+   a 16-bit word?
+3. **Terminators (§3.5, §16.5).** FFmpeg's encoder writes none between segments; its last access unit carries an
+   end-of-stream marker that the specification does not describe (entry 14). Do DEE's streams carry `terminatorA`
+   at the end of every segment of substreams 0 to 2, and `terminatorB` (0x1234) at the end of substream 3, as the
+   specification says? Is the 12-bit count after `terminatorA` part of the terminator? The decoder accepts a
+   stream with or without them.
+4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
+   default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
+5. **Noise generation (§17).** The specification gives `noise_shift` and `noisegen_seed` and no generator, and the
+   noise channels a matrix can draw on (entry 8) have no definition. The library refuses restart sync 0x31EB
+   (`noise_type` 1) and a matrix that uses a noise channel with `ErrorKind::kUnsupported`. Please supply the
+   generator, or a DEE stream that uses it.
+6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The streams
+   cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
+   `ch_assign` is the identity. The library shifts by the output position. **Provisional, owner to confirm.**
+7. **Negative `output_shift` (§8.2).** The field is signed; the specification allows no negative value and the
+   streams have none. The library shifts right (arithmetically) for a negative value (**no oracle**).
+8. **IIR state (§9.2, §9.5).** The streams never send `new_states`. The library loads `state[i]` as the history at
+   lag i + 1 without scaling by `state_shift`; §9.5's pseudo-code scales the state a filter *produces* by
+   `state_shift`, which no stream shows (**no oracle**).
+9. **The block data CRC (§8.1, App. B).** Polynomial 0x63; the initial value and the bytes covered are not given and
+   no stream sets `data_check_present`. The library checks `block_data_bits` (the length) and does not check the CRC.
+
+## Entries
+
+Each is numbered; code and documentation cite them as "ERRATA n".
+
+**1. The signature.** TH spec §4.3 (v3.3): 0xB752 for both stream types; v3.0 said 0xB753 for TrueHD. The streams
+have 0xB752 (`dumpms.py`: `f8 72 6f ba ... b7 52` for TrueHD, `f8 72 6f bb ... b7 52` for MLP). The library requires
+0xB752 (`ErrorKind::kBadSignature`).
+
+**2. Samples per access unit.** §3.3: 40 at every rate. The streams: 40 at 44.1 and 48 kHz, 80 at 88.2 and 96,
+160 at 176.4 and 192 (`nominal_samples_per_access_unit`; the blocks of a segment add up to the unit and the decoder
+does not depend on the nominal figure). Evidence: `endmark2.py programme_music_stereo.flac 96000 7` encodes 1,607
+samples into 21 units (`samples_in_AUs=1680`, one block of 80 in each); at 192 kHz 3,211 samples take 21 units of 160.
+
+**3. The check nibble (§3.2).** The nibbles of the four header bytes and of the substream directory XOR to 0xF; the
+major sync is not covered. `nib.py` over five streams (48 and 96 kHz, mono, 5.1, MLP): `{15: 2400}` for every
+stream, 2,400 access units each, whether or not the unit carries a major sync.
+
+**4. The major sync CRC (§4.1, App. B).** CRC-16, polynomial 0x002D, initial value 0, over the bytes from the sync
+word up to the last two before the CRC; those two are XORed into the register as a big-endian word, not fed to it.
+`msync_crc.py set/m51_48.thd mlp/st48.mlp`: the stored CRC equals `crc(bytes[0:24]) ^ be16(bytes[24:26])` in both
+(0xE4D1 and 0x2F92); the little-endian reading of the last two bytes gives 0xE4D1 and 0x3489, so it matches the first
+by chance and not the second.
+
+**5. The restart header CRC (§7.1).** CRC-8, polynomial 0x1D, initial value 0, over the bits from the first bit of
+the sync to the CRC field, the last eight of which are XORed into the register instead of fed to it. Found by
+running the candidate polynomials and initial values over the restart headers of the 5.1 stream (300 of them); this is
+the only combination of the search that matches all of them.
+
+**6. The substream parity and CRC (§6.2, App. B).** Parity: the XOR of the payload bytes XORed with 0xA9 (as
+written). CRC: polynomial 0x63, initial value **0x3C**, over the payload without its last byte, that byte XORed in
+(v3.1's note); the parity byte is not covered. Same search as entry 5, over the segments of the 5.1 stream; the
+library's strict decode then passes the parity and CRC of every segment of every FFmpeg stream tried (19 exploration streams and the 12 fixtures).
+
+**7. The restart header's tail.** §7.1 lists 19 reserved bits after `noisegen_seed` and `max_shift`, `max_lsbs`,
+`max_bits`, `max_bits_repeat` after the lossless check. The header is 113 bits to `ch_assign` in the streams
+(confirmed by the CRC), so the four fields take the place of the 19 reserved bits, and the 16 bits after
+`lossless_check` are zero in every stream. The `hires_output_timing` and `heavy_drc_present` bits (and the DRC word
+`heavy_drc_present` would add) are not in this header: the library reads the 16 bits as `tail` and carries them.
+Whether `heavy_drc_present` makes the header longer cannot be seen in streams that never set it (**no oracle**).
+
+**8. The matrix coefficients (§10.2).** The specification sends a coefficient for each channel up to `max_chan`.
+The streams send one for each of the `max_matrix_chan + 1` matrix channels and then two more, the noise channels
+(the walk of entry 9 stays aligned with the block data only with `max_matrix_chan + 1 + 2` presence bits). Each coefficient is `frac_bits + 2` bits, signed. The value is scaled by
+`2^(14 - frac_bits)`; the matrix output is `(sum >> 14)` masked to the output channel's quantiser step, plus the
+bypassed LSB when `lsb_bypass` is set. The noise channel coefficients are zero in every stream; a matrix that uses
+one is refused (Q5).
+
+**9. The FIR filter's state flag (§9.2).** The specification sends `new_states` for the IIR filter only. The streams
+send the bit for the FIR filter as well, always clear (a FIR filter that sets it is refused). Evidence: with the bit
+read for the IIR filter alone the two-channel chunk of a FIR filter is 36 bits where the data needs 51; with it read
+for both, `check_struct.py set/m51_48.thd 400` prints `AUs 400 segments 800 bad 0` and `set/st192.thd 400` prints
+`AUs 400 segments 400 bad 0` (each segment parses to within 16 bits of its end).
+
+**10. The per-channel parameters (§8.3).** `huff_type` (2 bits) and `huff_lsbs` (5 bits) are sent for every channel
+whose `params_for_this_chan` bit is set, not under their own presence bits. Same evidence as entry 9.
+
+**11. Sample reconstruction (§11.3).** The residual is `(symbol << lsb_bits) + raw`, then a centring term, then
+`huff_offset`, then `<< quant_step`. The centring term is `-(1 << (lsb_bits + 2 - huff_type))` for a Huffman channel
+(when the exponent is not negative) and `-(1 << (lsb_bits - 1))` for `huff_type` 0, with
+`lsb_bits = huff_lsbs - quant_step`; §11.3 has only the second. The Huffman symbol is signed (-7 upward, App. C). All
+11 TrueHD and 5 MLP streams decode exactly with these.
+
+**12. The lossless check (§7.3).** The specification XORs the three low bytes of each sample. The streams: for every
+sample of every output channel of the substream, `acc ^= (sample & 0xFFFFFF) << channel` (32-bit), and the check is
+`acc ^ acc>>8 ^ acc>>16 ^ acc>>24` in its low byte. It covers the output of the substream after the output shift, from
+the restart header before to the one after (the header carries the check of the interval that *ends* at it; the first
+header's value checks nothing). `explore27.py set/m51_48.thd 1000 1`: stored 129, 8, 13, 125, 180, 146 and the
+channel-shifted fold gives 129, 8, 13, 125, 180, 146; the plain byte fold gives 17, 41, 214, 201, 40, 103. The library's
+decode checks every interval of every FFmpeg stream tried (19 exploration streams and the 12 fixtures) (`m51_48.thd`: 298 intervals, 149 for each of its two
+substreams, none failing). The shift (Q6) is provisional.
+
+**13. The FIR and IIR histories (§9.4, §9.5).** The FIR filter predicts from the channel's previous *outputs*. The
+"IIR" filter predicts from its previous *residuals* (`output - prediction`), not from previous outputs. The
+prediction is `sum >> coeff_q` with one shift for both filters (§9.3 says they are equal); the output is
+`(prediction + residual) & ~((1 << quant_step) - 1)`. Histories are kept across blocks and zeroed at a restart.
+
+**14. The end-of-stream marker (§3.5, §16.5).** The last access unit of a stream whose length is not a multiple of
+the unit size ends every segment with 32 bits: `0xD234E` (20 bits, `terminatorA`) and a 12-bit count of the samples of
+the unit that are padding, after zero bits that fill the segment to the marker. FFmpeg's decoder returns the unit
+without them. Evidence, `endmark.py` (FFmpeg encodes n samples; the last unit's bits after its last block):
+
+    n=4001 ffmpeg=4001 last: 00000 11010010001101001110 000000100111   (0xD234E, count 39 = 4040 - 4001)
+    n=4025 ffmpeg=4025 last: 00 11010010001101001110 000000001111      (count 15)
+    n=4039 ffmpeg=4039 last: 00000 11010010001101001110 000000000001   (count 1)
+    n=803 (5.1) both substreams: ...11010010001101001110 000000100101  (count 37 = 840 - 803)
+    n=1607 (96 kHz): ...000001001001 (73 = 1680 - 1607); n=3211 (192 kHz): ...000010010101 (149 = 3360 - 3211)
+
+The second value in §16.5, 0x348D3, is `0xD234E` read two bits late (when the zero padding before it ends in "00"):
+it is not a second pattern. The decoder takes the last 32 bits of a segment that has at least 32 bits after its last
+block as the marker, and removes the counted samples from the unit (`DecodedAccessUnit::padding_samples`). The MLP
+encoder writes no marker. **Provisional, owner to confirm** (Q3): the meaning of the 12 bits, from these streams.
+
+**15. Substreams share the sample rows (§2.3, §20.2).** Substream 1's matrices take the channels substream 0 produced
+(after its matrices) as inputs, and its restart header's `min_chan` is where substream 0's `max_chan` ends. A decode
+of substream 1 therefore decodes substream 0 first. The samples of the units must agree in count. The 5.1 streams
+have a stereo downmix in substream 0 and the six channels in substream 1; `Presentation::kBest` gives the six.
+
+**16. The channel meaning (§14.1).** The widths in the specification add up to 64 bits (6+1+1+1+1+7+6+6+5+6+5+5+6+6+1+1);
+all of them are zero in the streams FFmpeg writes (**no oracle**). The 8 bytes after `substream_info` of an MLP major
+sync are not described: FFmpeg writes `56 3f 00 00 80 80 00 00` (5.1) and `56 03 00 00 80 80 00 1b` (stereo) and
+the library carries them as bytes. FFmpeg's MLP stream also has `flags` 0x4000 (§4.1 says bit 14 shall be clear) and
+`format_info` 0x2F0F0001 for stereo (group 1 word length code 2, 24 bits; group 2 code 0xF, absent).
+
+**17. The substream info byte (§6.4).** The bit table does not fit the streams: 0x3C (TrueHD 5.1, two substreams),
+0x14 (TrueHD stereo and mono), 0x04 and 0x05 (MLP 5.1 and stereo); the library carries the byte and uses
+`num_substreams` alone.
+
+**18. The directory entry (§6.1).** `restart_nonexistent` clear means the segment's first block carries a restart
+header, and every segment of a unit with a major sync has one. The first-unit flags are 0x2, the others 0x6
+(`tail.py`: `{(0,2): 150, (0,6): 2250}` per 2,400 units). An entry with `extra_substream_word` is followed by a
+16-bit word (DRC gain 9 bits signed, time 3 bits, 4 bits padding), counted by the check nibble (**no oracle**).
+
+**19. Block parameters carried over.** After a restart header the presence flags are 0xFF, the block size is 8 until a
+header sends one (the specification does not give the initial value), matrices and shifts are empty and zero, and
+every channel is `huff_type` 0 with `huff_lsbs` 24. The bit that gives each presence flag its group is the order of
+§8.2 from bit 7 down; every stream sends 0xFF, so the assignment is **provisional, owner to confirm**.
+
+**20. The Huffman codebooks (App. C).** The three codebooks decode every residual of every stream. Their codes use
+255/256 of the code space (the codes are prefix-free: checked at compile time), so an unused 9-bit prefix is an error
+(`ErrorKind::kBadBlockData`).
+
+**21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
+the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as
+this reads (**no oracle**).

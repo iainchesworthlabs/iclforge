@@ -14,18 +14,19 @@
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/export.hpp"
 
-// The syntax of a substream segment: the restart header (TH spec §7), the block header (§8.2), the channel
-// parameters (§8.3), the prediction filters (§9.2) and the primitive matrices (§10.2), each as a value a reader
-// returns and a writer takes. The decoder reads through these and an encoder writes through them, so that the
-// two directions share one description of the bits. Where the streams disagree with the specification the
-// layout here is the streams' (libs/truehd/ERRATA.md says where).
+// The syntax of a substream segment: the restart header (TH spec §7), the block header (§8.2), the
+// channel parameters (§8.3), the prediction filters (§9.2) and the primitive matrices (§10.2), each
+// as a value a reader returns and a writer takes. The decoder reads through these and an encoder
+// writes through them, so that the two directions share one description of the bits. Where the
+// streams disagree with the specification the layout here is the streams' (libs/truehd/ERRATA.md
+// says where).
 
 namespace iclforge::truehd {
 
-// TH spec §8.2: param_presence_flags. A block header sends a group of parameters only when its flag is set;
-// the flags are 0xFF after a restart and a block header can replace them. The bit for each group is the order
-// the syntax lists the groups in, the first group on bit 7. Streams all send 0xFF; no stream here shows another
-// value, so the assignment is provisional (ERRATA.md).
+// TH spec §8.2: param_presence_flags. A block header sends a group of parameters only when its flag
+// is set; the flags are 0xFF after a restart and a block header can replace them. The bit for each
+// group is the order the syntax lists the groups in, the first group on bit 7. Streams all send
+// 0xFF; no stream here shows another value, so the assignment is provisional (ERRATA.md).
 namespace presence {
 inline constexpr std::uint8_t kBlockSize = 0x80;
 inline constexpr std::uint8_t kMatrix = 0x40;
@@ -48,19 +49,19 @@ struct RestartHeader {
     std::uint8_t noise_shift = 0;
     std::uint32_t noisegen_seed = 0;  // 23 bits
     // The 19 bits that follow the seed carry four fields (max_shift 4, max_lsbs 5, max_bits 5,
-    // max_bits_repeat 5), which TH spec §7.1 lists after the lossless check and calls reserved here. They
-    // describe the interval's largest shift, residual width and coded width, and a decoder needs none of
-    // them; ERRATA.md has the evidence for the split.
+    // max_bits_repeat 5), which TH spec §7.1 lists after the lossless check and calls reserved
+    // here. They describe the interval's largest shift, residual width and coded width, and a
+    // decoder needs none of them; ERRATA.md has the evidence for the split.
     std::uint8_t max_shift = 0;
     std::uint8_t max_lsbs = 0;
     std::uint8_t max_bits = 0;
     std::uint8_t max_bits_repeat = 0;
     bool data_check_present = false;
-    // TH spec §7.3: the check of the PREVIOUS restart interval's samples (the first restart of a stream
-    // carries a value nothing checks). ERRATA.md has the fold.
+    // TH spec §7.3: the check of the PREVIOUS restart interval's samples (the first restart of a
+    // stream carries a value nothing checks). ERRATA.md has the fold.
     std::uint8_t lossless_check = 0;
-    // The 16 bits that end the fixed part; TH spec §7.1 lists several fields in them that cannot all fit.
-    // Zero in every stream checked; carried as read.
+    // The 16 bits that end the fixed part; TH spec §7.1 lists several fields in them that cannot
+    // all fit. Zero in every stream checked; carried as read.
     std::uint16_t tail = 0;
     std::array<std::uint8_t, kMaxChannels> ch_assign{};  // 6 bits each, max_matrix_chan + 1 of them
     std::uint8_t crc = 0;                                // as read; the writer computes it
@@ -71,20 +72,21 @@ struct RestartHeader {
     friend bool operator==(const RestartHeader&, const RestartHeader&) = default;
 };
 
-// The fixed part of a restart header in bits, from the first bit of the sync to the first of ch_assign, and the
-// size of the whole for a given max_matrix_chan.
+// The fixed part of a restart header in bits, from the first bit of the sync to the first of
+// ch_assign, and the size of the whole for a given max_matrix_chan.
 inline constexpr std::size_t kRestartFixedBits = 113;
 [[nodiscard]] constexpr std::size_t restart_header_bits(int max_matrix_chan) noexcept {
     return kRestartFixedBits + 6U * static_cast<std::size_t>(max_matrix_chan + 1) + 8U;
 }
 
-// Reads a restart header from `reader`, positioned at the first bit of its 14-bit sync (after the two flag
-// bits of the block that carries it). `data` is the bytes the reader reads, for the CRC. With `verify_crc` a
-// wrong CRC is kBadRestartCrc.
+// Reads a restart header from `reader`, positioned at the first bit of its 14-bit sync (after the
+// two flag bits of the block that carries it). `data` is the bytes the reader reads, for the CRC.
+// With `verify_crc` a wrong CRC is kBadRestartCrc.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<RestartHeader, Error> read_restart_header(
     BitReader& reader, std::span<const std::byte> data, bool verify_crc = true);
 
-// Writes the header from its sync on, computing the CRC. `writer` is at the bit after the block's flag bits.
+// Writes the header from its sync on, computing the CRC. `writer` is at the bit after the block's
+// flag bits.
 ICLFORGE_TRUEHD_EXPORT void write_restart_header(BitWriter& writer, const RestartHeader& header);
 
 // TH spec §9.2: a prediction filter. `coeff` holds the values after the left shift by coeff_shift.
@@ -94,8 +96,8 @@ struct FilterSpec {
     std::uint8_t coeff_bits = 0;   // 1..16
     std::uint8_t coeff_shift = 0;  // 0..7
     std::array<std::int32_t, kMaxFirOrder> coeff{};
-    // TH spec §9.2 sends the state flag for an IIR filter alone; the streams send it for a FIR filter too
-    // (which must leave it clear). state[i] is the filter's history at lag i + 1.
+    // TH spec §9.2 sends the state flag for an IIR filter alone; the streams send it for a FIR
+    // filter too (which must leave it clear). state[i] is the filter's history at lag i + 1.
     bool has_state = false;
     std::uint8_t state_bits = 0;   // 0..15
     std::uint8_t state_shift = 0;  // 0..15
@@ -103,7 +105,8 @@ struct FilterSpec {
     friend bool operator==(const FilterSpec&, const FilterSpec&) = default;
 };
 
-// TH spec §8.3: what a block header changes for one channel. A channel that is not `present` changes nothing.
+// TH spec §8.3: what a block header changes for one channel. A channel that is not `present`
+// changes nothing.
 struct ChannelUpdate {
     bool present = false;
     std::optional<FilterSpec> fir;
@@ -114,8 +117,9 @@ struct ChannelUpdate {
     friend bool operator==(const ChannelUpdate&, const ChannelUpdate&) = default;
 };
 
-// TH spec §10.2: one primitive matrix. coeff[c] is the value as sent (frac_bits + 2 bits, signed) for channel
-// c; the channels are the matrix channels 0..max_matrix_chan, then the two noise channels.
+// TH spec §10.2: one primitive matrix. coeff[c] is the value as sent (frac_bits + 2 bits, signed)
+// for channel c; the channels are the matrix channels 0..max_matrix_chan, then the two noise
+// channels.
 struct MatrixSpec {
     std::uint8_t out_ch = 0;
     std::uint8_t frac_bits = 0;
@@ -126,8 +130,8 @@ struct MatrixSpec {
     friend bool operator==(const MatrixSpec&, const MatrixSpec&) = default;
 };
 
-// The matrices a block header sends: `count` of `items` are used. A fixed array, so that reading a header does not
-// allocate.
+// The matrices a block header sends: `count` of `items` are used. A fixed array, so that reading a
+// header does not allocate.
 struct MatrixSet {
     std::array<MatrixSpec, kMaxMatrices> items{};
     std::uint8_t count = 0;
@@ -162,8 +166,8 @@ struct BlockContext {
 ICLFORGE_TRUEHD_EXPORT void write_block_header(BitWriter& writer, const BlockContext& context,
                                                const BlockHeaderSpec& header);
 
-// TH spec App. C: the three Huffman codebooks. A symbol is −7..+10 (type 1), −7..+8 (type 2) or −7..+7 (type
-// 3). `bits` is 0 for a symbol outside the codebook's range.
+// TH spec App. C: the three Huffman codebooks. A symbol is −7..+10 (type 1), −7..+8 (type 2) or
+// −7..+7 (type 3). `bits` is 0 for a symbol outside the codebook's range.
 struct HuffmanCode {
     std::uint16_t code = 0;
     std::uint8_t bits = 0;

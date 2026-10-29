@@ -13,8 +13,8 @@ using detail::put_field;
 using detail::put_signed;
 using detail::read_signed;
 
-// TH spec §14.2 has no length for the extension, and its fields add up to at most 45 bits; the CRC search
-// goes this far past the base form.
+// TH spec §14.2 has no length for the extension, and its fields add up to at most 45 bits; the CRC
+// search goes this far past the base form.
 constexpr std::size_t kMaxExtensionBytes = 8;
 
 [[nodiscard]] bool has_extended_substream(const MajorSync& major_sync) noexcept {
@@ -61,8 +61,8 @@ void write_channel_meaning(BitWriter& writer, const ChannelMeaning& meaning) {
     put_field(writer, meaning.extra_present ? 1U : 0U, 1);
 }
 
-// TH spec §14.2. The fields that follow extra_channel_meaning_length exist only when the stream has an extended
-// substream.
+// TH spec §14.2. The fields that follow extra_channel_meaning_length exist only when the stream has
+// an extended substream.
 [[nodiscard]] ExtraChannelMeaning read_extra(BitReader& reader, bool extended_substream) {
     ExtraChannelMeaning extra;
     extra.length = static_cast<std::uint8_t>(reader.read(4));
@@ -117,8 +117,9 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
         return std::unexpected(Error{ErrorKind::kBadSync, "major sync word"});
     }
     MajorSync major_sync;
-    major_sync.kind =
-        std::to_integer<std::uint8_t>(data[3]) == kTrueHdStreamByte ? StreamKind::kTrueHd : StreamKind::kMlp;
+    major_sync.kind = std::to_integer<std::uint8_t>(data[3]) == kTrueHdStreamByte
+                          ? StreamKind::kTrueHd
+                          : StreamKind::kMlp;
 
     BitReader reader(data);
     reader.skip(32);
@@ -133,13 +134,16 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
     major_sync.extended_reserved = static_cast<std::uint8_t>(reader.read(2));
     major_sync.substream_info = static_cast<std::uint8_t>(reader.read(8));
     if (major_sync.signature != kSignature) {
-        return std::unexpected(Error{ErrorKind::kBadSignature, "major sync signature is not 0xB752"});
+        return std::unexpected(
+            Error{ErrorKind::kBadSignature, "major sync signature is not 0xB752"});
     }
     if (major_sync.num_substreams < 1 || major_sync.num_substreams > kMaxSubstreams) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "num_substreams outside 1..4 (TH spec §4.1)"});
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "num_substreams outside 1..4 (TH spec §4.1)"});
     }
 
-    // The 8 bytes that follow: a TrueHD stream's channel meaning, bytes of unknown meaning in an MLP stream's.
+    // The 8 bytes that follow: a TrueHD stream's channel meaning, bytes of unknown meaning in an
+    // MLP stream's.
     for (std::uint8_t& byte : major_sync.channel_meaning_bytes) {
         byte = static_cast<std::uint8_t>(reader.read(8));
     }
@@ -150,20 +154,24 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
 
     // The size: 28 bytes, or more when the channel meaning goes on with the 16-channel fields.
     major_sync.size_bytes = kMajorSyncBaseBytes;
-    const bool extended = major_sync.kind == StreamKind::kTrueHd && major_sync.channel_meaning.extra_present;
+    const bool extended =
+        major_sync.kind == StreamKind::kTrueHd && major_sync.channel_meaning.extra_present;
     if (extended) {
         std::size_t chosen = 0;
         std::optional<ExtraChannelMeaning> chosen_extra;
         std::size_t fallback = 0;
         std::optional<ExtraChannelMeaning> fallback_extra;
-        // The extra fields start at byte 26, where the base form has its CRC. The CRC follows them, on a
-        // 16-bit boundary: try each size from the base form's 28 bytes (an extension of nothing) upward.
-        for (std::size_t size = kMajorSyncBaseBytes; size <= kMajorSyncBaseBytes + kMaxExtensionBytes; size += 2) {
+        // The extra fields start at byte 26, where the base form has its CRC. The CRC follows them,
+        // on a 16-bit boundary: try each size from the base form's 28 bytes (an extension of
+        // nothing) upward.
+        for (std::size_t size = kMajorSyncBaseBytes;
+             size <= kMajorSyncBaseBytes + kMaxExtensionBytes; size += 2) {
             if (data.size() < size) {
                 break;
             }
             BitReader extra_reader(data.subspan(26, size - 28 + 2));
-            const ExtraChannelMeaning extra = read_extra(extra_reader, has_extended_substream(major_sync));
+            const ExtraChannelMeaning extra =
+                read_extra(extra_reader, has_extended_substream(major_sync));
             const std::size_t extra_bytes = (extra_reader.bit_position() + 7U) / 8U;
             if (extra_bytes + 2U > size - 26U) {
                 continue;  // the fields do not fit before the CRC
@@ -180,14 +188,16 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
         }
         if (chosen == 0) {
             if (verify_crc || fallback == 0) {
-                return std::unexpected(Error{ErrorKind::kBadMajorSyncCrc, "major sync CRC (with the extension)"});
+                return std::unexpected(
+                    Error{ErrorKind::kBadMajorSyncCrc, "major sync CRC (with the extension)"});
             }
             chosen = fallback;
             chosen_extra = fallback_extra;
         }
         major_sync.size_bytes = chosen;
         major_sync.extra = chosen_extra;
-    } else if (verify_crc && major_sync_crc(data.first(kMajorSyncBaseBytes - 2)) != stored_crc(data, kMajorSyncBaseBytes)) {
+    } else if (verify_crc && major_sync_crc(data.first(kMajorSyncBaseBytes - 2)) !=
+                                 stored_crc(data, kMajorSyncBaseBytes)) {
         return std::unexpected(Error{ErrorKind::kBadMajorSyncCrc, "major sync CRC"});
     }
     major_sync.crc = stored_crc(data, major_sync.size_bytes);
@@ -196,7 +206,8 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
 
 std::expected<std::vector<std::byte>, Error> write_major_sync(const MajorSync& major_sync) {
     if (major_sync.extra.has_value()) {
-        return std::unexpected(Error{ErrorKind::kUnsupported, "writing a major sync with the 16-channel extension"});
+        return std::unexpected(
+            Error{ErrorKind::kUnsupported, "writing a major sync with the 16-channel extension"});
     }
     BitWriter writer;
     writer.put(kMajorSyncByte0, 8);

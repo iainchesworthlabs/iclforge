@@ -1,5 +1,5 @@
-// libFuzzer harness: the TrueHD / MLP readers over arbitrary bytes. Nothing it is given may crash it, read
-// out of bounds or loop without end.
+// libFuzzer harness: the TrueHD / MLP readers over arbitrary bytes. Nothing it is given may crash
+// it, read out of bounds or loop without end.
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -28,7 +28,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
             for (int i = 0; i < parsed->num_substreams; ++i) {
                 iclforge::BitReader bits(parsed->segments[static_cast<std::size_t>(i)]);
                 if (bits.read(1) != 0 && bits.read(1) != 0) {
-                    (void)read_restart_header(bits, parsed->segments[static_cast<std::size_t>(i)], false);
+                    (void)read_restart_header(bits, parsed->segments[static_cast<std::size_t>(i)],
+                                              false);
                 }
             }
         }

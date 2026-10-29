@@ -11,7 +11,8 @@ constexpr std::size_t kNotFound = static_cast<std::size_t>(-1);
 constexpr std::uint8_t kObjectSubstreamBit = 0x80;  // TH spec §6.4: substream_info bit 7
 
 // The offset of the first major sync word at or after `from`, or kNotFound.
-[[nodiscard]] std::size_t find_major_sync(std::span<const std::byte> data, std::size_t from) noexcept {
+[[nodiscard]] std::size_t find_major_sync(std::span<const std::byte> data,
+                                          std::size_t from) noexcept {
     for (std::size_t i = from; i + 4 <= data.size(); ++i) {
         if (std::to_integer<std::uint8_t>(data[i]) != kMajorSyncByte0) {
             continue;
@@ -23,9 +24,10 @@ constexpr std::uint8_t kObjectSubstreamBit = 0x80;  // TH spec §6.4: substream_
     return kNotFound;
 }
 
-// The offset of the first access unit that begins with a major sync at or after `from` and reads (its header,
-// its major sync and its directory are sound), or kNotFound.
-[[nodiscard]] std::size_t find_unit_with_major_sync(std::span<const std::byte> data, std::size_t from) noexcept {
+// The offset of the first access unit that begins with a major sync at or after `from` and reads
+// (its header, its major sync and its directory are sound), or kNotFound.
+[[nodiscard]] std::size_t find_unit_with_major_sync(std::span<const std::byte> data,
+                                                    std::size_t from) noexcept {
     std::size_t search_from = from + kAccessUnitHeaderBytes;
     while (true) {
         const std::size_t sync = find_major_sync(data, search_from);
@@ -40,7 +42,8 @@ constexpr std::uint8_t kObjectSubstreamBit = 0x80;  // TH spec §6.4: substream_
     }
 }
 
-// The restart header, when the segment begins with one: its first block's two flag bits, then the header.
+// The restart header, when the segment begins with one: its first block's two flag bits, then the
+// header.
 [[nodiscard]] std::optional<RestartHeader> restart_of_segment(std::span<const std::byte> segment) {
     BitReader reader(segment);
     if (reader.read(1) == 0 || reader.read(1) == 0) {
@@ -70,10 +73,11 @@ std::expected<StreamInfo, Error> probe_stream(std::span<const std::byte> data) {
     info.num_substreams = info.major_sync.num_substreams;
     info.samples_per_access_unit = nominal_samples_per_access_unit(info.major_sync.ratebits());
     info.first_unit_offset = first;
-    info.has_object_substream =
-        info.num_substreams == kMaxSubstreams || (info.major_sync.substream_info & kObjectSubstreamBit) != 0;
+    info.has_object_substream = info.num_substreams == kMaxSubstreams ||
+                                (info.major_sync.substream_info & kObjectSubstreamBit) != 0;
     for (int i = 0; i < info.num_substreams; ++i) {
-        if (const auto restart = restart_of_segment(first_unit->segments[static_cast<std::size_t>(i)])) {
+        if (const auto restart =
+                restart_of_segment(first_unit->segments[static_cast<std::size_t>(i)])) {
             info.channels[static_cast<std::size_t>(i)] = restart->matrix_channels();
         }
     }

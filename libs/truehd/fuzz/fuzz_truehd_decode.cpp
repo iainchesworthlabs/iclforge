@@ -1,5 +1,5 @@
-// libFuzzer harness: the TrueHD / MLP decoder over arbitrary bytes, in every presentation, strict and
-// lenient. The decoder has to return an error or samples, and stay usable after either.
+// libFuzzer harness: the TrueHD / MLP decoder over arbitrary bytes, in every presentation, strict
+// and lenient. The decoder has to return an error or samples, and stay usable after either.
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -11,8 +11,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     using namespace iclforge::truehd;
     const std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(data), size);
 
-    constexpr Presentation kPresentations[] = {Presentation::kBest, Presentation::k2ch, Presentation::k6ch,
-                                               Presentation::k8ch, Presentation::kAll};
+    constexpr Presentation kPresentations[] = {Presentation::kBest, Presentation::k2ch,
+                                               Presentation::k6ch, Presentation::k8ch,
+                                               Presentation::kAll};
     for (const Presentation presentation : kPresentations) {
         for (const Strictness strictness : {Strictness::kStrict, Strictness::kLenient}) {
             DecoderConfig config;

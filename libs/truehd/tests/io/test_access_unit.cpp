@@ -26,7 +26,8 @@ TEST_CASE("a TrueHD major sync written reads back with a good CRC", "[truehd][io
     REQUIRE(read.has_value());
     MajorSync expected = major_sync;
     expected.crc = read->crc;
-    expected.channel_meaning_bytes = read->channel_meaning_bytes;  // the 64 bits as written, beside their fields
+    expected.channel_meaning_bytes =
+        read->channel_meaning_bytes;  // the 64 bits as written, beside their fields
     CHECK(*read == expected);
     CHECK(read->sample_rate() == 48000);
     CHECK(read->eightch_decoder_channel_assignment() == 1);
@@ -59,7 +60,8 @@ TEST_CASE("a major sync with a wrong signature or a short buffer is refused", "[
     std::vector<std::byte> broken = *bytes;
     broken[9] = std::byte{0x53};  // 0xB753, v3.0's value for TrueHD
     CHECK(parse_major_sync(broken, false).error().kind == ErrorKind::kBadSignature);
-    CHECK(parse_major_sync(std::span<const std::byte>(bytes->data(), 20)).error().kind == ErrorKind::kTruncated);
+    CHECK(parse_major_sync(std::span<const std::byte>(bytes->data(), 20)).error().kind ==
+          ErrorKind::kTruncated);
     broken = *bytes;
     broken[0] = std::byte{0};
     CHECK(parse_major_sync(broken).error().kind == ErrorKind::kBadSync);
@@ -98,9 +100,11 @@ TEST_CASE("the check nibble makes the header and directory XOR to 0xF", "[truehd
 
 TEST_CASE("an end pointer past the unit and a unit past the data are refused", "[truehd][io]") {
     std::vector<std::byte> unit = stereo_unit(false);
-    CHECK(parse_access_unit(std::span<const std::byte>(unit).first(unit.size() - 2), 1).error().kind ==
+    CHECK(parse_access_unit(std::span<const std::byte>(unit).first(unit.size() - 2), 1)
+              .error()
+              .kind == ErrorKind::kTruncated);
+    CHECK(parse_access_unit(std::span<const std::byte>(unit).first(3), 1).error().kind ==
           ErrorKind::kTruncated);
-    CHECK(parse_access_unit(std::span<const std::byte>(unit).first(3), 1).error().kind == ErrorKind::kTruncated);
 
     SubstreamEntry entry;
     entry.end_ptr = 4000;
@@ -134,9 +138,11 @@ TEST_CASE("an entry with an extra word carries the DRC update", "[truehd][io]") 
 
 TEST_CASE("bytes after the last segment are extra data, carried and checked", "[truehd][io]") {
     std::vector<std::byte> unit = stereo_unit(false);
-    // The extra data: header word (length 2 words), the evolution framing for a 2-byte payload, a pad byte, parity.
-    const std::vector<std::byte> extra{std::byte{0x00 | 0x00}, std::byte{0x02}, std::byte{0x00}, std::byte{0x02},
-                                       std::byte{0xAB},        std::byte{0xCD}, std::byte{0x00}, std::byte{0x00}};
+    // The extra data: header word (length 2 words), the evolution framing for a 2-byte payload, a
+    // pad byte, parity.
+    const std::vector<std::byte> extra{std::byte{0x00 | 0x00}, std::byte{0x02}, std::byte{0x00},
+                                       std::byte{0x02},        std::byte{0xAB}, std::byte{0xCD},
+                                       std::byte{0x00},        std::byte{0x00}};
     // length 2 -> nibble = 0 ^ 0 ^ 2 = 2
     std::vector<std::byte> framed = extra;
     framed[0] = std::byte{0x20};
@@ -146,7 +152,8 @@ TEST_CASE("bytes after the last segment are extra data, carried and checked", "[
     }
     framed.back() = static_cast<std::byte>(((accumulator >> 8) ^ accumulator) & 0xFF);
     unit.insert(unit.end(), framed.begin(), framed.end());
-    // The length word grows by 4 words; the check nibble is recomputed from the header and directory.
+    // The length word grows by 4 words; the check nibble is recomputed from the header and
+    // directory.
     const unsigned words = static_cast<unsigned>(unit.size() / 2);
     unit[0] = static_cast<std::byte>((words >> 8) & 0xF);
     unit[1] = static_cast<std::byte>(words & 0xFF);

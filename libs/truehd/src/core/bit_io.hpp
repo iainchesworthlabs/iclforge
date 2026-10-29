@@ -16,8 +16,8 @@ namespace iclforge::truehd::detail {
     return static_cast<std::int32_t>((value ^ sign) - sign);
 }
 
-// A field is written from its low bits: a value a caller built wider than the syntax allows is cut to the
-// field, never an assertion in the bit writer.
+// A field is written from its low bits: a value a caller built wider than the syntax allows is cut
+// to the field, never an assertion in the bit writer.
 inline void put_field(BitWriter& writer, std::uint32_t value, int bits) {
     writer.put(bits >= 32 ? value : (value & ((1U << bits) - 1U)), bits);
 }

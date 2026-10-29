@@ -13,23 +13,27 @@
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
-// Streams the tests build from the library's own writers: small enough to hold in the head, and exact about
-// what the decoder has to give back. They are not a check of the syntax against anything but itself; the
-// FFmpeg fixtures (testdata/truehd/) and tools/references/truehd_syntax.py are.
+// Streams the tests build from the library's own writers: small enough to hold in the head, and
+// exact about what the decoder has to give back. They are not a check of the syntax against
+// anything but itself; the FFmpeg fixtures (testdata/truehd/) and tools/references/truehd_syntax.py
+// are.
 
 namespace iclforge::truehd::testing {
 
 constexpr int kBuiltBlockSize = 8;
-constexpr int kBuiltLsbs = 4;  // huff_lsbs of the built streams: raw four-bit residuals, no Huffman codes
+constexpr int kBuiltLsbs =
+    4;  // huff_lsbs of the built streams: raw four-bit residuals, no Huffman codes
 
-// The residual, as the stream holds it, of channel `ch` at sample `i` of a built unit: the decoder gives back
-// raw - 8 (TH spec §11.3: raw LSBs less half their range). The second channel's values are not symmetric, so
-// that the unit's lossless check is not zero.
+// The residual, as the stream holds it, of channel `ch` at sample `i` of a built unit: the decoder
+// gives back raw - 8 (TH spec §11.3: raw LSBs less half their range). The second channel's values
+// are not symmetric, so that the unit's lossless check is not zero.
 constexpr std::array<std::uint32_t, kBuiltBlockSize> kSecondChannelRaw{5, 9, 2, 14, 7, 7, 1, 12};
 constexpr std::uint32_t raw_residual(int ch, int i) {
     return ch == 0 ? static_cast<std::uint32_t>(i) : kSecondChannelRaw[static_cast<std::size_t>(i)];
 }
-constexpr std::int32_t expected_sample(int ch, int i) { return static_cast<std::int32_t>(raw_residual(ch, i)) - 8; }
+constexpr std::int32_t expected_sample(int ch, int i) {
+    return static_cast<std::int32_t>(raw_residual(ch, i)) - 8;
+}
 
 // A stereo TrueHD major sync at 48 kHz with one substream.
 inline MajorSync stereo_major_sync() {
@@ -43,8 +47,8 @@ inline MajorSync stereo_major_sync() {
     return major_sync;
 }
 
-// The bytes of one substream segment of the built stereo stream, with its parity and CRC bytes. With
-// `restart` the first block carries a restart header; without, a block with no header at all.
+// The bytes of one substream segment of the built stereo stream, with its parity and CRC bytes.
+// With `restart` the first block carries a restart header; without, a block with no header at all.
 inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = true) {
     BitWriter writer;
     if (restart) {
@@ -105,7 +109,8 @@ inline std::vector<std::byte> stereo_unit(bool with_major_sync, std::uint16_t in
     const std::optional<MajorSync> major_sync =
         with_major_sync ? std::optional<MajorSync>(stereo_major_sync()) : std::nullopt;
     const std::size_t prefix_bytes = 4 + (with_major_sync ? kMajorSyncBaseBytes : 0U) + 2U;
-    auto prefix = write_access_unit_prefix(major_sync, entries, input_timing, prefix_bytes + segment.size());
+    auto prefix =
+        write_access_unit_prefix(major_sync, entries, input_timing, prefix_bytes + segment.size());
     std::vector<std::byte> unit = *prefix;
     unit.insert(unit.end(), segment.begin(), segment.end());
     return unit;

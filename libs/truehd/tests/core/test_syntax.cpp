@@ -158,7 +158,8 @@ TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][s
     header.channels[0].huff_lsbs = 3;
     // channel 0 is not `present`: only its flag is written
     write_block_header(writer, context, header);
-    // new_guards, block size, matrixing, output shift, quantiser step: five zero bits; params_for_this_chan: one.
+    // new_guards, block size, matrixing, output shift, quantiser step: five zero bits;
+    // params_for_this_chan: one.
     CHECK(writer.bit_count() == 6);
     const std::vector<std::byte> bytes = writer.take();
     iclforge::BitReader reader(bytes);

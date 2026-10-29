@@ -51,7 +51,8 @@ TEST_CASE("the reader starts at the first major sync and counts what it passed",
 }
 
 TEST_CASE("the reader finds its way back after a broken unit", "[truehd][io]") {
-    // Two good units, then a unit whose check nibble is wrong, then a unit that carries a major sync again.
+    // Two good units, then a unit whose check nibble is wrong, then a unit that carries a major
+    // sync again.
     std::vector<std::byte> stream = stream_of(3);
     const std::size_t third = stereo_unit(true).size() + stereo_unit(false).size();
     stream[third] ^= std::byte{0x10};

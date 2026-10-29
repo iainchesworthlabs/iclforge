@@ -13,23 +13,29 @@ namespace iclforge::truehd {
 
 namespace {
 
-// The samples of a unit share one buffer of rows, a row holding a sample time's matrix channels and the two
-// noise channels, so that a substream reads the channels the ones before it produced (TH spec §2.3).
+// The samples of a unit share one buffer of rows, a row holding a sample time's matrix channels and
+// the two noise channels, so that a substream reads the channels the ones before it produced (TH
+// spec §2.3).
 constexpr int kRowStride = kMaxChannels + kNoiseChannels;
-constexpr int kMinBlockSize = 8;    // TH spec §8.4
-constexpr int kMaxBlockSize = 160;  // TH spec §8.4
+constexpr int kMinBlockSize = 8;      // TH spec §8.4
+constexpr int kMaxBlockSize = 160;    // TH spec §8.4
 constexpr int kDefaultBlockSize = 8;  // after a restart, until a block header sends one (ERRATA.md)
 constexpr int kHistoryPad = kMaxFirOrder;
 constexpr int kMaxTrueHdMatrixChannel = 7;  // TH spec §10.3
 constexpr int kMaxMlpMatrixChannel = 5;
-constexpr int kMaxHuffLsbs = 24;           // TH spec §8.3
+constexpr int kMaxHuffLsbs = 24;  // TH spec §8.3
 constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
 constexpr int kMatrixShift = 14;  // the coefficients are scaled to 2^-14 (ERRATA.md)
 constexpr int kObjectSubstream = 3;
-constexpr std::uint32_t kTerminatorA = 0xD234E;  // TH spec §16.5
-constexpr std::uint32_t kTerminatorAAlt = 0x348D3;
-constexpr std::uint32_t kTerminatorB = 0x1234;
+// TH spec §16.5: terminatorA. The streams show it as the first 20 bits of a 32-bit end-of-stream
+// marker that ends the segments of the last access unit, the 12 bits after it counting the samples
+// of the unit that are padding (ERRATA.md). 0x348D3, the spec's second value, is the same bits seen
+// two bits late.
+constexpr std::uint32_t kTerminatorA = 0xD234E;
+constexpr int kEndMarkerBits = 32;
+constexpr int kEndMarkerCountBits = 12;
+constexpr std::uint32_t kTerminatorB = 0x1234;  // TH spec §16.5, substream 3: no stream shows it
 
 constexpr std::array<Channel, 2> kStereo{Channel::kL, Channel::kR};
 
@@ -39,9 +45,9 @@ struct ChannelState {
     std::int32_t huff_offset = 0;
     std::uint8_t huff_type = 0;
     std::uint8_t huff_lsbs = kMaxHuffLsbs;
-    // The last outputs of the channel (FIR history) and the last residuals (IIR history), the newest at index
-    // kHistoryPad + i - 1 for the sample at block position i; the first kHistoryPad entries carry over from the
-    // block before.
+    // The last outputs of the channel (FIR history) and the last residuals (IIR history), the
+    // newest at index kHistoryPad + i - 1 for the sample at block position i; the first kHistoryPad
+    // entries carry over from the block before.
     std::array<std::int32_t, kHistoryPad + kMaxBlockSize> fir_history{};
     std::array<std::int32_t, kHistoryPad + kMaxBlockSize> iir_history{};
 };
@@ -64,7 +70,8 @@ struct SubstreamState {
     std::array<std::int8_t, kMaxChannels> output_shift{};
     std::array<std::uint8_t, kMaxChannels> quant_step{};
     std::array<ChannelState, kMaxChannels> channels{};
-    // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds anything.
+    // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds
+    // anything.
     std::uint32_t interval_fold = 0;
     bool interval_open = false;
 };
@@ -74,19 +81,23 @@ struct SegmentResult {
     int samples = 0;
     int channels = 0;
     bool restarted = false;
+    int padding_samples = 0;  // from the end-of-stream marker
 };
 
 [[nodiscard]] std::int32_t sign_extend_24(std::int32_t value) noexcept {
     return static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << 8U) >> 8;
 }
 
-// The 8-bit value a restart interval's fold is checked against: the fold XORs each sample masked to 24 bits
-// and shifted left by its channel, then folds the 32-bit result onto its low byte (ERRATA.md).
+// The 8-bit value a restart interval's fold is checked against: the fold XORs each sample masked to
+// 24 bits and shifted left by its channel, then folds the 32-bit result onto its low byte
+// (ERRATA.md).
 [[nodiscard]] std::uint8_t fold_to_check(std::uint32_t fold) noexcept {
     return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
 }
 
-Error make_error(ErrorKind kind, std::string_view detail) { return Error{kind, detail}; }
+Error make_error(ErrorKind kind, std::string_view detail) {
+    return Error{kind, detail};
+}
 
 }  // namespace
 
@@ -115,22 +126,25 @@ struct Decoder::Impl {
     [[nodiscard]] int substreams_wanted(int available) const noexcept;
     [[nodiscard]] std::span<const Channel> layout_for(int channels) const noexcept;
 
-    [[nodiscard]] std::expected<SegmentResult, Error> decode_segment(int index, const SubstreamEntry& entry,
-                                                                     std::span<const std::byte> segment, bool emit,
-                                                                     int expected_samples);
-    [[nodiscard]] std::expected<void, Error> begin_restart(int index, SubstreamState& state, BitReader& reader,
+    [[nodiscard]] std::expected<SegmentResult, Error> decode_segment(
+        int index, const SubstreamEntry& entry, std::span<const std::byte> segment, bool emit,
+        int expected_samples);
+    [[nodiscard]] std::expected<void, Error> begin_restart(int index, SubstreamState& state,
+                                                           BitReader& reader,
                                                            std::span<const std::byte> payload);
-    [[nodiscard]] std::expected<void, Error> apply_block_header(SubstreamState& state,
-                                                                const BlockHeaderSpec& header) const;
-    [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state, BitReader& reader,
-                                                          int position, bool emit);
+    [[nodiscard]] std::expected<void, Error> apply_block_header(
+        SubstreamState& state, const BlockHeaderSpec& header) const;
+    [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state,
+                                                          BitReader& reader, int position,
+                                                          bool emit);
 };
 
 std::expected<AccessUnit, Error> Decoder::Impl::parse_unit(std::span<const std::byte> data) {
     const int inherited = major_sync ? major_sync->num_substreams : 0;
     auto unit = parse_access_unit(data, inherited, true);
     if (!unit && !strict() &&
-        (unit.error().kind == ErrorKind::kBadCheckNibble || unit.error().kind == ErrorKind::kBadMajorSyncCrc)) {
+        (unit.error().kind == ErrorKind::kBadCheckNibble ||
+         unit.error().kind == ErrorKind::kBadMajorSyncCrc)) {
         ++counters.check_failures;
         unit = parse_access_unit(data, inherited, false);
     }
@@ -189,7 +203,8 @@ std::span<const Channel> Decoder::Impl::layout_for(int channels) const noexcept 
     return {};
 }
 
-std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamState& state, BitReader& reader,
+std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamState& state,
+                                                        BitReader& reader,
                                                         std::span<const std::byte> payload) {
     const BitReader before = reader;
     auto header = read_restart_header(reader, payload, true);
@@ -202,14 +217,18 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
         return std::unexpected(header.error());
     }
     if (header->noise_type()) {
-        return std::unexpected(make_error(
-            ErrorKind::kUnsupported, "restart sync 0x31EB (noise_type 1): the noise generator is not defined (TH spec §17)"));
+        return std::unexpected(make_error(ErrorKind::kUnsupported,
+                                          "restart sync 0x31EB (noise_type 1): the noise generator "
+                                          "is not defined (TH spec §17)"));
     }
     const bool is_mlp = major_sync && major_sync->kind == StreamKind::kMlp;
-    const int limit = index >= kObjectSubstream ? kMaxChannels - 1
-                                                : (is_mlp ? kMaxMlpMatrixChannel : kMaxTrueHdMatrixChannel);
+    const int limit = index >= kObjectSubstream
+                          ? kMaxChannels - 1
+                          : (is_mlp ? kMaxMlpMatrixChannel : kMaxTrueHdMatrixChannel);
     if (header->max_matrix_chan > limit) {
-        return std::unexpected(make_error(ErrorKind::kBadParameter, "max_matrix_chan above the stream type's limit (TH spec §10.3)"));
+        return std::unexpected(
+            make_error(ErrorKind::kBadParameter,
+                       "max_matrix_chan above the stream type's limit (TH spec §10.3)"));
     }
 
     // TH spec §7.3: this header carries the check of the interval that ends here.
@@ -220,7 +239,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             ++counters.lossless_check_failures;
             if (strict()) {
                 state.running = false;
-                return std::unexpected(make_error(ErrorKind::kBadLosslessCheck, "lossless check of the restart interval"));
+                return std::unexpected(make_error(ErrorKind::kBadLosslessCheck,
+                                                  "lossless check of the restart interval"));
             }
         }
     }
@@ -245,7 +265,8 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
     }
     if (header.block_size) {
         if (*header.block_size < kMinBlockSize || *header.block_size > kMaxBlockSize) {
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "block size outside 8..160 (TH spec §8.4)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter, "block size outside 8..160 (TH spec §8.4)"));
         }
         state.block_size = *header.block_size;
     }
@@ -267,19 +288,23 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             }
             for (int n = 0; n < kNoiseChannels; ++n) {
                 if (spec.present[static_cast<std::size_t>(restart.matrix_channels() + n)]) {
-                    return std::unexpected(make_error(ErrorKind::kUnsupported, "a matrix that draws on a noise channel (TH spec §17)"));
+                    return std::unexpected(
+                        make_error(ErrorKind::kUnsupported,
+                                   "a matrix that draws on a noise channel (TH spec §17)"));
                 }
             }
         }
     }
     if (header.output_shift) {
         for (int ch = 0; ch < restart.matrix_channels(); ++ch) {
-            state.output_shift[static_cast<std::size_t>(ch)] = (*header.output_shift)[static_cast<std::size_t>(ch)];
+            state.output_shift[static_cast<std::size_t>(ch)] =
+                (*header.output_shift)[static_cast<std::size_t>(ch)];
         }
     }
     if (header.quant_step) {
         for (int ch = 0; ch <= restart.max_chan; ++ch) {
-            state.quant_step[static_cast<std::size_t>(ch)] = (*header.quant_step)[static_cast<std::size_t>(ch)];
+            state.quant_step[static_cast<std::size_t>(ch)] =
+                (*header.quant_step)[static_cast<std::size_t>(ch)];
         }
     }
     const int lsb_limit = restart.sync == kRestartSyncAtmos ? kMaxHuffLsbsAtmos : kMaxHuffLsbs;
@@ -303,16 +328,22 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             }
         }
         if (channel.fir.order + channel.iir.order > kMaxFilterOrder) {
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "FIR and IIR orders add up to more than 8 (TH spec §9.3)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter,
+                           "FIR and IIR orders add up to more than 8 (TH spec §9.3)"));
         }
-        if (channel.fir.order > 0 && channel.iir.order > 0 && channel.fir.shift != channel.iir.shift) {
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "FIR and IIR filters with different coeff_q (TH spec §9.3)"));
+        if (channel.fir.order > 0 && channel.iir.order > 0 &&
+            channel.fir.shift != channel.iir.shift) {
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter,
+                           "FIR and IIR filters with different coeff_q (TH spec §9.3)"));
         }
         if (update.huff_offset) {
             channel.huff_offset = *update.huff_offset;
         }
         if (update.huff_lsbs > lsb_limit) {
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "huff_lsbs above 24 (TH spec §8.3)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter, "huff_lsbs above 24 (TH spec §8.3)"));
         }
         channel.huff_type = update.huff_type;
         channel.huff_lsbs = update.huff_lsbs;
@@ -320,14 +351,15 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
     return {};
 }
 
-std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState& state, BitReader& reader,
-                                                       int position, bool emit) {
+std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState& state,
+                                                       BitReader& reader, int position, bool emit) {
     const RestartHeader& restart = state.restart;
     const int block = state.block_size;
     const int min_chan = restart.min_chan;
     const int max_chan = restart.max_chan;
     const int out_channels = restart.matrix_channels();
-    std::int32_t* const rows_base = rows.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
+    std::int32_t* const rows_base =
+        rows.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
 
     if (index == 0) {
         std::fill_n(rows_base, static_cast<std::size_t>(block) * kRowStride, 0);
@@ -340,7 +372,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         expected_bits = reader.read(16);
         data_start = reader.bit_position();
         if (expected_bits > kMaxBlockDataBits) {
-            return std::unexpected(make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));
         }
     }
 
@@ -383,7 +416,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
         std::uint16_t bits = 0;
         for (int b = 0; b < bypass_count; ++b) {
-            bits = static_cast<std::uint16_t>(bits | (reader.read(1) << bypass_matrix[static_cast<std::size_t>(b)]));
+            bits = static_cast<std::uint16_t>(
+                bits | (reader.read(1) << bypass_matrix[static_cast<std::size_t>(b)]));
         }
         bypass[static_cast<std::size_t>(i)] = bits;
         for (int ch = min_chan; ch <= max_chan; ++ch) {
@@ -392,10 +426,13 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             if (plan.table != nullptr) {
                 const detail::DecodeEntry entry = plan.table->entries[reader.peek(kHuffmanMaxBits)];
                 if (entry.bits == 0) {
-                    return std::unexpected(make_error(ErrorKind::kBadBlockData, "a Huffman code no codebook has (TH spec App. C)"));
+                    return std::unexpected(
+                        make_error(ErrorKind::kBadBlockData,
+                                   "a Huffman code no codebook has (TH spec App. C)"));
                 }
                 reader.consume(entry.bits);
-                value += static_cast<std::int64_t>(entry.symbol) * (std::int64_t{1} << plan.raw_bits);
+                value +=
+                    static_cast<std::int64_t>(entry.symbol) * (std::int64_t{1} << plan.raw_bits);
             }
             if (plan.raw_bits > 0) {
                 value += reader.read(plan.raw_bits);
@@ -404,13 +441,16 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
     if (reader.overflowed()) {
-        return std::unexpected(make_error(ErrorKind::kBadBlockData, "a block runs past the end of its segment"));
+        return std::unexpected(
+            make_error(ErrorKind::kBadBlockData, "a block runs past the end of its segment"));
     }
     if (restart.data_check_present) {
         if (reader.bit_position() - data_start != expected_bits) {
             ++counters.check_failures;
             if (strict()) {
-                return std::unexpected(make_error(ErrorKind::kBadBlockData, "block data is not block_data_bits long (TH spec §8.1)"));
+                return std::unexpected(
+                    make_error(ErrorKind::kBadBlockData,
+                               "block data is not block_data_bits long (TH spec §8.1)"));
             }
         }
         reader.skip(8);  // block_data_crc: not checked (ERRATA.md)
@@ -419,7 +459,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     // The inverse prediction filters (TH spec §9.4, §9.5), channel by channel.
     for (int ch = min_chan; ch <= max_chan; ++ch) {
         ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
-        const std::uint32_t keep = ~((std::uint32_t{1} << plans[static_cast<std::size_t>(ch)].quant) - 1U);
+        const std::uint32_t keep =
+            ~((std::uint32_t{1} << plans[static_cast<std::size_t>(ch)].quant) - 1U);
         const int fir_order = channel.fir.order;
         const int iir_order = channel.iir.order;
         const int shift = fir_order > 0 ? channel.fir.shift : channel.iir.shift;
@@ -428,23 +469,26 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         for (int i = 0; i < block; ++i) {
             std::int64_t prediction = 0;
             for (int lag = 0; lag < fir_order; ++lag) {
-                prediction += std::int64_t{fir_history[i - 1 - lag]} * channel.fir.coeff[static_cast<std::size_t>(lag)];
+                prediction += std::int64_t{fir_history[i - 1 - lag]} *
+                              channel.fir.coeff[static_cast<std::size_t>(lag)];
             }
             for (int lag = 0; lag < iir_order; ++lag) {
-                prediction += std::int64_t{iir_history[i - 1 - lag]} * channel.iir.coeff[static_cast<std::size_t>(lag)];
+                prediction += std::int64_t{iir_history[i - 1 - lag]} *
+                              channel.iir.coeff[static_cast<std::size_t>(lag)];
             }
             prediction >>= shift;
             std::int32_t& sample = rows_base[static_cast<std::ptrdiff_t>(i) * kRowStride + ch];
-            const auto output = static_cast<std::int32_t>(static_cast<std::uint32_t>(prediction + sample) & keep);
+            const auto output =
+                static_cast<std::int32_t>(static_cast<std::uint32_t>(prediction + sample) & keep);
             fir_history[i] = output;
-            iir_history[i] =
-                static_cast<std::int32_t>(static_cast<std::uint32_t>(output) - static_cast<std::uint32_t>(prediction));
+            iir_history[i] = static_cast<std::int32_t>(static_cast<std::uint32_t>(output) -
+                                                       static_cast<std::uint32_t>(prediction));
             sample = output;
         }
-        std::copy(channel.fir_history.begin() + block, channel.fir_history.begin() + block + kHistoryPad,
-                  channel.fir_history.begin());
-        std::copy(channel.iir_history.begin() + block, channel.iir_history.begin() + block + kHistoryPad,
-                  channel.iir_history.begin());
+        std::copy(channel.fir_history.begin() + block,
+                  channel.fir_history.begin() + block + kHistoryPad, channel.fir_history.begin());
+        std::copy(channel.iir_history.begin() + block,
+                  channel.iir_history.begin() + block + kHistoryPad, channel.iir_history.begin());
     }
 
     // The primitive matrices (TH spec §10), in the order the block header listed them.
@@ -458,7 +502,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
             std::int64_t sum = 0;
             for (int k = 0; k < plan.count; ++k) {
-                sum += std::int64_t{row[plan.channel[static_cast<std::size_t>(k)]]} * plan.coeff[static_cast<std::size_t>(k)];
+                sum += std::int64_t{row[plan.channel[static_cast<std::size_t>(k)]]} *
+                       plan.coeff[static_cast<std::size_t>(k)];
             }
             std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
             if (plan.lsb_bypass) {
@@ -468,19 +513,22 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
 
-    // The output: each channel from the matrix channel ch_assign names, shifted, and folded into the check.
-    std::int32_t* const pcm_base = pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
+    // The output: each channel from the matrix channel ch_assign names, shifted, and folded into
+    // the check.
+    std::int32_t* const pcm_base =
+        pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
     for (int i = 0; i < block; ++i) {
         const std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[restart.ch_assign[static_cast<std::size_t>(ch)]];
             const int shift = state.output_shift[static_cast<std::size_t>(ch)];
-            const std::int32_t output = shift >= 0
-                                            ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
-                                            : source >> -shift;
+            const std::int32_t output =
+                shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
+                           : source >> -shift;
             state.interval_fold ^= (static_cast<std::uint32_t>(output) & 0xFFFFFFU) << ch;
             if (emit) {
-                pcm_base[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
+                pcm_base[static_cast<std::ptrdiff_t>(i) * out_channels + ch] =
+                    sign_extend_24(output);
             }
         }
     }
@@ -488,26 +536,30 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     return {};
 }
 
-std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(int index, const SubstreamEntry& entry,
-                                                                  std::span<const std::byte> segment, bool emit,
-                                                                  int expected_samples) {
+std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
+    int index, const SubstreamEntry& entry, std::span<const std::byte> segment, bool emit,
+    int expected_samples) {
     SubstreamState& state = substreams[static_cast<std::size_t>(index)];
     std::span<const std::byte> payload = segment;
     if (entry.crc_present) {
         if (segment.size() < 3) {
-            return std::unexpected(make_error(ErrorKind::kBadLength, "a segment shorter than its parity and CRC bytes"));
+            return std::unexpected(make_error(ErrorKind::kBadLength,
+                                              "a segment shorter than its parity and CRC bytes"));
         }
         payload = segment.first(segment.size() - 2);
-        if (substream_parity(payload) != std::to_integer<std::uint8_t>(segment[segment.size() - 2])) {
+        if (substream_parity(payload) !=
+            std::to_integer<std::uint8_t>(segment[segment.size() - 2])) {
             ++counters.check_failures;
             if (strict()) {
-                return std::unexpected(make_error(ErrorKind::kBadParity, "substream parity byte (TH spec §6.2)"));
+                return std::unexpected(
+                    make_error(ErrorKind::kBadParity, "substream parity byte (TH spec §6.2)"));
             }
         }
         if (substream_crc(payload) != std::to_integer<std::uint8_t>(segment[segment.size() - 1])) {
             ++counters.check_failures;
             if (strict()) {
-                return std::unexpected(make_error(ErrorKind::kBadSubstreamCrc, "substream CRC byte (TH spec §6.2)"));
+                return std::unexpected(
+                    make_error(ErrorKind::kBadSubstreamCrc, "substream CRC byte (TH spec §6.2)"));
             }
         }
     }
@@ -527,7 +579,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(int index, con
                 result.waiting = true;
                 return result;
             } else if (first_block && !entry.restart_nonexistent && strict()) {
-                return std::unexpected(make_error(ErrorKind::kBadBlockData, "the directory promises a restart header the segment lacks (TH spec §6.2)"));
+                return std::unexpected(make_error(
+                    ErrorKind::kBadBlockData,
+                    "the directory promises a restart header the segment lacks (TH spec §6.2)"));
             }
             auto header = read_block_header(reader, state.context);
             if (!header) {
@@ -542,22 +596,28 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(int index, con
             result.waiting = true;
             return result;
         } else if (first_block && !entry.restart_nonexistent && strict()) {
-            return std::unexpected(make_error(ErrorKind::kBadBlockData, "the directory promises a restart header the segment lacks (TH spec §6.2)"));
+            return std::unexpected(make_error(
+                ErrorKind::kBadBlockData,
+                "the directory promises a restart header the segment lacks (TH spec §6.2)"));
         }
         first_block = false;
 
         if (reader.overflowed()) {
             state.running = false;
-            return std::unexpected(make_error(ErrorKind::kTruncated, "a block header runs past the end of its segment"));
+            return std::unexpected(make_error(ErrorKind::kTruncated,
+                                              "a block header runs past the end of its segment"));
         }
         if (result.channels != 0 && result.channels != state.restart.matrix_channels()) {
             state.running = false;
-            return std::unexpected(make_error(ErrorKind::kUnsupported, "the channel count changes inside an access unit"));
+            return std::unexpected(make_error(ErrorKind::kUnsupported,
+                                              "the channel count changes inside an access unit"));
         }
         result.channels = state.restart.matrix_channels();
         if (result.samples + state.block_size > kMaxSamplesPerAccessUnit) {
             state.running = false;
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "more than 255 samples in an access unit (TH spec §3.3)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter,
+                           "more than 255 samples in an access unit (TH spec §3.3)"));
         }
         if (auto decoded = decode_block(index, state, reader, result.samples, emit); !decoded) {
             state.running = false;
@@ -567,33 +627,42 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(int index, con
         const bool last = reader.read(1) != 0;
         if (reader.overflowed()) {
             state.running = false;
-            return std::unexpected(make_error(ErrorKind::kBadBlockData, "a segment ends before its last block does"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadBlockData, "a segment ends before its last block does"));
         }
         if (last) {
             break;
         }
     }
 
-    // TH spec §16.5: a terminator may follow the last block; the streams checked have none.
+    // What follows the last block is zero padding to the end of the segment, or, in the last access
+    // unit of a stream that does not end on an access unit boundary, zero padding and then the
+    // 32-bit end-of-stream marker (TH spec §16.5, ERRATA.md): terminatorA and the count of padding
+    // samples in the unit.
     const std::size_t end_bits = payload.size() * 8U;
-    if (index == kObjectSubstream) {
-        if (end_bits - reader.bit_position() >= 16 && reader.peek(16) == kTerminatorB) {
-            reader.skip(16);
+    const std::size_t left = end_bits - reader.bit_position();
+    if (index == kObjectSubstream && left >= 16 && reader.peek(16) == kTerminatorB) {
+        reader.skip(16);
+    } else if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
+        BitReader marker(payload);
+        marker.skip(end_bits - kEndMarkerBits);
+        if (marker.read(20) == kTerminatorA) {
+            result.padding_samples = static_cast<int>(marker.read(kEndMarkerCountBits));
+            reader.skip(left);
         }
-    } else if (end_bits - reader.bit_position() >= 20 &&
-               (reader.peek(20) == kTerminatorA || reader.peek(20) == kTerminatorAAlt)) {
-        reader.skip(20);
     }
     if (strict() && end_bits - reader.bit_position() >= 16) {
         state.running = false;
-        return std::unexpected(make_error(ErrorKind::kBadBlockData, "data after the last block of a segment"));
+        return std::unexpected(
+            make_error(ErrorKind::kBadBlockData, "data after the last block of a segment"));
     }
     if (expected_samples >= 0 && result.samples != expected_samples) {
         state.running = false;
         const bool group_rates = major_sync && major_sync->kind == StreamKind::kMlp &&
                                  major_sync->group1_ratebits() != major_sync->group2_ratebits();
-        return std::unexpected(make_error(group_rates ? ErrorKind::kUnsupported : ErrorKind::kBadParameter,
-                                          "substreams of one access unit differ in their sample counts"));
+        return std::unexpected(
+            make_error(group_rates ? ErrorKind::kUnsupported : ErrorKind::kBadParameter,
+                       "substreams of one access unit differ in their sample counts"));
     }
     return result;
 }
@@ -606,7 +675,8 @@ Decoder::~Decoder() = default;
 Decoder::Decoder(Decoder&&) noexcept = default;
 Decoder& Decoder::operator=(Decoder&&) noexcept = default;
 
-std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(std::span<const std::byte> access_unit) {
+std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
+    std::span<const std::byte> access_unit) {
     Impl& impl = *impl_;
     ++impl.counters.units;
     auto unit = impl.parse_unit(access_unit);
@@ -619,7 +689,8 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(std::span
     }
     if (unit->major_sync) {
         if (unit->major_sync->sample_rate() == 0) {
-            return std::unexpected(make_error(ErrorKind::kBadParameter, "undefined sample rate code (TH spec §5.3)"));
+            return std::unexpected(
+                make_error(ErrorKind::kBadParameter, "undefined sample rate code (TH spec §5.3)"));
         }
         impl.accept_major_sync(*unit->major_sync);
     }
@@ -630,9 +701,11 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(std::span
     for (int index = 0; index < wanted; ++index) {
         const bool emit = index == wanted - 1;
         auto segment = impl.decode_segment(index, unit->entries[static_cast<std::size_t>(index)],
-                                           unit->segments[static_cast<std::size_t>(index)], emit, expected_samples);
+                                           unit->segments[static_cast<std::size_t>(index)], emit,
+                                           expected_samples);
         if (!segment) {
-            // The substreams after the one that failed missed this unit: they wait for a restart too.
+            // The substreams after the one that failed missed this unit: they wait for a restart
+            // too.
             for (int later = index; later < kMaxSubstreams; ++later) {
                 impl.substreams[static_cast<std::size_t>(later)].running = false;
             }
@@ -653,20 +726,30 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(std::span
     ++impl.counters.units_decoded;
     DecodedAccessUnit decoded;
     decoded.sample_rate = impl.major_sync->sample_rate();
+    if (last.padding_samples > last.samples) {
+        return std::unexpected(
+            make_error(ErrorKind::kBadParameter, "more padding samples than the unit holds"));
+    }
     decoded.channels = last.channels;
-    decoded.samples = last.samples;
+    decoded.samples = last.samples - last.padding_samples;
+    decoded.padding_samples = last.padding_samples;
     decoded.substream = wanted - 1;
-    decoded.pcm = std::span<const std::int32_t>(impl.pcm.data(), static_cast<std::size_t>(last.samples) *
-                                                                      static_cast<std::size_t>(last.channels));
+    decoded.pcm = std::span<const std::int32_t>(
+        impl.pcm.data(),
+        static_cast<std::size_t>(decoded.samples) * static_cast<std::size_t>(decoded.channels));
     decoded.layout = impl.layout_for(last.channels);
     decoded.extra_data = impl.extra_data;
     decoded.restarted = last.restarted;
     return std::optional<DecodedAccessUnit>{decoded};
 }
 
-const std::optional<MajorSync>& Decoder::major_sync() const noexcept { return impl_->major_sync; }
+const std::optional<MajorSync>& Decoder::major_sync() const noexcept {
+    return impl_->major_sync;
+}
 
-const DecoderCounters& Decoder::counters() const noexcept { return impl_->counters; }
+const DecoderCounters& Decoder::counters() const noexcept {
+    return impl_->counters;
+}
 
 void Decoder::reset() {
     const DecoderConfig config = impl_->config;

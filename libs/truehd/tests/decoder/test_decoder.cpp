@@ -102,8 +102,10 @@ TEST_CASE("a failed substream waits for its next restart header", "[truehd][deco
     CHECK(restarted->has_value());
 }
 
-TEST_CASE("the restart header's lossless check is that of the interval before it", "[truehd][decoder]") {
-    // The built restart headers carry lossless_check 0, which is not the fold of the samples before them.
+TEST_CASE("the restart header's lossless check is that of the interval before it",
+          "[truehd][decoder]") {
+    // The built restart headers carry lossless_check 0, which is not the fold of the samples before
+    // them.
     Decoder decoder;
     REQUIRE(decoder.decode(stereo_unit(true)).has_value());
     auto second = decoder.decode(stereo_unit(true));

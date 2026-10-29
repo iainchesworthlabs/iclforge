@@ -55,8 +55,8 @@ std::string_view channel_name(Channel channel) noexcept {
 
 namespace {
 
-// TH spec §13.1: bit n of the assignment lists these speakers, left before right. A zero second entry is a
-// bit with one speaker.
+// TH spec §13.1: bit n of the assignment lists these speakers, left before right. A zero second
+// entry is a bit with one speaker.
 struct AssignmentBit {
     Channel first;
     bool pair;
@@ -81,8 +81,8 @@ constexpr std::array<AssignmentBit, kChannelAssignmentBits> kAssignmentBits{{
 
 // TH spec App. D, the channel count of each MLP arrangement; -1 where the table is reserved.
 constexpr std::array<signed char, 32> kMlpArrangementCounts{
-    1, 2, 3, 4, 3, 4, 5, 3, 4, 5, 4, 5, 6, 4, 5, 4, 5, 6, 5, 5, 6,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    1, 2, 3, 4, 3, 4,  5,  3,  4,  5,  4,  5,  6,  4,  5,  4,
+    5, 6, 5, 5, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 }  // namespace
 

@@ -13,7 +13,7 @@ constexpr std::array<std::uint16_t, 256> make_crc16_table(std::uint16_t poly) {
         auto reg = static_cast<std::uint16_t>(i << 8U);
         for (int bit = 0; bit < 8; ++bit) {
             reg = (reg & 0x8000U) != 0 ? static_cast<std::uint16_t>((reg << 1U) ^ poly)
-                                      : static_cast<std::uint16_t>(reg << 1U);
+                                       : static_cast<std::uint16_t>(reg << 1U);
         }
         table[i] = reg;
     }
@@ -26,7 +26,7 @@ constexpr std::array<std::uint8_t, 256> make_crc8_table(std::uint8_t poly) {
         auto reg = static_cast<std::uint8_t>(i);
         for (int bit = 0; bit < 8; ++bit) {
             reg = (reg & 0x80U) != 0 ? static_cast<std::uint8_t>((reg << 1U) ^ poly)
-                                    : static_cast<std::uint8_t>(reg << 1U);
+                                     : static_cast<std::uint8_t>(reg << 1U);
         }
         table[i] = reg;
     }
@@ -36,8 +36,8 @@ constexpr std::array<std::uint8_t, 256> make_crc8_table(std::uint8_t poly) {
 constexpr auto kCrc16Table = make_crc16_table(0x002D);
 constexpr auto kCrc8SubstreamTable = make_crc8_table(0x63);
 
-// A table wrong for a known input fails the build rather than a test (CONTRIBUTING.md): the first entries
-// of a CRC table are fixed by the polynomial alone.
+// A table wrong for a known input fails the build rather than a test (CONTRIBUTING.md): the first
+// entries of a CRC table are fixed by the polynomial alone.
 static_assert(kCrc16Table[1] == 0x002D);
 static_assert(kCrc8SubstreamTable[1] == 0x63);
 
@@ -46,7 +46,8 @@ static_assert(kCrc8SubstreamTable[1] == 0x63);
     if (byte >= data.size()) {
         return 0;
     }
-    return static_cast<std::uint8_t>((std::to_integer<unsigned>(data[byte]) >> (7U - (bit & 7U))) & 1U);
+    return static_cast<std::uint8_t>((std::to_integer<unsigned>(data[byte]) >> (7U - (bit & 7U))) &
+                                     1U);
 }
 
 }  // namespace
@@ -58,8 +59,9 @@ std::uint16_t major_sync_crc(std::span<const std::byte> covered) noexcept {
     std::uint16_t reg = 0;
     const std::size_t run = covered.size() - 2;
     for (std::size_t i = 0; i < run; ++i) {
-        reg = static_cast<std::uint16_t>((reg << 8U) ^
-                                         kCrc16Table[((reg >> 8U) ^ std::to_integer<unsigned>(covered[i])) & 0xFFU]);
+        reg = static_cast<std::uint16_t>(
+            (reg << 8U) ^
+            kCrc16Table[((reg >> 8U) ^ std::to_integer<unsigned>(covered[i])) & 0xFFU]);
     }
     const auto last = static_cast<std::uint16_t>((std::to_integer<unsigned>(covered[run]) << 8U) |
                                                  std::to_integer<unsigned>(covered[run + 1]));
@@ -110,8 +112,8 @@ std::uint8_t substream_crc(std::span<const std::byte> payload) noexcept {
 }
 
 std::uint8_t extra_data_check_nibble(std::uint32_t extra_data_length) noexcept {
-    return static_cast<std::uint8_t>(((extra_data_length >> 8U) ^ (extra_data_length >> 4U) ^ extra_data_length) &
-                                     0xFU);
+    return static_cast<std::uint8_t>(
+        ((extra_data_length >> 8U) ^ (extra_data_length >> 4U) ^ extra_data_length) & 0xFU);
 }
 
 }  // namespace iclforge::truehd

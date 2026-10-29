@@ -28,7 +28,8 @@ TEST_CASE("the substream parity is the XOR of the payload with 0xA9", "[truehd][
 }
 
 TEST_CASE("the substream CRC folds in the last payload byte", "[truehd][checks]") {
-    // With one byte the register never runs: the result is the initial value 0x3C with the byte XORed in.
+    // With one byte the register never runs: the result is the initial value 0x3C with the byte
+    // XORed in.
     CHECK(substream_crc(bytes_of({0x5A})) == (0x3C ^ 0x5A));
     CHECK(substream_crc(bytes_of({})) == 0);
     // Changing any byte changes the CRC.

@@ -25,7 +25,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `ac4` | `libs/ac4/` | The AC-4 decoder and encoder, with the sync frames, table of contents and presentations both work through. | `base`, `dsp`, `objects`, `render` | `app-media`, `baremetal`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `sink`, `tests` | core |
 | `adm` | `libs/adm/` | ADM and BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder and decoder. | `iab`, `objects` | `examples`, `forge` | core |
 | `audio` (internal) | `libs/audio/` | Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and the OSC object-position source: the OS-specific audio code of the project. Internal; never installed. | `base`, `render`, `containers`, `objects` | `crucible`, `demo-android`, `forge`, `hearth`, `hearth-android` | core |
-| `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render` | core |
+| `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render`, `truehd` | core |
 | `capi` | `libs/capi/` | The C API over the AC-3 and AC-4 libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4`, `lyrics` | `examples`, `rust` | core |
 | `containers` | `libs/containers/` | The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing. | `base` | `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python`, `sink` | core |
 | `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
@@ -37,6 +37,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`, `sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-android`, `hearth-sink`, `sink` | core |
 | `sink` (internal) | `libs/sink/` | A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies: the pass-through output hands the coded bursts on, and the decoding output (AC-3, E-AC-3, AC-4) decodes and renders them and hands the samples to a PcmSink. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed. | `ac3`, `ac4`, `containers`, `lyrics`, `objects`, `render`, `sendspin` | `hearth`, `hearth-android` | core |
+| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values) and the lossless decoder. | `base` | nothing | core |
 
 ## Vendored code
 
@@ -121,6 +122,7 @@ flowchart LR
     sendspin(["sendspin"])
     sink(["sink"])
     time_filter["time-filter"]
+    truehd["truehd"]
     ac3 --> base
     ac3 --> dsp
     ac3 --> objects
@@ -153,6 +155,7 @@ flowchart LR
     sink --> objects
     sink --> render
     sink --> sendspin
+    truehd --> base
 ```
 
 An arrow is *uses*; a rounded box is an internal library.

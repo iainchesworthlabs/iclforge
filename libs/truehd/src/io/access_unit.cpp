@@ -38,7 +38,8 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     extra.length = static_cast<std::uint16_t>(word & 0xFFFU);
     extra.check_ok = extra.header_check_nibble == extra_data_check_nibble(extra.length);
     extra.parity = std::to_integer<std::uint8_t>(bytes.back());
-    // evo_reserved and evo_frame_byte_length share the next 16 bits; the payload starts on the byte after.
+    // evo_reserved and evo_frame_byte_length share the next 16 bits; the payload starts on the byte
+    // after.
     constexpr std::size_t kFramingBytes = 4;
     if (bytes.size() < kFramingBytes + 1) {
         return extra;
@@ -51,7 +52,8 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     }
     extra.framing_ok = true;
     extra.evolution_payload = bytes.subspan(kFramingBytes, extra.evo_frame_byte_length);
-    // TH spec §16.4: the payload and the padding are the bytes between the framing and the parity byte.
+    // TH spec §16.4: the payload and the padding are the bytes between the framing and the parity
+    // byte.
     unsigned accumulator = extra.evo_reserved ^ extra.evo_frame_byte_length ^ kExtraDataSeed;
     for (std::size_t i = kFramingBytes; i + 1 < bytes.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(bytes[i]);
@@ -66,8 +68,8 @@ std::size_t access_unit_length_bytes(std::span<const std::byte> data) noexcept {
     return data.size() < 2 ? 0 : std::size_t{be16(data, 0) & 0xFFFU} * 2U;
 }
 
-std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> data, int inherited_substreams,
-                                                   bool strict) {
+std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> data,
+                                                   int inherited_substreams, bool strict) {
     if (data.size() < kHeaderBytes) {
         return std::unexpected(Error{ErrorKind::kTruncated, "access unit header"});
     }
@@ -117,7 +119,8 @@ std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> da
         offset += 2;
         if (entry.extra_substream_word) {
             if (offset + 2 > whole.size()) {
-                return std::unexpected(Error{ErrorKind::kTruncated, "substream directory extra word"});
+                return std::unexpected(
+                    Error{ErrorKind::kTruncated, "substream directory extra word"});
             }
             entry.drc_gain_update = static_cast<std::int16_t>(read_signed(reader, 9));
             entry.drc_time_update = static_cast<std::uint8_t>(reader.read(3));
@@ -129,7 +132,8 @@ std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> da
 
     // TH spec §3.2: the nibbles of the header and the directory XOR to 0xF.
     const unsigned folded =
-        nibble_fold(whole.first(kHeaderBytes)) ^ nibble_fold(whole.subspan(directory_start, segments_start - directory_start));
+        nibble_fold(whole.first(kHeaderBytes)) ^
+        nibble_fold(whole.subspan(directory_start, segments_start - directory_start));
     if (strict && folded != kCheckNibbleTarget) {
         return std::unexpected(Error{ErrorKind::kBadCheckNibble, "access unit check nibble"});
     }
@@ -138,11 +142,12 @@ std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> da
     std::size_t previous_end = 0;
     for (int i = 0; i < num_substreams; ++i) {
         const SubstreamEntry& entry = unit.entries[static_cast<std::size_t>(i)];
-        if (entry.end_ptr < previous_end || segments_start + std::size_t{entry.end_ptr} * 2U > whole.size()) {
+        if (entry.end_ptr < previous_end ||
+            segments_start + std::size_t{entry.end_ptr} * 2U > whole.size()) {
             return std::unexpected(Error{ErrorKind::kBadLength, "substream end pointer"});
         }
-        unit.segments[static_cast<std::size_t>(i)] =
-            whole.subspan(segments_start + previous_end * 2U, (std::size_t{entry.end_ptr} - previous_end) * 2U);
+        unit.segments[static_cast<std::size_t>(i)] = whole.subspan(
+            segments_start + previous_end * 2U, (std::size_t{entry.end_ptr} - previous_end) * 2U);
         previous_end = entry.end_ptr;
     }
 
@@ -154,18 +159,19 @@ std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> da
     return unit;
 }
 
-std::expected<std::vector<std::byte>, Error> write_access_unit_prefix(const std::optional<MajorSync>& major_sync,
-                                                                      std::span<const SubstreamEntry> entries,
-                                                                      std::uint16_t input_timing,
-                                                                      std::size_t total_bytes) {
+std::expected<std::vector<std::byte>, Error> write_access_unit_prefix(
+    const std::optional<MajorSync>& major_sync, std::span<const SubstreamEntry> entries,
+    std::uint16_t input_timing, std::size_t total_bytes) {
     if (entries.empty() || entries.size() > static_cast<std::size_t>(kMaxSubstreams)) {
         return std::unexpected(Error{ErrorKind::kBadParameter, "substream count outside 1..4"});
     }
     if (total_bytes % 2 != 0 || total_bytes < kHeaderBytes || total_bytes / 2 > 0xFFFU) {
-        return std::unexpected(Error{ErrorKind::kBadLength, "access unit size is not 4 to 8190 bytes in words"});
+        return std::unexpected(
+            Error{ErrorKind::kBadLength, "access unit size is not 4 to 8190 bytes in words"});
     }
     if (major_sync && major_sync->num_substreams != entries.size()) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "major sync and directory disagree on substreams"});
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "major sync and directory disagree on substreams"});
     }
 
     BitWriter directory;
