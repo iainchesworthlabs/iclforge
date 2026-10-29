@@ -52,100 +52,20 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
-#include "truehd_bench.hpp"
+#include "bench_encoder.hpp"
 
 namespace {
 
+using perf::bench::fail;
+using perf::bench::FrameTimer;
+using perf::bench::kSampleRate;
+using perf::bench::kWarmupFrames;
+using perf::bench::real_time_budget_ms;
+using perf::bench::Result;
+
 constexpr int kFrames = 200;
-constexpr double kSampleRate = 48000.0;
 // The object count the Atmos encode and decode workloads share.
 constexpr int kObjects = 4;
-
-double real_time_budget_ms(int frames) {
-    return 1000.0 * static_cast<double>(frames) * iclforge::ac3::kSamplesPerFrame / kSampleRate;
-}
-
-struct Result {
-    std::string name;
-    int frames = 0;
-    double total_ms = 0.0;
-    double ms_per_frame = 0.0;
-    // The tail, not just the average. A real-time codec is bounded by its
-    // WORST frame, not its mean one: a block-switched frame on a transient
-    // costs more than a steady-state frame, and a change that doubles the
-    // tail while leaving the mean flat is invisible to a mean-only series -
-    // which is exactly the shape of regression the whole performance suite
-    // exists to catch. Both are per-frame milliseconds, same unit as
-    // ms_per_frame, so a reader can compare them directly against the
-    // real-time budget printed beside them.
-    double p95_ms_per_frame = 0.0;
-    double max_ms_per_frame = 0.0;
-    // The frame's duration, which is the real-time budget: A/52's 1 536
-    // samples for AC-3 and E-AC-3, AC-4's own frame length for AC-4. Written
-    // per result because the two codecs' frames differ.
-    double budget_ms_per_frame = real_time_budget_ms(1);
-};
-
-// Times each frame individually rather than the loop as a whole, so the
-// distribution above can be computed. The extra cost is one steady_clock
-// read per frame against a frame that takes milliseconds - under 0.01% at
-// the fastest workload here, measured, and it buys the tail.
-class FrameTimer {
-public:
-    explicit FrameTimer(int expected_frames) {
-        per_frame_ms_.reserve(static_cast<std::size_t>(expected_frames));
-    }
-
-    template <typename Fn>
-    void time_frame(Fn&& fn) {
-        const auto start = std::chrono::steady_clock::now();
-        fn();
-        per_frame_ms_.push_back(
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
-                .count());
-    }
-
-    [[nodiscard]] Result result(std::string name) const {
-        const auto frames = static_cast<int>(per_frame_ms_.size());
-        double total = 0.0;
-        for (const double ms : per_frame_ms_) {
-            total += ms;
-        }
-        // Nearest-rank percentile on a sorted copy: with 200 frames p95 is
-        // the 190th slowest. Sorting a copy keeps the caller's insertion
-        // order intact, which nothing needs today but costs nothing to keep.
-        std::vector<double> sorted = per_frame_ms_;
-        std::ranges::sort(sorted);
-        const auto rank =
-            static_cast<std::size_t>(std::ceil(0.95 * static_cast<double>(frames)));
-        const auto p95_index = sorted.empty() ? 0 : std::min(sorted.size() - 1,
-                                                             rank == 0 ? 0 : rank - 1);
-        return {.name = std::move(name),
-                .frames = frames,
-                .total_ms = total,
-                .ms_per_frame = frames > 0 ? total / frames : 0.0,
-                .p95_ms_per_frame = sorted.empty() ? 0.0 : sorted[p95_index],
-                .max_ms_per_frame = sorted.empty() ? 0.0 : sorted.back()};
-    }
-
-private:
-    std::vector<double> per_frame_ms_;
-};
-
-// Frames run before the clock starts, on a THROWAWAY encoder of the same
-// configuration. The point is to warm the caches, the branch predictors and
-// the allocator's free lists - not the encoder, which is why the timed run
-// below still constructs its own fresh instance and still starts at frame 0.
-// Without this the first workload in program order pays every cold-start cost
-// in the process and the rest do not, which is a bias between series rather
-// than noise within one: it does not average out over repetitions, and it
-// silently moves if the workload order ever changes.
-constexpr int kWarmupFrames = 8;
-
-[[noreturn]] void fail(const char* workload, const char* what) {
-    std::fprintf(stderr, "%s: %s failed\n", workload, what);
-    std::exit(1);
-}
 
 // --- encoder construction --------------------------------------------------
 // Shared by the timed runs below and by the untimed setup pass that builds
@@ -442,82 +362,6 @@ Result bench_ac4_decode(std::string name, const std::vector<std::vector<std::byt
     return r;
 }
 
-// --- TrueHD ----------------------------------------------------------------------------------
-// A frame is an access unit (truehd_bench.hpp). The encoder is given one access unit's PCM a call,
-// as a live caller would, and the call that completes a restart interval does the interval's whole
-// analysis: the mean is the codec's cost and the maximum is that burst.
-
-Result bench_truehd_encode(std::string name, const perf::truehd_bench::Source& source,
-                           const iclforge::truehd::EncoderConfig& config) {
-    const auto create = [&] {
-        auto encoder = iclforge::truehd::Encoder::create(config);
-        if (!encoder) {
-            fail(name.c_str(), "iclforge::truehd::Encoder::create");
-        }
-        return std::move(*encoder);
-    };
-    const int samples = create().samples_per_access_unit();
-    const auto units = static_cast<int>(source.frames()) / samples;
-    {
-        auto warm = create();
-        for (int unit = 0; unit < perf::truehd_bench::kIntervalUnits + kWarmupFrames; ++unit) {
-            (void)warm.encode(perf::truehd_bench::unit_pcm(source, samples,
-                                                           static_cast<std::size_t>(unit)));
-        }
-    }
-
-    auto encoder = create();
-    FrameTimer timer{units};
-    for (int unit = 0; unit < units; ++unit) {
-        timer.time_frame([&] {
-            const auto result = encoder.encode(
-                perf::truehd_bench::unit_pcm(source, samples, static_cast<std::size_t>(unit)));
-            if (!result) {
-                fail(name.c_str(), "iclforge::truehd::Encoder::encode");
-            }
-        });
-    }
-    // The tail of the last interval leaves the encoder here and is attributed to the last frame.
-    timer.time_frame([&] { (void)encoder.flush(); });
-    Result r = timer.result(std::move(name));
-    r.budget_ms_per_frame = perf::truehd_bench::budget_ms(config.sample_rate, samples);
-    return r;
-}
-
-// `passes` runs over the same units, each from a fresh decoder, so a series is long enough to time:
-// an access unit takes microseconds.
-Result bench_truehd_decode(std::string name, std::span<const std::span<const std::byte>> units,
-                           std::uint32_t sample_rate, int samples_per_unit, int passes) {
-    if (units.empty()) {
-        fail(name.c_str(), "building its source stream");
-    }
-    {
-        iclforge::truehd::Decoder warm;
-        for (const auto unit : units) {
-            (void)warm.decode(unit);
-        }
-    }
-    FrameTimer timer{static_cast<int>(units.size()) * passes};
-    for (int pass = 0; pass < passes; ++pass) {
-        iclforge::truehd::Decoder decoder;
-        for (const auto unit : units) {
-            timer.time_frame([&] {
-                const auto result = decoder.decode(unit);
-                if (!result) {
-                    fail(name.c_str(), "iclforge::truehd::Decoder::decode");
-                }
-            });
-        }
-    }
-    Result r = timer.result(std::move(name));
-    r.budget_ms_per_frame = perf::truehd_bench::budget_ms(sample_rate, samples_per_unit);
-    return r;
-}
-
-std::vector<std::span<const std::byte>> as_spans(const perf::truehd_bench::Stream& stream) {
-    return {stream.units.begin(), stream.units.end()};
-}
-
 void write_json(const std::vector<Result>& results, const std::string& path) {
     std::ofstream out(path);
     out << "{\n  \"real_time_budget_ms_per_frame\": " << real_time_budget_ms(1)
@@ -650,50 +494,7 @@ int main(int argc, char** argv) {
                                  ac4_five_one, perf::ac4_bench::five_one_config(), kFrames)));
     }
 
-    // TrueHD: stereo and 5.1 at 48 kHz and 24 bits, each direction. The decode rows read what the
-    // encode rows' encoder writes from the same source, as the other codecs' do.
-    const bool want_truehd_encode = wanted("truehd_stereo_encode") || wanted("truehd_51_encode");
-    const bool want_truehd_decode = wanted("truehd_stereo_decode") || wanted("truehd_51_decode");
-    if (want_truehd_encode || want_truehd_decode) {
-        namespace tb = perf::truehd_bench;
-        constexpr int kTrueHdDecodePasses = 20;
-        const struct {
-            const char* layout;
-            std::span<const std::size_t> channels;
-        } layouts[] = {{"stereo", tb::kStereoChannels}, {"51", tb::kFiveOneChannels}};
-        for (const auto& layout : layouts) {
-            const std::string base = std::string("truehd_") + layout.layout;
-            const tb::Source source = tb::make_source(audio, layout.channels, 24);
-            const auto config = tb::config_for(source);
-            if (wanted(base + "_encode")) {
-                results.push_back(bench_truehd_encode(base + "_encode", source, config));
-            }
-            if (wanted(base + "_decode")) {
-                const tb::Stream stream = tb::encode_stream(source, config);
-                const auto units = as_spans(stream);
-                results.push_back(bench_truehd_decode(base + "_decode", units, stream.sample_rate,
-                                                      stream.samples_per_unit,
-                                                      kTrueHdDecodePasses));
-            }
-        }
-    }
-    if (truehd_fixtures) {
-        namespace tb = perf::truehd_bench;
-        for (const auto& fixture : tb::load_fixtures(ICLFORGE_SOURCE_DIR "/testdata/truehd")) {
-            const auto units = tb::split_units(fixture.bytes);
-            if (wanted(fixture.name + "_decode")) {
-                results.push_back(bench_truehd_decode(
-                    fixture.name + "_decode", units, fixture.info.sample_rate,
-                    fixture.info.samples_per_access_unit, 20));
-            }
-            // The encoder writes TrueHD only, so an MLP fixture has a decode row and no encode row.
-            if (fixture.truehd && wanted(fixture.name + "_encode")) {
-                const tb::Source source = tb::decode_to_source(fixture);
-                results.push_back(bench_truehd_encode(fixture.name + "_encode", source,
-                                                      tb::config_for(source)));
-            }
-        }
-    }
+    perf::bench::add_truehd_results(results, audio, only, truehd_fixtures);
     if (results.empty()) {
         std::fprintf(stderr, "iclforge-bench: --only matched no workload\n");
         return 1;

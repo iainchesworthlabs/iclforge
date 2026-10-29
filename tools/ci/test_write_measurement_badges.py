@@ -663,6 +663,31 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("a different CPU model from run to run",
                       self.render("--page")["Speed"]["note"])
 
+    def test_truehd_gets_a_line_where_it_has_a_series_and_not_on_the_accuracy_card(self):
+        """The cards and the tiles draw what the badges say: TrueHD joins the speed, allocation
+        and growth lines once the history holds a TrueHD row, and never the accuracy line, since
+        it is lossless and has no accuracy series."""
+        self.fixture()
+        without = self.render("--page")
+        for title in ("Speed", "Allocation per frame", "Live growth", "Decode accuracy"):
+            self.assertNotIn("TrueHD", self.figures(without[title]))
+        self.write("performance-main", [
+            perf("plain_51", 4.0), perf("truehd_51_decode", 0.01, 40 / 48.0)])
+        self.write("memory-main", [
+            mem("ac3_51_encode", 20110.6, growth=2048),
+            mem("truehd_51_encode", 3072.0, growth=512, allocs=2.0)])
+        made = self.badge_messages()
+        for flags in ((), ("--page",)):
+            cards = self.render(*flags)
+            with self.subTest(surface="page" if flags else "strip"):
+                self.assertEqual(self.figures(cards["Speed"])["TrueHD"], "83x")
+                self.assertEqual(self.figures(cards["Allocation per frame"])["TrueHD"], "3 KB")
+                self.assertEqual(self.figures(cards["Live growth"])["TrueHD"], "0.5 KiB")
+                self.assertNotIn("TrueHD", self.figures(cards["Decode accuracy"]))
+        for badge in ("speed", "memory", "growth"):
+            self.assertIn(" | TrueHD ", made[badge]["message"])
+        self.assertNotIn("TrueHD", made["accuracy"]["message"])
+
     def test_an_ac4_leg_name_is_read_as_the_layout_it_spells(self):
         """"ac4-514-music-768" is 5.1.4 music at 768 kbps, not "514 music"."""
         self.fixture()

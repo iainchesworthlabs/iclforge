@@ -56,10 +56,7 @@ The AC-3, E-AC-3 and Atmos encoders are `plain_51` and `plain_51_fast_mdct`,
 `eac3_51_auto` and `eac3_stereo_auto`, and `atmos_4obj`, `atmos_4obj_fast_mdct` and
 `atmos_4obj_qmf_fast_mdct`; their decoders are `ac3_51_decode`, `eac3_51_decode` and
 `atmos_4obj_decode`. AC-4 adds `ac4_stereo_encode` and `ac4_51_encode`, and
-`ac4_stereo_decode` and `ac4_51_decode`, which read those encoders' streams. TrueHD has one,
-`truehd_51_decode`: the decoder on a 5.1 stream the TrueHD encoder writes from the same fixture, timed in
-frames of 40 access units (33.3 ms of audio, the length of an AC-3 frame) because one access unit takes a
-few microseconds to decode. The decode series
+`ac4_stereo_decode` and `ac4_51_decode`, which read those encoders' streams. The decode series
 are timed against streams encoded in the same run: a decode number only means something against
 a stream whose rate and tool set are known. By name, `plain_*` and `ac3_*` are AC-3 (`plain_51`
 is `iclforge::ac3::FrameEncoder` at 5.1, 448 kbit/s), `eac3_*`, `ecpl_*` and `atmos_*` are E-AC-3 (Atmos is

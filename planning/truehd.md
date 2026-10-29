@@ -111,7 +111,7 @@ lane builds or runs the TrueHD, crypto or signing code; the other words say what
 | ASan and UBSan leg | Covered: the full ctest run and the codec matrix, signing and TrueHD sections included. |
 | TSan leg | Not applicable. It runs the cases tagged `concurrency`; E-AC-3 has none, and the TrueHD and crypto code has no mutable static or thread state. |
 | Coverage | `libs/truehd` had no row; it has 84 line and 74 branch, under 87.1 and 79.7 measured on its own tests. `libs/base` takes the crypto under its existing floor. |
-| Speed trend and real-time guard | Added: `truehd_51_decode` in `iclforge-bench` and `iclforge-perf`. No TrueHD memory series (`iclforge-membench`) and no kernel series; those are the performance audit's. |
+| Speed trend and real-time guard | Covered by the performance task (`planning/truehd-parity-performance.md`): the four workloads `truehd_stereo_encode`, `truehd_51_encode`, `truehd_stereo_decode` and `truehd_51_decode` in `iclforge-bench`, `iclforge-membench` and the guards of `iclforge-perf`, and the kernels in `iclforge-kernelbench`. The badge, card and tile tables list them. Each executable's TrueHD code is a file of its own with a stand-in for `ICLFORGE_BUILD_TRUEHD=OFF`, which skips the guards and adds no row. |
 | Shared-library pass and ABI gate | Were broken: five exported-by-header functions of `libs/truehd` were not exported, so `forge` and the TrueHD tests did not link. Fixed; the export allowlists name the crypto, signing and MP4 reader functions. |
 | Minimum-footprint presets, ESP-IDF component, minimal AC-4 archive | Were broken: configure stopped at the root's guard, and the minimal AC-4 archive carried the signing source. Fixed, with tests. |
 | Packages | The vcpkg port and the Conan recipe offer `truehd` (off by default, like `ac4`). CMake install and the CPack library component are generic. The Python wheel builds the library without using it. |
@@ -124,7 +124,7 @@ Open, for the owner:
 
 1. Should the vcpkg port and the Conan recipe offer `truehd` (done, off by default), or pin it off until a program that ships needs it?
 2. Should TrueHD be a column of the README badges and the performance cards? It is now; accuracy and memory read "no data" for it, as AC-4's did.
-3. `ICLFORGE_BUILD_TRUEHD=OFF` with tests on is supported by the CMake files (the C API's absent file and its test) and built by no lane. Build it in
+3. `ICLFORGE_BUILD_TRUEHD=OFF` with tests on is supported by the CMake files (the C API's absent file and its test, and the stand-ins of the four performance executables) and built by no lane. Build it in
    one, or refuse it in the root as `ICLFORGE_BUILD_AC4=OFF` is?
 4. The AC-4 and TrueHD libraries are outside clang-tidy's list. Add them (a first nightly with findings), or leave them to CodeQL and Sonar?
 5. Forge writes the TrueHD WAV with `std::fopen`, which takes an ANSI path on Windows; a non-ASCII path needs `std::ofstream` or a wide path.
