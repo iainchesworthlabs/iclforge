@@ -4547,7 +4547,8 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 | Absolute output level | **partly** | Part 1 states no full-scale convention; it is settled against DEE's source, which assumes DEE's input convention is the decoder's |
 | Compression-curve DRC agrees with another decoder | **no** | The level detector is not normative |
 | The readings chosen for the errata | **partly** | A reading is checked where an encoder's stream exercises the tool; elsewhere it rests on the text |
-| Immersive stereo (`presentation_version` 2) | **by observation** | V1.3.1 names the version without defining it |
+| Immersive stereo (`presentation_version` 2) | **by observation** | V1.3.1 names the version without defining it; the second code, 0b1111001, rests on Dolby's AC-4 in MPEG-DASH text and the kit's two streams (`libs/ac4/ERRATA.md`) |
+| The decoder's output on Dolby's kit streams | **partly** | No PCM comes with them and no second decoder reads them; the check holds the decode to what they make checkable: framing, CRCs, sample counts, channel names, the LFE's band, loudness against the declared LKFS, and siblings (frame rates, languages, DD+, carriage) (`docs/verification.md`, "Dolby's Online Delivery Kit streams") |
 | Core decoding matches what a core decoder of Dolby's produces | **partly** | Checked against the text's matrices and gains on DEE and constructed streams; nothing here decodes the core otherwise |
 | AC-4 over IEC 61937 to a device | **no** | No device found that accepts it; D11 is checked against IEC 61937-14's tables only |
 | Real time on the ESP32-P4 and S3 in `float` and the C6 in fixed point | **on boards, in D14** | QEMU has no cache model and a fabricated clock, and none runs the P4 or the C6; the boards measure time. D14b measured the P4 (real time at 2.0 only, and no CI leg runs it); the S3 and the C6 are not built |
@@ -4560,6 +4561,23 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 | The WebAssembly module's C++ side and the Android build of the AC-4 libraries | **by CI only** | No Emscripten or NDK on the machine that made I4; I4b compiled `ac4_bindings.cpp` natively against a host model of `emscripten::val` |
 | Any DEE stream after 2026-11-06 | **no** | The licence is not renewed; G0, G1 and G2 made the sets before then (decision 23) |
 | What is published under the family's names | **partly** | Checked by hand on 2026-09-30 on GitHub, PyPI, npm, crates.io, the Homebrew tap and the two upstream pull requests. Not checked: the ESP Component Registry (its site was not queried), ConanCenter beyond a search of its pull requests, and the user's statement that Sendspin and the ESP32 firmware are unpublished |
+
+### Open after Dolby's kit streams (2026-10-29)
+
+Decoding the kit's 12 AC-4 streams, and their DASH, HLS and MP4 siblings, found one decoder defect, fixed
+(the second immersive stereo code, `libs/ac4/ERRATA.md`), and three open items outside the decoder's
+syntax and reconstruction:
+
+- **HLS packed audio.** `forge decode` and `probe` cannot read the kit's 12 `HLS/Audio_ID3/*_sub.ac4`
+  files: each has an ID3v2 tag before every segment (200 frames at 25 fps, 240 at 29.97), the detection
+  looks for a sync word at byte 0 and falls to AC-3. The frames between the tags are the elementary
+  stream's, byte for byte. Needed: skip a tag at the start and between frames, in the detection and in
+  `SyncFrameSplitter`.
+- **No channel mask in the AC-4 decode's WAV.** The E-AC-3 path writes `dwChannelMask`; the AC-4 path
+  writes none for 2, 6 or 10 channels, so the layout is in forge's message alone. The 10-channel 5.1.4 file
+  needs a decision on side or back surrounds.
+- **`forge probe` names 12 channels for a 5.1.4 stream** (L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr) where the
+  decode writes 10 (no Lb, Rb).
 
 ## Coordination
 

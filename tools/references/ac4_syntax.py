@@ -3150,7 +3150,10 @@ def parse_emdf_payloads(data, recs):
 # Frame walk (TOC from ac4_parse)
 # ---------------------------------------------------------------------------
 
-IMS_STEREO_CODE = 0b1111000
+# Table 56 codes read as stereo in a presentation_version 2 presentation: 0b1111000 (DEE's
+# immersive stereo) and 0b1111001 (immersive stereo made from Dolby Atmos content, Dolby's
+# AC-4 in MPEG-DASH specification, "Signaling immersive stereo content"); libs/ac4/ERRATA.md.
+IMS_STEREO_CODES = (0b1111000, 0b1111001)
 
 
 def _groups_of(toc, p):
@@ -3402,14 +3405,14 @@ def _carried_for(a, oc):
 
 def apply_ims_rule(toc):
     """The observed rule (libs/ac4/ERRATA.md): in a presentation_version 2 presentation,
-    channel_mode 0b1111000 is read as stereo (ch_mode 1)."""
+    channel_mode 0b1111000 or 0b1111001 is read as stereo (ch_mode 1)."""
     for p in toc['presentations']:
         if p.get('presentation_version') != 2:
             continue
         for g in _groups_of(toc, p):
             if g['b_channel_coded']:
                 for s in g['substreams']:
-                    if s['info']['channel_mode'] == IMS_STEREO_CODE:
+                    if s['info']['channel_mode'] in IMS_STEREO_CODES:
                         s['info']['ch_mode'] = 1
 
 

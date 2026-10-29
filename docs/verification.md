@@ -172,7 +172,7 @@ scheduled workflows are separate.
 | `Interop`: eight FATE excerpts | AC-3, E-AC-3 | Daily, and on pull requests that change the decode path |
 | `tools/checks/ac4_syntax_differential.py`, 3,000 mutated DEE frames and 800 synthetic tables of contents at a fixed seed | AC-4 | Daily, in the SonarCloud workflow, where it feeds the coverage scan and does not gate |
 | `tools/checks/check_install_consumer.sh`, and the ABI gate (advisory until the API freeze) | all | Nightly |
-| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; listening | AC-4 mostly | Locally, by hand |
+| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams (the kit is Dolby's and is not in the tree); listening | AC-4 mostly | Locally, by hand |
 | Dolby's Online Delivery Kit tools, `check_dolby_*.py` ([below](#dolbys-online-delivery-kit-tools)) | AC-3, E-AC-3, AC-4 containers | Locally, by hand; skip when the tools are absent |
 
 `PAUSE_NONESSENTIAL_CI` is a pause the workflows describe as temporary: while it is `true`, pull
@@ -1456,6 +1456,94 @@ processing" and in "A change of source" and "What an I-frame does not restore".
   undamaged decode's up to the lost audio and again from the second good frame after it; muted frames
   are silent, repeated ones fade by more than 20 dB a frame, and a frame whose table of contents does
   not read keeps the stream's counter and the converter's counts.
+
+### Dolby's Online Delivery Kit streams
+
+Dolby's AC-4 Online Delivery Kit (1.5, from ott.dolby.com) has a folder of test streams,
+`Test_Signals/elementary_streams/Audio`, that Dolby made to check playback and content-creation
+products. The kit is Dolby's, so none of it is committed; `tools/checks/check_ac4_kit_streams.py`
+reads the folder from `ICLFORGE_DOLBY_AC4_KIT_STREAMS` and prints SKIP when the variable is unset.
+`Audio.zip`, beside the folder, holds the same 14 files, byte for byte (SHA-256 compared member by
+member).
+
+| File | Bytes | SHA-256 |
+|---|---|---|
+| `Audio_ID_2ch_64kbps_25fps_ac4.ac4` | 263,586 | `cb6c8cd2fa7a6ac3225e98663a84088b0df52bc89ba8754b540f30c5b34d5b4e` |
+| `Audio_ID_2ch_64kbps_2997fps_ac4.ac4` | 265,240 | `68a99f710967fb8fe007ac3bae9696cbf6851220ab74afafaa56ebf5743b9663` |
+| `Audio_ID_514ch_192kbps_25fps_ac4.ac4` | 773,600 | `aacf8e50363def6ae7d2d89e595ff4d3319096a8209b74ddbe4d78fa2b35faff` |
+| `Audio_ID_514ch_192kbps_2997fps_ac4.ac4` | 775,488 | `958b18e481ed88bd1ecbd5f772076920f8259ca8c3f14ffbe2a4c29f854ffdc3` |
+| `Audio_ID_6ch_128kbps_25fps_ac4.ac4` | 520,816 | `5634921ddb5b14e32dce026f13a80b1e31d349059eb898f369c9350ac5616855` |
+| `Audio_ID_6ch_128kbps_2997fps_ac4.ac4` | 522,319 | `6de4fb2662a3122d377f66df47f8566b3221eba8053d5c3653f867d7ce510a11` |
+| `Audio_ID_ims_112kbps_25fps_ac4.ac4` | 452,800 | `714b599950526c207144c57915dbf2e2dcf58c5c675cf47bab984c1755cb7ebf` |
+| `Audio_ID_ims_112kbps_2997fps_ac4.ac4` | 454,208 | `772c24599837598879f60316f1c496191e4a71515dd0d0c776a63e61ad779292` |
+| `Holi_en_6ch_128kbps_25fps_ac4.ac4` | 1,374,688 | `1b43b761e10909da9b1b16d4c1f8433cd26b73ebbf00aee04153795e867eded5` |
+| `Holi_en_6ch_128kbps_2997fps_ac4.ac4` | 1,377,740 | `8c3451f20fc4b916e80ae375b21188ddf35e3f65b1068da26770845b70fbd6be` |
+| `Holi_fr_6ch_128kbps_25fps_ac4.ac4` | 1,374,688 | `33f4c6331485e773ad96bcb9a53a156b7710c82ba8486d57b84178ed552779fc` |
+| `Holi_fr_6ch_128kbps_2997fps_ac4.ac4` | 1,377,740 | `83484674fa8389b3ab01dcac25e753c91490d243c6a8674c13bff084e30dbc0c` |
+| `Audio_ID_6ch_256kbps_ddp.ec3` (E-AC-3) | 1,024,000 | `62b463a20ab6ef89562c198ad451f3ae5badb80049f7293cc8312029b1bf764e` |
+| `Audio_ID_2ch_64kbps_aac.aac` (AAC, not read) | 256,238 | `c81f7b3d189150fdd5a505ba27c01596850130b35dc9f06b1f643e21202184c7` |
+
+`Audio_ID_*` is a 32 s programme, 800 frames at 25 fps or 960 at 29.97, in 2.0, 5.1, 5.1.4 and
+immersive stereo; `Holi_en` and `Holi_fr` are one 5.1 programme in two languages, 2,128 or 2,552
+frames. The sync words are 0xAC41 except in the 5.1.4 pair (0xAC40, no CRC), and the frame size is
+the two-byte form in the immersive stereo and `Holi` streams and the 0xFFFF escape with three more
+bytes in the rest, on frames of 330 to 970 bytes. The kit comes with no PCM and no second AC-4
+decoder is installed, so the decode is not scored against a known answer. The check holds it to what
+the streams and their siblings make checkable, 134 lines over the 12 AC-4 streams, none failing:
+
+- forge decodes every frame, the CRC of every frame is valid, the sample count is the frame count
+  times the frame length at the stream's exact rate (30000/1001 at "29.97"), no sample is NaN or over
+  full scale, and the programme is not silent.
+- The WAV has the channels the decode reports, and those are the channels the probe names, in the
+  same order. For a 5.1.4 stream the probe names 12 channels (the 7.1.4 layout, with Lb and Rb) and
+  the decode writes 10, so the check requires the decode's names to be an ordered subset and prints
+  the difference as a NOTE.
+- The LFE holds at most 0.04 % of its energy above 200 Hz; the four heights of 5.1.4 carry signal in 88
+  to 89 % of the loud windows; the immersive stereo and the 2.0 streams are not dual mono.
+- The integrated loudness (BS.1770-4, measured with its own K-weighting) of every 2.0 and 5.1 decode
+  is within 0.2 LU of the LKFS the stream declares (immersive stereo -18.4 against -18.5, the rest -23.1
+  or -23.2 against -23.0). The 5.1.4 pair declares -16.0 and is not measured: BS.1770 gives heights no
+  weight.
+- The 25 and 29.97 fps versions of a programme match in level per channel to 0.5 dB, `Holi_en` and
+  `Holi_fr` correlate above 0.98 in every channel but the centre (0.04), and `Audio_ID_6ch_256kbps_ddp.ec3`
+  decoded by forge lines up with the AC-4 5.1 stream at a 1,982-sample lag, with the same loud and
+  quiet stretches in every window and a centre at 0.9967 and an LFE at 0.9957 correlation. Its L, R,
+  Ls and Rs correlate at 0.87 to 0.92, which two lossy codings at 256 and 128 kbps can account for;
+  that is a measurement and not a proof that those channels are right. Forge's decode of the E-AC-3
+  file and FFmpeg's, run once with both DRCs off, agree at lag 0 and at 0.9995 to 1.0 per channel but
+  are not the same samples (the difference is 57 to 94 dB below full scale; the stream uses dither
+  and spectral extension in nearly every block, and the cause was not isolated). Nothing here rests
+  on that comparison.
+
+The immersive stereo pair did not decode before this check: Dolby labels immersive stereo made from
+Dolby Atmos content `channel_mode` 0b1111001, and the decoder read only 0b1111000 as stereo. The
+reading, the evidence and the test (which builds the second kind from a DEE stream by setting one
+bit per frame) are in `libs/ac4/ERRATA.md`, "presentation_version 2 is read as immersive stereo".
+
+**No signature, no protection.** The kit does not say its streams are signed and a stream's
+`content_signature` trailer would show in three ways, each checked. Each of the 12 AC-4 files is a
+whole number of sync frames, found by walking `sync_word`, `frame_size` and the CRC of a 0xAC41 frame
+from byte 0 to the end of the file, with no byte after the last frame; a trailer, which
+[signing](library/signing.md) appends there, would leave bytes. None of the 14 files holds the
+content-signature UUID (as text or as 16 bytes), `pace-ccjf1`, `ecc_r_value` or `ContentSignature`.
+Nor does any of the 538 DASH, HLS and MP4 files fetched from the kit (audio-only DASH and HLS, and ten
+MP4 examples with video) hold those markers, a protection box (`sinf`, `schm`, `schi`, `tenc`, `pssh`,
+`senc`, `enca`, `saiz`, `saio`, `frma`) or manifest signalling (`EXT-X-KEY`, `ContentProtection`,
+`cenc:default_KID`, `urn:mpeg:dash:mp4protection`). The streams are neither signed nor encrypted, so
+they test the decoder and not the verifier or the CENC reader.
+
+**Carriage.** The kit's topics `codec_c_ac4_sync_frames`, `ac4_c_raw_ac4_frame` and
+`ac4_in_mpeg_dash_c_mp4_samp` say that an elementary stream (and HLS packed audio) is AC-4 sync
+frames, with a two-byte frame size or 0xFF 0xFF and three more bytes, and that an MP4 sample is one
+raw AC-4 frame, so it has no sync word, size or CRC. The files agree. Decoded by forge, the DASH Live
+files (init segment and media segments joined, which make a fragmented MP4), DASH On Demand and HLS
+fMP4 audio of each of the 12 streams, and the ten MP4 examples (H.265 video at 720p, 25 to 59.94
+fps, plain and fragmented), give the same samples, to the last bit, as the elementary stream.
+Forge cannot read the 12 HLS packed-audio files (`HLS/Audio_ID3/*_sub.ac4`). Each has an ID3v2 tag
+before every segment, 200 frames at 25 fps and 240 at 29.97, and forge, finding no AC-4 sync word at
+byte 0, tries the file as AC-3 and stops. With the tags skipped, the frames are the elementary
+stream's, byte for byte. The gap is in format detection and not in the decoder, and is recorded in
+`planning/ac4.md`.
 
 ### The decoder's presentations
 
