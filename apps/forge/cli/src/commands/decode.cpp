@@ -922,6 +922,10 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // (the transient-pre-noise flush below).
     PlanarWavSink sink;
     std::size_t sink_slots = 0;
+    // Whether sink_slots is the programme's width, which a concealed first unit's is not.
+    bool sink_width_is_programme = false;
+    // The access unit being decoded, counted from 1; the frame an error names.
+    std::uint64_t units_done = 0;
     const auto open_sink = [&](const iclforge::ac3::DecodedAccessUnit& unit,
                                std::size_t slots) -> bool {
         sink_slots = slots;
@@ -1206,9 +1210,25 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (!sink.is_open()) {
             first = out;
             programme_layout = out.layout;
+            // A first unit that was concealed down to its bed is narrower than the stream promised,
+            // so its width is not the programme's and later units are not held to it.
+            sink_width_is_programme = !out.concealed.has_value();
             if (!open_sink(first, out.channels.size())) {
                 return kExitOutput;
             }
+        }
+        // The sink is as wide as the first unit. A stream whose layout changes after it (a
+        // different acmod, or a dependent substream that comes or goes) cannot be written into it:
+        // the extra channels would be cut off, or the missing ones leave the sink's slots uneven.
+        // Stopping here is what the AC-3 and AC-4 paths do. A unit concealed down to its bed
+        // (ConcealmentAction::kBedOnly) is narrower on purpose and is written as it is.
+        if (sink_width_is_programme && !out.concealed.has_value() &&
+            out.channels.size() != sink_slots) {
+            fmt::println(stderr,
+                         "error: frame {}: the channel layout changes mid-stream ({} channels, then {})",
+                         units_done, sink_slots, out.channels.size());
+            abort_all();
+            return kExitInput;
         }
         if (out.concealed.has_value()) {
             ++concealed_units;
@@ -1252,7 +1272,6 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
 
     Progress progress;
     progress.start("decoding", units->size());
-    std::uint64_t units_done = 0;
     for (const auto& unit : *units) {
         progress.tick(++units_done);
         // Not const: a released unit is moved on to the mix, not copied.

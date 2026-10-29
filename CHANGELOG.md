@@ -10,6 +10,10 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: `forge decode` of an E-AC-3 stream that changes layout mid-stream wrote a wrong WAV and exited 0.** A stereo stream joined to a
+  5.1 one gave a stereo WAV with the 5.1 frames cut to their first two channels, and the other order a 6-channel WAV that lost the stereo
+  frames as a "ragged tail". It now stops with exit 2 and "frame N: the channel layout changes mid-stream (W channels, then V)", as the
+  AC-3 and AC-4 paths already did; a unit concealed down to its bed under `conceal=` is still written as it is.
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,

@@ -509,3 +509,68 @@ TEST_CASE("cat refuses joining a file into itself and streams whose shape differ
           1, "error: " + in.wide.string() + " differs from " + ec3_stereo.string()}},
         log);
 }
+
+namespace {
+
+// Two streams joined end to end, as a splicer or a concatenation of segments leaves them.
+fs::path joined(const fs::path& out, const fs::path& first, const fs::path& second) {
+    std::ofstream file{out, std::ios::binary | std::ios::trunc};
+    for (const auto& part : {first, second}) {
+        const auto bytes = read_bytes(part);
+        file.write(reinterpret_cast<const char*>(bytes.data()),
+                   static_cast<std::streamsize>(bytes.size()));
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("decode stops where an E-AC-3 stream changes layout, as the AC-3 and AC-4 paths do",
+          "[cli][decode][eac3]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "layout_change.log";
+    const auto stereo = generated(dir / "lc_stereo.ec3", "eac3-sine 1 192 1000 50 stereo");
+    const auto six = generated(dir / "lc_51.ec3", "eac3-sine 1 384 1000 50 51");
+    // A constant-rate stream: every syncframe is the same size, so the frame the join falls on is
+    // the stereo file's length in syncframes, plus one.
+    constexpr std::uintmax_t kStereoSyncframeBytes = 768;
+    REQUIRE(fs::file_size(stereo) % kStereoSyncframeBytes == 0);
+    const auto stereo_frames = fs::file_size(stereo) / kStereoSyncframeBytes;
+    const auto out = dir / "layout_change.wav";
+
+    SECTION("stereo, then 5.1") {
+        fs::remove(out);
+        const auto in = joined(dir / "lc_stereo_51.ec3", stereo, six);
+        const auto rc = run_cli("decode " + quoted(in) + " " + quoted(out), log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 2);
+        CHECK(text.find("error: frame " + std::to_string(stereo_frames + 1) +
+                        ": the channel layout changes mid-stream (2 channels, then 6)") !=
+              std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
+
+    SECTION("5.1, then stereo") {
+        fs::remove(out);
+        const auto in = joined(dir / "lc_51_stereo.ec3", six, stereo);
+        const auto rc = run_cli("decode " + quoted(in) + " " + quoted(out), log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 2);
+        CHECK(text.find(": the channel layout changes mid-stream (6 channels, then 2)") !=
+              std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
+
+    SECTION("the same layout twice decodes") {
+        for (const auto& part : {stereo, six}) {
+            fs::remove(out);
+            const auto in = joined(dir / "lc_twice.ec3", part, part);
+            const auto rc = run_cli("decode " + quoted(in) + " " + quoted(out), log);
+            INFO(read_log(log));
+            CHECK(rc == 0);
+            CHECK(fs::exists(out));
+        }
+    }
+}

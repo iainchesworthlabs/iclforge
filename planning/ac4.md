@@ -4590,10 +4590,12 @@ Dolby's Spott reference files (`docs/verification.md`, "A second source") add fo
   it prints "N frames waiting for an I-frame produced no output" and nothing else. A policy (non-zero in a
   strict mode, a loud warning with the count otherwise) is not made, and nor is the check of `forge probe`
   and the other users of the counter.
-- **E-AC-3 changing layout mid-stream** (`run_decode_eac3`, `apps/forge/cli/src/commands/decode.cpp`) is
-  handled silently: concatenating a 5.1 and a stereo Spott period file exits 0, with the later frames
-  dropped or cut to the first slots, where the AC-3 and AC-4 paths stop with kExitInput. Not changed; the
-  policy (error, split output, or render to the first layout) is the owner's call.
+- **E-AC-3 changing layout mid-stream** (`run_decode_eac3`, `apps/forge/cli/src/commands/decode.cpp`) used to
+  be handled silently: concatenating a 5.1 and a stereo Spott period file exited 0, with the later frames
+  dropped or cut to the first slots. It now stops with kExitInput and "frame N: the channel layout changes
+  mid-stream (W channels, then V)", as the AC-3 and AC-4 paths do; a unit concealed down to its bed
+  (`ConcealmentAction::kBedOnly`) is exempt. Open for the owner: whether an error is the right policy for a
+  spliced programme, against writing one WAV per layout or rendering every unit to the first layout.
 
 ## Coordination
 
