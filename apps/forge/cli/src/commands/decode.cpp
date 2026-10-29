@@ -555,10 +555,11 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
             status_println(status, "{}: a {} byte content signature follows the last sync frame",
                            in_path, trailer->blob.size());
         } else {
-            fmt::println(stderr,
-                         "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
-                         in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at),
-                         scan.frames.size());
+            fmt::println(
+                stderr,
+                "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
+                in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at),
+                scan.frames.size());
         }
     }
     // syntax-trace=: every record the decoder reads, frame by frame, as

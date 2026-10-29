@@ -525,14 +525,16 @@ void print_ac4_table(std::string_view path, const Ac4Summary& summary,
     if (summary.content_signature.present) {
         const auto& signature = summary.content_signature;
         if (signature.readable) {
-            fmt::println("{:<16}{} bytes, signer {}, dated {} (UTC), {} certificate(s); not "
-                         "verified (forge ac4-verify)",
-                         "content sig", signature.blob_size, signature.signer,
-                         signature.signed_date, signature.certificates);
+            fmt::println(
+                "{:<16}{} bytes, signer {}, dated {} (UTC), {} certificate(s); not "
+                "verified (forge ac4-verify)",
+                "content sig", signature.blob_size, signature.signer, signature.signed_date,
+                signature.certificates);
         } else {
-            fmt::println("{:<16}{} bytes after the last sync frame that do not read as a content "
-                         "signature: {}",
-                         "content sig", signature.blob_size, signature.problem);
+            fmt::println(
+                "{:<16}{} bytes after the last sync frame that do not read as a content "
+                "signature: {}",
+                "content sig", signature.blob_size, signature.problem);
         }
     }
     if (!summary.first_frame.has_value()) {

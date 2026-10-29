@@ -3408,13 +3408,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.verify_content || out.check_content || command == "ac4-verify";
         if (signs_content && !signing_asked &&
             (signing_given || (out.leaf_title.has_value() && !checks_content))) {
-            fmt::println(stderr,
-                         "error: content-key=, content-chain=, signed-date= and leaf-title= say how "
-                         "to sign, and nothing is signed unless sign-content asks for it");
+            fmt::println(
+                stderr,
+                "error: content-key=, content-chain=, signed-date= and leaf-title= say how "
+                "to sign, and nothing is signed unless sign-content asks for it");
             return false;
         }
-        if (checks_content && !checking_asked &&
-            (checking_given || out.leaf_title.has_value())) {
+        if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
             fmt::println(stderr,
                          "error: trust-anchor=, pin=, unanchored-ok, verify-time= and leaf-title= "
                          "say how to check, and nothing is checked unless verify-content or "

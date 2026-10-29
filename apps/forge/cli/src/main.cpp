@@ -266,8 +266,8 @@ constexpr std::array<Command, 48> kCommands{{
      "file (same formats as atmos-path), objects it doesn't mention keep their default "
      "placement; with codec=ac4, AC-4 objects (A-JOC, or coding=direct) in a raw stream or an "
      "MP4 file",
-     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects |
-         topic::kContentSignature,
+     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta |
+         topic::kObjects | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) {
          return run_atmos_encode(x.str(1), x.str(2), x.u32(3, 448), x.u32(4, 0), x.meta,
