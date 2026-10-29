@@ -16,9 +16,14 @@
 //      of the input as access units, none skipped and none cut off; the decoder, strict (a failed
 //      check nibble, CRC, parity byte or lossless check is an error), returned samples for every
 //      unit, none of them an error and none of them "waiting for a restart header"; its
-//      counters report no failed check and no failed lossless check; and every unit has the
-//      sample rate and channel count of the first. A unit that fails any of this was refused by
-//      the library, and what FFmpeg does with it proves nothing about which of the two is right.
+//      counters report no failed check and no failed lossless check; every unit has the sample
+//      rate and channel count of the first; and every major sync has the first's kind, format
+//      word and substream count. The last is not a check of the stream: a major sync that
+//      changes any of them starts a new stream, the library then forgets the codec state, the
+//      filter histories included, and FFmpeg's decoder goes on with them (the third finding of
+//      this harness, a changed channel assignment word; libs/truehd/ERRATA.md question 42).
+//      A unit that fails any of this was refused by the library, and what FFmpeg does with it
+//      proves nothing about which of the two is right.
 //
 //   2. FFMPEG DECODED THE INPUT CLEANLY (ffmpeg_strict_decode). It exited 0, with the invocation
 //      the repository uses everywhere as its oracle (`-xerror -err_detect
@@ -174,6 +179,7 @@ inline std::optional<Pcm> decode_ours(std::span<const std::byte> bytes) {
     ElementaryReader reader(bytes);
     Decoder decoder;  // strict, the best presentation: what `forge decode` does
     Pcm pcm;
+    MajorSync first_sync;
     std::size_t units = 0;
     while (const auto unit = reader.next()) {
         const auto decoded = decoder.decode(*unit);
@@ -184,11 +190,16 @@ inline std::optional<Pcm> decode_ours(std::span<const std::byte> bytes) {
         if (out.channels <= 0 || out.samples < 0) {
             return std::nullopt;
         }
+        const MajorSync& sync = *decoder.major_sync();
         if (units == 0) {
             pcm.sample_rate = out.sample_rate;
             pcm.channels = out.channels;
+            first_sync = sync;
         } else if (out.sample_rate != pcm.sample_rate || out.channels != pcm.channels) {
             return std::nullopt;  // the format changed: one raw PCM stream cannot say so
+        } else if (sync.kind != first_sync.kind || sync.format_info != first_sync.format_info ||
+                   sync.num_substreams != first_sync.num_substreams) {
+            return std::nullopt;  // a new stream, which the two decoders treat differently
         }
         pcm.samples.insert(pcm.samples.end(), out.pcm.begin(), out.pcm.end());
         ++units;

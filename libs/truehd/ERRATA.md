@@ -193,6 +193,20 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/ch-assign-repeats-an-output-channel`, which FFmpeg
     decodes and the library refuses.
 
+42. **A changed major sync and the filter histories (§7.1, §7.5; entry 13, question 18).** The library carries the filter
+    histories across a restart (question 18) but forgets all codec state when a major sync changes the stream's `kind`,
+    `format_info` or substream count, because the stream is then a different one: every substream waits for its restart
+    header, which a major sync's unit carries, and starts from zero histories. FFmpeg's decoder does not tell the two
+    apart and keeps the histories. The differential fuzzer's third finding: `hb_marker_last.thd` with the channel
+    assignment word of its second major sync changed (and the checks put right) decodes in the library from that unit
+    on to other samples than in FFmpeg's strict decode and in `tools/references/truehd_syntax.py`, which reads a major
+    sync's contents as nothing but a restart's. The sample rate and channel count did not change. Should a change of
+    the major sync's channel assignment words (which no decode depends on) reset the histories, and should any change?
+    Recommendation: reset only for a change of kind, sample rate or substream count, which cannot be one stream, and
+    carry the histories otherwise, as FFmpeg does and as the library does for a restart (question 18). Until the owner decides
+    the differential harness skips a stream whose major syncs differ. Evidence:
+    `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/major-sync-format-info-changes-mid-stream`.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
