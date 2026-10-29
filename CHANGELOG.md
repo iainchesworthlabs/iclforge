@@ -10,6 +10,21 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
+  stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
+  decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout
+  (`b_4_back_channels_present`, `top_channels_present`), the ones decode() writes as coded. An AC-4 decode of three channels or more now
+  writes `dwChannelMask` as the AC-3 and E-AC-3 paths do (0x3F for 5.1), where it wrote the plain header.
+- **Fixed: the AC-4 decoder stopped at frame 1 of a stream with a pair of direct-coded dialogue objects ("tools_metadata_size does not
+  match").** `audio_data_objs()` sets the channel mode from the object count (two objects are stereo, one mono, three 3.0, five 5.0) and
+  `metadata()` reads its mode-dependent fields with it; the decoder took the mode as undefined, so a pair's `b_prev_dmx_info` shifted
+  every field after it. Dolby's OTT00234 (four presentations over one pair) now decodes 1,861 of 1,861 frames. Reading and evidence in
+  `libs/ac4/ERRATA.md`, "An object substream's channel_mode".
+- **Added: a warning on stderr when `forge decode` or a measuring command loses frames of an AC-4 stream, and
+  `tools/checks/check_dolby_spott_streams.py`.** A frame that waits for an I-frame produces no output and the run still exits 0; it now says
+  "N frames waiting for an I-frame produced no output, of T in the stream; the output holds the other M" (`qc` and the other commands that
+  measure say the measurement is of the other M). Whether such a run should exit non-zero is left to the owner, with options in
+  `planning/ac4.md`. The check reads Dolby's Spott files from `ICLFORGE_DOLBY_SPOTT_STREAMS` (SKIP when unset).
 - **Fixed: `forge decode` of an E-AC-3 stream that changes layout mid-stream wrote a wrong WAV and exited 0.** A stereo stream joined to a
   5.1 one gave a stereo WAV with the 5.1 frames cut to their first two channels, and the other order a 6-channel WAV that lost the stereo
   frames as a "ragged tail". It now stops with exit 2 and "frame N: the channel layout changes mid-stream (W channels, then V)", as the

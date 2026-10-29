@@ -4565,31 +4565,38 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 ### Open after Dolby's kit streams (2026-10-29)
 
 Decoding the kit's 12 AC-4 streams, and their DASH, HLS and MP4 siblings, found one decoder defect, fixed
-(the second immersive stereo code, `libs/ac4/ERRATA.md`), and three open items outside the decoder's
-syntax and reconstruction:
+(the second immersive stereo code, `libs/ac4/ERRATA.md`), and three items outside the decoder's syntax
+and reconstruction, two of them since fixed (the AC-4 decode's WAV now carries `dwChannelMask`, as the
+E-AC-3 path's does, and `forge probe` lists a 5.1.4 stream's ten channels, not Table 56's twelve):
 
 - **HLS packed audio.** `forge decode` and `probe` cannot read the kit's 12 `HLS/Audio_ID3/*_sub.ac4`
   files: each has an ID3v2 tag before every segment (200 frames at 25 fps, 240 at 29.97), the detection
   looks for a sync word at byte 0 and falls to AC-3. The frames between the tags are the elementary
   stream's, byte for byte. Needed: skip a tag at the start and between frames, in the detection and in
   `SyncFrameSplitter`.
-- **No channel mask in the AC-4 decode's WAV.** The E-AC-3 path writes `dwChannelMask`; the AC-4 path
-  writes none for 2, 6 or 10 channels, so the layout is in forge's message alone. The 10-channel 5.1.4 file
-  needs a decision on side or back surrounds.
-- **`forge probe` names 12 channels for a 5.1.4 stream** (L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr) where the
-  decode writes 10 (no Lb, Rb).
 
-Dolby's Spott reference files (`docs/verification.md`, "A second source") add four more:
+Dolby's Spott reference files (`docs/verification.md`, "A second source") decode in full now (OTT00234 once its direct-coded pair's metadata took the channel mode `audio_data_objs()` sets); what they leave open:
 
-- **OTT00234** (`ac-4.02.01.01`, four presentations): frame 1 stops with "tools_metadata_size does not
-  match the drc_frame() and dialog_enhancement() read". Not investigated.
 - **Level 4** (`ac-4.02.01.04`, `md_compat` 4): read by observation from one stream, OTTEP00129, with a 5.1
   core for a five-signal adaptive A-JOC downmix (`libs/ac4/ERRATA.md`, "md_compat 4"). Whether other
   downmix counts have a core at level 4 needs another stream.
-- **`forge decode` exits 0 when a stream loses most of its frames** (96 % for OTTEP00128 before its fix):
-  it prints "N frames waiting for an I-frame produced no output" and nothing else. A policy (non-zero in a
-  strict mode, a loud warning with the count otherwise) is not made, and nor is the check of `forge probe`
-  and the other users of the counter.
+- **`forge decode` exits 0 when a stream loses most of its frames** (96 % for OTTEP00128 before its
+  fix). It now says so on stderr, whatever the report goes to: "warning: N frames waiting for an I-frame
+  produced no output, of T in the stream; the output holds the other M" (`forge decode`, and the same
+  line, ending "the measurement is of the other M", from `qc` and the other commands that measure an AC-4
+  stream, which measured only what decoded). The exit code is the owner's to choose; nothing here sets a threshold.
+  Options: (A) keep 0 and the warning, so a script reads stderr; (B) exit 2 whenever any frame waited,
+  which also fails a stream cut mid-GOP, whose leading frames wait for the first I-frame by design and
+  whose splices wait again; (C) exit 2 above a share lost, which needs a number nobody has chosen; (D)
+  keep 0 and the warning by default and add a `strict` mode that exits 2 when a frame waits after the
+  first one decoded, leaving the leading frames of a cut stream alone, as the content-signature modes
+  have an optional and a strict one. Recommended: D. A frame waiting after output has started means the
+  decoder dropped state, which is a fault in the decoder or the stream and not a property of a cut.
+  Other users of the count and what each does with it: `forge monitor`/`live` print "N waiting for an
+  I-frame played nothing" on stdout with the played count; `forge transcode` from AC-4 and the GUI's QC
+  and player controllers skip such frames without a word (`stream_tools.cpp`, the controllers); Hearth's
+  engine plays them as silence by design (`stream_decoder.hpp`); `forge probe` decodes nothing and has
+  no count.
 - **E-AC-3 changing layout mid-stream** (`run_decode_eac3`, `apps/forge/cli/src/commands/decode.cpp`) used to
   be handled silently: concatenating a 5.1 and a stereo Spott period file exited 0, with the later frames
   dropped or cut to the first slots. It now stops with kExitInput and "frame N: the channel layout changes

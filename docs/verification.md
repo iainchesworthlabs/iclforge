@@ -175,7 +175,7 @@ scheduled workflows are separate.
 | `Interop`: eight FATE excerpts | AC-3, E-AC-3 | Daily, and on pull requests that change the decode path |
 | `tools/checks/ac4_syntax_differential.py`, 3,000 mutated DEE frames and 800 synthetic tables of contents at a fixed seed | AC-4 | Daily, in the SonarCloud workflow, where it feeds the coverage scan and does not gate |
 | `tools/checks/check_install_consumer.sh`, and the ABI gate (advisory until the API freeze) | all | Nightly |
-| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams (the kit is Dolby's and is not in the tree); listening | AC-4 mostly | Locally, by hand |
+| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams and `check_dolby_spott_streams.py` on the Spott files (both are Dolby's and not in the tree); listening | AC-4 mostly | Locally, by hand |
 | Dolby's Online Delivery Kit tools, `check_dolby_*.py` ([below](#dolbys-online-delivery-kit-tools)) | AC-3, E-AC-3, AC-4 containers | Locally, by hand; skip when the tools are absent |
 
 `PAUSE_NONESSENTIAL_CI` is a pause the workflows describe as temporary: while it is `true`, pull
@@ -1521,9 +1521,9 @@ the streams and their siblings make checkable, 134 lines over the 12 AC-4 stream
   times the frame length at the stream's exact rate (30000/1001 at "29.97"), no sample is NaN or over
   full scale, and the programme is not silent.
 - The WAV has the channels the decode reports, and those are the channels the probe names, in the
-  same order. For a 5.1.4 stream the probe names 12 channels (the 7.1.4 layout, with Lb and Rb) and
-  the decode writes 10, so the check requires the decode's names to be an ordered subset and prints
-  the difference as a NOTE.
+  same order. (The probe once named 12 channels for a 5.1.4 stream, Table 56's 7.1.4 with Lb and Rb,
+  where the decode writes 10; it lists the source layout's now, and the check still accepts the
+  decode's names as an ordered subset of the probe's.)
 - The LFE holds at most 0.04 % of its energy above 200 Hz; the four heights of 5.1.4 carry signal in 88
   to 89 % of the loud windows; the immersive stereo and the 2.0 streams are not dual mono.
 - The integrated loudness (BS.1770-4, measured with its own K-weighting) of every 2.0 and 5.1 decode
@@ -1597,14 +1597,18 @@ full SHA-256 of each:
 | `OTTEP00124` (`02-02-00`, immersive stereo), `OTTEP00126` (`02-01-00`, 2.0), `OTTEP00127` (`02-01-01`, 5.1), `OTTEP00125` (`02-01-02`, 5.1.4), `OTT00236` (`02-01-02`, 5 presentations) | decode in full | 800 frames each (2,000 for `OTT00236`); per-channel levels plausible |
 | `OTT00232` (`02-01-03`, A-JOC 7 downmix + 9 upmix) | decodes in full since 2026-10-29 | 2,000 of 2,000 frames; it decoded the 80 I-frames before |
 | `OTTEP00128` (`02-01-03`, "OBI L3", 16 objects) | decodes in full since 2026-10-29 | 750 of 750 frames; it decoded 32 before; traces of the two transcriptions agree |
-| `OTTEP00129` (`02-01-04`, "OBI L4", 5 downmix + 20 upmix) | decodes in full since 2026-10-29 | 4,450 of 4,450 frames, 21 objects; traces agree; refused before as no selectable presentation |
-| `OTT00234` (`02-01-01`, 4 presentations) | **not decoded** | frame 1: "tools_metadata_size does not match the drc_frame() and dialog_enhancement() read"; not investigated |
+| `OTTEP00129` (`02-01-04`, "OBI L4", 5 downmix + 20 upmix) | decodes in full since 2026-10-29 | 4,450 of 4,450 frames, 21 objects; traces agree; refused before as no selectable presentation. Its 7.1.4 render peaks at +1.5 dBFS in float: the renderer is not normative, and `check_dolby_spott_streams.py` notes it and does not fail |
+| `OTT00234` (`02-01-01`, 4 presentations over one pair of dialogue objects) | decodes in full since 2026-10-29 | 1,861 of 1,861 frames; it stopped at frame 1 ("tools_metadata_size does not match") because the pair's metadata is read as stereo's, as `audio_data_objs()` sets the channel mode (`libs/ac4/ERRATA.md`) |
 
 The four E-AC-3 files decode in full (the integration build's run), and the stereo and 5.1 ones agree
-with FFmpeg's decode at lag 0, at 23.8 and 27.9 dB overall, which is the range this project's dither-on
+with FFmpeg's decode at lag 0, at 23.8 and 27.9 dB overall (FFmpeg's default dynamic range control on,
+forge's off) and at 31.7 and 33.1 dB with both off, which is the range this project's dither-on
 third-party E-AC-3 streams give and not a failure. Dolby's muxer (Bento4 here) writes `channelcount` 2 in
 every ec-3 sample entry, the 5.1 and JOC files included, so a reader must take the channel count from the
-stream and not from the sample entry. `tools/checks/check_ac4_kit_streams.py` does not read these files yet.
+stream and not from the sample entry. `tools/checks/check_dolby_spott_streams.py` reads them from
+`ICLFORGE_DOLBY_SPOTT_STREAMS` (SKIP when unset): every access unit decoded and none left waiting for an
+I-frame, the sample count, the channels, no NaN or clipping, not silent, no signature or protection marker,
+and as notes the sample entry's channel count and FFmpeg's agreement.
 
 ### The decoder's presentations
 
