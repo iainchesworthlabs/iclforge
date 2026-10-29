@@ -9,6 +9,18 @@
 //   - is it anchored (does it lead to a certificate the operator said to trust)?
 // A chain that is well formed and not anchored is reported as that. The caller must not call it
 // "valid": it says only that the signature agrees with the certificates the file carries.
+//
+// What is checked: at most kMaxChainLength certificates; each one issued by the one above it (the
+// issuer's DER name equals the subject's) and signed under that one's key with ECDSA over SHA-256;
+// every certificate above the leaf has basicConstraints cA TRUE, keyCertSign where it states a key
+// usage, and a pathLenConstraint not exceeded by the certificates below it; the leaf's
+// digitalSignature and title where the policy asks; validity at the time the policy names. What is
+// not: revocation (CRL, OCSP), name constraints and policy constraints (a certificate that marks
+// either critical is refused by parse_certificate(); one that does not is read past), extended key
+// usage, the authority and subject key identifiers, and, for a trust anchor the operator names, its
+// own basicConstraints, key usage, validity and path length (an anchor is trusted as given, like a
+// pin). The specification is silent on all of these (CS spec §6.1 steps 3 and 4); libs/ac4/ERRATA.md
+// open questions 7 and 8 and planning/static-analysis-truehd-signing-cenc.md say what has been asked.
 
 #include <array>
 #include <cstddef>
@@ -28,7 +40,7 @@ namespace iclforge::base::crypto {
 // checked, so a hostile signature cannot make the verifier verify a thousand certificates.
 inline constexpr std::size_t kMaxChainLength = 8;
 
-// A certificate the operator named by fingerprint: 20 bytes (SHA-1, the form CS spec §10.1 lists)
+// A certificate the operator named by fingerprint: 20 bytes (SHA-1, the form CS spec v2.0 §10.1 lists)
 // or 32 bytes (SHA-256). A pinned certificate is trusted wherever it appears in the chain.
 struct CertificatePin {
     std::vector<std::byte> fingerprint;
