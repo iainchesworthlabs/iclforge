@@ -84,3 +84,27 @@ TrueHD + Atmos 7.1 streams (streams 2, 5 and 8 of the clip), each 48 kHz. A 60 s
 - **`ch_assign` changes mid-stream.** Stream 2's second and third substreams change their `ch_assign` at a restart (from
   (4,5,1,0,2,3) to (4,5,2,1,0,3), for example), so a permutation is not fixed for a stream; the fix handles it.
 - `peak_data_rate` raw: 1849, 1792 and 1817 (against 2417 on the first disc); `twoch_control_enabled` is set here and not there.
+
+## Third and fourth discs: *The Lord of the Rings: The Two Towers* (F:) and *Hans Zimmer: Live in Prague* (S:, 2026-10-30)
+
+Two more owner-named sources, each with one TrueHD + Atmos stream (F: `BDMV/STREAM/00075.m2ts` stream 2; S:
+`BDMV/STREAM/00000.m2ts` stream 3). A 60 s excerpt of each (from 1800 s) is in `D:/ac3bld/bd-lotr/` and
+`D:/ac3bld/bd-zimmer/`, local only. forge at `2f9a3a907`:
+
+- **The output-shift fix holds on both.** 2, 6 and 8 channels decode with every lossless-check interval ok (575, 1,150 and
+  1,725 on LOTR; 567, 1,134 and 1,701 on Zimmer), and the 8-channel output equals FFmpeg's strict decode on all eight channels
+  (2.91 million samples each). That is six streams on four discs with the same result.
+- **Q 2, a second channel count.** Zimmer's fourth substream has 14 channels (probe: 2, 6, 8, 14). Its major sync extension is
+  `1fc6dc00` against `1fc6bc00` everywhere else; read as §14.2 lays the fields out, the channel count is 13, dynamic-object-only is
+  1 and LFE is 1, so 13 plus the LFE is the 14. The extension is still 4 bytes, `extra_channel_meaning_length` still 1.
+- **Q 19, variable-length extra data.** LOTR: the same 64-byte frame, 1,897 of them, length 31, payload 58. Zimmer's frames vary: 757 of
+  70 bytes (length field 34, payload 65) and 1,136 of 72 bytes (length 35, payload 66); one frame per 1536 samples. In every
+  case the length field is the frame's words less one, the payload fills it with at most a byte of padding, and the check
+  nibble and parity are as before. So `(extra_data_length + 1) x 16 >= payload x 8 + 40` is met with equality for the 65 byte payload
+  (35 x 16 = 560 = 65 x 8 + 40) and the length is the least that holds the payload.
+- **Q 12, the peak data rate.** The field is constant in a stream (raw 1673 for LOTR, 3147 for Zimmer; 1792 to 1849 for the three Dune
+  streams, 2417 for Blade Runner 2049). raw x rate / 16 is above the rate of the TrueHD core (substreams 0 to 2, their headers) over any
+  window of 4 or more access units in all six streams, by 1.2 to 1.8 times at 16 units, and it is *below* the rate of the whole unit
+  (the object substream and the extra data included) in LOTR (7.4 Mbps over 16 units against 5.0). So the scale fits raw x rate / 16,
+  and the field does not bound the object substream. This does not tell which window a player's FIFO model uses.
+- **Terminators.** None in any substream of either, as on the other discs.
