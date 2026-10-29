@@ -25,7 +25,10 @@ See [README.md](README.md) for the project overview and
   (`kScrambled`); both were read as audio with exit code 0 (audit M11). The documents now say that the EMDF `protection` field is an
   authenticity tag and has nothing to do with content protection. The reader gains `DemuxError::kProtectedTrack`, `Protection`,
   `describe_refusal()`, `Reader::refused_tracks()` and `list_refused_tracks()`; three small protected files from
-  `tools/generators/gen_cenc_reader_fixtures.py` are the MP4 fuzz harness's seeds and the tests' input.
+  `tools/generators/gen_cenc_reader_fixtures.py` are the MP4 fuzz harness's seeds and the tests' input, and four more (`--set dolby-ott`)
+  carry the protection layout of the audio in Dolby's public OTT reference streams: a subsample map with a clear lead, a 1:9 `cbcs`
+  pattern, an empty `senc`, the PIFF copy of the `senc`, PlayReady and Widevine `pssh` in `moov`. The reader steps over all of it and
+  refuses the track, with or without the fragments.
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

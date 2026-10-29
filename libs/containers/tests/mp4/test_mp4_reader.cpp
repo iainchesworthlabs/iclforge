@@ -2173,7 +2173,7 @@ TEST_CASE("MP4 demux round-trips an 'ac-4' track", "[mp4][reader][ac4]") {
 // An 'enca' sample entry holds ciphertext. The reader names such a track and refuses it, and a
 // track with a clear entry beside a protected one is refused whole (reader.hpp, close_finished
 // in reader.cpp). These tests build the entries by hand, with the sinf layout GPAC, FFmpeg and
-// Shaka Packager write, and then read the three small files tools/generators/
+// Shaka Packager write, and then read the seven small files tools/generators/
 // gen_cenc_reader_fixtures.py makes with the audit's generator. No key is read anywhere.
 
 namespace {
@@ -2701,5 +2701,117 @@ TEST_CASE("MP4 refuses the protected files the audit's generator writes",
         REQUIRE(listed.has_value());
         REQUIRE((*listed)[0].protection.has_value());
         CHECK((*listed)[0].protection->default_iv_size == 0);
+    }
+}
+
+namespace {
+
+// The offset of the first four characters `type` at or after `from` (a box's type field, 4 bytes
+// into the box), or npos. A search for the characters, good enough for fixtures whose layout the
+// test also states.
+std::size_t find_type(const Bytes& file, std::string_view type, std::size_t from = 0) {
+    Bytes needle;
+    put_fourcc(needle, type);
+    const auto at = std::search(file.begin() + static_cast<std::ptrdiff_t>(from), file.end(),
+                                needle.begin(), needle.end());
+    return at == file.end() ? std::string_view::npos : static_cast<std::size_t>(at - file.begin());
+}
+
+// The bytes of `file` up to the end of its top-level 'moov' box: the init segment a packager
+// publishes as a file of its own, with the 'pssh' boxes and no fragment.
+Bytes init_segment_of(const Bytes& file) {
+    std::size_t at = 0;
+    while (at + 8 <= file.size()) {
+        std::size_t size = 0;
+        std::string type;
+        for (std::size_t i = 0; i < 4; ++i) {
+            size = (size << 8U) | std::to_integer<std::size_t>(file[at + i]);
+            type.push_back(static_cast<char>(std::to_integer<unsigned>(file[at + 4 + i])));
+        }
+        REQUIRE(size >= 8);
+        REQUIRE(at + size <= file.size());
+        at += size;
+        if (type == "moov") {
+            return Bytes(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(at));
+        }
+    }
+    FAIL("the file has no moov box");
+    return {};
+}
+
+}  // namespace
+
+TEST_CASE("MP4 refuses protected files laid out like Dolby's OTT reference audio",
+          "[mp4][reader][protected]") {
+    using namespace iclforge::containers::mp4;
+
+    // The protection layout of the audio in Dolby's public OTT streams (planning/
+    // cenc-conformance.md, M13), in four small files from tools/generators/
+    // gen_cenc_reader_fixtures.py --set dolby-ott. What the reader does not read, it must step
+    // over: a 'senc' with a subsample map or with no entries, a 'saiz' with a size table or a
+    // count of 0, the PIFF uuid copy of the 'senc', PlayReady and Widevine 'pssh' boxes in
+    // 'moov'. None of it changes the verdict or lets a sample out.
+    struct Layout {
+        std::string_view file;
+        std::string_view scheme;
+        std::string_view original;
+        std::uint8_t iv_size;
+        std::uint8_t crypt;
+        std::uint8_t skip;
+        bool piff;
+        std::uint8_t senc_flags;
+        std::uint8_t saiz_default;
+    };
+    constexpr std::array<Layout, 4> kLayouts{{
+        {"dolby-ddp-cenc-iv8-piff.mp4", "cenc", "ec-3", 8, 0, 0, true, 0x0, 8},
+        {"dolby-ddp-cbcs-const-iv-empty-senc.mp4", "cbcs", "ec-3", 0, 0, 0, false, 0x0, 0},
+        {"dolby-ac4-cenc-subsample-piff.mp4", "cenc", "ac-4", 8, 0, 0, true, 0x2, 0},
+        {"dolby-ac4-cbcs-1-9-subsample.mp4", "cbcs", "ac-4", 0, 1, 9, false, 0x2, 0},
+    }};
+
+    for (const auto& layout : kLayouts) {
+        CAPTURE(layout.file);
+        const auto file = read_seed(layout.file);
+
+        // The file is the layout it is named for, so a generator change cannot empty the test.
+        const auto senc = find_type(file, "senc");
+        const auto saiz = find_type(file, "saiz");
+        const auto moof = find_type(file, "moof");
+        REQUIRE(senc != std::string_view::npos);
+        REQUIRE(saiz != std::string_view::npos);
+        REQUIRE(moof != std::string_view::npos);
+        CHECK(std::to_integer<std::uint8_t>(file[senc + 4 + 3]) == layout.senc_flags);
+        CHECK(std::to_integer<std::uint8_t>(file[saiz + 4 + 4]) == layout.saiz_default);
+        CHECK((find_type(file, "uuid") != std::string_view::npos) == layout.piff);
+        const auto first_pssh = find_type(file, "pssh");
+        REQUIRE(first_pssh != std::string_view::npos);
+        CHECK(first_pssh < moof);
+        CHECK(find_type(file, "pssh", moof) == std::string_view::npos);
+
+        const auto expected = plain_text(layout.scheme, layout.original);
+        check_refused_everywhere(file, expected);
+
+        const auto listed = list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        REQUIRE(listed->size() == 1);
+        REQUIRE((*listed)[0].protection.has_value());
+        const Protection& p = *(*listed)[0].protection;
+        CHECK(p.entry_type == "enca");
+        CHECK(p.scheme == layout.scheme);
+        CHECK(p.original_format == layout.original);
+        CHECK(p.has_tenc);
+        CHECK(p.default_is_protected);
+        CHECK(p.default_iv_size == layout.iv_size);
+        CHECK(p.crypt_byte_block == layout.crypt);
+        CHECK(p.skip_byte_block == layout.skip);
+        CHECK(p.default_kid == kTestKid);
+        CHECK(p.entry_index == 1);
+        CHECK_FALSE(p.track_has_clear_entry);
+
+        // The init segment on its own, which is how Dolby's packager publishes it: the same
+        // verdict from the 'moov' alone.
+        const auto init = init_segment_of(file);
+        REQUIRE(init.size() < file.size());
+        check_refused_everywhere(init, expected);
     }
 }

@@ -5,6 +5,10 @@ of [cenc-conformance.md](cenc-conformance.md)). The owner's decision of 2026-10-
 (G1 to G5) and plan the CENC read side too"; this is the plan. It starts nothing. Status lives in
 [ROADMAP.md](../ROADMAP.md).
 
+Revised the same day after M13 of the audit, which read the layout of Dolby's own protected
+reference audio. Dolby's AC-4 uses a subsample map and a 1:9 pattern, which the first draft had
+left out of the first release; they are now in it (sections 3, 5.3, 9, 10).
+
 ## 1. Summary
 
 A protected E-AC-3, AC-3 or AC-4 MP4 or CMAF file is refused today, by name and with its scheme,
@@ -14,10 +18,16 @@ The project would not ship a key, find one, derive one or talk to a licence serv
 
 The work has four parts: AES-128 in `libs/base` (new, with known-answer tests), a key type and its
 supply (a copy of the signing key's pattern), the sample-encryption parse and decrypt in
-`libs/containers`, and the command wiring. The estimate is two focused weeks (section 9). The
-largest risk is not technical: a decrypting reader changes what the project is, and the more key
+`libs/containers`, and the command wiring. The estimate is two and a half focused weeks (section 9).
+The largest risk is not technical: a decrypting reader changes what the project is, and the more key
 handling it carries, the harder it is to describe as an inspection tool (section 8). The decisions
 for the owner are in section 10.
+
+What Dolby's own reference audio needs (audit M13): for E-AC-3, whole-sample `cenc` (8-byte IV) and
+`cbcs` (constant IV, pattern 0:0); for AC-4, one subsample per sample (a clear lead, then the
+rest protected) in `cenc` with an 8-byte IV and in `cbcs` with a constant IV and a 1:9 pattern.
+The `cenc` files carry a PIFF copy of `senc` and the E-AC-3 `cbcs` files an empty `senc`; the parse
+has to step over both.
 
 ## 2. Basis and limits
 
@@ -33,6 +43,9 @@ published standard with its clause cited, and other projects are consulted for a
 only. Phase 0 (section 9) is therefore to obtain the standard. FFmpeg, GPAC and the audit's
 generator are oracles that run as separate programs; their source is not read.
 
+Dolby's own protected reference audio was read for structure only (audit M13): it supplies the
+layouts the reader has to meet, not keys, and nothing of it was decrypted.
+
 One fact checked for this plan: the three AES known-answer values named in section 7, typed from
 memory, agree with OpenSSL 3.0.13 on this machine. That confirms the values and says nothing about
 where in the NIST documents they sit; the section numbers stay [recalled] until the PDFs are open.
@@ -46,23 +59,28 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
 - The four schemes: `cenc` (AES-128 CTR), `cens` (CTR with a crypt:skip block pattern), `cbc1`
   (AES-128 CBC) and `cbcs` (CBC with a pattern and a constant IV). The audit [measured] that GPAC,
   FFmpeg and an independent Python implementation agree on all four for **full-sample audio**
-  (M4, M5), so full-sample audio is the first target: no subsample map, pattern 1:0 or 0:0.
+  (M4, M5), so full-sample audio, pattern 1:0 or 0:0, is the first target (Dolby's E-AC-3).
+- One subsample per sample, a clear lead and a protected remainder, in `cenc` and in `cbcs` with a
+  1:9 pattern: Dolby's AC-4 (M13). GPAC and FFmpeg agree with the generator on exactly these
+  layouts (M13's table), so they are the oracles; a 1:9 pattern with no map is not agreed by either
+  and stays out.
 - Per-sample IVs of 8 or 16 bytes from `senc`, a constant IV from `tenc`, `saiz` and `saio` read to
-  check `senc` and never trusted over it (section 5.3).
+  check `senc` and never trusted over it (section 5.3). An empty `senc` under a constant IV, and
+  the PIFF `uuid` copy of a `senc`, are stepped over.
 - Key choice by KID, from the track's `tenc` default and, in phase 4, a `seig` override.
 - A clear lead-in (phase 4): a second sample entry, or a `seig` group with `isProtected` 0
   (section 5.4).
 
 **A stated limit, not a gap to hide.**
 
-- A pattern other than 1:0 or 0:0 on audio is refused with a message that names the pattern. The
-  audit [measured] that neither GPAC nor FFmpeg decrypts a 1:9 audio file to the clear stream, GPAC
-  will not write one, and Shaka Packager applies patterns to video only [seen: Shaka raw-key page,
-  fetch]. Nobody can say what a 1:9 audio file means until the standard is read.
-- A `senc` with a subsample map is parsed (a reader must accept one) and refused with a message in
-  phase 2. Applying it is a small addition, but no audio producer examined writes one (M3, M7),
-  there is no fixture, and the CBC rules at a subsample boundary are [recalled] only. Phase 4
-  revisits it if a producer turns up.
+- A pattern other than 0:0, 1:0 and 1:9 on audio is refused with a message that names the pattern,
+  and so is a 1:9 pattern on a sample with no subsample map (neither GPAC nor FFmpeg decrypts that
+  to the clear stream, M13). Shaka Packager applies patterns to video only [seen: Shaka raw-key
+  page, fetch], so what a pattern means on audio beyond Dolby's two uses waits for the standard.
+- More than one subsample in a sample is parsed and decrypted by the rules below, but Dolby has
+  one per sample, there is no fixture with more, and the CBC chain rule at a subsample boundary is
+  [recalled] only. The first release refuses a sample with more than one subsample, naming the
+  count, and phase 4 lifts that once the standard has been read and a fixture exists.
 - Video (`encv`) and other tracks are neither decrypted nor read; they stay in the skipped list.
 
 **Out.**
@@ -85,7 +103,8 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
 | `libs/base/src/crypto` | SHA-256, HMAC-SHA-256 and `SigningKey` (operator-supplied, zeroized, loaded from a path or the environment). No AES. |
 | `libs/containers/src/matroska`, `libs/containers/src/mpegts` | A Matroska audio track with a `ContentEncryption` is refused (`kEncryptedTrack`) and so is an MPEG-TS audio PID with scrambled packets (`kScrambled`). Neither is Common Encryption and neither is in this plan. |
 | `tools/checks/projects.json` | `containers` may use `base` only. mbedTLS is linked by `libs/sendspin`, behind Hearth's vcpkg feature. |
-| `tools/generators/cenc_make_protected.py` | Writes protected fragmented MP4 in all four schemes and the clear-lead and rotation layouts; checked against GPAC and FFmpeg (M5 to M7). Needs the `cryptography` package. |
+| `tools/generators/cenc_make_protected.py` | Writes protected fragmented MP4 in all four schemes and the clear-lead and rotation layouts; checked against GPAC and FFmpeg (M5 to M7). With `--profile dolby-ott`, the layout of Dolby's own reference audio (M13): subsample map, 1:9, empty `senc`, PIFF copy, PlayReady and Widevine `pssh`. Needs the `cryptography` package. |
+| `libs/containers/fuzz/seeds/fuzz_mp4_demux` | Seven protected MP4s from `gen_cenc_reader_fixtures.py`: three packager layouts and four in Dolby's layout (E-AC-3 and AC-4, `cenc` and `cbcs`). The reader refuses all seven; a test reads each whole and as an init segment alone. |
 | Docs | [IAMF](../docs/library/iamf.md) already states the precedent: Common Encryption would be the module's first third-party dependency, so a protected IA track is refused. |
 
 ## 5. Design
@@ -174,12 +193,18 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
 
 - `senc` (per `traf` in a fragment, or in `stbl`): version and flags; flag `0x2` marks subsample
   entries; a sample count; per sample an IV of `tenc`'s per-sample IV size and, if flagged, a count
-  of subsamples with a 16-bit clear and a 32-bit protected length each [recalled]. One `senc` per
-  `traf` [seen: DASH-IF IOP-6 6.2].
+  of subsamples with a 16-bit clear and a 32-bit protected length each [recalled; the entry size
+  is [measured] in Dolby's files: 816 = 16 + 50 × 16 and 416 = 16 + 50 × 8, M13]. One `senc` per
+  `traf` [seen: DASH-IF IOP-6 6.2]. With a constant IV and no map the box is a count and no entries
+  (Dolby's E-AC-3 `cbcs`); that is whole-sample protection, not truncation. A `uuid` box with
+  usertype `a2394f52-5a9b-4f14-a244-6c427c648df4` after a `senc` is the PIFF copy of it
+  (Dolby's `cenc` files); the reader takes the `senc` and may check that the two agree.
 - `saiz` and `saio`: optional, left out when the parameters are the same for all samples
   [seen: IOP-6 6.2]. The reader checks them against `senc` when both are present and takes the
-  data from `senc`. Two `saio` layouts exist in practice, a base data offset (GPAC) and
-  default-base-is-moof (the generator), and FFmpeg reads only the second [measured, M4], which is
+  data from `senc`. `saiz` comes as a default size (8 for Dolby's E-AC-3 `cenc`), as a default of 0
+  with a table of one-byte sizes (Dolby's AC-4), or as 0 and a count of 0 (Dolby's E-AC-3 `cbcs`).
+  Two `saio` layouts exist in practice, a base data offset (GPAC) and default-base-is-moof (the
+  generator and Dolby's `tfhd` flags), and FFmpeg reads only the second [measured, M4], which is
   why GPAC's fragmented files are the hard case for the oracle and not for the parse.
 - `sgpd` and `sbgp` with grouping type `seig`: an entry carries a crypt and skip pair, the
   protected flag, the IV size, a KID and, when the protected flag is 1 and the IV size 0, a
@@ -196,15 +221,26 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
   clear, the chain restarting at each sample.
 - `cbcs`: CBC with the constant IV from `tenc` (IV size 0), restarting at each sample, the same
   partial-block rule; pattern 1:0 or 0:0 means every complete block.
-- Open: the counter width and wrap, the exact `cens` partial-block rule, and the pattern 0:0 case
-  (GPAC wrote 0:0 for `cbcs` audio and 1:0 for `cens` [measured, M3]). These are the first rows to
-  settle from the standard.
+- A sample with a subsample map: the clear lead is copied as it is, and the protected range is
+  decrypted by the rule of its scheme, starting at the first protected byte. `cenc`: the
+  counter starts at the IV with its low half at 0 for the first protected byte. `cbcs` 1:9: one block
+  encrypted, nine skipped, repeating from the first protected byte, with the constant IV starting the
+  chain; Dolby's key-less block map shows exactly that period [measured, M13]. A trailing partial block
+  is left clear. Dolby's protected ranges are whole blocks, so the partial-block rule is not
+  exercised by its files (the generator's fixtures do exercise it, and GPAC and FFmpeg agree with
+  them).
+- Open: the counter width and wrap, the exact `cens` partial-block rule, the pattern 0:0 case
+  (GPAC wrote 0:0 for `cbcs` audio and 1:0 for `cens` [measured, M3]; Dolby's E-AC-3 `cbcs` is 0:0
+  too) and the CBC chain rule at a subsample boundary (Dolby has one subsample per sample, so it
+  never arises there). These are the first rows to settle from the standard.
 
 **Wrong keys.** CENC has no integrity check: a wrong key gives noise and no error. The reader is
 codec-blind and cannot tell. The check belongs one layer up, in `apps/shared/media`
 (`container_input.cpp`), where the codec is known: for `ac-3` and `ec-3` the first access unit
 must start with `0x0B77`; for `ac-4` the sample must parse (`iclforge::ac4` already reads a table
-of contents and checks the CRC). A failure says "the key supplied for KID ... does not decrypt this
+of contents and checks the CRC). In Dolby's AC-4 the clear lead is left readable whatever the key
+(it probably holds the table of contents; that was not checked), so a parse of the lead proves
+nothing: the check has to read past it, into the substreams of the first frame. A failure says "the key supplied for KID ... does not decrypt this
 track" and exits as an input error. A test with a wrong key proves it.
 
 ### 5.4 Clear lead-in and key rotation
@@ -248,13 +284,13 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and section 8 of the
 |---|---|---|
 | 1. Known-answer AES | FIPS 197 Appendix B (key `2b7e1516 28aed2a6 abf71588 09cf4f3c`, plaintext `3243f6a8 885a308d 313198a2 e0370734` gives `3925841d 02dc09fb dc118597 196a0b32`); SP 800-38A F.2.1 (CBC-AES128, IV `00..0f`, first block `7649abac 8119b246 cee98e9b 12e9197d`) and F.5.1 (CTR-AES128, counter `f0f1f2f3 .. fcfdfeff`, first block `874d6191 b620e326 1bef6864 990db6ce`). Section numbers [recalled]; values [measured] against OpenSSL here. Add every block of F.2.x and F.5.x, a Python cross-check over random keys and lengths (OpenSSL as the second implementation), and the key-schedule round keys of Appendix A. | Mode use inside CENC |
 | 2. Reader unit tests | Hand-built boxes in `test_mp4_reader.cpp` style (independent of the writers): every `senc` shape, counts that lie, an IV size that disagrees with `tenc`, a constant IV of the wrong size, a missing key, a missing `senc`, a partial last block, one-block and empty samples. Test keys are made up and published as such. | That another packager writes the same bytes |
-| 3. FFmpeg, strict | Independent decrypt of `cenc`, `cbc1`, `cens`, `cbcs` full-sample audio in progressive and default-base-is-moof layouts, `-decryption_key`, packet hashes equal ours (M4, M5). | GPAC's base-offset layout and everything with a clear lead or a rotation |
-| 4. GPAC `MP4Box -decrypt` | All four schemes and four codecs; multi-entry `stsd`, `seig`, two keys (M3, M12). | Its own reading of the standard; it forces audio to 1:0 |
+| 3. FFmpeg, strict | Independent decrypt of `cenc`, `cbc1`, `cens`, `cbcs` full-sample audio in progressive and default-base-is-moof layouts, `-decryption_key`, packet hashes equal ours (M4, M5), and of the one-subsample `cenc` and `cbcs` 1:9 layouts of M13 (the `dolby-ac4-*` fixtures). | GPAC's base-offset layout, everything with a clear entry or a rotation, a 1:9 pattern with no map, and `cbcs` 0:0 with a map (FFmpeg differs, M13) |
+| 4. GPAC `MP4Box -decrypt` | All four schemes and four codecs; multi-entry `stsd`, `seig`, two keys (M3, M12); the four Dolby-layout fixtures (M13). | Its own reading of the standard; it writes audio at 1:0 only; a 1:9 pattern with no map |
 | 5. In-repo decoder | The decrypted E-AC-3 or AC-4 decodes bit-exactly as the clear stream does, and the `dec3` and `dac4` survive. The strongest rung and the only one for JOC at 7.1.4. | Whether the ciphertext is what a packager writes |
-| 6. Generated fixtures | `tools/generators/cenc_make_protected.py` makes protected files from forge-made clear ones; a nightly job beside `ffmpeg-validate` runs rungs 3 and 4 over them and skips when a tool is missing (G20). Three small committed fixtures (the refusal fix added them) cover the unit tests. | The generator and the reader share the author's reading of the rules |
+| 6. Generated fixtures | `tools/generators/cenc_make_protected.py` makes protected files from forge-made clear ones; a nightly job beside `ffmpeg-validate` runs rungs 3 and 4 over them and skips when a tool is missing (G20). Seven small committed fixtures (three from the refusal fix, four in Dolby's layout from audit M13) cover the unit tests. | The generator and the reader share the author's reading of the rules |
 | 7. Negative and leak tests | Wrong key (sync-word check), missing key, truncated `senc`; the key never reaches stdout, stderr or a written file in hex, base64 or raw; the key scrubs. | n/a |
 | 8. Fuzz | `fuzz_mp4_demux` gains a keyring so the decrypt paths run, with the protected fixtures as seeds; ASan and UBSan. | n/a |
-| 9. Somebody else's streams | Shaka's Clear Key demo asset is AAC, not Dolby, and its key was not obtained (M8). Keep looking for a Dolby stream with a published key; Dolby's browser test kit lists `cbcs` streams, unverified. | n/a |
+| 9. Somebody else's streams | Shaka's Clear Key demo asset is AAC, not Dolby, and its key was not obtained (M8). Dolby's test app serves 26 protected E-AC-3 and AC-4 streams whose structure was read (M13); their keys are behind the vendor's licence servers, which this plan does not use, so nothing of Dolby's decrypts here. Keep looking for a Dolby stream with a published key. | n/a |
 | The standard | Every [recalled] rule above. | Interoperability |
 
 ## 8. Risks
@@ -276,6 +312,10 @@ owner should decide, and take advice, before phase 2.
 **Dolby's terms.** Object decoding is gated by a keyed tag the project does not forge. A decrypting
 reader does not touch that gate, but protected Atmos streams are Dolby content in a Dolby
 ecosystem. Whether any Dolby licence the owner holds limits this work is a question for the owner.
+Dolby's test app shows only a copyright line and no terms (M13); its protected streams can be
+played only with keys from a DRM vendor's licence servers, which neither the audit nor this plan
+requests. So the plan has no Dolby content it may decrypt, and tests it with its own generator's
+files and with GPAC and FFmpeg as oracles.
 
 **Wrong keys are silent.** Handled by the plausibility check (5.3), at the cost of one codec-aware
 test in `apps/shared/media`.
@@ -302,14 +342,14 @@ The scale is ROADMAP.md's: S an afternoon, M a day or two, L a focused week.
 |---|---|---|---|
 | 0 | Obtain ISO/IEC 23001-7 and the CMAF clauses IOP-6 cites; replace every [recalled] row in section 3 of the audit and in 5.3; settle counter width, `cens` partial block, pattern 0:0 and 1:9, subsample CBC rules | all | S (the owner's purchase) |
 | 1 | `aes128` in `libs/base` with the rung 1 tests; `content_key.hpp` and the keyring with path, env, file format, zeroize and the leak test | G8, G21 | M |
-| 2 | `senc` and `tenc` parse, scheme dispatch, `cenc` and `cens` full-sample, `cbc1` and `cbcs` full-sample, key by KID, the arena, new errors, rungs 2 and 5, fuzz | G7, G9, G10 | L |
-| 3 | Command wiring (`content-key=`, shared entry, `demux` paths), the plausibility check, `probe --json` completion, documentation, CLI tests, rungs 3, 4, 7 | G6 | M |
-| 4 | Clear lead and `seig` rotation, `pssh` exposure, optional subsample maps | G11, G12 | M |
+| 2 | `senc` and `tenc` parse (empty `senc`, `saiz` table, PIFF copy), scheme dispatch, `cenc` and `cens` full-sample, `cbc1` and `cbcs` full-sample, one subsample per sample and the 1:9 pattern, key by KID, the arena, new errors, rungs 2 and 5, fuzz | G7, G9, G10, G26, G27, G28, G29 | L, and 1 to 2 days more for the map and the pattern |
+| 3 | Command wiring (`content-key=`, shared entry, `demux` paths), the plausibility check (AC-4: past the clear lead), `probe --json` completion, documentation, CLI tests, rungs 3, 4, 7 | G6 | M |
+| 4 | Clear lead and `seig` rotation, `pssh` exposure, more than one subsample per sample | G11, G12 | M |
 | 5 | Nightly oracle job over generated fixtures | G20 | M |
 
-Total: about two focused weeks (L, then M, M, M, M), after phase 0. Phases 1 to 3 give a working
-`cenc` and `cbcs` read; phases 4 and 5 are for the clear-lead and rotation layouts and for keeping
-the result checked.
+Total: about two and a half focused weeks (L plus 1 to 2 days, then M, M, M, M), after phase 0.
+Phases 1 to 3 give a working `cenc` and `cbcs` read of the layouts Dolby's E-AC-3 and AC-4 reference audio uses; phases 4
+and 5 are for the clear-lead and rotation layouts and for keeping the result checked.
 
 ## 10. Decisions for the owner
 
@@ -327,15 +367,19 @@ the result checked.
 - **D5. Reach.** The analysis commands only (recommended), or also Hearth and Crucible, whose
   passthrough would send decrypted JOC to a receiver (G25), or also the bindings.
 - **D6. Schemes and patterns.** All four schemes (recommended; the oracles agree) or `cenc` and
-  `cbcs` only; and whether a pattern other than 1:0 or 0:0 on audio stays refused until the standard
-  is read (recommended).
-- **D7. Subsample maps.** Refuse them in phase 2 (recommended), or apply them without a fixture.
+  `cbcs` only; and which patterns on audio are accepted. Recommended: 0:0, 1:0 and Dolby's 1:9 with
+  a subsample map, and every other pattern, or 1:9 with no map, refused by name until the standard
+  is read. (The first draft refused 1:9; M13 showed it is what Dolby's AC-4 `cbcs` uses.)
+- **D7. Subsample maps.** Apply one subsample per sample in phase 2 (recommended; Dolby's AC-4 has
+  it in both schemes, and the fixtures and two oracles exist), refuse more than one per sample until
+  the standard is read, or refuse maps altogether, which refuses every Dolby AC-4 stream.
 - **D8. `demux()` and zero-copy.** Accept an owned arena for decrypted samples in `Demuxed`
   (recommended), or add a separate `demux_decrypt()` and keep `demux()` strictly zero-copy.
 - **D9. Wrong-key check.** In `apps/shared/media` per codec (recommended), or an optional callback
   in `ReadOptions` for library users.
-- **D10. Fixtures.** The three small committed fixtures stay; whether more belong in
-  `testdata/` or are generated in CI from the generator (audit D8).
+- **D10. Fixtures.** The seven small committed fixtures (three from the refusal fix, four in
+  Dolby's layout from audit M13) stay; whether more belong in `testdata/` or are generated in CI from
+  the generator (audit D8).
 - **D11. The standard.** Who obtains ISO/IEC 23001-7 and by when; the work stops at phase 0 without
   it.
 - **D12. The write side.** Whether the AES and key types are written with the writer in view (CTR
@@ -348,4 +392,8 @@ the result checked.
    with an operator's key?
 3. May the plan's key surface drop the inline `key=` on the command line the owner sketched, for the
    reasons in D4?
-4. May the first release refuse subsample maps and audio patterns other than 1:0 and 0:0 (D6, D7)?
+4. May the first release apply one subsample per sample and the patterns 0:0, 1:0 and 1:9, and refuse
+   the rest by name (D6, D7)? Dolby's AC-4 needs the first two; its E-AC-3 needs neither.
+5. Does the owner have, or can Dolby supply, a protected E-AC-3 or AC-4 stream with a published test
+   key? Nothing of Dolby's can be decrypted here without one, and the oracles agree with the
+   generator, not with Dolby's packager (M13).

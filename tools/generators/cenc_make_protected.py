@@ -20,9 +20,36 @@ values; change them with --kid and --key.
 
     python3 tools/generators/cenc_make_protected.py clear.mp4 out.mp4 cenc
     python3 tools/generators/cenc_make_protected.py clear.mp4 out.mp4 cbcs --variant leader_entry
+    python3 tools/generators/cenc_make_protected.py ac4.mp4 out.mp4 cbcs --profile dolby-ott
 
 Schemes: cenc (AES-CTR, 8 or 16 byte IV per sample), cbc1 (AES-CBC, 16 byte IV), cens (AES-CTR with
 a crypt:skip pattern), cbcs (AES-CBC with a pattern and a constant IV, so no `senc`).
+
+Profiles (--profile):
+  plain             the layout above
+  dolby-ott         the protection layout of Dolby's public OTT reference streams (the Spott test
+                    app's DASH and HLS audio), as planning/cenc-conformance.md section 6, M13
+                    measured it, for `cenc` and `cbcs` of an E-AC-3 or AC-4 input:
+                    E-AC-3   whole sample protected. `cenc`: tenc v0, 8-byte IV, `saiz` with the
+                             default size 8, `senc` flags 0, and the PIFF uuid copy of the `senc`
+                             after it. `cbcs`: tenc v1 with a 16-byte constant IV and pattern 0:0
+                             (every block), an empty `senc` (flags 0, a count and no entries),
+                             `saiz` 0 and 0, no uuid box.
+                    AC-4     one subsample per sample: a clear lead of 18 to 29 bytes, then the
+                             rest protected (Dolby's leads are 14 to 144 bytes, vary per sample
+                             and stream, and what they hold was not checked). `cenc` as above
+                             with `senc` flags 0x2, a `saiz` size table and the uuid copy.
+                             `cbcs` with pattern 1:9 over the protected range, a constant IV,
+                             `senc` flags 0x2 holding only the subsample map, no uuid box.
+                    Both: PlayReady v0 and Widevine v0 `pssh` boxes in `moov` and none in `moof`,
+                    PlayReady header 4.0.0.0 (AESCTR) for `cenc` and 4.3.0.0 for `cbcs`, a
+                    `ftyp` of mp42 with the DASH and CMAF brands. The payloads are made up: the
+                    KID is the generator's test KID and the licence URL ends in `.invalid`. The
+                    clear lead lengths and the CBC chain rule inside a subsample are this
+                    script's own reading, not the standard's. Dolby's protected ranges are
+                    always a whole number of 16-byte blocks (M13); these leave a partial last
+                    block, so the fixtures also exercise that rule. `sidx`, `mfra` and `mehd`
+                    are not written.
 
 Variants (--variant):
   core              every fragment encrypted, one sample description
@@ -39,8 +66,10 @@ Needs the `cryptography` package. The `core` output is checked by decrypting it 
 """
 
 import argparse
+import base64
 import struct
 import sys
+import uuid
 from dataclasses import dataclass
 
 try:
@@ -57,8 +86,16 @@ CONSTANT_IV = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
 # DASH-IF IOP-6 7.3). The Widevine box carries a made-up payload: CENC does not define it.
 COMMON_SYSTEM_ID = bytes.fromhex("1077efecc0b24d02ace33c1e52e2fb4b")
 WIDEVINE_SYSTEM_ID = bytes.fromhex("edef8ba979d64acea3c827dcd51d21ed")
+# PlayReady's SystemID and the Microsoft PIFF SampleEncryptionBox usertype, as the boxes of Dolby's
+# public OTT reference streams carry them (planning/cenc-conformance.md, M13).
+PLAYREADY_SYSTEM_ID = bytes.fromhex("9a04f07998404286ab92e65be0885f95")
+PIFF_SENC_USERTYPE = bytes.fromhex("a2394f525a9b4f14a2446c427c648df4")
+# Clear lead of each AC-4 sample in the dolby-ott profile, in turn: within the 14 to 29 bytes that
+# the 2.0 and 5.1 streams of M13 show (23, 18, 29 were the first three samples of the 2.0 stream).
+AC4_CLEAR_LEADS = (23, 18, 29)
 
 SCHEMES = ("cenc", "cbc1", "cens", "cbcs")
+PROFILES = ("plain", "dolby-ott")
 VARIANTS = ("core", "leader_entry", "leader_entry_rev", "leader_seig", "rotate")
 AUDIO_ENTRY_BYTES = 28  # SampleEntry (8) and AudioSampleEntry (20) fields before the children
 SYNC_SAMPLE_FLAGS = 0x02000000
@@ -294,10 +331,27 @@ class Plan:
     key1: bytes
     kid2: bytes
     key2: bytes
+    profile: str = "plain"
+    subsample: bool = False  # one subsample per sample: a clear lead, then the protected range
+
+    @property
+    def dolby(self) -> bool:
+        return self.profile == "dolby-ott"
+
+    @property
+    def piff(self) -> bool:
+        """Whether each `senc` is repeated as a PIFF uuid box (Dolby's `cenc` files)."""
+        return self.dolby and self.scheme == "cenc"
 
     def key_of(self, number: int) -> bytes:
         """The key of fragment number (1-based)."""
         return self.key2 if self.variant == "rotate" and number % 2 == 0 else self.key1
+
+    def clear_lead(self, number: int, length: int) -> int:
+        """Clear bytes at the start of the number-th protected sample (1-based); 0 when whole."""
+        if not self.subsample:
+            return 0
+        return min(AC4_CLEAR_LEADS[(number - 1) % len(AC4_CLEAR_LEADS)], length)
 
 
 def tenc(plan: Plan, kid: bytes) -> bytes:
@@ -344,7 +398,45 @@ def pssh_v0(system_id: bytes, data: bytes) -> bytes:
     return fullbox(b"pssh", 0, 0, system_id + struct.pack(">I", len(data)) + data)
 
 
+def playready_object(plan: Plan) -> bytes:
+    """A PlayReady Object holding one header record, shaped like the ones in Dolby's streams.
+
+    Header 4.0.0.0 with an AESCTR ALGID for `cenc`; 4.3.0.0 with a per-KID AESCBC entry for
+    `cbcs`. The KID is the test KID in GUID byte order; the checksum and DS_ID are zero bytes and
+    the licence URL is a reserved `.invalid` name, so nothing here points anywhere.
+    """
+    kid = base64.b64encode(uuid.UUID(bytes=plan.kid1).bytes_le).decode()
+    ns = "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader"
+    url = "<LA_URL>https://license.invalid/rightsmanager.asmx</LA_URL>"
+    if plan.scheme == "cenc":
+        data = (
+            "<PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO>"
+            f"<KID>{kid}</KID><CHECKSUM>{base64.b64encode(bytes(8)).decode()}</CHECKSUM>{url}"
+        )
+        version = "4.0.0.0"
+    else:
+        data = (
+            f'<PROTECTINFO><KIDS><KID ALGID="AESCBC" VALUE="{kid}"></KID></KIDS></PROTECTINFO>'
+            f"{url}<DS_ID>{base64.b64encode(bytes(16)).decode()}</DS_ID>"
+        )
+        version = "4.3.0.0"
+    xml = f'<WRMHEADER xmlns="{ns}" version="{version}"><DATA>{data}</DATA></WRMHEADER>'
+    record = xml.encode("utf-16-le")
+    total = 4 + 2 + 4 + len(record)
+    return struct.pack("<IHHH", total, 1, 1, len(record)) + record
+
+
 # --- the file ----------------------------------------------------------------------------------
+
+
+def original_format(clear: bytes) -> bytes:
+    """The first sample entry's type of the clear input ('ec-3', 'ac-3', 'ac-4'), or b''."""
+    found = find(clear, "moov/trak/mdia/minf/stbl/stsd")
+    if not found:
+        return b""
+    pos, header, size = found
+    first = next(boxes(clear, pos + header + 8, pos + size), None)
+    return first[0] if first else b""
 
 
 def init_segment(clear: bytes, plan: Plan) -> tuple[bytes, int]:
@@ -385,13 +477,21 @@ def init_segment(clear: bytes, plan: Plan) -> tuple[bytes, int]:
     trex = fullbox(
         b"trex", 0, 0, struct.pack(">IIIII", 1, default_index, delta, 0, SYNC_SAMPLE_FLAGS)
     )
-    kids = [plan.kid1] + ([plan.kid2] if plan.variant == "rotate" else [])
-    pssh = pssh_v1(COMMON_SYSTEM_ID, kids) + pssh_v0(WIDEVINE_SYSTEM_ID, b"\x12\x10" + plan.kid1)
+    widevine = pssh_v0(WIDEVINE_SYSTEM_ID, b"\x12\x10" + plan.kid1)
+    if plan.dolby:
+        pssh = pssh_v0(PLAYREADY_SYSTEM_ID, playready_object(plan)) + widevine
+        codec_brands = [b"ca4s", b"ca4e", b"dby1"] if kind == b"ac-4" else [b"ceac"]
+        brands = [b"isom", b"mp42", b"iso5", b"dash", b"cmf2", b"unif", *codec_brands, b"iso6"]
+        major = b"mp42"
+    else:
+        kids = [plan.kid1] + ([plan.kid2] if plan.variant == "rotate" else [])
+        pssh = pssh_v1(COMMON_SYSTEM_ID, kids) + widevine
+        brands = [b"iso6", b"cmfc"] + (
+            [plan.scheme.encode()] if plan.scheme in ("cenc", "cbcs") else []
+        )
+        major = b"iso6"
     moov = box(b"moov", part("moov/mvhd") + trak + box(b"mvex", trex) + pssh)
-    brands = [b"iso6", b"cmfc"] + (
-        [plan.scheme.encode()] if plan.scheme in ("cenc", "cbcs") else []
-    )
-    ftyp = box(b"ftyp", b"iso6" + struct.pack(">I", 0) + b"".join(brands))
+    ftyp = box(b"ftyp", major + struct.pack(">I", 0) + b"".join(brands))
     return ftyp + moov, delta
 
 
@@ -406,10 +506,41 @@ def fragment_groups(plan: Plan, number: int, count: int, clear: bool) -> bytes:
     return b""
 
 
+def aux_boxes(plan: Plan, entries: list[bytes], saio_offset: int) -> tuple[bytes, bytes]:
+    """`saiz`, `saio` and `senc` for the entries (IV and subsample map of each sample), and the
+    PIFF copy of the `senc` that the dolby-ott profile writes after it for `cenc`.
+
+    A uniform entry size goes in `saiz` as the default; the subsample map gets a size table, as
+    Dolby's AC-4 files have it; entries that are all empty (a constant IV and no subsamples)
+    give `saiz` 0 and a count of 0.
+    """
+    sizes = [len(e) for e in entries]
+    if plan.subsample:
+        saiz_body = bytes([0]) + struct.pack(">I", len(entries)) + bytes(sizes)
+    else:
+        default = sizes[0] if sizes else 0
+        saiz_body = bytes([default]) + struct.pack(">I", len(entries) if default else 0)
+    senc = fullbox(
+        b"senc",
+        0,
+        0x2 if plan.subsample else 0,
+        struct.pack(">I", len(entries)) + b"".join(entries),
+    )
+    piff = box(b"uuid", PIFF_SENC_USERTYPE + senc[8:]) if plan.piff else b""
+    head = fullbox(b"saiz", 0, 0, saiz_body) + fullbox(
+        b"saio", 0, 0, struct.pack(">II", 1, saio_offset)
+    )
+    return head, senc + piff
+
+
 def movie_fragment(
-    plan: Plan, number: int, decode_time: int, coded: list[bytes], ivs: list[bytes], clear: bool
+    plan: Plan, number: int, decode_time: int, coded: list[bytes], entries: list[bytes], clear: bool
 ) -> bytes:
-    """One moof; its trun data offset and saio offset are fixed up from a trial build."""
+    """One moof; its trun data offset and saio offset are fixed up from a trial build.
+
+    `entries` holds each sample's `senc` entry: its IV, then its subsample map when the plan has
+    one. With a constant IV and no subsamples the entries are empty.
+    """
     two_entries = plan.variant in ("leader_entry", "leader_entry_rev")
     clear_first = plan.variant == "leader_entry"  # the clear entry is entry 1 in this layout
     description = (1 if clear else 2) if clear_first else (2 if clear else 1)
@@ -421,63 +552,77 @@ def movie_fragment(
     )
     tfdt = fullbox(b"tfdt", 1, 0, struct.pack(">Q", decode_time))
     groups = fragment_groups(plan, number, len(coded), clear)
-    with_aux = plan.iv_size != 0 and not clear
+    with_aux = (plan.dolby or plan.iv_size != 0) and not clear
+    mfhd = fullbox(b"mfhd", 0, 0, struct.pack(">I", number))
 
-    def build(data_offset: int, saio_offset: int) -> bytes:
+    def build(data_offset: int, saio_offset: int) -> tuple[bytes, int]:
+        """The moof, and where the first `senc` entry starts in it."""
         sizes = b"".join(struct.pack(">I", len(s)) for s in coded)
         trun = fullbox(b"trun", 0, 0x000201, struct.pack(">Ii", len(coded), data_offset) + sizes)
-        aux = b""
-        if with_aux:
-            aux = (
-                fullbox(b"saiz", 0, 0, bytes([plan.iv_size]) + struct.pack(">I", len(coded)))
-                + fullbox(b"saio", 0, 0, struct.pack(">II", 1, saio_offset))
-                + fullbox(b"senc", 0, 0, struct.pack(">I", len(coded)) + b"".join(ivs))
-            )
-        traf = box(b"traf", tfhd + tfdt + groups + trun + aux)
-        return box(b"moof", fullbox(b"mfhd", 0, 0, struct.pack(">I", number)) + traf)
+        head = tfhd + tfdt + groups + trun
+        aux_head, aux_tail = aux_boxes(plan, entries, saio_offset) if with_aux else (b"", b"")
+        traf = box(b"traf", head + aux_head + aux_tail)
+        # moof header, mfhd, traf header, the boxes before senc, then senc's 16 header bytes
+        entries_at = 8 + len(mfhd) + 8 + len(head) + len(aux_head) + 16
+        return box(b"moof", mfhd + traf), entries_at
 
-    data_offset = len(build(0, 0)) + 8  # the moof, then the 8-byte mdat header
-    # senc is the last box of the moof, so its IVs end it
-    saio_offset = len(build(data_offset, 0)) - len(ivs) * plan.iv_size if with_aux else 0
-    return build(data_offset, saio_offset)
+    data_offset = len(build(0, 0)[0]) + 8  # the moof, then the 8-byte mdat header
+    saio_offset = build(data_offset, 0)[1] if with_aux else 0
+    return build(data_offset, saio_offset)[0]
 
 
-def build(clear: bytes, plan: Plan, per_fragment: int) -> bytes:
+def protect_sample(plan: Plan, key: bytes, number: int, sample: bytes) -> tuple[bytes, bytes]:
+    """The coded sample and its `senc` entry for the number-th protected sample (1-based)."""
+    iv = sample_iv(number, plan.iv_size)
+    lead = plan.clear_lead(number, len(sample))
+    coded = sample[:lead] + crypt_sample(plan.scheme, key, sample[lead:], iv, plan.crypt, plan.skip)
+    entry = iv if plan.iv_size else b""
+    if plan.subsample:
+        entry += struct.pack(">HHI", 1, lead, len(sample) - lead)
+    return coded, entry
+
+
+def build(clear: bytes, plan: Plan, per_fragment: int, max_samples: int = 0) -> bytes:
     samples = read_samples(clear)
+    if max_samples:
+        samples = samples[:max_samples]
     if not samples:
         sys.exit("the input has no samples")
     out, delta = init_segment(clear, plan)
-    iv_counter = 0
+    protected_count = 0
     decode_time = 0
     for number, start in enumerate(range(0, len(samples), per_fragment), 1):
         chunk = samples[start : start + per_fragment]
         clear_fragment = plan.variant in CLEAR_LEAD_VARIANTS and number == 1
-        coded, ivs = [], []
+        coded, entries = [], []
         for sample in chunk:
             if clear_fragment:
                 coded.append(sample)
                 continue
-            iv_counter += 1
-            ivs.append(sample_iv(iv_counter, plan.iv_size))
-            key = plan.key_of(number)
-            coded.append(crypt_sample(plan.scheme, key, sample, ivs[-1], plan.crypt, plan.skip))
-        out += movie_fragment(plan, number, decode_time, coded, ivs, clear_fragment)
+            protected_count += 1
+            sample_coded, entry = protect_sample(plan, plan.key_of(number), protected_count, sample)
+            coded.append(sample_coded)
+            entries.append(entry)
+        out += movie_fragment(plan, number, decode_time, coded, entries, clear_fragment)
         out += box(b"mdat", b"".join(coded))
         decode_time += delta * len(chunk)
     return out
 
 
-def verify(clear: bytes, protected: bytes, plan: Plan) -> None:
+def verify(clear: bytes, protected: bytes, plan: Plan, max_samples: int = 0) -> None:
     """Decrypts the `core` output with its key and compares with the clear samples."""
     if plan.variant != "core":
         return  # the other layouts are for the oracles to judge
     got, want = read_samples(protected), read_samples(clear)
+    if max_samples:
+        want = want[:max_samples]
     if len(got) != len(want):
         sys.exit("verify: the sample count differs")
     for n, (sample, original) in enumerate(zip(got, want, strict=True), 1):
         iv = sample_iv(n, plan.iv_size)
-        plain = crypt_sample(
-            plan.scheme, plan.key1, sample, iv, plan.crypt, plan.skip, decrypt=True
+        lead = plan.clear_lead(n, len(sample))
+        plain = sample[:lead] + crypt_sample(
+            plan.scheme, plan.key1, sample[lead:], iv, plan.crypt, plan.skip, decrypt=True
         )
         if plain != original:
             sys.exit(f"verify: sample {n} does not decrypt to the clear sample")
@@ -494,9 +639,15 @@ def main() -> None:
     parser.add_argument("output", help="protected fragmented MP4 to write")
     parser.add_argument("scheme", choices=SCHEMES)
     parser.add_argument("--variant", choices=VARIANTS, default="core")
+    parser.add_argument("--profile", choices=PROFILES, default="plain")
     parser.add_argument("--iv-size", type=int, choices=(8, 16), default=0, help="cenc and cens IV")
-    parser.add_argument("--pattern", default="1:0", help="crypt:skip blocks for cens and cbcs")
+    parser.add_argument(
+        "--pattern",
+        help="crypt:skip blocks for cens and cbcs (default 1:0; 1:9 for AC-4 and 0:0 for "
+        "E-AC-3 in the dolby-ott profile)",
+    )
     parser.add_argument("--fragment", type=int, default=16, help="samples per fragment")
+    parser.add_argument("--max-samples", type=int, default=0, help="keep the first N samples")
     parser.add_argument("--kid", default=KID1.hex())
     parser.add_argument("--key", default=KEY1.hex())
     parser.add_argument("--kid2", default=KID2.hex(), help="second KID, for --variant rotate")
@@ -504,8 +655,17 @@ def main() -> None:
     parser.add_argument("--no-verify", action="store_true")
     args = parser.parse_args()
 
+    with open(args.input, "rb") as handle:
+        clear = handle.read()
+    original = original_format(clear)
+    dolby = args.profile == "dolby-ott"
+    if dolby and (args.scheme not in ("cenc", "cbcs") or args.variant != "core"):
+        sys.exit("the dolby-ott profile takes the cenc and cbcs schemes and the core variant")
+    if dolby and original not in (b"ec-3", b"ac-4"):
+        sys.exit("the dolby-ott profile takes an ec-3 or ac-4 input")
     patterned = args.scheme in ("cens", "cbcs")
-    crypt, skip = parse_pattern(args.pattern) if patterned else (0, 0)
+    pattern = args.pattern or (("1:9" if original == b"ac-4" else "0:0") if dolby else "1:0")
+    crypt, skip = parse_pattern(pattern) if patterned else (0, 0)
     if args.scheme == "cbcs":
         iv_size = 0
     else:
@@ -520,15 +680,18 @@ def main() -> None:
         bytes.fromhex(args.key),
         bytes.fromhex(args.kid2),
         bytes.fromhex(args.key2),
+        args.profile,
+        subsample=dolby and original == b"ac-4",
     )
-    with open(args.input, "rb") as handle:
-        clear = handle.read()
-    protected = build(clear, plan, args.fragment)
+    protected = build(clear, plan, args.fragment, args.max_samples)
     if not args.no_verify:
-        verify(clear, protected, plan)
+        verify(clear, protected, plan, args.max_samples)
     with open(args.output, "wb") as handle:
         handle.write(protected)
-    print(f"wrote {args.output}: {args.scheme}, {args.variant}, {len(protected)} bytes")
+    print(
+        f"wrote {args.output}: {args.scheme}, {args.variant}, {args.profile}, "
+        f"{len(protected)} bytes"
+    )
 
 
 if __name__ == "__main__":
