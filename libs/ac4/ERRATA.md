@@ -4,6 +4,158 @@ Where ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1 (Part 2) co
 leave a case open or print a defect, and the reading the library takes for each: the decoder's, then
 the encoder's.
 
+## Content signing (pace-ccjf1)
+
+Everything under this heading is about the content signature appended to a raw `.ac4` stream
+(`libs/base/src/crypto`, `libs/ac4/src/io/content_signature.cpp`, `forge ac4-sign` and
+`ac4-verify`), not about ETSI TS 103 190. It follows the owner-supplied "AC-4 content signing"
+specification, version 2.3, cited here as "CS spec" with section numbers. That specification and the
+sample blob below were supplied by the owner; parts derive from analysis of DEE and FFmpeg, per the
+owner. Only wire-format facts are used. The sample is kept outside the repository, with its
+certificates, and the tests that read it take its path from `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` and
+skip when it is unset.
+
+### Open questions for the owner
+
+Each of these was met while writing the code. The code does what the second sentence says until the
+owner decides; none of them blocks the rest.
+
+1. **What time should a certificate be valid at?** CS spec §6.1 step 3 says every certificate must be
+   valid "now". The sample's chain has a CA certificate that expired before the signature's own
+   `signedDate`, so a genuine signature fails that check today (see measured correction 4). Strict
+   mode follows the spec: `verify-time=now`. `verify-time=signed` (judged at the date the signer
+   wrote, which is only as good as the signer), `ignore` and a fixed instant are there, and a report
+   names the time used. Should strict mode keep `now`, or should own-QC default to `signed`?
+2. **How is a signature carried in an MP4?** §8.3.2 says "container-level metadata on the audio
+   track, using the MP4 muxer infrastructure" and gives no box, no payload layout and no digest
+   boundary beyond "the raw bitstream in `mdat`". `sign-content` therefore refuses an MP4 and says so;
+   only the raw `.ac4` trailer of §8.3.1 is implemented. Which box, and does the digest cover the
+   samples as the muxer stores them, or the sync frames they came from?
+3. **What goes in the signer information of a signature made with an operator's own key?** The
+   sample names a publisher (type, UUID, name, role), a product, a platform and an application. We
+   write a random 128-byte nonce, publisher type 1 with no name, and the application as "ICL Forge
+   forge". A verifier that reads these fields downstream may expect more, or must not trust any of it.
+   Should `ac4-sign` take the publisher and product from options, and may a verifier refuse an empty
+   publisher?
+4. **Are digests or curves other than SHA-256 and secp256r1 ever written?** The spec fixes both
+   (§1.1) but the wire carries them as strings (`sha256`, `ecdsa`, `secp256r1`). We refuse anything
+   else with `BadContentSignaturePKStandard`. Say if SHA-384, SHA-512 or P-384 appear in practice.
+5. **What is `ContentSignatureInfo`?** §3.15 and §8.4 name a companion structure under
+   `kContentSignatureInfoThriftDataId` and say its wire layout is not confirmed. We neither write nor
+   read it. If it is needed, a layout or a sample is.
+6. **More than one signature entry, or more than one content digest.** The blob holds a list of
+   entries and a list of digests. We verify the first entry and the digest whose reference is
+   `digest_data_ref_win_signature_data`, and do not look at the rest. Should a second entry be
+   refused, verified too, or reported?
+7. **Which leaf checks beyond the title and key usage?** §6.1 step 4 asks for `Code/Content Signer` and
+   Digital Signature. The sample's leaf is also `CA:TRUE`, which we accept. Revocation (CRL, OCSP) is
+   not checked at all, as the spec does not mention it. Is that intended?
+8. **Trust model.** §4.4 says to accept any valid Dolby-issued chain, which needs the issuer's roots.
+   None ships here. A chain that checks out but leads to no `trust-anchor=` or `pin=` is reported as
+   `chain unanchored` and exits 6 unless `unanchored-ok` is given; it is never called valid. Pins
+   take a SHA-1 (as §10.1 gives them) or a SHA-256 fingerprint. Confirm that is the right split.
+9. **Is the trailer meant to be invisible to other readers?** §8.6 says the frames are unmodified so
+   "the audio content is byte-identical". FFmpeg's raw AC-4 demuxer does not stop at the trailer: it
+   reads it as five more packets and reports a corrupt one (measured correction 9). forge's own
+   reader stops at the first non-sync byte, as §8.5 describes. Only files that go through FFmpeg
+   are affected.
+10. **What is an acceptable `signedDate`?** `BadContentSignatureDate` is "outside acceptable range"
+    (§6.2) with no range. We require `YYYY-MM-DDTHH:MM:SS`, a date inside the signer certificate's
+    validity unless `verify-time=ignore`, and accept a date in the future without complaint.
+11. **The DER fallback scan of §8.5 and the DER step of §9.2.** v2.3 stores `r` and `s` raw in a map,
+    so no DER pattern follows in a signed file and the fallback finds nothing. We do not implement
+    it. Delete it from the specification, or say what it is for.
+
+### Measured corrections
+
+Measured on the owner's sample blob, with OpenSSL and a Thrift reader written separately from the
+library's (`tools/checks/check_content_signature_openssl.py --sample`, which runs no forge code). The
+library's own tests assert the same facts (`ICLFORGE_CONTENT_SIGNATURE_SAMPLE=<blob> ctest -R
+"owner's sample"`). Each entry is the spec's reading, what was measured, and the lines the command
+prints. To repeat them:
+
+```
+ICLFORGE_CONTENT_SIGNATURE_SAMPLE=<blob>
+python3 tools/checks/check_content_signature_openssl.py --sample "$ICLFORGE_CONTENT_SIGNATURE_SAMPLE"
+ctest -R "owner's sample"        # with the same variable set; "Passed", not "Skipped"
+```
+
+1. **The ECDSA signature is over the bytes of `SignedInfoWire`, not over the content digest.**
+   §2.2, §5.2 step 6 and §6.1 step 8 sign and verify the content digest (the 32-byte SHA-256 of the
+   stream) directly.
+   The signature in the sample verifies under the signing certificate's key over SHA-256 of the
+   Thrift serialisation of `SignedInfoWire` (field 1 of the signature entry, from its first field
+   header to its STOP byte). The content digest is covered because it is a field inside that struct.
+   ```
+   ok    openssl dgst -verify accepts the signature over the signed information
+   ok    the signature does not verify over SHA-256 of the content digest
+   ok    the signature does not verify with the content digest taken as the hash that was signed
+   ```
+2. **The signer-information digest is over the bytes as received.** §5.2 step 3 and §6.1 step 6 hash
+   the serialised `SignerInfoWire`, the second by serialising the parsed struct again. The digest
+   stored in `SignedInfoWire` field 6 is that of the exact received bytes of field 3 of the blob,
+   through its STOP byte. A re-serialisation need not reproduce those bytes, so the verifier keeps the
+   span it parsed.
+   ```
+   ok    SHA-256 of the signer information, as received, is the digest the signed information holds
+   ```
+3. **The certificates are wrapped.** §3.7 says the field holds "concatenated DER certificates". It is
+   a Thrift list of bytes whose first four bytes are `40 82 LL LL` (a long-form length of `LLLL`
+   bytes), followed by the certificates back to back, root first. `LLLL` equals the rest of the list.
+   ```
+   ok    the certificates start with a 40 82 LL LL wrapper whose length is the rest of the list
+   ok    openssl reads carried certificate 3 of 4
+   ```
+4. **A CA certificate in the chain had expired before the signature was made.** §6.1 step 3 checks that
+   every certificate is valid now. The second CA certificate (depth 2 from the signer) expired in
+   November 2025, months before the sample's `signedDate`. OpenSSL chains the signer to the root only
+   with the time check off. The default of `verify-time` is open question 1.
+   ```
+   ok    openssl verify chains the last certificate to the first, ignoring validity times
+   info  the same with validity times checked today: exit 2: error 10 at 2 depth lookup: certificate has expired
+   ```
+5. **The signer's certificate is `CA:TRUE`, and the subjects carry more than the spec lists.** §4.2 and
+   §4.3 give a leaf with Key Usage Digital Signature and a short subject. The sample's leaf is also
+   BasicConstraints `CA:TRUE` (critical), and every subject carries `serialNumber`, `dnQualifier`,
+   `generationQualifier`, `businessCategory` and `title` besides the common name and organisation. The
+   chain code accepts a `CA:TRUE` leaf and compares names as a whole. All four certificates are
+   `ecdsa-with-SHA256`.
+   ```
+   ok    the signing certificate is signed ecdsa-with-SHA256
+   ok    the signing certificate also carries BasicConstraints CA:TRUE, which a verifier must not reject
+   ```
+6. **Every byte list is a Thrift list of BYTE, and fields are in ascending id order.** The spec writes
+   `list<byte>` and `binary` interchangeably. In the sample the nonce, the digests, `r`, `s` and the
+   certificates are all lists with element type BYTE, never binary strings. The writer does the same.
+   ```
+   ok    every byte list is a Thrift list of BYTE elements: nonce, content digest, signer information digest, certificates, r, s
+   ok    fields are written in ascending id order in every struct
+   ```
+7. **`r` and `s` are raw, 32 bytes each, in a map keyed `ecc_r_value` and `ecc_s_value`.** v2.3 §3.13 and
+   §5.2 step 6 say so, but §8.5 (the fallback scan for `30 44..48 02 20..21 ...`) and §9.2 ("DER encoding of (r, s)")
+   still describe a DER signature. The sample has no DER signature. To check it with OpenSSL the
+   two integers are wrapped into an `Ecdsa-Sig-Value` first, which the script does.
+   ```
+   ok    r and s are raw 32-byte values, not DER: 32 and 32
+   ```
+8. **`signedDate` is `YYYY-MM-DDTHH:MM:SS`, UTC, with no `Z`.** The spec says "ISO 8601". The reader
+   accepts a trailing `Z` and the writer never adds one. Asserted by the sample test, not printed.
+9. **A signed file is not what FFmpeg's raw AC-4 demuxer expects.** Frame counts by `ffprobe -v error
+   -f ac4 -count_packets -show_entries stream=nb_read_packets -of csv=p=0`, on a 50-frame stream
+   from `forge ac4-encode` and the same stream after `forge ac4-sign` with a 2 026-byte trailer:
+   ```
+   plain.ac4   50
+   signed.ac4  55      (and, at -v warning: "Packet corrupt")
+   ```
+   forge's `decode` reads the same 50 frames from both and produces identical PCM
+   (`tools/ci/run_codec_matrix.sh`, "AC-4 content signing").
+
+The chain, nonce and digest handling that the measurements did not change follow the spec: the
+signature is ECDSA P-256 over SHA-256 with RFC 6979 nonces; the content digest is SHA-256 of every
+byte before the trailer; the trailer is found by walking the sync frames; the leaf must carry the
+title `Code/Content Signer` unless `leaf-title=any`; and the chain is validated from the trust
+anchor down.
+
 ## The decoder
 
 The places where ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1 (Part 2) contradict
