@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 import tempfile
@@ -38,8 +37,14 @@ from pathlib import Path
 WORKLOADS = {
     "truehd_stereo_decode": ("iclforge::truehd::Decoder::decode*",),
     "truehd_51_decode": ("iclforge::truehd::Decoder::decode*",),
-    "truehd_stereo_encode": ("iclforge::truehd::Encoder::encode*", "iclforge::truehd::Encoder::flush*"),
-    "truehd_51_encode": ("iclforge::truehd::Encoder::encode*", "iclforge::truehd::Encoder::flush*"),
+    "truehd_stereo_encode": (
+        "iclforge::truehd::Encoder::encode*",
+        "iclforge::truehd::Encoder::flush*",
+    ),
+    "truehd_51_encode": (
+        "iclforge::truehd::Encoder::encode*",
+        "iclforge::truehd::Encoder::flush*",
+    ),
 }
 # The function whose calls are the units: one per access unit in both directions.
 UNIT_FUNCTION = {
@@ -82,7 +87,8 @@ def run_workload(bench: Path, workload: str, valgrind: str) -> dict:
         command += [str(bench), "--only", workload, "--json-out", str(result_json)]
         subprocess.run(command, check=True, capture_output=True, text=True)
         total, calls = parse_callgrind(out.read_text(encoding="utf-8"), UNIT_FUNCTION[direction])
-        budget_ms = json.loads(result_json.read_text())["results"][0]["real_time_budget_ms_per_frame"]
+        result = json.loads(result_json.read_text())["results"][0]
+        budget_ms = result["real_time_budget_ms_per_frame"]
     if calls == 0:
         raise SystemExit(f"{workload}: callgrind saw no call of {UNIT_FUNCTION[direction]}")
     per_unit = total / calls
@@ -97,7 +103,9 @@ def run_workload(bench: Path, workload: str, valgrind: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument("--bench", type=Path, required=True, help="the iclforge-bench binary")
     parser.add_argument("--workload", action="append", choices=sorted(WORKLOADS),
                         help="a workload to count; repeatable, default all four")
@@ -107,11 +115,15 @@ def main() -> int:
                         help="a JSON file of {workload: most instructions per access unit}")
     args = parser.parse_args()
 
-    rows = [run_workload(args.bench, name, args.valgrind) for name in (args.workload or sorted(WORKLOADS))]
+    names = args.workload or sorted(WORKLOADS)
+    rows = [run_workload(args.bench, name, args.valgrind) for name in names]
     ceilings = json.loads(args.ceilings.read_text())["ceilings"] if args.ceilings else {}
 
     failed = False
-    print(f"{'workload':<24} {'calls':>8} {'instr/unit':>12} {'unit ms':>8} {'Minstr/s audio':>15}  ceiling")
+    print(
+        f"{'workload':<24} {'calls':>8} {'instr/unit':>12} {'unit ms':>8} "
+        f"{'Minstr/s audio':>15}  ceiling"
+    )
     for row in rows:
         ceiling = ceilings.get(row["workload"])
         over = ceiling is not None and row["instructions_per_unit"] > ceiling

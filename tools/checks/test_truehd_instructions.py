@@ -1,7 +1,6 @@
 """Unit tests for truehd_instructions.py: the callgrind parser and the ceiling gate."""
 
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import truehd_instructions as ti  # noqa: E402
+import truehd_instructions as ti
 
 CALLGRIND = """\
 version: 1

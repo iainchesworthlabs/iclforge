@@ -422,7 +422,8 @@ class WorkloadTableTest(unittest.TestCase):
     """The table that says which codec a `config` belongs to, and how to say it."""
 
     def test_names_follow_the_prefix_convention(self):
-        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4, truehd_* TrueHD."""
+        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4,
+        truehd_* TrueHD."""
         for config, (codec, _words) in badges.WORKLOADS.items():
             with self.subTest(config=config):
                 self.assertEqual(codec, PREFIX_CODEC[config.split("_")[0]])

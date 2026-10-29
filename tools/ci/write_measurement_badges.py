@@ -402,7 +402,7 @@ def _per_codec(entries, describe):
     TrueHD comes last, and only once the series holds a TrueHD workload: it is lossless, so the
     accuracy badge has nothing to say about it, and "TrueHD no data" on three badges would be noise.
     """
-    codecs = CODECS + ("TrueHD",) if "TrueHD" in entries else CODECS
+    codecs = (*CODECS, "TrueHD") if "TrueHD" in entries else CODECS
     return " | ".join(
         f"{codec} {describe(entries[codec]) if codec in entries else NO_DATA}"
         for codec in codecs)
