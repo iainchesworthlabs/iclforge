@@ -46,6 +46,7 @@ TEST_CASE("without ICLFORGE_BUILD_TRUEHD every TrueHD call is unsupported", "[ca
     CHECK(iclforge_truehd_decoded_pcm(decoded) == nullptr);
     CHECK(iclforge_truehd_decoded_channels(decoded) == 0);
     CHECK(std::string_view(iclforge_truehd_decoded_channel_name(decoded, 0)).empty());
+    iclforge_truehd_decoder_lost_data(decoder);  // a no-op, like reset and destroy
     iclforge_truehd_decoder_destroy(decoder);
     iclforge_truehd_decoded_destroy(decoded);
     iclforge_truehd_units_destroy(units);

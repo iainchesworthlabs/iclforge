@@ -7,6 +7,7 @@ iclforge::truehd::Decoder::Impl::parse_unit(std::span<std::byte const, 184467440
 iclforge::truehd::Decoder::Impl::substreams_wanted(int) const
 iclforge::truehd::Decoder::counters() const
 iclforge::truehd::Decoder::decode(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::truehd::Decoder::lost_data()
 iclforge::truehd::Decoder::major_sync() const
 iclforge::truehd::Decoder::operator=(iclforge::truehd::Decoder&&)
 iclforge::truehd::Decoder::reset()

@@ -2,7 +2,7 @@
 
 TH spec §21 names the transport formats a TrueHD stream travels in and gives each a line or a table. It gives no byte
 layout for any of them. This page records what the TrueHD code in `libs/containers` does for each, where the layout
-comes from, and what is not known. "TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.3
+comes from, and what is not known. "TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5
 (planning/truehd.md says what it is). Entries are cited from the code as "ERRATA C1" and so on.
 
 The oracle for everything below is FFmpeg 6.1.1, used as a program: its muxers write the layouts, its demuxers read

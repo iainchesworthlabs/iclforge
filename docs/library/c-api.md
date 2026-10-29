@@ -732,14 +732,25 @@ for (size_t i = 0; i < iclforge_truehd_units_count(units); ++i) {
 `ICLFORGE_OK`) when the unit gives no samples yet, as the other decoders in this header do. The
 handle holds its own copy of the samples, so it stays valid across the next decode and is released
 with `iclforge_truehd_decoded_destroy`. After an error the decoder stays usable, and the substream
-that failed waits for its next restart header. `config.presentation` picks the substreams a decode
-reads: the stereo, 5.1 or 8-channel bed, the best of them, or all of them; the best is the default.
-`config.lenient` counts a failed check (CRC, parity, the lossless check) in
-`iclforge_truehd_decoder_counters()` and decodes on, where the default drops the unit. A decoded
+that failed waits for its next restart header (all of them do, for a unit that does not read at all): the
+units in between give no samples and no error, and the decode is exact again from that restart header. The
+decoder cannot see a unit the caller never gave it, so a caller that dropped input (a lost packet, bytes
+`iclforge_truehd_scan()` skipped) calls `iclforge_truehd_decoder_lost_data()` to make it wait the same way.
+`config.presentation` picks the substreams a decode reads: the stereo, 5.1 or 8-channel bed, the best of
+them, or all of them; the best is the default. `config.lenient` counts a failed check (CRC, parity, the
+lossless check) in `iclforge_truehd_decoder_counters()` and decodes on, where the default drops the unit; the
+samples of a unit that failed a check can be wrong, and the lossless check at the next restart header says so
+(`lossless_check_failures`). That check covers a restart interval when the next restart header arrives, so
+the last interval of a stream is never checked. A decoded
 unit also reports its `_sample_rate`, `_substream`, `_restarted` and `_padding_samples` (the
 end-of-stream marker's count, not in `_samples()` or the PCM), and `_extra_data` hands back the
 bytes after the last substream segment as they are. Those hold the object audio metadata of an
 Atmos stream; the library does not interpret them.
+
+A decoder, an encoder, a list of units and the other handles a call returns are each used by one thread at a time;
+the library takes no lock, and different handles can be used from different threads at once. A decoded unit and an
+encode's access units own their data, so they stay valid when the decoder or encoder that made them is used again or
+destroyed.
 
 [`examples/capi_decode_truehd.c`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_decode_truehd.c)
 is the walkthrough as a program: it writes the 24-bit PCM of a `.thd` or `.mlp` and ctest runs it on
@@ -779,8 +790,9 @@ status = iclforge_truehd_encoder_flush(encoder, &encoded);
 `iclforge_truehd_default_channel_assignment()`), `restart_interval_units`, `peak_data_rate_bps` and `allow_rate_violations`,
 `downmix` (`ICLFORGE_TRUEHD_DOWNMIX_NONE` or `_STANDARD`) with its four gains, `stereo_mode`, `max_fir_order` and
 `matrix_search`. A stream that cannot be sent within the peak rate is `ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED` unless
-violations are allowed, and then `iclforge_truehd_encoder_stats()` counts them beside the unit, byte and interval counts. After
-an error the encoder should be destroyed.
+violations are allowed, and then `iclforge_truehd_encoder_stats()` counts them beside the unit, byte and interval counts. A call refused with
+`ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT` (a sample outside the range of `bits`) has kept
+nothing and the encoder carries on; after any other error the encoder should be destroyed.
 [`examples/capi_encode_truehd.c`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_truehd.c) encodes a
 tone, decodes it with the functions above and compares, and ctest runs it; the encoder cases of `test_capi_truehd.cpp` encode every
 TrueHD fixture's PCM and decode it again to the manifest's SHA-256.

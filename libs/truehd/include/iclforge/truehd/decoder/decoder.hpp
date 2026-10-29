@@ -50,10 +50,18 @@ enum class Presentation : std::uint8_t {
     kAll,   // every substream, the sixteen-channel one last
 };
 
+// What a failed check does. Either way a unit that cannot be read at all (its header, its
+// directory or a segment's framing) is an error, and from then until a substream's next restart
+// header that substream gives no samples and no error, because what it carries from unit to unit
+// no longer follows the stream. A decode that has to be exact therefore resumes at the next
+// restart header: the samples of the units in between are lost, not wrong.
 enum class Strictness : std::uint8_t {
-    kStrict,   // a check that fails (nibble, CRC, parity, lossless check) is an error and the unit
-               // is dropped
-    kLenient,  // the failed check is counted and the unit is decoded as far as it reads
+    kStrict,   // a check that fails (nibble, CRC, parity, lossless check) is an error, the unit is
+               // dropped, and its substream waits for its next restart header
+    kLenient,  // the failed check is counted and the unit is decoded as far as it reads. Its
+               // samples can be wrong: the lossless check at the next restart header says so
+               // (DecoderCounters::lossless_check_failures), and it is not made for the last
+               // restart interval of a stream, which no restart header follows
 };
 
 struct DecoderConfig {
@@ -108,9 +116,15 @@ class ICLFORGE_TRUEHD_EXPORT Decoder {
     // lossless check. Nothing for a unit that cannot give samples yet: one that arrives before a
     // major sync, or whose substreams have not had a restart header (a stream joined partway).
     // After an error the decoder stays usable, but the substream that failed waits for its next
-    // restart header.
+    // restart header; so do all of them after a unit that does not read at all.
     [[nodiscard]] std::expected<std::optional<DecodedAccessUnit>, Error> decode(
         std::span<const std::byte> access_unit);
+
+    // For a caller that dropped input between the unit it decoded last and the next one it will
+    // decode (a container packet lost, bytes a reader skipped to find the next unit): the decoder
+    // cannot see a missing unit, so this makes every substream wait for its next restart header,
+    // as after an error. The stream's major sync and the counters are kept.
+    void lost_data() noexcept;
 
     // The latest major sync, once one has been read.
     [[nodiscard]] const std::optional<MajorSync>& major_sync() const noexcept;

@@ -136,6 +136,13 @@ void iclforge_truehd_decoder_reset(iclforge_truehd_decoder_t* decoder) {
     decoder->last_detail = {};
 }
 
+void iclforge_truehd_decoder_lost_data(iclforge_truehd_decoder_t* decoder) {
+    if (decoder == nullptr) {
+        return;
+    }
+    decoder->impl.lost_data();
+}
+
 iclforge_status_t iclforge_truehd_decoder_decode(iclforge_truehd_decoder_t* decoder,
                                                  const uint8_t* access_unit, size_t size,
                                                  iclforge_truehd_decoded_t** out_decoded) {

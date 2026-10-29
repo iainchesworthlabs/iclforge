@@ -93,13 +93,6 @@ struct SegmentResult {
     return static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << 8U) >> 8;
 }
 
-// The 8-bit value a restart interval's fold is checked against: the fold XORs each sample masked to
-// 24 bits and shifted left by its channel, then folds the 32-bit result onto its low byte
-// (ERRATA.md).
-[[nodiscard]] std::uint8_t fold_to_check(std::uint32_t fold) noexcept {
-    return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
-}
-
 Error make_error(ErrorKind kind, std::string_view detail) {
     return Error{kind, detail};
 }
@@ -236,7 +229,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
 
     // TH spec §7.3: this header carries the check of the interval that ends here.
     if (state.running && state.interval_open) {
-        if (fold_to_check(state.interval_fold) == header->lossless_check) {
+        if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
         } else {
             ++counters.lossless_check_failures;
@@ -248,7 +241,21 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
         }
     }
 
+    // ERRATA.md entry 13 (provisional, owner to confirm, open question 18): a restart resets the
+    // coding parameters but not the filter histories. TH spec §7.1 says a restart resets all codec
+    // state; FFmpeg's decoder keeps the last outputs of a channel's FIR filter and the last
+    // residuals of its IIR filter across it, so a stream whose first block after a restart is
+    // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
+    // not running (the first restart, or the first after an error) starts from zero.
+    const auto previous = state.channels;
+    const bool carry_history = state.running;
     state = SubstreamState{};
+    if (carry_history) {
+        for (std::size_t c = 0; c < kMaxChannels; ++c) {
+            state.channels[c].fir_history = previous[c].fir_history;
+            state.channels[c].iir_history = previous[c].iir_history;
+        }
+    }
     state.running = true;
     state.restart = *header;
     state.context.min_chan = header->min_chan;
@@ -386,12 +393,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         std::fill_n(rows_base, static_cast<std::size_t>(block) * kRowStride, 0);
     }
 
-    // TH spec §8.1: the length of the sample data, to be checked after it.
+    // TH spec §8.1: the length of the sample data, to be checked after it. ERRATA.md entry 21
+    // (provisional): the length counts from the start of its own 16 bit field, as FFmpeg's decoder
+    // counts it, so a block of n bits of samples carries n + 16.
     std::size_t expected_bits = 0;
     std::size_t data_start = 0;
     if (restart.data_check_present) {
         expected_bits = reader.read(16);
-        data_start = reader.bit_position();
+        data_start = reader.bit_position() - 16;
         if (expected_bits > kMaxBlockDataBits) {
             return std::unexpected(
                 make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));
@@ -513,13 +522,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     }
 
     // TH spec §17.2: generator 0's two noise channels, one step of the LFSR a sample whether or not
-    // a matrix draws on them, so that the sequence runs on across blocks and units.
+    // a matrix draws on them, so that the sequence runs on across blocks and units. `shr7` is the
+    // 16 bits of the seed from bit 7 up: FFmpeg's decoder reads it so, and the 32-bit reading the
+    // text shows gives a different sequence (ERRATA.md entry 23, open question 5; provisional).
     {
         std::uint32_t seed = state.noise_seed;
         const int shift = restart.noise_shift;
         for (int i = 0; i < block; ++i) {
             std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-            const std::uint32_t shr7 = seed >> 7U;
+            const std::uint32_t shr7 = (seed >> 7U) & 0xFFFFU;
             row[kMaxChannels] =
                 static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << shift);
             row[kMaxChannels + 1] =
@@ -568,7 +579,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
-            state.interval_fold ^= (static_cast<std::uint32_t>(output) & 0xFFFFFFU) << ch;
+            state.interval_fold =
+                lossless_fold_step(state.interval_fold, static_cast<std::uint32_t>(output),
+                                   restart.ch_assign[static_cast<std::size_t>(ch)]);
             if (emit) {
                 pcm_base[static_cast<std::ptrdiff_t>(i) * out_channels + ch] =
                     sign_extend_24(output);
@@ -722,16 +735,21 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     std::span<const std::byte> access_unit) {
     Impl& impl = *impl_;
     ++impl.counters.units;
+    // A unit that does not read is lost to every substream, and the state a substream carries from
+    // one unit to the next (block parameters, filter histories, the noise seed) no longer follows
+    // the stream: every substream waits for its next restart header, whatever the strictness.
     auto unit = impl.parse_unit(access_unit);
     if (!unit) {
         if (unit.error().kind == ErrorKind::kNeedsRestart) {
             ++impl.counters.units_waiting;
             return std::optional<DecodedAccessUnit>{};
         }
+        lost_data();
         return std::unexpected(unit.error());
     }
     if (unit->major_sync) {
         if (unit->major_sync->sample_rate() == 0) {
+            lost_data();
             return std::unexpected(
                 make_error(ErrorKind::kBadParameter, "undefined sample rate code (TH spec §5.3)"));
         }
@@ -770,6 +788,7 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     DecodedAccessUnit decoded;
     decoded.sample_rate = impl.major_sync->sample_rate();
     if (last.padding_samples > last.samples) {
+        lost_data();
         return std::unexpected(
             make_error(ErrorKind::kBadParameter, "more padding samples than the unit holds"));
     }
@@ -792,6 +811,12 @@ const std::optional<MajorSync>& Decoder::major_sync() const noexcept {
 
 const DecoderCounters& Decoder::counters() const noexcept {
     return impl_->counters;
+}
+
+void Decoder::lost_data() noexcept {
+    for (auto& substream : impl_->substreams) {
+        substream.running = false;
+    }
 }
 
 void Decoder::reset() {

@@ -1401,8 +1401,9 @@ run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
 # independent oracle (CONTRIBUTING.md's "Oracles", #2): the PCM forge writes must equal the PCM
 # FFmpeg's decoder gives for the same stream, and every container the CLI writes must be read back
 # by FFmpeg to the same PCM. What FFmpeg's encoders do not write (IIR filters, LSB bypass, noise,
-# the 16-channel substream) has no leg here: libs/truehd's tests hold hand-built streams to their
-# signals, and tools/checks/verify_truehd_interop.py names the gaps.
+# the 16-channel substream) has no leg here: tools/checks/verify_truehd_interop.py --handbuilt holds
+# FFmpeg's decode of hand-built streams to their signals (the FFmpeg Validate job runs it), and
+# libs/truehd's tests hold the library to them.
 #
 # The streams are testdata/truehd's, FFmpeg-made (tools/generators/gen_truehd_ffmpeg.py).
 

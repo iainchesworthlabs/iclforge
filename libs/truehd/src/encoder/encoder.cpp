@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "encoder/coding.hpp"
+#include "encoder/verify.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
@@ -22,7 +23,10 @@ using Plane = std::vector<std::int32_t>;
 
 // TH spec §8.4 and ERRATA.md entry 19: the block size after a restart is 8 until a header says
 // otherwise. FFmpeg's streams start each restart interval with a block of 8 that is not filtered
-// (the filter has no history yet) and then use blocks of a whole access unit.
+// and then use blocks of a whole access unit. The decoder keeps the filter histories across a
+// restart (ERRATA.md entry 13), but those 8 samples fill the longest history a filter has (8
+// entries) before the first filtered sample, so the encoder's prediction never reaches back past
+// the restart and does not depend on which reading of the specification is right.
 constexpr int kFirstBlock = 8;
 constexpr int kMatrixShift = 14;    // ERRATA.md entry 8: coefficients are scaled to 2^-14
 constexpr int kMatrixFracBits = 4;  // a coefficient is sent in 1/16 steps, 6 bits
@@ -38,9 +42,10 @@ constexpr int kLatencyMs = 75;  // TH spec §3.4, §18.1
     return EncodeError{kind, detail};
 }
 
-// TH spec §7.3, ERRATA.md entry 12: the value a restart interval's samples fold to.
-[[nodiscard]] std::uint8_t fold_to_check(std::uint32_t fold) noexcept {
-    return static_cast<std::uint8_t>((fold ^ (fold >> 8U) ^ (fold >> 16U) ^ (fold >> 24U)) & 0xFFU);
+// The matrix channel output channel `c` of a stage takes: the encoder writes the identity ch_assign
+// (restart header and fold both read it here).
+[[nodiscard]] constexpr std::uint8_t stage_ch_assign(int c) noexcept {
+    return static_cast<std::uint8_t>(c);
 }
 
 [[nodiscard]] bool is_sample_rate(std::uint32_t rate) noexcept {
@@ -809,13 +814,17 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
     const std::int32_t lowest = -(std::int32_t{1} << (bits - 1));
     const std::int32_t highest = (std::int32_t{1} << (bits - 1)) - 1;
     const int up = 24 - bits;
-    impl.pending.reserve(impl.pending.size() + pcm.size());
+    // The whole call is checked before any of it is kept, so that a refused call leaves the
+    // encoder as it was.
     for (const std::int32_t sample : pcm) {
         if (sample < lowest || sample > highest) {
             return std::unexpected(
                 make_error(EncodeErrorKind::kBadInput,
                            "a sample is outside the range of EncoderConfig::bits"));
         }
+    }
+    impl.pending.reserve(impl.pending.size() + pcm.size());
+    for (const std::int32_t sample : pcm) {
         impl.pending.push_back(static_cast<std::int32_t>(static_cast<std::uint32_t>(sample) << up));
     }
     impl.stats.input_samples += pcm.size() / channels;
@@ -1104,10 +1113,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 const auto value =
                     static_cast<std::uint32_t>(stage.outputs[static_cast<std::size_t>(k)][t])
                     << output_shift;
-                fold ^= (value & 0xFFFFFFU) << k;
+                fold = lossless_fold_step(fold, value, stage_ch_assign(k));
             }
         }
-        stage.check = fold_to_check(fold);
+        stage.check = lossless_check_of(fold);
     }
 
     // --- the access units --------------------------------------------------------------------
@@ -1183,8 +1192,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         restart.data_check_present = false;
                         restart.lossless_check = previous_check[s];
                         for (int c = 0; c <= stage.spec.last_row; ++c) {
-                            restart.ch_assign[static_cast<std::size_t>(c)] =
-                                static_cast<std::uint8_t>(c);
+                            restart.ch_assign[static_cast<std::size_t>(c)] = stage_ch_assign(c);
                         }
                         write_restart_header(w, restart);
                     }
@@ -1316,25 +1324,12 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
             const DecodedAccessUnit& got = **decoded;
             const int expected_samples = nominal - unit.padding_samples;
-            if (got.channels != channels || got.samples != expected_samples) {
-                return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed,
-                                                  "the decoded unit has a different shape"));
-            }
             const std::size_t base =
                 static_cast<std::size_t>(au) * static_cast<std::size_t>(nominal);
-            for (int t = 0; t < expected_samples; ++t) {
-                for (int c = 0; c < channels; ++c) {
-                    const std::int32_t want =
-                        original[static_cast<std::size_t>(c)][base + static_cast<std::size_t>(t)];
-                    const std::int32_t have =
-                        got.pcm[static_cast<std::size_t>(t) * static_cast<std::size_t>(channels) +
-                                static_cast<std::size_t>(c)];
-                    if (want != have) {
-                        return std::unexpected(
-                            make_error(EncodeErrorKind::kVerifyFailed,
-                                       "the decoded PCM differs from the input"));
-                    }
-                }
+            if (const auto mismatch =
+                    detail::verify_mismatch(got, channels, expected_samples, original, base);
+                !mismatch.empty()) {
+                return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed, mismatch));
             }
             ++stats.verified_units;
         }

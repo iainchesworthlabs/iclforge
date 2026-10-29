@@ -260,6 +260,9 @@ class Substream:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
         self.interval = None
+        # The filters' histories run on across a restart (ERRATA 13, provisional): FFmpeg's decoder
+        # keeps them, the specification says a restart resets all state.
+        previous = getattr(self, "channels", None) if self.running else None
         self.running = True
         self.flags = 0xFF
         self.block_size = 8
@@ -267,6 +270,10 @@ class Substream:
         self.output_shift = [0] * (self.max_matrix_chan + 1)
         self.quant = [0] * (self.max_chan + 1)
         self.channels = [Channel() for _ in range(self.max_chan + 1)]
+        if previous:
+            for channel, old in zip(self.channels, previous, strict=False):
+                channel.fir_history = list(old.fir_history)
+                channel.iir_history = list(old.iir_history)
 
     def block_header(self, bits):
         if bits.read(1):
@@ -354,8 +361,8 @@ def residual(bits, channel, quant):
 def decode_block(sub, bits, rows, first):
     """Decode one block into rows[first:first + block_size], which the substreams share."""
     size = sub.block_size
+    start = bits.pos  # the length counts from the start of its 16 bit field (ERRATA 21)
     expected_bits = bits.read(16) if sub.data_check else None
-    start = bits.pos
     for row in rows[first : first + size]:
         for column in range(sub.max_matrix_chan + 1):
             if sub.index == 0:
@@ -389,7 +396,7 @@ def decode_block(sub, bits, rows, first):
     # Generator 0 (TH spec 17.2, ERRATA 23): two noise channels, one step of the LFSR a sample.
     seed = sub.noise_seed
     for i in range(size):
-        shr7 = seed >> 7
+        shr7 = (seed >> 7) & 0xFFFF  # 16 bits, as FFmpeg reads it (ERRATA 23, provisional)
         rows[first + i][16] = int8(seed >> 15) * (1 << sub.noise_shift)
         rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
         seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
@@ -415,7 +422,8 @@ def decode_block(sub, bits, rows, first):
         if sub.interval is None:
             sub.interval = 0
         for ch, value in enumerate(out_row):
-            sub.interval ^= (value & 0xFFFFFF) << ch
+            # The shift is the matrix channel the output channel takes (ERRATA 12, provisional).
+            sub.interval ^= (value & 0xFFFFFF) << sub.ch_assign[ch]
             sub.interval &= 0xFFFFFFFF
     return output_rows
 

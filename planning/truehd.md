@@ -5,7 +5,7 @@ Atmos substream and its object metadata, and the front ends. This page is the pl
 [ROADMAP.md](../ROADMAP.md); what ships is in [docs/library/capabilities.md](../docs/library/capabilities.md) once it lands.
 
 As of 2026-10-29: phase T1 is built and its checks pass (the bitstream layer, the decoder, `forge decode` and `forge probe`; bit-exact with
-FFmpeg on its fixtures, the rest held to hand-built streams). Phase T2 waits on the owner's answers to the questions below and in
+FFmpeg on its fixtures, the rest held to hand-built streams, which FFmpeg's decoder reads too except the 16-channel substream). Phase T2 waits on the owner's answers to the questions below and in
 [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md).
 
 ## Sources, and what they are
@@ -64,10 +64,12 @@ Ranked as in [CONTRIBUTING.md](../CONTRIBUTING.md#oracles), for this codec.
    writes, and its encoder's streams through this library's decoder. Bit-exact in both directions. FFmpeg 6.1.1 here, 8.x in
    CI. FFmpeg's encoder writes 1 to 6 channels (stereo and 5.1 are the layouts used), 44.1 to 192 kHz, 16 and 24 bits, with
    one or two substreams. It does not write the Atmos substream, 7.1, noise generation, an IIR filter that is not trivial, or
-   LSB bypass, and the in-repo decoder implements all of those from the specification with no external oracle for them.
+   LSB bypass. Hand-built streams carry noise generation, an IIR filter and LSB bypass, and FFmpeg's decoder reads them to
+   the same samples; this library's encoder writes 7.1, which FFmpeg also decodes. The Atmos substream (restart sync 0x31EC) is refused by FFmpeg, so it has no
+   external oracle.
 2. **`tools/references/truehd_syntax.py`**, an independent transcription of the syntax and of the inverse filters and
-   matrices, compared with the C++ decoder on the committed fixtures. It is the only check, besides a round trip through this
-   project's own writer, for the features in the previous point.
+   matrices, compared with the C++ decoder on the committed fixtures and on the hand-built streams. It is the second reader
+   of the features FFmpeg's decoder does not read (the extra data, the Atmos substream).
 3. **DEE's streams** of known sources, scored by `tools/checks/score_truehd_decode.py` on the owner's machine (the set is not
    committed). DEE's licence ends on 2026-11-06 and is not renewed, so the set has to be made before then. The legs worth
    having, all in `gen_dee_gold.py`'s `truehd` group: 2ch, 6ch and 8ch at 48 and 96 kHz and 16 and 24 bits from tones, music,
@@ -75,7 +77,9 @@ Ranked as in [CONTRIBUTING.md](../CONTRIBUTING.md#oracles), for this codec.
    presentation; dialogue normalisation values; and `--optimize-data-rate`. A TrueHD Atmos leg would be the only external
    check of the sixteen-channel substream, and `--presentation atmos` with an ADM master is how `gen_dee_gold.py --masters`
    asks for one (DEE refuses it for the AC-3 family; whether it refuses it for TrueHD is not known).
-4. **Hand-built streams** from the Python writer, for the features no encoder here writes.
+4. **Hand-built streams** from the Python writer, for the features no encoder here writes. FFmpeg's decoder reads most of them
+   (`tools/checks/verify_truehd_interop.py --handbuilt`), and its behaviour decided four readings the specification leaves open
+   (ERRATA questions 5, 6 and 18, and entry 21).
 
 ## Decisions for the owner
 

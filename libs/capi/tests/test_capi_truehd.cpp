@@ -318,6 +318,26 @@ TEST_CASE("a unit before any major sync gives no samples, and a corrupt one is r
         CHECK(counters.units_decoded == 0);
     }
 
+    SECTION("lost data makes the decoder wait for the next restart") {
+        Decoder decoder;
+        Decoded first;
+        const std::vector<std::uint8_t> opening = unit(0);
+        REQUIRE(iclforge_truehd_decoder_decode(decoder.handle, opening.data(), opening.size(),
+                                               &first.handle) == ICLFORGE_OK);
+        REQUIRE(first.handle != nullptr);
+        iclforge_truehd_decoder_lost_data(decoder.handle);
+        // Unit 1 carries no restart header: with the data between lost it gives nothing.
+        const std::vector<std::uint8_t> next = unit(1);
+        Decoded none;
+        none.handle = sentinel();
+        CHECK(iclforge_truehd_decoder_decode(decoder.handle, next.data(), next.size(),
+                                             &none.handle) == ICLFORGE_OK);
+        CHECK(none.handle == nullptr);
+        iclforge_truehd_counters_t counters;
+        iclforge_truehd_decoder_counters(decoder.handle, &counters);
+        CHECK(counters.units_waiting == 1);
+    }
+
     SECTION("strict refuses a flipped payload bit and says why") {
         Decoder decoder;
         std::vector<std::uint8_t> bad = unit(0);
@@ -433,6 +453,7 @@ TEST_CASE(
               ICLFORGE_ERROR_INVALID_ARGUMENT);
     }
     iclforge_truehd_decoder_reset(nullptr);
+    iclforge_truehd_decoder_lost_data(nullptr);
     iclforge_truehd_decoder_destroy(nullptr);
     CHECK(std::string_view(iclforge_truehd_decoder_last_error_detail(nullptr)).empty());
     iclforge_truehd_counters_t counters;
