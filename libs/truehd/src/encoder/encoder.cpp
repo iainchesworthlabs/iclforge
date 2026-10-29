@@ -596,6 +596,10 @@ struct Encoder::Impl {
           interval_units(configuration.restart_interval_units),
           stages(stage_layout(configuration.channels, ratebits, assignment)) {
         previous_check.assign(stages.size(), 0);
+        // One restart interval of input is what the encoder holds before it writes anything: take
+        // the room once, so that a caller giving it an access unit a call allocates nothing
+        // after this and the buffer is not a figure that grows over a stream's first interval.
+        pending.reserve(interval_frames() * static_cast<std::size_t>(configuration.channels));
         if (config.downmix == DownmixMode::kStandard && config.channels > 2) {
             downmix_plan = make_downmix_plan(layout, stages, config.downmix_gains);
         }
@@ -846,7 +850,9 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
             out.push_back(std::move(unit));
         }
     }
-    if (impl.pending_start > (1U << 20U)) {
+    // What the intervals just written consumed leaves with them: the input held is then never more
+    // than the interval being filled, where it used to keep up to a mebibyte of PCM it had coded.
+    if (impl.pending_start > 0) {
         impl.pending.erase(impl.pending.begin(),
                            impl.pending.begin() + static_cast<std::ptrdiff_t>(impl.pending_start));
         impl.pending_start = 0;
