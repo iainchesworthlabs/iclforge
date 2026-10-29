@@ -24,6 +24,15 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    frame carries its own full ContentSignature or the certificate chain is sent once. The specification's owner
    does not know these either, so the answer has to come from a stream or from the encoder. What is on the wire? Until this is answered
    the library carries the extra data as bytes (`DecodedAccessUnit::extra_data`) and phase T2b writes nothing.
+
+   ETSI TS 103 420 (V1.2.1, public) is the document the owner names for the object data. Its scope is E-AC-3 only: it
+   specifies the object audio metadata (OAMD) syntax (§5, EMDF payload id 11) and the JOC tool (§6, payload id 14), and the
+   text does not mention TrueHD or MLP. The owner's v3.5 §15 and §16.3.2 list OAMD as typed payload entry 0x0B (11) with
+   field names that overlap §5's (`multiple_bed_instances_present`, the intermediate spatial format, the object info block
+   count), which fits the entry being the same OAMD payload that `libs/ac3` already reads and writes for E-AC-3. The owner
+   said on 2026-10-29 that the object data follows TS 103 420. That settles the syntax of the entry, if it was meant that
+   way; it does not settle what this question asks (the outer container's field IDs, the digest scope, one signature per
+   frame or per stream), and TS 103 420 does not either. Nothing is written until the owner confirms the reading.
 2. **The 16-channel extension of the channel meaning (§14.2).** `extra_channel_meaning_length` has no unit and the
    section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
    ... bytes) and reads the fields as written, with "extended_substream" taken to mean `extended_substream_info != 0`.
