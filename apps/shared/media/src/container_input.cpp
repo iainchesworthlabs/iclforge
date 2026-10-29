@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -149,10 +150,25 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     ContainerFacts facts;
     facts.kind = ContainerKind::kMp4;
     for (const auto& other : demuxed.skipped) {
-        facts.other_tracks.push_back(OtherTrack{.id = other.track_id,
-                                                .kind = std::string{describe(other.kind)},
-                                                .codec_id = other.codec_id,
-                                                .language = other.language});
+        OtherTrack listed{.id = other.track_id,
+                          .kind = std::string{describe(other.kind)},
+                          .codec_id = other.codec_id,
+                          .language = other.language};
+        if (other.protection.has_value()) {
+            const iclforge::containers::mp4::Protection& p = *other.protection;
+            listed.protection = ProtectionFacts{
+                .entry_type = p.entry_type,
+                .scheme = p.scheme,
+                .original_format = p.original_format,
+                .default_kid = p.has_tenc ? iclforge::containers::mp4::format_kid(p.default_kid)
+                                          : std::string{},
+                .description = iclforge::containers::mp4::describe(p),
+                .default_iv_size = p.default_iv_size,
+                .crypt_byte_block = p.crypt_byte_block,
+                .skip_byte_block = p.skip_byte_block,
+                .has_clear_entry = p.track_has_clear_entry};
+        }
+        facts.other_tracks.push_back(std::move(listed));
     }
     facts.codec_id = track.codec_id;
     facts.track = track.track_id;
@@ -360,6 +376,19 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
         case ContainerKind::kMp4: {
             const auto demuxed = iclforge::containers::mp4::demux(file);
             if (!demuxed) {
+                if (demuxed.error() == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                    // Which track, and with what scheme and KID, is what a person needs to hear
+                    // first: the file is not damaged, its audio is encrypted. The generic sentence
+                    // stands in if the second walk finds nothing to name.
+                    const auto refused = iclforge::containers::mp4::list_refused_tracks(file);
+                    std::string named;
+                    if (refused.has_value()) {
+                        named = iclforge::containers::mp4::describe_refusal(*refused);
+                    } else {
+                        named = std::string{iclforge::containers::mp4::describe(demuxed.error())};
+                    }
+                    return {.bytes = {}, .error = "MP4 file this build cannot demux: " + named};
+                }
                 return {.bytes = {},
                         .error = std::string{"MP4 file this build cannot demux ("} +
                                  std::string{iclforge::containers::mp4::describe(demuxed.error())} +

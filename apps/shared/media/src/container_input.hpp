@@ -83,6 +83,24 @@ struct CodecBox {
     std::size_t bytes = 0;
 };
 
+// What a protected MP4 track's sample entry says about its protection (Common Encryption, ISO/IEC
+// 23001-7: the 'sinf' and its 'tenc'), as text and numbers for whoever shows the file. Nothing
+// here is a key; the default KID names one and is public.
+struct ProtectionFacts {
+    std::string entry_type{};       // "enca" or "encv"
+    std::string scheme{};           // "cenc", "cbc1", "cens", "cbcs"; empty when not stated
+    std::string original_format{};  // "ec-3", "ac-3", "ac-4", "avc1"; empty when not stated
+    std::string default_kid{};      // 8-4-4-4-12 hex; empty when the entry has no 'tenc'
+    // The three above as a person reads them: "cenc, original format ec-3, default KID ...".
+    std::string description{};
+    int default_iv_size = 0;   // 8 or 16, or 0 for a constant IV
+    int crypt_byte_block = 0;  // 'tenc' version 1's pattern
+    int skip_byte_block = 0;
+    // The track also holds a clear sample entry, so a reader cannot tell its clear samples from
+    // its protected ones and reads none.
+    bool has_clear_entry = false;
+};
+
 // A track the file declares and the reader did not read: a picture, a subtitle track, a second
 // audio track. What its container says of it and nothing of its content, so that a person can be
 // told what else a file carries (a karaoke video's picture, a text track that holds its words).
@@ -94,6 +112,8 @@ struct OtherTrack {
     // MP4's first sample entry ("avc1", "tx3g", "wvtt") or Matroska's CodecID ("S_TEXT/UTF8").
     std::string codec_id{};
     std::string language{};
+    // Set when the track is protected: it is not read, whatever its codec.
+    std::optional<ProtectionFacts> protection = std::nullopt;
 };
 
 // What a container declared about the track it gave up, for whoever shows the

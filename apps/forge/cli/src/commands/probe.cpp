@@ -505,6 +505,9 @@ void print_container(const iclforge::apps::ContainerFacts& facts) {
             }
             others += fmt::format("{} track {} '{}' ({})", other.kind, other.id, other.codec_id,
                                   other.language);
+            if (other.protection.has_value()) {
+                others += fmt::format(", protected, not read ({})", other.protection->description);
+            }
         }
         fmt::println("{:<16}{}", "other tracks", others);
     }

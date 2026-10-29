@@ -1034,6 +1034,24 @@ void write_container(JsonSink& json, const ContainerFacts& facts) {
         json.member("kind", other.kind);
         text_or_null("codec_id", other.codec_id);
         text_or_null("language", other.language);
+        // null for a track that is not protected; for one that is, what its sample entry says
+        // (Common Encryption). The track is not read either way.
+        json.key("protection");
+        if (other.protection.has_value()) {
+            const ProtectionFacts& p = *other.protection;
+            json.begin_object();
+            json.member("entry_type", p.entry_type);
+            text_or_null("scheme", p.scheme);
+            text_or_null("original_format", p.original_format);
+            text_or_null("default_kid", p.default_kid);
+            json.member("default_iv_size", static_cast<std::int64_t>(p.default_iv_size));
+            json.member("crypt_byte_block", static_cast<std::int64_t>(p.crypt_byte_block));
+            json.member("skip_byte_block", static_cast<std::int64_t>(p.skip_byte_block));
+            json.member("has_clear_entry", p.has_clear_entry);
+            json.end_object();
+        } else {
+            json.value_null();
+        }
         json.end_object();
     }
     json.end_array();

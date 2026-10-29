@@ -1246,7 +1246,16 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
                 },
                 [&](std::span<const std::byte> sample) { emit_mp4_sample(track_codec, sample); });
             if (!track.has_value()) {
-                status = fail(iclforge::containers::mp4::describe(track.error()), kExitInput);
+                // A protected track is not damaged input; say which one and how it is protected.
+                // The source can be read again, so the detail is one more walk of the boxes.
+                std::string why{iclforge::containers::mp4::describe(track.error())};
+                if (track.error() == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                    if (const auto refused =
+                            iclforge::containers::mp4::list_refused_tracks(read_at, file_size)) {
+                        why = iclforge::containers::mp4::describe_refusal(*refused);
+                    }
+                }
+                status = fail(why, kExitInput);
             } else {
                 codec_id = track->codec_id;
                 sample_rate = track->sample_rate;
@@ -1256,12 +1265,15 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
             iclforge::containers::mp4::Reader reader{};
             drive(
                 reader,
-                [](iclforge::containers::mp4::DemuxError e) -> std::string_view {
+                [&reader](iclforge::containers::mp4::DemuxError e) -> std::string {
                     if (e == iclforge::containers::mp4::DemuxError::kMoovAfterMdat) {
                         return "this MP4's sample table (moov) follows its media data, which "
                                "cannot be read from a pipe: give demux the file's path instead";
                     }
-                    return iclforge::containers::mp4::describe(e);
+                    if (e == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                        return iclforge::containers::mp4::describe_refusal(reader.refused_tracks());
+                    }
+                    return std::string{iclforge::containers::mp4::describe(e)};
                 },
                 [&reader, &emit_mp4_sample](std::span<const std::byte> sample) {
                     emit_mp4_sample(reader.track().codec_id, sample);
