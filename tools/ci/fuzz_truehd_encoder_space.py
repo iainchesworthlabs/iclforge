@@ -59,8 +59,21 @@ REGRESSION_SEEDS = {
 
 RATES = (48000, 48000, 48000, 44100, 96000, 88200, 192000, 176400)
 PROFILES = (
-    "silence", "dc", "noise", "quiet-noise", "square", "nyquist", "impulses", "one-loud",
-    "identical", "inverted", "low-bits", "cliff", "tone", "sweep", "extremes",
+    "silence",
+    "dc",
+    "noise",
+    "quiet-noise",
+    "square",
+    "nyquist",
+    "impulses",
+    "one-loud",
+    "identical",
+    "inverted",
+    "low-bits",
+    "cliff",
+    "tone",
+    "sweep",
+    "extremes",
 )
 CHUNKS = (0, 1, 7, 40, 333, 4096)
 RESTARTS = (1, 8, 9, 16, 50, 128)
@@ -108,7 +121,9 @@ def draw_case(seed):
     rng = random.Random(seed)
     rate = rng.choice(RATES)
     high = rate >= 176400
-    channels = rng.choice((1, 2, 2, 2, 3, 4, 5, 6, 6, 6, 7, 8) if not high else (1, 2, 2, 3, 4, 5, 6))
+    channels = rng.choice(
+        (1, 2, 2, 2, 3, 4, 5, 6, 6, 6, 7, 8) if not high else (1, 2, 2, 3, 4, 5, 6)
+    )
     bits = rng.choice((16, 20, 24, 24))
     seconds = rng.choice((0.0012, 0.02, 0.1, 0.25, 0.5017, 0.7))
     if high or channels >= 7:
@@ -179,7 +194,11 @@ def make_pcm(case):
         elif case.profile == "tone":
             out[:, c] = np.round(0.5 * top * wave)
         elif case.profile == "sweep":
-            out[:, c] = np.round(0.45 * top * np.sin(2 * np.pi * (30 + 300 * t / case.rate) * t / case.rate * (c + 1)))
+            out[:, c] = np.round(
+                0.45
+                * top
+                * np.sin(2 * np.pi * (30 + 300 * t / case.rate) * t / case.rate * (c + 1))
+            )
         elif case.profile == "extremes":
             out[:, c] = rng.choice(np.array([bottom, top, 0, -1, 1]), size=n)
         else:
@@ -188,8 +207,11 @@ def make_pcm(case):
 
 
 def describe(case):
-    return (f"{case.profile} {case.rate} Hz {case.channels} ch {case.bits} bit {case.seconds:g} s "
-            f"{' '.join(case.args)}" + (f"  [expects a refusal: {case.refusal}]" if case.refusal else ""))
+    return (
+        f"{case.profile} {case.rate} Hz {case.channels} ch {case.bits} bit {case.seconds:g} s "
+        f"{' '.join(case.args)}"
+        + (f"  [expects a refusal: {case.refusal}]" if case.refusal else "")
+    )
 
 
 def run_case(tool, interop, ffmpeg, case, workdir):
@@ -213,10 +235,14 @@ def run_case(tool, interop, ffmpeg, case, workdir):
         if case.refusal:
             if 0 < run.returncode < 128 and stderr and not stream.exists():
                 return Result(case, "refused")
-            return Result(case, "fail", "refusal",
-                          "a configuration outside the range was not refused cleanly: "
-                          f"exit {run.returncode}, stream {'written' if stream.exists() else 'absent'}, "
-                          f"message {stderr!r}")
+            return Result(
+                case,
+                "fail",
+                "refusal",
+                "a configuration outside the range was not refused cleanly: "
+                f"exit {run.returncode}, stream {'written' if stream.exists() else 'absent'}, "
+                f"message {stderr!r}",
+            )
         if run.returncode != 0:
             return Result(case, "fail", "encode", f"exit {run.returncode}: {stderr}")
         if ffmpeg is None:
@@ -224,11 +250,19 @@ def run_case(tool, interop, ffmpeg, case, workdir):
         pcm, error = interop.ffmpeg_decode(stream)
         if pcm is None:
             return Result(case, "fail", "ffmpeg", f"strict decode failed: {error}")
-        ordered = source[:, interop.FFMPEG_ORDER[case.channels]] if case.channels in interop.FFMPEG_ORDER else source
+        ordered = (
+            source[:, interop.FFMPEG_ORDER[case.channels]]
+            if case.channels in interop.FFMPEG_ORDER
+            else source
+        )
         expected = (ordered.astype(np.int64) << (32 - case.bits)).astype("<i4").tobytes()
         if pcm != expected:
-            return Result(case, "fail", "ffmpeg",
-                          f"the decode differs from the source ({len(pcm)} vs {len(expected)} bytes)")
+            return Result(
+                case,
+                "fail",
+                "ffmpeg",
+                f"the decode differs from the source ({len(pcm)} vs {len(expected)} bytes)",
+            )
         return Result(case, "ok")
     finally:
         wav.unlink(missing_ok=True)
@@ -236,16 +270,30 @@ def run_case(tool, interop, ffmpeg, case, workdir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tool", default=os.environ.get("ICLFORGE_TRUEHD_ENCODE_TOOL",
-                                                         "build/dev/bin/iclforge-truehd-encode-tool"),
-                        help="the encoder program (or set ICLFORGE_TRUEHD_ENCODE_TOOL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--tool",
+        default=os.environ.get(
+            "ICLFORGE_TRUEHD_ENCODE_TOOL", "build/dev/bin/iclforge-truehd-encode-tool"
+        ),
+        help="the encoder program (or set ICLFORGE_TRUEHD_ENCODE_TOOL)",
+    )
     parser.add_argument("--no-ffmpeg", action="store_true", help="skip FFmpeg's strict decode")
-    parser.add_argument("--seed", type=int, default=None, help="master seed; drawn and printed if omitted")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="master seed; drawn and printed if omitted"
+    )
     parser.add_argument("--cases", type=int, default=None, help="run exactly this many cases")
-    parser.add_argument("--seconds", type=float, default=None, help="run until this many seconds have passed")
-    parser.add_argument("--replay", type=int, default=None, help="run the one case with this case seed")
-    parser.add_argument("--regressions", action="store_true", help="replay every REGRESSION_SEEDS case")
+    parser.add_argument(
+        "--seconds", type=float, default=None, help="run until this many seconds have passed"
+    )
+    parser.add_argument(
+        "--replay", type=int, default=None, help="run the one case with this case seed"
+    )
+    parser.add_argument(
+        "--regressions", action="store_true", help="replay every REGRESSION_SEEDS case"
+    )
     parser.add_argument("--jobs", type=int, default=min(4, os.cpu_count() or 2))
     parser.add_argument("--max-failures", type=int, default=10)
     args = parser.parse_args()
@@ -278,9 +326,11 @@ def main():
         args.cases = 40
     master = args.seed if args.seed is not None else random.SystemRandom().randrange(2**63)
     print(f"TrueHD encoder-space fuzz: tool={tool} ffmpeg={ffmpeg or 'off'}")
-    print(f"master seed {master}, "
-          + (f"{args.cases} cases" if args.cases is not None else f"{args.seconds:g}s budget")
-          + f", {args.jobs} jobs")
+    print(
+        f"master seed {master}, "
+        + (f"{args.cases} cases" if args.cases is not None else f"{args.seconds:g}s budget")
+        + f", {args.jobs} jobs"
+    )
     print("(every failure prints its case seed; --replay <seed> reruns it)\n")
 
     started = time.monotonic()
@@ -293,8 +343,10 @@ def main():
             return index < args.cases
         return (time.monotonic() - started) < args.seconds
 
-    with (tempfile.TemporaryDirectory(prefix="thdspace_") as workdir,
-          concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool):
+    with (
+        tempfile.TemporaryDirectory(prefix="thdspace_") as workdir,
+        concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool,
+    ):
         pending = set()
         while (budget_left() or pending) and len(failures) < args.max_failures:
             while budget_left() and len(pending) < args.jobs * 2:
@@ -303,7 +355,9 @@ def main():
                 pending.add(pool.submit(run_case, tool, interop, ffmpeg, case, workdir))
             if not pending:
                 break
-            done, pending = concurrent.futures.wait(pending, return_when=concurrent.futures.FIRST_COMPLETED)
+            done, pending = concurrent.futures.wait(
+                pending, return_when=concurrent.futures.FIRST_COMPLETED
+            )
             for future in done:
                 result = future.result()
                 counts[result.status] += 1
@@ -311,12 +365,16 @@ def main():
                     failures.append(result)
                     print(f"FAIL [{result.stage}] {describe(result.case)}")
                     print(f"  {result.detail}")
-                    print("  replay: python tools/ci/fuzz_truehd_encoder_space.py "
-                          f"--replay {result.case.seed}\n")
+                    print(
+                        "  replay: python tools/ci/fuzz_truehd_encoder_space.py "
+                        f"--replay {result.case.seed}\n"
+                    )
 
     total = sum(counts.values())
-    print(f"{total} cases in {time.monotonic() - started:.1f}s: {counts['ok']} encoded and read back "
-          f"exactly, {counts['refused']} refused as intended, {counts['fail']} failed")
+    print(
+        f"{total} cases in {time.monotonic() - started:.1f}s: {counts['ok']} encoded and read back "
+        f"exactly, {counts['refused']} refused as intended, {counts['fail']} failed"
+    )
     if counts["fail"]:
         sys.exit(1)
     if total == 0 or counts["ok"] < total * 0.5:

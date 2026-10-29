@@ -169,7 +169,10 @@ from the owner's TrueHD (MLP) Reference Specification v3.5; `libs/truehd/ERRATA.
 | IIR filter, LSB bypass, several matrices, a permuted `ch_assign`, block data check, extra data, DRC word, end-of-stream marker in every unit, 16-channel substream 3 | decoded | **none**: hand-built streams only |
 | Noise generator 0 (`0x31EA`): two noise channels through matrix coefficients | decoded | **none**: a hand-built stream only |
 | Noise generator 1 (`0x31EB`), heavy DRC in the restart header | refused / not read | the specification gives neither generator 1's table nor heavy DRC's place in the header |
-| Encoder, Atmos object audio metadata, evolution frame, containers | not built | phase T2 |
+| Encoder: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, restart intervals, output shift and quantiser step, pair matrices, FIR prediction up to order 8, codebook and offset choice, the declared peak rate and 75 ms latency, extra data framing, self-verification | written | FFmpeg's strict decode, sample for sample (43 cases and a fuzzer) |
+| Encoder: the 2 and 6 channel presentations as downmixes (`DownmixMode::kStandard`) | written | FFmpeg for the full presentation; nothing checks the downmix itself |
+| Encoder: IIR filter, LSB bypass, negative output shift, heavy DRC, noise, MLP | refused with a reason | no oracle |
+| Atmos object audio metadata, evolution frame, containers | not built | phase T2b and T2c |
 
 ### Inspection
 

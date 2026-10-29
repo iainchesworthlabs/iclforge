@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: a TrueHD encoder in `iclforge::truehd`, bit-exact with FFmpeg's strict decode in 43 cases.** `Encoder`, in the style of the AC-4
+  encoder's streaming API, writes 1 to 8 channels of 16, 20 or 24 bit PCM at 44.1 to 192 kHz as a lossless TrueHD stream: the output shift and
+  quantiser step of a narrower source, pair matrices, FIR prediction up to order 8, the three codebooks or raw bits with their offsets, restart
+  intervals of 1 or 8 to 4096 units, the declared peak data rate and 75 ms latency (`allow_rate_violations` to write past them), extra data
+  framing and `verify`, which has the library's decoder read every unit back. `DownmixMode::kStandard` writes the 2 and 6 channel
+  presentations as downmixes that the later substreams' matrices undo exactly. FFmpeg's strict decode returns every sample of 43 cases
+  (`tools/checks/verify_truehd_encode_interop.py`: real music, speech and 5.1, hard synthetic signals, stereo to 7.1, every rate and width), and
+  `tools/ci/fuzz_truehd_encoder_space.py` and the libFuzzer harness `fuzz_truehd_encode` search the configuration space; the streams are
+  0.95 times the size of FFmpeg's encoder's over the layouts it writes, and larger at 192 kHz, on full-scale squares, with a restart interval of 1 and with the downmix presentations. Writing
+  streams FFmpeg decodes added nine entries to `libs/truehd/ERRATA.md` (30 to 38) and four more questions for the owner
+  (12 to 15), and the decoder now reads a substream's predecessor's rows before that predecessor's matrices, as
+  FFmpeg's does. No IIR filter, LSB bypass, negative output shift, heavy DRC, noise or MLP is written (`ExperimentalTools` is refused with a
+  reason), and nothing outside the library reads the downmix presentations. `iclforge-truehd-encode-tool` is the test tool; `forge` has no
+  encode command yet.
 - **Added: `iclforge::truehd`, a TrueHD and MLP reader and lossless decoder, and `forge decode` and `forge probe` for `.thd` and `.mlp`
   streams.** Written from the owner's TrueHD (MLP) Reference Specification v3.5 and checked against the streams FFmpeg's `truehd` and `mlp`
   encoders write: the decoder gives the samples FFmpeg's strict decode gives for 12 committed fixtures (`testdata/truehd/`, 1, 2 and 6
