@@ -104,8 +104,8 @@ The module links `iclforge::base` (bit reader and writer, CRC helpers, speakers)
 | 6 substream directory | `core/syntax` `SubstreamDirectoryEntry` |
 | 7 restart header | `core/syntax` `RestartHeader` |
 | 8 block header, channel parameters | `core/syntax` `BlockHeader`, `ChannelParams` |
-| 9 filters | `src/core/reconstruct.hpp` `ChannelFilter`; encoder `analysis` |
-| 10 primitive matrices | `src/core/reconstruct.hpp` `matrix_output`; encoder `plan` |
+| 9 filters | `libs/mlp/src/core/reconstruct.hpp` `ChannelFilter`; encoder `analysis` |
+| 10 primitive matrices | `libs/mlp/src/core/reconstruct.hpp` `matrix_output`; encoder `plan` |
 | 11, Appendix C Huffman | `core/huffman` |
 | 12 DRC | `decoder/decoder.hpp` `DrcMetadata` |
 | 15, 16 OAMD, evolution | `io/extra_data`, `atmos/atmos.cpp` |
