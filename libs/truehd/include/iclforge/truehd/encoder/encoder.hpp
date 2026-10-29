@@ -161,6 +161,8 @@ struct EncoderStats {
     // second; the peak rate is a limit on a longer average (TH spec §18), this is not.
     std::uint64_t max_unit_rate_bps = 0;
     std::uint64_t matrices_used = 0;  // primitive matrices sent, over all intervals
+    // Restart intervals whose downmix had its gains lowered, or dropped, to stay within 24 bits.
+    std::uint64_t downmix_reduced_intervals = 0;
     std::uint64_t verified_units = 0;
 };
 

@@ -144,6 +144,208 @@ void invert_matrix(const MatrixSpec& matrix, std::vector<Plane>& rows, int quant
     }
 }
 
+// The decoder's side of a matrix, applied to `rows` in place (TH spec §10.2).
+void apply_matrix(const MatrixSpec& matrix, std::vector<Plane>& rows, int quant) {
+    Plane& out = rows[matrix.out_ch];
+    const std::size_t n = out.size();
+    const std::int64_t keep = ~((std::int64_t{1} << quant) - 1);
+    const int scale = kMatrixShift - matrix.frac_bits;
+    for (std::size_t t = 0; t < n; ++t) {
+        std::int64_t sum = 0;
+        for (std::size_t c = 0; c < rows.size(); ++c) {
+            if (matrix.present[c] && matrix.coeff[c] != 0) {
+                sum += std::int64_t{rows[c][t]} * (std::int64_t{matrix.coeff[c]} << scale);
+            }
+        }
+        out[t] = static_cast<std::int32_t>((sum >> kMatrixShift) & keep);
+    }
+}
+
+// --- the downmix presentations (TH spec §2.2, §10.5) ---------------------------------------
+//
+// Substream 0 carries a stereo downmix instead of L and R, and the matrices of the later
+// substreams take the folded-in channels out of it again, exactly. An 8 channel stream is a
+// cascade: substream 1's 5.1 has the rear surrounds folded into its surrounds, and substream 2's
+// matrices take them out. Which gains the standard downmix uses is the encoder's choice (the
+// specification gives none; ERRATA.md entry 38): no decoder here checks the downmix itself, only
+// that the full presentation comes back as it went in.
+
+struct DownmixTerm {
+    int source = 0;
+    double gain = 0.0;
+};
+
+struct DownmixStep {
+    int out_row = 0;
+    std::vector<DownmixTerm> terms;
+};
+
+struct DownmixPlan {
+    bool active = false;
+    std::vector<DownmixStep> stereo;  // L and R, from the rows of substream 1
+    std::vector<DownmixStep> rear;    // Ls and Rs, from the rows of substream 2
+};
+
+// The sentence for a layout the downmix cannot be built for, empty if it can.
+[[nodiscard]] std::string_view downmix_problem(const std::vector<Channel>& layout,
+                                               const std::vector<StageSpec>& stages) {
+    if (stages.size() < 2) {
+        return "a downmix presentation needs a second substream, and a stream of 176.4 or 192 kHz "
+               "has one (TH spec §9.6)";
+    }
+    if (layout.size() < 3 || layout[0] != Channel::kL || layout[1] != Channel::kR) {
+        return "the downmix needs the first two channels to be L and R";
+    }
+    for (int row = stages[1].first_row; row <= stages[1].last_row; ++row) {
+        switch (layout[static_cast<std::size_t>(row)]) {
+            case Channel::kC:
+            case Channel::kLfe:
+            case Channel::kLs:
+            case Channel::kRs:
+            case Channel::kLrs:
+            case Channel::kRrs:
+                break;
+            default:
+                return "the downmix is written for the channels L R C LFE Ls Rs Lrs Rrs only";
+        }
+    }
+    if (stages.size() == 3) {
+        bool has_ls = false;
+        bool has_rs = false;
+        for (int row = stages[1].first_row; row <= stages[1].last_row; ++row) {
+            has_ls = has_ls || layout[static_cast<std::size_t>(row)] == Channel::kLs;
+            has_rs = has_rs || layout[static_cast<std::size_t>(row)] == Channel::kRs;
+        }
+        const auto first = static_cast<std::size_t>(stages[2].first_row);
+        if (stages[2].coded() != 2 || layout[first] != Channel::kLrs ||
+            layout[first + 1] != Channel::kRrs || !has_ls || !has_rs) {
+            return "an 8 channel downmix needs Lrs and Rrs last, after an Ls and Rs";
+        }
+    }
+    return {};
+}
+
+[[nodiscard]] DownmixPlan make_downmix_plan(const std::vector<Channel>& layout,
+                                            const std::vector<StageSpec>& stages,
+                                            const DownmixGains& gains) {
+    DownmixPlan plan;
+    plan.active = true;
+    DownmixStep left;
+    DownmixStep right;
+    left.out_row = 0;
+    right.out_row = 1;
+    for (int row = stages[1].first_row; row <= stages[1].last_row; ++row) {
+        switch (layout[static_cast<std::size_t>(row)]) {
+            case Channel::kC:
+                left.terms.push_back({row, gains.centre});
+                right.terms.push_back({row, gains.centre});
+                break;
+            case Channel::kLfe:
+                left.terms.push_back({row, gains.lfe});
+                right.terms.push_back({row, gains.lfe});
+                break;
+            case Channel::kLs:
+            case Channel::kLrs:
+                left.terms.push_back({row, gains.surround});
+                break;
+            default:  // Rs and Rrs
+                right.terms.push_back({row, gains.surround});
+                break;
+        }
+    }
+    plan.stereo = {left, right};
+    if (stages.size() == 3) {
+        for (int row = stages[1].first_row; row <= stages[1].last_row; ++row) {
+            const Channel channel = layout[static_cast<std::size_t>(row)];
+            if (channel == Channel::kLs) {
+                DownmixStep step;
+                step.out_row = row;
+                step.terms.push_back({stages[2].first_row, gains.rear_to_surround});
+                plan.rear.push_back(step);
+            } else if (channel == Channel::kRs) {
+                DownmixStep step;
+                step.out_row = row;
+                step.terms.push_back({stages[2].first_row + 1, gains.rear_to_surround});
+                plan.rear.push_back(step);
+            }
+        }
+    }
+    return plan;
+}
+
+// The matrices of `steps` with every gain multiplied by `scale`: a coefficient of -gain on each
+// source and 1.0 on the row itself (the decoder takes the sources out). A step none of whose
+// gains survive the quantisation to 2^-14 is left out.
+[[nodiscard]] std::vector<MatrixSpec> make_fold_matrices(const std::vector<DownmixStep>& steps,
+                                                         double scale) {
+    constexpr int kUnity = 1 << kMatrixShift;
+    std::vector<MatrixSpec> matrices;
+    for (const DownmixStep& step : steps) {
+        MatrixSpec matrix;
+        matrix.out_ch = static_cast<std::uint8_t>(step.out_row);
+        matrix.frac_bits = kMatrixShift;
+        matrix.present[static_cast<std::size_t>(step.out_row)] = true;
+        matrix.coeff[static_cast<std::size_t>(step.out_row)] = kUnity;
+        bool any = false;
+        for (const DownmixTerm& term : step.terms) {
+            const long q = std::lround(-term.gain * scale * kUnity);
+            if (q == 0) {
+                continue;
+            }
+            matrix.present[static_cast<std::size_t>(term.source)] = true;
+            matrix.coeff[static_cast<std::size_t>(term.source)] =
+                static_cast<std::int32_t>(std::clamp<long>(q, -2 * kUnity, 2 * kUnity - 1));
+            any = true;
+        }
+        if (any) {
+            matrices.push_back(matrix);
+        }
+    }
+    return matrices;
+}
+
+[[nodiscard]] bool within_24_bits(const Plane& plane, int shift) {
+    const std::int64_t limit = std::int64_t{1} << (23 - shift);
+    return std::all_of(plane.begin(), plane.end(),
+                       [limit](std::int32_t v) { return v >= -limit && v < limit; });
+}
+
+// Folds the channels into `rows` (the encoder's side of the downmix matrices) and returns the
+// matrices the decoder undoes it with, stereo steps first. Each fold uses the largest of a few
+// gain scales whose downmix rows stay within the 24 bit range of a presentation (TH spec §10.5);
+// with none left the rows stay as they are. True if a fold was weakened or dropped.
+[[nodiscard]] bool fold_downmix(const DownmixPlan& plan, int quant, int shift,
+                                std::vector<Plane>& rows, std::vector<MatrixSpec>& matrices) {
+    constexpr std::array<double, 5> kScales{1.0, 0.75, 0.5, 0.25, 0.0};
+    bool reduced = false;
+    const auto fold = [&](const std::vector<DownmixStep>& steps, std::vector<MatrixSpec>& chosen) {
+        const bool wanted = !make_fold_matrices(steps, 1.0).empty();
+        for (const double scale : kScales) {
+            std::vector<MatrixSpec> candidate = make_fold_matrices(steps, scale);
+            std::vector<Plane> trial = rows;
+            for (auto it = candidate.rbegin(); it != candidate.rend(); ++it) {
+                invert_matrix(*it, trial, quant);
+            }
+            const bool fits = std::all_of(
+                candidate.begin(), candidate.end(),
+                [&](const MatrixSpec& m) { return within_24_bits(trial[m.out_ch], shift); });
+            if (fits) {
+                rows = std::move(trial);
+                chosen = std::move(candidate);
+                reduced = reduced || (wanted && scale < 1.0);
+                return;
+            }
+        }
+    };
+    std::vector<MatrixSpec> rear;
+    std::vector<MatrixSpec> stereo;
+    fold(plan.rear, rear);  // the decoder undoes the stereo steps first, so they are folded last
+    fold(plan.stereo, stereo);
+    matrices = stereo;
+    matrices.insert(matrices.end(), rear.begin(), rear.end());
+    return reduced;
+}
+
 // The bit cost, up to a constant, of coding `x` with an order 8 predictor: half the log of the
 // prediction error power per sample, for comparing two ways of presenting the same channel.
 [[nodiscard]] double prediction_cost(const Plane& x) {
@@ -389,6 +591,9 @@ struct Encoder::Impl {
           interval_units(configuration.restart_interval_units),
           stages(stage_layout(configuration.channels, ratebits, assignment)) {
         previous_check.assign(stages.size(), 0);
+        if (config.downmix == DownmixMode::kStandard && config.channels > 2) {
+            downmix_plan = make_downmix_plan(layout, stages, config.downmix_gains);
+        }
         if (config.verify) {
             DecoderConfig decoder_config;
             decoder_config.presentation = Presentation::kBest;
@@ -404,6 +609,7 @@ struct Encoder::Impl {
     int nominal;
     int interval_units;
     std::vector<StageSpec> stages;
+    DownmixPlan downmix_plan;
 
     std::vector<std::int32_t> pending;  // interleaved, in the 24 bit domain
     std::size_t pending_start = 0;      // index of the first unread value
@@ -467,12 +673,25 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
     if (config.experimental.iir || config.experimental.lsb_bypass) {
         return "ExperimentalTools::iir and lsb_bypass are not written yet";
     }
-    if (config.downmix != DownmixMode::kNone) {
-        return "DownmixMode::kStandard is not written yet";
+    if (config.downmix == DownmixMode::kStandard) {
+        for (const double gain :
+             {config.downmix_gains.centre, config.downmix_gains.surround, config.downmix_gains.lfe,
+              config.downmix_gains.rear_to_surround}) {
+            if (!(gain >= 0.0 && gain <= 1.99)) {
+                return "downmix gains must be between 0 and 1.99";
+            }
+        }
     }
     const unsigned bits = ratebits_of(config.sample_rate);
     if (rate_factor(bits) >= 2 && config.channels > 6) {
         return "at 176.4 and 192 kHz at most 6 channels are written (TH spec §9.6, §21.6)";
+    }
+    if (config.downmix == DownmixMode::kStandard && config.channels > 2) {
+        const std::uint32_t used = config.channel_assignment != 0
+                                       ? config.channel_assignment
+                                       : default_channel_assignment(config.channels);
+        return downmix_problem(channels_of_assignment(used),
+                               stage_layout(config.channels, bits, used));
     }
     return {};
 }
@@ -686,6 +905,11 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     const std::size_t stage_count = stages.size();
     std::vector<StageWork> work(stage_count);
     std::vector<Plane> coded_rows = rows;  // becomes the rows as they are coded, before matrices
+    std::vector<MatrixSpec> fold_matrices;
+    if (downmix_plan.active &&
+        fold_downmix(downmix_plan, quant, output_shift, coded_rows, fold_matrices)) {
+        ++stats.downmix_reduced_intervals;
+    }
     std::vector<MatrixSpec> pair_matrices;
     if (config.matrix_search) {
         for (const StageSpec& stage : stages) {
@@ -716,22 +940,42 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     for (std::size_t s = 0; s < stage_count; ++s) {
         StageWork& stage = work[s];
         stage.spec = stages[s];
-        stage.outputs.assign(rows.begin(), rows.begin() + stage.spec.out_rows());
-        for (const MatrixSpec& matrix : pair_matrices) {
-            if (matrix.out_ch < stage.spec.out_rows()) {
-                bool inside = true;
-                for (int c = stage.spec.out_rows(); c < static_cast<int>(matrix.present.size());
-                     ++c) {
-                    inside = inside && !matrix.present[static_cast<std::size_t>(c)];
-                }
-                if (inside) {
-                    stage.matrices.push_back(matrix);
+        stage.outputs.assign(coded_rows.begin(), coded_rows.begin() + stage.spec.out_rows());
+        // The decoder applies the pair matrices first, then the downmix (stereo steps, rear steps).
+        const auto inside = [&stage](const MatrixSpec& matrix) {
+            if (matrix.out_ch >= stage.spec.out_rows()) {
+                return false;
+            }
+            for (int c = stage.spec.out_rows(); c < static_cast<int>(matrix.present.size()); ++c) {
+                if (matrix.present[static_cast<std::size_t>(c)]) {
+                    return false;
                 }
             }
+            return true;
+        };
+        for (const MatrixSpec& matrix : pair_matrices) {
+            if (inside(matrix)) {
+                stage.matrices.push_back(matrix);
+            }
+        }
+        for (const MatrixSpec& matrix : fold_matrices) {
+            if (inside(matrix)) {
+                stage.matrices.push_back(matrix);
+            }
+        }
+        for (const MatrixSpec& matrix : stage.matrices) {
+            apply_matrix(matrix, stage.outputs, quant);
         }
         stats.matrices_used += stage.matrices.size();
         stage.coded.assign(coded_rows.begin() + stage.spec.first_row,
                            coded_rows.begin() + stage.spec.out_rows());
+    }
+    // The last substream's decode is the source, whatever the matrices before it did.
+    for (std::size_t k = 0; k < work.back().outputs.size(); ++k) {
+        if (work.back().outputs[k] != rows[k]) {
+            return std::unexpected(make_error(EncodeErrorKind::kInternal,
+                                              "the matrices do not give back the source channels"));
+        }
     }
 
     // --- prediction filters and residuals ----------------------------------------------------

@@ -159,6 +159,15 @@ def cases(full):
         ("synth-st48-mixed-s20", ("synth", "mixed"), 48000, 2, 20, 2.0, []),
         ("synth-3ch-48", ("synth", "tone"), 48000, 3, 24, 1.0, []),
         ("synth-5ch-48-s16", ("synth", "sweep"), 48000, 5, 16, 1.5, []),
+        # The downmix presentations (substream 0 carries a stereo downmix): the full presentation
+        # still comes back exactly. FFmpeg decodes the last substream only, so these say nothing
+        # about the downmix itself; the library's tests read the lower presentations.
+        ("downmix-3ch-48", ("synth", "mixed"), 48000, 3, 24, 1.0, ["downmix=standard"]),
+        ("downmix-ref51-48-s24", ("ref51",), 48000, 6, 24, 3.0, ["downmix=standard"]),
+        ("downmix-ref51-48-s16", ("ref51",), 48000, 6, 16, 2.0, ["downmix=standard"]),
+        ("downmix-51-noise", ("synth", "noise"), 48000, 6, 24, 1.0, ["downmix=standard"]),
+        ("downmix-71-48-s24", ("synth", "mixed"), 48000, 8, 24, 2.0, ["downmix=standard"]),
+        ("downmix-7ch-48-s24", ("synth", "sweep"), 48000, 7, 24, 1.0, ["downmix=standard"]),
         ("synth-st48-restart8", ("synth", "mixed"), 48000, 2, 24, 2.0, ["restart=8"]),
         ("synth-st48-restart1", ("synth", "tone"), 48000, 2, 24, 0.2, ["restart=1"]),
         ("synth-st48-order0", ("synth", "tone"), 48000, 2, 24, 1.0, ["order=0"]),
@@ -178,6 +187,8 @@ def cases(full):
         ("synth-st88-s24", ("synth", "mixed"), 88200, 2, 24, 1.0, []),
         ("synth-7ch-48", ("synth", "sweep"), 48000, 7, 24, 1.0, []),
         ("synth-mono-96", ("synth", "sweep"), 96000, 1, 24, 1.0, []),
+        ("downmix-ref51-96-s24", ("ref51",), 96000, 6, 24, 2.0, ["downmix=standard"]),
+        ("downmix-71-44-s16", ("synth", "mixed"), 44100, 8, 16, 1.5, ["downmix=standard"]),
     ]
     return quick + extra
 
