@@ -4,7 +4,7 @@ Forge contains two applications built on the [ICL Forge library](../library/inde
 
 - `forge` covers synthesis, encoding and decoding of AC-3, E-AC-3 (with its Atmos object layer)
   and AC-4, container wrapping, inspection, QC, and live capture and playback. It also decodes,
-  inspects, wraps and encodes TrueHD (and reads MLP), signs and verifies an AC-4 stream's content
+  inspects, measures and wraps TrueHD and MLP and encodes TrueHD, signs and verifies an AC-4 stream's content
   signature with the operator's own key, and refuses an MP4 whose audio is protected, by name. It encodes and
   decodes karaoke streams, writes a song's lyrics beside the stream it encodes, and runs a
   project file the GUI saved. See the [CLI reference](cli/index.md).
@@ -14,8 +14,8 @@ Forge contains two applications built on the [ICL Forge library](../library/inde
   inspects a finished stream. It does not open, play, check or encode TrueHD or MLP, and has no
   signing or verifying of an AC-4 stream. A [Karaoke flow](gui/karaoke.md) builds a karaoke stream from a
   backing, a melody guide and vocals, and a [project file](gui/projects.md) keeps a session to
-  open again. It shows the equivalent `forge` command at the bottom of the window. See the
-  [GUI guide](gui/index.md).
+  open again. It shows the equivalent `forge` command at the bottom of the window. It does not
+  open, play, check or encode TrueHD or MLP; `forge` does. See the [GUI guide](gui/index.md).
 
 The CLI and GUI ship together where both are available.
 

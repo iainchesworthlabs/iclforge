@@ -16,7 +16,7 @@ it: the GUI twin of `forge monitor`, plus `forge decode`'s WAV and object export
 **Settings**. It opens regardless of what (if anything) is loaded in the main workbench.
 
 **Choose file…** opens a standard file picker with three filters: `*.ac3`/`*.ec3`, `*.ac4` and
-**All files**. Picking one starts the decode immediately, off the window's own event loop so the dialog stays
+**All files**. The player does not open TrueHD or MLP (`.thd`, `.mlp`): `forge decode` reads them. Picking one starts the decode immediately, off the window's own event loop so the dialog stays
 responsive while a long file decodes — the whole file is held in memory once decoded, the same
 trade QC and Inspect objects already make, because a real seek needs the samples already
 resident rather than re-decoded on demand.

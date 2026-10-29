@@ -14,7 +14,7 @@ popover use.
 **QC a stream…**, top right, next to Settings and the Guided/Advanced/Expert control. It opens
 regardless of what (if anything) is loaded in the main workbench — QC-ing a finished file has
 nothing to do with whatever source is currently being configured for a new encode, and the two
-never interact.
+never interact. QC does not read TrueHD or MLP either; `forge levels` and `forge loudness` measure them.
 
 **Choose file…** opens a standard file picker with four filters — `*.ac3`/`*.ec3`, `*.ac4`,
 **Containers** (`*.mkv *.webm *.mp4 *.m4a *.mov *.ts *.m2ts`) and **All files**. The filters are a

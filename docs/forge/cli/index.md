@@ -3,8 +3,9 @@
 `forge` is the command-line front end over the ICL Forge library — 49 commands covering
 synthesis, file encoding/decoding, container wrapping, inspection, live capture/playback, and the
 tool's own self-description (`help`, `man`, `completions`). It reads and writes AC-3, E-AC-3 (with
-the Atmos object layer) and AC-4, and decodes, inspects, wraps and encodes TrueHD (MLP is read, not written); the
-[Commands](commands.md) page says which command takes which, and which refuse TrueHD.
+the Atmos object layer) and AC-4, and decodes, inspects, measures and wraps TrueHD and MLP and
+encodes TrueHD; the [Commands](commands.md) page says which command takes which, and which refuse
+TrueHD.
 Two of the 49 (`atmos-adm` and `atmos-iab`) only *run* in a build configured with
 `-DICLFORGE_BUILD_ADM=ON`, but are always *listed* — the same "shown, not hidden" treatment
 this page's own live-audio commands get when the platform can't run them either (see
