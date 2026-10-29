@@ -5,7 +5,9 @@
 #include <vector>
 
 #include "core/huffman.hpp"
+#include "decoder/kernels.hpp"
 #include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 
@@ -20,13 +22,13 @@ constexpr int kRowStride = kMaxChannels + kNoiseChannels;
 constexpr int kMinBlockSize = 8;      // TH spec §8.4
 constexpr int kMaxBlockSize = 160;    // TH spec §8.4
 constexpr int kDefaultBlockSize = 8;  // after a restart, until a block header sends one (ERRATA.md)
-constexpr int kHistoryPad = kMaxFirOrder;
+constexpr int kHistoryPad = kernels::kHistoryPad;
 constexpr int kMaxTrueHdMatrixChannel = 7;  // TH spec §10.3
 constexpr int kMaxMlpMatrixChannel = 5;
 constexpr int kMaxHuffLsbs = 24;  // TH spec §8.3
 constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
-constexpr int kMatrixShift = 14;  // the coefficients are scaled to 2^-14 (ERRATA.md)
+constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-14 (ERRATA.md)
 constexpr int kObjectSubstream = 3;
 // TH spec §16.5: terminatorA. The streams show it as the first 20 bits of a 32-bit end-of-stream
 // marker that ends the segments of the last access unit, the 12 bits after it counting the samples
@@ -88,10 +90,6 @@ struct SegmentResult {
     bool restarted = false;
     int padding_samples = 0;  // from the end-of-stream marker
 };
-
-[[nodiscard]] std::int32_t sign_extend_24(std::int32_t value) noexcept {
-    return static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << 8U) >> 8;
-}
 
 Error make_error(ErrorKind kind, std::string_view detail) {
     return Error{kind, detail};
@@ -408,16 +406,10 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     }
 
     // What each channel's residuals need, worked out once for the block (TH spec §11.3, ERRATA.md).
-    struct ChannelPlan {
-        const detail::DecodeTable* table = nullptr;
-        int raw_bits = 0;
-        int quant = 0;
-        std::int64_t bias = 0;
-    };
-    std::array<ChannelPlan, kMaxChannels> plans;
+    std::array<kernels::ResidualPlan, kMaxChannels> plans;
     for (int ch = min_chan; ch <= max_chan; ++ch) {
         const ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
-        ChannelPlan& plan = plans[static_cast<std::size_t>(ch)];
+        kernels::ResidualPlan& plan = plans[static_cast<std::size_t>(ch)];
         plan.quant = state.quant_step[static_cast<std::size_t>(ch)];
         const int lsb_bits = channel.huff_lsbs - plan.quant;
         plan.raw_bits = std::max(lsb_bits, 0);
@@ -442,32 +434,12 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
 
     // The residuals, and the bits that put back the LSBs a matrix dropped.
     std::array<std::uint16_t, kMaxBlockSize> bypass{};
-    for (int i = 0; i < block; ++i) {
-        std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-        std::uint16_t bits = 0;
-        for (int b = 0; b < bypass_count; ++b) {
-            bits = static_cast<std::uint16_t>(
-                bits | (reader.read(1) << bypass_matrix[static_cast<std::size_t>(b)]));
-        }
-        bypass[static_cast<std::size_t>(i)] = bits;
-        for (int ch = min_chan; ch <= max_chan; ++ch) {
-            const ChannelPlan& plan = plans[static_cast<std::size_t>(ch)];
-            std::int64_t value = plan.bias;
-            if (plan.table != nullptr) {
-                const detail::DecodeEntry entry = plan.table->entries[reader.peek(kHuffmanMaxBits)];
-                if (entry.bits == 0) {
-                    return std::unexpected(
-                        make_error(ErrorKind::kBadBlockData,
-                                   "a Huffman code no codebook has (TH spec App. C)"));
-                }
-                reader.consume(entry.bits);
-                value +=
-                    static_cast<std::int64_t>(entry.symbol) * (std::int64_t{1} << plan.raw_bits);
-            }
-            if (plan.raw_bits > 0) {
-                value += reader.read(plan.raw_bits);
-            }
-            row[ch] = static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << plan.quant);
+    {
+        ICLFORGE_ZONE_SCOPED_N("truehd_residuals");
+        if (!kernels::read_residuals(reader, block, min_chan, max_chan, plans.data(), bypass_count,
+                                     bypass_matrix.data(), rows_base, kRowStride, bypass.data())) {
+            return std::unexpected(make_error(ErrorKind::kBadBlockData,
+                                              "a Huffman code no codebook has (TH spec App. C)"));
         }
     }
     if (reader.overflowed()) {
@@ -487,57 +459,34 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     }
 
     // The inverse prediction filters (TH spec §9.4, §9.5), channel by channel.
-    for (int ch = min_chan; ch <= max_chan; ++ch) {
-        ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
-        const std::uint32_t keep =
-            ~((std::uint32_t{1} << plans[static_cast<std::size_t>(ch)].quant) - 1U);
-        const int fir_order = channel.fir.order;
-        const int iir_order = channel.iir.order;
-        const int shift = fir_order > 0 ? channel.fir.shift : channel.iir.shift;
-        std::int32_t* const fir_history = channel.fir_history.data() + kHistoryPad;
-        std::int32_t* const iir_history = channel.iir_history.data() + kHistoryPad;
-        for (int i = 0; i < block; ++i) {
-            std::int64_t prediction = 0;
-            for (int lag = 0; lag < fir_order; ++lag) {
-                prediction += std::int64_t{fir_history[i - 1 - lag]} *
-                              channel.fir.coeff[static_cast<std::size_t>(lag)];
-            }
-            for (int lag = 0; lag < iir_order; ++lag) {
-                prediction += std::int64_t{iir_history[i - 1 - lag]} *
-                              channel.iir.coeff[static_cast<std::size_t>(lag)];
-            }
-            prediction >>= shift;
-            std::int32_t& sample = rows_base[static_cast<std::ptrdiff_t>(i) * kRowStride + ch];
-            const auto output =
-                static_cast<std::int32_t>(static_cast<std::uint32_t>(prediction + sample) & keep);
-            fir_history[i] = output;
-            iir_history[i] = static_cast<std::int32_t>(static_cast<std::uint32_t>(output) -
-                                                       static_cast<std::uint32_t>(prediction));
-            sample = output;
+    {
+        ICLFORGE_ZONE_SCOPED_N("truehd_filters");
+        for (int ch = min_chan; ch <= max_chan; ++ch) {
+            ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
+            const std::uint32_t keep =
+                ~((std::uint32_t{1} << plans[static_cast<std::size_t>(ch)].quant) - 1U);
+            const int fir_order = channel.fir.order;
+            const int iir_order = channel.iir.order;
+            const int shift = fir_order > 0 ? channel.fir.shift : channel.iir.shift;
+            kernels::inverse_filter(block, fir_order, channel.fir.coeff.data(), iir_order,
+                                    channel.iir.coeff.data(), shift, keep,
+                                    channel.fir_history.data() + kHistoryPad,
+                                    channel.iir_history.data() + kHistoryPad, rows_base + ch,
+                                    kRowStride);
+            std::copy(channel.fir_history.begin() + block,
+                      channel.fir_history.begin() + block + kHistoryPad,
+                      channel.fir_history.begin());
+            std::copy(channel.iir_history.begin() + block,
+                      channel.iir_history.begin() + block + kHistoryPad,
+                      channel.iir_history.begin());
         }
-        std::copy(channel.fir_history.begin() + block,
-                  channel.fir_history.begin() + block + kHistoryPad, channel.fir_history.begin());
-        std::copy(channel.iir_history.begin() + block,
-                  channel.iir_history.begin() + block + kHistoryPad, channel.iir_history.begin());
     }
 
-    // TH spec §17.2: generator 0's two noise channels, one step of the LFSR a sample whether or not
-    // a matrix draws on them, so that the sequence runs on across blocks and units. `shr7` is the
-    // 16 bits of the seed from bit 7 up: FFmpeg's decoder reads it so, and the 32-bit reading the
-    // text shows gives a different sequence (ERRATA.md entry 23, open question 5; provisional).
+    // TH spec §17.2: generator 0's two noise channels (kernels::generate_noise says how).
     {
-        std::uint32_t seed = state.noise_seed;
-        const int shift = restart.noise_shift;
-        for (int i = 0; i < block; ++i) {
-            std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-            const std::uint32_t shr7 = (seed >> 7U) & 0xFFFFU;
-            row[kMaxChannels] =
-                static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << shift);
-            row[kMaxChannels + 1] =
-                static_cast<std::int32_t>(static_cast<std::int8_t>(shr7)) * (1 << shift);
-            seed = (seed << 16U) ^ shr7 ^ (shr7 << 5U);
-        }
-        state.noise_seed = seed;
+        ICLFORGE_ZONE_SCOPED_N("truehd_noise");
+        kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base, kRowStride,
+                                kMaxChannels);
     }
 
     // The primitive matrices (TH spec §10), in the order the block header listed them. They work
@@ -546,47 +495,30 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     std::int32_t* const matrix_base =
         matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
-    for (int m = 0; m < state.matrix_count; ++m) {
-        const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
-        const std::uint32_t keep =
-            plan.out <= max_chan
-                ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) - 1U)
-                : 0xFFFFFFFFU;
-        for (int i = 0; i < block; ++i) {
-            std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-            std::int64_t sum = 0;
-            for (int k = 0; k < plan.count; ++k) {
-                sum += std::int64_t{row[plan.channel[static_cast<std::size_t>(k)]]} *
-                       plan.coeff[static_cast<std::size_t>(k)];
-            }
-            std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
-            if (plan.lsb_bypass) {
-                value += (bypass[static_cast<std::size_t>(i)] >> m) & 1U;
-            }
-            row[plan.out] = static_cast<std::int32_t>(value);
+    {
+        ICLFORGE_ZONE_SCOPED_N("truehd_matrices");
+        for (int m = 0; m < state.matrix_count; ++m) {
+            const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
+            const std::uint32_t keep =
+                plan.out <= max_chan
+                    ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
+                        1U)
+                    : 0xFFFFFFFFU;
+            kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
+                                  plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
+                                  kRowStride);
         }
     }
 
     // The output: each channel from the matrix channel ch_assign names, shifted, and folded into
     // the check.
-    std::int32_t* const pcm_base =
-        pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
-    for (int i = 0; i < block; ++i) {
-        const std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-        for (int ch = 0; ch < out_channels; ++ch) {
-            const std::int32_t source = row[restart.ch_assign[static_cast<std::size_t>(ch)]];
-            const int shift = state.output_shift[static_cast<std::size_t>(ch)];
-            const std::int32_t output =
-                shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
-                           : source >> -shift;
-            state.interval_fold =
-                lossless_fold_step(state.interval_fold, static_cast<std::uint32_t>(output),
-                                   restart.ch_assign[static_cast<std::size_t>(ch)]);
-            if (emit) {
-                pcm_base[static_cast<std::ptrdiff_t>(i) * out_channels + ch] =
-                    sign_extend_24(output);
-            }
-        }
+    {
+        ICLFORGE_ZONE_SCOPED_N("truehd_output");
+        std::int32_t* const pcm_base =
+            pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
+        state.interval_fold = kernels::assign_output(
+            block, out_channels, restart.ch_assign.data(), state.output_shift.data(), matrix_base,
+            kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
     }
     state.interval_open = true;
     return {};
