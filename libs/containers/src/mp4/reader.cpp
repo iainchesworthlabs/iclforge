@@ -113,6 +113,18 @@ constexpr std::uint32_t kDmlp = fourcc("dmlp");
     }
 }
 
+// The sampling frequency a 'dmlp' format_info word states, 0 for one it does not. The word is the
+// major sync's field of that name, byte for byte (ERRATA C3), so its layout is the stream's. A TrueHD
+// word opens with the rate code, [31:28], and keeps [27:24] reserved (TH spec §5.1). An MLP word
+// opens with the two groups' bit depths and then their rates: group 1's rate is at [23:20], and a
+// stream with one group sends 0xF as group 2's depth at [27:24] (TH spec §5.2). That 0xF, which a
+// TrueHD word never has, tells the two apart. Read as TrueHD's, an MLP stream's 24-bit depth code in
+// [31:28] is the code for 192 kHz.
+[[nodiscard]] std::uint32_t dmlp_rate_hz(std::uint32_t format_info) {
+    const bool mlp_layout = ((format_info >> 24U) & 0xFU) == 0xFU;
+    return mlp_rate_hz(mlp_layout ? (format_info >> 20U) & 0xFU : format_info >> 28U);
+}
+
 // --- the dac3/dec3 configuration box ---------------------------------------
 //
 // The read twin of iclforge::ac3::io::build_codec_config_box (ac3/io/dec3.hpp), field
@@ -823,7 +835,7 @@ constexpr std::size_t kAudioSampleEntryBytes = 28;
             if (config.type == kDmlp) {
                 // dmlp's ratebits are the rate the decoder uses; they win over the sample entry's
                 // field when they name one (ERRATA C2).
-                const std::uint32_t hz = mlp_rate_hz(track.codec_config.mlp_format_info >> 28U);
+                const std::uint32_t hz = dmlp_rate_hz(track.codec_config.mlp_format_info);
                 if (hz != 0) {
                     track.sample_rate = hz;
                 }

@@ -55,6 +55,9 @@ repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]`
    disc was available. The reader assumes only that, in the stream the PES payloads add up to, whole AC-3 frames and whole
    TrueHD access units follow one another. Does a disc lay the two out that way? `tools/checks/verify_truehd_local_streams.py`
    prints the layout of a transport stream's TrueHD PID (structure only) for the owner's discs: please send that back.
+10. **MLP in MP4.** FFmpeg's MP4 muxer refuses an MLP stream, so no second writer or document confirms what this library
+   writes for one: the same `mlpa` entry as TrueHD, with the major sync's own `format_info` in `dmlp` (C3). Keep it, or
+   refuse MLP in MP4 as FFmpeg does? **Provisional, owner to confirm.**
 
 ## MP4 (`mlpa`, `dmlp`)
 
@@ -83,6 +86,17 @@ sync's 15-bit field of that name, shifted left by one:
 
 The same holds for the 5.1 stream (`0007800f 18fe`), 44.1 kHz (`8050a001 1b34`), 96 kHz (`1050a001 0c7e`), 192 kHz
 (`2050a001 063e`) and mono (`00f16002 18fe`). `is_vbr`, the top bit of the major sync's word, is not kept.
+
+**The layout of the word is the stream's.** An MLP stream's `format_info` is TH spec §5.2's, not §5.1's: the two groups'
+bit depths first, then their rates (`2f0f0001` is 24 bit, 48 kHz, no second group; the fixtures have `2f0f000c`,
+`0f8f0001` and `2f1f0001` too). A TrueHD word opens with the rate code. The reader took the rate from the leading nibble
+for both, and an MLP file's depth code 2 is also the code for 192 kHz, so a 48 kHz MLP file in MP4 read as 192,000 Hz in
+`forge probe` and `forge demux` while its `mlpa` entry said 48,000. The reader now takes the rate from bits [23:20] when
+bits [27:24] are 0xF, MLP's marker for no second group (TrueHD keeps those bits reserved and every stream seen has them
+zero), and from [31:28] otherwise. An MLP stream with a second group of bits (a depth code of 0 to 2 at [27:24]) would be
+read as TrueHD's layout; none is in the tree. FFmpeg 6.1.1's MP4 muxer writes TrueHD only (`Could not find tag for codec
+mlp ... codec not currently supported in container`), so an MLP file in MP4 is this library's own, read by FFmpeg's
+demuxer as 48,000 Hz (question 10).
 
 **C4. A sample is one whole access unit.** Four-byte header, any major sync and extra data included, unmodified:
 `cmp_mp4_samples.py` finds 300 of 300 samples identical to the raw stream's units for the stereo and 5.1 fixtures.

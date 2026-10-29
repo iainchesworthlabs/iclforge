@@ -927,3 +927,35 @@ TEST_CASE("a TrueHD transport stream is Blu-ray's, and remux defaults to it",
         }
     }
 }
+
+TEST_CASE("an MLP stream in MP4 reports its own rate, not 192 kHz", "[forge-cli][truehd][containers]") {
+    // dmlp's word is the major sync's, which for MLP opens with the bit depths: the depth code 2
+    // (24 bit) is the code for 192 kHz in TrueHD's layout, and probe and demux said 192000.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "mlp_rate.log";
+    for (const auto& item : fixture_list()) {
+        if (item["codec"] != "mlp") {
+            continue;
+        }
+        const std::string name = item["name"];
+        const std::string rate = std::to_string(item["sample_rate"].get<int>());
+        DYNAMIC_SECTION(name) {
+            const fs::path file = dir / (name + "_rate.mp4");
+            const fs::path back = dir / (name + "_rate.mlp");
+            REQUIRE(run_cli("mp4 " + cli_arg(fixture(item["file"])) + cli_arg(file), log) == 0);
+            REQUIRE(run_cli("probe " + cli_arg(file), log) == 0);
+            std::string text = read_text(log);
+            CHECK(text.find(fmt::format("'mlpa', {} samples, {} Hz",
+                                        item["access_units"].get<int>(), rate)) !=
+                  std::string::npos);
+            CHECK(text.find("sample rate     " + rate + " Hz") != std::string::npos);
+            REQUIRE(run_cli("probe " + cli_arg(file) + "json=1", log) == 0);
+            const auto document = nlohmann::json::parse(read_text(log));
+            CHECK(document["container"]["sample_rate_hz"] == item["sample_rate"]);
+            REQUIRE(run_cli("demux " + cli_arg(file) + cli_arg(back), log) == 0);
+            text = read_text(log);
+            CHECK(text.find("(mlpa, " + rate + " Hz,") != std::string::npos);
+            CHECK(read_bytes(back) == read_bytes(fixture(item["file"])));
+        }
+    }
+}

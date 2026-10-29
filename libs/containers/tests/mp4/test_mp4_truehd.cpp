@@ -170,6 +170,38 @@ TEST_CASE("the reader takes an 'mlpa' sample rate written either way", "[truehd]
     }
 }
 
+TEST_CASE("an MLP stream in 'mlpa' is read at its own rate, not as TrueHD's rate code",
+          "[truehd][mp4]") {
+    // ERRATA C3: dmlp's word is the major sync's, whose layout is the stream's. An MLP word opens
+    // with the bit depths (0x2f0f0001 for 24-bit, 48 kHz, one group) where a TrueHD word opens with
+    // the rate code, and the depth code 2 is also the code for 192 kHz. FFmpeg's MP4 muxer writes
+    // TrueHD only, so these files are this library's alone.
+    struct Expected {
+        const char* name;
+        std::uint32_t rate;
+    };
+    for (const Expected& item : {Expected{"mlp_st44_s16.mlp", 44100},
+                                 Expected{"mlp_st48_s24.mlp", 48000},
+                                 Expected{"mlp_st96_s24.mlp", 96000},
+                                 Expected{"mlp_m51_s24.mlp", 48000}}) {
+        SECTION(item.name) {
+            const TruehdStream stream = load(item.name);
+            REQUIRE(stream.info.sample_rate == item.rate);
+            REQUIRE(stream.info.major_sync.kind == iclforge::truehd::StreamKind::kMlp);
+            mp4::MuxOptions options;
+            options.sync_samples = stream.major;
+            const auto file = mp4::mux(track_of(stream), stream.units, options);
+            REQUIRE(file.has_value());
+            const auto demuxed = mp4::demux(*file);
+            REQUIRE(demuxed.has_value());
+            CHECK(demuxed->track.sample_rate == item.rate);
+            CHECK(demuxed->track.timescale == item.rate);
+            CHECK(demuxed->track.codec_config.mlp_format_info ==
+                  stream.info.major_sync.format_info);
+        }
+    }
+}
+
 TEST_CASE("without a usable rate code in dmlp the sample entry's field decides", "[truehd][mp4]") {
     // ratebits 0xF names no rate (TH spec §1.4), so the field is all the reader has, and it has to
     // read it as the integer FFmpeg writes (a low half of 0x7700 here) or as 16.16 (a low half of
