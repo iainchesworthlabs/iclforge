@@ -122,7 +122,7 @@ TEST_CASE("mlp random block headers round-trip through their description", "[mlp
                 p.frac_bits = static_cast<std::uint8_t>(pick(0, 14));
                 p.lsb_bypass = pick(0, 1) == 1;
                 const int lim = 1 << (p.frac_bits + 1);
-                for (int ch = 0; ch < ctx.max_chan + 3; ++ch) {
+                for (int ch = 0; ch < ctx.max_chan + 1 + ctx.noise_inputs(); ++ch) {
                     if (pick(0, 1)) {
                         p.coeff_present |= 1U << ch;
                         p.coeffs[static_cast<std::size_t>(ch)] = pick(-lim, lim - 1);
