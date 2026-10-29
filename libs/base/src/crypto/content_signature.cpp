@@ -551,7 +551,7 @@ std::expected<ParsedContentSignature, SignatureFault> parse_content_signature(
     bool have_s = false;
     for (const tb::ByteListEntry& e : *values) {
         if (e.value.size() != 32) {
-            return bad("the signature value \"" + e.key + "\" is not 32 bytes");
+            return bad("the signature value \"" + escape_text(e.key) + "\" is not 32 bytes");
         }
         if (e.key == "ecc_r_value" && !have_r) {
             std::copy(e.value.begin(), e.value.end(), out.signature.r.begin());
@@ -613,7 +613,7 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
     const ParsedContentSignature& p = *parsed;
     record("structure", true, "the Thrift structure of CS spec v2.3 §3 reads",
            SignatureError::kBadOrMissingSignature);
-    report.signed_date = p.signed_date;
+    report.signed_date = escape_text(p.signed_date);
 
     // Versions, scheme and methods.
     const bool versions_ok =
@@ -633,16 +633,18 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
         p.canonical_method == kCanonicalThriftBinary && p.canonical_hash == "sha256" &&
         p.signature_id == kContentSignatureUuid && p.signature_data_id == p.signature_id;
     record("scheme", scheme_ok,
-           scheme_ok ? "pace-ccjf1, DER certificates, Thrift-canonical signed information"
-                     : "the signing method \"" + p.signing_method + "\", encoding \"" +
-                           p.encoding_format + "\" or canonical method \"" + p.canonical_method +
-                           "\" is not the one this reader supports",
+           scheme_ok
+               ? "pace-ccjf1, DER certificates, Thrift-canonical signed information"
+               : "the signing method \"" + escape_text(p.signing_method) + "\", encoding \"" +
+                     escape_text(p.encoding_format) + "\" or canonical method \"" +
+                     escape_text(p.canonical_method) + "\" is not the one this reader supports",
            SignatureError::kLibDoesntSupportContentSignature);
     const bool curve_ok = p.signature_algorithm == "ecdsa" && p.signature_curve == "secp256r1";
     record("signature method", curve_ok,
-           curve_ok ? "ecdsa on secp256r1"
-                    : "the signature method is \"" + p.signature_algorithm + "\" on \"" +
-                          p.signature_curve + "\", not ecdsa on secp256r1",
+           curve_ok
+               ? "ecdsa on secp256r1"
+               : "the signature method is \"" + escape_text(p.signature_algorithm) + "\" on \"" +
+                     escape_text(p.signature_curve) + "\", not ecdsa on secp256r1",
            SignatureError::kBadContentSignaturePkStandard);
 
     // The chain.
@@ -699,17 +701,18 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
     {
         bool ok = signed_epoch.has_value();
         std::string detail =
-            ok ? p.signed_date : "\"" + p.signed_date + "\" is not YYYY-MM-DDTHH:MM:SS";
+            ok ? escape_text(p.signed_date)
+               : "\"" + escape_text(p.signed_date) + "\" is not YYYY-MM-DDTHH:MM:SS";
         if (ok && policy.time_basis == TimeBasis::kNow &&
             *signed_epoch > policy.now + policy.max_future_skew_seconds) {
             ok = false;
-            detail = p.signed_date + " is in the future";
+            detail = escape_text(p.signed_date) + " is in the future";
         }
         if (ok && chain_read && policy.time_basis != TimeBasis::kIgnore &&
             (*signed_epoch < p.chain.back().not_before ||
              *signed_epoch > p.chain.back().not_after)) {
             ok = false;
-            detail = p.signed_date + " lies outside the signer certificate's validity";
+            detail = escape_text(p.signed_date) + " lies outside the signer certificate's validity";
         }
         record("signed date", ok, detail, SignatureError::kBadContentSignatureDate);
     }

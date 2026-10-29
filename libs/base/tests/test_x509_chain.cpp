@@ -292,6 +292,55 @@ TEST_CASE("a well-formed chain is reported unanchored until an anchor is given",
     CHECK_FALSE(crypto::validate_chain(certs, policy).anchored);
 }
 
+TEST_CASE("text that comes out of a certificate is escaped before a person reads it",
+          "[crypto][x509][escape]") {
+    // What escape_text keeps and what it makes visible.
+    CHECK(crypto::escape_text("plain ASCII / with punctuation") ==
+          "plain ASCII / with punctuation");
+    CHECK(crypto::escape_text("caf\xC3\xA9") == "caf\xC3\xA9");  // valid UTF-8 stays
+    CHECK(crypto::escape_text("a\nb\rc\td") == "a\\x0Ab\\x0Dc\\x09d");
+    CHECK(crypto::escape_text("\x1b[2J\x1b[31m") == "\\x1B[2J\\x1B[31m");
+    CHECK(crypto::escape_text("back\\slash") == "back\\\\slash");
+    CHECK(crypto::escape_text("\x7f") == "\\x7F");
+    CHECK(crypto::escape_text("\xC3(") == "\\xC3(");                  // invalid UTF-8
+    CHECK(crypto::escape_text("\xC0\x80") == "\\xC0\\x80");           // an overlong NUL
+    CHECK(crypto::escape_text("\xED\xA0\x80") == "\\xED\\xA0\\x80");  // a surrogate
+    CHECK(crypto::escape_text("\xC2\x9B") == "\\u{9B}");              // the C1 control CSI
+    CHECK(crypto::escape_text("\xE2\x80\xAE") == "\\u{202E}");        // right-to-left override
+    CHECK(crypto::escape_text("\xE2\x80\xA8") == "\\u{2028}");        // line separator
+    CHECK(crypto::escape_text("\xEF\xBB\xBF") == "\\u{FEFF}");        // byte order mark
+    CHECK(crypto::escape_text("").empty());
+
+    // A certificate whose names try to clear the screen, start a line that reads like a verdict and
+    // hide text. Its text reaches every message, so none of that may survive, and the title it
+    // carries is not mistaken for the one that is required.
+    pki::CertSpec spec;
+    spec.subject = pki::Name{"Evil\x1b[2J\nsigner ok \xE2\x80\xAE",
+                             std::string("Code/Content Signer\x1b"), std::string("T\n1")};
+    spec.ca = false;
+    spec.key_usage = 1U;
+    const pki::Name issuer{"ICL Forge Test Issuer"};
+    const auto cert = crypto::parse_certificate(
+        pki::issue(spec, pki::key_for("hostile"), issuer, pki::key_for("hostile issuer")));
+    REQUIRE(cert.has_value());
+    for (const std::string& text :
+         {cert->subject.text, cert->subject.common_name.value_or(""),
+          cert->subject.title.value_or(""), crypto::describe_certificate(*cert, 0)}) {
+        INFO(text);
+        CHECK(std::none_of(text.begin(), text.end(), [](char c) {
+            const auto u = static_cast<unsigned char>(c);
+            return u < 0x20 || u == 0x7F;
+        }));
+        CHECK(text.find("\xE2\x80\xAE") == std::string::npos);
+    }
+    CHECK(cert->subject.text.find("\\x1B[2J\\x0Asigner ok \\u{202E}") != std::string::npos);
+    CHECK(cert->subject.title != std::optional<std::string>("Code/Content Signer"));
+    crypto::ChainPolicy policy;
+    policy.required_leaf_title = "Code/Content Signer";
+    const std::vector<crypto::Certificate> alone = {*cert};
+    CHECK(crypto::validate_chain(alone, policy).failure != crypto::ChainFailure::kNone);
+}
+
 TEST_CASE("a chain past the cap is refused before any signature in it is checked",
           "[crypto][chain][bounds]") {
     const pki::TestChain chain = pki::make_chain();

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -64,41 +65,31 @@ std::string hex_upper(std::span<const std::byte> bytes) {
     return out;
 }
 
-// days_from_civil: the number of days from 1970-01-01 to y-m-d in the proleptic Gregorian calendar
-// (Howard Hinnant's well-known derivation, in the public domain).
+// Days from 1970-01-01 to y-m-d in the proleptic Gregorian calendar; the date is valid (see
+// days_in_month_ok) when this is called.
 std::int64_t days_from_civil(std::int64_t y, unsigned m, unsigned d) {
-    y -= m <= 2 ? 1 : 0;
-    const std::int64_t era = (y >= 0 ? y : y - 399) / 400;
-    const auto yoe = static_cast<unsigned>(y - era * 400);
-    const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
-    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
+    namespace chrono = std::chrono;
+    const chrono::year_month_day date{chrono::year{static_cast<int>(y)}, chrono::month{m},
+                                      chrono::day{d}};
+    return chrono::sys_days{date}.time_since_epoch().count();
 }
 
 void civil_from_days(std::int64_t z, std::int64_t& y, unsigned& m, unsigned& d) {
-    z += 719468;
-    const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-    const auto doe = static_cast<unsigned>(z - era * 146097);
-    const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    y = static_cast<std::int64_t>(yoe) + era * 400;
-    const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    const unsigned mp = (5 * doy + 2) / 153;
-    d = doy - (153 * mp + 2) / 5 + 1;
-    m = mp < 10 ? mp + 3 : mp - 9;
-    y += m <= 2 ? 1 : 0;
+    namespace chrono = std::chrono;
+    const chrono::year_month_day date{chrono::sys_days{chrono::days{static_cast<int>(z)}}};
+    y = static_cast<int>(date.year());
+    m = static_cast<unsigned>(date.month());
+    d = static_cast<unsigned>(date.day());
 }
 
 bool days_in_month_ok(std::int64_t year, unsigned month, unsigned day) {
-    static constexpr unsigned kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    if (month < 1 || month > 12 || day < 1) {
+    namespace chrono = std::chrono;
+    if (year < 0 || year > 9999) {
         return false;
     }
-    unsigned limit = kDays[month - 1];
-    const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-    if (month == 2 && leap) {
-        limit = 29;
-    }
-    return day <= limit;
+    return chrono::year_month_day{chrono::year{static_cast<int>(year)}, chrono::month{month},
+                                  chrono::day{day}}
+        .ok();
 }
 
 std::optional<unsigned> two_digits(std::string_view s, std::size_t pos) {
@@ -153,8 +144,9 @@ std::optional<std::int64_t> parse_asn1_time(std::uint8_t tag, std::span<const st
 }
 
 // The text of a string-valued attribute. The 8-bit string types are shown as they are; a BMPString
-// is shown when it is plain ASCII; any other type is hex, which is honest if not pretty.
-std::string attribute_text(const der::Tlv& value) {
+// is shown when it is plain ASCII; any other type is hex, which is honest if not pretty. The result
+// goes through escape_text(): a name comes from a certificate a stranger made.
+std::string raw_attribute_text(const der::Tlv& value) {
     switch (value.tag) {
         case der::kUtf8String:
         case der::kPrintableString:
@@ -174,6 +166,10 @@ std::string attribute_text(const der::Tlv& value) {
         default:
             return "#" + hex_upper(value.content);
     }
+}
+
+std::string attribute_text(const der::Tlv& value) {
+    return escape_text(raw_attribute_text(value));
 }
 
 // RFC 5280 §4.1.2.4: Name ::= SEQUENCE OF RelativeDistinguishedName (SET OF AttributeTypeAndValue).
@@ -537,6 +533,74 @@ bool certificate_signature_valid(const Certificate& cert, const P256PublicKey& i
         return false;
     }
     return ecdsa_p256_verify(issuer, sha256(cert.tbs()), cert.signature);
+}
+
+std::string escape_text(std::string_view text) {
+    static constexpr char kDigits[] = "0123456789ABCDEF";
+    std::string out;
+    const auto byte_escape = [&out](unsigned char c) {
+        out += "\\x";
+        out.push_back(kDigits[c >> 4]);
+        out.push_back(kDigits[c & 0xFU]);
+    };
+    std::size_t i = 0;
+    while (i < text.size()) {
+        const auto c = static_cast<unsigned char>(text[i]);
+        if (c < 0x80) {
+            if (c == '\\') {
+                out += "\\\\";
+            } else if (c < 0x20 || c == 0x7F) {
+                byte_escape(c);
+            } else {
+                out.push_back(static_cast<char>(c));
+            }
+            ++i;
+            continue;
+        }
+        // A multi-byte UTF-8 sequence, shortest form only, no surrogates, nothing past U+10FFFF.
+        std::size_t length = 0;
+        std::uint32_t code = 0;
+        if (c >= 0xC2 && c <= 0xDF) {
+            length = 2;
+            code = c & 0x1FU;
+        } else if (c >= 0xE0 && c <= 0xEF) {
+            length = 3;
+            code = c & 0x0FU;
+        } else if (c >= 0xF0 && c <= 0xF4) {
+            length = 4;
+            code = c & 0x07U;
+        }
+        bool valid = length != 0 && i + length <= text.size();
+        for (std::size_t k = 1; valid && k < length; ++k) {
+            const auto next = static_cast<unsigned char>(text[i + k]);
+            valid = (next & 0xC0U) == 0x80U;
+            code = (code << 6) | (next & 0x3FU);
+        }
+        valid = valid && !(length == 3 && code < 0x800) && !(length == 4 && code < 0x10000) &&
+                code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF);
+        // Controls that are not ASCII (U+0080 to U+009F, which some terminals act on), the line
+        // and paragraph separators, the zero-width and bidirectional controls and the byte order
+        // mark are shown as code points: they can reorder or hide text without a visible trace.
+        const bool hidden = code < 0xA0 || (code >= 0x200B && code <= 0x200F) ||
+                            (code >= 0x2028 && code <= 0x202E) ||
+                            (code >= 0x2066 && code <= 0x2069) || code == 0x061C || code == 0xFEFF;
+        if (valid && !hidden) {
+            out.append(text.substr(i, length));
+            i += length;
+        } else if (valid) {
+            out += "\\u{";
+            std::string digits;
+            for (std::uint32_t v = code; v != 0; v >>= 4) {
+                digits.insert(digits.begin(), kDigits[v & 0xFU]);
+            }
+            out += digits + "}";
+            i += length;
+        } else {
+            byte_escape(c);
+            ++i;
+        }
+    }
+    return out;
 }
 
 std::optional<std::int64_t> parse_iso8601_utc(std::string_view text) {

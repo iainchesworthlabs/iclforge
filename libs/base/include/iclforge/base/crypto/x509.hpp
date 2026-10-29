@@ -92,6 +92,14 @@ struct Certificate {
 [[nodiscard]] ICLFORGE_BASE_EXPORT bool certificate_signature_valid(const Certificate& cert,
                                                                     const P256PublicKey& issuer);
 
+// `text` made safe to print where a person reads it: a backslash, control characters, invalid UTF-8
+// and the code points that act on a terminal or can reorder or hide text (U+0080 to U+009F, line
+// and paragraph separators, zero-width and bidirectional controls) become \\, \xHH or \u{XXXX};
+// valid printable UTF-8 is kept. Every name and string that comes out of a certificate or a
+// signature goes through it before it reaches a message, so a hostile one cannot move the cursor,
+// change a colour or begin a line that reads like a verdict.
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::string escape_text(std::string_view text);
+
 // "YYYY-MM-DDTHH:MM:SS" (UTC, with or without a trailing 'Z') as the content signature's signedDate
 // is written (CS spec §3, the sample's value is "2026-04-13T23:38:29"), to seconds since the epoch.
 // nullopt for anything that is not a real calendar instant.
