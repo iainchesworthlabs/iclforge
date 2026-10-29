@@ -825,6 +825,12 @@ since none opens the eight-channel high-bit-rate link it needs.
 `RenderDeviceInfo::supports_ac4_passthrough` says whether an endpoint takes the base link; no
 platform reports whether the receiver decodes AC-4, and no receiver found so far does.
 
+**TrueHD.** None. `BitstreamFormat` names AC-3, E-AC-3 and AC-4 only, so there is no way to ask a backend for a MAT link, and the
+ALSA capability parser files a TrueHD coding type under "other". The library packs MAT bursts
+([TrueHD in the containers](#truehd-in-the-containers)) and `forge spdif` writes them to a file; nothing sends one to a device,
+and no receiver has been tried with one. This is a gap against E-AC-3 and AC-4 on this page, tracked in the roadmap row
+[TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
+
 When the device goes away mid-stream (the cable pulled, the receiver switched off, the endpoint
 disabled), the sink stops itself. `running()` turns false, `position()` reports nothing,
 `submit()` and `can_submit()` refuse, `flush()` returns at once, and `pause()` and `resume()`

@@ -19,6 +19,11 @@ has no colour. The listening-quality card scores the encoders of all three codec
 from the [tool comparison](tool-comparison-trend.md), AC-4 from its own series,
 [AC-4 encode quality](quality-trend.md#ac-4-encode-quality).
 
+**TrueHD is in none of these series.** Its speed and allocation are not measured by `iclforge-perf`,
+`iclforge-bench`, `iclforge-membench` or `iclforge-kernelbench`, and a lossless decoder has no quality
+figure to trend: its check is that FFmpeg's strict decode equals the source ([Validation: TrueHD](verification.md#truehd-and-mlp)).
+Speed and memory rows for TrueHD are on the [roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
+
 New to codec benchmarks: start with
 [How to read these numbers](#how-to-read-these-numbers).
 
