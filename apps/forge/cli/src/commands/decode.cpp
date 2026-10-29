@@ -1,4 +1,5 @@
 #include "decode.hpp"
+#include "truehd.hpp"
 
 #include <fmt/base.h>
 #include <fmt/format.h>
@@ -1446,6 +1447,10 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // reads the stream, before anything below reads it as AC-3.
     if (is_ac4_stream(stream)) {
         return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out);
+    }
+    // TrueHD's major sync word follows its first access unit's 4-byte header (4.1).
+    if (forge_cli::is_truehd_stream(stream)) {
+        return forge_cli::run_truehd_decode(stream, out_path, requested);
     }
     if (!requested.syntax_trace_path.empty()) {
         fmt::println(stderr, "error: syntax-trace= records AC-4 syntax, and {} is AC-3 or E-AC-3", in_path);

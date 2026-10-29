@@ -1,4 +1,5 @@
 #include "probe.hpp"
+#include "truehd.hpp"
 
 #include <array>
 #include <cstddef>
@@ -676,6 +677,16 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
 }  // namespace
 
 int run_probe(std::string_view in_path, const Options& meta) {
+    // A TrueHD stream, read whole: its major sync follows the first access unit's header.
+    if (!is_stdio_path(in_path)) {
+        const auto bytes = read_all(in_path);
+        if (forge_cli::is_truehd_stream(bytes)) {
+            if (meta.json) {
+                iclforge::cli::platform::set_stdio_binary();
+            }
+            return forge_cli::run_truehd_probe(bytes, in_path, meta);
+        }
+    }
     Detail detail = Detail::kNone;
     if (meta.detail.has_value()) {
         detail = *meta.detail == "blocks" ? Detail::kBlocks : Detail::kFrames;

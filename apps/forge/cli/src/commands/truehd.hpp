@@ -4,7 +4,7 @@
 #include <span>
 #include <string_view>
 
-#include "support.hpp"
+#include "../support.hpp"
 
 // TrueHD (MLP) in forge (libs/mlp, planning/truehd.md): 'truehd-encode', and 'decode', 'probe'
 // and 'transcode' when the stream is TrueHD or the output is. TrueHD is lossless, so these read
@@ -27,7 +27,7 @@ int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path
                      const Options& meta);
 // A transcode with TrueHD on either side: through integer PCM when both sides are TrueHD, and
 // through a WAV the other codec's own command reads or writes otherwise.
-int run_truehd_transcode(std::string_view in_path, std::string_view out_path,
-                         std::uint32_t bitrate, std::string_view layout, const Options& meta);
+int run_truehd_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
+                         std::string_view layout, const Options& meta);
 
 }  // namespace forge_cli

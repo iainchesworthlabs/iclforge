@@ -20,6 +20,7 @@
 #include "commands/audio_io.hpp"
 #include "commands/containers.hpp"
 #include "commands/decode.hpp"
+#include "commands/truehd.hpp"
 #include "commands/encode.hpp"
 #include "commands/live_audio.hpp"
 #include "commands/lyrics.hpp"
@@ -212,13 +213,13 @@ int run_words(const std::vector<std::string>& words) {
     return run_main(static_cast<int>(pointers.size()), pointers.data());
 }
 
-// 46 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// 47 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 46> kCommands{{
+constexpr std::array<Command, 47> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -387,6 +388,18 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kStdio | topic::kAc4Encode,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
+    {"truehd-encode", 3, "<in.wav> <out.thd>",
+     "16 or 24-bit PCM, 1 to 8 channels (WAV channel order; 6.1 and 7.1 as their channel masks "
+     "order them) at 44.1 to 192 kHz, to a lossless TrueHD (MLP) stream: 2 channels make one "
+     "substream, 6 two (the 2-channel presentation a fold-down of the 5.1), 8 three (2, 6 and "
+     "8). The encoder decodes every access unit it writes and fails rather than emit one that "
+     "is not lossless. truehd-restart=8..128 (access units between restart headers, 16), "
+     "truehd-peak=<kbit/s> (the delivery ceiling, 18000), truehd-fir=0..8 and truehd-iir=0..4 "
+     "(the filter orders searched), truehd-decorrelate=0|1, truehd-downmix=0|1 (fold the lower "
+     "presentations down, or carry the first channels as FFmpeg does), truehd-verify=0|1",
+     topic::kStdio,
+     Needs::kNothing,
+     [](const Args& x) { return forge_cli::run_truehd_encode(x.str(1), x.str(2), x.meta); }},
     {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "

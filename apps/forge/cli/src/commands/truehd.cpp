@@ -1,4 +1,4 @@
-#include "commands/truehd.hpp"
+#include "truehd.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -13,9 +13,9 @@
 
 #include <fmt/format.h>
 
-#include "commands/decode.hpp"
-#include "commands/encode.hpp"
-#include "exit_codes.hpp"
+#include "../exit_codes.hpp"
+#include "decode.hpp"
+#include "encode.hpp"
 #include "iclforge/mlp/decoder/decoder.hpp"
 #include "iclforge/mlp/encoder/encoder.hpp"
 #include "iclforge/mlp/io/elementary.hpp"
@@ -54,7 +54,8 @@ bool write_bytes(std::string_view path, std::span<const std::byte> bytes) {
     if (!out) {
         return false;
     }
-    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    out.write(reinterpret_cast<const char*>(bytes.data()),
+              static_cast<std::streamsize>(bytes.size()));
     return static_cast<bool>(out);
 }
 
@@ -84,8 +85,8 @@ std::optional<Pcm> read_pcm(std::string_view path, std::string& error) {
     while (at + 8 <= d.size()) {
         const std::uint32_t size = u32(at + 4);
         const std::size_t body = at + 8;
-        const bool is_fmt = d[at] == std::byte{'f'} && d[at + 1] == std::byte{'m'} &&
-                            d[at + 2] == std::byte{'t'};
+        const bool is_fmt =
+            d[at] == std::byte{'f'} && d[at + 1] == std::byte{'m'} && d[at + 2] == std::byte{'t'};
         const bool is_data = d[at] == std::byte{'d'} && d[at + 1] == std::byte{'a'} &&
                              d[at + 2] == std::byte{'t'} && d[at + 3] == std::byte{'a'};
         if (is_fmt && body + 16 <= d.size()) {
@@ -108,9 +109,8 @@ std::optional<Pcm> read_pcm(std::string_view path, std::string& error) {
             }
             const auto width = static_cast<std::size_t>(pcm.bits / 8);
             const std::size_t available = std::min<std::size_t>(size, d.size() - body);
-            const std::size_t count =
-                available / width / static_cast<std::size_t>(pcm.channels) *
-                static_cast<std::size_t>(pcm.channels);
+            const std::size_t count = available / width / static_cast<std::size_t>(pcm.channels) *
+                                      static_cast<std::size_t>(pcm.channels);
             pcm.samples.resize(count);
             for (std::size_t i = 0; i < count; ++i) {
                 const std::size_t p = body + i * width;
@@ -184,8 +184,46 @@ bool write_pcm(std::string_view path, const Pcm& pcm, int bits) {
     return write_bytes(path, out);
 }
 
-// SPEAKER_* masks (mmreg.h) for 13.1's channel order: L R C LFE, then for 5.1 the side pair
-// (the order a 5.1(side) WAV carries), for 7.1 the side pair and the rear pair.
+// A WAV carries its channels in the order of its SPEAKER_* mask bits (mmreg.h), which puts a
+// 7.1 file's back pair before its side pair and a 6.1 file's back centre before the side pair;
+// section 13.1 carries the side pair (Ls, Rs) first. order[w] is the 13.1 channel a WAV's channel
+// w holds. FFmpeg's decoder gives the WAV order (planning/truehd.md, P38).
+std::vector<int> wav_order(int channels) {
+    switch (channels) {
+        case 7:
+            return {0, 1, 2, 3, 6, 4, 5};
+        case 8:
+            return {0, 1, 2, 3, 6, 7, 4, 5};
+        default: {
+            std::vector<int> order(static_cast<std::size_t>(channels));
+            for (int c = 0; c < channels; ++c) {
+                order[static_cast<std::size_t>(c)] = c;
+            }
+            return order;
+        }
+    }
+}
+
+// Interleaved samples from one channel order to the other: to 13.1's (`to_stream`) or back.
+void reorder(std::vector<std::int32_t>& samples, int channels, bool to_stream) {
+    const auto order = wav_order(channels);
+    const auto n = static_cast<std::size_t>(channels);
+    std::vector<std::int32_t> frame(n);
+    for (std::size_t at = 0; at + n <= samples.size(); at += n) {
+        for (std::size_t w = 0; w < n; ++w) {
+            const auto s = static_cast<std::size_t>(order[w]);
+            if (to_stream) {
+                frame[s] = samples[at + w];
+            } else {
+                frame[w] = samples[at + s];
+            }
+        }
+        std::copy(frame.begin(), frame.end(), samples.begin() + static_cast<std::ptrdiff_t>(at));
+    }
+}
+
+// The SPEAKER_* mask of the WAV order above: L R C LFE, the side pair for 5.1, and for 7.1 the
+// back pair and the side pair.
 std::uint32_t wav_mask(int channels) {
     switch (channels) {
         case 3:
@@ -274,8 +312,10 @@ int run_truehd_encode(std::string_view in_wav, std::string_view out_path, const 
         fmt::println(stderr, "error: {}: {}", in_wav, error);
         return kExitInput;
     }
+    std::vector<std::int32_t> samples = pcm->samples;
+    reorder(samples, pcm->channels, true);
     mlp::EncoderStats stats;
-    auto stream = mlp::encode_stream(pcm->samples, encoder_config(*pcm, meta), &stats);
+    auto stream = mlp::encode_stream(samples, encoder_config(*pcm, meta), &stats);
     if (!stream) {
         fmt::println(stderr, "error: TrueHD encode of {} failed: {}", in_wav,
                      mlp::describe(stream.error()));
@@ -319,6 +359,7 @@ int run_truehd_decode(std::span<const std::byte> stream, std::string_view out_wa
     pcm.sample_rate = decoded->sample_rate;
     pcm.channel_mask = wav_mask(decoded->channels);
     pcm.samples = std::move(decoded->pcm);
+    reorder(pcm.samples, pcm.channels, false);
     // A 16-bit WAV when every sample's low byte is zero (a 16-bit source), unless truehd-bits=
     // says otherwise; a 24-bit one when not.
     int bits = 16;
@@ -382,9 +423,8 @@ int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path
             summary->duration_seconds, summary->bytes, summary->mean_bits_per_second,
             ms.peak_bits_per_second(), summary->peak_access_unit_bytes,
             summary->has_extra_data ? "true" : "false", ms.signature,
-            summary->stopped_at
-                ? fmt::format("\"{}\"", mlp::describe(*summary->stopped_at))
-                : std::string{"null"});
+            summary->stopped_at ? fmt::format("\"{}\"", mlp::describe(*summary->stopped_at))
+                                : std::string{"null"});
         return kExitOk;
     }
     fmt::println("{}: {} stream", in_path,
@@ -398,10 +438,11 @@ int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path
     fmt::println("  access units       {} ({} with a major sync)", summary->access_units,
                  summary->major_syncs);
     fmt::println("  duration           {:.3f} s", summary->duration_seconds);
-    fmt::println("  rate               mean {} kbit/s; peak_data_rate {} kbit/s; largest access "
-                 "unit {} bytes",
-                 summary->mean_bits_per_second / 1000U, ms.peak_bits_per_second() / 1000U,
-                 summary->peak_access_unit_bytes);
+    fmt::println(
+        "  rate               mean {} kbit/s; peak_data_rate {} kbit/s; largest access "
+        "unit {} bytes",
+        summary->mean_bits_per_second / 1000U, ms.peak_bits_per_second() / 1000U,
+        summary->peak_access_unit_bytes);
     fmt::println("  extra data         {}", summary->has_extra_data ? "present" : "none");
     if (summary->stopped_at) {
         fmt::println("  framing error      {}", mlp::describe(*summary->stopped_at));
@@ -409,8 +450,8 @@ int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path
     return kExitOk;
 }
 
-int run_truehd_transcode(std::string_view in_path, std::string_view out_path,
-                         std::uint32_t bitrate, std::string_view layout, const Options& meta) {
+int run_truehd_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
+                         std::string_view layout, const Options& meta) {
     const auto bytes = read_bytes(in_path);
     if (!bytes) {
         fmt::println(stderr, "error: cannot read {}", in_path);
@@ -426,20 +467,20 @@ int run_truehd_transcode(std::string_view in_path, std::string_view out_path,
     if (from_truehd) {
         status = run_truehd_decode(*bytes, wav_path, meta);
     } else {
-        status = run_decode(in_path, wav_path, meta, {}, {});
+        status = commands::run_decode(in_path, wav_path, meta, {}, {});
     }
     if (status == kExitOk) {
         if (to_truehd) {
             status = run_truehd_encode(wav_path, out_path, meta);
         } else if (out_path.ends_with(".ac4")) {
-            status = commands::run_ac4_encode(wav_path, out_path, bitrate == 0 ? 192 : bitrate,
-                                              meta);
+            status =
+                commands::run_ac4_encode(wav_path, out_path, bitrate == 0 ? 192 : bitrate, meta);
         } else if (out_path.ends_with(".ec3") || out_path.ends_with(".eac3")) {
             status = commands::run_eac3_encode(wav_path, out_path, bitrate == 0 ? 448 : bitrate,
                                                "none", layout, "off", meta);
         } else {
-            status = commands::run_encode(wav_path, out_path, bitrate == 0 ? 448 : bitrate,
-                                          false, layout, meta);
+            status = commands::run_encode(wav_path, out_path, bitrate == 0 ? 448 : bitrate, false,
+                                          layout, meta);
         }
     }
     std::error_code ignored;

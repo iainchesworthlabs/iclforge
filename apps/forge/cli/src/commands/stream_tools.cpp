@@ -1,4 +1,5 @@
 #include "stream_tools.hpp"
+#include "truehd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1228,6 +1229,10 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
     auto bytes = read_elementary_stream(in_path);
     if (bytes.empty()) {
         return kExitInput;
+    }
+    // TrueHD on either side goes through integer PCM (commands/truehd.cpp).
+    if (forge_cli::is_truehd_stream(bytes) || forge_cli::is_truehd_path(out_path)) {
+        return forge_cli::run_truehd_transcode(in_path, out_path, bitrate, layout, meta);
     }
     const auto target_codec = output_codec(out_path, meta);
     if (!target_codec.has_value()) {
