@@ -2,7 +2,7 @@
 
 # forge
 
-Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4.
+Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4, and, in the command-line tool only, for decoding, analysis, wrapping and encoding of TrueHD.
 
 A app.
 
