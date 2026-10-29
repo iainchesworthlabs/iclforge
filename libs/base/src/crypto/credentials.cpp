@@ -8,7 +8,6 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
-#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -19,7 +18,9 @@
 
 #include "iclforge/base/crypto/chain.hpp"
 #include "iclforge/base/crypto/der.hpp"
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/pem.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 
 namespace iclforge::base::crypto {
 namespace {
@@ -235,14 +236,20 @@ std::expected<P256PrivateKey, CredentialError> parse_key_text(std::span<const st
 }
 
 std::expected<std::vector<std::byte>, CredentialError> read_file(const std::string& path) {
-    std::ifstream in(path, std::ios::binary);
+    std::ifstream in;
+    // Unbuffered, and set before the file is opened (a stream ignores the request after): a
+    // stream's own buffer is a block of 4 to 8 KiB that the read fills with the file and that is
+    // freed, unwiped, when the stream is closed. For a key file that is the key.
+    in.rdbuf()->pubsetbuf(nullptr, 0);
+    in.open(path, std::ios::binary);
     if (!in) {
         return error(CredentialErrorKind::kUnreadable, "cannot open '" + path + "'");
     }
     std::vector<std::byte> bytes;
-    // A key file is read straight into the vector that is wiped later: no stack buffer holds a copy
-    // of it, and a vector reserved at the file's size is never regrown, which would leave the
-    // smaller block freed with the key in it. (A source of unknown size, a pipe, can still regrow.)
+    // A key file is read straight into the vector that is wiped later: no stack buffer and no
+    // stream buffer holds a copy of it, and a vector reserved at the file's size is never regrown,
+    // which would leave the smaller block freed with the key in it. (A source of unknown size, a
+    // pipe, can still regrow.)
     std::error_code size_error;
     const auto file_size = std::filesystem::file_size(path, size_error);
     if (!size_error && file_size <= kMaxCredentialFileBytes) {

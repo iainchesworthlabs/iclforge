@@ -32,3 +32,10 @@ iclforge_add_test_binary(iclforge-base-number-parse-libc-tests PROJECT base SOUR
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/number_parse_libc.cpp")
 target_link_libraries(iclforge-base-number-parse-libc-tests PRIVATE iclforge::base)
 target_compile_definitions(iclforge-base-number-parse-libc-tests PRIVATE ICLFORGE_BASE_STATIC_DEFINE)
+
+# What a private key leaves in freed memory (test_key_residue.cpp). A binary of its own: it replaces
+# the global allocation functions to look at each block as it is freed, and no other test should run
+# under that.
+iclforge_add_test_binary(iclforge-base-key-residue-tests PROJECT base SOURCES
+    test_key_residue.cpp)
+target_link_libraries(iclforge-base-key-residue-tests PRIVATE iclforge::base)
