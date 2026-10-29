@@ -146,8 +146,8 @@ struct ContainerFacts {
     std::vector<OtherTrack> other_tracks{};
     // MPEG-TS: the programme, its PMT's PID, the stream_type, how the PMT
     // named the codec ("atsc_stream_type", "dvb_descriptor",
-    // "registration_descriptor" or "dvb_extension_descriptor") and the
-    // packet size.
+    // "registration_descriptor", "dvb_extension_descriptor",
+    // "hdmv_stream_type" or "bare_truehd_stream_type") and the packet size.
     std::uint16_t program_number = 0;
     std::uint16_t pmt_pid = 0;
     std::uint8_t stream_type = 0;

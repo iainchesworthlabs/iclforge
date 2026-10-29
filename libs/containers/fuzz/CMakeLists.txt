@@ -31,3 +31,8 @@ endif()
 # entry point here whose input is by definition off a wire - an S/PDIF or
 # HDMI capture - and whose Pd word is an attacker-chosen length.
 iclforge_add_fuzzer(fuzz_iec61937_unwrap iclforge::containers)
+
+# iclforge::containers::iec61937::unwrap_mat_stream and MatPacker: TrueHD MAT, whose 24 slots each open with a
+# self-declared length (libs/containers/src/iec61937/mat.cpp). Its seed is one burst of FFmpeg-made TrueHD; the
+# MP4, Matroska and MPEG-TS harnesses above have a TrueHD file each among their seeds too.
+iclforge_add_fuzzer(fuzz_mat_unwrap iclforge::containers)

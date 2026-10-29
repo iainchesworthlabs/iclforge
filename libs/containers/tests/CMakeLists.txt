@@ -33,3 +33,22 @@ if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(iec61937/test_iec61937_ac4.cpp iec61937/test_iec61937_parts.cpp
                                 PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
+
+# TrueHD in the containers (planning/truehd.md, phase T2c): the tests read the committed FFmpeg fixtures
+# (ICLFORGE_GOLDEN_TRUEHD_DIR) and meet the truehd library only through truehd/truehd_stream.hpp, because the
+# library itself knows no codec. iclforge-truehd-container-tool is the same code as a command line, which
+# tools/checks/verify_truehd_containers.py runs against FFmpeg.
+if(TARGET iclforge::truehd)
+    target_sources(iclforge-containers-tests PRIVATE
+        iec61937/test_mat.cpp
+        matroska/test_matroska_truehd.cpp
+        mp4/test_mp4_truehd.cpp
+        mpegts/test_mpegts_truehd.cpp)
+    target_link_libraries(iclforge-containers-tests PRIVATE iclforge::truehd)
+
+    add_executable(iclforge-truehd-container-tool truehd/truehd_container_tool.cpp)
+    target_link_libraries(iclforge-truehd-container-tool
+        PRIVATE iclforge::containers iclforge::truehd iclforge::warnings iclforge::fmt)
+    target_include_directories(iclforge-truehd-container-tool PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    add_dependencies(iclforge-tests iclforge-truehd-container-tool)
+endif()

@@ -60,6 +60,22 @@ constexpr std::array<std::string_view, 5> kIsobmffLeadingTypes{"ftyp", "styp", "
     return (id == "RIFF" || id == "RF64" || id == "BW64") && form == "WAVE";
 }
 
+// A TrueHD or MLP elementary stream opens with an access unit: four header bytes (check nibble,
+// length, timing) and then, when the unit carries one, a major sync 0xF8726FBA or 0xF8726FBB (TH
+// spec §4.2). A stream cut at an access-unit boundary opens that way, and so does every file
+// `forge` writes. Recognised by that major sync before the packet grid below for the reason AC-3
+// is: a steady signal repeats bytes at a fixed period, and the grid test only counts recurrence.
+[[nodiscard]] bool has_truehd_major_sync(std::span<const std::byte> head) {
+    if (head.size() < 8) {
+        return false;
+    }
+    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
+           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
+           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
+           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
+            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
+}
+
 // A transport stream has no header at all - it is a bare repeating grid of
 // 188-byte packets, each starting with 0x47, and a capture may begin
 // anywhere in it. So the test is the grid itself: a sync byte that recurs at
@@ -185,6 +201,10 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
         box.bytes = config.payload.size();
         if (config.ac4) {
             box.type = "dac4";
+        } else if (config.mlp) {
+            // 'dmlp' (TrueHD): its format_info and peak data rate are in the TrueHD stream's own
+            // major sync, which `forge probe` reads; the box is named here and nothing else.
+            box.type = "dmlp";
         } else {
             box.type = config.eac3 ? "dec3" : "dac3";
             box.fscod = config.fscod;
@@ -233,6 +253,10 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
             return "registration_descriptor";
         case iclforge::containers::mpegts::CodecSignalling::kDvbExtensionDescriptor:
             return "dvb_extension_descriptor";
+        case iclforge::containers::mpegts::CodecSignalling::kHdmvStreamType:
+            return "hdmv_stream_type";
+        case iclforge::containers::mpegts::CodecSignalling::kBareTruehdStreamType:
+            return "bare_truehd_stream_type";
     }
     return "";
 }
@@ -348,6 +372,9 @@ ContainerKind sniff_container(std::span<const std::byte> head) {
     }
     // A WAV likewise, by its magic - see has_riff_wave_magic.
     if (has_riff_wave_magic(sniffed)) {
+        return ContainerKind::kUnknown;
+    }
+    if (has_truehd_major_sync(sniffed)) {
         return ContainerKind::kUnknown;
     }
     if (has_ts_packet_grid(sniffed)) {

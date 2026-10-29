@@ -1262,6 +1262,17 @@ Omitting `preset=` entirely leaves `qc` in measure-and-report mode — every num
 just no PASS/FAIL verdict and nothing to gate on. See [Commands → `qc`](commands.md#decoding-inspection) for the
 full report format and the exit-code convention this drives.
 
+## TrueHD and MLP options (`decode`)
+
+```text
+decode of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
+  truehd-presentation=best|2ch|6ch|8ch|all
+                    the substreams read; best (default) is the highest of substreams 0 to 2
+  truehd-check=strict|lenient
+                    strict (default) stops with exit status 2 at the first failed check;
+                    lenient counts failed checks and decodes on
+```
+
 ## Probe options (`probe`): `json=`, `detail=`
 
 ```text

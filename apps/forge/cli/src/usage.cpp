@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 112> kOptionTokens{{
+constexpr std::array<OptionToken, 122> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -80,7 +80,7 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"numblkscod=", "atmos* encode: 0-3 (default 3), §E2.3.1.4 short syncframes of 1/2/3/6 blocks"},
     {"search=", "AC-3 encode, and eac3-encode under CBR: bit-allocation search, off (default)"},
     {"fgaincod=", "encode: auto (default) or 0..7, §7.2.2.4 fast gain pinned for the whole encode"},
-    {"verify", "eac3-encode: decode every access unit as it's encoded and diff against it"},
+    {"verify", "eac3-encode and truehd-encode: decode every access unit as it's encoded and diff against it"},
     {"channels=", "decode/monitor: 2 or 1 apply the §7.8 output stage; as-coded (default) is a no-op; "
                   "decode of AC-4: 5.1 folds a 7.X stream to 5.X"},
     {"ltrt-phase=", "decode/monitor: off skips §7.8.2's real 90° surround phase shift"},
@@ -89,6 +89,16 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"dialogue-enhancement=", "decode of AC-4: raise the dialogue by 0 to 12 dB, capped by the stream"},
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
+    {"truehd-presentation=", "decode of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all"},
+    {"truehd-check=", "decode of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
+    {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
+    {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
+    {"truehd-peak-rate=", "truehd-encode: the rate the stream is declared not to exceed, kbit/s (default 18000)"},
+    {"truehd-rate-check=", "truehd-encode: strict (the default) refuses a stream that cannot be sent within the peak rate; lenient writes it and counts"},
+    {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
+    {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
+    {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},

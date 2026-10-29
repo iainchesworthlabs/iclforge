@@ -39,6 +39,7 @@ inline constexpr std::uint8_t kStreamTypePrivateData = 0x06;
 // profiles are recognised on the way in even though only one is written.
 inline constexpr std::uint8_t kStreamTypeAtscAc3 = 0x81;
 inline constexpr std::uint8_t kStreamTypeAtscEac3 = 0x87;
+inline constexpr std::uint8_t kStreamTypeTruehd = 0x83;  // TH spec §21.2
 
 // ISO/IEC 13818-1 Table 2-19: private_stream_1, the PES stream_id a
 // stream_type 0x06 payload is carried under.

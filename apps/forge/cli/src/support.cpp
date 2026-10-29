@@ -2312,6 +2312,137 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.bap_census_path = std::string{value};
             continue;
         }
+        // TrueHD and MLP, which 'decode' alone reads; run_decode says when the input is something else.
+        if (command == "decode" && key == "truehd-presentation") {
+            if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
+                fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
+                return false;
+            }
+            out.truehd_presentation = std::string{value};
+            continue;
+        }
+        if (command == "decode" && key == "truehd-check") {
+            if (value != "strict" && value != "lenient") {
+                fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);
+                return false;
+            }
+            out.truehd_lenient = value == "lenient";
+            continue;
+        }
+        // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
+        if (command == "truehd-encode" && key.starts_with("truehd-")) {
+            Options::TruehdEncode& enc = out.thdenc;
+            const std::string_view name = key.substr(7);
+            if (name == "downmix") {
+                if (value != "none" && value != "standard") {
+                    fmt::println(stderr, "error: truehd-downmix is none or standard (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.downmix = std::string{value};
+                continue;
+            }
+            if (name == "restart") {
+                const auto units = parse_u32_or(value, 0);
+                if (units == 0 || units > 4096) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-restart is the access units between restart headers, "
+                        "1 or 8 to 4096 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.restart_units = static_cast<int>(units);
+                continue;
+            }
+            if (name == "peak-rate") {
+                const auto kbps = parse_u32_or(value, 0);
+                if (kbps == 0 || kbps > 100000) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-peak-rate is a rate in kbit/s, 1 to 100000 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.peak_rate_kbps = kbps;
+                continue;
+            }
+            if (name == "rate-check") {
+                if (value != "strict" && value != "lenient") {
+                    fmt::println(stderr, "error: truehd-rate-check is strict or lenient (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.rate_lenient = value == "lenient";
+                continue;
+            }
+            if (name == "fir-order") {
+                if (value.size() != 1 || value[0] < '0' || value[0] > '8') {
+                    fmt::println(stderr, "error: truehd-fir-order is 0 to 8 (got '{}')", token);
+                    return false;
+                }
+                enc.fir_order = value[0] - '0';
+                continue;
+            }
+            if (name == "matrix") {
+                if (value != "on" && value != "off") {
+                    fmt::println(stderr, "error: truehd-matrix is on or off (got '{}')", token);
+                    return false;
+                }
+                enc.matrix = value == "on";
+                continue;
+            }
+            if (name == "stereo-mode") {
+                if (value == "stereo") {
+                    enc.stereo_mode = 0;
+                } else if (value == "ltrt") {
+                    enc.stereo_mode = 1;
+                } else if (value == "headphone") {
+                    enc.stereo_mode = 2;
+                } else {
+                    fmt::println(
+                        stderr, "error: truehd-stereo-mode is stereo, ltrt or headphone (got '{}')",
+                        token);
+                    return false;
+                }
+                continue;
+            }
+            if (name == "downmix-gains") {
+                std::array<double, 4> gains{};
+                std::string_view rest = value;
+                bool good = true;
+                for (std::size_t i = 0; i < gains.size() && good; ++i) {
+                    const std::size_t comma = rest.find(',');
+                    const std::string_view part = rest.substr(0, comma);
+                    double db = 0.0;
+                    if (part == "off") {
+                        gains[i] = 0.0;
+                    } else if (parse_double(part, db) && std::isfinite(db) && db <= 0.0 &&
+                               db >= -60.0) {
+                        gains[i] = std::pow(10.0, db / 20.0);
+                    } else {
+                        good = false;
+                    }
+                    if (i + 1 < gains.size()) {
+                        good = good && comma != std::string_view::npos;
+                        rest = comma == std::string_view::npos ? std::string_view{}
+                                                               : rest.substr(comma + 1);
+                    } else {
+                        good = good && comma == std::string_view::npos;
+                    }
+                }
+                if (!good) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-downmix-gains is four gains in dB, 0 to -60 or off, for C, "
+                        "Ls and Rs, LFE, and Lrs and Rrs, e.g. -3,-3,off,-3 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.downmix_gains = gains;
+                continue;
+            }
+        }
         // Scoped like bap-census, and for the same reason: only these two
         // record an AC-4 syntax trace. 'decode' refuses it for AC-3 and E-AC-3
         // input itself, since which syntax a stream holds is known only once

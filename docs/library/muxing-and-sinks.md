@@ -674,6 +674,27 @@ read back the exact original frame count and duration. The same holds for what `
 streams, and for the DASH MPD: see [Validation](../verification.md#where-the-oracles-dont-reach)
 for exactly what was and was not checked externally.
 
+## TrueHD in the containers
+
+`iclforge::containers` carries Dolby TrueHD in MP4, Matroska and MPEG-TS, and packs it as MAT for HDMI. As for the
+other codecs, the containers read no codec: the caller passes whole access units, each with its 4-byte header and
+unmodified (`iclforge::truehd::ElementaryReader` yields exactly that), and tells the container which units open with a
+major sync. TH spec §21 names these formats but gives no layout for any of them, so each is the layout FFmpeg's muxer
+writes, with FFmpeg's own demuxer and muxer as the check in both directions. No document was found for the MP4 and MAT
+layouts, and no receiver or disc player has read either. [`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)
+records each layout, the evidence and the questions that are open.
+
+| Container | How | Notes |
+|---|---|---|
+| MP4 | `mp4::mux` and `mp4::fragment` with `AudioTrack::codec_id` `kCodecTruehd` (`mlpa`), the `dmlp` payload from `mp4::build_dmlp_payload` and `sync_samples` set on the units with a major sync | One access unit to a sample. The sample entry's rate field is a plain integer, not 16.16, so 96 and 192 kHz fit. An `Edit` drops the padding samples the last unit's end-of-stream marker counts. `mp4::demux` and `mp4::Reader` return the `dmlp` fields in `ReadTrack::codec_config`. |
+| Matroska | `matroska::mux` and `matroska::Writer` with `kCodecTruehd` (`A_TRUEHD`), no CodecPrivate, `MuxOptions::key_frames` (or `Writer::push(frame, keyframe)`) set on the units with a major sync, and `AudioTrack::bit_depth` if the caller knows it | `matroska::demux` selects an `A_TRUEHD` track as it does `A_AC3` and `A_EAC3`. |
+| MPEG-TS | `mpegts::mux` and `mpegts::Writer` with `AudioCodec::kTruehd` and `BroadcastProfile::kBluray`: stream_type 0x83 and a program-level `HDMV` registration descriptor | `mpegts::demux` takes 0x83 with or without the registration (`ReadStream::signalling` says which) and reads 188- and 192-byte packets. There is no M2TS writer. The payloads concatenated are the elementary stream. |
+| MAT | `iec61937::MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream` (`iclforge/containers/iec61937/mat.hpp`) | 24 access units to a 61,440-byte IEC 61937 burst of data type 22, written as 16-bit little-endian words. The last frame is padded; FFmpeg drops it. |
+
+The checks are `tools/checks/verify_truehd_containers.py` (FFmpeg, over the committed fixtures: 120 legs, 8 skipped
+because FFmpeg's `spdif` demuxer reads no stream from its own MAT) and the cases tagged `[truehd]` in
+`iclforge-containers-tests`, which hold the MAT bytes to FFmpeg's by SHA-256.
+
 ## Muxer errors
 
 Every muxing entry point above returns `std::expected`, against a per-module `MuxError` enum

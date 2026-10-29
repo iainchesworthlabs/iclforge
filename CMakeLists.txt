@@ -181,6 +181,10 @@ option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (lib
 # it unconditionally.
 option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the decoder and the encoder (libs/ac4)" ON)
 
+# The TrueHD and MLP codec (libs/truehd, iclforge::truehd, planning/truehd.md): the bitstream layer and
+# the lossless decoder. It links iclforge::base and nothing else, so it defaults ON like iclforge::iab.
+option(ICLFORGE_BUILD_TRUEHD "Build the TrueHD and MLP codec: the bitstream layer and the decoder (libs/truehd)" ON)
+
 # iclforge::iab (libs/iab) - IAB reader, phase 1: a standalone reader for SMPTE
 # ST 2098-2's Immersive Audio Bitstream. Like the three container writers above, it needs no
 # opt-in third-party library (unlike iclforge::adm, see its own option() below), so it defaults ON the
@@ -327,6 +331,10 @@ if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFO
         "ICLFORGE_BUILD_GUI and ICLFORGE_BUILD_TESTS to all be OFF too - they all link iclforge::ac4 "
         "unconditionally.")
 endif()
+if(NOT ICLFORGE_BUILD_TRUEHD AND ICLFORGE_BUILD_CLI)
+    message(FATAL_ERROR "ICLFORGE_BUILD_TRUEHD=OFF requires ICLFORGE_BUILD_CLI to be OFF too - forge "
+        "decodes and probes TrueHD and MLP through iclforge::truehd unconditionally.")
+endif()
 # Hearth's applications (apps/hearth), as distinct from the libraries under them. ON, with
 # ICLFORGE_BUILD_HEARTH, is every build that is not a board's or an Android app's. OFF leaves
 # libs/sendspin and libs/sink to a program that links them through a wrapper of its own: Hearth for
@@ -360,7 +368,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
                           ICLFORGE_BUILD_EXAMPLES ICLFORGE_BUILD_MATROSKA ICLFORGE_BUILD_MP4
                           ICLFORGE_BUILD_MPEGTS ICLFORGE_BUILD_IAB ICLFORGE_BUILD_IAMF
                           ICLFORGE_BUILD_CAPI ICLFORGE_BUILD_ADM ICLFORGE_BUILD_PYTHON
-                          ICLFORGE_BUILD_FUZZERS ICLFORGE_BUILD_AC4)
+                          ICLFORGE_BUILD_FUZZERS ICLFORGE_BUILD_AC4 ICLFORGE_BUILD_TRUEHD)
         if(${_opt})
             list(APPEND _ac3_minimal_conflicts "${_opt}")
         endif()
@@ -560,6 +568,13 @@ if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)
     add_subdirectory(libs/ac4)
 endif()
 
+# The TrueHD and MLP codec, a peer of iclforge::ac3 and iclforge::ac4 that links only iclforge::base:
+# the bitstream layer and the decoder (libs/truehd). Gated by ICLFORGE_BUILD_TRUEHD (default ON, see
+# the option() above).
+if(ICLFORGE_BUILD_TRUEHD)
+    add_subdirectory(libs/truehd)
+endif()
+
 # A standalone reader - roadmap item IM1
 # phase 1 ("IAB (SMPTE ST 2098-2) reader"). Gated by ICLFORGE_BUILD_IAB
 # (default ON, see the option() above).
@@ -700,7 +715,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 iab adm capi sendspin sink)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 truehd iab adm capi sendspin sink)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")
@@ -723,7 +738,7 @@ endif()
 # instruments; each file guards its harnesses on the option that builds their library.
 if(ICLFORGE_BUILD_FUZZERS)
     include(IclforgeFuzz)
-    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 adm sendspin)
+    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 truehd adm sendspin)
         add_subdirectory(libs/${_iclforge_lib}/fuzz)
     endforeach()
     unset(_iclforge_lib)

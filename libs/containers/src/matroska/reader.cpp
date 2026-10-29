@@ -348,7 +348,7 @@ enum class Lacing : std::uint8_t { kNone, kXiph, kFixed, kEbml };
 // is the only codec-aware line in the module, and a caller naming a
 // TrackNumber explicitly bypasses it entirely (see ReadOptions).
 [[nodiscard]] bool is_selectable_codec(std::string_view codec_id) {
-    return codec_id == kCodecEac3 || codec_id == kCodecAc3;
+    return codec_id == kCodecEac3 || codec_id == kCodecAc3 || codec_id == kCodecTruehd;
 }
 
 // How many tracks a file may have listed beside the one that is read: a hostile Tracks declares as
@@ -386,7 +386,7 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kMalformed:
             return "malformed element, vint or block layout";
         case DemuxError::kNoAudioTrack:
-            return "no A_AC3/A_EAC3 audio track (or the requested track number is absent)";
+            return "no A_AC3/A_EAC3/A_TRUEHD audio track (or the requested track number is absent)";
         case DemuxError::kLimitExceeded:
             return "element size or nesting depth beyond the reader's limits";
         case DemuxError::kEncryptedTrack:

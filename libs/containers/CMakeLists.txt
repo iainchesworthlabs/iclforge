@@ -18,7 +18,7 @@
 # installs none of its headers (cmake/InstallLibrary.cmake). The five were libraries of their own
 # until planning/consolidation.md's C3.
 # ---------------------------------------------------------------------------
-set(_containers_sources src/iec61937/iec61937.cpp)
+set(_containers_sources src/iec61937/iec61937.cpp src/iec61937/mat.cpp)
 set(_containers_not_built "")
 if(ICLFORGE_BUILD_MATROSKA)
     list(APPEND _containers_sources src/matroska/matroska.cpp src/matroska/reader.cpp)

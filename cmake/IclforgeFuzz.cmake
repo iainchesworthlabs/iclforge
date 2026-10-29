@@ -109,6 +109,11 @@ endif()
 if(ICLFORGE_BUILD_IAB)
     iclforge_instrument_for_fuzzing(iclforge_iab_objects)
 endif()
+# fuzz_truehd_parse and fuzz_truehd_decode mutate the TrueHD reader and decoder, which take their lengths,
+# end pointers and counts from the stream.
+if(ICLFORGE_BUILD_TRUEHD)
+    iclforge_instrument_for_fuzzing(iclforge_truehd_objects)
+endif()
 if(ICLFORGE_BUILD_ADM)
     iclforge_instrument_for_fuzzing(iclforge_adm_objects)
 endif()

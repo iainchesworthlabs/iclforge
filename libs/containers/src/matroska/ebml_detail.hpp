@@ -46,6 +46,7 @@ inline constexpr std::uint32_t kLanguage = 0x22B59C;
 inline constexpr std::uint32_t kAudio = 0xE1;
 inline constexpr std::uint32_t kSamplingFrequency = 0xB5;
 inline constexpr std::uint32_t kChannels = 0x9F;
+inline constexpr std::uint32_t kBitDepth = 0x6264;
 
 inline constexpr std::uint32_t kCluster = 0x1F43B675;
 inline constexpr std::uint32_t kClusterTimestamp = 0xE7;

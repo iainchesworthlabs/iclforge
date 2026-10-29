@@ -27,6 +27,7 @@
 #include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
 #include "commands/synth.hpp"
+#include "commands/truehd.hpp"
 #include "exit_codes.hpp"
 #include "platform/console_encoding.hpp"
 #include "support.hpp"
@@ -218,7 +219,7 @@ int run_words(const std::vector<std::string>& words) {
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 46> kCommands{{
+constexpr std::array<Command, 47> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -387,7 +388,25 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kStdio | topic::kAc4Encode,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
-    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
+    {"truehd-encode", 3, "<in.wav> <out.thd|out.mkv|out.mp4|out.ts>",
+     "1 to 8 channels of 16 or 24 bit PCM at 44.1, 48, 88.2, 96, 176.4 or 192 kHz, with the speakers "
+     "the WAV's channel mask names, or in the order decode writes them (L R C LFE Ls Rs Lrs Rrs) when "
+     "it has none, to a lossless TrueHD stream: bare, or in Matroska, MP4 "
+     "or a Blu-ray transport stream when the output is .mkv, .mp4 or .ts. Decoding it gives the "
+     "samples back, bit for bit, and so does FFmpeg's strict decode. Each restart interval "
+     "(truehd-restart=, 128 access units by default) is coded whole, with FIR prediction "
+     "(truehd-fir-order=), a pair matrix where it helps (truehd-matrix=) and the shortest of three "
+     "codebooks or raw residuals; the 2, 6 and 8 channel presentations are a stereo and 5.1 downmix "
+     "of the source with truehd-downmix=standard (truehd-downmix-gains=), and the first two "
+     "channels and so on as they are with none. The stream is kept within truehd-peak-rate= "
+     "(18000 kbit/s, Blu-ray's) and TH spec section 18's 75 ms, or truehd-rate-check=lenient writes "
+     "it anyway and counts the violations; verify decodes every access unit as it is coded and "
+     "compares it with the input. 24 bit input is coded as 24 bit and 16 bit input as the same "
+     "samples with their clear low bits sent as an output shift",
+     topic::kStdio,
+     Needs::kNothing,
+     [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
+    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "
      "direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and "
@@ -444,14 +463,15 @@ constexpr std::array<Command, 46> kCommands{{
          const auto inputs = x.tail(2);
          return run_cat(x.str(1), inputs);
      }},
-    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
-     "per-channel peak/RMS report; an AC-4 presentation as coded",
+    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
+     "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded",
      topic::kProgramme | topic::kAc4Decode,
      Needs::kNothing,
      [](const Args& x) { return run_levels(x.str(1), x.meta); }},
-    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
+    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
      "BS.1770-4 loudness -> dialnorm, beside a stream's own: an AC-3 or E-AC-3 stream's first "
-     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB",
+     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB; a TrueHD or MLP "
+     "stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights)",
      topic::kAc4Decode,
      Needs::kNothing,
      [](const Args& x) { return run_loudness(x.str(1), x.meta); }},
@@ -463,13 +483,14 @@ constexpr std::array<Command, 46> kCommands{{
      "against its dialnorm and the loudness it states",
      topic::kQc | topic::kProgramme | topic::kAc4Decode,
      Needs::kNothing, [](const Args& x) { return run_qc(x.str(1), x.meta); }},
-    {"spdif", 3, "<in.ac3|in.ec3|in.ac4> <out.wav>",
+    {"spdif", 3, "<in.ac3|in.ec3|in.ac4|in.thd> <out.wav>",
      "IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream "
-     "(programme=); AC-4 in IEC 61937-14's bursts",
+     "(programme=); AC-4 in IEC 61937-14's bursts; TrueHD in MAT bursts (an eight-channel WAV, or "
+     "the raw bursts when the output is not .wav)",
      topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_spdif(x.str(1), x.str(2), x.meta); }},
-    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|->",
+    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|out.thd|->",
      "the inverse: recover the elementary stream from IEC 61937 bursts, as captured from "
      "an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end",
      topic::kStdio,
@@ -495,13 +516,15 @@ constexpr std::array<Command, 46> kCommands{{
          }
          return run_project(x.str(1), out, print, run_words);
      }},
-    {"mkv", 3, "<in.ac3|in.ec3> <out.mkv>",
-     "wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it",
+    {"mkv", 3, "<in.ac3|in.ec3|in.thd|in.mlp> <out.mkv>",
+     "wrap as a playable Matroska file (A_AC3, A_EAC3 or A_TRUEHD); AC-4 is refused, Matroska "
+     "registering no codec ID for it",
      topic::kMkv,
      Needs::kNothing,
      [](const Args& x) { return run_mkv(x.str(1), x.str(2), x.meta); }},
-    {"mp4", 3, "<in.ac3|in.ec3|in.ac4> <out.mp4>",
-     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4", topic::kNone,
+    {"mp4", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.mp4>",
+     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3, dac4 for AC-4 or 'mlpa'/'dmlp' for "
+     "TrueHD and MLP", topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_mp4(x.str(1), x.str(2), x.meta); }},
     {"fmp4", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment]",
@@ -512,11 +535,12 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kFmp4 | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) { return run_fmp4(x.str(1), x.str(2), x.u32(3, 48), x.meta); }},
-    {"ts", 3, "<in.ac3|in.ec3|in.ac4> <out.ts> [dvb|atsc]",
-     "wrap as MPEG-2 TS; AC-4 supports DVB only",
+    {"ts", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ts> [dvb|atsc|bluray]",
+     "wrap as MPEG-2 TS; AC-4 supports DVB only; TrueHD and MLP are Blu-ray's stream_type 0x83 "
+     "(profile bluray, the default for them)",
      topic::kTs | topic::kMeta,
-     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3, "dvb"), x.meta); }},
-    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4>",
+     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3), x.meta); }},
+    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4|out.thd>",
      "the inverse of 'mkv': unwrap the elementary stream a container carries. The container is "
      "identified by its own magic bytes, not by the file name",
      topic::kStdio,

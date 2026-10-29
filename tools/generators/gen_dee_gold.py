@@ -73,6 +73,10 @@ made them. Each TrueHD entry says so (TRUEHD_NOTE).
 
 What DEE 6.5.4 could not be made to write is in the manifest's dee_cannot (DEE_CANNOT).
 
+The TrueHD legs are what tools/checks/score_truehd_decode.py scores a decoder with, from this
+manifest and the streams and sources it names (docs/verification.md, "Scoring DEE's TrueHD
+streams"). Make them before the licence ends: --only thd- makes just those.
+
 Usage (repo root):
   python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold [--cli ICLFORGE_CLI]
       [--jobs N] [--only NAME_PART ...] [--masters DIR]
@@ -195,8 +199,9 @@ G2_GROUPS = {
     "ac3-metadata": "AC-3 metadata, the same, and AC-3's timecode",
     "joc": "E-AC-3 JOC from channel beds: the object layer's third-party coverage "
            "(test_dee_joc_fixture.cpp), transcoding to AC-4 (planning/ac4.md I1, I5)",
-    "truehd": "TrueHD with a lossless source: the TrueHD module's decode material "
-              "(feature/truehd-atmos-support, ROADMAP.md) and MAT passthrough",
+    "truehd": "TrueHD with a lossless source: the TrueHD module's decode material, scored "
+              "against the sources by tools/checks/score_truehd_decode.py (planning/truehd.md), "
+              "and MAT passthrough",
     "programme": "60 s and 300 s programmes for soak tests and listening: the ESP32 player "
                  "(planning/esp32-stream-set.md), Hearth",
     "objects": "Atmos-master inputs, refused on provenance as in the AC-4 gold set",
