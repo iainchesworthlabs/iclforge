@@ -2309,8 +2309,8 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
 only, and part of the second has no outside reader.
 
 1. **FFmpeg's strict decode** (`-err_detect crccheck+bitstream+buffer+explode`) of the streams its `truehd` and `mlp`
-   encoders write. The codec is lossless, so a decode either equals FFmpeg's sample for sample or is wrong: 12 committed
-   fixtures (`testdata/truehd/`, 1, 2 and 6 channels, 44.1 to 192 kHz, 16 and 24 bits, both stream types) are held to the
+   encoders write. The codec is lossless, so a decode either equals FFmpeg's sample for sample or is wrong: 25 committed
+   fixtures (`testdata/truehd/`, 1 to 6 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, both stream types, restart intervals of 8, 16 and 128 units) are held to the
    SHA-256 of FFmpeg's decode by the library's test, by `forge decode` (`tools/checks/verify_truehd_interop.py --forge`)
    and by `tools/references/truehd_syntax.py`, an independent transcription. Nineteen more streams were compared
    while the decoder was written. That comparison found the check values, the matrix scaling, the lossless check's fold
@@ -2323,7 +2323,7 @@ only, and part of the second has no outside reader.
    same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
    do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
-   block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. Each
+   block data check, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
    it: for nine of the twelve it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, LSB bypass, three matrices
@@ -2336,6 +2336,10 @@ only, and part of the second has no outside reader.
    restart (question 18), the width of `shr7` in noise generator 0 (question 5) and the block data length (entry 21). What FFmpeg
    does not read stays without an outside reader: the layout of the extra data, the values of the DRC word, the block data CRC,
    and the 16-channel substream; for those a misreading of the specification is in the writer and in both decoders alike.
+   `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
+   (63 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
+   the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
+   failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
    is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
@@ -2395,6 +2399,43 @@ The streams are test inputs only (the decision of 2026-09-26): they are decoded 
 no one reads a stream to learn how DEE wrote it. A FAIL is therefore not a reason to change the decoder to fit one stream;
 it is an entry in `libs/truehd/ERRATA.md` (the leg, the check that failed, what the specification says) and, if it is the
 sixteen-channel substream, the terminators or the evolution payload (open questions 1 and 3), a question for the owner.
+
+### Checking your own Blu-ray soundtracks
+
+The codec is lossless, so two correct decoders return the same samples. `tools/checks/verify_truehd_local_streams.py` holds
+`forge decode` to FFmpeg's strict decode on TrueHD tracks you ripped from your own discs. They are never committed or copied:
+the script reads them where they are.
+
+Put the tracks in one directory (BDAV `.m2ts`, `.ts`, Matroska, MP4 or a raw `.thd`), have `ffmpeg` and `ffprobe` on `PATH`
+and run, with a forge built from this tree:
+
+```sh
+ICLFORGE_TRUEHD_STREAMS=/path/to/tracks ICLFORGE_CLI=build/bin/forge \
+    python3 tools/checks/verify_truehd_local_streams.py --anonymous --report truehd-local.txt
+```
+
+With the variable unset it prints SKIP and exits 0. `--self-test` runs it on stand-ins built from the committed fixtures instead
+(a BDAV `.m2ts`, Matroska, MP4, and transport streams with AC-3 frames in the stream), which is also a test of the script itself.
+
+For each TrueHD or MLP track, FFmpeg extracts the stream, and FFmpeg's strict decode and `forge decode` of it are compared
+channel by channel, sample for sample (FFmpeg returns the channels of a 7 or 8 channel stream in its own order, so they are
+matched by content and the order is reported). FFmpeg only warns when a lossless check fails, so its warnings are counted. When
+the file is not over `--max-container-mib` (2048) and forge's first stream in it is this track, `forge decode` of the file as it
+is must give the same samples, which tests the container reader and the handling of an AC-3 core. The table has the container,
+rate, channel layout, sample width, duration, access units, restart headers, mean and peak rate, the AC-3 frames that share the
+stream, access units with extra data (evolution frames), whether an object substream (Atmos) is present, each decoder's
+lossless-check failures, and anything forge refused. A track with an object substream is decoded as its 7.1 bed; the objects
+and the payload are carried, not read (`libs/truehd/ERRATA.md`, question 1), and FFmpeg may refuse such a track outright.
+
+The script writes a copy of each track and its decode to the system temporary directory and removes them; keep free space
+for about the size of the largest decoded track (a two-hour 5.1 film is several gigabytes). forge reads a stream whole, so its
+memory is of that order too. The output is names (or numbers with `--anonymous`), counts and rates, never samples.
+
+Send back the table (`--report`), the "Transport stream layout" lines it ends with for a `.m2ts` or `.ts` file, and the first
+lines of `ffmpeg -version` and `forge --version`. The layout lines say, for a track's PID, which PES packets hold access units
+(T), AC-3 frames (A) or both (M) and what their headers say; they answer how a disc lays out its AC-3 core
+(`libs/containers/ERRATA.md`, open question 9). A row that says DIFFERENT, or a lossless-check count that is not zero, is a
+defect in one decoder: send the row, not the audio.
 
 ## What untrusted input is checked against
 

@@ -79,7 +79,10 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     heavy DRC; the directory's standard DRC word (§12.1) is read and carried (entry 18). Please give the layout, or
     a DEE stream that sets `heavy_drc_present`.
 11. **Where a bypassed LSB comes from (§10.2, §17.1, §17.5).** v3.5 says that with `lsb_bypass` set "the matrix output
-    LSB comes from noise" ("rather than the coefficient computation"). No stream sets `lsb_bypass`, and the block data
+    LSB comes from noise" ("rather than the coefficient computation"). The twelve FFmpeg streams whose matrix sets the flag
+    (every 24 bit stereo stream; `python3 tools/checks/check_truehd_coverage.py --list`) carry one bit a sample for it and
+    decode exactly as FFmpeg's decoder does, so the reading below has that oracle; what is not known is the specification's
+    word "noise". The block data
     syntax (§8.1) has no field for it. The library reads one bit a sample, for each matrix with the flag, from the
     sample data (before the channels' residuals) and adds it to the matrix output; that reading is not in the
     specification (**provisional, owner to confirm**). Which noise channel, which bit, and does the stream carry it?
@@ -129,6 +132,15 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     whole count. FFmpeg ignores the field: its strict decode of `hb_extra_data` returns the same samples with the length changed
     by -1 and +5 and with a wrong check nibble (`python3 tools/checks/probe_truehd_extra_length.py`), so no oracle decides it.
     Is it the words less one? **Provisional, owner to confirm.**
+
+20. **The lossless check across a join (§7.3; entry 12).** Two streams of one format joined end to end
+    (`testdata/truehd/truehd_cat_st48_s24.thd`, `planning/truehd-fixtures.md`): the second stream's first restart header
+    carries a lossless check that checks nothing (entry 12). The library reads it as the check of the first stream's last
+    interval, finds it wrong and, strict, stops at the join; lenient, it counts the failure and decodes on, to the samples
+    FFmpeg's strict decode returns (FFmpeg logs "Lossless check failed - expected 00, calculated e7" as a warning and goes
+    on: `-xerror` does not make it fatal). Should a decoder skip the check at a major sync that starts a new stream, and how
+    is that told? Recommendation: keep the strict stop, since one file holding two streams is not a disc's stream, and
+    document `truehd-check=lenient` for it. Evidence: `python3 tools/checks/verify_truehd_interop.py --forge forge`.
 
 ## Entries
 
