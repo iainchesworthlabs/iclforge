@@ -228,6 +228,8 @@ struct CertSpec {
         key_usage;  // RFC 5280 bit 0 = digitalSignature; critical, when set
     bool unknown_critical_extension = false;
     bool unknown_noncritical_extension = false;
+    bool repeat_basic_constraints = false;    // a second basicConstraints, cA TRUE, after the first
+    bool repeat_unknown_extension = false;    // the non-critical unknown extension a second time
     bool generalized_time = false;
     int version = 2;  // v3
 };
@@ -298,6 +300,13 @@ inline Bytes issue(const CertSpec& spec, const iclforge::base::crypto::P256Priva
     if (spec.unknown_noncritical_extension) {
         extensions =
             cat({extensions, extension("1.3.6.1.4.1.99999.1", false, octets(Bytes{std::byte{1}}))});
+    }
+    if (spec.repeat_unknown_extension) {
+        extensions =
+            cat({extensions, extension("1.3.6.1.4.1.99999.1", false, octets(Bytes{std::byte{1}}))});
+    }
+    if (spec.repeat_basic_constraints) {
+        extensions = cat({extensions, extension("2.5.29.19", true, sequence(boolean(true)))});
     }
     if (spec.unknown_critical_extension) {
         extensions =

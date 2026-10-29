@@ -10,10 +10,10 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "iclforge/base/crypto/der.hpp"
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/sha1.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 
@@ -214,7 +214,9 @@ std::optional<DistinguishedName> parse_name(const der::Tlv& name) {
             if (!out.text.empty()) {
                 out.text += ", ";
             }
-            out.text += label + "=" + text;
+            out.text += label;
+            out.text += '=';
+            out.text += text;
             if (*oid_text == "2.5.4.3" && !out.common_name) {
                 out.common_name = text;
             } else if (*oid_text == "2.5.4.12" && !out.title) {
@@ -335,7 +337,7 @@ bool parse_basic_constraints(std::span<const std::byte> extension_value, bool& c
         if (!value) {
             return false;
         }
-        path_length = *value;
+        path_length = value;
     }
     return true;
 }
@@ -482,6 +484,7 @@ std::expected<Certificate, X509Error> parse_certificate(std::span<const std::byt
             return Unexpected(X509Error::kMalformed);
         }
         std::span<const std::byte> extensions = list->content;
+        std::vector<std::string> seen;  // RFC 5280 §4.2: no extension appears twice
         while (!extensions.empty()) {
             const auto extension = der::read_expecting(extensions, der::kSequence);
             if (!extension) {
@@ -505,6 +508,14 @@ std::expected<Certificate, X509Error> parse_certificate(std::span<const std::byt
             if (!oid_text) {
                 return Unexpected(X509Error::kMalformed);
             }
+            // "A certificate MUST NOT include more than one instance of a particular extension"
+            // (RFC 5280 §4.2). Reading the last of two basicConstraints, as this loop would, is a
+            // choice the specification does not give a reader; OpenSSL refuses the certificate, and
+            // so does this.
+            if (std::ranges::find(seen, *oid_text) != seen.end()) {
+                return Unexpected(X509Error::kMalformed);
+            }
+            seen.push_back(*oid_text);
             if (*oid_text == kOidKeyUsage) {
                 cert.key_usage = parse_key_usage(value->content);
                 if (!cert.key_usage) {

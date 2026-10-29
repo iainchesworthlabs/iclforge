@@ -182,6 +182,24 @@ TEST_CASE("certificate parsing refuses what it cannot vouch for", "[crypto][x509
         spec.unknown_noncritical_extension = true;
         CHECK(crypto::parse_certificate(pki::issue(spec, key, issuer, issuer_key)).has_value());
     }
+    SECTION("an extension that appears twice is refused (RFC 5280 section 4.2)") {
+        // The second basicConstraints says cA TRUE where the first says FALSE: a reader that took
+        // the last would make a CA of a certificate its issuer marked as an end entity.
+        spec.ca = false;
+        spec.repeat_basic_constraints = true;
+        const auto twice_bc = crypto::parse_certificate(pki::issue(spec, key, issuer, issuer_key));
+        REQUIRE_FALSE(twice_bc.has_value());
+        CHECK(twice_bc.error() == crypto::X509Error::kMalformed);
+
+        spec.ca = std::nullopt;
+        spec.repeat_basic_constraints = false;
+        spec.unknown_noncritical_extension = true;
+        spec.repeat_unknown_extension = true;
+        const auto twice_unknown =
+            crypto::parse_certificate(pki::issue(spec, key, issuer, issuer_key));
+        REQUIRE_FALSE(twice_unknown.has_value());
+        CHECK(twice_unknown.error() == crypto::X509Error::kMalformed);
+    }
     SECTION("a v1 certificate is refused") {
         spec.version = 0;
         const auto parsed = crypto::parse_certificate(pki::issue(spec, key, issuer, issuer_key));
