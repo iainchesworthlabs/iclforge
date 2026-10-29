@@ -269,8 +269,10 @@ iclforge_add_library(base
         src/wav_format.cpp
         src/wav_stream_reader.cpp
         src/wav_stream_writer.cpp
+        src/crypto/sha1.cpp
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
+        src/crypto/ecdsa_p256.cpp
         src/crypto/signing_key.cpp
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
