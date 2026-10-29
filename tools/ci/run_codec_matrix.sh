@@ -115,6 +115,8 @@ fi
 # script's own location rather than $PWD, so it does not matter where the
 # script was invoked from.
 FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/audio" && pwd)"
+# The TrueHD and MLP streams FFmpeg's encoders wrote (tools/generators/gen_truehd_ffmpeg.py).
+TRUEHD_FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/truehd" && pwd)"
 # The karaoke example's project, for the `forge project` section at the end. Resolved here for the
 # same reason: CI runs this script by a relative path, which names nothing after the `cd`.
 PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
@@ -1325,6 +1327,166 @@ run fmp4 ac4_51_192.ac4 i1_ac4_fmp4 24
 run_ac4_fmp4_check i1_ac4_fmp4 ac4_51_192.ac4
 run fmp4 ac4_stereo_2997.mp4 i1_ac4_fmp4_2997 20
 run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
+
+# --- TrueHD and MLP (iclforge::truehd, planning/truehd.md) ----------------------------------------
+# The lossless codec makes every check here exact: a decode is the source sample for sample or it
+# is wrong, so these are comparisons of bytes, not SNR floors. FFmpeg's strict decode is the
+# independent oracle (CONTRIBUTING.md's "Oracles", #2): the PCM forge writes must equal the PCM
+# FFmpeg's decoder gives for the same stream, and every container the CLI writes must be read back
+# by FFmpeg to the same PCM. What FFmpeg's encoders do not write (IIR filters, LSB bypass, noise,
+# the 16-channel substream) has no leg here: libs/truehd's tests hold hand-built streams to their
+# signals, and tools/checks/verify_truehd_interop.py names the gaps.
+#
+# The streams are testdata/truehd's, FFmpeg-made (tools/generators/gen_truehd_ffmpeg.py).
+
+# FFmpeg's strict decode of $1 (a TrueHD stream or MLP stream, bare or in a container; $2 names its
+# demuxer when the container is not self-describing) as 32-bit little-endian PCM on stdout.
+truehd_ffmpeg_pcm() {
+    ffmpeg -v error -xerror -err_detect crccheck+bitstream+buffer+explode "${@:2}" -i "$1" -f s32le -
+}
+
+# forge's decode of $1 must give the PCM FFmpeg gives for $2 (the stream, read as codec $3).
+run_truehd_bitexact_check() {
+    count=$((count + 1))
+    echo "[$count] truehd bit-exact $1 against ffmpeg's strict decode of $2"
+    truehd_ffmpeg_pcm "$1" >"$1.s32" # a WAV: ffmpeg widens its 24-bit samples to the 32-bit layout
+    truehd_ffmpeg_pcm "$2" -f "$3" >"$2.ffmpeg.s32"
+    cmp -s "$1.s32" "$2.ffmpeg.s32" || {
+        echo "forge's decode of $2 differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+}
+
+# A container's file must give FFmpeg the PCM the bare stream gives it.
+run_truehd_container_check() {
+    count=$((count + 1))
+    echo "[$count] truehd container $1 reads in ffmpeg as $2 does"
+    truehd_ffmpeg_pcm "$1" >"$1.s32"
+    truehd_ffmpeg_pcm "$2" -f "$3" >"$2.ffmpeg.s32"
+    cmp -s "$1.s32" "$2.ffmpeg.s32" || {
+        echo "ffmpeg's decode of $1 differs from its decode of $2" >&2
+        exit 1
+    }
+}
+
+for fixture in truehd_mono48_s24.thd truehd_st44_s24.thd truehd_st48_s16.thd truehd_st48_s24.thd \
+    truehd_st96_s24.thd truehd_st192_s24.thd truehd_m51_s16.thd truehd_m51_s24.thd \
+    mlp_st44_s16.mlp mlp_st48_s24.mlp mlp_st96_s24.mlp mlp_m51_s24.mlp; do
+    name="${fixture%.*}"
+    case "$fixture" in
+        *.mlp) codec=mlp ;;
+        *) codec=truehd ;;
+    esac
+    cp "$TRUEHD_FIXTURES/$fixture" "th_$fixture"
+    run probe "th_$fixture"
+    run probe "th_$fixture" json=1
+    run decode "th_$fixture" "th_$name.wav"
+    run_truehd_bitexact_check "th_$name.wav" "th_$fixture" "$codec"
+    run levels "th_$fixture"
+    run decode "th_$fixture" "th_${name}_lenient.wav" truehd-check=lenient
+    cmp -s "th_$name.wav" "th_${name}_lenient.wav" || {
+        echo "a lenient decode of the undamaged th_$fixture differs from the strict one" >&2
+        exit 1
+    }
+done
+
+# Loudness needs more than the 400 ms of one gating block, which the 0.25 s fixtures do not have: a
+# two-second stream from FFmpeg's own TrueHD encoder, decoded bit-exactly as above, is measured.
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=2:sample_rate=48000" -ac 2 \
+    -c:a truehd -strict -2 -f truehd th_sine.thd
+run decode th_sine.thd th_sine.wav
+run_truehd_bitexact_check th_sine.wav th_sine.thd truehd
+run loudness th_sine.thd
+run levels th_sine.thd
+
+# The presentations a stream with a 2-channel and a 6-channel substream gives (the 5.1 fixtures).
+for presentation in 2ch 6ch best; do
+    run decode th_truehd_m51_s24.thd "th_m51_${presentation}.wav" truehd-presentation=$presentation
+done
+
+# The containers: each is written by forge, read back by forge's demux byte for byte, and read by
+# FFmpeg to the PCM the bare stream gives it. libs/containers/ERRATA.md says that every layout is
+# FFmpeg's (a single oracle) and names what no document backs.
+for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd truehd_m51_s24.thd \
+    truehd_mono48_s24.thd truehd_st44_s24.thd; do
+    name="${fixture%.*}"
+    src="th_$fixture"
+    run mkv "$src" "th_$name.mkv"
+    run demux "th_$name.mkv" "th_$name.mkv.thd"
+    cmp -s "$src" "th_$name.mkv.thd" || {
+        echo "demux of th_$name.mkv did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.mkv" "$src" truehd
+    run probe "th_$name.mkv"
+    run mp4 "$src" "th_$name.mp4"
+    run demux "th_$name.mp4" "th_$name.mp4.thd"
+    cmp -s "$src" "th_$name.mp4.thd" || {
+        echo "demux of th_$name.mp4 did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.mp4" "$src" truehd
+    run probe "th_$name.mp4" json=1
+    run ts "$src" "th_$name.ts"
+    run ts "$src" "th_${name}_bluray.ts" bluray
+    cmp -s "th_$name.ts" "th_${name}_bluray.ts" || {
+        echo "ts with and without the bluray profile differ for $src" >&2
+        exit 1
+    }
+    run demux "th_$name.ts" "th_$name.ts.thd"
+    cmp -s "$src" "th_$name.ts.thd" || {
+        echo "demux of th_$name.ts did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.ts" "$src" truehd
+    run probe "th_$name.ts"
+    # Remuxing one container into another goes through the same readers and writers.
+    run mkv "th_$name.mp4" "th_${name}_remux.mkv"
+    run mp4 "th_$name.mkv" "th_${name}_remux.mp4"
+    # MAT: a raw burst file and an eight-channel WAV carrier both read back to the units, and the
+    # whole bursts are FFmpeg's `spdif` output byte for byte (a last partial burst is padded here
+    # and dropped by FFmpeg, so the comparison stops at FFmpeg's length).
+    run spdif "$src" "th_$name.mat"
+    run unspdif "th_$name.mat" "th_$name.mat.thd"
+    cmp -s "$src" "th_$name.mat.thd" || {
+        echo "unspdif of th_$name.mat did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run spdif "$src" "th_$name.mat.wav"
+    run unspdif "th_$name.mat.wav" "th_$name.matwav.thd"
+    cmp -s "$src" "th_$name.matwav.thd" || {
+        echo "unspdif of th_$name.mat.wav did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    count=$((count + 1))
+    echo "[$count] truehd MAT bursts of $src equal ffmpeg's spdif muxer's"
+    ffmpeg -v error -y -f truehd -i "$src" -c copy -f spdif "th_$name.ffmpeg.mat"
+    ff_bytes=$(wc -c <"th_$name.ffmpeg.mat")
+    if [[ "$ff_bytes" -gt 0 ]]; then
+        cmp -s -n "$ff_bytes" "th_$name.mat" "th_$name.ffmpeg.mat" || {
+            echo "th_$name.mat differs from ffmpeg's spdif output" >&2
+            exit 1
+        }
+    fi
+done
+
+# Refusals: the commands that do not read TrueHD say so and exit 1 (kExitUsage), and the other
+# transports' profiles do not apply to it.
+count=$((count + 1))
+echo "[$count] truehd is refused by transcode, qc, fmp4 and the dvb ts profile"
+for refused in "transcode th_truehd_st48_s24.thd th_refused.ac3 192" \
+    "qc th_truehd_st48_s24.thd" "fmp4 th_truehd_st48_s24.thd th_refused_fmp4 24" \
+    "ts th_truehd_st48_s24.thd th_refused.ts dvb"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    [[ "$refused_status" -eq 1 ]] || {
+        echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
+        exit 1
+    }
+done
 
 # --- A Forge project file, run as the commands it stands for (apps/shared/project) --------------
 # `forge project` reads a .forgeproj and runs the line the Forge GUI's command bar shows for it, so

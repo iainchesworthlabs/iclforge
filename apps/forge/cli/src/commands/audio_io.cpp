@@ -23,6 +23,7 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/audio/capture.hpp"
@@ -987,6 +988,9 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
     const auto stream = read_elementary_stream(in_path);
     if (stream.empty()) {
         return kExitInput;
+    }
+    if (is_truehd_stream(stream)) {
+        return refuse_truehd("play", in_path);
     }
     // AC-4: no receiver found takes it over IEC 61937 (planning/ac4.md, phase
     // D11), so 'play' decodes it on an ordinary output, as its fallback for a

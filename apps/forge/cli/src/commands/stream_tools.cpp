@@ -21,6 +21,7 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
@@ -1236,6 +1237,9 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
     const bool to_ac4 = *target_codec == plan::Codec::kAc4;
     if (bitrate == 0) {
         bitrate = to_ac4 ? 192 : 448;
+    }
+    if (is_truehd_stream(bytes)) {
+        return refuse_truehd("transcode", in_path);
     }
     if (is_ac4_stream(bytes)) {
         return transcode_from_ac4(in_path, out_path, bitrate, layout, meta, *target_codec, bytes);

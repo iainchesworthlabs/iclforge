@@ -21,6 +21,7 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
 #include "iclforge/ac4/decoder/frame.hpp"
@@ -234,6 +235,9 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     const auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
         return kExitInput;
+    }
+    if (is_truehd_stream(raw)) {
+        return refuse_truehd("monitor", in_path);
     }
     // AC-4's sync word, 0xAC40 or 0xAC41, where A/52's is 0x0B77: its own
     // decoder, and none of the A/52 checks below.

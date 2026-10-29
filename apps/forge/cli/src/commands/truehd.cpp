@@ -347,6 +347,13 @@ int run_probe_truehd(std::string_view in_path, const Options& meta) {
     if (stream.empty()) {
         return kExitUsage;
     }
+    return run_probe_truehd_stream(stream, in_path, meta, {}, {});
+}
+
+int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view in_path,
+                            const Options& meta,
+                            const std::function<void(iclforge::apps::JsonSink&)>& container_json,
+                            const std::function<void()>& container_text) {
     const auto info = th::probe_stream(stream);
     if (!info) {
         fmt::println(stderr, "error: {}: {}", in_path, error_text(info.error()));
@@ -404,7 +411,11 @@ int run_probe_truehd(std::string_view in_path, const Options& meta) {
         json.member("generator", iclforge::ac3::version_full);
         json.member("file", in_path);
         json.key("container");
-        json.value_null();
+        if (container_json) {
+            container_json(json);
+        } else {
+            json.value_null();
+        }
         json.key("truehd");
         json.begin_object();
         json.member("codec", major_sync.kind == th::StreamKind::kTrueHd ? "truehd" : "mlp");
@@ -432,6 +443,9 @@ int run_probe_truehd(std::string_view in_path, const Options& meta) {
         json.finish();
     } else {
         fmt::println("{:<16}{}", "file", in_path);
+        if (container_text) {
+            container_text();
+        }
         fmt::println("{:<16}{}", "codec", codec_name(major_sync));
         fmt::println("{:<16}{} ({} sample(s) each), {} major sync(s)", "access units",
                      info->access_units, info->samples_per_access_unit, major_syncs);

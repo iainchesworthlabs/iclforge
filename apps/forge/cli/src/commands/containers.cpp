@@ -41,6 +41,7 @@
 #include "../exit_codes.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -264,6 +265,10 @@ int run_mkv(std::string_view in_path, std::string_view out_path, const Options& 
     if (raw.empty()) {
         return kExitInput;
     }
+    // TrueHD and MLP: A_TRUEHD, one access unit a block (truehd_containers.cpp).
+    if (is_truehd_stream(raw)) {
+        return run_mkv_truehd(raw, in_path, out_path);
+    }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
@@ -352,6 +357,10 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
     auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
         return kExitInput;
+    }
+    // TrueHD and MLP: the 'mlpa' sample entry and its 'dmlp' box (truehd_containers.cpp).
+    if (is_truehd_stream(raw)) {
+        return run_mp4_truehd(raw, in_path, out_path);
     }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
@@ -735,6 +744,14 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
     if (raw.empty()) {
         return kExitInput;
     }
+    if (is_truehd_stream(raw)) {
+        fmt::println(stderr,
+                     "error: {} is TrueHD or MLP, for which no CMAF, HLS or DASH signalling is "
+                     "defined here ('forge mp4' writes the 'mlpa' track the container library "
+                     "can fragment; libs/containers/ERRATA.md says what is known of it)",
+                     in_path);
+        return kExitUsage;
+    }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
@@ -935,20 +952,32 @@ iclforge::containers::mpegts::ServiceInfo service_info_from(
 
 int run_ts(std::string_view in_path, std::string_view out_path, std::string_view profile_name,
            const Options& meta) {
-    iclforge::containers::mpegts::BroadcastProfile profile =
-        iclforge::containers::mpegts::BroadcastProfile::kDvb;
-    if (profile_name == "atsc") {
-        profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc;
-    } else if (!profile_name.empty() && profile_name != "dvb") {
-        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb or atsc)", profile_name);
-        return kExitUsage;
-    }
     // read_elementary_stream (container readers (mkv/mp4/ts)) also accepts a Matroska or MP4
     // input here - container-to-container remux, same as run_mkv/run_mp4
     // above.
     auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
         return kExitInput;
+    }
+    // TrueHD and MLP: Blu-ray's stream_type 0x83, the only transport profile that carries them
+    // (TH spec §21.2); the dvb and atsc profiles of the other codecs do not apply.
+    if (is_truehd_stream(raw)) {
+        return run_ts_truehd(raw, in_path, out_path, profile_name);
+    }
+    iclforge::containers::mpegts::BroadcastProfile profile =
+        iclforge::containers::mpegts::BroadcastProfile::kDvb;
+    if (profile_name == "atsc") {
+        profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc;
+    } else if (profile_name == "bluray") {
+        fmt::println(stderr,
+                     "error: the bluray profile carries TrueHD (stream_type 0x83), and {} is not "
+                     "TrueHD or MLP",
+                     in_path);
+        return kExitUsage;
+    } else if (!profile_name.empty() && profile_name != "dvb") {
+        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb, atsc or bluray)",
+                     profile_name);
+        return kExitUsage;
     }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
@@ -1282,7 +1311,10 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
         // rate or channel count - those live in the bitstream, which this
         // command deliberately never looks inside. Reported as absent
         // rather than guessed.
-        codec_id = reader.stream().ac4 ? "AC-4" : reader.stream().eac3 ? "E-AC-3" : "AC-3";
+        codec_id = reader.stream().truehd ? "TrueHD"
+                   : reader.stream().ac4  ? "AC-4"
+                   : reader.stream().eac3 ? "E-AC-3"
+                                          : "AC-3";
     }
     if (status != kExitOk) {
         return status;

@@ -444,14 +444,15 @@ constexpr std::array<Command, 46> kCommands{{
          const auto inputs = x.tail(2);
          return run_cat(x.str(1), inputs);
      }},
-    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
-     "per-channel peak/RMS report; an AC-4 presentation as coded",
+    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
+     "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded",
      topic::kProgramme | topic::kAc4Decode,
      Needs::kNothing,
      [](const Args& x) { return run_levels(x.str(1), x.meta); }},
-    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
+    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
      "BS.1770-4 loudness -> dialnorm, beside a stream's own: an AC-3 or E-AC-3 stream's first "
-     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB",
+     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB; a TrueHD or MLP "
+     "stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights)",
      topic::kAc4Decode,
      Needs::kNothing,
      [](const Args& x) { return run_loudness(x.str(1), x.meta); }},
@@ -463,13 +464,14 @@ constexpr std::array<Command, 46> kCommands{{
      "against its dialnorm and the loudness it states",
      topic::kQc | topic::kProgramme | topic::kAc4Decode,
      Needs::kNothing, [](const Args& x) { return run_qc(x.str(1), x.meta); }},
-    {"spdif", 3, "<in.ac3|in.ec3|in.ac4> <out.wav>",
+    {"spdif", 3, "<in.ac3|in.ec3|in.ac4|in.thd> <out.wav>",
      "IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream "
-     "(programme=); AC-4 in IEC 61937-14's bursts",
+     "(programme=); AC-4 in IEC 61937-14's bursts; TrueHD in MAT bursts (an eight-channel WAV, or "
+     "the raw bursts when the output is not .wav)",
      topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_spdif(x.str(1), x.str(2), x.meta); }},
-    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|->",
+    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|out.thd|->",
      "the inverse: recover the elementary stream from IEC 61937 bursts, as captured from "
      "an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end",
      topic::kStdio,
@@ -495,13 +497,15 @@ constexpr std::array<Command, 46> kCommands{{
          }
          return run_project(x.str(1), out, print, run_words);
      }},
-    {"mkv", 3, "<in.ac3|in.ec3> <out.mkv>",
-     "wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it",
+    {"mkv", 3, "<in.ac3|in.ec3|in.thd|in.mlp> <out.mkv>",
+     "wrap as a playable Matroska file (A_AC3, A_EAC3 or A_TRUEHD); AC-4 is refused, Matroska "
+     "registering no codec ID for it",
      topic::kMkv,
      Needs::kNothing,
      [](const Args& x) { return run_mkv(x.str(1), x.str(2), x.meta); }},
-    {"mp4", 3, "<in.ac3|in.ec3|in.ac4> <out.mp4>",
-     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4", topic::kNone,
+    {"mp4", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.mp4>",
+     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3, dac4 for AC-4 or 'mlpa'/'dmlp' for "
+     "TrueHD and MLP", topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_mp4(x.str(1), x.str(2), x.meta); }},
     {"fmp4", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment]",
@@ -512,11 +516,12 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kFmp4 | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) { return run_fmp4(x.str(1), x.str(2), x.u32(3, 48), x.meta); }},
-    {"ts", 3, "<in.ac3|in.ec3|in.ac4> <out.ts> [dvb|atsc]",
-     "wrap as MPEG-2 TS; AC-4 supports DVB only",
+    {"ts", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ts> [dvb|atsc|bluray]",
+     "wrap as MPEG-2 TS; AC-4 supports DVB only; TrueHD and MLP are Blu-ray's stream_type 0x83 "
+     "(profile bluray, the default for them)",
      topic::kTs | topic::kMeta,
-     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3, "dvb"), x.meta); }},
-    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4>",
+     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3), x.meta); }},
+    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4|out.thd>",
      "the inverse of 'mkv': unwrap the elementary stream a container carries. The container is "
      "identified by its own magic bytes, not by the file name",
      topic::kStdio,

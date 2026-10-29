@@ -600,6 +600,17 @@ check_one "ext_eac3_transient_stereo_128_dee" "$TPN_DIR/dee.ec3" "eac3" 128 3 "3
 check_against_source "ext_eac3_transient_stereo_128_dee_source" "$TPN_DIR/dee.ec3" \
     "$TPN_DIR/source.wav" "eac3" 128 1 "1,1" "--probe-samples 60000"
 
+# --- TrueHD and MLP: lossless, so the comparison is bit-exact rather than an SNR ---------------------
+# testdata/truehd holds streams FFmpeg's `truehd` and `mlp` encoders wrote (made by
+# tools/generators/gen_truehd_ffmpeg.py, with the PCM FFmpeg's strict decode gives them pinned in
+# its manifest). forge's decode of each must equal that PCM sample for sample on every leg: a
+# lossless decode has no noise floor to leave headroom for, so there is no threshold here, and a
+# difference in one sample fails. The script also checks the streams against their pinned SHA-256
+# and, with --reference, the independent Python decoder (tools/references/truehd_syntax.py).
+count=$((count + 1))
+echo "[$count] truehd: forge decode of testdata/truehd equals ffmpeg's strict decode, bit for bit"
+"$PYTHON" "$REPO_ROOT/tools/checks/verify_truehd_interop.py" --forge "$CLI" --require-ffmpeg
+
 # --- Real programme material, for the bitstream-hash gate below ---------------------------
 # gold.ac3/gold.ec3/gold_cpl.ec3 are one synthetic 5.1 file through three tool
 # sets. The encoder's floating-point decisions - rematrixing, coupling's band

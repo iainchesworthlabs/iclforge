@@ -1094,11 +1094,20 @@ jobs:
       - name: Configure
         run: cmake --preset config-linux-llvm
 
-      - name: Build forge
-        run: cmake --build --preset build-linux-llvm --target forge -- -k 0
+      - name: Build forge and the TrueHD container tool
+        run: cmake --build --preset build-linux-llvm --target forge iclforge-truehd-container-tool -- -k 0
 
       - name: Codec matrix against the FFmpeg oracle
         run: bash tools/ci/run_codec_matrix.sh build/config-linux-llvm/bin/forge
+
+      # TrueHD and MLP are lossless, so FFmpeg's strict decode is held to bit for bit: the decoder on
+      # testdata/truehd (with the independent Python reference beside it), and the containers in both
+      # directions (planning/truehd.md, libs/containers/ERRATA.md).
+      - name: TrueHD and MLP decode against FFmpeg (bit-exact)
+        run: python3 tools/checks/verify_truehd_interop.py --forge build/config-linux-llvm/bin/forge --reference --require-ffmpeg
+
+      - name: TrueHD in MP4, Matroska, MPEG-TS and MAT against FFmpeg (bit-exact)
+        run: python3 tools/checks/verify_truehd_containers.py --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
 
       - name: Metadata checks against FFmpeg (dynrng, compr, downmix, dialnorm)
         run: python3 tools/checks/check_drc.py --cli build/config-linux-llvm/bin/forge

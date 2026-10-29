@@ -727,6 +727,17 @@ int run_probe(std::string_view in_path, const Options& meta) {
                 return 1;
             }
             container = std::move(result.container);
+            // A TrueHD or MLP track (MP4 'mlpa', Matroska A_TRUEHD, TS 0x83) gives up whole
+            // access units, which the TrueHD probe reads with what the container said of the
+            // track beside them.
+            if (is_truehd_stream(result.bytes)) {
+                return run_probe_truehd_stream(
+                    result.bytes, in_path, meta,
+                    [&container](iclforge::apps::JsonSink& sink) {
+                        write_container(sink, container);
+                    },
+                    [&container] { print_container(container); });
+            }
             demuxed.str(std::string{reinterpret_cast<const char*>(result.bytes.data()),
                                     result.bytes.size()});
             source = &demuxed;

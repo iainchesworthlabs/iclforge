@@ -45,6 +45,7 @@
 #include "ac4_channels.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "stream_playback.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -1256,6 +1257,9 @@ int run_qc(std::string_view in_path, const Options& meta) {
     if (stream.empty()) {
         return kExitInput;
     }
+    if (is_truehd_stream(stream)) {
+        return refuse_truehd("qc", in_path);
+    }
     std::optional<QcResult> result;
     std::optional<QcProgrammeResult> object_result;
     if (is_ac4_stream(stream)) {
@@ -1371,6 +1375,9 @@ int run_levels(std::string_view in_path, const Options& meta) {
     const auto bytes = read_elementary_stream(in_path);
     if (bytes.empty()) {
         return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_levels_truehd(bytes, in_path, meta);
     }
     // AC-4: the presentation decode's options choose, as the stream codes it,
     // each channel under its own name in the order the level meter reports A/52
@@ -1514,6 +1521,9 @@ int run_loudness(std::string_view in_path, const Options& meta) {
     const auto bytes = read_elementary_stream(in_path);
     if (bytes.empty()) {
         return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_loudness_truehd(bytes, in_path, meta);
     }
     if (is_ac4_stream(bytes)) {
         iclforge::ac4::Decoder decoder(ac4_coded_config(meta));
@@ -1695,6 +1705,9 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
     if (stream.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
         return kExitInput;
+    }
+    if (is_truehd_stream(stream)) {
+        return run_spdif_truehd(stream, in_path, out_path);
     }
     // associated= names a second programme to mix into the main, and this
     // decodes nothing: said once, as 'play' says it, since wrapping the main
@@ -1898,6 +1911,19 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         in.seekg(0, std::ios::beg);
     }
 
+    // TrueHD's MAT bursts (IEC 61937 data type 22) are 61 kB each and the unit table is read from
+    // the whole carrier, so that carrier is read in one go (truehd_containers.cpp).
+    if (!stdio) {
+        std::array<std::byte, 4096> head{};
+        in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+        const auto got = static_cast<std::size_t>(in.gcount());
+        in.clear();
+        in.seekg(0, std::ios::beg);
+        if (is_mat_carrier(std::span<const std::byte>{head}.first(got))) {
+            const auto carrier = read_all(in_path);
+            return run_unspdif_mat(carrier, in_path, out_path, keep_partial);
+        }
+    }
     // A WAV carrier (what 'spdif' writes, and what a capture tool saves) or a
     // bare dump of carrier bytes. Both are ordinary inputs here, so neither
     // is an error: if the RIFF walk does not find a data chunk, the whole
