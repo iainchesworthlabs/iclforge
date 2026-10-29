@@ -11,6 +11,10 @@ firmware, a decoder it links, or the tools around it.
     since no board of either shape has run the suite. The board suite is run by hand: no CI job
     has a board.
 
+    **2026-10-29:** `p4-rev1-ac4` was folded into `p4-rev1` (the same fragments and locked values, so the same hash): its
+    baseline is now `p4-rev1`'s, and every `p4-rev1-ac4` column and row below is `p4-rev1`'s figures. The old `p4-rev1`
+    baseline (without AC-4) is gone.
+
 A *profile* is one locked build of the firmware for one board (`firmware/hearth-sink/profiles.json`,
 read by `tools/hearth/sink_profile.py`). An image carries its profile's id and a 12-digit hash of
 the profile's fragments and locked values, and reports both in `GET /hardware`. The design records
@@ -101,7 +105,7 @@ the values the x86-64 host and the [Cortex-M3](cortex-m3.md) leg are held to.
   loads and the `c6-4mb` and `c6-16mb` images, holds each image to its profile and budgets, and
   runs none of them.
 - **The ESP32-P4.** There is no emulator for the part. CI builds the P4 probe and the `p4-rev1`,
-  `p4-rev1-ac4` and `p4-rev3` images, held the same way.
+  and `p4-rev3` images (the AC-4 decoder is in `p4-rev1` since 2026-10-29), held the same way.
 - **On the S3: Wi-Fi, I2S, octal PSRAM and the USB console.** The `qemu-net` overlay puts
   Ethernet, the capture sink, quad PSRAM and UART0 in their place.
 - **Speed.** QEMU is not cycle-accurate. The probes print `us_per_frame` under it and no gate
@@ -232,11 +236,11 @@ own, each with the spread it was measured from in a `note`.
 
 | Figure | A regression when | Profiles with their own margin |
 |---|---|---|
-| Decoder time per frame | Over the baseline by more than the larger of 5% and 5 permille | `p4-rev1-ac4`: 12% (its AC-4 rows are three or four frames, and a play varies by about 6%) |
+| Decoder time per frame | Over the baseline by more than the larger of 5% and 5 permille | `p4-rev1`: 12% (its AC-4 rows are three or four frames, and a play varies by about 6%) |
 | Decode stack free | More than 512 bytes under | |
 | Sink queue's least headroom | More than 2 ms under | |
-| Boot: largest internal block | More than 1,024 bytes under | `c6-16mb`: 12,288; `p4-rev1`, `p4-rev1-ac4`: 8,192 (the block steps by 4 KB from boot to boot) |
-| Boot: internal RAM free | More than 2,048 bytes under | `p4-rev1-ac4`: 4,096 |
+| Boot: largest internal block | More than 1,024 bytes under | `c6-16mb`: 12,288; `p4-rev1`: 8,192 (the block steps by 4 KB from boot to boot) |
+| Boot: internal RAM free | More than 2,048 bytes under | `p4-rev1`: 4,096 |
 | Glitched plays of a Sendspin row | More than one over the baseline's count | The two S3 profiles allow the E-AC-3 row two |
 | Least heap during a Sendspin play | Held only for a row that names a margin | S3: 2,048 for E-AC-3 (and AC-4 music on `s3-n16r8-ac4`); `c6-16mb`: 3,072 for E-AC-3 |
 | State, units, boot verdict, PCM hash | Any difference | |
