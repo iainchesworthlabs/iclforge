@@ -2092,8 +2092,8 @@ finished on a constant block far from zero, which is now a regression seed and a
 over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
 outside the library reads the 2 and 6 channel presentations.
 
-Not covered: noise generator 1 beyond a stream whose matrices do not bypass an LSB (its table is not available, so a
-bypassed LSB under restart sync 0x31EB is refused; `libs/truehd/ERRATA.md`, entry 32), heavy DRC (not read, and not written)
+Not covered: noise generator 1 beyond a stream whose matrices have no non-zero noise shift and bypass no LSB (its table is
+not available, so a restart under sync 0x31EB with either is refused; `libs/truehd/ERRATA.md`, entry 32), heavy DRC (not read, and not written)
 and the block data CRC (the length is checked, the algorithm is not known); and, in the encoder, the IIR filter, LSB bypass
 and a negative output shift, which it does not write.
 
