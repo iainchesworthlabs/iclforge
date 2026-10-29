@@ -111,6 +111,18 @@ struct PositionSourceSpec {
     std::uint16_t port = 0;
 };
 
+// What a decode lost after the first frame or unit had decoded, for `decode strict`. A frame that
+// waits for a sync point (an AC-4 I-frame, a TrueHD restart header) before any has decoded is the
+// start of a stream cut in the middle of a group, and is not counted.
+struct DecodeLoss {
+    std::size_t waiting =
+        0;  // frames or units that waited for a sync point, after output had begun
+    std::size_t concealed = 0;  // frames or units made in place of ones that failed (conceal=)
+    std::size_t dropped =
+        0;  // TrueHD: units a lenient decode could not read, or the reader skipped
+    [[nodiscard]] std::size_t total() const noexcept { return waiting + concealed + dropped; }
+};
+
 // Everything a command accepts after its positional arguments, in any order.
 // The metadata group is iclforge::ac3::plan::Metadata verbatim; drc_scale is decode-
 // side local, because nothing an encoder is configured with corresponds to
@@ -143,6 +155,10 @@ struct Options {
     // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
     bool truehd_lenient = false;
+    // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
+    // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
+    // it such a decode exits 0 and warns where it always did.
+    bool strict = false;
     // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's
     // own default.
     struct TruehdEncode {

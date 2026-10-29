@@ -88,6 +88,11 @@ metadata options (any order, after the positional arguments):
   couple            enable channel coupling - honored by 'encode' and 'sine' ('sine' can also
                     spell it as a 'c' layout suffix); E-AC-3 coupling is the tools argument's
                     cpl token instead
+  strict            decode: exit 2, after writing what could be decoded, when any frame or unit was
+                    lost after the first one decoded (an AC-4 frame waiting for an I-frame, a
+                    concealed frame or unit, a TrueHD unit a lenient decode dropped); the frames
+                    that wait before the first one decodes are not a loss. Without it such a decode
+                    exits 0 and warns, as it always has
   keep-partial      encode/eac3-encode/atmos-encode/atmos-cbi: if the run fails partway, keep
                     whatever frames were already encoded (named beside the intended output as
                     <name>.partial.<ext>) instead of discarding them - off by default, matching
@@ -859,7 +864,7 @@ only *that* it did. `forge help exit-codes` prints the same table.
 |---|---|
 | `0` | Success. |
 | `1` | Usage — a bad or missing argument, an unknown command or option, or a configuration the encoder cannot express (an illegal bitrate for a layout, more objects than a stream can carry). Retrying the same command line cannot help. |
-| `2` | Input — unreadable, absent, or not a valid AC-3/E-AC-3/AC-4/WAV/ADM file, or a stream that stopped decoding part-way. |
+| `2` | Input — unreadable, absent, or not a valid AC-3/E-AC-3/AC-4/WAV/ADM file, or a stream that stopped decoding part-way (and, with `decode ... strict`, one that lost frames or units after the first one decoded, once what could be decoded is written). |
 | `3` | Output — the destination could not be created, written or finalized. |
 | `4` | Unavailable here — this build or this machine cannot run the command at all (no audio backend, no capture/render endpoint, an endpoint that refuses the format, a library this build was not configured with). The same command line may well succeed elsewhere. |
 | `5` | Runtime — the run started and then failed for none of the above reasons: a capture device that stopped delivering audio (the `record`/`live` watchdog), an output device that went away mid-playback (`play`, `monitor`, `identify`, `live`'s output legs), a loudness measurement with nothing above the gate, a signing pass that could not complete. |

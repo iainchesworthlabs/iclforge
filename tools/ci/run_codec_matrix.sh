@@ -1677,6 +1677,52 @@ for refused in "cut $th_in th_refused.thd 0.05 0.1" \
     }
 done
 
+# --- decode strict (planning/ac4.md, option D) --------------------------------------------------------
+# A decode that loses frames exits 0 and warns; with `strict` it writes what it could decode and exits 2
+# when a frame or unit was lost after the first one decoded. An AC-3 stream with a damaged frame
+# (concealed under conceal=), and a TrueHD stream with bytes in the middle that are not a unit (a lenient
+# decode skips them), against the same streams undamaged.
+run sine strict_clean.ac3 2 192 440 70 stereo
+python3 - <<'PYEOF'
+import pathlib
+data = bytearray(pathlib.Path("strict_clean.ac3").read_bytes())
+data[3 * 768 + 384] ^= 0xFF  # the middle of the fourth 768-byte syncframe
+pathlib.Path("strict_damaged.ac3").write_bytes(data)
+stream = bytearray(pathlib.Path("th_truehd_st48_s24_gap8.thd").read_bytes())  # copied by the loop above
+offset = 0
+for _ in range(11):
+    offset += ((stream[offset] & 0xF) << 8 | stream[offset + 1]) * 2
+stream[offset:offset] = b"\x5a" * 9
+pathlib.Path("strict_junk.thd").write_bytes(stream)
+PYEOF
+count=$((count + 1))
+echo "[$count] decode strict: exit 0 for a stream that loses nothing, 2 for one that lost a frame, and the output is the same"
+"$CLI" decode strict_clean.ac3 strict_clean.wav strict >/dev/null
+"$CLI" decode strict_damaged.ac3 strict_damaged.wav conceal=repeat >/dev/null
+"$CLI" decode "th_truehd_st48_s24_gap8.thd" strict_gap8.wav truehd-check=lenient strict >/dev/null
+"$CLI" decode strict_junk.thd strict_junk.wav truehd-check=lenient >/dev/null
+for lossy in "strict_damaged.ac3 strict_damaged_strict.wav conceal=repeat strict" \
+    "strict_junk.thd strict_junk_strict.wav truehd-check=lenient strict"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" decode $lossy >/dev/null 2>&1
+    strict_status=$?
+    set -e
+    echo "  forge decode $lossy -> exit $strict_status"
+    [[ "$strict_status" -eq 2 ]] || {
+        echo "forge decode $lossy should exit 2 (input: frames were lost), exited $strict_status" >&2
+        exit 1
+    }
+done
+cmp -s strict_damaged.wav strict_damaged_strict.wav || {
+    echo "decode strict wrote a different WAV from the decode without it" >&2
+    exit 1
+}
+cmp -s strict_junk.wav strict_junk_strict.wav || {
+    echo "decode strict of the TrueHD stream wrote a different WAV from the decode without it" >&2
+    exit 1
+}
+
 # --- TrueHD encoding (iclforge::truehd::Encoder, planning/truehd.md phase T2a) -------------------
 # FFmpeg makes the sources, a different sine in each channel, with the speaker mask of the layout
 # (forge reads the channels' meaning from it: 7.1 is FL FR FC LFE BL BR SL SR, which forge codes as

@@ -4584,8 +4584,12 @@ Dolby's Spott reference files (`docs/verification.md`, "A second source") decode
   fix). It now says so on stderr, whatever the report goes to: "warning: N frames waiting for an I-frame
   produced no output, of T in the stream; the output holds the other M" (`forge decode`, and the same
   line, ending "the measurement is of the other M", from `qc` and the other commands that measure an AC-4
-  stream, which measured only what decoded). The exit code is the owner's to choose; nothing here sets a threshold.
-  Options: (A) keep 0 and the warning, so a script reads stderr; (B) exit 2 whenever any frame waited,
+  stream, which measured only what decoded). The exit code was the owner's to choose: option D below is the one chosen.
+  **Option D is built** (the owner chose it on 2026-10-29): `forge decode ... strict` exits 2, after writing what could be decoded, when a
+  frame was lost after the first one decoded, and the default is unchanged. "Lost" covers every codec that counts loss: an AC-4 frame
+  waiting for an I-frame, a frame or unit concealed under `conceal=` (AC-3, E-AC-3, AC-4) and, in a lenient TrueHD decode, bytes the reader
+  skipped, units it could not read and units that waited for a restart header (`docs/forge/cli/commands.md`, "Lost frames: `strict`";
+  `apps/forge/cli/tests/test_cli_decode_strict.cpp`). The options as they stood: (A) keep 0 and the warning, so a script reads stderr; (B) exit 2 whenever any frame waited,
   which also fails a stream cut mid-GOP, whose leading frames wait for the first I-frame by design and
   whose splices wait again; (C) exit 2 above a share lost, which needs a number nobody has chosen; (D)
   keep 0 and the warning by default and add a `strict` mode that exits 2 when a frame waits after the

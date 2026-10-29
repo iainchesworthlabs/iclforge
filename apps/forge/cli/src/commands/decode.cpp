@@ -496,8 +496,10 @@ iclforge::objects::oba::DynamicObject to_oba_dynamic_object(
 // 7.1.4 by default, through the layout renderer Hearth plays E-AC-3's objects
 // with (apps/shared/media/src/ac4_object_render.hpp); the object options, which write
 // E-AC-3's objects out, are reported rather than applied.
-int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, std::string_view out_path,
-                   const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
+int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path,
+                   std::string_view out_path, const forge_cli::Options& meta,
+                   std::string_view objects_dir, std::string_view adm_out,
+                   forge_cli::DecodeLoss& loss) {
     const auto status = status_stream(out_path);
     if (meta.output.mode != iclforge::ac3::OperatingMode::kCustom) {
         fmt::println(
@@ -694,13 +696,18 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         }
         if (!decoded->has_value()) {
             // A frame waiting for an I-frame, at the start or after a change
-            // of source: nothing to write.
+            // of source: nothing to write. Only one that waits after output has begun is a loss
+            // (`strict`): the leading frames of a stream cut mid-group wait by design.
             ++waiting_frames;
+            if (decoded_frames > 0) {
+                ++loss.waiting;
+            }
             continue;
         }
         const iclforge::ac4::DecodedFrame& pcm = **decoded;
         if (pcm.concealed.has_value()) {
             ++concealed_frames;
+            ++loss.concealed;
         }
         if (!sink.is_open()) {
             first = pcm;
@@ -852,7 +859,8 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
 }
 
 int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path,
-                     const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
+                    const forge_cli::Options& meta, std::string_view objects_dir,
+                    std::string_view adm_out, forge_cli::DecodeLoss& loss) {
     if (!adm_out.empty() && !forge_cli::adm_capability().available) {
         fmt::println(stderr, "error: {}", forge_cli::adm_capability().reason);
         return kExitInput;
@@ -1252,6 +1260,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         }
         if (out.concealed.has_value()) {
             ++concealed_units;
+            ++loss.concealed;
         }
         track_metadata(out.dynrng, out.numblkscod, out.compr);
         for (std::size_t ch = 0; ch < out.channels.size() && ch < sink_slots; ++ch) {
@@ -1494,9 +1503,13 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
 
 }  // namespace
 
-int run_decode(std::string_view in_path, std::string_view out_path,
-               const forge_cli::Options& requested, std::string_view objects_dir,
-               std::string_view adm_out) {
+namespace {
+
+// A decode of `in_path` to `out_path`, counting in `loss` what it lost after the first frame or
+// unit had decoded; run_decode turns that into an exit status when asked to be strict.
+int run_decode_counting(std::string_view in_path, std::string_view out_path,
+                        const forge_cli::Options& requested, std::string_view objects_dir,
+                        std::string_view adm_out, forge_cli::DecodeLoss& loss) {
     const auto stream = read_elementary_stream(in_path);
     if (stream.empty()) {
         return kExitInput;
@@ -1508,8 +1521,8 @@ int run_decode(std::string_view in_path, std::string_view out_path,
         // stage, the DRC options, the programme choice, the object outputs and every verification
         // flag, none of which a TrueHD decode reads. verify-content passing here would pass
         // without verifying anything.
-        if (const int refused =
-                check_options_applied(requested, {"truehd-presentation=", "truehd-check="});
+        if (const int refused = check_options_applied(
+                requested, {"truehd-presentation=", "truehd-check=", "strict"});
             refused != kExitOk) {
             return refused;
         }
@@ -1520,14 +1533,14 @@ int run_decode(std::string_view in_path, std::string_view out_path,
                          in_path, !objects_dir.empty() ? objects_dir : adm_out);
             return kExitUsage;
         }
-        return run_decode_truehd(stream, in_path, out_path, requested);
+        return run_decode_truehd(stream, in_path, out_path, requested, loss);
     }
     warn_truehd_options_unused(requested, in_path);
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where
     // AC-3's and E-AC-3's is 0x0B77; the first two bytes decide which decoder
     // reads the stream, before anything below reads it as AC-3.
     if (is_ac4_stream(stream)) {
-        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out);
+        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out, loss);
     }
     if (!requested.syntax_trace_path.empty()) {
         fmt::println(stderr, "error: syntax-trace= records AC-4 syntax, and {} is AC-3 or E-AC-3", in_path);
@@ -1586,7 +1599,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // the stream is not: an AC-3 bed with Annex E dependents extending it goes
     // down the access-unit path too, which reads the core natively.
     if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(playable)) {
-        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out);
+        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out, loss);
     }
     if (!objects_dir.empty()) {
         fmt::println(stderr,
@@ -1655,6 +1668,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
         }
         if (decoded->concealed.has_value()) {
             ++concealed_frames;
+            ++loss.concealed;
         }
         for (const auto word : decoded->dynrng) {
             const double db = iclforge::ac3::meta::to_db(iclforge::ac3::meta::dynrng_gain(word));
@@ -1827,6 +1841,38 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     print_channel_summary(*meter, status);
     return 0;
+}
+
+}  // namespace
+
+int run_decode(std::string_view in_path, std::string_view out_path,
+               const forge_cli::Options& requested, std::string_view objects_dir,
+               std::string_view adm_out) {
+    forge_cli::DecodeLoss loss;
+    const int status =
+        run_decode_counting(in_path, out_path, requested, objects_dir, adm_out, loss);
+    // Without `strict` a decode that lost frames exits 0, and says so where it always has (AC-4's
+    // warning, the concealment summary, TrueHD's counters). With it, once everything that could be
+    // decoded is written, the loss is an input fault: the stream was not whole.
+    if (status != kExitOk || !requested.strict || loss.total() == 0) {
+        return status;
+    }
+    std::string detail;
+    const auto add = [&detail](std::size_t count, std::string_view what) {
+        if (count != 0) {
+            detail += fmt::format("{}{} {}", detail.empty() ? "" : ", ", count, what);
+        }
+    };
+    add(loss.waiting,
+        "waited for a sync point (an I-frame or a restart header) after the first had "
+        "decoded");
+    add(loss.concealed, "concealed");
+    add(loss.dropped, "unreadable or skipped");
+    fmt::println(stderr,
+                 "error: strict: {} frame(s) or unit(s) lost after the first one decoded ({}); "
+                 "what could be decoded is in {}",
+                 loss.total(), detail, out_path);
+    return kExitInput;
 }
 
 }  // namespace forge_cli::commands

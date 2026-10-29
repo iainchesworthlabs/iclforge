@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 155> kOptionTokens{{
+constexpr std::array<OptionToken, 156> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -80,6 +80,7 @@ constexpr std::array<OptionToken, 155> kOptionTokens{{
     {"karaoke-v2=", "decode/monitor: the capable decoder's V2 level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
+    {"strict", "decode: exit 2, after writing what could be decoded, when any frame or unit was lost after the first one decoded (AC-4 frames waiting for an I-frame, concealed units, TrueHD units a lenient decode dropped); without it such a decode exits 0 and warns"},
     {"quiet", "no status output at all - errors and the payload only"},
     {"verbose", "print the stderr progress line whatever the run's length"},
     {"drc=", "§7.7.1 DRC profile (encode) or partial-compression scale (decode)"},

@@ -54,9 +54,11 @@ struct CoreStrip {
 // Decodes `stream` to a 24-bit PCM WAV at `out_path` ("-" is stdout), the channels in the order the
 // stream carries them. Options: truehd-presentation= (best, 2ch, 6ch, 8ch, all) and truehd-check=
 // (strict, the default, stops with kExitInput at the first failed check or damaged unit; lenient
-// counts them and goes on).
+// counts them and goes on). `loss` takes the units a lenient decode lost after the first one
+// decoded: bytes the reader skipped (the decoder is told, lost_data()), units it could not read,
+// and units that waited for a restart header (`decode strict` makes them an input fault).
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta);
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss);
 
 // Describes the stream in `in_path` and checks every access unit's header, directory, parity and
 // CRC bytes. Exit 1 when any of them fails.

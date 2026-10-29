@@ -1715,6 +1715,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.insert_missing = true;
             continue;
         }
+        // decode's strict mode: a decode that lost frames or units exits 2 (DecodeLoss). Scoped to
+        // decode, so that another command given it refuses it as an unknown option and does not
+        // drop it.
+        if (token == "strict" && command == "decode") {
+            out.strict = true;
+            continue;
+        }
         if (token == "couple" || token == "heavy" || token == "heavy2" || token == "mixmeta" ||
             token == "keep-partial" || token == "fast-mdct") {
             if (token == "heavy") {

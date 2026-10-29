@@ -443,7 +443,10 @@ constexpr std::array<Command, 49> kCommands{{
      "for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): "
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
-     "pinned to their speaker, dynamic objects positioned by their own timeline",
+     "pinned to their speaker, dynamic objects positioned by their own timeline. strict: exit 2, "
+     "after writing what could be decoded, when any frame or unit was lost after the first one "
+     "decoded (an AC-4 frame waiting for an I-frame, a concealed frame, a TrueHD unit a lenient "
+     "decode dropped); without it such a decode exits 0 and warns",
      topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kTruehd | topic::kObjects |
          topic::kContentSignature,
      Needs::kNothing,
@@ -795,7 +798,7 @@ int run_main(int argc, char** argv) {
                                token == "infomdat" || token == "encinfo" ||
                                token == "langcod" || token == "langcod2" ||
                                token == "copyright" || token == "sourcefscod" ||
-                               token == "quiet" || token == "verbose" ||
+                               token == "quiet" || token == "verbose" || token == "strict" ||
                                is_extra_programme_token(token);
         if (token == "couple") {
             couple_flag = true;

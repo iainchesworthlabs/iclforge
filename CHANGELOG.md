@@ -10,6 +10,12 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
+  decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
+  (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
+  concealed (`conceal=`, AC-3, E-AC-3 and AC-4), or when a lenient TrueHD decode skipped bytes, could not read a unit or had units wait for
+  a restart header. The frames that wait before the first one decodes (a stream cut mid-group) are not a loss. `strict` is `decode`'s alone
+  and another command refuses it as an unknown option. The owner chose this on 2026-10-29 from the options `planning/ac4.md` listed.
 - **Added: `forge qc` reads a TrueHD or MLP stream: an integrity gate, the loudness of each presentation, the dialogue norm beside the
   measurement, and the preset gates; exit 6 when one fails.** It was refused by name. The integrity gate counts, over a lenient decode
   of every substream, the units and bytes the reader does not take for an access unit, the failed check nibbles, major sync and restart

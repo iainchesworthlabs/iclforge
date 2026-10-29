@@ -420,7 +420,7 @@ bool starts_with_ac3_core_then_truehd(std::span<const std::byte> stream) {
 }
 
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta) {
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss) {
     const auto presentation = parse_presentation(meta.truehd_presentation);
     if (!presentation) {
         fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')",
@@ -465,6 +465,9 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             }
             // The reader dropped a unit the decoder cannot miss: it waits for the next restart.
             decoder.lost_data();
+            if (channels != 0) {
+                ++loss.dropped;
+            }
         }
         if (!unit) {
             break;
@@ -477,6 +480,16 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             if (!meta.truehd_lenient) {
                 failed = true;
                 break;
+            }
+            if (channels != 0) {
+                ++loss.dropped;  // a lenient decode goes on without the unit
+            }
+        } else if (!*result) {
+            // A unit that gave no samples: its substreams wait for a restart header, as at the
+            // start of a stream cut in the middle of an interval. Only one after output has begun
+            // is a loss.
+            if (channels != 0) {
+                ++loss.waiting;
             }
         } else if (*result) {
             const th::DecodedAccessUnit& decoded = **result;

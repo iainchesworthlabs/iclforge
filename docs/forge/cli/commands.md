@@ -1169,6 +1169,29 @@ the decoder's own transform and output stages; the QMF-domain tools pass it thro
 that wait for an I-frame after a change of source, which otherwise write nothing, are concealed
 the same way. A frame that fails before any frame has decoded still stops the run.
 
+### Lost frames: `strict`
+
+A decode that loses frames or units keeps going and exits 0, and says so where it always has: an AC-4 stream's frames that wait for an
+I-frame ("N frames waiting for an I-frame produced no output, of T in the stream; the output holds the other M"), the `concealed N of T`
+line under `conceal=`, TrueHD's counters of the units a lenient decode waited on or skipped. A script reads that from stderr. `strict`
+makes it the exit status:
+
+```bash
+forge decode programme.ac4 out.wav strict            # exit 2 if any frame was lost after the first one decoded
+forge decode damaged.ec3 out.wav conceal=repeat strict
+forge decode disc.thd out.wav truehd-check=lenient strict
+```
+
+With `strict`, once everything that could be decoded has been written (the WAV is the same as without it), the run exits **2**, an input
+fault, when any of these happened **after the first frame or unit decoded**: an AC-4 frame waited for an I-frame (the decoder dropped state,
+which is a fault in the stream or the decoder), a frame or unit was concealed (AC-3, E-AC-3 or AC-4 under `conceal=`), or a TrueHD decode
+under `truehd-check=lenient` skipped bytes the reader could not take for a unit, could not read a unit, or had units wait for a restart
+header. The message gives the count and what it was made of. **The frames that wait before the first one decodes do not count**: a stream
+cut in the middle of a group of pictures has leading frames that wait for the first I-frame by design, and `strict` leaves it alone. Without
+`strict` nothing changes: the exit status, the output and the warning are what they were. A TrueHD decode that stops at a failed check
+(the default, `truehd-check=strict`) already exits 2; `strict` matters for the lenient one. `strict` is `decode`'s alone, and another
+command given it refuses it as an unknown option.
+
 #### `probe` — what the stream says about itself
 
 Every other inspection here goes through the audio: `levels` and `qc` decode the whole
