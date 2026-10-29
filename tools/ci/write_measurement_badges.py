@@ -71,7 +71,7 @@ NO_DATA = "no data"
 MEMORY_RETENTION_WARN_BYTES = 4 * 1024
 
 # The order every message lists them in.
-CODECS = ("AC-3", "E-AC-3", "AC-4", "TrueHD")
+CODECS = ("AC-3", "E-AC-3", "AC-4")
 
 # The `codec` field of the gold-reference records (main.jsonl), which
 # verify_gold_reference.sh's --codec-label writes. AC-4's decode quality is a
@@ -108,6 +108,9 @@ WORKLOADS = {
     "ac4_stereo_decode": ("AC-4", "stereo decode"),
     "ac4_51_encode": ("AC-4", "5.1 encode"),
     "ac4_51_decode": ("AC-4", "5.1 decode"),
+    "truehd_stereo_encode": ("TrueHD", "stereo encode"),
+    "truehd_stereo_decode": ("TrueHD", "stereo decode"),
+    "truehd_51_encode": ("TrueHD", "5.1 encode"),
     "truehd_51_decode": ("TrueHD", "5.1 decode"),
 }
 
@@ -394,10 +397,15 @@ def _labelled(words, figure):
 
 
 def _per_codec(entries, describe):
-    """"AC-3 x | E-AC-3 y | AC-4 z": every codec in order, with no data where it has none."""
+    """"AC-3 x | E-AC-3 y | AC-4 z": every codec in order, with no data where it has none.
+
+    TrueHD comes last, and only once the series holds a TrueHD workload: it is lossless, so the
+    accuracy badge has nothing to say about it, and "TrueHD no data" on three badges would be noise.
+    """
+    codecs = CODECS + ("TrueHD",) if "TrueHD" in entries else CODECS
     return " | ".join(
         f"{codec} {describe(entries[codec]) if codec in entries else NO_DATA}"
-        for codec in CODECS)
+        for codec in codecs)
 
 
 def speed_badge(rows):

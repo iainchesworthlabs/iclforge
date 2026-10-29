@@ -34,7 +34,12 @@
   // one figure each - "2.0 dB SNR", "2009 KB/frame" - and a reader took them for the project's
   // headline numbers: they were the tightest E-AC-3 check and the AC-4 5.1 encoder's allocator
   // traffic, which say nothing about each other.
-  const CODECS = ["AC-3", "E-AC-3", "AC-4", "TrueHD"];
+  const CODECS = ["AC-3", "E-AC-3", "AC-4"];
+
+  // The codecs a speed or allocation line is drawn for: the three above, and TrueHD once the series
+  // holds a TrueHD workload. TrueHD is lossless, so it has no decode-accuracy or listening-quality
+  // line; the cards for those two keep CODECS.
+  const codecsOf = (picked) => (has(picked, "TrueHD") ? [...CODECS, "TrueHD"] : CODECS);
 
   // The `codec` field of a gold-reference record (main.jsonl) and of a tool-comparison one.
   const QUALITY_CODECS = { "ac3": "AC-3", "eac3": "E-AC-3" };
@@ -66,6 +71,9 @@
     "ac4_stereo_decode": ["AC-4", "stereo decode"],
     "ac4_51_encode": ["AC-4", "5.1 encode"],
     "ac4_51_decode": ["AC-4", "5.1 decode"],
+    "truehd_stereo_encode": ["TrueHD", "stereo encode"],
+    "truehd_stereo_decode": ["TrueHD", "stereo decode"],
+    "truehd_51_encode": ["TrueHD", "5.1 encode"],
     "truehd_51_decode": ["TrueHD", "5.1 decode"],
   };
 
@@ -381,7 +389,7 @@
     const picked = slowestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Speed");
     const timed = rows.filter((r) => isNumber(r.ms_per_frame) && r.ms_per_frame > 0);
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       return e ? line(codec, formatMultiple(e.times) + "&times;", "",
         esc(e.words) + ", " + oneDecimal(e.ms) + " ms of a " + round1(e.budget) + " ms frame." +
@@ -444,7 +452,7 @@
   function allocationTile(rows, noteFor = () => "") {
     const picked = heaviestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Allocation per frame");
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       return e ? line(codec, round0(e.value / 1024), "KB", esc(e.words) +
         (isNumber(e.allocs) ? ", " + round0(e.allocs) + " allocations" : "") + "." + noteFor(codec)) : noLine(codec);
@@ -459,7 +467,7 @@
     if (Object.keys(picked).length === 0) return emptyTile("Live growth");
     const windows = [...new Set(Object.values(picked).filter((e) => isNumber(e.frames)).map((e) => e.frames - 1))];
     const frames = windows.length === 1 ? String(windows[0]) : "about 200";
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       const over = e && e.value >= MEMORY_RETENTION_WARN_BYTES;
       return e ? line(codec, oneDecimal(e.value / 1024), "KiB",
