@@ -29,6 +29,24 @@ See [README.md](README.md) for the project overview and
   5.1 one gave a stereo WAV with the 5.1 frames cut to their first two channels, and the other order a 6-channel WAV that lost the stereo
   frames as a "ragged tail". It now stops with exit 2 and "frame N: the channel layout changes mid-stream (W channels, then V)", as the
   AC-3 and AC-4 paths already did; a unit concealed down to its bed under `conceal=` is still written as it is.
+- **Added: TrueHD and MLP beside E-AC-3 in the documentation, with the status of each feature stated.** A Concepts page, "TrueHD and MLP",
+  says what the lossless codec is, why it has no published standard and how a stream travels (MP4 `mlpa`, Matroska `A_TRUEHD`, MPEG-TS
+  `stream_type` 0x83, MAT in IEC 61937 data type 22); it is in the navigation, on the home page and in the README, the quick start and the
+  library overview, each of which named only E-AC-3 and AC-4 for its codecs. The capability and status tables
+  (`docs/library/capabilities.md`, `development-status.md`), the application coverage and platform tables generated from
+  `support-catalogue.json`, the header map, the example list, the C API and bindings pages, `docs/verification.md` and the threat model give
+  TrueHD, the MAT burst, the AC-4 content signature and TrueHD's missing counterpart of it a row each. Where TrueHD is not built the row says
+  so: the Forge GUI, Hearth, Crucible, the Python, Rust and WebAssembly bindings, device output of a MAT burst, content signing of the evolution
+  frame, performance series, and seeds and corpora for its fuzz harnesses. `ROADMAP.md` replaces its TrueHD section with a table by layer,
+  adds the area-by-area rows of "TrueHD and E-AC-3 as equals" and a row for Dolby's reference content, and corrects the Blocked row that said
+  the reference material was non-public. The inventory of every page checked is `planning/documentation-sweep.md`.
+- **Fixed: `docs/forge/cli/commands.md` listed 46 commands, and its usage block predated TrueHD and AC-4 signing.** `forge --help` prints 49: the
+  block now has `ac4-sign` and `ac4-verify` and the `.thd` and `.mlp` inputs of `decode`, `levels`, `loudness`, `spdif`, `unspdif`, `mkv`, `mp4`, `ts`
+  and `demux`, and the count follows. `forge probe` reads TrueHD and MLP too, and its usage line still does not name them.
+- **Fixed: two pages pointed at the superseded TrueHD branch for the evolution frame's authenticity check.** Object signing and the
+  roadmap described a truncated HMAC-SHA-256 as TrueHD's check and left the branch to settle it. They now give both accounts (that note, and
+  the owner's specification, where the payload is the container AC-4's content signature uses), say the specification is the one the code
+  follows and that neither has been checked against a stream, and say nothing for TrueHD is built.
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,
@@ -95,8 +113,8 @@ See [README.md](README.md) for the project overview and
   streams FFmpeg decodes added nine entries to `libs/truehd/ERRATA.md` (30 to 38) and four more questions for the owner
   (12 to 15), and the decoder now reads a substream's predecessor's rows before that predecessor's matrices, as
   FFmpeg's does. No IIR filter, LSB bypass, negative output shift, heavy DRC, noise or MLP is written (`ExperimentalTools` is refused with a
-  reason), and nothing outside the library reads the downmix presentations. `iclforge-truehd-encode-tool` is the test tool; `forge` has no
-  encode command yet.
+  reason), and nothing outside the library reads the downmix presentations. `iclforge-truehd-encode-tool` is the test tool; `forge truehd-encode`
+  is the command (the entry on the `forge` commands, below).
 - **Added: `iclforge::truehd`, a TrueHD and MLP reader and lossless decoder, and `forge decode` and `forge probe` for `.thd` and `.mlp`
   streams.** Written from the owner's TrueHD (MLP) Reference Specification v3.5 and checked against the streams FFmpeg's `truehd` and `mlp`
   encoders write: the decoder gives the samples FFmpeg's strict decode gives for 12 committed fixtures (`testdata/truehd/`, 1, 2 and 6
@@ -113,8 +131,8 @@ See [README.md](README.md) for the project overview and
   filter histories across a restart, the width of noise generator 0's `shr7` and the block data length. The 16-channel
   substream, the end-of-stream marker in every unit and the extra data's layout have **no external oracle**. Noise generator 1 (its table is not available) and heavy DRC are not decoded.
   `forge decode` writes a 24-bit WAV in the stream's channel order (`truehd-presentation=`, `truehd-check=strict|lenient`; a strict decode
-  of a damaged stream exits 2); `forge probe` checks every unit and exits 1 on a failure. The encoder, the Atmos substream and the
-  containers are phase T2 (`planning/truehd.md`).
+  of a damaged stream exits 2); `forge probe` checks every unit and exits 1 on a failure. The Atmos substream is phase T2b
+  (`planning/truehd.md`); the encoder, the containers, the `forge` commands and the C API are the entries above this one.
 - **Added: TrueHD in MP4, Matroska, MPEG-TS and MAT.** `iclforge::containers` carries whole TrueHD access units in an `mlpa`
   MP4 track (with its `dmlp` box, plain and fragmented), an `A_TRUEHD` Matroska track, a Blu-ray-profile MPEG-TS stream
   (stream_type 0x83 and the `HDMV` registration; the reader also takes 192-byte packets and a bare 0x83) and 24-unit MAT bursts
