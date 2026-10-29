@@ -1,7 +1,6 @@
 #include "content_signature.hpp"
 
 #include <fmt/base.h>
-#include <fmt/format.h>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -23,7 +22,6 @@
 #include "../support.hpp"
 #include "ac4_encode_core.hpp"
 #include "iclforge/ac4/io/content_signature.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/chain.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/credentials.hpp"
@@ -292,8 +290,6 @@ int run_ac4_sign(std::string_view in_path, std::string_view out_path, const Opti
         switch (signed_stream.error().kind) {
             case iclforge::ac4::StreamSignatureErrorKind::kAlreadySigned:
                 return kExitUsage;
-            case iclforge::ac4::StreamSignatureErrorKind::kSigning:
-                return kExitInput;
             default:
                 return kExitInput;
         }

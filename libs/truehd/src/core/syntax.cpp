@@ -261,7 +261,7 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
         if (!matrices) {
             return std::unexpected(matrices.error());
         }
-        header.matrices = std::move(*matrices);
+        header.matrices = *matrices;
     }
     if ((flags & presence::kOutputShift) != 0 && reader.read(1) != 0) {
         std::array<std::int8_t, kMaxChannels> shifts{};

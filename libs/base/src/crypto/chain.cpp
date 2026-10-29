@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 
 namespace iclforge::base::crypto {

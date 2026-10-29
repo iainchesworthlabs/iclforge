@@ -1112,7 +1112,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     previous[k] = choice.coding;
                 }
                 plan.has_header = any;
-                stage.blocks.push_back(std::move(plan));
+                stage.blocks.push_back(plan);
             }
         }
     }

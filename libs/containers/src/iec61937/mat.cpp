@@ -2,8 +2,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <expected>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 namespace iclforge::containers::iec61937 {
 
@@ -157,12 +164,13 @@ std::expected<std::vector<std::byte>, MatError> wrap_mat_stream(
     MatPacker packer;
     std::vector<std::byte> carrier;
     for (const auto& unit : access_units) {
-        auto burst = packer.push(unit);
-        if (!burst) {
-            return std::unexpected(burst.error());
+        auto pushed = packer.push(unit);
+        if (!pushed) {
+            return std::unexpected(pushed.error());
         }
-        if (burst->has_value()) {
-            carrier.insert(carrier.end(), (*burst)->begin(), (*burst)->end());
+        const std::optional<std::vector<std::byte>>& burst = *pushed;
+        if (burst.has_value()) {
+            carrier.insert(carrier.end(), burst->begin(), burst->end());
         }
     }
     if (auto last = packer.flush()) {

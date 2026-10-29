@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 
 #include "iclforge/base/bitreader.hpp"
@@ -11,6 +12,7 @@ namespace iclforge::truehd::detail {
 
 // A two's-complement field of `bits` bits (1..32).
 [[nodiscard]] inline std::int32_t read_signed(BitReader& reader, int bits) noexcept {
+    assert(bits >= 1 && bits <= 32);  // every caller has checked the width it passes
     const std::uint32_t value = reader.read(bits);
     const std::uint32_t sign = 1U << (bits - 1);
     return static_cast<std::int32_t>((value ^ sign) - sign);

@@ -13,9 +13,13 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/crypto/chain.hpp"
+#include "iclforge/base/crypto/credentials.hpp"
 #include "iclforge/base/crypto/der.hpp"
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 #include "iclforge/base/crypto/thrift_binary.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 
 namespace iclforge::base::crypto {
 namespace {

@@ -4,8 +4,10 @@
 #include <fmt/format.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <initializer_list>
 #include <optional>
 #include <span>
@@ -20,9 +22,12 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace forge_cli::commands {
 
@@ -131,7 +136,8 @@ class Pcm24Wav {
    public:
     ~Pcm24Wav() {
         if (file_ != nullptr && file_ != stdout) {
-            std::fclose(file_);
+            // Only reached when close() was not: a run that failed first. Nothing to report to.
+            static_cast<void>(std::fclose(file_));
         }
     }
 
