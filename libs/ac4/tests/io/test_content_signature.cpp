@@ -110,6 +110,16 @@ TEST_CASE("a signed AC-4 stream is the unsigned one with the signature after the
     // The blob does not look like a sync word, which is how a syncframe walk knows to stop.
     CHECK(located->blob[0] == std::byte{0x08});
 
+    // The digest the blob holds is SHA-256 of exactly the unsigned stream, worked out here and not
+    // by the library's own helper (a boundary one byte out in signing and in verifying alike would
+    // round-trip and still be wrong).
+    const auto parsed = crypto::parse_content_signature(located->blob);
+    REQUIRE(parsed.has_value());
+    const std::array<std::byte, 32> expected = crypto::sha256(stream);
+    CHECK(std::ranges::any_of(parsed->content_digests, [&expected](const crypto::DigestEntry& d) {
+        return std::equal(d.value.begin(), d.value.end(), expected.begin(), expected.end());
+    }));
+
     // The frame walk sees the same frames and stops exactly where the signature starts.
     const auto before = iclforge::ac4::scan(stream);
     const auto after = iclforge::ac4::scan(*signed_stream);
@@ -148,6 +158,15 @@ TEST_CASE("a signed AC-4 stream verifies, and changes to either part are caught"
     anchored.trust_anchors = anchors;
     CHECK(iclforge::ac4::verify_stream(*signed_stream, anchored).verdict ==
           crypto::Verdict::kValid);
+
+    // A signature made by the codec-neutral signer over the stream, and appended by hand, verifies:
+    // the boundary verify_stream hashes up to is not merely the one sign_stream hashed to.
+    const auto blob = crypto::sign_content(stream, f.credentials, f.options());
+    REQUIRE(blob.has_value());
+    std::vector<std::byte> by_hand = stream;
+    by_hand.insert(by_hand.end(), blob->begin(), blob->end());
+    CHECK(iclforge::ac4::verify_stream(by_hand, f.policy()).verdict ==
+          crypto::Verdict::kChecksChainUnanchored);
 
     // One bit of audio changed.
     std::vector<std::byte> bad_audio = *signed_stream;
