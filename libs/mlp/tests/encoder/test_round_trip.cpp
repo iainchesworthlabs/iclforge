@@ -37,13 +37,25 @@ void save(const std::string& name, const std::vector<std::byte>& bytes) {
 
 void round_trip(const std::vector<std::int32_t>& pcm, const EncoderConfig& config,
                 const std::string& name) {
-    INFO(name);
+    INFO(name << ": " << config.channels << " channels at " << config.sample_rate
+              << " Hz, restart interval " << config.restart_interval << ", downmix "
+              << config.downmix << ", " << pcm.size() << " samples");
     EncoderStats stats;
     auto stream = encode_stream(pcm, config, &stats);
     if (!stream) {
         FAIL(std::string(describe(stream.error())));
     }
     save(name + ".thd", *stream);
+    // The source beside it, as raw 32-bit samples (the 24-bit scale shifted up by 8, as FFmpeg's
+    // s32 output holds it), for a comparison with FFmpeg's decode.
+    std::vector<std::byte> raw(pcm.size() * 4);
+    for (std::size_t i = 0; i < pcm.size(); ++i) {
+        const auto v = static_cast<std::uint32_t>(pcm[i]) << 8U;
+        for (std::size_t b = 0; b < 4; ++b) {
+            raw[i * 4 + b] = static_cast<std::byte>((v >> (8U * b)) & 0xFFU);
+        }
+    }
+    save(name + ".s32", raw);
     auto decoded = decode_stream(*stream);
     if (!decoded) {
         FAIL(std::string(describe(decoded.error())));

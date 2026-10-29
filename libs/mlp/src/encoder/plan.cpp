@@ -262,10 +262,12 @@ std::expected<void, Error> plan_interval(const Plan& plan, const EncoderConfig& 
             for (const double v : *w) {
                 peak_w = std::max(peak_w, std::abs(v));
             }
-            int frac = 14;
-            while (frac > 0 && peak_w * std::ldexp(1.0, frac) >= std::ldexp(1.0, frac + 1) - 1.0) {
-                --frac;
+            // frac_bits + 2 bits signed hold weights below 2 in magnitude at any frac_bits; a
+            // heavier weight cannot be coded (10.2).
+            if (peak_w >= 1.99) {
+                continue;
             }
+            int frac = 14;
             Dec d{j, frac, {}, 0.0};
             std::array<std::int32_t, kMaxChannels> eff{};
             bool nonzero = false;
