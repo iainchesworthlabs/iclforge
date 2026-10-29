@@ -273,14 +273,14 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     unit. The library skips them (a bounded search for a major sync that reads and is followed by an access unit that reads) and
     says how many; it does not read them. Is the packet something a decoder should carry (a timecode to report), and is the limit of 64 KiB
     right? **Recommendation:** skip and warn, as now; carry it only when something needs the timecode.
-50. **The 96 kHz legs of the DEE gold set (v3.9 §19.1).** `thd-fx-2ch-music-96k24` and `thd-fx-8ch-tones-96k24` decode in forge with every
+50. **The 96 kHz legs of the DEE gold set.** `thd-fx-2ch-music-96k24` and `thd-fx-8ch-tones-96k24` decode in forge with every
     lossless-check interval ok, to the samples FFmpeg 6.1.1's strict decode gives, and not to their sources (about -47 dB on music and
     tones, -10 dB on noise and a sweep for the whole set). The decoder is therefore giving what the encoder coded. The FFmpeg-made
     fixtures at 88.2, 96, 176.4 and 192 kHz (`truehd_st88_s24`, `truehd_st96_s24`, `mlp_st96_s24`, `truehd_st176_s24`, `truehd_st192_s24`)
     decode to FFmpeg's strict decode bit for bit with every check ok, the encoder's 44.1 to 192 kHz streams decode to their inputs here and
     in FFmpeg (`verify_truehd_encode_interop.py`), and `hb_noise_generator_1_96k` and `_192k` hold the hand-built path at those rates. So
     the codec is lossless at every rate here, and what differs is upstream of the stream. v3.9 §19.1 makes the apodising filters a
-    configuration option and no longer explains it. **Open; the scorer reports the legs as UNEXPLAINED.** **Recommendation:** ask what DEE
+    configuration option, so it is not offered as the reason. **Open; the scorer reports the legs as UNEXPLAINED.** **Recommendation:** ask what DEE
     does to a 96 kHz input before coding (a resampler or a filter that its options name) rather than look in the decoder.
 
 ## Entries
