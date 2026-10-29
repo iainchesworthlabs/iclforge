@@ -435,13 +435,17 @@ struct Options {
     // pin=<hex> (repeatable): a certificate by SHA-1 or SHA-256 fingerprint.
     std::vector<std::string> trust_anchors;
     std::vector<std::string> pins;
+    // expect-publisher-uuid=<UUID> (repeatable): the publisher accounts the operator accepts. A
+    // signature naming another is a finding in ac4-verify and a refusal in verify-content. CS spec
+    // v2.6 §5.3: the UUID is not in the signing certificate, so without this it is only reported.
+    std::vector<std::string> expect_publisher_uuids;
     // leaf-title=<title|any>: the `title` the signer certificate must carry (default
     // "Code/Content Signer", CS spec v2.3 §6.1 step 4); "any" checks none. Unset: the default.
     std::optional<std::string> leaf_title;
     // signed-date=<YYYY-MM-DDTHH:MM:SS>: the date written into a signature, UTC; unset: now. CS spec
-    // v2.5 §5.3 says signedDate is the time of signing, so a date that is not that is warned about.
+    // v2.6 §5.3 says signedDate is the time of signing, so a date that is not that is warned about.
     std::optional<std::string> signed_date;
-    // The signer information of CS spec v2.5 §5.3, for ac4-sign and sign-content: whom the
+    // The signer information of CS spec v2.6 §5.3, for ac4-sign and sign-content: whom the
     // signature names as its publisher and product, and the platform it was made on. Unset: left
     // empty (publisher-uuid= is the one the specification asks for; its absence is warned about).
     std::string publisher_uuid;  // publisher-uuid=<UUID>
@@ -453,7 +457,7 @@ struct Options {
     std::string os_version;         // os-version=<text>
     std::string os_description;     // os-description=<text>
     // verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>: the instant every certificate must be
-    // valid at. Unset, it depends on how the signature is being checked: "now", CS spec v2.5 §6.1
+    // valid at. Unset, it depends on how the signature is being checked: "now", CS spec v2.6 §6.1
     // steps 3 and 4, for ac4-verify and verify-content (the strict checks), and "signed", the date
     // the signer wrote (only as good as the signer), for check-content, which reports and carries on.
     std::optional<std::string> verify_time;

@@ -412,7 +412,7 @@ constexpr std::array<Command, 49> kCommands{{
      "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
      "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
      "operator's own; none is built in. The sync frames are not touched, so a signed file plays as "
-     "the unsigned one. An MP4 is refused: CS spec v2.5 puts signing one out of scope. "
+     "the unsigned one. An MP4 is refused: CS spec v2.6 puts signing one out of scope. "
      "publisher-uuid= (your publisher account's UUID), publisher-name=, product-id=, "
      "product-name=, wrapper-name=, os-name=, os-version= and os-description= say who signed and "
      "where; leaf-title= and signed-date= adjust what is written and checked",
@@ -425,7 +425,8 @@ constexpr std::array<Command, 49> kCommands{{
      "vouches for its certificates (unanchored-ok accepts one that checks but has no anchor); "
      "check-content prints the checks and exits 0 whatever they find, judging the certificates at "
      "the signed date unless verify-time= says otherwise; verify-content also refuses a signature "
-     "whose signer nonce or publisher UUID is not as CS spec v2.5 section 5.3 asks",
+     "whose signer nonce or publisher UUID is not as CS spec v2.6 section 5.3 asks (expect-publisher-uuid= "
+     "names the publisher accounts to accept; the UUID is not in the certificate)",
      topic::kStdio | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_verify(x.str(1), x.meta); }},

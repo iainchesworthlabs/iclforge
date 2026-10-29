@@ -1313,7 +1313,7 @@ if command -v openssl >/dev/null 2>&1; then
         echo "ac4-verify does not report the signed-date $signed_when" >&2
         exit 1
     fi
-    # CS spec v2.5: the signer information of section 5.3 (who signed, with what product and on what
+    # CS spec v2.6: the signer information of section 5.3 (who signed, with what product and on what
     # platform), reported by ac4-verify; verify-content, the strict reading, refuses a signature
     # without a publisher UUID and takes one with a well formed UUID; and check-content judges the
     # certificates at the signed date, which the report says.
@@ -1331,6 +1331,17 @@ if command -v openssl >/dev/null 2>&1; then
         fi
     done
     run ac4-verify cs/described.ac4 trust-anchor=cs/root.pem verify-content
+    # The publisher UUID is an account's, not in the certificate (v2.6): compared only with the accounts
+    # expect-publisher-uuid= names, a finding in ac4-verify and a refusal with verify-content.
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-content \
+        expect-publisher-uuid=3b9c1f52-7a4e-4d08-b6a1-2f0e9d7c5a84
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-content \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 2 decode cs/signed.ac4 cs/refused_account.wav verify-content trust-anchor=cs/root.pem \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 1 ac4-verify cs/signed.ac4 expect-publisher-uuid=not-a-uuid
     run ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem
     run_fails 6 ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem verify-content
     run_fails 2 decode cs/anonymous.ac4 cs/refused_strict.wav verify-content trust-anchor=cs/root.pem

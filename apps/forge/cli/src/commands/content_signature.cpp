@@ -128,7 +128,7 @@ std::expected<SigningMaterial, int> load_signing_material(const Options& meta,
         crypto::parse_iso8601_utc(material.options.signed_date);
     material.options.chain_policy.required_leaf_title = required_title(meta);
 
-    // The signer information of CS spec v2.5 section 5.3. The application is this program, named
+    // The signer information of CS spec v2.6 section 5.3. The application is this program, named
     // and numbered as it is built; the publisher, product and platform are the operator's to give.
     crypto::SignerMetadata& info = material.options.metadata;
     info.application_name = "ICL Forge forge";
@@ -152,7 +152,7 @@ void warn_about_signer_information(const Options& meta, std::string_view option,
                                    std::string_view signed_date) {
     if (meta.publisher_uuid.empty()) {
         fmt::println(stderr,
-                     "warning: {} has no publisher-uuid=: CS spec v2.5 section 5.3 asks for the "
+                     "warning: {} has no publisher-uuid=: CS spec v2.6 section 5.3 asks for the "
                      "UUID of your publisher account, and a verifier that requires it (forge's "
                      "verify-content does) refuses a signature without one",
                      option);
@@ -164,7 +164,7 @@ void warn_about_signer_information(const Options& meta, std::string_view option,
             *given < now - kSignedDateToleranceSeconds) {
             fmt::println(stderr,
                          "warning: signed-date={} is not the time of signing ({} UTC now): CS spec "
-                         "v2.5 section 5.3 says signedDate shall be the actual signing time, and a "
+                         "v2.6 section 5.3 says signedDate shall be the actual signing time, and a "
                          "verifier may refuse a signature whose date it does not accept",
                          signed_date, crypto::format_iso8601_utc(now));
         }
@@ -176,13 +176,16 @@ void warn_about_signer_information(const Options& meta, std::string_view option,
 //
 // Two ways of checking, as the owner decided for the time: the strict one, which refuses what does
 // not check (ac4-verify, and verify-content on decode), judges the certificates at the time of the
-// check, as CS spec v2.5 section 6.1 steps 3 and 4 say; check-content, which reports what it finds
+// check, as CS spec v2.6 section 6.1 steps 3 and 4 say; check-content, which reports what it finds
 // and carries on, judges them at the date the signature records unless verify-time= says otherwise.
-// verify-content is also the strict reading of the operator metadata of section 5.3 (the signature
-// nonce and the publisher UUID decide the verdict); everywhere else they are reported.
+// verify-content is also the strict reading of the operator metadata of section 5.3 (the signer
+// nonce and the publisher UUID decide the verdict); everywhere else they are reported. The publisher
+// UUID is not in the signing certificate (v2.6), so it is compared only with the accounts
+// expect-publisher-uuid= names, and with none it is reported.
 struct VerifyMaterial {
     std::vector<crypto::Certificate> anchors;
     std::vector<crypto::CertificatePin> pins;
+    std::vector<std::string> expected_publishers;  // the UUIDs of the accounts expect-publisher-uuid= names
     crypto::TimeBasis basis = crypto::TimeBasis::kNow;
     std::int64_t instant = 0;
     std::string title;
@@ -199,6 +202,7 @@ struct VerifyMaterial {
         p.required_leaf_title = title;
         p.operator_metadata = require_metadata ? crypto::OperatorMetadata::kRequire
                                                : crypto::OperatorMetadata::kReport;
+        p.expected_publisher_uuids = expected_publishers;
         return p;
     }
 };
@@ -237,6 +241,7 @@ std::expected<VerifyMaterial, int> load_verify_material(const Options& meta) {
     }
     m.title = required_title(meta);
     m.require_metadata = meta.verify_content;
+    m.expected_publishers = meta.expect_publisher_uuids;
     return m;
 }
 
@@ -444,7 +449,7 @@ int check_sign_content_request(std::string_view out_path, const Options& meta, b
     }
     if (iclforge::apps::ac4_output_names_mp4(out_path)) {
         fmt::println(stderr,
-                     "error: sign-content does not sign an MP4: CS spec v2.5 section 8.3.2 puts "
+                     "error: sign-content does not sign an MP4: CS spec v2.6 section 8.3.2 puts "
                      "that out of scope, because it names no box that carries a content "
                      "signature. Write a raw .ac4 file (name the output *.ac4), whose signature "
                      "is a trailer after its last sync frame, and sign that");

@@ -3438,6 +3438,17 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.publisher_uuid = std::string{value};
             continue;
         }
+        if (key == "expect-publisher-uuid") {
+            if (!iclforge::base::crypto::is_uuid(value)) {
+                fmt::println(stderr,
+                             "error: expect-publisher-uuid= is a publisher account's UUID, as "
+                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (got '{}')",
+                             token);
+                return false;
+            }
+            out.expect_publisher_uuids.emplace_back(value);
+            continue;
+        }
         if (key == "publisher-name" || key == "product-name" || key == "wrapper-name" ||
             key == "os-name" || key == "os-version" || key == "os-description") {
             if (value.empty()) {
@@ -3559,6 +3570,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                                    signer_info_given;
         const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
                                     !out.trust_anchors.empty() || !out.pins.empty() ||
+                                    !out.expect_publisher_uuids.empty() ||
                                     out.verify_time.has_value();
         if (signing_given && !signs_content) {
             fmt::println(stderr,
@@ -3569,9 +3581,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (checking_given && !checks_content) {
             fmt::println(stderr,
-                         "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin= "
-                         "and verify-time= check an AC-4 content signature: decode and ac4-verify "
-                         "take them");
+                         "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin=, "
+                         "expect-publisher-uuid= and verify-time= check an AC-4 content "
+                         "signature: decode and ac4-verify take them");
             return false;
         }
         if (out.leaf_title.has_value() && !signs_content && !checks_content) {
@@ -3601,9 +3613,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
             fmt::println(stderr,
-                         "error: trust-anchor=, pin=, unanchored-ok, verify-time= and leaf-title= "
-                         "say how to check, and nothing is checked unless verify-content or "
-                         "check-content asks for it");
+                         "error: trust-anchor=, pin=, expect-publisher-uuid=, unanchored-ok, "
+                         "verify-time= and leaf-title= say how to check, and nothing is checked "
+                         "unless verify-content or check-content asks for it");
             return false;
         }
     }
