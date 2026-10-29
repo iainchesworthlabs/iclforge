@@ -63,9 +63,9 @@ names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/l
 The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
 do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, noise generator 0, the block data check,
 the end-of-stream marker, extra data, the directory's DRC word and the 16-channel substream. They are held to the signal each
-was made from, by this decoder and by `tools/references/truehd_syntax.py`, and FFmpeg's strict decode of eleven of the fourteen
+was made from, by this decoder and by `tools/references/truehd_syntax.py`, and FFmpeg's strict decode of eleven of the fifteen
 returns that signal too (`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the
-other three). The extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream have no external
+other four). The extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream have no external
 oracle.
 
 `tools/checks/verify_truehd_encode_interop.py --encoder <iclforge-truehd-encode-tool>` encodes 43 cases and requires FFmpeg's strict decode of each

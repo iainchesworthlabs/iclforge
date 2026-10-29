@@ -205,7 +205,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 ## TrueHD / MLP
 
 Written from the owner's TrueHD (MLP) Reference Specification, which has no published counterpart; the reading taken wherever it and the
-streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (21 open questions for the owner). Every row below is the peer of a row in the
+streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (39 open questions for the owner). Every row below is the peer of a row in the
 E-AC-3 and AC-4 sections above; where TrueHD is not built the row says so. The Priority and Criticality of a row that is not built are
 provisional until the parity audits of [the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) land.
 
@@ -213,7 +213,7 @@ provisional until the parity audits of [the roadmap](https://github.com/iainches
 |---|---|---|---|---|---|
 | **Codec** | TrueHD and MLP decoder (`iclforge::truehd`) | 🟢 | Medium | Important | Substreams 0 to 2 and a generic 16-channel substream 3, FIR and IIR, matrices with LSB bypass, Huffman and raw residuals, every check; bit-exact with FFmpeg on 25 fixtures. [TrueHD and MLP](truehd.md) |
 | | TrueHD encoder (`iclforge::truehd::Encoder`, `forge truehd-encode`, `iclforge_truehd_encoder_*`) | 🟢 | Medium | Important | 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits; FFmpeg's strict decode returns every sample (43 cases and a fuzzer). MLP, IIR, LSB bypass, heavy DRC and noise are not written. [TrueHD and MLP](truehd.md) |
-| | IIR, LSB bypass, block data length, permuted `ch_assign`, extra data, 16-channel substream | 🟡 | Medium | Important | Decoded. FFmpeg's strict decode of hand-built streams returns the signal for the first four and for extra data; the extra data's layout and the 16-channel substream (FFmpeg refuses its restart sync) have no external oracle: fourteen hand-built streams |
+| | IIR, LSB bypass, block data length, permuted `ch_assign`, extra data, 16-channel substream | 🟡 | Medium | Important | Decoded. FFmpeg's strict decode of hand-built streams returns the signal for the first four and for extra data; the extra data's layout and the 16-channel substream (FFmpeg refuses its restart sync) have no external oracle: fifteen hand-built streams |
 | | Noise generator 0 | 🟡 | Low | Nice-to-have | Decoded from the specification's LFSR (§17.2), `shr7` 16 bits as FFmpeg reads it (ERRATA question 5, provisional); FFmpeg's strict decode of one hand-built stream equals it |
 | | Noise generator 1, heavy DRC | 🔴 | Low | Nice-to-have | Refused (`kUnsupported`) or not read: generator 1's 256-entry table is not in the specification yet, and the streams do not show where heavy DRC's bits sit (ERRATA open questions 5 and 10) |
 | | Atmos substream (16 channels), object audio metadata, the evolution frame | 🔴 | Medium | Important | Not built (phase T2b). The decoder carries a unit's extra data as bytes and reads none of it. Blocked on the owner's answers about the evolution payload (ERRATA open questions 1 and 2). Atmos in E-AC-3 is JOC, in the Atmos / JOC section above |
@@ -438,7 +438,7 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 21 questions for the specification's owner, the first being the evolution payload | 🟡 |
+| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 39 questions for the specification's owner, the first being the evolution payload | 🟡 |
 | Evolution frame | Content signing (the container of the specification v3.4 and later, or the older truncated HMAC note): field IDs and digest scope unconfirmed | 🔴 |
 | MLP reference material | Shipping interop (IM6): no Dolby decoder, player or receiver has read output | 🔴 |
 

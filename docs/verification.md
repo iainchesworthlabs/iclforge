@@ -2335,11 +2335,11 @@ only, and part of the second has no outside reader.
    block data check, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
-   it: for eleven of the fourteen it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, LSB bypass, three matrices
+   it: for eleven of the fifteen it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, LSB bypass, three matrices
    with a permuted `ch_assign` and an output shift, noise generator 0, `noise_type` 1 with zero noise shifts, the block data
-   length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other three: with the marker in
-   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel stream, whose substreams 2 and 3 use restart sync
-   `0x31EC`; and it decodes the stream with a non-zero matrix noise shift under `0x31EB`, which the library refuses because noise
+   length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other four: with the marker in
+   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel stream and the one at substream 3's limits, whose
+   substreams 2 and 3 use restart sync `0x31EC`; and it decodes the stream with a non-zero matrix noise shift under `0x31EB`, which the library refuses because noise
    generator 1's table is not available. Comparing found four readings the first writer and the library had wrong, each now
    FFmpeg's and marked provisional in ERRATA.md: the lossless check's channel shift (question 6), the filter histories across a
    restart (question 18), the width of `shr7` in noise generator 0 (question 5) and the block data length (entry 21). What FFmpeg
