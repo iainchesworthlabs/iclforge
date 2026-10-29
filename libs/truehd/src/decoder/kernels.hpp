@@ -144,7 +144,8 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
         if (lsb_bypass) {
-            value += (bypass[static_cast<std::size_t>(i)] >> matrix_index) & 1U;
+            const std::uint32_t sent = bypass[static_cast<std::size_t>(i)];
+            value += (sent >> matrix_index) & 1U;
         }
         row[out] = static_cast<std::int32_t>(value);
     }
