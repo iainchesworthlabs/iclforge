@@ -509,6 +509,29 @@ def case_filters():
     )
 
 
+def case_filter_orders():
+    """Every order a channel's filters can have: IIR 1 to 4, FIR 8, and the two filters together
+    at the 8 they may add up to (TH spec 9.2; the decoder refuses 9). An IIR filter feeds back its
+    own residual, so its coefficients add up to less than 1 (here 64 of 64) to stay stable."""
+    n = 40 * 24
+    sources = [tone(n, 60 + c, 2**14) for c in range(6)]
+    fir8 = [96, -64, 40, -24, 16, -10, 6, -3]
+    channels = {
+        0: Channel(iir=filt([40], 6)),
+        1: Channel(iir=filt([24, -12, 6], 6)),
+        2: Channel(iir=filt([20, -10, 6, -3], 6)),
+        3: Channel(fir=filt(fir8, 6)),
+        4: Channel(fir=filt(fir8[:4], 6), iir=filt([16, -8, 4, -2], 6)),
+        5: Channel(fir=filt(fir8[:5], 6), iir=filt([24, -12, 6], 6)),
+    }
+    sub = Substream(0, 5, 5, channels, list(zip(*sources, strict=True)), dict(enumerate(sources)))
+    return (
+        Stream([sub], n),
+        "IIR orders 1 to 4, FIR order 8, and FIR and IIR together at 4 + 4 and 5 + 3",
+        ["fir", "iir", "filter_orders"],
+    )
+
+
 def case_bypass():
     n = 40 * 40
     s0, s1 = tone(n, 3), tone(n, 4)
@@ -656,6 +679,29 @@ def case_sixteen():
     )
 
 
+def case_eight_channels():
+    """7.1 as the library's encoder lays it out: substreams of 2, 6 and 8 channels, the third
+    with restart sync 0x31EB, the only one FFmpeg's decoder reads above 6 channels (ERRATA 32)."""
+    n = 40 * 24
+    src = [tone(n, 80 + c, 2**14) for c in range(8)]
+
+    def sub_for(lo, hi, sync=0x31EA):
+        channels = {
+            c: Channel(fir=filt([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
+            for c in range(lo, hi + 1)
+        }
+        rows = [tuple(src[c][i] for c in range(hi + 1)) for i in range(n)]
+        return Substream(
+            lo, hi, hi, channels, rows, {c: src[c] for c in range(lo, hi + 1)}, sync=sync
+        )
+
+    return (
+        Stream([sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EB)], n),
+        "7.1: substreams of 2, 6 and 8 channels, the last under restart sync 0x31EB",
+        ["eight_channels", "substreams_3"],
+    )
+
+
 def noise_sequences(count, interval, seed, shift):
     """Generator 0's two noise channels (TH spec 17.2); the state restarts with each interval."""
     first, second = [], []
@@ -730,6 +776,7 @@ def case_noise_type1_shift():
 
 CASES = {
     "hb_filters": case_filters,
+    "hb_filter_orders": case_filter_orders,
     "hb_lsb_bypass": case_bypass,
     "hb_matrices": case_matrices,
     "hb_noise_generator_0": case_noise,
@@ -740,6 +787,7 @@ CASES = {
     "hb_extra_data": case_extra_data,
     "hb_drc_word": case_drc_word,
     "hb_sixteen_channels": case_sixteen,
+    "hb_eight_channels": case_eight_channels,
 }
 
 
@@ -763,6 +811,13 @@ FFMPEG = {
         "note": "with the end-of-stream marker in every access unit FFmpeg returns two of the 20 "
         "(the first is the signal's) and skips the rest "
         '("Stream parameters not seen; skipping frame")',
+    },
+    "hb_eight_channels": {
+        "outcome": "equal",
+        "columns": [0, 1, 2, 3, 6, 7, 4, 5],
+        "note": "FFmpeg returns the channels of a 7.1 stream in the order of its own layout "
+        "bits, the back pair before the side pair (ERRATA 33): its column k holds the stream's "
+        "channel `columns`[k]",
     },
     "hb_sixteen_channels": {
         "outcome": "refused",

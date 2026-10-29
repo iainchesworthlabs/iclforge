@@ -24,6 +24,27 @@
       "pcm_sha256": "1f2df0476ae28f3e60a2bfc0645b6ff7dcf8982bb4271c03ac2cc1fbbad41a85"
     },
     {
+      "name": "hb_filter_orders",
+      "file": "hb_filter_orders.thd",
+      "description": "IIR orders 1 to 4, FIR order 8, and FIR and IIR together at 4 + 4 and 5 + 3",
+      "features": [
+        "fir",
+        "iir",
+        "filter_orders"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 6,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "11fb19e17476c45f0ea5a5a17c95498ec9524293a72991c1350be2b1258e2661",
+      "pcm_sha256": "106c1a81de944225d9f98b4fce6472cd7cfa5532478fe885b9a443309869b71d"
+    },
+    {
       "name": "hb_lsb_bypass",
       "file": "hb_lsb_bypass.thd",
       "description": "LSB bypass: a matrix with a quantised output channel",
@@ -243,6 +264,37 @@
       "pcm_samples": 1280,
       "stream_sha256": "c88716c5a282af63896af978b4038efd7aac7604d5dd5d681a8d7a863f59c0f6",
       "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
+    },
+    {
+      "name": "hb_eight_channels",
+      "file": "hb_eight_channels.thd",
+      "description": "7.1: substreams of 2, 6 and 8 channels, the last under restart sync 0x31EB",
+      "features": [
+        "eight_channels",
+        "substreams_3"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg returns the channels of a 7.1 stream in the order of its own layout bits, the back pair before the side pair (ERRATA 33): its column k holds the stream's channel `columns`[k]"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "1f691df661d46fd798f5d02343fd384fcf82ad2a19a9faa2fdc552c8b1ac2a76",
+      "pcm_sha256": "e2b64351d3a6c4b59a2b49a1ef22b6d828be6f75d78123835319323f453a21cb"
     }
   ],
   "refused": [

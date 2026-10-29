@@ -62,6 +62,19 @@ class HandbuiltOutcomes(unittest.TestCase):
         equal = {"channels": 2, "pcm_sha256": sha(PCM), "ffmpeg": {"outcome": "equal"}}
         self.assertTrue(problems(equal, (None, "failed"), held=False))
 
+    def test_equal_in_ffmpegs_channel_order_is_put_back_before_the_comparison(self):
+        columns = [0, 1, 2, 3, 6, 7, 4, 5]  # a 7.1 stream: the back pair before the side pair
+        stream = b"".join(bytes([c]) * 4 for c in range(8))  # one frame, channel c holds c c c c
+        ffmpeg = b"".join(bytes([c]) * 4 for c in columns)
+        fixture = {
+            "channels": 8,
+            "pcm_sha256": sha(stream),
+            "ffmpeg": {"outcome": "equal", "columns": columns},
+        }
+        self.assertEqual(problems(fixture, (ffmpeg, "")), [])
+        self.assertTrue(problems(fixture, (stream, "")))  # not permuted: the signal is not it
+        self.assertEqual(V.in_stream_order(ffmpeg, 8, columns), stream)
+
     def test_an_unknown_outcome_is_a_problem(self):
         fixture = {"channels": 2, "ffmpeg": {"outcome": "maybe"}}
         self.assertTrue(problems(fixture, (PCM, "")))

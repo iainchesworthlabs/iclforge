@@ -123,6 +123,17 @@ def ffmpeg_major():
     return int(match.group(1)) if match else None
 
 
+def in_stream_order(pcm, channels, columns):
+    """32-bit interleaved PCM whose column k holds the stream's channel columns[k], put back in the
+    stream's order (FFmpeg returns the channels of a 7 or 8 channel stream in its own order)."""
+    words = [pcm[i : i + 4] for i in range(0, len(pcm), 4)]
+    out = [b""] * len(words)
+    for frame in range(0, len(words), channels):
+        for k, column in enumerate(columns):
+            out[frame + column] = words[frame + k]
+    return b"".join(out)
+
+
 def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
     """The problems with FFmpeg's strict decode of a hand-built stream against the outcome the
     manifest names for it (equal: the whole signal; short: fewer samples, the first of them the
@@ -151,6 +162,8 @@ def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
             ]
         return []
     if kind == "equal":
+        if "columns" in outcome:
+            pcm = in_stream_order(pcm, fixture["channels"], outcome["columns"])
         if sha256(pcm) != fixture["pcm_sha256"]:
             return ["ffmpeg's strict decode is not the signal the stream was built from"]
         return []
@@ -208,6 +221,40 @@ def check_handbuilt(args, have_ffmpeg, scratch):
         print(f"{status} {label}" + "".join(f"\n       {p}" for p in problems))
     print(f"{len(entries)} hand-built streams, {failures} failing")
     return 1 if failures else 0
+
+
+def check_spliced(manifest_path, manifest, args, have_ffmpeg, scratch):
+    """The streams of two encodes joined end to end. FFmpeg's strict decode and the library's
+    lenient decode return the same samples; the library's strict decode stops at the join, where
+    the second stream's first restart header carries a lossless check that checks nothing
+    (libs/truehd/ERRATA.md, entry 12 and question 20)."""
+    failures = 0
+    for fixture in manifest.get("spliced", []):
+        path = manifest_path.parent / fixture["file"]
+        problems = []
+        if sha256(path.read_bytes()) != fixture["stream_sha256"]:
+            problems.append("the stream is not the one the manifest names")
+        if have_ffmpeg:
+            pcm, error = ffmpeg_pcm(path, "truehd")
+            if pcm is None:
+                problems.append(f"ffmpeg strict decode failed: {error}")
+            elif sha256(pcm) != fixture["pcm_sha256"]:
+                problems.append("ffmpeg's strict decode is not the manifest's")
+        if args.forge:
+            pcm, error = run_forge(args.forge, path, scratch, ["truehd-check=lenient"])
+            if pcm is None:
+                problems.append(f"forge lenient decode failed: {error}")
+            elif sha256(pcm) != fixture["pcm_sha256"]:
+                problems.append("forge lenient decode differs from the manifest")
+            pcm, error = run_forge(args.forge, path, scratch)
+            if pcm is not None:
+                problems.append("forge's strict decode did not stop at the join")
+            elif "lossless check" not in error:
+                problems.append(f"forge's strict decode stopped for another reason: {error}")
+        failures += bool(problems)
+        status = "FAIL" if problems else "ok  "
+        print(f"{status} {fixture['name']} (spliced)" + "".join(f"\n       {p}" for p in problems))
+    return failures
 
 
 def main():
@@ -278,6 +325,7 @@ def main():
             failures += bool(problems)
             status = "FAIL" if problems else "ok  "
             print(f"{status} {fixture['name']}" + "".join(f"\n       {p}" for p in problems))
+        failures += check_spliced(args.manifest, manifest, args, have_ffmpeg, scratch)
     print(f"{len(manifest['fixtures'])} fixtures, {failures} failing")
     return 1 if failures else 0
 
