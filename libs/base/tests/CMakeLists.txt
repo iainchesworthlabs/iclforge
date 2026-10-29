@@ -16,6 +16,12 @@ iclforge_add_test_binary(iclforge-base-tests PROJECT base SOURCES
 
 target_link_libraries(iclforge-base-tests PRIVATE iclforge::base iclforge::ac3)
 
+# test_content_signature.cpp reads std::getenv, for the owner's sample blob it parses when
+# ICLFORGE_CONTENT_SIGNATURE_SAMPLE names one - the C4996 reasoning of libs/ac3/tests' cpu_features.cpp.
+if(ICLFORGE_IS_MSVC_LIKE)
+    set_source_files_properties(test_content_signature.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()
+
 # The same table of cases against iclforge::base::parse_double's other implementation,
 # src/number_parse_libc.cpp, which the minimum-footprint builds take because they link no third-party
 # library (libs/ac3/minimal.cmake). A binary of its own, with that file compiled in, so that the

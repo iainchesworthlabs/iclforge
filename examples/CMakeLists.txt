@@ -143,6 +143,13 @@ if(ICLFORGE_BUILD_CAPI)
     add_executable(capi_encode_truehd capi_encode_truehd.c)
     target_link_libraries(capi_encode_truehd PRIVATE iclforge::c iclforge::warnings)
 
+    # Both TrueHD examples write or read a file with fopen, which MSVC and clang-cl flag with C4996
+    # (an error under /WX); the two before them touch no file.
+    if(ICLFORGE_IS_MSVC_LIKE)
+        set_source_files_properties(capi_decode_truehd.c capi_encode_truehd.c
+            PROPERTIES COMPILE_OPTIONS "/wd4996")
+    endif()
+
     # Pin the dialect rather than riding whatever the compiler defaults to
     # (gnu17 on GCC/Clang, an unspecified MSVC default) - this is the project's
     # one standing proof that iclforge_c/iclforge.h is valid strict C11 (with

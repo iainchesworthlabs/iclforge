@@ -114,13 +114,14 @@ endif()
 # decoder/test_api.cpp, for a directory of further streams to decode,
 # encoder/test_presentations.cpp, for where to write its streams,
 # encoder/test_objects.cpp, for where to write its streams and those to
-# listen to, and encoder/test_presentations_race.cpp, for the gold set's -
+# listen to, and encoder/test_presentations_race.cpp, for the gold set's, and
+# io/test_content_signature.cpp, for the directory of the Online Delivery Kit's streams -
 # the C4996 reasoning of libs/ac3/tests' cpu_features.cpp.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(decoder/test_syntax.cpp
         decoder/test_constructed.cpp decoder/test_objects.cpp decoder/test_presentations.cpp
         decoder/test_api.cpp decoder/test_object_render.cpp decoder/test_hsf.cpp
         encoder/test_objects.cpp encoder/test_presentations.cpp
-        encoder/test_presentations_race.cpp
+        encoder/test_presentations_race.cpp io/test_content_signature.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
