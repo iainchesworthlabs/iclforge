@@ -128,8 +128,13 @@ struct EncoderConfig {
     DownmixGains downmix_gains{};
     // The 2 channel mode of TH spec §5.4: 0 stereo, 1 Lt/Rt matrix encoded, 2 headphone.
     unsigned stereo_mode = 0;
-    // TH spec §14: dialogue normalisation, mix levels and the DRC start-up gains. All zero by
-    // default, as in FFmpeg's streams.
+    // TH spec §14: dialogue normalisation, mix levels, source formats, the control-enabled bits and
+    // the DRC start-up gains, per presentation (2, 6 and 8 channels), written into every major sync.
+    // All zero by default, as in FFmpeg's streams, so a configuration that does not set them writes
+    // the stream it always wrote. A field wider than its width (channel_meaning_problem()) or
+    // `extra_present` (the sixteen-channel extension is not written) is kInvalidConfig, the detail
+    // naming the field. Provisional, no oracle until the DEE set: what the values mean (units, which
+    // presentation applies when, what a control-enabled bit gates) is ERRATA.md questions 51 to 55.
     ChannelMeaning channel_meaning{};
     // The largest FIR order tried (TH spec §9.3: 8). 0 turns prediction off.
     int max_fir_order = 8;

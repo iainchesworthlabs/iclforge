@@ -683,6 +683,14 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
     if (config.stereo_mode > 3) {
         return "stereo_mode must be 0..3 (TH spec §5.4)";
     }
+    if (const std::string_view field = channel_meaning_problem(config.channel_meaning);
+        !field.empty()) {
+        return field;
+    }
+    if (config.channel_meaning.extra_present) {
+        return "channel_meaning.extra_present: the sixteen-channel extension is not written (TH "
+               "spec §14.2)";
+    }
     if (config.experimental.iir || config.experimental.lsb_bypass) {
         return "ExperimentalTools::iir and lsb_bypass are not written yet";
     }

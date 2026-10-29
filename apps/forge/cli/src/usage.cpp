@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 142> kOptionTokens{{
+constexpr std::array<OptionToken, 155> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -119,6 +119,19 @@ constexpr std::array<OptionToken, 142> kOptionTokens{{
     {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
     {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
     {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
+    {"truehd-dialnorm-2ch=", "truehd-encode: the 2 channel presentation's dialogue norm, 0 to 63 (TH spec 12.5; provisional, no oracle until the DEE set)"},
+    {"truehd-dialnorm-6ch=", "truehd-encode: the 6 channel presentation's dialogue norm, 0 to 31 (-n dBFS; provisional)"},
+    {"truehd-dialnorm-8ch=", "truehd-encode: the 8 channel presentation's dialogue norm, 0 to 31 (-n dBFS; provisional)"},
+    {"truehd-mix-level-2ch=", "truehd-encode: the 2 channel presentation's mix level, 0 to 63 (no unit given; provisional)"},
+    {"truehd-mix-level-6ch=", "truehd-encode: the 6 channel presentation's mix level, 0 to 63 (provisional)"},
+    {"truehd-mix-level-8ch=", "truehd-encode: the 8 channel presentation's mix level, 0 to 63 (provisional)"},
+    {"truehd-source-format-6ch=", "truehd-encode: the 6 channel presentation's source format, 0 to 31 (no table given; provisional)"},
+    {"truehd-source-format-8ch=", "truehd-encode: the 8 channel presentation's source format, 0 to 63 (provisional)"},
+    {"truehd-control-2ch=", "truehd-encode: on or off, the 2 channel presentation's control-enabled bit (what it gates is not given; provisional)"},
+    {"truehd-control-6ch=", "truehd-encode: on or off, the 6 channel presentation's control-enabled bit (provisional)"},
+    {"truehd-control-8ch=", "truehd-encode: on or off, the 8 channel presentation's control-enabled bit (provisional)"},
+    {"truehd-heavy-drc-start-up-gain=", "truehd-encode: the heavy DRC start-up gain, -32 to 31 (TH spec 12.3; provisional)"},
+    {"truehd-drc-start-up-gain=", "truehd-encode: the DRC start-up gain, -64 to 63 (TH spec 12.3; provisional)"},
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
@@ -539,6 +552,15 @@ void print_truehd_topic() {
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
     fmt::println("       the input.");
+    fmt::println("       truehd-encode also writes the stream's channel meaning (TH spec 14) into");
+    fmt::println("       every major sync, per presentation: truehd-dialnorm-2ch|6ch|8ch=,");
+    fmt::println("       truehd-mix-level-2ch|6ch|8ch=, truehd-source-format-6ch|8ch=,");
+    fmt::println("       truehd-control-2ch|6ch|8ch=on|off, truehd-heavy-drc-start-up-gain= and");
+    fmt::println("       truehd-drc-start-up-gain=, each refused by name outside its field's");
+    fmt::println("       width. Left out, a field is 0 (and a control bit off), as in FFmpeg's");
+    fmt::println("       streams. PROVISIONAL, no oracle until the DEE set: the units, which");
+    fmt::println("       presentation applies when and what a control bit gates are open");
+    fmt::println("       (libs/truehd/ERRATA.md, questions 51 to 55).");
     fmt::println("       A TrueHD or MLP run does not apply the other options (the output stage,");
     fmt::println("       DRC, programmes, objects, metadata, sources, signatures) and refuses them");
     fmt::println("       by name with a usage error instead of accepting and dropping them; a");

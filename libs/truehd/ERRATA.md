@@ -286,6 +286,45 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     the codec is lossless at every rate here, and what differs is upstream of the stream. v3.9 §19.1 makes the apodising filters a
     configuration option, so it is not offered as the reason. **Open; the scorer reports the legs as UNEXPLAINED.** **Recommendation:** ask what DEE
     does to a 96 kHz input before coding (a resampler or a filter that its options name) rather than look in the decoder.
+51. **Dialogue normalisation (TH spec §12.5, §14.1; `forge truehd-encode`, `metadata`, `normalize`, `probe`).** The channel meaning has one
+    dialogue-norm field for each presentation: 6 bits for the 2 channel presentation (§12.5 gives the range 0 to 63 and no unit) and 5
+    bits for the 6 and 8 channel ones ("0 to 31 -> 0 to -31 dBFS"). Open: (a) is the 2 channel field -n dBFS as well, and what do 32 to 63
+    mean; (b) is 0 a level (0 dBFS) or "not indicated", as A/52 §5.4.2.8 reserves 0 in E-AC-3; (c) which presentation's value applies when,
+    that of the presentation a decoder reads (substream 0, 1 or 2, which is how the library names them: `Presentation::k2ch`, `k6ch`,
+    `k8ch`) or that of the largest presentation the stream has, for a decoder that folds a larger one down itself; (d) the 6 and 8 channel
+    fields exist in a stream with fewer substreams, and the library takes the presentation names for substream indexes (a stream with one
+    substream has a 2 channel presentation whatever its channel count). **Built, provisional, no oracle until the DEE set:** the library
+    writes and reads the raw numbers, widths and ranges as §12.5 and §14.1 give them, rejecting a value outside its range by field name;
+    `probe` shows each as n and as -n dBFS; `normalize` writes round(-LKFS) clamped to 1..31 for every presentation the stream has (the
+    mapping of ATSC A/85 §8 that E-AC-3's `normalize` uses, and the range the 5 bit fields hold, so no value relies on 32 to 63 and none is
+    0). **Recommendation:** as built; the DEE set is two encodes of one programme, one with dialnorm 0 and one with another value for each
+    presentation, and a read of the field, which settles (a) and (b); (c) and (d) need a statement from the owner or a decode of a stream
+    with a known dialogue norm by a decoder that applies it.
+52. **Mix level (§12.5, §14.1).** 6 bits for each presentation, no unit, no table, no statement of the range in use. Whether it is a level in
+    dB (an offset such as the 80 + n dB SPL of A/52's `mixlevel` in the audio production information, which is an analogy and not evidence),
+    a code, or something else is not known. **Built, provisional:** written, read and shown as the raw number, never converted; `normalize`
+    leaves it alone, as E-AC-3's `normalize` leaves its mixing metadata. **Recommendation:** raw until the DEE set shows what DEE writes for
+    a known mixing level.
+53. **Source format (§12.5, §14.1).** 5 bits for the 6 channel presentation and 6 bits for the 8 channel one, none for the 2 channel one; no
+    table of values and no reason for the extra bit. Whether it names the layout the stream was authored in (and so duplicates the channel
+    assignment of §13), the programme's original format, or something else is not known. **Built, provisional:** raw, as the mix level.
+    **Recommendation:** raw; the DEE set is a 5.1, a 7.1 and a stereo programme encoded as such and their fields read.
+54. **What the `*_control_enabled` bits gate (§14.1).** `twoch_control_enabled`, `sixch_control_enabled` and `eightch_control_enabled` are one bit each,
+    undescribed. If a bit says that a decoder applies the presentation's dialogue norm and mix level only when it is set, a dialogue norm
+    written with the bit clear is ignored; if it only says that the fields are present, a decoder reads them either way. **Built,
+    provisional:** the bits are written as the line names them (off by default, as in FFmpeg's streams) and are never set on their
+    own; `normalize` writes only the dialogue norm and says, for each presentation whose bit is off, that a decoder may ignore the field;
+    `metadata` sets a bit with `truehd-control-6ch=on` and the like. The owner's two discs show that the bit is not constant in streams
+    that exist: `twoch_control_enabled` is set in the Atmos streams of *Dune: Part Two* and clear in *Blade Runner 2049*
+    (planning/truehd-disc-findings.md), so a decoder meets both and the library's default of clear is one of the two. **Recommendation:** leave `normalize` as it is until the DEE set
+    shows whether a stream with the bit clear carries a dialogue norm at all; if DEE sets the bit whenever it writes one, `normalize`
+    should set it too.
+55. **The DRC start-up gains (§12.3, §14.1).** `heavy_drc_start_up_gain` is signed, 6 bits, and `drc_start_up_gain` signed, 7 bits; no unit, and
+    "start-up" is not explained: the gain a decoder applies before the first DRC word of the directory (§12.1) or the restart header (§12.2)
+    arrives, or the gain at the start of each restart interval, or the reference level. Whether the most negative value means "off" is not
+    given. **Built, provisional:** raw, in the stated ranges (-32 to 31 and -64 to 63); nothing applies them (the decoder does not apply
+    the directory's DRC word either, entry 18). **Recommendation:** raw until the DEE set; then decide with the owner whether `decode`
+    should apply them, which is a separate decision.
 
 ## Entries
 
@@ -388,7 +427,11 @@ of substream 1 therefore decodes substream 0 first. The samples of the units mus
 have a stereo downmix in substream 0 and the six channels in substream 1; `Presentation::kBest` gives the six.
 
 **16. The channel meaning (§14.1).** The widths in the specification add up to 64 bits (6+1+1+1+1+7+6+6+5+6+5+5+6+6+1+1);
-all of them are zero in the streams FFmpeg writes (**no oracle**). The 8 bytes after `substream_info` of an MLP major
+all of them are zero in the streams FFmpeg writes (**no oracle**). The library now writes them (`EncoderConfig::channel_meaning`,
+`forge truehd-encode`), rewrites them in a finished stream (`edit_channel_meaning`, `forge metadata`), shows them (`forge probe`) and
+sets the dialogue norm from a measurement (`forge normalize`), all provisional and all as raw numbers in the widths given here;
+the open points are questions 51 to 55. The field order and widths are from the specification alone, so a mistake in reading them
+would be in the encoder and in every decoder of this library alike. The 8 bytes after `substream_info` of an MLP major
 sync are not described: FFmpeg writes `56 3f 00 00 80 80 00 00` (5.1) and `56 03 00 00 80 80 00 1b` (stereo) and
 the library carries them as bytes. FFmpeg's MLP stream also has `flags` 0x4000 (§4.1 says bit 14 shall be clear) and
 `format_info` 0x2F0F0001 for stereo (group 1 word length code 2, 24 bits; group 2 code 0xF, absent).

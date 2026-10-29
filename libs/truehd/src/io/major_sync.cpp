@@ -3,6 +3,7 @@
 #include <array>
 
 #include "core/bit_io.hpp"
+#include "io/channel_meaning_fields.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
@@ -103,6 +104,42 @@ void write_channel_meaning(BitWriter& writer, const ChannelMeaning& meaning) {
 }
 
 }  // namespace
+
+std::string_view channel_meaning_problem(const ChannelMeaning& meaning) noexcept {
+    using namespace detail;
+    const struct {
+        const MeaningField& field;
+        int value;
+    } fields[] = {
+        {kHeavyDrcStartUpGain, meaning.heavy_drc_start_up_gain},
+        {kDrcStartUpGain, meaning.drc_start_up_gain},
+        {kTwochDialogueNorm, meaning.twoch_dialogue_norm},
+        {kTwochMixLevel, meaning.twoch_mix_level},
+        {kSixchDialogueNorm, meaning.sixch_dialogue_norm},
+        {kSixchMixLevel, meaning.sixch_mix_level},
+        {kSixchSourceFormat, meaning.sixch_source_format},
+        {kEightchDialogueNorm, meaning.eightch_dialogue_norm},
+        {kEightchMixLevel, meaning.eightch_mix_level},
+        {kEightchSourceFormat, meaning.eightch_source_format},
+    };
+    for (const auto& entry : fields) {
+        if (!entry.field.holds(entry.value)) {
+            return entry.field.problem;
+        }
+    }
+    return {};
+}
+
+std::array<std::uint8_t, 8> pack_channel_meaning(const ChannelMeaning& meaning) {
+    BitWriter writer;
+    write_channel_meaning(writer, meaning);
+    const std::vector<std::byte> bytes = writer.take();
+    std::array<std::uint8_t, 8> packed{};
+    for (std::size_t i = 0; i < packed.size() && i < bytes.size(); ++i) {
+        packed[i] = std::to_integer<std::uint8_t>(bytes[i]);
+    }
+    return packed;
+}
 
 bool starts_with_major_sync(std::span<const std::byte> data) noexcept {
     return data.size() >= 4 && std::to_integer<std::uint8_t>(data[0]) == kMajorSyncByte0 &&
@@ -232,6 +269,12 @@ std::expected<std::vector<std::byte>, Error> write_major_sync(const MajorSync& m
     if (major_sync.extra.has_value()) {
         return std::unexpected(
             Error{ErrorKind::kUnsupported, "writing a major sync with the 16-channel extension"});
+    }
+    if (major_sync.kind == StreamKind::kTrueHd) {
+        if (const std::string_view field = channel_meaning_problem(major_sync.channel_meaning);
+            !field.empty()) {
+            return std::unexpected(Error{ErrorKind::kBadParameter, field});
+        }
     }
     BitWriter writer;
     writer.put(kMajorSyncByte0, 8);

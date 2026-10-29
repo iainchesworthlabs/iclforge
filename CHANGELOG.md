@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge truehd-encode` writes the stream's channel meaning (TH spec §14.1), per presentation, and `EncoderConfig::channel_meaning`
+  rejects a value outside its field's width by name.** Options `truehd-dialnorm-2ch=` (0 to 63), `-6ch=` and `-8ch=` (0 to 31),
+  `truehd-mix-level-2ch=`, `-6ch=`, `-8ch=` (0 to 63), `truehd-source-format-6ch=` (0 to 31) and `-8ch=` (0 to 63), `truehd-control-2ch=`,
+  `-6ch=`, `-8ch=` (on or off) and the two DRC start-up gains `truehd-heavy-drc-start-up-gain=` (-32 to 31) and `truehd-drc-start-up-gain=`
+  (-64 to 63) go into every major sync with its CRC; a run that names none writes the bytes it wrote before (58 encodes of the committed
+  streams' decodes compared equal against the previous build, and the generators of the FFmpeg-made and hand-built fixtures reproduce all 43
+  committed files). **Provisional, with no oracle until the DEE set:** FFmpeg's encoder writes zeros, and the specification gives no unit
+  for the mix level, no table for the source format and no word on what a control-enabled bit gates; five numbered questions with
+  recommendations are in `libs/truehd/ERRATA.md` (51 to 55).
 - **Changed: AC-4 content signing follows the owner's CS spec v2.5 and v2.6.** An MP4 is refused by name (`ac4-sign` and `sign-content` exit
   1, the second before anything is encoded): §8.3.2 puts signing an MP4 out of scope and asks for the raw `.ac4` stream. The signature is
   checked before the digests it holds (§6.1), so a forged signature over altered content is reported as the signature's fault and the digest

@@ -289,6 +289,84 @@ bool parse_block_mix_config(std::string_view text,
 // those too, its own final "unknown option".
 enum class MetadataOptionResult : std::uint8_t { kNotMetadata, kOk, kError };
 
+// A whole number in [low, high] with nothing else in the token, signs allowed.
+bool parse_int_in(std::string_view text, int low, int high, int& out) {
+    int value = 0;
+    const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || ptr != text.data() + text.size() || value < low || value > high) {
+        return false;
+    }
+    out = value;
+    return true;
+}
+
+// The channel meaning options of TH spec §14.1, which `truehd-encode` writes and `metadata` sets in
+// a finished stream: one option for each field of each presentation, named after the presentation
+// it belongs to. The ranges are the widths of the fields (iclforge::truehd::channel_meaning_problem).
+// Provisional, no oracle until the DEE set: libs/truehd/ERRATA.md, questions 51 to 55.
+using MeaningEdit = iclforge::truehd::ChannelMeaningEdit;
+
+struct MeaningNumber {
+    std::string_view name;  // after "truehd-"
+    int low;
+    int high;
+    std::optional<int> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningNumber, 10> kMeaningNumbers{{
+    {"dialnorm-2ch", 0, 63, &MeaningEdit::twoch_dialogue_norm},
+    {"dialnorm-6ch", 0, 31, &MeaningEdit::sixch_dialogue_norm},
+    {"dialnorm-8ch", 0, 31, &MeaningEdit::eightch_dialogue_norm},
+    {"mix-level-2ch", 0, 63, &MeaningEdit::twoch_mix_level},
+    {"mix-level-6ch", 0, 63, &MeaningEdit::sixch_mix_level},
+    {"mix-level-8ch", 0, 63, &MeaningEdit::eightch_mix_level},
+    {"source-format-6ch", 0, 31, &MeaningEdit::sixch_source_format},
+    {"source-format-8ch", 0, 63, &MeaningEdit::eightch_source_format},
+    {"heavy-drc-start-up-gain", -32, 31, &MeaningEdit::heavy_drc_start_up_gain},
+    {"drc-start-up-gain", -64, 63, &MeaningEdit::drc_start_up_gain},
+}};
+
+struct MeaningFlag {
+    std::string_view name;
+    std::optional<bool> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningFlag, 3> kMeaningFlags{{
+    {"control-2ch", &MeaningEdit::twoch_control_enabled},
+    {"control-6ch", &MeaningEdit::sixch_control_enabled},
+    {"control-8ch", &MeaningEdit::eightch_control_enabled},
+}};
+
+// kNotMetadata when `name` (an option without its "truehd-") is none of them.
+MetadataOptionResult parse_truehd_meaning_option(std::string_view name, std::string_view value,
+                                                 std::string_view token, MeaningEdit& edit) {
+    for (const MeaningNumber& number : kMeaningNumbers) {
+        if (name != number.name) {
+            continue;
+        }
+        int parsed = 0;
+        if (!parse_int_in(value, number.low, number.high, parsed)) {
+            fmt::println(stderr, "error: truehd-{} is a whole number from {} to {} (got '{}')",
+                         name, number.low, number.high, token);
+            return MetadataOptionResult::kError;
+        }
+        edit.*number.field = parsed;
+        return MetadataOptionResult::kOk;
+    }
+    for (const MeaningFlag& flag : kMeaningFlags) {
+        if (name != flag.name) {
+            continue;
+        }
+        if (value != "on" && value != "off") {
+            fmt::println(stderr, "error: truehd-{} is on or off (got '{}')", name, token);
+            return MetadataOptionResult::kError;
+        }
+        edit.*flag.field = value == "on";
+        return MetadataOptionResult::kOk;
+    }
+    return MetadataOptionResult::kNotMetadata;
+}
+
 // "programmeN" or "programmeN-<suffix>" for N in 2..8 - the range §E2.3.1.2
 // allows beyond the primary programme (kMaxProgrammes - 1 extra independent
 // substreams, I1-I7). Returns the 0-based slot into Options::extra_programmes
@@ -2351,6 +2429,18 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             out.truehd_lenient = value == "lenient";
             continue;
+        }
+        // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
+        // finished TrueHD stream.
+        if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {
+            switch (parse_truehd_meaning_option(key.substr(7), value, token, out.thd_meaning)) {
+                case MetadataOptionResult::kOk:
+                    continue;
+                case MetadataOptionResult::kError:
+                    return false;
+                case MetadataOptionResult::kNotMetadata:
+                    break;
+            }
         }
         // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
         if (command == "truehd-encode" && key.starts_with("truehd-")) {

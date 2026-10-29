@@ -42,6 +42,7 @@
 #include "iclforge/containers/mp4/dash.hpp"
 #include "iclforge/containers/mp4/hls.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "recording_sink.hpp"
 #include "associated_mix.hpp"
 #include "stream_playback.hpp"
@@ -156,6 +157,11 @@ struct Options {
         std::optional<std::array<double, 4>> downmix_gains;
     };
     TruehdEncode thdenc{};
+    // 'truehd-encode' and 'metadata' of TrueHD: the channel meaning of TH spec §14.1 the line names,
+    // per presentation (2, 6 and 8 channels): dialogue norm, mix level, source format, the
+    // control-enabled bit, and the two DRC start-up gains. Unset members are not touched.
+    // Provisional, no oracle until the DEE set (libs/truehd/ERRATA.md, questions 51 to 55).
+    iclforge::truehd::ChannelMeaningEdit thd_meaning{};
     // 'ac4-encode' and 'decode' of AC-4 only: when non-empty, write the
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value

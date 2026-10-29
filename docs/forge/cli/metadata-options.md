@@ -1338,6 +1338,29 @@ truehd-encode (after the positional arguments):
   verify            decode every access unit as it is coded and compare it with the input
 ```
 
+The channel meaning of TH spec section 14, written into every major sync. Per presentation, 2, 6 and 8 channels, each refused by name outside its field's width; a field
+left out is 0 and a control bit off, as in FFmpeg's streams. **Provisional, no oracle until the DEE set** (FFmpeg writes
+zeros): the specification gives the widths and, for the 6 and 8 channel dialogue norms, a unit (n is -n dBFS), and gives
+no unit for the mix level, no table for the source format and no word on what a control bit gates
+([`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), questions
+51 to 55):
+
+```text
+truehd-encode (after the positional arguments):
+  truehd-dialnorm-2ch=0..63    truehd-dialnorm-6ch=0..31    truehd-dialnorm-8ch=0..31
+                    the presentation's dialogue norm (6 bits for 2 channels, 5 for the others)
+  truehd-mix-level-2ch=0..63   truehd-mix-level-6ch=0..63   truehd-mix-level-8ch=0..63
+                    the presentation's mix level (6 bits; no unit is given, so the number is not converted)
+  truehd-source-format-6ch=0..31   truehd-source-format-8ch=0..63
+                    the presentation's source format (5 and 6 bits; no table is given); the 2 channel
+                    presentation has none
+  truehd-control-2ch=on|off    truehd-control-6ch=on|off    truehd-control-8ch=on|off
+                    the presentation's control-enabled bit (what it gates is not given)
+  truehd-heavy-drc-start-up-gain=-32..31
+  truehd-drc-start-up-gain=-64..63
+                    the two DRC start-up gains (6 and 7 bits, signed)
+```
+
 ## Probe options (`probe`): `json=`, `detail=`
 
 ```text

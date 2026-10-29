@@ -6,6 +6,7 @@
 #include <expected>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/truehd/core/error.hpp"
@@ -67,6 +68,20 @@ struct ChannelMeaning {
 };
 
 inline constexpr int kChannelMeaningBits = 64;
+
+// Names the first field of `meaning` whose value its width cannot hold (TH spec §12.3, §12.5: the
+// two start-up gains are signed, 6 and 7 bits; the dialogue norms are 6 bits for the 2 channel
+// presentation and 5 for the others; the mix levels 6; the source formats 5 for 6 channels and 6
+// for 8), as a sentence with the range; an empty view when every field fits. The writer, the
+// encoder's configuration check and the in-place edit all use it.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::string_view channel_meaning_problem(
+    const ChannelMeaning& meaning) noexcept;
+
+// The 64 bits of the channel meaning as a major sync carries them after substream_info (TH spec
+// §14.1), most significant bit first. A value wider than its field is cut to the field's width;
+// check it with channel_meaning_problem() first.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::array<std::uint8_t, 8> pack_channel_meaning(
+    const ChannelMeaning& meaning);
 
 struct MajorSync {
     StreamKind kind = StreamKind::kTrueHd;
@@ -137,7 +152,8 @@ struct MajorSync {
 
 // Writes the major sync with its CRC. A TrueHD stream's channel meaning is written from
 // `channel_meaning`, an MLP stream's from `channel_meaning_bytes`. The writer does not write an
-// extension (`extra` must be empty): kUnsupported otherwise.
+// extension (`extra` must be empty): kUnsupported otherwise. A channel meaning with a field wider
+// than its width is kBadParameter, the detail naming the field (channel_meaning_problem()).
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<std::vector<std::byte>, Error> write_major_sync(
     const MajorSync& major_sync);
 

@@ -404,7 +404,11 @@ constexpr std::array<Command, 49> kCommands{{
      "(18000 kbit/s, Blu-ray's) and TH spec section 18's 75 ms, or truehd-rate-check=lenient writes "
      "it anyway and counts the violations; verify decodes every access unit as it is coded and "
      "compares it with the input. 24 bit input is coded as 24 bit and 16 bit input as the same "
-     "samples with their clear low bits sent as an output shift",
+     "samples with their clear low bits sent as an output shift. The stream's channel meaning "
+     "(TH spec section 14: dialogue norm, mix level, source format, control-enabled bit per "
+     "presentation, and the two DRC start-up gains) is written into every major sync from "
+     "truehd-dialnorm-6ch= and the options like it, zero when none is given; provisional, no "
+     "oracle until the DEE set",
      topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},

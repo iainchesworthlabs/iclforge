@@ -27,7 +27,9 @@
 #include "iclforge/base/wav.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
+#include "truehd_meaning.hpp"
 
 namespace forge_cli::commands {
 
@@ -256,7 +258,11 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
             meta,
             {"truehd-downmix=", "truehd-downmix-gains=", "truehd-restart=", "truehd-peak-rate=",
              "truehd-rate-check=", "truehd-fir-order=", "truehd-matrix=", "truehd-stereo-mode=",
-             "verify"});
+             "truehd-dialnorm-2ch=", "truehd-dialnorm-6ch=", "truehd-dialnorm-8ch=",
+             "truehd-mix-level-2ch=", "truehd-mix-level-6ch=", "truehd-mix-level-8ch=",
+             "truehd-source-format-6ch=", "truehd-source-format-8ch=", "truehd-control-2ch=",
+             "truehd-control-6ch=", "truehd-control-8ch=", "truehd-heavy-drc-start-up-gain=",
+             "truehd-drc-start-up-gain=", "verify"});
         refused != kExitOk) {
         return refused;
     }
@@ -311,6 +317,13 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
     }
     config.matrix_search = opts.matrix;
     config.stereo_mode = opts.stereo_mode;
+    // The channel meaning (TH spec §14.1): the fields the line names, the rest zero as FFmpeg's
+    // streams have them. Provisional, no oracle until the DEE set (ERRATA.md, questions 51 to 55).
+    if (const std::string_view field = th::apply_edit(meta.thd_meaning, config.channel_meaning);
+        !field.empty()) {
+        fmt::println(stderr, "error: truehd-encode: {}", field);
+        return kExitUsage;
+    }
     config.verify = meta.verify;
 
     auto encoder = th::Encoder::create(config);
@@ -372,6 +385,19 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         if (config.verify) {
             status_println(status, "verified: {} access units decode to the input",
                            stats.verified_units);
+        }
+        if (!meta.thd_meaning.empty()) {
+            // Written into every major sync; no decoder here applies it, and what the values
+            // mean is not settled (ERRATA.md, questions 51 to 55).
+            status_println(status, "channel meaning written (provisional, no oracle until the DEE set):");
+            for (const MeaningPresentation presentation :
+                 {MeaningPresentation::k2ch, MeaningPresentation::k6ch,
+                  MeaningPresentation::k8ch}) {
+                status_println(status, "  {}  {}", presentation_name(presentation),
+                               describe_presentation(config.channel_meaning, presentation));
+            }
+            status_println(status, "  drc start-up  {}",
+                           describe_start_up_gains(config.channel_meaning));
         }
     };
 

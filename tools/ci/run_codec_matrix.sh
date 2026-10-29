@@ -1755,6 +1755,17 @@ run_truehd_encode_case opt_downmix71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" tru
 run_truehd_encode_case opt_rate 48000 6 5.1 pcm_s24le "" truehd-peak-rate=18000 truehd-rate-check=lenient \
     truehd-downmix=none
 
+# The channel meaning of TH spec section 14.1, every field of every presentation set (provisional, no
+# oracle until the DEE set: FFmpeg's encoder writes zeros). FFmpeg's strict decode must still give the
+# samples, which holds its reader to the major sync's CRC over the new bytes.
+thd_meaning_options=(truehd-dialnorm-2ch=40 truehd-dialnorm-6ch=27 truehd-dialnorm-8ch=24
+    truehd-mix-level-2ch=33 truehd-mix-level-6ch=17 truehd-mix-level-8ch=49
+    truehd-source-format-6ch=5 truehd-source-format-8ch=38 truehd-control-2ch=on truehd-control-6ch=off
+    truehd-control-8ch=on truehd-heavy-drc-start-up-gain=-9 truehd-drc-start-up-gain=21)
+run_truehd_encode_case opt_meaning51 48000 6 5.1 pcm_s24le "" truehd-restart=8 "${thd_meaning_options[@]}"
+run_truehd_encode_case opt_meaning71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" truehd-restart=8 \
+    "${thd_meaning_options[@]}"
+
 # The streams forge wrote, in the containers forge writes: encode straight into each, read it back
 # with demux byte for byte, and by FFmpeg to the PCM the bare stream gives. The bare stream on
 # stdout is the file's bytes.

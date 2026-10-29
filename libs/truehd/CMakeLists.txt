@@ -23,6 +23,7 @@ iclforge_add_library(truehd
         src/io/elementary.cpp
         src/io/evolution.cpp
         src/io/major_sync.cpp
+        src/io/metadata_edit.cpp
     DEPENDS base
     PRIVATE_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

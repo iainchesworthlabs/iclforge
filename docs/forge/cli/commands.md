@@ -1024,8 +1024,23 @@ options, each only here:
 | `truehd-stereo-mode=stereo\|ltrt\|headphone` | the 2 channel mode the stream declares |
 | `truehd-peak-rate=KBPS`, `truehd-rate-check=strict\|lenient` | the rate the stream is declared not to exceed (default 18000, Blu-ray's; at least 1000) and whether a stream that cannot be sent within it and TH spec §18's 75 ms is refused (exit 1) or written and counted |
 | `verify` | decode every access unit with the library's decoder as it is coded and compare it with the input |
+| `truehd-dialnorm-2ch=`, `-6ch=`, `-8ch=` | the dialogue norm of the 2, 6 and 8 channel presentation (TH spec section 12.5): 0 to 63 for 2 channels, 0 to 31 for the others |
+| `truehd-mix-level-2ch=`, `-6ch=`, `-8ch=` | the mix level of each presentation, 0 to 63 (the specification gives no unit, so the number is written as it is) |
+| `truehd-source-format-6ch=`, `-8ch=` | the source format of the 6 channel (0 to 31) and 8 channel (0 to 63) presentation; the 2 channel one has none |
+| `truehd-control-2ch=`, `-6ch=`, `-8ch=` | `on` or `off`, the presentation's control-enabled bit |
+| `truehd-heavy-drc-start-up-gain=`, `truehd-drc-start-up-gain=` | the two DRC start-up gains, signed: -32 to 31 and -64 to 63 (TH spec section 12.3) |
 
 The status line gives the access units, restart intervals, bytes, the percentage of the PCM, and the substreams.
+
+**The channel meaning options are provisional, with no oracle until the DEE set.** TH spec section 14.1 puts a dialogue norm, a mix
+level, a source format and a control-enabled bit for each of the three presentations, and two DRC start-up gains, in the major sync, which
+repeats at every restart; the options write them into every one, each refused by name outside its field's width, and a field left out is
+0 (a control bit off), so a run that names none writes the stream it always wrote. FFmpeg's encoder writes zeros, so nothing outside this
+library reads them. The specification gives a unit for the 6 and 8 channel dialogue norms only (n is -n dBFS), gives none for the mix level,
+no table for the source format, no word on what a control-enabled bit gates, and does not say which presentation's value applies when;
+`forge` writes and shows the numbers as they are and converts none of them
+([`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), questions 51 to 55). No decoder
+here applies them.
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
 `truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the

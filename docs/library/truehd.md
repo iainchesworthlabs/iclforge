@@ -115,6 +115,14 @@ presentation outside 24 bits has its gains lowered for that interval and `Encode
 counts it. The full presentation always comes back exactly; the gains and the limiter are the encoder's choice, since
 the specification gives none (`libs/truehd/ERRATA.md`, entry 38), and no decoder checks them.
 
+`EncoderConfig::channel_meaning` writes the channel meaning of TH spec §14.1 into every major sync: for the 2, 6 and 8 channel
+presentations a dialogue norm, a mix level, a source format (not the 2 channel one) and a control-enabled bit, and the two DRC
+start-up gains. A field outside its width, or `extra_present` (the sixteen-channel extension is not written), is
+`EncodeErrorKind::kInvalidConfig` with the field's name in the detail (`channel_meaning_problem()` gives the same sentence);
+left alone every field is zero, as in FFmpeg's streams, so a configuration that does not set them writes the stream it always wrote.
+**Provisional, no oracle until the DEE set:** the units, the presentation that applies when and what a control bit gates are open
+(`libs/truehd/ERRATA.md`, questions 51 to 55).
+
 The stream is held to the peak data rate it declares (18 Mbps by default, Blu-ray's) and to the 75 ms latency of the
 specification's FIFO model: a stream that cannot be sent in time is `EncodeErrorKind::kRateExceeded`, or with
 `allow_rate_violations` is written and counted. `verify` decodes every unit with this library's decoder as it is
