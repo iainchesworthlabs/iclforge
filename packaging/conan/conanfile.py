@@ -1,7 +1,8 @@
 # Conan (2.x) recipe for iclforge - installs the library only (iclforge::ac3,
 # the Matroska, MP4 and MPEG-TS parts of iclforge::containers behind their own default-on options,
-# and iclforge::c, the AC-4 library, iclforge::iab and the IAMF part behind default-off "capi",
-# "ac4", "iab" and "iamf" options), never the CLI, GUI, Hearth, tests, examples or fuzz
+# and iclforge::c, the AC-4 library, the TrueHD library, iclforge::iab and the IAMF part behind
+# default-off "capi", "ac4", "truehd", "iab" and "iamf" options), never the CLI, GUI, Hearth, tests,
+# examples or fuzz
 # harnesses. Same scope as the vcpkg port (packaging/vcpkg-port/iclforge/) - one Conan option
 # <-> one ICLFORGE_BUILD_<NAME> CMake option, same pattern that port's vcpkg_check_features()
 # call already establishes, and tools/checks/check_packaging_versions.sh holds the two recipes to
@@ -50,6 +51,7 @@ class IclforgeConan(ConanFile):
         "mpegts": [True, False],
         "capi": [True, False],
         "ac4": [True, False],
+        "truehd": [True, False],
         "iab": [True, False],
         "iamf": [True, False],
     }
@@ -65,10 +67,12 @@ class IclforgeConan(ConanFile):
         "mpegts": True,
         # Off by default, same reasoning as the vcpkg port's own features of the same names: each
         # adds whole new installed libraries and public targets (iclforge::c; iclforge::ac4,
-        # iclforge::ac4; iclforge::iab; iclforge::containers::iamf), not a behavior
-        # toggle on an already-installed one - opt in explicitly with -o "&:ac4=True" and the like.
+        # iclforge::ac4; iclforge::truehd; iclforge::iab; iclforge::containers::iamf), not a
+        # behavior toggle on an already-installed one - opt in explicitly with -o "&:ac4=True" and
+        # the like.
         "capi": False,
         "ac4": False,
+        "truehd": False,
         "iab": False,
         "iamf": False,
     }
@@ -137,8 +141,9 @@ class IclforgeConan(ConanFile):
         tc.variables["ICLFORGE_BUILD_MP4"] = bool(self.options.mp4)
         tc.variables["ICLFORGE_BUILD_MPEGTS"] = bool(self.options.mpegts)
         tc.variables["ICLFORGE_BUILD_CAPI"] = bool(self.options.capi)
-        # Upstream defaults these three ON; the recipe's options, off unless asked for, decide.
+        # Upstream defaults these four ON; the recipe's options, off unless asked for, decide.
         tc.variables["ICLFORGE_BUILD_AC4"] = bool(self.options.ac4)
+        tc.variables["ICLFORGE_BUILD_TRUEHD"] = bool(self.options.truehd)
         tc.variables["ICLFORGE_BUILD_IAB"] = bool(self.options.iab)
         tc.variables["ICLFORGE_BUILD_IAMF"] = bool(self.options.iamf)
         tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)

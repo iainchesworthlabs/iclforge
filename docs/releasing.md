@@ -297,7 +297,7 @@ updated 2026-08-19) - see
 [docs/library/index.md](library/index.md) for how a consumer uses it either way. It installs the
 library only (`iclforge::ac3`, plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/
 `iclforge::containers::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
-`capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
+`capi` (see the note below), the AC-4 library behind `ac4`, the TrueHD library behind `truehd`, `iclforge::iab` behind `iab` and
 `iclforge::containers::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
 `iclforge::adm` (the ADM/BW64 reader and its bridge) has no vcpkg feature
@@ -308,7 +308,7 @@ now - see the recipe note further down and [docs/library/index.md](library/index
 None of the features is on by default: a curated-registry port's `default-features` may only
 cover behaviors, not additional public APIs/targets/binaries (see
 [vcpkg's maintainer guide](https://learn.microsoft.com/vcpkg/contributing/maintainer-guide#default-features-should-enable-behaviors-not-apis))
-, and each of `matroska`/`mp4`/`mpegts`/`capi`/`ac4`/`iab`/`iamf` is exactly that. Upstream's
+, and each of `matroska`/`mp4`/`mpegts`/`capi`/`ac4`/`truehd`/`iab`/`iamf` is exactly that. Upstream's
 own `ICLFORGE_BUILD_<NAME>` options default ON; `vcpkg_check_features()` turns each OFF unless
 its feature is asked for. A plain `vcpkg install iclforge` installs the codec only; opt in
 explicitly with `vcpkg install iclforge[matroska,mp4,mpegts]`, `iclforge[ac4]` or any subset.
@@ -378,16 +378,16 @@ it drives change (whether or not a release is involved):
 ```bash
 vcpkg install iclforge --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
 vcpkg install iclforge --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows-static
-vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf] --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
+vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,truehd,iab,iamf] --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
 ```
 
 `--classic` is required from inside this repo - the root `vcpkg.json` (manifest mode, for this
 project's *own* build-time dependencies) would otherwise shadow the package-name argument.
 Check for a clean post-build lint (no "not used"/"missing usage" warnings) and that the bare
 `iclforge` install excludes every feature's library (`iclforge::containers::matroska`/`iclforge::containers::mp4`/
-`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
+`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, the TrueHD library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
 unlinked, no matching files anywhere in the install tree - while
-`iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf]` installs all seven.
+`iclforge[matroska,mp4,mpegts,capi,ac4,truehd,iab,iamf]` installs all eight.
 `tools/checks/check_install_consumer.sh` makes the same check of any build tree it installs: a
 library whose `ICLFORGE_BUILD_<NAME>` option is OFF must leave no file in the prefix.
 
@@ -642,8 +642,8 @@ A Conan (2.x) recipe for `iclforge` is staged in-tree at
 (`conanfile.py`, `conandata.yml`, `test_package/`) and has not been submitted to ConanCenter
 (`conan-center-index`), where no pull request names it. Scoped the same as the vcpkg port - the library only (`iclforge::ac3`,
 plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/`iclforge::containers::mpegts` behind their own default-on `matroska`/
-`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, `iclforge::iab` and
-`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
+`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, the TrueHD library, `iclforge::iab` and
+`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`truehd`/`iab`/`iamf` options), never the
 CLI/GUI/Hearth/tests/examples/fuzzers - with one Conan option per `ICLFORGE_BUILD_<NAME>` CMake option,
 the same pattern the vcpkg port's `vcpkg_check_features()` call already establishes, and the same
 options as the port's features, which `tools/checks/check_packaging_versions.sh` checks. The
@@ -675,7 +675,7 @@ conan create packaging/conan --version <version> -s compiler.cppstd=23
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:shared=True"
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:matroska=False" -o "&:mp4=False" -o "&:mpegts=False"
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:capi=True"
-conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:ac4=True" -o "&:iab=True" -o "&:iamf=True"
+conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:ac4=True" -o "&:truehd=True" -o "&:iab=True" -o "&:iamf=True"
 ```
 
 `-s compiler.cppstd=23` is required - a bare default profile's `compiler.cppstd` predates
