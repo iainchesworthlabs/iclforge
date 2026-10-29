@@ -134,7 +134,7 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
     major_sync.peak_data_rate = static_cast<std::uint16_t>(reader.read(15));
     major_sync.num_substreams = static_cast<std::uint8_t>(reader.read(4));
     // TH spec §4.1: "2+2 bits (low 2 bits used, upper 2 reserved)": the reserved pair comes first
-    // and extended_substream_info is the low pair (ERRATA.md entry 46, the owner's Blu-ray: 0x43 for
+    // and extended_substream_info is the low pair (ERRATA.md entry 47, the owner's Blu-ray: 0x43 for
     // four substreams with the 16-channel extension).
     major_sync.extended_reserved = static_cast<std::uint8_t>(reader.read(2));
     major_sync.extended_substream_info = static_cast<std::uint8_t>(reader.read(2));

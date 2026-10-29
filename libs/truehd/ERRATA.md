@@ -52,7 +52,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    `zero_samples_indicated` in DEE (its width not isolated: the library keeps 12 bits, which FFmpeg's end-of-stream marker shows,
    ERRATA 14); the end-of-stream marker `0xD234D234` is another thing. The decoder takes either pattern of terminatorA with its count
    as the last 32 bits of a segment, and terminatorB at once after the last block or as the last 16 bits of the segment of substream 3
-   (entry 45). Open: where in the segment DEE puts terminatorA relative to the padding (the library takes the end of the segment and
+   (entry 46). Open: where in the segment DEE puts terminatorA relative to the padding (the library takes the end of the segment and
    FFmpeg-made streams agree; a terminator right after the last block is counted and refused in strict mode), and the width of
    `zero_samples`. A disc's stream settles it: `forge probe DISC detail=structure` counts what follows the last block of every
    substream's segments (section H).
@@ -249,9 +249,18 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     and the three-cycle stream of `test_channel_assignment.cpp`), the output position of matrix channel `m`; the array that maps an output
     position to its matrix channel is its inverse, which FFmpeg holds in memory and the pseudo-code is written from. The two readings
     decode a permutation that is not its own inverse differently, and the new wording, taken for the bits of the stream, is the other one.
-    **Recommendation:** keep the library's reading (FFmpeg's strict decode agrees with it) and word §7.4 as
-    "the field, read in order, gives the output position of each matrix channel; the inverse maps output positions to matrix channels".
-    Is that what DEE writes? A DEE stream whose `ch_assign` is a three-cycle would settle it.
+    The owner's Blu-ray decides the stream: its second and third substreams carry `ch_assign` (0, 5, 1, 4, 2, 3) and (0, 6, 1, 4, 2, 3,
+    7, 5), neither its own inverse, and with the library's reading every lossless-check interval of the 2, 6 and 8 channel presentations
+    passes and the 8 channel output equals FFmpeg's (planning/truehd-disc-findings.md, question 6; entry 43). So the library's reading is
+    what Dolby's encoder writes, and what is left is the wording. **Recommendation:** word §7.4 as "the field, read in order, gives the
+    output position of each matrix channel; the inverse maps output positions to matrix channels", and keep the pseudo-code's
+    `ch_assign[out_ch]` as that inverse.
+
+46. **What `extended_substream_info` 3 means (§4.5).** The table has 0 (none), 1 (8-channel extension) and 2 (16-channel extension, Atmos); the
+    owner's Blu-ray, an Atmos 7.1 stream of four substreams of 2, 6, 8 and 12 channels, has 3 in a major sync that carries the 16-channel
+    fields. The library takes any non-zero value as "the 16-channel fields are present" and ignores the rest. Is 3 "both extensions", the
+    value of an Atmos stream, or a bit field (bit 0 the 8-channel extension, bit 1 the 16-channel)? **Recommendation:** treat it as a bit
+    field, which fits 0, 1, 2 and 3, and keep the library's reading until the owner says.
 
 ## Entries
 
@@ -580,7 +589,7 @@ showed it too: the 6 and 8 channel legs of `testdata/truehd-dee` stopped at acce
 substream (`thd-fx-6ch-music-48k24`, `thd-fx-8ch-tones-48k24-dmx6-dmx2`) and decode to their sources, with every substream's check
 passing, since this was changed. Held by `hb_output_shift_permuted`, `hb_output_shift_negative` and `test_kernels.cpp`.
 
-**45. What follows the last block of a segment (§3.5, §16.5; TH spec v3.9).** Zero padding to the end of the segment, or a terminator:
+**46. What follows the last block of a segment (§3.5, §16.5; TH spec v3.9).** Zero padding to the end of the segment, or a terminator:
 terminatorA, `0xD234E` or `0x348D3`, followed by the 12-bit `zero_samples` count, as the last 32 bits of the segment of substream 0
 to 2; terminatorB, `0x1234`, as the 16 bits after the last block or the last 16 bits of the segment of substream 3. The decoder accepts all
 of them and a segment with none. A terminatorA right after the last block, before the padding, is counted by the probe and refused by the
@@ -588,6 +597,14 @@ strict decode (more than 15 bits after the last block), since no stream shows it
 segment. FFmpeg reads the end-of-stream marker as `0xD234E` only: `hb_marker_shifted` (0x348D3 in every unit) and
 `hb_sixteen_channels_b_end` are refused by it (the manifest says so), and decode in the library and the Python reference. Held by
 `test_handbuilt.cpp` and `test_substream3.cpp`.
+
+**47. `extended_substream_info` is the low pair of the four bits (§4.1, §4.5; TH spec v3.9; the owner's Blu-ray).** §4.1 lists "2+2 bits (low 2 bits
+used, upper 2 reserved)" after the substream count. The library read the upper pair as `extended_substream_info` and the lower as
+reserved, which the FFmpeg-made streams cannot show (both are zero). The Atmos stream on the owner's Blu-ray (planning/truehd-disc-findings.md,
+question 2) has 0x43 there: four substreams, the upper pair 0, the low pair 3, and its major sync carries the 16-channel extension of
+§14.2, which the old reading never looked for. The pair is now read and written the other way round and any non-zero value of the low
+pair means an extended substream; §4.5 lists 0, 1 and 2 and the disc has 3, which the table does not say. `test_access_unit.cpp` holds
+the byte. **Confirmed by the Blu-ray; the meaning of 3 is open (question 46).**
 
 ## Atmos, spec v3.6
 

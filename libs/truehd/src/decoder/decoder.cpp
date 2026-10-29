@@ -35,7 +35,7 @@ constexpr int kObjectSubstream = 3;
 // count (§16.5.4: a field, its width not isolated). DEE writes it after the segments of substreams
 // 0 to 2 and FFmpeg's encoder only in the last access unit of a stream, as the last 32 bits of the
 // segment (ERRATA.md entry 14); a decoder accepts a segment with it, without it, right after the
-// last block or at the end of the segment (ERRATA.md entry 45).
+// last block or at the end of the segment (ERRATA.md entry 46).
 constexpr std::uint32_t kTerminatorA = 0xD234E;
 constexpr std::uint32_t kTerminatorAShifted = 0x348D3;  // the spec's second value (§16.5.1)
 constexpr int kTerminatorABits = 20;
@@ -116,7 +116,7 @@ Error make_error(ErrorKind kind, std::string_view detail) {
 // segments of substreams 0 to 2; terminatorB (16 bits) after substream 3, either at once after the
 // last block or ending the segment. FFmpeg's streams carry terminatorA only at the end of the last
 // access unit's segments (ERRATA.md entry 14), and a segment without one is as good (ERRATA.md
-// entry 45). `reader` is left after what was taken.
+// entry 46). `reader` is left after what was taken.
 void take_terminator(int index, std::span<const std::byte> payload, BitReader& reader,
                      SegmentResult& result) {
     const std::size_t end_bits = payload.size() * 8U;

@@ -498,7 +498,7 @@ def decode_segment(sub, entry, segment, rows):
             break
     # What may follow the last block (TH spec 3.5, 16.5): terminatorB after substream 3, right
     # after the block or ending the segment; terminatorA and the 12 bit count of padding samples
-    # ending the segment (ERRATA 45).
+    # ending the segment (ERRATA 46).
     padding = 0
     end = len(payload) * 8
     if sub.index == 3 and bits.left() >= 16 and bits.bits(bits.pos, 16) == 0x1234:
