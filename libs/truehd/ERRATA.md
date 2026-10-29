@@ -199,17 +199,18 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     decodes and the library refuses.
 
 42. **A changed major sync and the filter histories (§7.1, §7.5; entry 13, question 18).** The library carries the filter
-    histories across a restart (question 18) but forgets all codec state when a major sync changes the stream's `kind`,
-    `format_info` or substream count, because the stream is then a different one: every substream waits for its restart
-    header, which a major sync's unit carries, and starts from zero histories. FFmpeg's decoder does not tell the two
-    apart and keeps the histories. The differential fuzzer's third finding: `hb_marker_last.thd` with the channel
-    assignment word of its second major sync changed (and the checks put right) decodes in the library from that unit
-    on to other samples than in FFmpeg's strict decode and in `tools/references/truehd_syntax.py`, which reads a major
-    sync's contents as nothing but a restart's. The sample rate and channel count did not change. Should a change of
-    the major sync's channel assignment words (which no decode depends on) reset the histories, and should any change?
-    Recommendation: reset only for a change of kind, sample rate or substream count, which cannot be one stream, and
-    carry the histories otherwise, as FFmpeg does and as the library does for a restart (question 18). Until the owner decides
-    the differential harness skips a stream whose major syncs differ. Evidence:
+    histories across a restart (question 18). It used to forget all codec state when a major sync changed the stream's `kind`,
+    `format_info` or substream count, and so also on a change of the channel assignment words alone, which FFmpeg's decoder does not
+    do: the differential fuzzer's third finding, `hb_marker_last.thd` with the channel assignment word of its second major sync
+    changed, decoded from that unit on to other samples than in FFmpeg's strict decode and in `tools/references/truehd_syntax.py`.
+    TH spec v3.9 §9.6 (TH-18, TH-23) answers it: a restart does not clear the histories, and a decoder SHOULD reset them only on a
+    change of stream kind, sample rate, or substream or matrix-channel count, never on a bare `ch_assign` or channel assignment
+    relabelling, since the histories belong to the matrix channels. The decoder now resets for a change of kind, sample rate (both
+    group rates of an MLP stream) or substream count and not for the rest of `format_info`; `test_handbuilt.cpp` rewrites the
+    channel assignment word of every later major sync of `hb_filters` and holds the decode to the unchanged one. A restart header
+    that changes `max_matrix_chan` inside a stream keeps the histories (FFmpeg does too; v3.9 permits a reset there, and no stream
+    does it). **Confirmed by TH spec v3.9 §9.6; awaiting the DEE score.** The differential harness
+    (`libs/truehd/fuzz/differential_oracle.hpp`) still skips a stream whose major syncs differ; it could stop. Evidence:
     `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/major-sync-format-info-changes-mid-stream`.
 
 43. **The details of noise generator 1 that §17.3 leaves out (entry 44).** `access_unit_size_pow2`, the starting index (`index_orig`) and

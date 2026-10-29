@@ -163,13 +163,22 @@ std::expected<AccessUnit, Error> Decoder::Impl::parse_unit(std::span<const std::
 }
 
 void Decoder::Impl::accept_major_sync(const MajorSync& incoming) {
+    // TH spec §9.6: the codec state is forgotten only for a change that alters the decoded channel
+    // set, the stream's kind, its sample rate or its number of substreams; a major sync that only
+    // relabels the channels (the channel assignment words of its format_info) leaves the filters'
+    // histories alone, since they belong to the matrix channels (ERRATA.md question 42).
     const bool changed = !major_sync || major_sync->kind != incoming.kind ||
-                         major_sync->format_info != incoming.format_info ||
+                         major_sync->ratebits() != incoming.ratebits() ||
+                         (incoming.kind == StreamKind::kMlp &&
+                          major_sync->group2_ratebits() != incoming.group2_ratebits()) ||
                          major_sync->num_substreams != incoming.num_substreams;
     if (changed) {
         for (SubstreamState& state : substreams) {
             state.running = false;
         }
+    }
+    if (!major_sync || major_sync->kind != incoming.kind ||
+        major_sync->format_info != incoming.format_info) {
         layout_eight.clear();
         layout_six.clear();
         if (incoming.kind == StreamKind::kTrueHd) {

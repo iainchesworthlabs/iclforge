@@ -188,6 +188,53 @@ TEST_CASE("noise generator 0 runs on a 16 bit shr7, as in FFmpeg's decode",
                                      {1579950, 16890}}});
 }
 
+TEST_CASE("a major sync that changes only the channel assignment keeps the filters' histories",
+          "[truehd][handbuilt]") {
+    // TH spec §9.6: the filters' histories belong to the matrix channels, and a restart does not
+    // clear them; only a change of the stream's kind, sample rate or number of substreams does.
+    // hb_filters filters from the first sample after each restart, so a decoder that zeroes the
+    // histories decodes the interval after a changed major sync to other samples. Every major sync
+    // after the first here has the eight-channel assignment word of format_info changed (L R C
+    // instead of L R: a relabelling the decoded samples do not depend on).
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_filters.thd");
+    std::vector<std::vector<std::byte>> units;
+    ElementaryReader reader(stream);
+    while (const auto unit = reader.next()) {
+        units.emplace_back(unit->begin(), unit->end());
+    }
+    const auto decode_all = [](const std::vector<std::vector<std::byte>>& all) {
+        Decoder decoder;
+        std::vector<std::int32_t> pcm;
+        for (const std::vector<std::byte>& unit : all) {
+            auto decoded = decoder.decode(unit);
+            REQUIRE(decoded.has_value());
+            REQUIRE(decoded->has_value());
+            pcm.insert(pcm.end(), (*decoded)->pcm.begin(), (*decoded)->pcm.end());
+        }
+        CHECK(decoder.counters().lossless_check_failures == 0);
+        return pcm;
+    };
+    const std::vector<std::int32_t> plain = decode_all(units);
+    std::size_t changed = 0;
+    for (std::size_t k = 1; k < units.size(); ++k) {
+        const std::span<std::byte> body = std::span<std::byte>(units[k]).subspan(4);
+        if (!starts_with_major_sync(body)) {
+            continue;
+        }
+        auto parsed = parse_major_sync(body, true);
+        REQUIRE(parsed.has_value());
+        MajorSync relabelled = *parsed;
+        relabelled.format_info ^= 0x2;  // the eight-channel assignment gains the centre channel
+        auto bytes = write_major_sync(relabelled);
+        REQUIRE(bytes.has_value());
+        REQUIRE(bytes->size() == parsed->size_bytes);
+        std::copy(bytes->begin(), bytes->end(), body.begin());
+        ++changed;
+    }
+    REQUIRE(changed >= 2);
+    CHECK(decode_all(units) == plain);
+}
+
 TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
           "[truehd][handbuilt][ffmpeg-derived]") {
     // ERRATA entries 12 and 42: the fold shifts by the matrix channel the output channel takes.
