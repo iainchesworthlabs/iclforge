@@ -105,6 +105,7 @@ struct Decoder::Impl {
     explicit Impl(const DecoderConfig& configuration)
         : config(configuration),
           rows(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kRowStride),
+          matrixed(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kRowStride),
           pcm(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kMaxChannels) {
         extra_data.reserve(256);
     }
@@ -114,6 +115,7 @@ struct Decoder::Impl {
     std::optional<MajorSync> major_sync;
     std::array<SubstreamState, kMaxSubstreams> substreams;
     std::vector<std::int32_t> rows;
+    std::vector<std::int32_t> matrixed;  // a substream's rows after its matrices (ERRATA.md, 15)
     std::vector<std::int32_t> pcm;
     std::vector<std::byte> extra_data;
     std::vector<Channel> layout_eight;  // the channels of the major sync's eight-channel assignment
@@ -216,11 +218,6 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     if (!header) {
         return std::unexpected(header.error());
     }
-    if (header->noise_type()) {
-        return std::unexpected(make_error(ErrorKind::kUnsupported,
-                                          "restart sync 0x31EB (noise_type 1): the noise generator "
-                                          "is not defined (TH spec §17)"));
-    }
     const bool is_mlp = major_sync && major_sync->kind == StreamKind::kMlp;
     const int limit = index >= kObjectSubstream
                           ? kMaxChannels - 1
@@ -251,7 +248,10 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.min_chan = header->min_chan;
     state.context.max_chan = header->max_chan;
     state.context.max_matrix_chan = header->max_matrix_chan;
-    state.context.noise_type = false;
+    // TH spec §10.2: a restart with noise_type set adds a noise shift to every matrix. The
+    // generator itself is not defined (§17); a matrix that draws on a noise channel is refused
+    // where its header is applied, so a stream that sets the flag and uses no noise decodes.
+    state.context.noise_type = header->noise_type();
     state.context.presence_flags = presence::kAll;
     ++counters.restarts;
     return {};
@@ -491,7 +491,12 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                   channel.iir_history.begin() + block + kHistoryPad, channel.iir_history.begin());
     }
 
-    // The primitive matrices (TH spec §10), in the order the block header listed them.
+    // The primitive matrices (TH spec §10), in the order the block header listed them. They work
+    // on a copy of the block's rows: the next substream starts from the rows this one decoded
+    // before its matrices, as FFmpeg's decoder gives them (ERRATA.md, 15).
+    std::int32_t* const matrix_base =
+        matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
+    std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     for (int m = 0; m < state.matrix_count; ++m) {
         const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
         const std::uint32_t keep =
@@ -499,7 +504,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) - 1U)
                 : 0xFFFFFFFFU;
         for (int i = 0; i < block; ++i) {
-            std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
             std::int64_t sum = 0;
             for (int k = 0; k < plan.count; ++k) {
                 sum += std::int64_t{row[plan.channel[static_cast<std::size_t>(k)]]} *
@@ -518,7 +523,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     std::int32_t* const pcm_base =
         pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
     for (int i = 0; i < block; ++i) {
-        const std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+        const std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[restart.ch_assign[static_cast<std::size_t>(ch)]];
             const int shift = state.output_shift[static_cast<std::size_t>(ch)];

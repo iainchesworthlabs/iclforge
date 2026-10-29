@@ -17,6 +17,8 @@ iclforge_add_library(truehd
         src/core/format.cpp
         src/core/syntax.cpp
         src/decoder/decoder.cpp
+        src/encoder/coding.cpp
+        src/encoder/encoder.cpp
         src/io/access_unit.cpp
         src/io/elementary.cpp
         src/io/major_sync.cpp
