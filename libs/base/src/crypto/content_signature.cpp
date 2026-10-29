@@ -328,6 +328,10 @@ std::optional<DigestEntry> read_digest(std::span<const std::byte> struct_bytes) 
     return d;
 }
 
+// A signature names one content digest (and the signer-information digest beside it); a few more
+// are read, and a list longer than that is refused before it is copied.
+constexpr std::size_t kMaxContentDigests = 8;
+
 // CertificateChainWire.certificates -> the certificates, or why not.
 std::vector<Certificate> read_chain(std::span<const std::byte> field, std::string& error) {
     std::vector<Certificate> chain;
@@ -342,6 +346,12 @@ std::vector<Certificate> read_chain(std::span<const std::byte> field, std::strin
         body = wrapper->content;
     }
     while (!body.empty()) {
+        if (chain.size() == kMaxChainLength) {
+            error = "the certificate list holds more than " + std::to_string(kMaxChainLength) +
+                    " certificates";
+            chain.clear();
+            return chain;
+        }
         const auto cert = der::read_expecting(body, der::kSequence);
         if (!cert) {
             error = "the certificate list does not hold DER certificates";
@@ -453,9 +463,24 @@ std::expected<ParsedContentSignature, SignatureFault> parse_content_signature(
         out.chain_error = "the certificate chain carries no certificates";
     }
 
+    // Exactly one signature entry: this verifier checks one, so a blob that carries another is
+    // refused and not read as if the first stood for the whole (libs/ac4/ERRATA.md, open question
+    // 6). The count is read from the list header, before any element is.
+    const std::uint32_t entry_count =
+        values_field->value.size() >= 5
+            ? (std::to_integer<std::uint32_t>(values_field->value[1]) << 24) |
+                  (std::to_integer<std::uint32_t>(values_field->value[2]) << 16) |
+                  (std::to_integer<std::uint32_t>(values_field->value[3]) << 8) |
+                  std::to_integer<std::uint32_t>(values_field->value[4])
+            : 0U;
+    if (entry_count != 1) {
+        return bad(entry_count == 0 ? "the content signature holds no signature entry"
+                                    : "the content signature holds " + std::to_string(entry_count) +
+                                          " signature entries and exactly one is accepted");
+    }
     const auto entries = tb::as_struct_list(*values_field);
-    if (!entries || entries->empty()) {
-        return bad("the content signature holds no signature entry");
+    if (!entries || entries->size() != 1) {
+        return bad("the signature entries are damaged");
     }
     const auto entry = tb::read_struct(entries->front());
     if (!entry) {
@@ -497,6 +522,11 @@ std::expected<ParsedContentSignature, SignatureFault> parse_content_signature(
         const auto list = tb::as_struct_list(*contents);
         if (!list) {
             return bad("the content digests are damaged");
+        }
+        if (list->size() > kMaxContentDigests) {
+            return bad("the signed information lists " + std::to_string(list->size()) +
+                       " content digests and at most " + std::to_string(kMaxContentDigests) +
+                       " are accepted");
         }
         for (const auto& bytes : *list) {
             const auto digest = read_digest(bytes);

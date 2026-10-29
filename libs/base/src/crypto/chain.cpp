@@ -62,6 +62,12 @@ ChainReport validate_chain(std::span<const Certificate> chain, const ChainPolicy
     if (chain.empty()) {
         return failure(ChainFailure::kEmpty, 0, "the signature carries no certificates");
     }
+    if (chain.size() > kMaxChainLength) {
+        return failure(ChainFailure::kPathLength, kMaxChainLength,
+                       "the chain holds " + std::to_string(chain.size()) +
+                           " certificates and at most " + std::to_string(kMaxChainLength) +
+                           " are accepted");
+    }
 
     // 1. Each certificate is issued by, and signed under the key of, the one above it. The first is
     // checked against itself when it is self-issued (a root).

@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <span>
@@ -10,6 +12,7 @@
 #include "iclforge/base/crypto/credentials.hpp"
 #include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/pem.hpp"
+#include "iclforge/base/crypto/sha256.hpp"
 #include "test_pki.hpp"
 
 namespace {
@@ -158,6 +161,65 @@ TEST_CASE("certificates load from PEM bundles and DER, in any order", "[crypto][
     CHECK(crypto::parse_certificates(text_bytes("")).error().kind ==
           crypto::CredentialErrorKind::kEmpty);
     CHECK_FALSE(crypto::parse_certificates(text_bytes("plain text")).has_value());
+}
+
+TEST_CASE("a bare 32-byte scalar loads whatever bytes it begins and ends with",
+          "[crypto][credentials]") {
+    // The bytes that count as white space where a key file is trimmed. A scalar is binary: 62 of
+    // 2000 random ones used to be refused because they began or ended with one of these.
+    const std::array<unsigned, 4> white = {0x09, 0x0A, 0x0D, 0x20};
+    std::vector<std::byte> scalar(32, std::byte{0x11});
+    for (const unsigned first : white) {
+        for (const unsigned last : white) {
+            scalar.front() = static_cast<std::byte>(first);
+            scalar.back() = static_cast<std::byte>(last);
+            INFO("first " << first << " last " << last);
+            const auto key = crypto::parse_p256_private_key(scalar);
+            REQUIRE(key.has_value());
+            CHECK(std::equal(scalar.begin(), scalar.end(), key->scalar().begin()));
+        }
+    }
+    // Both ends at once with a plain middle, and a spread of scalars with one end in the set.
+    for (unsigned n = 0; n < 400; ++n) {
+        const pki::Bytes seed = {static_cast<std::byte>(n & 0xFF), static_cast<std::byte>(n >> 8)};
+        const auto digest = crypto::sha256(seed);
+        std::vector<std::byte> bytes(digest.begin(), digest.end());
+        bytes[(n % 2 == 0) ? 0 : 31] = static_cast<std::byte>(white[(n / 2) % 4]);
+        const auto key = crypto::parse_p256_private_key(bytes);
+        REQUIRE(key.has_value());
+        CHECK(std::equal(bytes.begin(), bytes.end(), key->scalar().begin()));
+    }
+    // Padding around a scalar is still trimmed, as a file with a trailing newline needs.
+    std::vector<std::byte> padded(scalar.begin(), scalar.end());
+    padded.front() = std::byte{0x42};
+    padded.back() = std::byte{0x43};
+    padded.insert(padded.begin(), std::byte{'\n'});
+    padded.push_back(std::byte{'\n'});
+    const auto from_padded = crypto::parse_p256_private_key(padded);
+    REQUIRE(from_padded.has_value());
+    CHECK(from_padded->scalar()[0] == std::byte{0x42});
+}
+
+TEST_CASE("a chain or a certificate file past its cap is refused", "[crypto][credentials]") {
+    const pki::TestChain chain = pki::make_chain();
+    std::vector<crypto::Certificate> nine;
+    for (int i = 0; i < 9; ++i) {
+        nine.push_back(*crypto::parse_certificate(chain.certificates[3]));
+    }
+    const auto too_long = crypto::order_chain(nine);
+    REQUIRE_FALSE(too_long.has_value());
+    CHECK(too_long.error().message.find("longer than the 8 accepted") != std::string::npos);
+
+    const std::string pem = crypto::pem_encode("CERTIFICATE", chain.certificates[0]);
+    std::string bundle;
+    for (int i = 0; i < 1024; ++i) {
+        bundle += pem;
+    }
+    CHECK(crypto::parse_certificates(text_bytes(bundle)).has_value());
+    bundle += pem;
+    const auto too_many = crypto::parse_certificates(text_bytes(bundle));
+    REQUIRE_FALSE(too_many.has_value());
+    CHECK(too_many.error().message.find("at most 1024") != std::string::npos);
 }
 
 TEST_CASE("credentials need the key to belong to the leaf", "[crypto][credentials]") {

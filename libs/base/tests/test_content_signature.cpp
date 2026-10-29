@@ -460,6 +460,133 @@ TEST_CASE("a content signature is parsed or refused, whatever its length",
     CHECK(crypto::parse_content_signature(*blob).has_value());
 }
 
+// ---- Lists a hostile blob can stretch -------------------------------------------------------
+
+namespace {
+
+// `blob` with the bytes of `part`, which must lie inside it, replaced by `with`.
+std::vector<std::byte> splice(std::span<const std::byte> blob, std::span<const std::byte> part,
+                              std::span<const std::byte> with) {
+    const auto at = static_cast<std::size_t>(part.data() - blob.data());
+    std::vector<std::byte> out(blob.begin(), blob.begin() + static_cast<std::ptrdiff_t>(at));
+    out.insert(out.end(), with.begin(), with.end());
+    out.insert(out.end(), blob.begin() + static_cast<std::ptrdiff_t>(at + part.size()), blob.end());
+    return out;
+}
+
+// A Thrift list header: the element type and a big-endian count.
+std::vector<std::byte> list_header(tb::Type element, std::uint32_t count) {
+    return {static_cast<std::byte>(element), static_cast<std::byte>(count >> 24),
+            static_cast<std::byte>((count >> 16) & 0xFF),
+            static_cast<std::byte>((count >> 8) & 0xFF), static_cast<std::byte>(count & 0xFF)};
+}
+
+void append(std::vector<std::byte>& to, std::span<const std::byte> bytes) {
+    to.insert(to.end(), bytes.begin(), bytes.end());
+}
+
+}  // namespace
+
+TEST_CASE("a second signature entry is refused, even one that is damaged",
+          "[crypto][content-signature][bounds]") {
+    const Fixture f;
+    const auto content = content_of(300);
+    const auto blob = crypto::sign_content(content, f.credentials, f.options());
+    REQUIRE(blob.has_value());
+    const auto digest = crypto::sha256(content);
+    REQUIRE(crypto::verify_content_signature(*blob, digest, f.policy()).verdict ==
+            crypto::Verdict::kChecksChainUnanchored);
+
+    const auto top = tb::read_struct(*blob);
+    REQUIRE(top.has_value());
+    const tb::Field* list = tb::find(*top, 4, tb::Type::kList);
+    REQUIRE(list != nullptr);
+    const std::span<const std::byte> one_entry = list->value.subspan(5);
+
+    // The entry again with the last byte of s changed: the first entry is untouched and verifies
+    // alone, so a verifier that read only the first would call this blob valid.
+    std::vector<std::byte> damaged(one_entry.begin(), one_entry.end());
+    damaged[damaged.size() - 3] ^= std::byte{0x01};
+    for (const auto& second :
+         {std::vector<std::byte>(one_entry.begin(), one_entry.end()), damaged}) {
+        std::vector<std::byte> value = list_header(tb::Type::kStruct, 2);
+        append(value, one_entry);
+        append(value, second);
+        const auto two = splice(*blob, list->value, value);
+        const auto parsed = crypto::parse_content_signature(two);
+        REQUIRE_FALSE(parsed.has_value());
+        CHECK(parsed.error().code == crypto::SignatureError::kBadOrMissingSignature);
+        CHECK(parsed.error().message.find("2 signature entries") != std::string::npos);
+        const crypto::VerifyReport report =
+            crypto::verify_content_signature(two, digest, f.policy());
+        CHECK(report.verdict == crypto::Verdict::kInvalid);
+        CHECK(report.fault.has_value());
+    }
+
+    // None at all, and a count that claims millions, are refused without reading the elements.
+    const auto none = splice(*blob, list->value, list_header(tb::Type::kStruct, 0));
+    CHECK_FALSE(crypto::parse_content_signature(none).has_value());
+    const auto huge = splice(*blob, list->value, list_header(tb::Type::kStruct, 4'000'000));
+    CHECK_FALSE(crypto::parse_content_signature(huge).has_value());
+}
+
+TEST_CASE("a chain or a digest list past its cap is refused",
+          "[crypto][content-signature][bounds]") {
+    const Fixture f;
+    const auto content = content_of(300);
+    const auto blob = crypto::sign_content(content, f.credentials, f.options());
+    REQUIRE(blob.has_value());
+    const auto digest = crypto::sha256(content);
+    const auto top = tb::read_struct(*blob);
+    REQUIRE(top.has_value());
+
+    // Nine certificates in the list (the four of the chain, then five repeated): the cap is eight.
+    const auto signer = tb::as_struct(*tb::find(*top, 3, tb::Type::kStruct));
+    REQUIRE(signer.has_value());
+    const auto info = tb::as_struct(*tb::find(*signer, 10, tb::Type::kStruct));
+    REQUIRE(info.has_value());
+    const tb::Field* certificates = tb::find(*info, 4, tb::Type::kList);
+    REQUIRE(certificates != nullptr);
+    const std::span<const std::byte> wrapped = certificates->value.subspan(5);
+    std::vector<std::byte> body(wrapped.begin() + 4, wrapped.end());  // after 40 82 LL LL
+    for (int i = 0; i < 5; ++i) {
+        append(body, f.chain.certificates[3]);
+    }
+    std::vector<std::byte> list = {std::byte{0x40}, std::byte{0x82},
+                                   static_cast<std::byte>(body.size() >> 8),
+                                   static_cast<std::byte>(body.size() & 0xFF)};
+    append(list, body);
+    std::vector<std::byte> value =
+        list_header(tb::Type::kByte, static_cast<std::uint32_t>(list.size()));
+    append(value, list);
+    const auto long_chain = splice(*blob, certificates->value, value);
+    const auto parsed = crypto::parse_content_signature(long_chain);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->chain.empty());
+    CHECK(parsed->chain_error.find("more than 8 certificates") != std::string::npos);
+    CHECK(crypto::verify_content_signature(long_chain, digest, f.policy()).verdict ==
+          crypto::Verdict::kInvalid);
+
+    // Nine content digests where one belongs.
+    const auto entries = tb::as_struct_list(*tb::find(*top, 4, tb::Type::kList));
+    REQUIRE(entries.has_value());
+    const auto entry = tb::read_struct(entries->front());
+    REQUIRE(entry.has_value());
+    const auto signed_info = tb::as_struct(*tb::find(*entry, 1, tb::Type::kStruct));
+    REQUIRE(signed_info.has_value());
+    const tb::Field* digests = tb::find(*signed_info, 7, tb::Type::kList);
+    REQUIRE(digests != nullptr);
+    const auto first_digest = tb::as_struct_list(*digests)->front();
+    std::vector<std::byte> nine = list_header(tb::Type::kStruct, 9);
+    for (int i = 0; i < 9; ++i) {
+        append(nine, first_digest);
+    }
+    const auto many = splice(*blob, digests->value, nine);
+    const auto refused = crypto::parse_content_signature(many);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().message.find("at most 8") != std::string::npos);
+}
+
 // ---- The owner's sample ------------------------------------------------------------------
 // A ContentSignature blob the owner extracted from a signing tool (see libs/ac4/ERRATA.md for the
 // provenance). It is not in the repository and these checks need no key: set

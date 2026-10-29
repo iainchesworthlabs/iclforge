@@ -45,7 +45,7 @@ inline constexpr std::uint16_t kKeyUsageCrlSign = 1U << 6;
 
 struct DistinguishedName {
     std::vector<std::byte> der;  // the Name as encoded; two names are equal when these are
-    std::string text;            // "CN=ILok, title=Code/Content Signer, ..." for people to read
+    std::string text;            // "CN=Example, title=Code/Content Signer, ..." for people to read
     std::optional<std::string> common_name;
     std::optional<std::string> title;  // the `title` attribute, 2.5.4.12 (CS spec §6.1 step 4)
 };

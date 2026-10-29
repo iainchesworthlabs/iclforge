@@ -42,6 +42,11 @@ enum class Type : std::uint8_t {
 // The deepest struct/list/map nesting the reader follows. The content signature nests five levels.
 inline constexpr int kMaxDepth = 16;
 
+// The most values (fields, list elements, map keys and values) one read_struct() will walk past. A
+// content signature has a few dozen; a count claiming millions, each an empty struct, would
+// otherwise cost memory and time in proportion to the input.
+inline constexpr std::size_t kMaxValues = 16384;
+
 class ICLFORGE_BASE_EXPORT Writer {
    public:
     // A field header: type and id. The caller writes the value next (or uses the field_* helpers).

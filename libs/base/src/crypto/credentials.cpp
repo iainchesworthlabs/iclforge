@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/crypto/chain.hpp"
 #include "iclforge/base/crypto/der.hpp"
 #include "iclforge/base/crypto/pem.hpp"
 
@@ -24,6 +25,9 @@ namespace {
 using Unexpected = std::unexpected<CredentialError>;
 
 constexpr std::size_t kMaxCredentialFileBytes = 4U << 20;
+// A trust-anchor file may be a system bundle (about 150 certificates); this stops a file of
+// thousands from costing a parse of each.
+constexpr std::size_t kMaxCertificatesPerFile = 1024;
 constexpr std::string_view kOidEcPublicKey = "1.2.840.10045.2.1";
 constexpr std::string_view kOidPrime256v1 = "1.2.840.10045.3.1.7";
 
@@ -169,6 +173,13 @@ constexpr std::string_view kEncryptedHint =
 
 std::expected<P256PrivateKey, CredentialError> parse_key_text(std::span<const std::byte> contents,
                                                               int depth) {
+    // A bare scalar is 32 bytes of binary, any of which may be a byte that counts as white space,
+    // so its length is tested on the input as it came, before anything is trimmed from it.
+    if (contents.size() == 32) {
+        if (auto key = P256PrivateKey::from_scalar(contents); key.has_value()) {
+            return *key;
+        }
+    }
     const std::span<const std::byte> trimmed = trim_ascii_space(contents);
     if (trimmed.empty()) {
         return error(CredentialErrorKind::kEmpty, "the key source is empty");
@@ -290,6 +301,12 @@ std::expected<std::vector<Certificate>, CredentialError> parse_certificates(
     if (ders.empty()) {
         return error(CredentialErrorKind::kMalformed, "no certificate found");
     }
+    if (ders.size() > kMaxCertificatesPerFile) {
+        return error(CredentialErrorKind::kMalformed,
+                     "the file holds " + std::to_string(ders.size()) +
+                         " certificates and at most " + std::to_string(kMaxCertificatesPerFile) +
+                         " are read");
+    }
     std::vector<Certificate> out;
     for (std::size_t i = 0; i < ders.size(); ++i) {
         auto parsed = parse_certificate(ders[i]);
@@ -308,6 +325,12 @@ std::expected<std::vector<Certificate>, CredentialError> order_chain(
     std::vector<Certificate> certificates) {
     if (certificates.empty()) {
         return error(CredentialErrorKind::kEmpty, "no certificates");
+    }
+    if (certificates.size() > kMaxChainLength) {
+        return error(CredentialErrorKind::kMismatch,
+                     "a chain of " + std::to_string(certificates.size()) +
+                         " certificates is longer than the " + std::to_string(kMaxChainLength) +
+                         " accepted");
     }
     const std::size_t n = certificates.size();
     for (std::size_t i = 0; i < n; ++i) {

@@ -292,6 +292,23 @@ TEST_CASE("a well-formed chain is reported unanchored until an anchor is given",
     CHECK_FALSE(crypto::validate_chain(certs, policy).anchored);
 }
 
+TEST_CASE("a chain past the cap is refused before any signature in it is checked",
+          "[crypto][chain][bounds]") {
+    const pki::TestChain chain = pki::make_chain();
+    const auto certs = parse_all(chain);
+    // Eight is accepted (the cap), nine and fifteen hundred are not. The long one is the same
+    // certificate over and over, which fails its issuer check; reaching that check would take the
+    // cost of the cap's worth of signatures, so the failure kind says which check refused it.
+    const std::vector<crypto::Certificate> eight(8, certs[0]);
+    CHECK(crypto::validate_chain(eight, {}).failure != crypto::ChainFailure::kPathLength);
+    for (const std::size_t count : {std::size_t{9}, std::size_t{1500}}) {
+        const std::vector<crypto::Certificate> long_chain(count, certs[0]);
+        const crypto::ChainReport report = crypto::validate_chain(long_chain, {});
+        CHECK(report.failure == crypto::ChainFailure::kPathLength);
+        CHECK(report.detail.find("at most 8") != std::string::npos);
+    }
+}
+
 TEST_CASE("an expired intermediate fails at the time asked and is skipped above a pinned anchor",
           "[crypto][chain]") {
     const pki::TestChain chain = pki::make_chain("2025-11-13T01:47:10");

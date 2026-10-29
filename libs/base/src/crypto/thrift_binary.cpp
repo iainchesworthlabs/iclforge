@@ -68,10 +68,12 @@ std::size_t fixed_size(Type t) {
     }
 }
 
-// Advances `pos` past one value of `type`, checking everything on the way.
-bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int depth);
+// Advances `pos` past one value of `type`, checking everything on the way. `budget` is the number
+// of values still allowed (kMaxValues at the start of a read); each value takes one.
+bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int depth,
+                std::size_t& budget);
 
-bool skip_struct(std::span<const std::byte> in, std::size_t& pos, int depth) {
+bool skip_struct(std::span<const std::byte> in, std::size_t& pos, int depth, std::size_t& budget) {
     if (depth > kMaxDepth) {
         return false;
     }
@@ -88,13 +90,18 @@ bool skip_struct(std::span<const std::byte> in, std::size_t& pos, int depth) {
             return false;
         }
         pos += 2;  // the field id
-        if (!skip_value(in, pos, static_cast<Type>(t), depth)) {
+        if (!skip_value(in, pos, static_cast<Type>(t), depth, budget)) {
             return false;
         }
     }
 }
 
-bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int depth) {
+bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int depth,
+                std::size_t& budget) {
+    if (budget == 0) {
+        return false;
+    }
+    --budget;
     if (const std::size_t n = fixed_size(type); n != 0) {
         if (in.size() - pos < n) {
             return false;
@@ -116,7 +123,7 @@ bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int 
             return true;
         }
         case Type::kStruct:
-            return skip_struct(in, pos, depth + 1);
+            return skip_struct(in, pos, depth + 1, budget);
         case Type::kList:
         case Type::kSet: {
             if (depth + 1 > kMaxDepth || in.size() - pos < 5) {
@@ -142,7 +149,7 @@ bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int 
                 return true;
             }
             for (std::uint32_t i = 0; i < count; ++i) {
-                if (!skip_value(in, pos, et, depth + 1)) {
+                if (!skip_value(in, pos, et, depth + 1, budget)) {
                     return false;
                 }
             }
@@ -160,8 +167,8 @@ bool skip_value(std::span<const std::byte> in, std::size_t& pos, Type type, int 
                 return false;
             }
             for (std::uint32_t i = 0; i < count; ++i) {
-                if (!skip_value(in, pos, static_cast<Type>(key), depth + 1) ||
-                    !skip_value(in, pos, static_cast<Type>(value), depth + 1)) {
+                if (!skip_value(in, pos, static_cast<Type>(key), depth + 1, budget) ||
+                    !skip_value(in, pos, static_cast<Type>(value), depth + 1, budget)) {
                     return false;
                 }
             }
@@ -233,6 +240,7 @@ std::optional<std::vector<Field>> read_struct(std::span<const std::byte> bytes,
                                               std::size_t* consumed) {
     std::vector<Field> fields;
     std::size_t pos = 0;
+    std::size_t budget = kMaxValues;
     for (;;) {
         if (pos >= bytes.size()) {
             return std::nullopt;
@@ -253,7 +261,7 @@ std::optional<std::vector<Field>> read_struct(std::span<const std::byte> bytes,
         const std::size_t start = pos;
         // The nesting of the field's own value counts from one: the struct being read is level
         // zero.
-        if (!skip_value(bytes, pos, field.type, 1)) {
+        if (!skip_value(bytes, pos, field.type, 1, budget)) {
             return std::nullopt;
         }
         field.value = bytes.subspan(start, pos - start);
@@ -330,6 +338,9 @@ std::optional<std::vector<std::span<const std::byte>>> as_struct_list(const Fiel
         return std::nullopt;
     }
     const std::uint32_t count = get_u32(field.value.subspan(1, 4));
+    if (count > kMaxValues) {
+        return std::nullopt;
+    }
     std::vector<std::span<const std::byte>> out;
     std::size_t pos = 5;
     for (std::uint32_t i = 0; i < count; ++i) {

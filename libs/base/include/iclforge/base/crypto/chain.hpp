@@ -23,6 +23,11 @@
 
 namespace iclforge::base::crypto {
 
+// The longest chain read from a signature, taken from an operator's files or validated: a root, a
+// few intermediates and the signer. Beyond it a chain is refused before any signature in it is
+// checked, so a hostile signature cannot make the verifier verify a thousand certificates.
+inline constexpr std::size_t kMaxChainLength = 8;
+
 // A certificate the operator named by fingerprint: 20 bytes (SHA-1, the form CS spec §10.1 lists)
 // or 32 bytes (SHA-256). A pinned certificate is trusted wherever it appears in the chain.
 struct CertificatePin {
@@ -77,7 +82,7 @@ struct ChainReport {
 [[nodiscard]] ICLFORGE_BASE_EXPORT ChainReport validate_chain(std::span<const Certificate> chain,
                                                               const ChainPolicy& policy);
 
-// "certificate 2 (CN=PACE ..., serial 22BD3F2875DC00000007)" for messages.
+// "certificate 2 (CN=Example Signer, serial 0A1B2C, ...)" for messages.
 [[nodiscard]] ICLFORGE_BASE_EXPORT std::string describe_certificate(const Certificate& cert,
                                                                     std::size_t index);
 

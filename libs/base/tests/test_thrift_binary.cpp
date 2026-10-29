@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -123,6 +124,23 @@ TEST_CASE("Thrift binary reader refuses what is malformed", "[crypto][thrift]") 
     CHECK_FALSE(reads("0d0001 0b0f 7fffffff 00"));  // a map claiming two billion entries
     CHECK_FALSE(
         reads("0d0001 0b0f 00000001 00000001 6b 03 00000005 01 00"));  // its value cut short
+
+    // More values than the reader's budget are refused whatever the lengths say: a list of empty
+    // structs costs a byte each, so 4 MB of them is four million values to hold.
+    const auto many_structs = [](std::size_t count) {
+        std::string hex = "0f0001 0c ";
+        char header[16];
+        std::snprintf(header, sizeof header, "%08x", static_cast<unsigned>(count));
+        hex += header;
+        for (std::size_t i = 0; i < count; ++i) {
+            hex += "00";
+        }
+        return hex + "00";
+    };
+    CHECK(reads(many_structs(100).c_str()));
+    CHECK(reads(many_structs(tb::kMaxValues - 8).c_str()));
+    CHECK_FALSE(reads(many_structs(tb::kMaxValues + 8).c_str()));
+    CHECK_FALSE(reads(many_structs(4'000'000).c_str()));
 
     // Nesting past kMaxDepth is refused, not followed: 40 structs inside one another.
     std::string deep;
