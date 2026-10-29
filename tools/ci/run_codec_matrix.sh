@@ -1831,34 +1831,37 @@ done
 
 # `metadata` sets the same fields in a finished stream without re-encoding it: every major sync is
 # rewritten under its CRC and nothing else changes. FFmpeg's strict decode of the patched stream must
-# give what it gave for the original, forge's decode must equal it, the probe must give the values,
-# and a second pass with the same values must change no byte. FFmpeg's own streams and forge's.
+# give what it gave for the original, forge's decode must equal its decode of the original, the probe
+# must give the values, and a second pass with the same values must change no byte. FFmpeg's own
+# streams and forge's.
 for stream in th_truehd_m51_s24.thd th_truehd_st48_s24.thd th_truehd_st192_s24.thd \
     th_truehd_mono48_s24.thd th_truehd_st48_s16.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
-    run metadata "$stream" "meta_$stream" "${thd_meaning_options[@]}"
+    patched="${stream%.thd}_meta.thd"
+    again="${stream%.thd}_meta2.thd"
+    run metadata "$stream" "${stream%.thd}_meta.thd" "${thd_meaning_options[@]}"
     count=$((count + 1))
-    echo "[$count] truehd metadata $stream: ffmpeg's strict decode and forge's decode of the patched stream equal the original's"
+    echo "[$count] truehd metadata $stream: ffmpeg's strict decode of the patched stream equals the original's"
     truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig.s32"
-    truehd_ffmpeg_pcm "meta_$stream" -f truehd >"meta_$stream.s32"
-    cmp -s "$stream.orig.s32" "meta_$stream.s32" || {
-        echo "ffmpeg's strict decode of meta_$stream differs from its decode of $stream" >&2
+    truehd_ffmpeg_pcm "$patched" -f truehd >"$patched.s32"
+    cmp -s "$stream.orig.s32" "$patched.s32" || {
+        echo "ffmpeg's strict decode of $patched differs from its decode of $stream" >&2
         exit 1
     }
-    run decode "meta_$stream" "meta_$stream.wav"
-    truehd_ffmpeg_pcm "meta_$stream.wav" >"meta_$stream.wav.s32"
-    cmp -s "meta_$stream.wav.s32" "meta_$stream.s32" || {
-        echo "forge's decode of meta_$stream differs from ffmpeg's strict decode" >&2
+    run decode "$stream" "$stream.orig.wav"
+    run decode "$patched" "$patched.wav"
+    cmp -s "$stream.orig.wav" "$patched.wav" || {
+        echo "forge's decode of $patched differs from its decode of $stream" >&2
         exit 1
     }
-    "$CLI" probe "meta_$stream" json=1 | python3 -c '
+    "$CLI" probe "$patched" json=1 | python3 -c '
 import json, sys
 meaning = json.load(sys.stdin)["truehd"]["channel_meaning"]
 sys.exit(0 if meaning["distinct_in_stream"] == 1 and meaning["drc_start_up_gain"] == 21
          and meaning["presentations"]["6ch"]["dialogue_norm"] == 27
          and meaning["presentations"]["8ch"]["source_format"] == 38 else 1)'
-    run metadata "meta_$stream" "meta_again_$stream" "${thd_meaning_options[@]}"
-    cmp -s "meta_$stream" "meta_again_$stream" || {
-        echo "a second metadata pass with the same values changed meta_$stream" >&2
+    run metadata "${stream%.thd}_meta.thd" "${stream%.thd}_meta2.thd" "${thd_meaning_options[@]}"
+    cmp -s "$patched" "$again" || {
+        echo "a second metadata pass with the same values changed $patched" >&2
         exit 1
     }
 done
@@ -1868,16 +1871,17 @@ done
 # probe must show a dialogue norm of 1 to 31 where the stream had 0. forge's own streams, which are
 # long enough for the 400 ms blocks of a loudness measurement (the fixtures are 0.25 s).
 for stream in te_st48_s24.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
-    run normalize "$stream" "norm_$stream"
+    normalized="${stream%.thd}_norm.thd"
+    run normalize "$stream" "${stream%.thd}_norm.thd"
     count=$((count + 1))
     echo "[$count] truehd normalize $stream: ffmpeg's strict decode of the result equals the original's"
     truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig2.s32"
-    truehd_ffmpeg_pcm "norm_$stream" -f truehd >"norm_$stream.s32"
-    cmp -s "$stream.orig2.s32" "norm_$stream.s32" || {
-        echo "ffmpeg's strict decode of norm_$stream differs from its decode of $stream" >&2
+    truehd_ffmpeg_pcm "$normalized" -f truehd >"$normalized.s32"
+    cmp -s "$stream.orig2.s32" "$normalized.s32" || {
+        echo "ffmpeg's strict decode of $normalized differs from its decode of $stream" >&2
         exit 1
     }
-    "$CLI" probe "norm_$stream" json=1 | python3 -c '
+    "$CLI" probe "$normalized" json=1 | python3 -c '
 import json, sys
 presentations = json.load(sys.stdin)["truehd"]["channel_meaning"]["presentations"]
 present = [p for p in ("2ch", "6ch", "8ch") if presentations[p]["in_stream"]]
