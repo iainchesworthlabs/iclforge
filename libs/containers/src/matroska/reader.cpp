@@ -390,8 +390,8 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kLimitExceeded:
             return "element size or nesting depth beyond the reader's limits";
         case DemuxError::kEncryptedTrack:
-            return "the audio track is encrypted (the track declares ContentEncryption): its "
-                   "frames are ciphertext and decryption is not supported";
+            return "the audio track is encrypted: it declares ContentEncryption, its frames "
+                   "are ciphertext and decryption is not supported";
     }
     return "unknown error";
 }

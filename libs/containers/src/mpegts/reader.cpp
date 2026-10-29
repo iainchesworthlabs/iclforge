@@ -142,8 +142,8 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kLimitExceeded:
             return "a PES packet or PSI section beyond the reader's limits";
         case DemuxError::kScrambled:
-            return "the audio stream is scrambled (a packet has transport_scrambling_control "
-                   "set): its payload is ciphertext and descrambling is not supported";
+            return "the audio stream is scrambled: a packet has transport_scrambling_control "
+                   "set, its payload is ciphertext and descrambling is not supported";
     }
     return "unknown error";
 }
