@@ -1558,9 +1558,16 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     run_truehd_container_check "th_$name.ts" "$src" truehd
     run probe "th_$name.ts"
     run_truehd_probe_json_check "th_$name.ts"
-    # Remuxing one container into another goes through the same readers and writers.
+    # Remuxing one container into another goes through the same readers and writers. A transport
+    # stream without a profile is Blu-ray's for TrueHD (remux once passed dvb, which ts refuses).
     run mkv "th_$name.mp4" "th_${name}_remux.mkv"
     run mp4 "th_$name.mkv" "th_${name}_remux.mp4"
+    run remux "th_$name.mkv" "th_${name}_remux.ts"
+    run demux "th_${name}_remux.ts" "th_${name}_remux.ts.thd"
+    cmp -s "$src" "th_${name}_remux.ts.thd" || {
+        echo "remux of th_$name.mkv to a transport stream did not reproduce $src byte for byte" >&2
+        exit 1
+    }
     # MAT: a raw burst file and an eight-channel WAV carrier both read back to the units, and the
     # whole bursts are FFmpeg's `spdif` output byte for byte (a last partial burst is padded here
     # and dropped by FFmpeg, so the comparison stops at FFmpeg's length).
@@ -1588,18 +1595,35 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     fi
 done
 
-# Refusals: the commands that do not read TrueHD say so and exit 1 (kExitUsage), and the other
-# transports' profiles do not apply to it.
+# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
+# cut, cat, metadata and normalize once stopped with AC-3's sync error (exit 2); the other
+# transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
+# dropped (a verification flag above all, which must never exit 0 without verifying). play and
+# monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
+# this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by transcode, qc, fmp4 and the dvb ts profile"
-for refused in "transcode th_truehd_st48_s24.thd th_refused.ac3 192" \
-    "qc th_truehd_st48_s24.thd" "fmp4 th_truehd_st48_s24.thd th_refused_fmp4 24" \
-    "ts th_truehd_st48_s24.thd th_refused.ts dvb"; do
+echo "[$count] truehd is refused by cut, cat, metadata, normalize, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied"
+th_in=th_truehd_st48_s24.thd
+for refused in "cut $th_in th_refused.thd 0.05 0.1" \
+    "cat th_refused.thd $th_in $th_in" \
+    "metadata $th_in th_refused.thd dialnorm=27" \
+    "normalize $th_in th_refused.thd" \
+    "transcode $th_in th_refused.ac3 192" \
+    "qc $th_in" "fmp4 $th_in th_refused_fmp4 24" \
+    "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
+    "remux th_truehd_st48_s24.mkv th_refused.ts dvb" \
+    "decode $th_in th_refused.wav verify-content" "decode $th_in th_refused.wav check-content" \
+    "decode $th_in th_refused.wav verify-objects" "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
+    "decode $th_in th_refused.wav channels=2" "decode $th_in th_refused.wav programme=3" \
+    "levels $th_in programme=1" "loudness $th_in programme=1" \
+    "mkv $th_in th_refused.mkv mainid=1" "mp4 $th_in th_refused.mp4 asvc=1" \
+    "ts $th_in th_refused.ts programme=1" "spdif $th_in th_refused.wav mainid=1"; do
     set +e
     # shellcheck disable=SC2086
     "$CLI" $refused >/dev/null 2>&1
     refused_status=$?
     set -e
+    echo "  forge $refused -> exit $refused_status"
     [[ "$refused_status" -eq 1 ]] || {
         echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
         exit 1
@@ -1716,10 +1740,12 @@ cmp -s te_st48_s24.thd te_stdout.thd || {
 
 # What the encoder does not write, and an output it has no name for, are usage errors (exit 1).
 count=$((count + 1))
-echo "[$count] truehd-encode refuses an MLP name, an unknown output and an unsupported rate"
+echo "[$count] truehd-encode refuses an MLP name, an unknown output, an unsupported rate and options it does not apply"
 ffmpeg -v error -y -f lavfi -i "sine=frequency=440:sample_rate=32000:duration=1" -c:a pcm_s24le te_32k.wav
 for refused in "truehd-encode te_st48_s24.wav te_refused.mlp" "truehd-encode te_st48_s24.wav te_refused.wav" \
-    "truehd-encode te_32k.wav te_refused.thd"; do
+    "truehd-encode te_32k.wav te_refused.thd" \
+    "truehd-encode te_st48_s24.wav te_refused.thd src=te_st48_s24.wav" \
+    "truehd-encode te_st48_s24.wav te_refused.thd dialnorm=27" "truehd-encode te_st48_s24.wav te_refused.thd map=0:0"; do
     set +e
     # shellcheck disable=SC2086
     "$CLI" $refused >/dev/null 2>&1
