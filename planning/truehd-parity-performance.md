@@ -37,7 +37,7 @@ Size is the ROADMAP's scale: S an afternoon, M a day or two, L a focused week, X
 
 | # | Capability | DD+ | TrueHD | Gap | Size | Blocked by | Evidence |
 |---|---|---|---|---|---|---|---|
-| P1 | Hard real-time gate: every workload within twice its real-time budget, in the pull-request gate | `tests/performance/test_performance.cpp`: 10 cases (AC-3, E-AC-3, Atmos, AC-4; encode and decode), label `Performance`, `kSlackFactor` 2.0 | Four more cases, the same four workloads, the whole 2.5 s fixture each (3,000 access units) | none | - | - | `iclforge-perf` builds; the cases were not run under ctest here (the label needs the full test build) |
+| P1 | Hard real-time gate: every workload within twice its real-time budget, in the pull-request gate | `tests/performance/test_performance.cpp`: 10 cases (AC-3, E-AC-3, Atmos, AC-4; encode and decode), label `Performance`, `kSlackFactor` 2.0 | Four more cases, the same four workloads, the whole 2.5 s fixture each (3,000 access units) | none | - | - | `iclforge-perf "the TrueHD*"`: 4 test cases, 12,010 assertions, all pass |
 | P2 | Whole-frame trend: ms per frame, p95 and max per frame, fed real programme material | `tests/performance/bench_encoder.cpp` (`iclforge-bench`): 14 workloads, 200 frames each, three runs, the fastest kept | Four workloads (stereo and 5.1, encode and decode; a frame is an access unit) and, with `--truehd-fixtures`, a decode row for each of the 12 committed streams and an encode row for each TrueHD one | none | - | - | Section 4; `iclforge-bench --only truehd_51_decode` | |
 | P3 | Per-kernel trend: ns per call of each hot kernel, fed real audio | `tests/performance/kernel_bench.cpp` (`iclforge-kernelbench`): 34 kernels | 19 kernels: the decoder's CRC and parity, residual reader (Huffman, raw), filters (FIR 8, FIR 4 with IIR 4, IIR 8), matrices (pair, six), noise, output and lossless fold; the encoder's autocorrelation, Levinson, filter quantiser, residual, code lengths, coding choice, bit estimate and bit packing | none | - | - | Section 4; the decoder kernels are checked to give the source back before they are timed | |
 | P4 | Memory trend: allocations and bytes per frame, live growth, peak transient, peak RSS | `tests/performance/bench_memory.cpp` (`iclforge-membench`), `platform/{linux,windows}/mem_probe.cpp` | The same four names; the encode rows count three restart intervals | none | - | - | Section 4 | |
@@ -322,8 +322,7 @@ against `ICLFORGE_SIMD_TIER=sse2`, which takes the tier away:
 
 The last row is the kernel alone on one candidate that fits: the vector body pays for its set-up and the scalar one for nothing, and they tie.
 The gain is in the candidates that do not fit and in the raw codings, which the scalar counts to the end or leaves late. The streams are
-byte for byte the same under both tiers (`reference_51.wav` 497,026 bytes and `reference_stereo.wav` 189,940, and the 18 inputs of
-section 5 through the scalar tier).
+byte for byte the same under both tiers (`reference_51.wav` 497,026 bytes and `reference_stereo.wav` 189,940, by `cmp`).
 
 **Not built, and why.**
 
