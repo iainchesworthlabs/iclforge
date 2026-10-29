@@ -17,7 +17,7 @@ vcpkg_from_github(
 )
 
 # One vcpkg feature <-> one ICLFORGE_BUILD_<NAME> CMake option, OFF where the feature is not
-# asked for: upstream defaults ICLFORGE_BUILD_AC4/IAB/IAMF (and the container writers) ON.
+# asked for: upstream defaults ICLFORGE_BUILD_AC4/MLP/IAB/IAMF (and the container writers) ON.
 vcpkg_check_features(
     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
@@ -26,6 +26,7 @@ vcpkg_check_features(
         mpegts   ICLFORGE_BUILD_MPEGTS
         capi     ICLFORGE_BUILD_CAPI
         ac4      ICLFORGE_BUILD_AC4
+        truehd   ICLFORGE_BUILD_MLP
         iab      ICLFORGE_BUILD_IAB
         iamf     ICLFORGE_BUILD_IAMF
 )

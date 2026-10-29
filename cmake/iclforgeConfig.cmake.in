@@ -27,6 +27,11 @@ endif()
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/ac4Targets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/ac4Targets.cmake")
 endif()
+# The TrueHD (MLP) codec (ICLFORGE_BUILD_MLP) - see cmake/InstallLibrary.cmake's ICLFORGE_BUILD_MLP
+# block. Its Atmos headers name the object model, whose targets come first (objectsTargets.cmake).
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/mlpTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/mlpTargets.cmake")
+endif()
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/capiTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/capiTargets.cmake")
 endif()

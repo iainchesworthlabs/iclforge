@@ -50,6 +50,7 @@ class IclforgeConan(ConanFile):
         "mpegts": [True, False],
         "capi": [True, False],
         "ac4": [True, False],
+        "truehd": [True, False],
         "iab": [True, False],
         "iamf": [True, False],
     }
@@ -69,6 +70,7 @@ class IclforgeConan(ConanFile):
         # toggle on an already-installed one - opt in explicitly with -o "&:ac4=True" and the like.
         "capi": False,
         "ac4": False,
+        "truehd": False,
         "iab": False,
         "iamf": False,
     }
@@ -139,6 +141,7 @@ class IclforgeConan(ConanFile):
         tc.variables["ICLFORGE_BUILD_CAPI"] = bool(self.options.capi)
         # Upstream defaults these three ON; the recipe's options, off unless asked for, decide.
         tc.variables["ICLFORGE_BUILD_AC4"] = bool(self.options.ac4)
+        tc.variables["ICLFORGE_BUILD_MLP"] = bool(self.options.truehd)
         tc.variables["ICLFORGE_BUILD_IAB"] = bool(self.options.iab)
         tc.variables["ICLFORGE_BUILD_IAMF"] = bool(self.options.iamf)
         tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)

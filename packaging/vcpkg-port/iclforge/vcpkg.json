@@ -34,6 +34,9 @@
     "ac4": {
       "description": "AC-4 (ETSI TS 103 190) sync frame and table of contents reader, decoder and encoder (iclforge::ac4) - depends on nothing in iclforge::ac3"
     },
+    "truehd": {
+      "description": "TrueHD (MLP) bitstream layer, lossless decoder and encoder, with Atmos object carriage (iclforge::mlp) - depends on nothing in iclforge::ac3 or iclforge::ac4"
+    },
     "iab": {
       "description": "Standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader (iclforge::iab) - depends on nothing in iclforge::ac3"
     },
