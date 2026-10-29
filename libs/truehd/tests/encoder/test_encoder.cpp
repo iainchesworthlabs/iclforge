@@ -135,9 +135,10 @@ TEST_CASE("a major sync and a restart header open every restart interval and no 
     }
 }
 
-TEST_CASE("the restart sync of a substream follows TH spec 7.2: 0x31EB unless it is the last of a "
-          "presentation",
-          "[truehd][encoder][stream]") {
+TEST_CASE(
+    "the restart sync of a substream follows TH spec 7.2: 0x31EB unless it is the last of a "
+    "presentation",
+    "[truehd][encoder][stream]") {
     // TH spec §7.2 (v3.9): a non-Atmos substream carries 0x31EA or 0x31EB whatever its index, and
     // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation,
     // which is to say unless the stream has a third; the third (8 channel) substream carries 0x31EB
@@ -412,10 +413,10 @@ TEST_CASE("the peak data rate field is the declared rate in the unit of TH spec 
     CHECK(parsed->major_sync->peak_data_rate_bps() == 18'000'000);
 }
 
-TEST_CASE("the peak data rate of a major sync is read in bits per second",
-          "[truehd][io]") {
+TEST_CASE("the peak data rate of a major sync is read in bits per second", "[truehd][io]") {
     // The figures TH spec §4.4 gives (raw 6000 at 48 kHz is 18 Mbit/s, 3200 is 9.6 Mbit/s) and
-    // the fields of the FFmpeg-made fixtures (3199 at 48 kHz, 3482 at 44.1, 1599 at 96, 799 at 192).
+    // the fields of the FFmpeg-made fixtures (3199 at 48 kHz, 3482 at 44.1, 1599 at 96, 799 at
+    // 192).
     const auto rate_of = [](std::uint16_t raw, std::uint32_t format_info) {
         MajorSync sync;
         sync.format_info = format_info;
@@ -425,9 +426,9 @@ TEST_CASE("the peak data rate of a major sync is read in bits per second",
     CHECK(rate_of(6000, 0x00000001) == 18'000'000);
     CHECK(rate_of(3200, 0x00000001) == 9'600'000);
     CHECK(rate_of(3199, 0x00000001) == 9'597'000);
-    CHECK(rate_of(3482, 0x80000001) == 9'597'263);   // 44.1 kHz: (3482 * 44100 + 8) >> 4
-    CHECK(rate_of(1599, 0x10000001) == 9'594'000);   // 96 kHz
-    CHECK(rate_of(799, 0x20000001) == 9'588'000);    // 192 kHz
+    CHECK(rate_of(3482, 0x80000001) == 9'597'263);  // 44.1 kHz: (3482 * 44100 + 8) >> 4
+    CHECK(rate_of(1599, 0x10000001) == 9'594'000);  // 96 kHz
+    CHECK(rate_of(799, 0x20000001) == 9'588'000);   // 192 kHz
     CHECK(rate_of(0, 0x00000001) == 0);
     CHECK(rate_of(0x7FFF, 0x20000001) == (std::uint64_t{0x7FFF} * 192000U + 8U) / 16U);
 }

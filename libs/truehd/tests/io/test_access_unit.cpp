@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstddef>
 #include <initializer_list>
 #include <string>
-#include <cstddef>
 #include <vector>
 
 #include "iclforge/base/bitwriter.hpp"
@@ -52,7 +52,8 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
     base.extended_substream_info = 2;
     base.channel_meaning.extra_present = true;
     base.num_substreams = 4;
-    auto head = write_major_sync(base);  // written without the extension; its last two bytes are the CRC
+    auto head =
+        write_major_sync(base);  // written without the extension; its last two bytes are the CRC
     REQUIRE(head.has_value());
     // extra_present is the last bit of the channel meaning, the last bit before the CRC.
     for (const bool nibble_in_body : {true, false}) {
@@ -60,13 +61,13 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
             std::vector<std::byte> bytes(head->begin(), head->end() - 2);
             iclforge::BitWriter extension;
             extension.put(length, 4);
-            extension.put(21, 5);   // sixteench_dialogue_norm
-            extension.put(33, 6);   // sixteench_mix_level
-            extension.put(16, 5);   // sixteench_channel_count
-            extension.put(0, 1);    // dyn_object_only
-            extension.put(6, 4);    // content_description: ISF and dynamic objects
-            extension.put(3, 3);    // sixteench_isf
-            extension.put(9, 5);    // sixteench_dynamic_object_count
+            extension.put(21, 5);  // sixteench_dialogue_norm
+            extension.put(33, 6);  // sixteench_mix_level
+            extension.put(16, 5);  // sixteench_channel_count
+            extension.put(0, 1);   // dyn_object_only
+            extension.put(6, 4);   // content_description: ISF and dynamic objects
+            extension.put(3, 3);   // sixteench_isf
+            extension.put(9, 5);   // sixteench_dynamic_object_count
             // length + 1 words of body; with the nibble in front of them one more word holds it.
             const std::size_t words = length + 1U + (nibble_in_body ? 0U : 1U);
             extension.put(0, static_cast<int>(words * 16U - extension.bit_count()));

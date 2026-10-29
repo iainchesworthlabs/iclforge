@@ -124,8 +124,8 @@ TEST_CASE("bytes that only look like a major sync are not taken for a stream", "
         CHECK(find_stream_start(stream) == 9);
         // ... and so is the start of a longer stream cut inside its second unit.
         std::vector<std::byte> cut(9, std::byte{0x22});
-        cut.insert(cut.end(), body.begin(), body.begin() + static_cast<std::ptrdiff_t>(
-                                                                good_unit.size() + 10));
+        cut.insert(cut.end(), body.begin(),
+                   body.begin() + static_cast<std::ptrdiff_t>(good_unit.size() + 10));
         CHECK(find_stream_start(cut) == 9);
     }
     SECTION("a stream that starts at once needs no second unit") {

@@ -175,7 +175,8 @@ TEST_CASE("restart sync 0x31EB decodes, with LSB bypass as with 0x31EA", "[trueh
     // the channel's own value and the stream's explicit bit, added at the bottom (TH spec §10.2.1).
     for (int i = 0; i < kBuiltBlockSize; ++i) {
         CHECK((*noise_type)->pcm[static_cast<std::size_t>(2 * i)] ==
-              expected_sample(0, i) + static_cast<std::int32_t>(kBuiltBypassBit[static_cast<std::size_t>(i)]));
+              expected_sample(0, i) +
+                  static_cast<std::int32_t>(kBuiltBypassBit[static_cast<std::size_t>(i)]));
         CHECK((*noise_type)->pcm[static_cast<std::size_t>(2 * i + 1)] == expected_sample(1, i));
     }
 }

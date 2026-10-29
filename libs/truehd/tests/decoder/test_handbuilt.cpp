@@ -260,8 +260,9 @@ TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
     CHECK(checks[1] == 0xEC);
 }
 
-TEST_CASE("the noise_type 1 streams are under restart sync 0x31EB and decode with noise and LSB bypass",
-          "[truehd][handbuilt][ffmpeg-derived]") {
+TEST_CASE(
+    "the noise_type 1 streams are under restart sync 0x31EB and decode with noise and LSB bypass",
+    "[truehd][handbuilt][ffmpeg-derived]") {
     // Restart sync 0x31EB, generator 1 (TH spec §17.3, §17.4, ERRATA.md, noise generator 1). The
     // first test of this file holds each of these streams to the signal it was built from, which
     // includes what its matrices add from the table; the Python writer computes that

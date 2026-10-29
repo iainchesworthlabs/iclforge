@@ -118,8 +118,8 @@ struct MajorSync {
     [[nodiscard]] unsigned mlp_channel_arrangement() const noexcept { return format_info & 0x1FU; }
 
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_hz(ratebits()); }
-    // TH spec §4.4 (v3.9): the peak data rate in bits per second, (raw * group1 sample rate + 8) >> 4
-    // for the 15-bit field `peak_data_rate`: raw 6000 at 48 kHz is Blu-ray's 18 Mbit/s. The field
+    // TH spec §4.4 (v3.9): the peak data rate in bits per second, (raw * group1 sample rate + 8) >>
+    // 4 for the 15-bit field `peak_data_rate`: raw 6000 at 48 kHz is Blu-ray's 18 Mbit/s. The field
     // feeds a player's buffer model and changes no decoding.
     [[nodiscard]] std::uint64_t peak_data_rate_bps() const noexcept {
         return (std::uint64_t{peak_data_rate} * sample_rate() + 8U) >> 4U;

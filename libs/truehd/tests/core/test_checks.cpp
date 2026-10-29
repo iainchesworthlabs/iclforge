@@ -107,8 +107,7 @@ TEST_CASE("the common channel assignments are bitmasks, not an enumeration (TH s
     const std::vector<Case> cases{
         {0x01, {Channel::kL, Channel::kR}},
         {0x0B, {Channel::kL, Channel::kR, Channel::kC, Channel::kLs, Channel::kRs}},
-        {0x0F,
-         {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLs, Channel::kRs}},
+        {0x0F, {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLs, Channel::kRs}},
         {0x4F,
          {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLs, Channel::kRs,
           Channel::kLrs, Channel::kRrs}},
