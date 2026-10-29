@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 112> kOptionTokens{{
+constexpr std::array<OptionToken, 123> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -50,6 +50,17 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
+    {"sign-content", "ac4-encode/atmos-encode: sign the AC-4 file with the operator's own key and chain (needs content-key=, content-chain=)"},
+    {"verify-content", "decode/ac4-verify: refuse unless the AC-4 content signature, its chain and an anchor all check"},
+    {"check-content", "decode/ac4-verify: print what the AC-4 content signature checks find and carry on"},
+    {"unanchored-ok", "with verify-content: accept a signature that checks out against a chain no trust-anchor= or pin= vouches for"},
+    {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
+    {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
+    {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
+    {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
+    {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
+    {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now)"},
+    {"verify-time=", "when every certificate must be valid: now (default), signed, ignore, or YYYY-MM-DDTHH:MM:SS UTC"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"karaoke", "decode/monitor: an AC-3 or E-AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
@@ -755,6 +766,22 @@ void print_objects_topic() {
     fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
+void print_content_signature_topic() {
+    fmt::println("");
+    fmt::println("An AC-4 content signature is one signature over the whole stream, made with the");
+    fmt::println("operator's own P-256 key and certificate chain and written after the last sync");
+    fmt::println("frame; the frames are not touched, so a signed file plays as the unsigned one.");
+    fmt::println("Nothing signs or checks unless asked: ac4-sign, sign-content, ac4-verify,");
+    fmt::println("verify-content and check-content are the asking. The key and the chain are");
+    fmt::println("the operator's (content-key=, content-chain=, or ICLFORGE_CONTENT_KEY_FILE /");
+    fmt::println("ICLFORGE_CONTENT_KEY and ICLFORGE_CONTENT_CHAIN_FILE) and are never stored.");
+    fmt::println("A signature that checks out against a chain no trust-anchor= or pin= vouches");
+    fmt::println("for is reported as that, not as valid. Every certificate must be valid when");
+    fmt::println("the file is checked unless verify-time= says otherwise; signed trusts the date");
+    fmt::println("the signer wrote, which is only as good as the signer. This is not an object");
+    fmt::println("signature (sign-objects is E-AC-3's); see docs/concepts/object-signing.md.");
+}
+
 // The per-topic sections, in the order both the full listing and a single
 // command's help print them. One table, so the two orders cannot diverge.
 struct TopicSection {
@@ -791,6 +818,9 @@ void print_topic_sections(std::uint32_t mask) {
     }
     if ((mask & topic::kObjects) != 0) {
         print_objects_topic();
+    }
+    if ((mask & topic::kContentSignature) != 0) {
+        print_content_signature_topic();
     }
 }
 
@@ -1015,6 +1045,34 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=blocks     the same, plus every block's coding tools and");
         fmt::println("                    exponent strategies - what a codec bug report needs");
     }
+    if ((mask & topic::kContentSignature) != 0) {
+        fmt::println("");
+        fmt::println("AC-4 content signature options (ac4-sign, ac4-verify, ac4-encode, atmos-encode, "
+                     "decode; any order, after the positional arguments):");
+        fmt::println("  sign-content      ac4-encode/atmos-encode: sign the file once it is written; "
+                     "needs content-key= and content-chain=");
+        fmt::println("  verify-content    decode: stop (exit 6) unless the signature, its chain and an "
+                     "anchor all check");
+        fmt::println("  check-content     decode: report what the checks find and play on");
+        fmt::println("  unanchored-ok     with verify-content: a signature that checks out but whose "
+                     "chain reaches no trust-anchor= or pin= also passes; it is still reported as "
+                     "unanchored, never as valid");
+        fmt::println("  content-key=<path>    the operator's private key, P-256, PEM or DER (or "
+                     "ICLFORGE_CONTENT_KEY_FILE / ICLFORGE_CONTENT_KEY)");
+        fmt::println("  content-chain=<path>  the certificates for that key, as a bundle; repeat it "
+                     "for more (or ICLFORGE_CONTENT_CHAIN_FILE)");
+        fmt::println("  trust-anchor=<path>   a certificate to trust as the top of the chain; repeat "
+                     "for more");
+        fmt::println("  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) "
+                     "fingerprint, trusted wherever it appears in the chain");
+        fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "
+                     "Code/Content Signer)");
+        fmt::println("  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC "
+                     "(default now)");
+        fmt::println("  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>");
+        fmt::println("                    when every certificate must be valid; now is the default, "
+                     "signed uses the date the signer wrote");
+    }
 }
 
 // fish's -d description is a single-quoted word, and several command notes
@@ -1112,7 +1170,7 @@ void print_exit_codes() {
 
 void print_meta_usage() {
     print_option_blocks(topic::kMeta | topic::kMulti | topic::kTake | topic::kLive | topic::kQc |
-                        topic::kProbe);
+                        topic::kProbe | topic::kContentSignature);
     print_common_options();
 }
 

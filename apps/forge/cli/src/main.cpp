@@ -19,6 +19,7 @@
 #include "commands/atmos.hpp"
 #include "commands/audio_io.hpp"
 #include "commands/containers.hpp"
+#include "commands/content_signature.hpp"
 #include "commands/decode.hpp"
 #include "commands/encode.hpp"
 #include "commands/live_audio.hpp"
@@ -212,13 +213,13 @@ int run_words(const std::vector<std::string>& words) {
     return run_main(static_cast<int>(pointers.size()), pointers.data());
 }
 
-// 46 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// 48 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 46> kCommands{{
+constexpr std::array<Command, 48> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -265,7 +266,8 @@ constexpr std::array<Command, 46> kCommands{{
      "file (same formats as atmos-path), objects it doesn't mention keep their default "
      "placement; with codec=ac4, AC-4 objects (A-JOC, or coding=direct) in a raw stream or an "
      "MP4 file",
-     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects,
+     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects |
+         topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) {
          return run_atmos_encode(x.str(1), x.str(2), x.u32(3, 448), x.u32(4, 0), x.meta,
@@ -384,9 +386,25 @@ constexpr std::array<Command, 46> kCommands{{
      "dialogue enhancement metadata; substreamN= and presentationN= add substreams, each an input "
      "of its own, and the presentations that play them; syntax-trace=<file> writes what the "
      "encoder writes",
-     topic::kStdio | topic::kAc4Encode,
+     topic::kStdio | topic::kAc4Encode | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
+    {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path>",
+     "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
+     "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
+     "operator's own; none is built in. The sync frames are not touched, so a signed file plays as "
+     "the unsigned one. leaf-title= and signed-date= adjust what is written and checked",
+     topic::kStdio | topic::kContentSignature,
+     Needs::kNothing,
+     [](const Args& x) { return run_ac4_sign(x.str(1), x.str(2), x.meta); }},
+    {"ac4-verify", 2, "<in.ac4> [trust-anchor=<path>] [pin=<fingerprint>]",
+     "check a raw AC-4 stream's content signature: the digests, the ECDSA signature, the chain and "
+     "its validity, and the leaf's title. Exit 0 only when it is valid and a trust-anchor= or pin= "
+     "vouches for its certificates (unanchored-ok accepts one that checks but has no anchor); "
+     "check-content prints the checks and exits 0 whatever they find",
+     topic::kStdio | topic::kContentSignature,
+     Needs::kNothing,
+     [](const Args& x) { return run_ac4_verify(x.str(1), x.meta); }},
     {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "
@@ -397,7 +415,7 @@ constexpr std::array<Command, 46> kCommands{{
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
      "pinned to their speaker, dynamic objects positioned by their own timeline",
-     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects,
+     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_decode(x.str(1), x.str(2), x.meta, x.str(3), x.str(4)); }},
     {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
@@ -716,6 +734,8 @@ int run_main(int argc, char** argv) {
                                token == "couple" || token == "heavy" || token == "heavy2" ||
                                token == "mixmeta" || token == "sign-objects" ||
                                token == "verify-objects" || token == "gate-objects" ||
+                               token == "sign-content" || token == "verify-content" ||
+                               token == "check-content" || token == "unanchored-ok" ||
                                token == "verify" ||
                                token == "bed-only" ||
                                token == "keep-partial" || token == "fast-mdct" ||

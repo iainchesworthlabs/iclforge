@@ -42,12 +42,14 @@
 #include "iclforge/ac3/verify/bap_census.hpp"
 #include "iclforge/ac3/verify/eac3_mirror.hpp"
 #include "iclforge/ac3/verify/mirror.hpp"
+#include "iclforge/ac4/io/content_signature.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "associated_mix.hpp"
+#include "content_signature.hpp"
 #include "stream_playback.hpp"
 
 namespace forge_cli::commands {
@@ -533,14 +535,31 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         fmt::println(stderr, "warning: {} is AC-4: karaoke is AC-3's (Annex C), and ignored",
                      in_path);
     }
+    // verify-content / check-content: the content signature is checked before anything is decoded,
+    // so a stream that is refused is never played.
+    if (const int refused = check_content_before_decode(stream, in_path, meta, status);
+        refused != kExitOk) {
+        return refused;
+    }
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     if (scan.frames.empty()) {
         fmt::println(stderr, "error: {} holds no AC-4 sync frame", in_path);
         return kExitInput;
     }
     if (scan.stopped_at.has_value()) {
-        fmt::println(stderr, "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
-                     in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at), scan.frames.size());
+        // A content signature is written after the last sync frame: that is where the frames are
+        // meant to stop, not a fault.
+        const auto trailer = iclforge::ac4::locate_signature_trailer(stream);
+        if (trailer.has_value() && trailer->present &&
+            trailer->content_size == scan.stopped_at_offset) {
+            status_println(status, "{}: a {} byte content signature follows the last sync frame",
+                           in_path, trailer->blob.size());
+        } else {
+            fmt::println(stderr,
+                         "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
+                         in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at),
+                         scan.frames.size());
+        }
     }
     // syntax-trace=: every record the decoder reads, frame by frame, as
     // ac4_syntax.py's `trace` writes what it reads.
@@ -1449,6 +1468,13 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     }
     if (!requested.syntax_trace_path.empty()) {
         fmt::println(stderr, "error: syntax-trace= records AC-4 syntax, and {} is AC-3 or E-AC-3", in_path);
+        return kExitUsage;
+    }
+    if (requested.verify_content || requested.check_content) {
+        fmt::println(stderr,
+                     "error: verify-content and check-content check an AC-4 content signature, and "
+                     "{} is AC-3 or E-AC-3 (verify-objects is E-AC-3's)",
+                     in_path);
         return kExitUsage;
     }
     if (requested.ac4_fold_5x) {

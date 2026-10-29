@@ -388,6 +388,38 @@ struct Options {
     // verify-objects; the two cannot be combined (one says "refuse", the other
     // "play the bed"). See ac3::signing::gate_atmos_stream.
     bool gate_objects = false;
+    // AC-4 content signing (docs/concepts/object-signing.md, "AC-4 content signing"): a signature
+    // over the whole stream, made with the operator's own key and certificate chain and carried as
+    // a trailer after the last sync frame. Unlike the EMDF tag it is not per frame, and nothing
+    // here is on by default: signing, checking and reporting each need their own token.
+    // 'ac4-encode'/'atmos-encode codec=ac4': sign what was just written (needs content-key= and
+    // content-chain=).
+    bool sign_content = false;
+    // 'decode'/'ac4-verify': refuse unless the signature, its chain and its trust anchor all check.
+    bool verify_content = false;
+    // 'decode'/'ac4-verify': say what the checks found and carry on, whatever they found.
+    bool check_content = false;
+    // With verify-content: accept a signature that checks out against a chain no trust-anchor= or
+    // pin= vouches for. Off by default, because that is the integrity of the file against itself
+    // and not the identity of its signer.
+    bool unanchored_ok = false;
+    // content-key=<path>: the operator's private key; content-chain=<path>, repeatable: the
+    // certificates (a bundle, or several files) that vouch for it.
+    std::string content_key;
+    std::vector<std::string> content_chains;
+    // trust-anchor=<path> (repeatable): certificates the operator trusts as the top of a chain;
+    // pin=<hex> (repeatable): a certificate by SHA-1 or SHA-256 fingerprint.
+    std::vector<std::string> trust_anchors;
+    std::vector<std::string> pins;
+    // leaf-title=<title|any>: the `title` the signer certificate must carry (default
+    // "Code/Content Signer", CS spec v2.3 §6.1 step 4); "any" checks none. Unset: the default.
+    std::optional<std::string> leaf_title;
+    // signed-date=<YYYY-MM-DDTHH:MM:SS>: the date written into a signature, UTC; unset: now.
+    std::optional<std::string> signed_date;
+    // verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>: the instant every certificate must be
+    // valid at. "now" (the default) is CS spec v2.3 §6.1 step 3; "signed" trusts the date the
+    // signer wrote, which is only as good as the signer.
+    std::string verify_time = "now";
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.
