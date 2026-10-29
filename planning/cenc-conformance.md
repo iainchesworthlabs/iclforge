@@ -53,6 +53,7 @@ parsers, which are not committed. The DASH-IF test-vector site (`testvectors.das
 proxy. No public encrypted E-AC-3 or AC-4 stream with a published key was found (section 6, M8).
 Dolby's own test app (Spott) serves 26 encrypted E-AC-3 and AC-4 reference streams; their keys sit
 behind licence servers, which were not contacted, so M13 reads structure only.
+M14 uses Dolby's `streamdemuxer` the same way as `mp4drop`.
 
 What this audit does not cover: playback through any DRM system (there is no CDM here), the
 behaviour of Widevine, PlayReady or FairPlay beyond what their public pages say, and any
@@ -489,6 +490,46 @@ source it is a place to read Dolby's own packaging, which can change without not
 cannot be played back here: the keys are behind the vendor's licence servers, which this audit does
 not contact.
 
+**M14. Dolby's own tools.** `mp4drop` and `streamdemuxer` (1.0.0.5519896, built 2020-09-14) from the
+free AC-4 Online Delivery Kit 1.5, fetched and run by `tools/checks/dolby_odk.py` and
+`tools/checks/check_dolby_cenc.py` (empty environment, no network, temporary directory). Inputs: the
+92 files `cenc_make_protected.py` writes for four codecs and four schemes (layouts `core`, a 16-byte
+IV for `cenc`, the 1:9 pattern for `cens` and `cbcs`, `leader_seig`, `leader_entry`,
+`leader_entry_rev`, `rotate`; `cbc1` has no pattern file), and 16 of M3's 20 progressive files (one
+CryptFile per scheme, four codecs).
+
+```
+python3 tools/checks/dolby_odk.py fetch dolby-odk-tools
+ICLFORGE_DOLBY_ODK_TOOLS=dolby-odk-tools python3 tools/checks/check_dolby_cenc.py --cli build/bin/forge --verbose
+mp4drop FILE -m 1                                          # ISO-BMFF to XML, what the box leg reads
+streamdemuxer -i FILE -o OUT --decryption-keys KID:KEY     # what the decryption leg runs
+```
+
+Box leg: mp4drop reads `enca`, `sinf`, `frma` (the original format), `schm` (the scheme), `tenc`
+(default KID, IV size, constant IV, pattern) and, where IVs are sent, a `senc` entry count equal to
+the `trun` sample count of its fragment, with the values the generator wrote, in 108 of 108 files:
+28 `cenc`, 24 `cbc1`, 28 `cens`, 28 `cbcs`; 27 each for AC-3, E-AC-3, JOC and AC-4. The order is
+the one Dolby's AC-4 page gives (the configuration box, then `sinf`), and 16 of the 108 are GPAC's
+own output, so the reading holds for a layout another packager wrote. This says a Dolby parser
+reads the structure; it says nothing about ciphertext.
+
+Decryption leg: streamdemuxer answered "Need a key for decryption" for 76 of 108 with the matching
+KID and key (the key in lower case, upper case, dashed and `0x` prefixed, with `--track-id`, with two
+pairs, and for a file FFmpeg encrypted), exiting after `moov`. For the 32 files that put a clear
+sample entry beside an `enca` entry (`leader_entry`, `leader_entry_rev`; 8 of every scheme) it
+exits 0 and writes no stream. It crashes on a clear or protected MP4 that GPAC fragmented with
+`-frag`. So no Dolby tool decrypted any file, and the cipher still has GPAC and FFmpeg only. The
+schemes are the same here: `cenc`, `cbc1`, `cens` and `cbcs` have 20, 16, 20 and 20 files that "need a
+key" and 8 each with no stream. Whether a newer `streamdemuxer` (the Dolby Digital Plus kit was not
+examined) honours the key is open.
+
+What it adds to the audit: the protected layouts of G13 (configuration box kept, `sinf` after it)
+are read by the format owner's parser, for AC-3, E-AC-3, JOC and AC-4 and all four schemes, and the
+AC-4 signalling page's order is the order in all 108. The page's other rule, that a reader must
+also accept `sinf` first, is covered by the reader's own unit test ("the sinf may come before the
+configuration box") and was not run through mp4drop. Not added: a decryption oracle, a statement
+about the 1:9 audio pattern, or any certification of conformance with ISO/IEC 23001-7.
+
 ## 7. Premises corrected
 
 | Premise | What the evidence shows | Source |
@@ -536,6 +577,7 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and says what each r
 | 2. FFmpeg, strict (`-xerror -err_detect crccheck+bitstream+buffer+explode`) | Independent decrypt of `cenc`, `cbc1`, `cens` and `cbcs` full-sample audio in progressive and default-base-is-moof layouts (M4, M5), and of the one-subsample layouts of M13 (`cenc`, `cbcs` 1:9; not `cbcs` 0:0). | Encryption (it writes no valid AC-3, E-AC-3 or AC-4, M2); a clear entry listed first in `stsd`, `seig`, rotation and GPAC's base-offset layout. |
 | 3. GPAC `MP4Box`, another implementation | Encrypt and decrypt for all four schemes and four codecs; multi-entry `stsd`, `seig` and two keys. | Its own reading of the standard; it forces audio to a 1:0 pattern. Not a Dolby validator. |
 | 3b. Somebody else's streams | Structure of real packager output (the Shaka file: two sample entries, `pssh` v1, `senc` flag 0; Dolby's 26 protected reference streams, M13: subsample map, 1:9, PIFF copy, empty `senc`, PlayReady and Widevine `pssh`). | Decryption of Dolby audio: the keys sit behind the vendor's licence servers, which this project does not use, and no Dolby stream with a published key was found. |
+| 3c. Dolby's Online Delivery Kit tools (M14) | `mp4drop`, the format owner's box parser, reads the protection boxes of 108 files in all four schemes and four codecs, in the order Dolby's AC-4 page gives. `check_dolby_cenc.py` runs it locally and skips without it. | Ciphertext: `streamdemuxer` 1.0.0.5519896 did not decrypt any file (76 "Need a key", 32 no stream). It does not certify conformance with ISO/IEC 23001-7. |
 | 4. A Python reference in `tools/references/` | A second transcription of the sample-encryption rules and box syntax, once the standard is in hand. | A shared misreading. |
 | 5. Dolby Reference Player | Not tried; whether it plays protected input is unknown. | Anything about boxes. |
 | The standard itself | Every [recalled] row, the 1:9 audio case, counter width, partial blocks. | Interoperability. |

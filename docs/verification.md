@@ -173,6 +173,7 @@ scheduled workflows are separate.
 | `tools/checks/ac4_syntax_differential.py`, 3,000 mutated DEE frames and 800 synthetic tables of contents at a fixed seed | AC-4 | Daily, in the SonarCloud workflow, where it feeds the coverage scan and does not gate |
 | `tools/checks/check_install_consumer.sh`, and the ABI gate (advisory until the API freeze) | all | Nightly |
 | Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; listening | AC-4 mostly | Locally, by hand |
+| Dolby's Online Delivery Kit tools, `check_dolby_*.py` ([below](#dolbys-online-delivery-kit-tools)) | AC-3, E-AC-3, AC-4 containers | Locally, by hand; skip when the tools are absent |
 
 `PAUSE_NONESSENTIAL_CI` is a pause the workflows describe as temporary: while it is `true`, pull
 requests skip `Fuzz Regress`, OSV Scanner and Zizmor, which leaves the hosted runners to the
@@ -903,6 +904,117 @@ with no published binary; it was built from its tag with its own Gradle wrapper.
 java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMPAnalyzer track.mxf
 java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMFTrackFileReader track.mxf <empty working dir>
 ```
+
+## Dolby's Online Delivery Kit tools
+
+Dolby publishes, free of charge on ott.dolby.com, kits for delivering Dolby Digital Plus and Dolby
+AC-4 online. The AC-4 kit (1.5) has a `Test_Tools` folder with two programs that read what this
+project writes. `streamdemuxer` (1.0.0.5519896, built 14 September 2020) demultiplexes MP4,
+fragmented MP4, DASH, HLS and MPEG-2 TS into elementary streams and takes `--decryption-keys
+<kid>:<key>`. `mp4drop` dumps the boxes of an ISO base media file as XML. Both are written by the
+format's owner, so they are the strongest outside reader of the container layer this project has:
+FFmpeg and GPAC read the same files, but neither is Dolby's. Neither decodes audio, so they sit
+beside the decoder oracles and not above them.
+
+They are optional and local. Nothing from the kit is committed (not the programs, not Dolby's
+streams, not XML dumps of them) and CI does not fetch it. The project has not read the kit's
+licence terms in full, and whether CI may download the kit is the owner's decision. A check skips
+with exit status 77 when the tools are absent.
+
+```
+python3 tools/checks/dolby_odk.py fetch dolby-odk-tools
+export ICLFORGE_DOLBY_ODK_TOOLS=$PWD/dolby-odk-tools
+python3 tools/checks/check_dolby_mp4_boxes.py --cli build/bin/forge
+python3 tools/checks/check_dolby_demux_roundtrip.py --cli build/bin/forge
+python3 tools/checks/check_dolby_cenc.py --cli build/bin/forge
+```
+
+`fetch` is the only step that touches the network. It reads the two tool archives (1.3 MB) out of
+the kit's 1.1 GB zip with HTTP range requests, checks each against a SHA-256 recorded in the
+script and extracts the program for this platform. `dolby-odk-tools/` is in `.gitignore`. The
+first two checks also take `--samples DIR` (or `ICLFORGE_DOLBY_ODK_SAMPLES`), a directory of MP4
+files from the kit itself, which stay on the machine that downloaded them. The programs are run
+the careful way, because they are Dolby's and not this project's: an empty environment, no
+network where `unshare -n` works, a temporary working directory, a time limit and a cap on what
+they may print.
+
+| Check | What it compares | Result, 2026-10-29 |
+|---|---|---|
+| `check_dolby_mp4_boxes.py` | mp4drop's reading of `dac3`, `dec3` (with the JOC flag and complexity index) and `dac4` in the MP4 and the init segment forge writes for AC-3, E-AC-3, E-AC-3 JOC and AC-4, against `forge probe` of the stream the box was made from; then `forge probe` of the box in Dolby's two sample MP4s against mp4drop | 10 pass, 1 note |
+| `check_dolby_demux_roundtrip.py` | forge's MP4, fragmented MP4 (init, DASH and HLS media), and MPEG-2 TS (DVB and ATSC) of the same four streams, through streamdemuxer, against the stream put in (AC-4 by raw frame, since two writers may frame the same frames differently); then forge's demux of Dolby's two sample MP4s against streamdemuxer's | 23 pass, 2 skip (AC-3 in TS: the tool does not list AC-3) |
+| `check_dolby_cenc.py` | 108 protected files (`tools/generators/cenc_make_protected.py` and GPAC's `MP4Box -crypt`; four codecs, four schemes, clear-lead, key-rotation and 16-byte-IV layouts): mp4drop's reading of the protection boxes against what the generator wrote, then streamdemuxer's decryption against the clear stream | 108 box legs pass; the 108 decryption legs skip |
+
+### Findings from Dolby's tools
+
+Each of these has one oracle, Dolby's tool, and is recorded as such. None is a defect found in
+forge; they are the places the tools say something forge's own tests could not.
+
+**Agreement.** On forge's containers the two programs read what forge wrote. streamdemuxer's
+elementary stream equals the stream that went in for 21 of 21 legs (MP4, DASH, HLS media and master,
+and TS for AC-3, E-AC-3, JOC and AC-4, less AC-3 in TS, which the tool does not list), and
+mp4drop's configuration-box fields equal what forge reads from the stream in 8 of 8 files (MP4 and
+init segment, four streams). The other way, forge reads Dolby's two sample MP4s (a stereo and a
+5.1 JOC E-AC-3 file) as streamdemuxer and mp4drop do. A reader written by the format's owner finds
+the output well formed.
+
+**Two framings of AC-4.** streamdemuxer writes an AC-4 elementary stream with sync word 0xAC40,
+no CRC and, on every frame, the 0xFFFF escape followed by a 24-bit length. forge writes 0xAC41, a
+CRC-16 and a 16-bit length. Both carry the same 73 raw frames and `forge probe` reads the tool's
+file, so the checks compare raw frames and not framing. ETSI TS 103 190-1 Annex G allows either; a
+consumer that needs one form should say so. Single oracle: Dolby's tool.
+
+**The channelcount of a JOC entry.** forge writes 6 in the `channelcount` of the `ec-3` sample
+entry for a 5.1 JOC stream; the kit's 5.1 JOC sample, made by Dolby's muxer, writes 2. The field
+is the player's hint, and the project has not established which value ETSI TS 103 420 asks for.
+The check prints it as a note, not a failure. Single oracle: a Dolby sample and Dolby's muxer. The
+owner decides whether the writer follows it; read the text before changing the writer.
+
+**The cipher is not checked.** streamdemuxer answered "Need a key for decryption" for 76 of the
+108 protected files with the matching key supplied (the other 32 are below). Trying the key in
+lower case, upper case, dashed and `0x` prefixed, with `--track-id`, and with two key pairs made no
+difference, nor did a control file FFmpeg had encrypted. The tool stops after the `moov` box. Whatever the cause, a tool that cannot be told from "ignores the key"
+proves nothing, so the check reports one skip for the decryption legs and `--require-decrypt` turns
+it into an error. No cipher output of forge's generator has been decrypted by a Dolby tool, and
+GPAC and FFmpeg remain the only decryption oracles ([planning/cenc-conformance.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md),
+section 6). Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
+Dolby Digital Plus kit was not examined), or a protected stream from Dolby with a published key.
+
+**Layouts the tool does not read.** For the 32 files that put a clear sample entry beside an
+`enca` entry, in either order, streamdemuxer exits 0 and writes no stream. It crashes (SIGSEGV) on
+a clear or protected MP4 that GPAC fragmented with `MP4Box -frag`, for E-AC-3 and for AC-4, though
+it reads the fragmented MP4 forge writes. Neither is a reason to change forge. They are why those
+legs are skipped, and the second was seen while exploring and is not one of the checks.
+
+**The protection boxes.** mp4drop reads `enca`, `sinf`, `frma`, `schm`, `schi` and `tenc` in all
+108 files and reports the scheme, the original format, the default KID, the IV size, the
+constant IV and the pattern the generator wrote, and a `senc` entry count equal to the `trun`
+sample count in each fragment that sends IVs. That puts the layout of the protection boxes (the
+order Dolby's AC-4 page gives: the configuration box, then `sinf`) under a Dolby parser. It says
+nothing about the cipher. The 1:9 pattern files are among the 108 and pass this leg for the same
+reason: it reads fields, not audio.
+
+### StreamValidator
+
+The kit also points at a hosted StreamValidator (and an MPD validator) on ott.dolby.com. It runs
+in a browser, takes `.mpd`, `.m3u8`, `.mp4`, `.m4a`, `.ts` or a zip of manifests and media, and has
+a Decryption box for `kid:key` pairs. Nothing here drives it. From the environment this project's
+automated work runs in, a default headless Chromium (no changed headers, one navigation each) was
+refused at both addresses the kit names:
+
+| Address | Answer |
+|---|---|
+| `https://ott.dolby.com/OnDel_Tools/validator/Start_Here.html` | HTTP 403, AccessDenied |
+| `https://ott.dolby.com/OnDelKits_dev/StreamValidator/Start_Here.html` | HTTP 403, AccessDenied |
+
+The attempt stopped there. `python3 tools/checks/dolby_validator_bundle.py --cli build/bin/forge
+--out DIR` writes `validator-bundle.zip`, which a person opens from their own browser: forge's
+elementary streams, MP4, DASH and HLS sets and TS files, the protected files, a `keys.txt` of
+made-up test values, and a checklist. Run it, then add one line per run below. Say whether the
+validator printed PASSED or FAILED and copy the error class and message.
+
+| File | Validator version and date | Result | Error class and message |
+|---|---|---|---|
+| (not run) | | | |
 
 ## Going the other way: published conformance vectors
 

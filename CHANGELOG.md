@@ -10,6 +10,18 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
+  tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
+  out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,
+  without network, in a temporary directory, with a time limit. `check_dolby_mp4_boxes.py` compares mp4drop's reading of `dac3`, `dec3`
+  and `dac4` with `forge probe`; `check_dolby_demux_roundtrip.py` sends forge's MP4, fragmented MP4, DASH, HLS and TS through
+  streamdemuxer and compares the stream that comes out; `check_dolby_cenc.py` reads 108 protected test files with mp4drop and, when the tool
+  decrypts, compares its output with the clear stream. All skip with status 77 without the tools; nothing from the kit is committed and CI
+  does not fetch it. Result on 2026-10-29: 10 and 23 legs agree, 108 protection-box legs agree, and every decryption leg is skipped because
+  the tested streamdemuxer (1.0.0.5519896) answers "Need a key for decryption" whatever key it is given; forge differs from Dolby's muxer
+  in the `channelcount` of a JOC entry (6 against 2) and in AC-4 framing (0xAC41 with CRC against 0xAC40). `dolby_validator_bundle.py` writes
+  the files and checklist for Dolby's hosted StreamValidator, which refused the automated browser with HTTP 403 at both addresses the kit
+  names. See `docs/verification.md`, "Dolby's Online Delivery Kit tools".
 - **Fixed: a Common Encryption MP4 is refused by name, and one with a clear sample entry beside a protected one no longer comes out as audio
   (G1 to G5 of `planning/cenc-conformance.md`).** The MP4 reader skipped an `enca` sample entry as an unknown codec, took the first
   `ac-3`, `ec-3` or `ac-4` entry of a track and ignored which entry a sample uses. A file with a clear `ec-3` entry and a `cenc` `enca`
