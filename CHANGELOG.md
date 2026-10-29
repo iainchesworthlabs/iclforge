@@ -42,11 +42,25 @@ See [README.md](README.md) for the project overview and
   the reference material was non-public. The inventory of every page checked is `planning/documentation-sweep.md`.
 - **Fixed: `docs/forge/cli/commands.md` listed 46 commands, and its usage block predated TrueHD and AC-4 signing.** `forge --help` prints 49: the
   block now has `ac4-sign` and `ac4-verify` and the `.thd` and `.mlp` inputs of `decode`, `levels`, `loudness`, `spdif`, `unspdif`, `mkv`, `mp4`, `ts`
-  and `demux`, and the count follows. `forge probe` reads TrueHD and MLP too, and its usage line still does not name them.
+  and `demux`, and the count follows.
 - **Fixed: two pages pointed at the superseded TrueHD branch for the evolution frame's authenticity check.** Object signing and the
   roadmap described a truncated HMAC-SHA-256 as TrueHD's check and left the branch to settle it. They now give both accounts (that note, and
   the owner's specification, where the payload is the container AC-4's content signature uses), say the specification is the one the code
   follows and that neither has been checked against a stream, and say nothing for TrueHD is built.
+- **Fixed: what `forge` does with TrueHD and MLP where it said nothing or the wrong thing (the first phase of the Forge parity audit).**
+  `forge probe json=1` of a stream in MP4, Matroska or a transport stream wrote the key `container` twice and was not JSON; a test now parses
+  the probe of every fixture in every container. `forge probe -` read a pipe as AC-3 and stopped at "lost sync"; it reads a TrueHD or MLP
+  stream from a pipe now, and still reads the AC-3 family forward in constant memory. `cut`, `cat`, `metadata` and `normalize` stopped with
+  AC-3's frame-sync error (exit 2) on a TrueHD or MLP stream; they refuse it by name with their reason and exit 1, as `qc`, `transcode` and
+  `fmp4` do. `levels` and `loudness` accept `truehd-presentation=` and `truehd-check=`, which only `decode` took. `remux` to a `.ts` passed
+  the DVB profile, which `ts` refuses for TrueHD with advice `remux` could not follow; without a profile it writes Blu-ray's for TrueHD and MLP.
+  A 48 kHz MLP stream in MP4 was reported as 192,000 Hz by `probe` and `demux`, because the `dmlp` word was read in TrueHD's layout; the
+  reader now reads MLP's. **A run on TrueHD or MLP refuses an option it does not apply, by name, with exit 1, where it accepted and dropped
+  it:** `decode ... verify-content` exited 0 having verified nothing, `truehd-encode ... src=other.wav` ignored the second source, and `ts`,
+  `mkv`, `mp4` and `spdif` dropped `mainid=`, `asvc=` and `programme=`. The rule is the audit's recommendation and provisional until the owner
+  answers (`libs/truehd/ERRATA.md`, question 21). `forge help truehd-encode`, `decode`, `levels` and `loudness` print their TrueHD options, and
+  the help, the man page and the banner name TrueHD. New cases cover the containers, MAT, levels, loudness and refusals over streams
+  `truehd-encode` makes, and the codec matrix lists every refusal with its exit status.
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,
