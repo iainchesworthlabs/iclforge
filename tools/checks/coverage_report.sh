@@ -164,6 +164,14 @@ fi
 # this one was added without it, and the first run that got as far as the gate (2026-10-13, run
 # 38354367943) said "no data for libs/sink" of a library built and tested with coverage on.
 #
+# libs/truehd is the TrueHD and MLP library (bitstream, decoder, encoder). Measured 2026-10-29 on
+# its own test binary alone (iclforge-truehd-tests, GCC 13 at -O0, gcovr 8.7 with this script's flags):
+# 87.1 line and 79.7 branch over 2,541 lines. The suite of this job adds what the C API, the
+# containers and forge drive through it (core/format.cpp and io/major_sync.cpp, the two files the
+# library's own tests leave lowest, are among them), so the floors sit under that figure, a few points
+# lower than the other libraries' are under theirs: the first hosted run of this job is the
+# calibration authority, as it was for libs/sink.
+#
 # apps/crucible/engine/src is the platform-free engine core iclforge-crucible-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
@@ -179,6 +187,7 @@ libs/adm               82 75
 libs/sendspin          85 74
 libs/sink              80 65
 libs/ac4               88 80
+libs/truehd            84 74
 libs/iab               90 87
 apps/forge/cli/src              80 71
 apps/shared/media/src           78 66
@@ -237,7 +246,7 @@ html="$build_dir/coverage.html"
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
 gcovr --root . \
-    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|sink|ac4|iab)/.*' \
+    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|sink|ac4|truehd|iab)/.*' \
     --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
     --filter 'apps/forge/cli/src/.*' \
     --filter 'apps/shared/media/src/.*' \
