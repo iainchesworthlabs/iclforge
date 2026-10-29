@@ -150,7 +150,8 @@ class Stream:
         self.marker_pattern = marker_pattern  # terminatorA: 0xD234E or 0x348D3 (TH spec 16.5.1)
         self.drc_words = drc_words
         self.extra_data = extra_data  # a function of the unit's index giving its payload
-        self.terminator_b = terminator_b  # True: right after the last block; "end": ends the segment
+        # True: right after the last block; "end": ends the segment
+        self.terminator_b = terminator_b
         self.word_code = word_code  # an MLP stream's group 1 word length code: 0 16, 1 20, 2 24 bit
         self.channel_assignment = channel_assignment or DEFAULT_ASSIGNMENT[self.channels]
 
