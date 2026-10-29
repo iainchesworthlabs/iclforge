@@ -152,6 +152,7 @@ std::expected<Plan, Error> make_plan(int channels, std::uint16_t assignment, boo
 
 std::expected<void, Error> plan_interval(const Plan& plan, const EncoderConfig& config,
                                          const std::vector<std::vector<std::int32_t>>& input,
+                                         int spa, std::span<const ObjectRender> renders,
                                          IntervalPlan& out) {
     const int channels = plan.channels;
     const std::size_t n = input.empty() ? 0 : input[0].size();
@@ -191,44 +192,70 @@ std::expected<void, Error> plan_interval(const Plan& plan, const EncoderConfig& 
         int target;
         std::array<std::int32_t, kMaxChannels> coeffs;  // Q14 gains on the sources
     };
-    std::array<std::vector<Undo>, kMaxSubstreams> undo{};
+    // undo[k][u]: the matrices that undo stage k in access unit u. Every stage's gains are the
+    // same in every access unit except stage 3's in an Atmos stream, which follow the objects.
+    const std::size_t units = spa > 0 ? n / static_cast<std::size_t>(spa) : 0;
+    std::array<std::vector<std::vector<Undo>>, kMaxSubstreams> undo{};
     out.presentations[static_cast<std::size_t>(plan.substreams - 1)] = level;
     for (int k = plan.substreams - 1; k >= 1; --k) {
-        const auto& steps = plan.stages[static_cast<std::size_t>(k)];
-        std::vector<Undo> chosen;
+        const bool rendered = k == 3 && !renders.empty();
+        auto steps_for = [&](std::size_t u) {
+            if (!rendered) {
+                return plan.stages[static_cast<std::size_t>(k)];
+            }
+            // An object's render into the bed: object o (channel 8 + o) into bed channel c.
+            std::vector<FoldStep> steps;
+            const auto& render = renders[std::min(u, renders.size() - 1)];
+            for (int c = 0; c < 8; ++c) {
+                FoldStep step{c, {}};
+                for (int o = 0; o + 8 < channels; ++o) {
+                    step.gains[static_cast<std::size_t>(8 + o)] =
+                        render[static_cast<std::size_t>(o)][static_cast<std::size_t>(c)];
+                }
+                steps.push_back(step);
+            }
+            return steps;
+        };
+        std::vector<std::vector<Undo>> chosen;
         std::vector<std::vector<std::int32_t>> folded;
         for (const double f : {1.0, 0.5, 0.25, 0.0}) {
-            chosen.clear();
+            chosen.assign(units, {});
             folded = level;
             bool fits = true;
-            for (const FoldStep& step : steps) {
-                Undo u{step.target, {}};
-                bool nonzero = false;
-                for (int s = 0; s < channels; ++s) {
-                    u.coeffs[static_cast<std::size_t>(s)] = static_cast<std::int32_t>(
-                        std::lround(step.gains[static_cast<std::size_t>(s)] * f * 16384.0));
-                    nonzero = nonzero || u.coeffs[static_cast<std::size_t>(s)] != 0;
-                }
-                if (!nonzero) {
-                    continue;
-                }
-                auto& t = folded[static_cast<std::size_t>(step.target)];
-                for (std::size_t i = 0; i < n && fits; ++i) {
-                    std::int64_t acc = 0;
+            bool any_steps = false;
+            for (std::size_t u = 0; u < units && fits; ++u) {
+                const std::size_t first = u * static_cast<std::size_t>(spa);
+                const std::size_t last = first + static_cast<std::size_t>(spa);
+                for (const FoldStep& step : steps_for(u)) {
+                    Undo un{step.target, {}};
+                    bool nonzero = false;
                     for (int s = 0; s < channels; ++s) {
-                        acc += std::int64_t{u.coeffs[static_cast<std::size_t>(s)]} *
-                               level[static_cast<std::size_t>(s)][i];
+                        un.coeffs[static_cast<std::size_t>(s)] = static_cast<std::int32_t>(
+                            std::lround(step.gains[static_cast<std::size_t>(s)] * f * 16384.0));
+                        nonzero = nonzero || un.coeffs[static_cast<std::size_t>(s)] != 0;
                     }
-                    const std::int64_t d = std::int64_t{t[i]} - rq(floor14(-acc));
-                    if (d >= limit || d < -limit) {
-                        fits = false;
+                    any_steps = true;
+                    if (!nonzero) {
+                        continue;
                     }
-                    t[i] = static_cast<std::int32_t>(d);
+                    auto& tgt = folded[static_cast<std::size_t>(step.target)];
+                    for (std::size_t i = first; i < last && fits; ++i) {
+                        std::int64_t acc = 0;
+                        for (int s = 0; s < channels; ++s) {
+                            acc += std::int64_t{un.coeffs[static_cast<std::size_t>(s)]} *
+                                   level[static_cast<std::size_t>(s)][i];
+                        }
+                        const std::int64_t d = std::int64_t{tgt[i]} - rq(floor14(-acc));
+                        if (d >= limit || d < -limit) {
+                            fits = false;
+                        }
+                        tgt[i] = static_cast<std::int32_t>(d);
+                    }
+                    chosen[u].push_back(un);
                 }
-                chosen.push_back(u);
             }
             if (fits) {
-                if (f < 1.0 && !steps.empty()) {
+                if (f < 1.0 && any_steps) {
                     out.limited = true;
                 }
                 break;
@@ -333,7 +360,11 @@ std::expected<void, Error> plan_interval(const Plan& plan, const EncoderConfig& 
                 count += k.target <= plan.sub[static_cast<std::size_t>(s)].max_matrix_chan ? 1 : 0;
             }
             for (int k = 1; k <= s; ++k) {
-                count += static_cast<int>(undo[static_cast<std::size_t>(k)].size());
+                std::size_t most = 0;
+                for (const auto& per_unit : undo[static_cast<std::size_t>(k)]) {
+                    most = std::max(most, per_unit.size());
+                }
+                count += static_cast<int>(most);
             }
             if (count > plan.sub[static_cast<std::size_t>(s)].max_matrices) {
                 ok = false;
@@ -362,35 +393,43 @@ std::expected<void, Error> plan_interval(const Plan& plan, const EncoderConfig& 
     out.decorrelation_count = static_cast<int>(kept.size());
     out.coded = std::move(coded);
 
-    // Each substream's stack: the decorrelations of its channels in increasing order, then the
-    // fold stages 1 to k.
+    // Each substream's stack, per access unit: the decorrelations of its channels in increasing
+    // order, then the fold stages 1 to k as that access unit folded them.
     for (int s = 0; s < plan.substreams; ++s) {
         const int mmc = plan.sub[static_cast<std::size_t>(s)].max_matrix_chan;
         const int inputs_limit = plan.sub[static_cast<std::size_t>(s)].max_chan;
-        MatrixParams& m = out.stacks[static_cast<std::size_t>(s)];
-        auto push = [&](int target, int frac, auto coded_of) {
-            PrimitiveMatrix p;
-            p.output_channel = static_cast<std::uint8_t>(target);
-            p.frac_bits = static_cast<std::uint8_t>(frac);
-            for (int ch = 0; ch <= inputs_limit; ++ch) {
-                const std::int32_t v = ch == target ? (std::int32_t{1} << frac) : coded_of(ch);
-                if (v != 0) {
-                    p.coeff_present |= 1U << ch;
-                    p.coeffs[static_cast<std::size_t>(ch)] = v;
+        auto& per_unit = out.stacks[static_cast<std::size_t>(s)];
+        per_unit.assign(units, MatrixParams{});
+        for (std::size_t u = 0; u < units; ++u) {
+            MatrixParams& m = per_unit[u];
+            auto push = [&](int target, int frac, auto coded_of) {
+                PrimitiveMatrix p;
+                p.output_channel = static_cast<std::uint8_t>(target);
+                p.frac_bits = static_cast<std::uint8_t>(frac);
+                for (int ch = 0; ch <= inputs_limit; ++ch) {
+                    const std::int32_t v = ch == target ? (std::int32_t{1} << frac) : coded_of(ch);
+                    if (v != 0) {
+                        p.coeff_present |= 1U << ch;
+                        p.coeffs[static_cast<std::size_t>(ch)] = v;
+                    }
+                }
+                m.matrices[m.count++] = p;
+            };
+            for (const Dec& d : kept) {
+                if (d.target <= mmc) {
+                    push(d.target, d.frac, [&](int ch) {
+                        return ch < d.target ? d.coded[static_cast<std::size_t>(ch)] : 0;
+                    });
                 }
             }
-            m.matrices[m.count++] = p;
-        };
-        for (const Dec& d : kept) {
-            if (d.target <= mmc) {
-                push(d.target, d.frac, [&](int ch) {
-                    return ch < d.target ? d.coded[static_cast<std::size_t>(ch)] : 0;
-                });
-            }
-        }
-        for (int k = 1; k <= s; ++k) {
-            for (const auto& u : undo[static_cast<std::size_t>(k)]) {
-                push(u.target, 14, [&](int ch) { return -u.coeffs[static_cast<std::size_t>(ch)]; });
+            for (int k = 1; k <= s; ++k) {
+                const auto& stage = undo[static_cast<std::size_t>(k)];
+                if (u < stage.size()) {
+                    for (const auto& un : stage[u]) {
+                        push(un.target, 14,
+                             [&](int ch) { return -un.coeffs[static_cast<std::size_t>(ch)]; });
+                    }
+                }
             }
         }
     }

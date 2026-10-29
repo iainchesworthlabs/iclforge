@@ -67,6 +67,22 @@ bool same_filter(const FilterParams& a, const FilterParams& b) {
     return true;
 }
 
+bool same_matrices(const MatrixParams& a, const MatrixParams& b) {
+    if (a.count != b.count) {
+        return false;
+    }
+    for (int i = 0; i < a.count; ++i) {
+        const auto& x = a.matrices[static_cast<std::size_t>(i)];
+        const auto& y = b.matrices[static_cast<std::size_t>(i)];
+        if (x.output_channel != y.output_channel || x.frac_bits != y.frac_bits ||
+            x.lsb_bypass != y.lsb_bypass || x.coeff_present != y.coeff_present ||
+            x.coeffs != y.coeffs || x.noise_shift != y.noise_shift) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Runs a candidate over a block with the decoder's arithmetic, from a copy of the channel's
 // filter state. False when a prediction or a residual leaves the range the decoder accepts.
 bool run(const ChannelFilter& start, const FilterDesign& d, bool keep, int quant,
@@ -112,6 +128,9 @@ struct Encoder::State {
     std::vector<std::int32_t> pending;  // interleaved frames not yet coded
     // Payloads attached for the access unit holding pending frame `first`.
     std::deque<std::pair<std::uint64_t, EvolutionPayload>> payloads;
+    // Object renders (render_objects()), each from the frame it was set at.
+    std::deque<std::pair<std::uint64_t, ObjectRender>> renders;
+    std::optional<ObjectRender> render;  // the one in force
     std::uint64_t frames_in = 0;
     std::uint64_t au_index = 0;  // of the next access unit to code
     std::array<LosslessCheck, kMaxSubstreams> checks{};
@@ -192,6 +211,14 @@ const EncoderStats& Encoder::stats() const noexcept {
 }
 const EncoderConfig& Encoder::config() const noexcept {
     return state_->config;
+}
+
+void Encoder::render_objects(std::span<const std::array<double, 8>> gains) {
+    ObjectRender r{};
+    for (std::size_t o = 0; o < gains.size() && o < r.size(); ++o) {
+        r[o] = gains[o];
+    }
+    state_->renders.emplace_back(state_->frames_in, r);
 }
 
 void Encoder::attach(EvolutionPayload payload) {
@@ -279,8 +306,30 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
     }
 
     // The interval's analysis: shift, presentations, matrices (encoder/plan.hpp).
+    // Each access unit's object render: the latest set at or before its first frame.
+    std::vector<ObjectRender> unit_renders;
+    if (plan.substreams == 4) {
+        for (int u = 0; u < units; ++u) {
+            const std::uint64_t first =
+                (au_index + static_cast<std::uint64_t>(u)) * static_cast<std::uint64_t>(spa);
+            while (!renders.empty() && renders.front().first <= first) {
+                render = renders.front().second;
+                renders.pop_front();
+            }
+            unit_renders.push_back(render.value_or(ObjectRender{}));
+        }
+        for (const auto& r : unit_renders) {
+            for (const auto& object : r) {
+                for (const double g : object) {
+                    if (std::abs(g) > 1.0) {
+                        return std::unexpected(Error::kInvalidConfiguration);
+                    }
+                }
+            }
+        }
+    }
     IntervalPlan ip;
-    if (auto r = plan_interval(plan, config, input, ip); !r) {
+    if (auto r = plan_interval(plan, config, input, spa, unit_renders, ip); !r) {
         return std::unexpected(r.error());
     }
     stats.decorrelation_matrices += static_cast<std::uint64_t>(ip.decorrelation_count);
@@ -505,11 +554,20 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
                     block_size_sent[static_cast<std::size_t>(ss)] = span.size;
                     any = true;
                 }
+                // A stack that changes with the access unit (an Atmos object render) is resent
+                // in the first block of each access unit it changes in.
+                const auto& stacks = ip.stacks[static_cast<std::size_t>(ss)];
+                const auto unit = static_cast<std::size_t>(u);
+                if (!restart_block && span.start == u * spa && unit > 0 &&
+                    !same_matrices(stacks[unit], stacks[unit - 1])) {
+                    header.matrix = stacks[unit];
+                    any = true;
+                }
                 if (restart_block) {
                     // Every parameter is sent at a restart, its default value included: FFmpeg's
                     // decoder keeps a channel's filter (and so, it is safest to assume, any
                     // parameter) across a restart header that does not resend it (P35).
-                    header.matrix = ip.stacks[static_cast<std::size_t>(ss)];
+                    header.matrix = ip.stacks[static_cast<std::size_t>(ss)][0];
                     std::array<std::uint8_t, kMaxChannels> quant{};
                     for (int ch = 0; ch <= sp.max_chan; ++ch) {
                         quant[static_cast<std::size_t>(ch)] = static_cast<std::uint8_t>(ip.quant);

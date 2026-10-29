@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -105,6 +106,14 @@ class ICLFORGE_MLP_EXPORT Encoder {
     // Evolution payloads (an Atmos frame's object audio metadata, say) for the access unit that
     // holds the next sample given to encode(). Several calls before one sample add up.
     void attach(EvolutionPayload payload);
+
+    // A 16-channel stream's object render (the Atmos path, encoder/atmos.hpp): from the access
+    // unit that holds the next sample given to encode(), object o (channel 8 + o) folds into bed
+    // channel c (0 to 7, 13.1's 7.1 order) of the 8-channel presentation with gain gains[o][c],
+    // and the 16-channel substream's matrices undo that fold exactly. Before the first call no
+    // object is folded in. Gains above 1 in magnitude are not representable (10.2) and fail the
+    // next interval with kInvalidConfiguration.
+    void render_objects(std::span<const std::array<double, 8>> gains);
 
     // Codes what is left, padding the last access unit and marking the padding in its
     // termination word (P7), and returns those access units.

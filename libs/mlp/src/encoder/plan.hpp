@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <expected>
+#include <span>
 #include <vector>
 
 #include "iclforge/mlp/core/error.hpp"
@@ -86,13 +87,19 @@ struct IntervalPlan {
     std::vector<std::vector<std::int32_t>> coded;
     // Each substream's presentation, shifted: its channels 0 to max_matrix_chan.
     std::array<std::vector<std::vector<std::int32_t>>, kMaxSubstreams> presentations{};
-    std::array<MatrixParams, kMaxSubstreams> stacks{};
+    // Each substream's matrix stack, per access unit of the interval.
+    std::array<std::vector<MatrixParams>, kMaxSubstreams> stacks{};
 };
 
-// `input` is per channel, at 24-bit scale. `gains` overrides stage 3's nominal fold gains (the
-// Atmos objects' render into the bed), per source and target, when not empty.
+// An Atmos access unit's object render (Encoder::render_objects): [object][bed channel].
+using ObjectRender = std::array<std::array<double, 8>, 8>;
+
+// `input` is per channel, at 24-bit scale, a whole number of `spa`-sample access units.
+// `renders` gives stage 3's gains per access unit (the Atmos objects' render into the 7.1 bed);
+// empty for a stream without one, whose stage 3 folds nothing.
 [[nodiscard]] std::expected<void, Error> plan_interval(
     const Plan& plan, const EncoderConfig& config,
-    const std::vector<std::vector<std::int32_t>>& input, IntervalPlan& out);
+    const std::vector<std::vector<std::int32_t>>& input, int spa,
+    std::span<const ObjectRender> renders, IntervalPlan& out);
 
 }  // namespace iclforge::mlp::detail
