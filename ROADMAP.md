@@ -93,7 +93,8 @@ C version macros; release criteria written.
 In progress as `libs/truehd` (`iclforge::truehd`, `ICLFORGE_BUILD_TRUEHD`), written from the owner's
 specification and checked against FFmpeg's encoder and decoder: [`planning/truehd.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md).
 Phase T1 (the bitstream layer, the lossless decoder, and `forge decode` and `forge probe`) is done: bit-exact with FFmpeg on its
-fixtures, with the features its encoders do not write checked against hand-built streams only. The containers, the Forge commands
+fixtures, with the features its encoders do not write checked against hand-built streams, which FFmpeg's decoder reads too
+except for the 16-channel substream. The containers, the Forge commands
 (including `forge truehd-encode`), the C API and the CI legs against FFmpeg are done too; the Atmos substream, and the Python,
 JavaScript and Rust bindings, follow (was UX10). The branch `feature/truehd-atmos-support` is superseded: no TrueHD
 decoder reads its block layout and it carries non-redistributable PDFs, so nothing is taken from it.

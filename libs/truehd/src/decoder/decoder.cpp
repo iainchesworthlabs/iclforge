@@ -393,12 +393,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         std::fill_n(rows_base, static_cast<std::size_t>(block) * kRowStride, 0);
     }
 
-    // TH spec §8.1: the length of the sample data, to be checked after it.
+    // TH spec §8.1: the length of the sample data, to be checked after it. ERRATA.md entry 21
+    // (provisional): the length counts from the start of its own 16 bit field, as FFmpeg's decoder
+    // counts it, so a block of n bits of samples carries n + 16.
     std::size_t expected_bits = 0;
     std::size_t data_start = 0;
     if (restart.data_check_present) {
         expected_bits = reader.read(16);
-        data_start = reader.bit_position();
+        data_start = reader.bit_position() - 16;
         if (expected_bits > kMaxBlockDataBits) {
             return std::unexpected(
                 make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));

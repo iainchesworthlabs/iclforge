@@ -37,8 +37,9 @@ while (const auto unit = reader.next()) {
 `decode()` returns no samples, and no error, for a unit that comes before the first major sync or before a substream's
 first restart header. A failed check (the check nibble, a CRC, a parity byte, the lossless check) is an error with
 `Strictness::kStrict` and a counter with `kLenient`. The decoder reads substreams 0 to 2 (up to 8 channels) and the
-generic 16-channel substream 3 the same way; the FFmpeg encoders write neither 7.1 nor the sixteen-channel substream,
-so those have no external oracle (see the plan).
+generic 16-channel substream 3 the same way. FFmpeg's encoders write neither 7.1 nor the sixteen-channel substream: 7.1 is
+checked through this library's encoder, whose streams FFmpeg's decoder reads, and the sixteen-channel substream has no
+external oracle, because FFmpeg refuses its restart sync (see the plan).
 
 ## Encoding
 
@@ -60,9 +61,12 @@ names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/l
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
 The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
-do not write: an IIR filter, LSB bypass, several matrices, the block data check, the end-of-stream marker, extra data,
-the directory's DRC word and the 16-channel substream. They have no external oracle: they are held to the signal each
-was made from, by this decoder and by `tools/references/truehd_syntax.py`.
+do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, noise generator 0, the block data check,
+the end-of-stream marker, extra data, the directory's DRC word and the 16-channel substream. They are held to the signal each
+was made from, by this decoder and by `tools/references/truehd_syntax.py`, and FFmpeg's strict decode of nine of the twelve
+returns that signal too (`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the
+other three). The extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream have no external
+oracle.
 
 `tools/checks/verify_truehd_encode_interop.py --encoder <iclforge-truehd-encode-tool>` encodes 43 cases and requires FFmpeg's strict decode of each
 to equal the source; `tools/ci/fuzz_truehd_encoder_space.py` does the same for random legal configurations against adversarial PCM

@@ -159,11 +159,15 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 | FFmpeg's strict decode of the streams this library's **encoder** writes (`tools/checks/verify_truehd_encode_interop.py`, with `--forge` it runs `forge truehd-encode`; the codec matrix's encode legs and the gold-reference gate also run it) | 43 cases: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, real music, speech and 5.1 programme material and synthetic signals chosen to be hard (full-scale squares, impulses, silence, DC, noise, level steps), the downmix presentations, restart intervals of 1, 8 and 128 units, lengths that are not whole units | FFmpeg: sample for sample, 43 of 43 |
 | `tools/ci/fuzz_truehd_encoder_space.py`, random legal configurations against adversarial PCM, and the libFuzzer harness `fuzz_truehd_encode` | the encoder's whole configuration space, FFmpeg's strict decode of each stream | FFmpeg: sample for sample |
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 12, and the hand-built streams | none beyond the two readings agreeing |
-| Hand-built streams, `tools/references/truehd_writer.py` | an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one | **none**: held to the signal each was built from |
+| Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one | FFmpeg: the whole signal each was built from, for 9 of the 12; the manifest names what FFmpeg does with the other 3. **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
 | DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent | the sources |
 
 FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient, the Atmos substream or
-extra data, so those have no external oracle. [Validation](../verification.md#truehd-and-mlp) says what that leaves.
+extra data. The hand-built streams carry the first, second and fourth and extra data, and FFmpeg's decoder reads them to the
+same samples; 7.1 is checked through this library's encoder. What FFmpeg does not read has no external oracle: the extra data's
+layout, the DRC word's values, the block data CRC, the 16-channel substream (FFmpeg refuses its restart sync `0x31EC`) and
+the end-of-stream marker in every unit (FFmpeg returns two of the twenty units of the hand-built stream).
+[Validation](../verification.md#truehd-and-mlp) says what that leaves.
 
 ## What it does not do
 
@@ -172,7 +176,8 @@ extra data, so those have no external oracle. [Validation](../verification.md#tr
   A `0x31EB` restart with neither decodes: FFmpeg's streams of more than 6 channels use it, and its matrices carry no
   noise coefficients. Generator 0, the default (`0x31EA`), is decoded from the
   specification's LFSR: two noise channels follow the matrix channels and enter through ordinary matrix
-  coefficients. No stream FFmpeg writes uses a non-zero noise coefficient, so that has no external oracle.
+  coefficients. No stream FFmpeg writes uses a non-zero noise coefficient; a hand-built stream does, and FFmpeg's strict decode
+  of it equals this library's with `shr7` read as 16 bits (ERRATA question 5, provisional).
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.
 - The block data CRC is not checked, only the length it follows.
 - The evolution frame and the object audio metadata in the extra data are carried as bytes, not read.

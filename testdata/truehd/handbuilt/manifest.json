@@ -1,5 +1,6 @@
 {
-  "_comment": "Made by tools/references/truehd_writer.py. No external decoder reads these streams: pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8).",
+  "_comment": "Made by tools/references/truehd_writer.py. pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). `ffmpeg` says what FFmpeg's strict decode of the stream does, as seen with ffmpeg_version (outcome equal: it returns that signal; the other outcomes are described in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-only (FFmpeg decodes a stream the library refuses) or none. tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg and the library to it.",
+  "ffmpeg_version": "6.1.1",
   "fixtures": [
     {
       "name": "hb_filters",
@@ -10,13 +11,16 @@
         "iir",
         "huffman"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 48,
       "pcm_samples": 1920,
-      "stream_sha256": "46d5b22563d0c8b0e60a593391d44b6baf4145de50a6699ad78877cedb335a16",
+      "stream_sha256": "bd9644605434fcb0f1adf5f3765210eab2d09afee0b7b7c1926a8cd36e95c4be",
       "pcm_sha256": "1f2df0476ae28f3e60a2bfc0645b6ff7dcf8982bb4271c03ac2cc1fbbad41a85"
     },
     {
@@ -27,13 +31,16 @@
         "lsb_bypass",
         "matrix"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "93dfbf3bd9f94e8280cfa4d8f8e91b9062b8bd332e6d107a24b1947434dae4f5",
+      "stream_sha256": "630e2e084cbf7d7a5ddbc31ecb2f6de3abfaba7727cccf1de210e6b9d060338c",
       "pcm_sha256": "72625756323164510321469f26131a2e3729f272e953b22fc990c1ecaef32dd3"
     },
     {
@@ -45,13 +52,16 @@
         "ch_assign",
         "output_shift"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 6,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "170bc368165a6147af5aafe7b5f2f42d87cf54e445437be57a2c40020777de2e",
+      "stream_sha256": "911a2f5e1f52b57e379715591d25cef9a3e202d4d67cfad17e6bb488038587a2",
       "pcm_sha256": "30167119ba28821123ab6cc56bc21dc93c618995920ad46a9f7e55257063f1ed"
     },
     {
@@ -61,13 +71,16 @@
       "features": [
         "noise_generator_0"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "0bc57b7d8ce7d4ab9ca5fcb5240bce2ff0461a48e29365e1fa650a2443bc00d1",
+      "stream_sha256": "3597223c12a7e3ac42c1e70107a84d484218889e415110400dc2a4522509ed11",
       "pcm_sha256": "e15ae5189f998050eea6c10aa85078e705752ac7572a680c5e20139081fbdad6"
     },
     {
@@ -77,13 +90,16 @@
       "features": [
         "noise_type_1"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 40,
       "pcm_samples": 1600,
-      "stream_sha256": "29491f2accab4a5d46b45bcad554fe038c295414fd5ff7f40fcb3f1cb3b1b7e1",
+      "stream_sha256": "5b3c0f847360d31bc82428dfc05656c68dda4ab237041eb160fb0f0a883ccbfe",
       "pcm_sha256": "8bc998f43ee5f534cb998c92513b3d9da00576e13eed189d1b5dc907c65a9d83"
     },
     {
@@ -93,13 +109,16 @@
       "features": [
         "data_check"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 24,
       "pcm_samples": 960,
-      "stream_sha256": "b271f25134516848b600c561126f68962e9547144c4522e836bdfbc19d70ae6e",
+      "stream_sha256": "001fca6d18b585d37df624994851412d85561313a8db8ceb41745915f55dafb8",
       "pcm_sha256": "505c8a16abe33e11558f9900fbbba60b7d93e2194a550895fe9e3010ffcf41fe"
     },
     {
@@ -109,13 +128,16 @@
       "features": [
         "end_marker"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 783,
-      "stream_sha256": "283bcd01a2055e051cfdc2e0d8c9be34d370ce7606f503cc686deaea07ffe0ba",
+      "stream_sha256": "c96e38cca1117d755b399d2b29995a9d773d4e69901cd4b450709471823935fb",
       "pcm_sha256": "c62f27281b93ab9371ef00b3796dee0d0f761080e96cd07d606ad08901185b60"
     },
     {
@@ -125,13 +147,20 @@
       "features": [
         "end_marker"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-short",
+      "ffmpeg": {
+        "outcome": "short",
+        "returned": 80,
+        "equal_samples": 40,
+        "note": "with the end-of-stream marker in every access unit FFmpeg returns two of the 20 (the first is the signal's) and skips the rest (\"Stream parameters not seen; skipping frame\")",
+        "pcm_sha256": "4c1608e2aa82458e6411d883a1f158b23937e582e69ea6c59269fea1264a51a0"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 791,
-      "stream_sha256": "99dbff8deb0b9ddadeabdd6aca3bf1a55b9219d24e09fd27c348d3f0d7840842",
+      "stream_sha256": "2dbe0ca19cf17a6d77c240a266f5c09546504c44f418fa546a899a0a951fbb1a",
       "pcm_sha256": "bb84cb950e2b48e7e883fbb196e07f84f56a3395b7d1ff65c6db4cbcd5d2c497"
     },
     {
@@ -141,13 +170,16 @@
       "features": [
         "extra_data"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 800,
-      "stream_sha256": "ca6ee8de40e253087d67a3732fef14dc5cc992729b6376943eebbd04cb750e90",
+      "stream_sha256": "3acd5db6c447a8cad68a2e5d6101641e7f188344e9b251d9b656415cb285da92",
       "pcm_sha256": "ee66d6c23db2b05d3f267baa5c454c09c60d89e27c1e0423f52487bea5df8838",
       "extra_data_first_hex": "0001020304"
     },
@@ -158,13 +190,16 @@
       "features": [
         "drc_word"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 800,
-      "stream_sha256": "63df63ac97ba38de140b74d971f491be00410ed7a2346a32c2fa2e52c3aa6e40",
+      "stream_sha256": "b8eb00832d0577b13ebcd3d96c163579191786518d7e2d44c3c065ee83b439d2",
       "pcm_sha256": "1b55125d8c66048a63390856e312abe89ba8578b8993861b08ce1ac8c2fcb892"
     },
     {
@@ -176,12 +211,16 @@
         "terminator_b"
       ],
       "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
       "presentation": "all",
       "sample_rate": 48000,
       "channels": 16,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "ef66cc54f7be1c3bef1d9b17b98564dcbb4ed389f67b818f4f59e64d15d18a63",
+      "stream_sha256": "b498d42b61c3c83803324c1875eeccdc413c6ca2ec99aecda437bfd3b1e62d97",
       "pcm_sha256": "a4332898a5fa61ce7df96d0f2e0b9ddabb33ad91dea19b4cba410203dd159a16"
     },
     {
@@ -193,12 +232,16 @@
         "terminator_b"
       ],
       "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "ef66cc54f7be1c3bef1d9b17b98564dcbb4ed389f67b818f4f59e64d15d18a63",
+      "stream_sha256": "b498d42b61c3c83803324c1875eeccdc413c6ca2ec99aecda437bfd3b1e62d97",
       "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
     }
   ],
@@ -211,9 +254,13 @@
         "noise_type_1",
         "matrix_noise_shift"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-only",
+      "ffmpeg": {
+        "outcome": "decodes",
+        "note": "the library refuses a non-zero matrix noise shift under 0x31EB (question 5)"
+      },
       "error": "kUnsupported",
-      "stream_sha256": "e534d72c716ad3df487ba4f2f36892c85e9197ea8685166e817d9f723dd12cd4"
+      "stream_sha256": "9c1504dcae09bf1a0f9ae5f706f100477aad76b54f7fab95e2095bba3c1ec616"
     }
   ]
 }

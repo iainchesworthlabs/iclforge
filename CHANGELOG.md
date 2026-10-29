@@ -33,8 +33,12 @@ See [README.md](README.md) for the project overview and
   lossless check of every restart interval. The specification and the streams disagree in 23 places (`libs/truehd/ERRATA.md`, which also
   lists the eleven questions only the specification's owner can answer); one was the end-of-stream marker, a 32-bit field in the last unit
   that counts its padding samples, which FFmpeg's decoder removes and this one does too. An IIR filter, LSB bypass, noise generator 0, several matrices,
-  the block data check, extra data and the 16-channel substream have **no external oracle**: eleven hand-built streams
-  (`tools/references/truehd_writer.py`) are held to the signal each was made from. Noise generator 1 (its table is not available) and heavy DRC are not decoded.
+  the block data check and extra data are carried by twelve hand-built streams (`tools/references/truehd_writer.py`), and
+  `tools/checks/verify_truehd_interop.py --handbuilt` holds FFmpeg's strict decode of them to the signal each was made from
+  (nine of the twelve; for the others the manifest says what FFmpeg does). Where FFmpeg decodes and the specification is
+  silent, this library follows FFmpeg and ERRATA marks the reading provisional: the lossless check's channel shift, the
+  filter histories across a restart, the width of noise generator 0's `shr7` and the block data length. The 16-channel
+  substream, the end-of-stream marker in every unit and the extra data's layout have **no external oracle**. Noise generator 1 (its table is not available) and heavy DRC are not decoded.
   `forge decode` writes a 24-bit WAV in the stream's channel order (`truehd-presentation=`, `truehd-check=strict|lenient`; a strict decode
   of a damaged stream exits 2); `forge probe` checks every unit and exits 1 on a failure. The encoder, the Atmos substream and the
   containers are phase T2 (`planning/truehd.md`).

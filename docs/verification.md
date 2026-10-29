@@ -665,7 +665,8 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
 | TrueHD and MLP, 1 to 6 channels, as FFmpeg's encoders write them | yes | yes |
-| TrueHD with an IIR filter, LSB bypass, 7.1, extra data or the 16-channel substream | no stream to try | yes, held to hand-built streams ([TrueHD and MLP](#truehd-and-mlp)) |
+| TrueHD with an IIR filter, LSB bypass, noise generator 0, a permuted `ch_assign` or the block data check | yes, on hand-built streams (its encoders do not write them) | yes ([TrueHD and MLP](#truehd-and-mlp)) |
+| TrueHD with the 16-channel substream (restart sync `0x31EC`) | no, it refuses it | yes, held to a hand-built stream only |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
@@ -2053,7 +2054,8 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
 
 ## TrueHD and MLP
 
-`iclforge::truehd` ([TrueHD and MLP](library/truehd.md)) is checked in three tiers, and the third has no outside reader.
+`iclforge::truehd` ([TrueHD and MLP](library/truehd.md)) is checked in three tiers. The third is scored on the owner's machine
+only, and part of the second has no outside reader.
 
 1. **FFmpeg's strict decode** (`-err_detect crccheck+bitstream+buffer+explode`) of the streams its `truehd` and `mlp`
    encoders write. The codec is lossless, so a decode either equals FFmpeg's sample for sample or is wrong: 12 committed
@@ -2070,9 +2072,19 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
    do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
-   block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. **None has
-   an external oracle.** They are held to the signal each was made from, so a decoder that is wrong shows; but the writer
-   follows ERRATA.md's reading of the specification, and a misreading is in the writer and in both decoders alike.
+   block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. Each
+   stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
+   accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
+   it: for nine of the twelve it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, LSB bypass, three matrices
+   with a permuted `ch_assign` and an output shift, noise generator 0, `noise_type` 1 with zero noise shifts, the block data
+   length, the marker in the last unit, extra data present, the directory's DRC word present). The other three: with the marker in
+   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel stream, whose substreams 2 and 3 use restart sync
+   `0x31EC`; and it decodes the stream with a non-zero matrix noise shift under `0x31EB`, which the library refuses because noise
+   generator 1's table is not available. Comparing found four readings the first writer and the library had wrong, each now
+   FFmpeg's and marked provisional in ERRATA.md: the lossless check's channel shift (question 6), the filter histories across a
+   restart (question 18), the width of `shr7` in noise generator 0 (question 5) and the block data length (entry 21). What FFmpeg
+   does not read stays without an outside reader: the layout of the extra data, the values of the DRC word, the block data CRC,
+   and the 16-channel substream; for those a misreading of the specification is in the writer and in both decoders alike.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
    is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.

@@ -361,8 +361,8 @@ def residual(bits, channel, quant):
 def decode_block(sub, bits, rows, first):
     """Decode one block into rows[first:first + block_size], which the substreams share."""
     size = sub.block_size
+    start = bits.pos  # the length counts from the start of its 16 bit field (ERRATA 21)
     expected_bits = bits.read(16) if sub.data_check else None
-    start = bits.pos
     for row in rows[first : first + size]:
         for column in range(sub.max_matrix_chan + 1):
             if sub.index == 0:

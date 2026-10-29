@@ -2,16 +2,20 @@
 """A TrueHD stream writer for hand-built streams, and the hand-built streams it makes.
 
 FFmpeg's encoders do not write an IIR filter, LSB bypass, several matrices with a permuted channel
-assignment, the block data check, the end-of-stream marker in every unit, extra data, the DRC word
-of the directory, or the 16-channel substream. The decoders have to read them all, and nothing
-outside this repository can say whether they read them right: **none of these streams has an
-external oracle.** What they are held to is the signal each was made from. The codec is lossless,
-so a decoder that is right gives that signal back, and the expected PCM in
-testdata/truehd/handbuilt/manifest.json is the writer's input, not any decoder's output. The
-layout the writer follows is libs/truehd/ERRATA.md's (the specification's where the streams of
-FFmpeg cannot say), so a mistake in reading the specification is in the writer and both decoders
-alike; what these streams do check is that the two decoders and the writer agree, that the
-features work together, and that nothing regresses.
+assignment, noise generator 0, the block data check, the end-of-stream marker in every unit, extra
+data, the DRC word of the directory, or the 16-channel substream. The decoders have to read them
+all. The streams carry a major sync FFmpeg accepts, and FFmpeg's strict decode is held to each of
+them (tools/checks/verify_truehd_interop.py --handbuilt): for nine of the twelve it returns the
+signal the stream was made from, which is the outside check; the manifest's `ffmpeg` field says
+what it does with the others. What FFmpeg does not read has no outside reader: the extra data, the
+values of the DRC word, the block data CRC, the 16-channel substream.
+
+The codec is lossless, so a decoder that is right gives the signal back, and the expected PCM in
+testdata/truehd/handbuilt/manifest.json is the writer's input, not any decoder's output. The layout
+the writer follows is libs/truehd/ERRATA.md's (the specification's where FFmpeg's decode cannot
+say), so where FFmpeg does not read a field a mistake in reading the specification is in the
+writer and both decoders alike; what those streams check is that the two decoders and the writer
+agree, that the features work together, and that nothing regresses.
 
     truehd_writer.py generate [--out DIR]    # write the streams and the manifest
     truehd_writer.py check [DIR]             # decode them with truehd_syntax.py and compare
@@ -113,6 +117,10 @@ class Substream:
         self.matrix_noise_shift = matrix_noise_shift
 
 
+# The channel assignment (TH spec 13.1) for a channel count, as the library's encoder takes it.
+DEFAULT_ASSIGNMENT = {1: 0x2, 2: 0x1, 3: 0x3, 4: 0x9, 5: 0xB, 6: 0xF, 7: 0x4B, 8: 0x4F}
+
+
 class Stream:
     def __init__(
         self,
@@ -125,7 +133,7 @@ class Stream:
         drc_words=False,
         extra_data=None,
         terminator_b=False,
-        eightch_assignment=0x1,
+        channel_assignment=None,
     ):
         self.substreams = substreams
         self.samples = samples
@@ -136,7 +144,12 @@ class Stream:
         self.drc_words = drc_words
         self.extra_data = extra_data  # a function of the unit's index giving its payload
         self.terminator_b = terminator_b
-        self.eightch_assignment = eightch_assignment
+        self.channel_assignment = channel_assignment or DEFAULT_ASSIGNMENT[self.channels]
+
+    @property
+    def channels(self):
+        """The channels of the best presentation: the highest of substreams 0 to 2."""
+        return self.substreams[min(len(self.substreams), 3) - 1].mm + 1
 
     @property
     def per_unit(self):
@@ -371,7 +384,7 @@ def build_stream(stream):
                         lsbs, offset = coding[ch]
                         encode_residual(body, sub.channels[ch], res[ch][i], lsbs, offset)
                 if sub.data_check:
-                    w.put(body.count, 16)
+                    w.put(body.count + 16, 16)  # counted from the start of this field (ERRATA 21)
                 w.append(body)
                 if sub.data_check:
                     w.put(
@@ -441,7 +454,15 @@ def parity_extra(frame):
 def write_major_sync(stream):
     sync = b"\xf8\x72\x6f" + (b"\xba" if stream.kind == "truehd" else b"\xbb")
     if stream.kind == "truehd":
-        format_info = (stream.rate_code << 28) | stream.eightch_assignment
+        # As the library's encoder writes it (TH spec 5.1): the assignment in the eight channel
+        # field and, as far as six channels fit, in the six channel field; the modifiers 0, or 3
+        # for mono. FFmpeg's decoder refuses a major sync whose six channel assignment is zero or
+        # whose channel count disagrees with it.
+        assignment = stream.channel_assignment
+        six = assignment if stream.channels <= 6 else assignment & 0xF
+        modifier = 3 if stream.channels == 1 else 0
+        format_info = (stream.rate_code << 28) | (modifier << 22) | (modifier << 20)
+        format_info |= ((six & 0x1F) << 15) | (modifier << 13) | (assignment & 0x1FFF)
     else:
         format_info = (0x2F << 24) | (stream.rate_code << 20) | 0x0F0000
     body = sync + format_info.to_bytes(4, "big") + (0xB752).to_bytes(2, "big")
@@ -550,7 +571,7 @@ def case_matrices():
         out_shift=shifts,
     )
     return (
-        Stream([sub], n, eightch_assignment=0xF),
+        Stream([sub], n),
         "three matrices, a permuted ch_assign, an output shift",
         ["matrices", "ch_assign", "output_shift"],
     )
@@ -620,7 +641,7 @@ def case_sixteen():
         )
 
     subs = [sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EC), sub_for(8, 15, 0x31EC)]
-    stream = Stream(subs, n, terminator_b=True, eightch_assignment=0x4F)
+    stream = Stream(subs, n, terminator_b=True)
     return (
         stream,
         "four substreams, the last of 16 channels with terminatorB",
@@ -720,6 +741,41 @@ REFUSED = {
     "hb_noise_type1_shift": case_noise_type1_shift,
 }
 
+# What FFmpeg's strict decode does with a stream, where it is not "the signal it was built from,
+# whole", as seen with FFmpeg 6.1.1 (tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg
+# to this; with another major version only the "equal" outcomes are held):
+#   short    - it returns `returned` samples, the first `equal_samples` of them the signal's
+#   refused  - it fails
+#   decodes  - it decodes, and the library refuses the stream (REFUSED)
+FFMPEG_VERSION = "6.1.1"
+FFMPEG = {
+    "hb_marker_every": {
+        "outcome": "short",
+        "returned": 80,
+        "equal_samples": 40,
+        "note": "with the end-of-stream marker in every access unit FFmpeg returns two of the 20 "
+        "(the first is the signal's) and skips the rest "
+        '("Stream parameters not seen; skipping frame")',
+    },
+    "hb_sixteen_channels": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+    },
+    "hb_noise_type1_shift": {
+        "outcome": "decodes",
+        "note": "the library refuses a non-zero matrix noise shift under 0x31EB (question 5)",
+    },
+}
+ORACLE = {"equal": "ffmpeg", "short": "ffmpeg-short", "refused": "none", "decodes": "ffmpeg-only"}
+
+
+def ffmpeg_outcome(name, rows):
+    """What the manifest says FFmpeg's strict decode of stream `name` does (its signal is rows)."""
+    outcome = dict(FFMPEG.get(name, {"outcome": "equal"}))
+    if outcome["outcome"] == "short":
+        outcome["pcm_sha256"] = hashlib.sha256(s32le(rows[: outcome["equal_samples"]])).hexdigest()
+    return outcome
+
 
 def s32le(rows):
     flat = [value << 8 for row in rows for value in row]
@@ -743,6 +799,7 @@ def generate(out):
         presentations = ["all", "best"] if len(stream.substreams) == 4 else ["best"]
         for presentation in presentations:
             rows = expected(stream, presentation)
+            outcome = ffmpeg_outcome(name, rows)
             fixtures.append(
                 {
                     "name": name
@@ -751,7 +808,8 @@ def generate(out):
                     "file": f"{name}.thd",
                     "description": description,
                     "features": features,
-                    "oracle": "none",
+                    "oracle": ORACLE[outcome["outcome"]],
+                    "ffmpeg": outcome,
                     "presentation": presentation,
                     "sample_rate": 48000,
                     "channels": len(rows[0]),
@@ -774,17 +832,27 @@ def generate(out):
                 "file": f"{name}.thd",
                 "description": description,
                 "features": features,
-                "oracle": "none",
+                "oracle": ORACLE[FFMPEG[name]["outcome"]],
+                "ffmpeg": FFMPEG[name],
                 "error": "kUnsupported",
                 "stream_sha256": hashlib.sha256(data).hexdigest(),
             }
         )
     comment = (
-        "Made by tools/references/truehd_writer.py. No external decoder reads these streams: "
-        "pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian "
-        "samples (the 24-bit value shifted left by 8)."
+        "Made by tools/references/truehd_writer.py. pcm_sha256 is the SHA-256 of the signal each "
+        "was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). "
+        "`ffmpeg` says what FFmpeg's strict decode of the stream does, as seen with "
+        "ffmpeg_version (outcome equal: it returns that signal; the other outcomes are described "
+        "in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-only "
+        "(FFmpeg decodes a stream the library refuses) or none. "
+        "tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg and the library to it."
     )
-    manifest = {"_comment": comment, "fixtures": fixtures, "refused": refused}
+    manifest = {
+        "_comment": comment,
+        "ffmpeg_version": FFMPEG_VERSION,
+        "fixtures": fixtures,
+        "refused": refused,
+    }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for fixture in fixtures:
         name, channels, samples = fixture["name"], fixture["channels"], fixture["pcm_samples"]

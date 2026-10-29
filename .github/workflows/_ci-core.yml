@@ -1107,6 +1107,9 @@ jobs:
       - name: TrueHD and MLP decode against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_interop.py --forge build/config-linux-llvm/bin/forge --reference --require-ffmpeg
 
+      - name: TrueHD hand-built streams against FFmpeg's strict decode
+        run: python3 tools/checks/verify_truehd_interop.py --handbuilt --forge build/config-linux-llvm/bin/forge --reference --require-ffmpeg
+
       - name: TrueHD encoder against FFmpeg's strict decode (bit-exact)
         run: python3 tools/checks/verify_truehd_encode_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
 

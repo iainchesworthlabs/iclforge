@@ -18,14 +18,17 @@
 #include "iclforge/truehd/io/elementary.hpp"
 
 // The hand-built streams of testdata/truehd/handbuilt (tools/references/truehd_writer.py): an IIR
-// filter, LSB bypass, several matrices with a permuted ch_assign and an output shift, the block
-// data check, the end-of-stream marker, extra data, the directory's DRC word, and the 16-channel
-// substream.
+// filter, LSB bypass, several matrices with a permuted ch_assign and an output shift, noise
+// generator 0, the block data check, the end-of-stream marker, extra data, the directory's DRC
+// word, and the 16-channel substream.
 //
-// NONE OF THESE HAS AN EXTERNAL ORACLE. No decoder but this one and
-// tools/references/truehd_syntax.py reads them. The expected PCM is the signal each was built from,
-// so a decode that differs is wrong, but the layout they follow is ERRATA.md's, and a misreading of
-// the specification would be in the writer and in both decoders alike.
+// The expected PCM is the signal each was built from. FFmpeg 6.1.1's strict decode of most of them
+// gives the same signal (tools/checks/verify_truehd_interop.py --handbuilt holds it to the outcome
+// the manifest's `ffmpeg` field names for each stream), so for those the layout is FFmpeg's and
+// the tests tagged [ffmpeg-derived] carry values read from its decode. What FFmpeg does not read
+// stays without an oracle: the extra data, the values of the directory's DRC word, the
+// 16-channel substream (restart sync 0x31EC), the end-of-stream marker in every unit; those tests
+// are tagged [no-external-oracle].
 
 namespace {
 
@@ -92,7 +95,7 @@ void check_stereo_against_ffmpeg(const std::string& file, std::size_t first,
 }  // namespace
 
 TEST_CASE("every hand-built stream decodes to the signal it was built from",
-          "[truehd][handbuilt][no-external-oracle]") {
+          "[truehd][handbuilt]") {
     std::ifstream manifest_file(dir() + "/manifest.json");
     REQUIRE(manifest_file.good());
     const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
@@ -100,7 +103,10 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
     for (const nlohmann::json& fixture : manifest["fixtures"]) {
         const std::string name = fixture["name"];
         DYNAMIC_SECTION(name) {
-            CHECK(fixture["oracle"] == "none");
+            // The manifest names what FFmpeg's strict decode of the stream does; the python leg
+            // holds FFmpeg to it. Here the library is held to the signal.
+            const std::string outcome = fixture["ffmpeg"]["outcome"];
+            CHECK((outcome == "equal" || outcome == "short" || outcome == "refused"));
             const std::vector<std::byte> stream =
                 read_file(dir() + "/" + std::string(fixture["file"]));
             CHECK(hex(iclforge::base::crypto::sha256(stream)) ==
@@ -205,7 +211,7 @@ TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
 }
 
 TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused when one has",
-          "[truehd][handbuilt][no-external-oracle]") {
+          "[truehd][handbuilt]") {
     // Restart sync 0x31EB, generator 1 (TH spec 17.3): its table is not available, so a matrix with
     // a non-zero noise shift is kUnsupported (ERRATA entry 32). With every shift zero nothing
     // draws on it and the stream decodes: the fixture hb_noise_type1 is in the manifest's list.
@@ -247,8 +253,7 @@ TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused 
     }
 }
 
-TEST_CASE("the end-of-stream marker removes its padding samples",
-          "[truehd][handbuilt][no-external-oracle]") {
+TEST_CASE("the end-of-stream marker removes its padding samples", "[truehd][handbuilt]") {
     const std::vector<std::byte> stream = read_file(dir() + "/hb_marker_last.thd");
     Decoder decoder;
     ElementaryReader reader(stream);

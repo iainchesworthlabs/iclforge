@@ -10,7 +10,8 @@ written and says so (**no oracle**).
 
 The scripts quoted as evidence are the exploration scripts of the T1 work; the checks that stay in the tree are
 `tools/references/truehd_syntax.py` (the independent Python transcription) and
-`tools/checks/verify_truehd_interop.py` (FFmpeg's strict decode against this library's).
+`tools/checks/verify_truehd_interop.py` (FFmpeg's strict decode against this library's, on the FFmpeg-made fixtures and,
+with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg does with each).
 
 ## Open questions for the owner
 
@@ -48,16 +49,18 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
    streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
    `ch_assign` is the identity. FFmpeg's decoder shifts by `ch_assign[output channel]`: its strict decode of a stream
    built with a permuted `ch_assign` and the position shift says `Lossless check failed - expected 23, calculated ec`
-   (the old `hb_matrices.thd`, patched as `verify_truehd_interop.py` does), and 0xEC is the fold shifted by the matrix
-   channel. The library follows FFmpeg, in decoder and encoder through one helper (`lossless_fold_step`). Does the
-   specification mean the matrix channel? **Provisional, owner to confirm.**
+   (the first `hb_matrices.thd`, its major sync patched to a channel assignment FFmpeg accepts), and 0xEC is the fold
+   shifted by the matrix channel. The committed `hb_matrices` carries 0xEC and FFmpeg decodes it to the stream's signal
+   (`python3 tools/checks/verify_truehd_interop.py --handbuilt`). The library follows FFmpeg, in decoder and encoder through
+   one helper (`lossless_fold_step`). Does the specification mean the matrix channel? **Provisional, owner to confirm.**
 7. **Negative `output_shift` (§8.2).** The field is signed; the specification allows no negative value and the
    streams have none. The library shifts right (arithmetically) for a negative value (**no oracle**).
 8. **IIR state (§9.2, §9.5).** The streams never send `new_states`. The library loads `state[i]` as the history at
    lag i + 1 without scaling by `state_shift`; §9.5's pseudo-code scales the state a filter *produces* by
    `state_shift`, which no stream shows (**no oracle**).
 9. **The block data CRC (§8.1, App. B).** Polynomial 0x63; the initial value and the bytes covered are not given and
-   no stream sets `data_check_present`. The library checks `block_data_bits` (the length) and does not check the CRC.
+   no stream FFmpeg writes sets `data_check_present`. The library checks `block_data_bits` (the length, entry 21) and does
+   not check the CRC; FFmpeg's strict decode of `hb_data_check`, whose CRC byte is zero, does not object either.
 
 10. **Heavy DRC (§7.1, §12.2).** The restart header is listed with `heavy_drc_present` and, when set, a 9-bit gain and a
     3-bit time. The streams' header has no room for them where the specification puts them (entry 7: its fields after
@@ -223,7 +226,8 @@ the library carries them as bytes. FFmpeg's MLP stream also has `flags` 0x4000 (
 **18. The directory entry (§6.1).** `restart_nonexistent` clear means the segment's first block carries a restart
 header, and every segment of a unit with a major sync has one. The first-unit flags are 0x2, the others 0x6
 (`tail.py`: `{(0,2): 150, (0,6): 2250}` per 2,400 units). An entry with `extra_substream_word` is followed by a
-16-bit word (DRC gain 9 bits signed, time 3 bits, 4 bits padding), counted by the check nibble (**no oracle**).
+16-bit word (DRC gain 9 bits signed, time 3 bits, 4 bits padding), counted by the check nibble. FFmpeg's strict decode of
+`hb_drc_word` returns the samples and no gain, so the word's values have no oracle.
 
 **19. Block parameters carried over.** After a restart header the presence flags are 0xFF, the block size is 8 until a
 header sends one (the specification does not give the initial value), matrices and shifts are empty and zero, and
@@ -234,17 +238,21 @@ every channel is `huff_type` 0 with `huff_lsbs` 24. The bit that gives each pres
 255/256 of the code space (the codes are prefix-free: checked at compile time), so an unused 9-bit prefix is an error
 (`ErrorKind::kBadBlockData`).
 
-**21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
-the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as
-this reads (**no oracle**).
+**21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the block's data from the start of
+its own 16-bit field to the end of the sample data, where the block data CRC byte follows: a block whose samples take
+n bits carries n + 16. The first `hb_data_check` counted from the end of the field, and FFmpeg's strict decode of it said
+`block data length mismatch`; counting from the start of the field it decodes without a message
+(`python3 tools/checks/verify_truehd_interop.py --handbuilt`). **Provisional, owner to confirm.** No stream FFmpeg writes sets
+the flag. FFmpeg accepts a zero CRC byte (question 9), so the CRC has no oracle.
 
 **22. Extra data (§16.1) and the terminators written by `tools/references/truehd_writer.py`.** Read and written as
 the specification lays them out: a header word (`header_check_nibble`, `extra_data_length`), a word with
 `evo_reserved` and `evo_frame_byte_length`, the payload, zero padding, and the parity byte; the length is taken as the
 words of the whole extra data (§16.2 says only "in 16-bit words"), and the decoder does not depend on it. The payload
 is carried as opaque bytes. `terminatorB` (0x1234) is read right after the last block's flag of substream 3. No stream
-has either (**no oracle**; `testdata/truehd/handbuilt/`). Every hand-built stream is expected to decode to the signal
-it was made from; none has an external decoder.
+FFmpeg writes has either. FFmpeg's strict decode of `hb_extra_data` returns the samples and no payload, so the extra data's
+layout has no oracle; `terminatorB` is in `hb_sixteen_channels`, whose restart sync 0x31EC FFmpeg refuses
+(`testdata/truehd/handbuilt/`).
 
 **23. Noise generator 0 (§17.2, v3.5).** The two noise channels sit after the matrix channels in the coefficient order
 (coefficient indices `max_matrix_chan + 1` and `+ 2`, which entry 8 found in the streams). Each sample, in order:
@@ -289,15 +297,18 @@ not available, Q5). **Provisional, owner to confirm.**
 As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects
 noise from generator 1's table, which is not available. The decoder refuses it (`ErrorKind::kUnsupported`), as it
 refuses LSB bypass under that sync, and decodes the restart when every shift is zero. `hb_noise_type1` (decodes) and
-`hb_noise_type1_shift` (refused) hold both outcomes, in the decoder and in `tools/references/truehd_syntax.py`
-(**no oracle**).
+`hb_noise_type1_shift` (refused) hold both outcomes, in the decoder and in `tools/references/truehd_syntax.py`.
+FFmpeg's strict decode of `hb_noise_type1` equals the library's; it also decodes `hb_noise_type1_shift`, with a noise table
+of its own that this library does not have (`verify_truehd_interop.py --handbuilt`, outcome `decodes`).
 
 **33. FFmpeg's channel order and the six channel field.** For 7 and 8 channel streams FFmpeg's decode returns the channels
 in the order of its own layout bits: a stream in the order L R C LFE Ls Rs Lrs Rrs comes back as L R C LFE Lrs Rrs Ls Rs
 (columns 0 1 2 3 6 7 4 5), and L R C Ls Rs Lrs Rrs as columns 0 1 2 5 6 3 4. A 7 channel stream whose substream 1 held
 6 rows while `sixch_decoder_channel_assignment` named 5 channels (0x0B) was refused with `channel count mismatch`; with
 substream 1 holding the 5 rows the field names (Lrs and Rrs in substream 2) it decodes. The rule used: substream 1
-holds as many rows as the assignment's low four bits name. **Provisional, owner to confirm.**
+holds as many rows as the assignment's low four bits name. **Provisional, owner to confirm.** FFmpeg also refuses a major sync
+whose six channel assignment is zero (the first hand-built streams had one), so the hand-built writer now writes the
+assignment as the encoder does: in the eight channel field and, as far as six channels fit, in the six channel field.
 
 **34. A substream's matrices (§2.3, §20.2; corrects entry 15).** Entry 15 had substream 1 take the rows substream 0
 produced after its matrices. FFmpeg's decoder gives it the rows before them: a 3 channel stream with a matrix in
