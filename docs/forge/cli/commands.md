@@ -967,6 +967,16 @@ mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status 
 `best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `probe` describes the stream (`json=1` adds a `truehd`
 member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
 
+`probe` also shows the stream's channel meaning (TH spec section 14.1), of a TrueHD stream (an MLP stream's bytes at that place are not
+described): a `channel meaning` line and, under it, one line each for the 2, 6 and 8 channel presentation (control-enabled bit, dialogue
+norm as the number and as -n dBFS, mix level and, for 6 and 8 channels, source format; a presentation the stream has no substream for
+says so) and one for the two DRC start-up gains; with `json=1` a `channel_meaning` object under `truehd` (`null` for MLP) with
+`provisional`, `question`, `distinct_in_stream`, `heavy_drc_start_up_gain`, `drc_start_up_gain` and `presentations`, an object keyed
+`2ch`, `6ch` and `8ch` whose members are `in_stream`, `control_enabled`, `dialogue_norm`, `dialogue_norm_dbfs`, `mix_level` and (not for
+`2ch`) `source_format`. The first major sync's values are shown, and `distinct_in_stream` (and a `note` line) says when the stream's major
+syncs carry different ones. **Provisional, no oracle until the DEE set:** FFmpeg's streams hold zeros, so the numbers are the fields as
+written and no unit is applied beyond the specification's -n dBFS for a dialogue norm (`libs/truehd/ERRATA.md`, questions 51 to 55).
+
 When access units carry extra data, `probe` adds an `evolution` line (and an `evolution` object under `truehd` with `json=1`): how
 many units carry it; how many pass the check nibble, the framing and the parity; how many read as an evolution frame under each of
 the two readings of TH spec v3.6 section 15.4 (the EMDF container of E-AC-3, and the section to the letter) and how many of those

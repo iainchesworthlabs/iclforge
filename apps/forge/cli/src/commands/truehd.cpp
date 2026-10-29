@@ -33,6 +33,7 @@
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "truehd_evolution.hpp"
+#include "truehd_meaning.hpp"
 #include "truehd_structure.hpp"
 
 namespace forge_cli::commands {
@@ -573,6 +574,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     std::uint64_t segment_failures = 0;
     int substreams = 0;
     std::uint64_t extra_data_units = 0;
+    // The different channel meanings (TH spec §14.1) the major syncs carry; the first is reported.
+    constexpr std::size_t kMaxMeanings = 256;
+    std::vector<th::ChannelMeaning> meanings;
     // detail=evolution, structure or format: the structure of the evolution frames, the
     // stream-level syntax facts the specification leaves open, or both (the owner's check on a
     // disc's stream).
@@ -598,6 +602,12 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         if (parsed->major_sync) {
             ++major_syncs;
             substreams = parsed->major_sync->num_substreams;
+            if (parsed->major_sync->kind == th::StreamKind::kTrueHd &&
+                meanings.size() < kMaxMeanings &&
+                std::ranges::find(meanings, parsed->major_sync->channel_meaning) ==
+                    meanings.end()) {
+                meanings.push_back(parsed->major_sync->channel_meaning);
+            }
         }
         for (int i = 0; i < parsed->num_substreams; ++i) {
             const auto& entry = parsed->entries[static_cast<std::size_t>(i)];
@@ -660,6 +670,14 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("peak_data_rate", static_cast<std::uint64_t>(major_sync.peak_data_rate));
         json.member("peak_data_rate_bps", major_sync.peak_data_rate_bps());
         json.member("object_substream", info->has_object_substream);
+        // TH spec §14.1; an MLP stream's bytes after substream_info are not described.
+        json.key("channel_meaning");
+        if (major_sync.kind == th::StreamKind::kTrueHd) {
+            write_channel_meaning_json(json, major_sync.channel_meaning, info->num_substreams,
+                                       meanings.size());
+        } else {
+            json.value_null();
+        }
         json.member("extra_data_units", extra_data_units);
         json.member("ac3_core_frames", static_cast<std::uint64_t>(ac3_core_frames));
         json.member("major_syncs", major_syncs);
@@ -691,6 +709,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         fmt::println("{:<16}{}, peak data rate {} bit/s (field {})", "rate",
                      major_sync.is_vbr ? "variable" : "constant", major_sync.peak_data_rate_bps(),
                      major_sync.peak_data_rate);
+        if (major_sync.kind == th::StreamKind::kTrueHd) {
+            print_channel_meaning_text(major_sync.channel_meaning, info->num_substreams,
+                                       meanings.size());
+        }
         if (info->has_object_substream) {
             fmt::println("{:<16}present (read as a 16-channel substream, not rendered)",
                          "object substream");

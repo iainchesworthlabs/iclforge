@@ -1757,7 +1757,8 @@ run_truehd_encode_case opt_rate 48000 6 5.1 pcm_s24le "" truehd-peak-rate=18000 
 
 # The channel meaning of TH spec section 14.1, every field of every presentation set (provisional, no
 # oracle until the DEE set: FFmpeg's encoder writes zeros). FFmpeg's strict decode must still give the
-# samples, which holds its reader to the major sync's CRC over the new bytes.
+# samples, which holds its reader to the major sync's CRC over the new bytes, and forge's probe must
+# give the values back.
 thd_meaning_options=(truehd-dialnorm-2ch=40 truehd-dialnorm-6ch=27 truehd-dialnorm-8ch=24
     truehd-mix-level-2ch=33 truehd-mix-level-6ch=17 truehd-mix-level-8ch=49
     truehd-source-format-6ch=5 truehd-source-format-8ch=38 truehd-control-2ch=on truehd-control-6ch=off
@@ -1765,6 +1766,21 @@ thd_meaning_options=(truehd-dialnorm-2ch=40 truehd-dialnorm-6ch=27 truehd-dialno
 run_truehd_encode_case opt_meaning51 48000 6 5.1 pcm_s24le "" truehd-restart=8 "${thd_meaning_options[@]}"
 run_truehd_encode_case opt_meaning71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" truehd-restart=8 \
     "${thd_meaning_options[@]}"
+for case in opt_meaning51 opt_meaning71; do
+    count=$((count + 1))
+    echo "[$count] truehd probe of te_$case.thd gives the channel meaning back"
+    "$CLI" probe "te_$case.thd" json=1 | python3 -c '
+import json, sys
+meaning = json.load(sys.stdin)["truehd"]["channel_meaning"]
+sys.exit(0 if meaning["heavy_drc_start_up_gain"] == -9 and meaning["drc_start_up_gain"] == 21
+         and meaning["distinct_in_stream"] == 1
+         and [meaning["presentations"][name]["dialogue_norm"] for name in ("2ch", "6ch", "8ch")] == [40, 27, 24]
+         and [meaning["presentations"][name]["mix_level"] for name in ("2ch", "6ch", "8ch")] == [33, 17, 49]
+         and meaning["presentations"]["6ch"]["source_format"] == 5
+         and meaning["presentations"]["8ch"]["source_format"] == 38
+         and [meaning["presentations"][name]["control_enabled"] for name in ("2ch", "6ch", "8ch")] == [True, False, True]
+         else 1)'
+done
 
 # The streams forge wrote, in the containers forge writes: encode straight into each, read it back
 # with demux byte for byte, and by FFmpeg to the PCM the bare stream gives. The bare stream on

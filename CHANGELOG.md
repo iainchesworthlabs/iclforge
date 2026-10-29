@@ -10,6 +10,11 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge probe` shows a TrueHD stream's channel meaning (TH spec §14.1), in text and in JSON.** A `channel meaning` line with a line for
+  each presentation (2, 6 and 8 channels: control-enabled bit, dialogue norm as the number and as -n dBFS, mix level, source format) and one for
+  the two DRC start-up gains; in JSON a `channel_meaning` object under `truehd` (`null` for MLP, whose bytes at that place the specification does not
+  describe) that is valid in a bare stream and in Matroska, MP4 and a transport stream, and says when a stream's major syncs carry different
+  values. The audit's R13. **Provisional, with no oracle until the DEE set** (`libs/truehd/ERRATA.md`, questions 51 to 55).
 - **Added: `forge truehd-encode` writes the stream's channel meaning (TH spec §14.1), per presentation, and `EncoderConfig::channel_meaning`
   rejects a value outside its field's width by name.** Options `truehd-dialnorm-2ch=` (0 to 63), `-6ch=` and `-8ch=` (0 to 31),
   `truehd-mix-level-2ch=`, `-6ch=`, `-8ch=` (0 to 63), `truehd-source-format-6ch=` (0 to 31) and `-8ch=` (0 to 63), `truehd-control-2ch=`,

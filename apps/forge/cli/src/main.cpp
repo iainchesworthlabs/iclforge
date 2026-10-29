@@ -451,8 +451,10 @@ constexpr std::array<Command, 49> kCommands{{
     {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
      "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 "
      "TOC/presentations/substream groups, or a TrueHD/MLP stream's substreams, rate and parity "
-     "and CRC checks (detail= is not read for it), bare or inside a container, and what the "
-     "container says of its track; table or documented JSON",
+     "and CRC checks and, for TrueHD, the channel meaning of TH spec section 14 (dialogue norm, "
+     "mix level, source format, control bit per presentation, DRC start-up gains; provisional, no "
+     "oracle until the DEE set), bare or inside a container, and what the container says of its "
+     "track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
     {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",

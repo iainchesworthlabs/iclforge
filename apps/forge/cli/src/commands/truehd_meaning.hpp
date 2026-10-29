@@ -5,6 +5,10 @@
 
 #include "iclforge/truehd/io/major_sync.hpp"
 
+namespace iclforge::apps {
+class JsonSink;
+}  // namespace iclforge::apps
+
 // The channel meaning of a TrueHD stream (TH spec §14.1) as `probe`, `metadata` and `normalize`
 // show it: per presentation (2, 6 and 8 channels) the dialogue norm, the mix level, the source
 // format and the control-enabled bit, and the two DRC start-up gains.
@@ -34,5 +38,15 @@ enum class MeaningPresentation : int { k2ch = 0, k6ch = 1, k8ch = 2 };
 
 // "heavy -9, standard 21".
 [[nodiscard]] std::string describe_start_up_gains(const iclforge::truehd::ChannelMeaning& meaning);
+
+// The "channel meaning" lines of the text report. `distinct` is how many different channel
+// meanings the stream's major syncs carry (the first is shown).
+void print_channel_meaning_text(const iclforge::truehd::ChannelMeaning& meaning, int substreams,
+                                std::size_t distinct);
+
+// The value of the "channel_meaning" member: an object.
+void write_channel_meaning_json(iclforge::apps::JsonSink& json,
+                                const iclforge::truehd::ChannelMeaning& meaning, int substreams,
+                                std::size_t distinct);
 
 }  // namespace forge_cli::commands

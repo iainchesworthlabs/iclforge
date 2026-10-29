@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -7,6 +9,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -126,6 +129,31 @@ th::ChannelMeaning every_option_meaning() {
     meaning.heavy_drc_start_up_gain = -9;
     meaning.drc_start_up_gain = 21;
     return meaning;
+}
+
+// Whether any object of the document names a key twice.
+bool repeats_a_key(const std::string& text) {
+    std::vector<std::set<std::string>> keys;
+    bool repeated = false;
+    const nlohmann::json::parser_callback_t callback =
+        [&keys, &repeated](int, nlohmann::json::parse_event_t event, nlohmann::json& parsed) {
+            switch (event) {
+                case nlohmann::json::parse_event_t::object_start:
+                    keys.emplace_back();
+                    break;
+                case nlohmann::json::parse_event_t::key:
+                    repeated = !keys.back().insert(parsed.get<std::string>()).second || repeated;
+                    break;
+                case nlohmann::json::parse_event_t::object_end:
+                    keys.pop_back();
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        };
+    const nlohmann::json parsed = nlohmann::json::parse(text, callback);
+    return repeated || parsed.is_discarded();
 }
 
 }  // namespace
@@ -281,5 +309,99 @@ TEST_CASE("a channel meaning option out of its field's range is refused by name"
         CHECK(run_cli("decode " + cli_arg(fixture("truehd_m51_s24.thd")) + cli_arg(dir / "x.wav") +
                           "truehd-dialnorm-6ch=27",
                       log) == kExitUsage);
+    }
+}
+
+TEST_CASE("forge probe shows the channel meaning of a TrueHD stream",
+          "[forge-cli][truehd][truehd-meta][probe]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "probe_meaning.log";
+    const fs::path source = source_wav(dir);
+    const fs::path written = dir / "probe_every.thd";
+    REQUIRE(run_cli("truehd-encode " + cli_arg(source) + cli_arg(written) + "truehd-restart=8 " +
+                        kEveryOption,
+                    log) == 0);
+
+    SECTION("text, in the style of the other lines, marked provisional") {
+        REQUIRE(run_cli("probe " + cli_arg(written), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(contains(text,
+                       "channel meaning provisional, no oracle until the DEE set "
+                       "(libs/truehd/ERRATA.md, questions 51 to 55)"));
+        CHECK(contains(text,
+                       "  2ch           control on, dialogue norm 40 (-40 dBFS), mix level 33\n"));
+        CHECK(contains(text,
+                       "  6ch           control off, dialogue norm 27 (-27 dBFS), mix level 17, "
+                       "source format 5\n"));
+        CHECK(contains(text, "  drc start-up  heavy -9, standard 21\n"));
+        // The 5.1 stream has two substreams, so no 8 channel presentation.
+        CHECK(contains(text, "source format 38 (the stream has no such substream)"));
+        CHECK_FALSE(contains(text, "different channel meanings"));
+    }
+    SECTION("a stream FFmpeg wrote shows its zeros") {
+        REQUIRE(run_cli("probe " + cli_arg(fixture("truehd_m51_s24.thd")), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(contains(text, "channel meaning"));
+        CHECK(contains(text,
+                       "6ch           control off, dialogue norm 0 (0 dBFS), mix level 0, "
+                       "source format 0\n"));
+    }
+    SECTION("JSON, with the raw fields and which presentations the stream has") {
+        REQUIRE(run_cli("probe " + cli_arg(written) + "json=1", log) == 0);
+        const std::string text = read_text(log);
+        CHECK_FALSE(repeats_a_key(text));
+        const auto meaning = nlohmann::json::parse(text)["truehd"]["channel_meaning"];
+        CHECK(meaning["provisional"] == true);
+        CHECK(meaning["question"] == "libs/truehd/ERRATA.md, questions 51 to 55");
+        CHECK(meaning["distinct_in_stream"] == 1);
+        CHECK(meaning["heavy_drc_start_up_gain"] == -9);
+        CHECK(meaning["drc_start_up_gain"] == 21);
+        const auto presentations = meaning["presentations"];
+        CHECK(presentations["2ch"]["in_stream"] == true);
+        CHECK(presentations["2ch"]["control_enabled"] == true);
+        CHECK(presentations["2ch"]["dialogue_norm"] == 40);
+        CHECK(presentations["2ch"]["dialogue_norm_dbfs"] == -40);
+        CHECK(presentations["2ch"]["mix_level"] == 33);
+        CHECK_FALSE(presentations["2ch"].contains("source_format"));
+        CHECK(presentations["6ch"]["in_stream"] == true);
+        CHECK(presentations["6ch"]["control_enabled"] == false);
+        CHECK(presentations["6ch"]["dialogue_norm"] == 27);
+        CHECK(presentations["6ch"]["mix_level"] == 17);
+        CHECK(presentations["6ch"]["source_format"] == 5);
+        CHECK(presentations["8ch"]["in_stream"] == false);
+        CHECK(presentations["8ch"]["dialogue_norm"] == 24);
+        CHECK(presentations["8ch"]["mix_level"] == 49);
+        CHECK(presentations["8ch"]["source_format"] == 38);
+    }
+    SECTION("valid JSON, the same fields, in every container") {
+        for (const std::string container : {"mkv", "mp4", "ts"}) {
+            DYNAMIC_SECTION(container) {
+                const fs::path file = dir / ("probe_every." + container);
+                REQUIRE(run_cli(container + " " + cli_arg(written) + cli_arg(file), log) == 0);
+                REQUIRE(run_cli("probe " + cli_arg(file) + "json=1", log) == 0);
+                const std::string text = read_text(log);
+                CHECK_FALSE(repeats_a_key(text));
+                const auto document = nlohmann::json::parse(text);
+                REQUIRE(document["container"].is_object());
+                const auto meaning = document["truehd"]["channel_meaning"];
+                CHECK(meaning["presentations"]["6ch"]["dialogue_norm"] == 27);
+                CHECK(meaning["drc_start_up_gain"] == 21);
+            }
+        }
+    }
+    SECTION("every fixture has the member, MLP has none, and a damaged stream still shows it") {
+        for (const char* name : {"truehd_st48_s24.thd", "truehd_mono48_s24.thd",
+                                 "truehd_c50_s16.thd", "truehd_st192_s24.thd"}) {
+            DYNAMIC_SECTION(name) {
+                REQUIRE(run_cli("probe " + cli_arg(fixture(name)) + "json=1", log) == 0);
+                const auto document = nlohmann::json::parse(read_text(log));
+                CHECK(document["truehd"]["channel_meaning"]["presentations"]["2ch"]["in_stream"] ==
+                      true);
+            }
+        }
+        REQUIRE(run_cli("probe " + cli_arg(fixture("mlp_st48_s24.mlp")) + "json=1", log) == 0);
+        CHECK(nlohmann::json::parse(read_text(log))["truehd"]["channel_meaning"].is_null());
+        REQUIRE(run_cli("probe " + cli_arg(fixture("mlp_st48_s24.mlp")), log) == 0);
+        CHECK_FALSE(contains(read_text(log), "channel meaning"));
     }
 }
