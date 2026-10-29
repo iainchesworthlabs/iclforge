@@ -88,12 +88,14 @@ C version macros; release criteria written.
 `inline namespace v1`; make the ABI gate **required** (today advisory — see `_ci-core.yml`
 `ABI_ENFORCE`).
 
-### Library — TrueHD experimental module (was IM5, L)
+### Library — TrueHD module (was IM5, L)
 
-Substantial internal codec on branch `feature/truehd-atmos-support` — not on `main`. To merge:
-rebase, gate as `iclforge::mlp` / `ICLFORGE_BUILD_MLP`, remove non-redistributable PDFs, label output
-accurately (no real TrueHD decoder reads the current block layout). Forge front ends follow as a
-separate item (was UX10). Dolby Encoding Engine's TrueHD streams of known sources (2, 6 and 8
+In progress as `libs/truehd` (`iclforge::truehd`, `ICLFORGE_BUILD_TRUEHD`), written from the owner's
+specification and checked against FFmpeg's encoder and decoder: [`planning/truehd.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md).
+Phase T1 (the bitstream layer and the lossless decoder) is under way; the encoder, the Atmos substream and the
+Forge front ends follow (was UX10). The branch `feature/truehd-atmos-support` is superseded: no TrueHD
+decoder reads its block layout and it carries non-redistributable PDFs, so nothing is taken from it.
+Dolby Encoding Engine's TrueHD streams of known sources (2, 6 and 8
 channels, 48 and 96 kHz, 16 and 24 bits, several presentations), made by
 `tools/generators/gen_dee_gold.py` while DEE's licence runs (it ends on 2026-11-06), are kept
 locally for what the clean-room rule below allows.
