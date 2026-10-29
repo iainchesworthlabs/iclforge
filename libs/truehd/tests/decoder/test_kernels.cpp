@@ -173,9 +173,9 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         }
     }
 
-    SECTION("the output takes the matrix channel it is given, shifts it, and folds it") {
+    SECTION("the output takes the matrix channel it is given, shifts it by that matrix channel's shift, and folds it") {
         const std::array<std::uint8_t, 3> assign = {2, 0, 1};
-        const std::array<std::int8_t, 3> shift = {0, 2, -3};
+        const std::array<std::int8_t, 3> shift = {0, 2, -3};  // by matrix channel
         std::array<std::int32_t, kBlock * 3> pcm{};
         const std::uint32_t fold = kernels::assign_output(kBlock, 3, assign.data(), shift.data(),
                                                          base.data(), kStride, pcm.data(), 0x5A5A5AU);
@@ -183,10 +183,11 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         for (int i = 0; i < kBlock; ++i) {
             for (int ch = 0; ch < 3; ++ch) {
                 const std::int32_t source = base[static_cast<std::size_t>(i * kStride + assign[static_cast<std::size_t>(ch)])];
-                const std::int32_t out = shift[static_cast<std::size_t>(ch)] >= 0
+                const int by_channel = shift[assign[static_cast<std::size_t>(ch)]];
+                const std::int32_t out = by_channel >= 0
                                              ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source)
-                                                                         << shift[static_cast<std::size_t>(ch)])
-                                             : source >> -shift[static_cast<std::size_t>(ch)];
+                                                                         << by_channel)
+                                             : source >> -by_channel;
                 expected = lossless_fold_step(expected, static_cast<std::uint32_t>(out),
                                               assign[static_cast<std::size_t>(ch)]);
                 REQUIRE(pcm[static_cast<std::size_t>(i * 3 + ch)] ==

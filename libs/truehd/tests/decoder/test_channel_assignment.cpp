@@ -45,7 +45,8 @@ std::int32_t sample(int unit, int m, int i) {
 // One built unit: a restart header (with `lossless_check`), one block of kBlock samples of three
 // channels, and the major sync when `with_major_sync`.
 std::vector<std::byte> unit_of(int unit, const std::array<std::uint8_t, 3>& ch_assign,
-                               std::uint8_t lossless_check, bool with_major_sync) {
+                               std::uint8_t lossless_check, bool with_major_sync,
+                               std::optional<std::array<std::int8_t, 3>> output_shift = {}) {
     iclforge::BitWriter writer;
     writer.put(1, 1);  // block_header_exists
     writer.put(1, 1);  // restart_header_exists
@@ -64,6 +65,13 @@ std::vector<std::byte> unit_of(int unit, const std::array<std::uint8_t, 3>& ch_a
     context.max_matrix_chan = kChannels - 1;
     BlockHeaderSpec block;
     block.block_size = kBlock;
+    if (output_shift) {
+        std::array<std::int8_t, kMaxChannels> shifts{};
+        for (int m = 0; m < kChannels; ++m) {
+            shifts[static_cast<std::size_t>(m)] = (*output_shift)[static_cast<std::size_t>(m)];
+        }
+        block.output_shift = shifts;
+    }
     for (int ch = 0; ch < kChannels; ++ch) {
         block.channels[static_cast<std::size_t>(ch)].present = true;
         block.channels[static_cast<std::size_t>(ch)].huff_type = 0;
@@ -212,4 +220,51 @@ TEST_CASE("a ch_assign that gives two matrix channels one output channel is refu
         REQUIRE_FALSE(decoded.has_value());
         CHECK(decoded.error().kind == ErrorKind::kBadParameter);
     }
+}
+
+TEST_CASE("the output shift is indexed by the matrix channel, as the lossless check's is",
+          "[truehd][decoder][checks]") {
+    // ERRATA entry 43: on a Blu-ray's TrueHD (a 6 and an 8 channel substream with a permuted
+    // ch_assign and a different output shift for each channel) the shift an output channel gets is
+    // the one of the matrix channel it takes, not the one of its position; only so do the
+    // lossless checks of the second and later substreams hold and the samples equal FFmpeg's. With
+    // ch_assign {1, 2, 0} output 0 takes matrix channel 2, output 1 channel 0, output 2 channel 1.
+    const std::array<std::uint8_t, 3> ch_assign{1, 2, 0};
+    const std::array<std::int8_t, 3> shift{1, 3, 2};  // by matrix channel
+    const std::array<int, 3> source = inverse_of(ch_assign);
+    Decoder decoder;
+    std::vector<std::int32_t> expected;
+    for (int i = 0; i < kBlock; ++i) {
+        for (int p = 0; p < kChannels; ++p) {
+            const int m = source[static_cast<std::size_t>(p)];
+            expected.push_back(sample(0, m, i) * (1 << shift[static_cast<std::size_t>(m)]));
+        }
+    }
+    CHECK(decoded_pcm(decoder, unit_of(0, ch_assign, 0, true, shift)) == expected);
+
+    // The check of that interval, folded by matrix channel over the shifted samples, is what a
+    // restart header carries; by position it would be another value.
+    std::uint32_t by_matrix = 0;
+    std::uint32_t by_position = 0;
+    for (int i = 0; i < kBlock; ++i) {
+        for (int p = 0; p < kChannels; ++p) {
+            const int m = source[static_cast<std::size_t>(p)];
+            const auto value = static_cast<std::uint32_t>(
+                sample(0, m, i) * (1 << shift[static_cast<std::size_t>(m)]));
+            by_matrix = lossless_fold_step(by_matrix, value, static_cast<unsigned>(m));
+            by_position = lossless_fold_step(by_position, value, static_cast<unsigned>(p));
+        }
+    }
+    REQUIRE(lossless_check_of(by_matrix) != lossless_check_of(by_position));
+    const auto second = unit_of(1, ch_assign, lossless_check_of(by_matrix), false, shift);
+    (void)decoded_pcm(decoder, second);
+    CHECK(decoder.counters().lossless_checks_ok == 1);
+    CHECK(decoder.counters().lossless_check_failures == 0);
+
+    Decoder other;
+    (void)decoded_pcm(other, unit_of(0, ch_assign, 0, true, shift));
+    const auto refused =
+        other.decode(unit_of(1, ch_assign, lossless_check_of(by_position), false, shift));
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().kind == ErrorKind::kBadLosslessCheck);
 }

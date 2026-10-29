@@ -67,7 +67,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    (the first `hb_matrices.thd`, its major sync patched to a channel assignment FFmpeg accepts), and 0xEC is the fold
    shifted by the matrix channel. The committed `hb_matrices` carries 0xEC and FFmpeg decodes it to the stream's signal
    (`python3 tools/checks/verify_truehd_interop.py --handbuilt`). The library follows FFmpeg, in decoder and encoder through
-   one helper (`lossless_fold_step`). Does the specification mean the matrix channel? **Provisional, owner to confirm.**
+   one helper (`lossless_fold_step`). Does the specification mean the matrix channel? A Blu-ray stream with a permuted `ch_assign` fits the matrix channel for both this fold and `output_shift` (entry 43). **Provisional, owner to confirm.**
 7. **Negative `output_shift` (§8.2).** The field is signed; the specification allows no negative value and the
    streams have none. The library shifts right (arithmetically) for a negative value (**no oracle**).
 8. **IIR state (§9.2, §9.5).** The streams never send `new_states`. The library loads `state[i]` as the history at
@@ -488,6 +488,19 @@ the same kind of stream and holds the output and the lossless check to the new r
 specification means §7.4? **Provisional, owner to confirm** (open question 41 is the related one). A `ch_assign` with a
 repeated value is refused. Not added to `testdata/truehd/handbuilt`: that set is the fixtures' (a stream with a cyclic
 `ch_assign` should join it).
+
+**43. `output_shift` is indexed by the matrix channel (§8.2, §7.3; with entries 12 and 42).** The library shifted the
+output channel in position `p` by `output_shift[p]`. On the owner's Blu-ray (a TrueHD Atmos stream, planning/truehd-disc-findings.md)
+the second and third substreams carry a permuted `ch_assign` and a different shift for each channel, and the lossless check of every
+restart interval failed in both of them, with the 6 and 8 channel presentations stopping at the second restart. The shift is the one of
+the matrix channel the output takes (`output_shift[m]` with `m` the channel `output_source[p]` names), the same index the lossless
+check's fold shifts by (entries 12 and 42). With that change the 2, 6 and 8 channel presentations of the whole 60 s excerpt (72,753
+access units) decode with every lossless-check interval ok (568, 1,136 and 1,704), and the 8 channel output equals FFmpeg's strict decode
+sample for sample (2.9 million samples a channel, FFmpeg's channel order of entry 33). With the shift by position, or with the fold by
+position, the second and third substreams fail every interval. The streams that carry the same shift for every channel (FFmpeg's, the
+encoder's, the hand-built ones) cannot tell the two apart, which is why no fixture caught it. `test_channel_assignment.cpp` and
+`test_kernels.cpp` hold both; `tools/references/truehd_syntax.py` reads it the same way. The encoder writes one shift for all channels
+and is unchanged. **Provisional, owner to confirm** (the specification's §8.2 does not say which index).
 
 ## Atmos, spec v3.6
 

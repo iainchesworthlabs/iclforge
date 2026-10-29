@@ -423,7 +423,7 @@ def decode_block(sub, bits, rows, first):
         out_row = []
         for ch in range(sub.max_matrix_chan + 1):
             value = rows[first + i][sub.output_source[ch]]
-            shift = sub.output_shift[ch]
+            shift = sub.output_shift[sub.output_source[ch]]  # by matrix channel (ERRATA 43)
             out_row.append(s32(value << shift) if shift >= 0 else value >> -shift)
         output_rows.append(out_row)
         if sub.interval is None:

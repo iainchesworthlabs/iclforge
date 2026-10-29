@@ -157,7 +157,9 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
 
 // The output of a block: each output channel from the matrix channel `source_channel` names for it
 // (the decoder builds that from ch_assign, which assigns matrix channels to output channels:
-// ERRATA.md entry 42), shifted by its output shift, folded into the lossless check (TH spec §7.3)
+// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is indexed
+// by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the lossless
+// check (TH spec §7.3)
 // and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
 // the new fold.
 [[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
@@ -169,7 +171,7 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
         const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[source_channel[ch]];
-            const int shift = output_shift[ch];
+            const int shift = output_shift[source_channel[ch]];
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
