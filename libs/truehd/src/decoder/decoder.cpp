@@ -120,7 +120,8 @@ struct Decoder::Impl {
     std::optional<MajorSync> major_sync;
     std::array<SubstreamState, kMaxSubstreams> substreams;
     std::vector<std::int32_t> rows;
-    std::vector<std::int32_t> matrixed;  // a substream's rows after its matrices (ERRATA.md entry 34)
+    std::vector<std::int32_t>
+        matrixed;  // a substream's rows after its matrices (ERRATA.md entry 34)
     std::vector<std::int32_t> pcm;
     std::vector<std::byte> extra_data;
     std::vector<Channel> layout_eight;  // the channels of the major sync's eight-channel assignment
@@ -285,6 +286,13 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
+            if (spec.lsb_bypass && state.context.noise_type) {
+                return std::unexpected(make_error(
+                    ErrorKind::kUnsupported,
+                    "LSB bypass under restart sync 0x31EB (noise_type 1): the bypassed bits come "
+                    "from "
+                    "generator 1, whose 256-entry table is not available (TH spec §17.4)"));
+            }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {

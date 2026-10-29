@@ -141,18 +141,28 @@ TEST_CASE("a whole built stream decodes through the elementary reader", "[truehd
     CHECK(decoded == 8);
 }
 
-TEST_CASE("noise generator 1 is refused until its table is available", "[truehd][decoder]") {
-    // TH spec 17.3 needs a 256-entry table that 17.4 does not give (ERRATA open question 5):
-    // restart sync 0x31EB is kUnsupported, with the decoder left waiting for another restart.
-    // Generator 0 (0x31EA) is decoded: see the hand-built stream hb_noise_generator_0.
+TEST_CASE("restart sync 0x31EB decodes unless a matrix needs generator 1's noise",
+          "[truehd][decoder]") {
+    // FFmpeg's streams of more than 6 channels use 0x31EB without any noise (ERRATA entry 32): the
+    // matrices of such a restart have no noise coefficients, so nothing draws on the generator.
+    // Only LSB bypass, whose bits come from the noise, needs the 256-entry table that TH spec 17.4
+    // does not give (ERRATA open question 5): that is kUnsupported, with the decoder left waiting
+    // for another restart. Generator 0 (0x31EA) is decoded: see the hand-built stream
+    // hb_noise_generator_0.
     Decoder decoder;
-    auto refused = decoder.decode(stereo_unit(true, 0, kRestartSyncNoise));
+    auto plain = decoder.decode(stereo_unit(true, 0, kRestartSyncNoise));
+    REQUIRE(plain.has_value());
+    REQUIRE(plain->has_value());
+    check_built_samples(**plain);
+
+    Decoder refusing;
+    auto refused = refusing.decode(stereo_unit(true, 0, kRestartSyncNoise, true));
     REQUIRE_FALSE(refused.has_value());
     CHECK(refused.error().kind == ErrorKind::kUnsupported);
-    auto waiting = decoder.decode(stereo_unit(false));
+    auto waiting = refusing.decode(stereo_unit(false));
     REQUIRE(waiting.has_value());
     CHECK_FALSE(waiting->has_value());
-    auto restarted = decoder.decode(stereo_unit(true));
+    auto restarted = refusing.decode(stereo_unit(true));
     REQUIRE(restarted.has_value());
     CHECK(restarted->has_value());
 }

@@ -279,3 +279,17 @@ restart headers `output_timing` = the first sample of the unit mod 65536. The en
 could not arrive at the declared peak rate in time: the unit may start to arrive when the previous one has finished and
 no sooner than one unit duration after the previous start (§3.4), and the stream fails (or counts a `rate_violation`) if
 a unit would finish arriving later than 75 ms after its slot (§18).
+
+**38. Downmix presentations (§2.2, §10.5).** The specification describes substreams 0 and 1 as the 2 and 6 channel
+presentations of an 8 channel stream, and §10.5 says the matrices of a later substream take the folded-in channels out
+again; it gives no gains and no limiter. `DownmixMode::kStandard` writes one reading: substream 0 holds
+`L + gC*C + gLFE*LFE + gS*Ls` and the same for R (defaults 1/sqrt(2), 0 and 1/sqrt(2)); in an 8 channel stream
+substream 1 holds a 5.1 whose surrounds are `Ls + gR*Lrs` (gR 1/sqrt(2)) and substream 2 undoes that. Each later
+substream's matrices carry every earlier step, because a substream reads the rows its predecessor decoded before that
+predecessor's matrices (entry 34): the stereo steps first (coefficient -gain on each source, 1.0 on the row itself,
+`frac_bits` 14, so the sent coefficient is 16 bits), then the rear steps. When a fold would leave a downmix row outside
+24 bits in a restart interval, the gains of that fold are multiplied by 0.75, 0.5 and 0.25 in turn and finally dropped,
+and the interval is counted in `EncoderStats::downmix_reduced_intervals`. FFmpeg's decoder returns the last
+substream only, so its strict decode of these streams checks that the full presentation comes back exactly and nothing
+about the downmix; the library's tests read the 2 and 6 channel presentations back and compare them with the formula
+(**provisional, owner to confirm the gains and the limiter**; open question 13).
