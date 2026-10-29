@@ -130,7 +130,7 @@ Open, for the owner:
 3. `ICLFORGE_BUILD_TRUEHD=OFF` with tests on is supported by the CMake files (the C API's absent file and its test, and the stand-ins of the four performance executables) and built by no lane. Build it in
    one, or refuse it in the root as `ICLFORGE_BUILD_AC4=OFF` is?
 4. The AC-4 and TrueHD libraries are outside clang-tidy's list. Add them (a first nightly with findings), or leave them to CodeQL and Sonar?
-5. Forge writes the TrueHD WAV with `std::fopen`, which takes an ANSI path on Windows; a non-ASCII path needs `std::ofstream` or a wide path.
+5. Forge writes the TrueHD WAV through `std::ofstream` with a narrow path, as the rest of the CLI writes its outputs; Windows reads a narrow path in the ANSI code page, so a non-ASCII path needs a wide one. Is that a fix for all of the CLI's outputs, or for none?
 
 ## Not in scope here
 

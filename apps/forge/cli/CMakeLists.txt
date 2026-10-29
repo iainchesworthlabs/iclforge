@@ -174,12 +174,6 @@ set_source_files_properties(src/commands/stream_tools.cpp
 set_source_files_properties(src/commands/containers.cpp
     PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-free-nonheap-object>")
 
-# The TrueHD decode writes its WAV through std::fopen, which MSVC and clang-cl flag with C4996 (an
-# error under /WX), as they flag the std::getenv of the sources named in libs/ac3/tests/CMakeLists.txt.
-if(ICLFORGE_IS_MSVC_LIKE)
-    set_source_files_properties(src/commands/truehd.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
-endif()
-
 include(GNUInstallDirs)
 
 # COMPONENT runtime: without one, CPack files this under its own

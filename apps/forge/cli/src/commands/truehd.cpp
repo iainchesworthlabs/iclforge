@@ -7,9 +7,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
+#include <ios>
+#include <iostream>
 #include <optional>
+#include <ostream>
 #include <span>
 #include <string>
 #include <string_view>
@@ -134,22 +138,16 @@ void put_u32(std::vector<std::uint8_t>& out, std::uint32_t value) {
 // patched at the end; stdout's say "unknown" (0xFFFFFFFF), as a stream's do.
 class Pcm24Wav {
    public:
-    ~Pcm24Wav() {
-        if (file_ != nullptr && file_ != stdout) {
-            // Only reached when close() was not: a run that failed first. Nothing to report to.
-            static_cast<void>(std::fclose(file_));
-        }
-    }
-
     bool open(std::string_view out_path, int channels, std::uint32_t rate, std::uint32_t mask) {
         to_stdout_ = out_path == "-";
         if (to_stdout_) {
             iclforge::cli::platform::set_stdio_binary();
-            file_ = stdout;
+            out_ = &std::cout;
         } else {
-            file_ = std::fopen(std::string{out_path}.c_str(), "wb");
+            file_.open(std::string{out_path}, std::ios::binary | std::ios::trunc);
+            out_ = &file_;
         }
-        if (file_ == nullptr) {
+        if (!*out_) {
             return false;
         }
         const auto block = static_cast<std::uint32_t>(channels * kBitsPerSample / 8);
@@ -179,7 +177,7 @@ class Pcm24Wav {
         header.insert(header.end(), kPcm.begin(), kPcm.end());
         tag("data");
         put_u32(header, 0xFFFFFFFFU);
-        return std::fwrite(header.data(), 1, header.size(), file_) == header.size();
+        return put(header);
     }
 
     bool write(std::span<const std::int32_t> pcm) {
@@ -191,30 +189,45 @@ class Pcm24Wav {
             buffer_.push_back(static_cast<std::uint8_t>((bits >> 16U) & 0xFFU));
         }
         data_bytes_ += buffer_.size();
-        return std::fwrite(buffer_.data(), 1, buffer_.size(), file_) == buffer_.size();
+        return put(buffer_);
     }
 
     bool close() {
+        if (out_ == nullptr) {
+            return true;
+        }
         bool ok = true;
-        if (file_ != nullptr && !to_stdout_) {
-            const auto patch = [this](long at, std::uint64_t value) {
+        if (to_stdout_) {
+            out_->flush();
+            ok = static_cast<bool>(*out_);
+        } else {
+            const auto patch = [this](std::streamoff at, std::uint64_t value) {
                 std::vector<std::uint8_t> bytes;
                 put_u32(bytes,
                         static_cast<std::uint32_t>(std::min<std::uint64_t>(value, 0xFFFFFFFFU)));
-                return std::fseek(file_, at, SEEK_SET) == 0 &&
-                       std::fwrite(bytes.data(), 1, bytes.size(), file_) == bytes.size();
+                file_.seekp(at);
+                return put(bytes);
             };
             ok = patch(4, data_bytes_ + kWavHeaderBytes - 8) && patch(64, data_bytes_);
-            ok = std::fclose(file_) == 0 && ok;
-            file_ = nullptr;
-        } else if (file_ != nullptr) {
-            ok = std::fflush(file_) == 0;
+            file_.close();  // flushes: a full disk shows here
+            ok = ok && !file_.fail();
         }
+        out_ = nullptr;
         return ok;
     }
 
    private:
-    std::FILE* file_ = nullptr;
+    bool put(const std::vector<std::uint8_t>& bytes) {
+        out_->write(reinterpret_cast<const char*>(bytes.data()),
+                    static_cast<std::streamsize>(bytes.size()));
+        return static_cast<bool>(*out_);
+    }
+
+    // A file goes through an ofstream like the CLI's other outputs; "-" is std::cout. (It was
+    // fopen(path, "wb") until CodeQL's cpp/world-writable-file-creation named it: the only
+    // fopen for writing in the CLI, creating the file with mode 0666.)
+    std::ofstream file_;
+    std::ostream* out_ = nullptr;
     bool to_stdout_ = false;
     std::uint64_t data_bytes_ = 0;
     std::vector<std::uint8_t> buffer_;
