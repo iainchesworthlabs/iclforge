@@ -118,6 +118,8 @@ FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/audio" && pwd)"
 # The karaoke example's project, for the `forge project` section at the end. Resolved here for the
 # same reason: CI runs this script by a relative path, which names nothing after the `cd`.
 PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
+# The checks directory, for the AC-4 content signing section: resolved here for the same reason.
+CHECKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" && pwd)"
 
 WORKDIR="${2:-$(mktemp -d)}"
 mkdir -p "$WORKDIR"
@@ -1242,6 +1244,71 @@ run decode atmos_enc_ajoc.ac4 atmos_enc_ajoc.wav atmos_enc_ajoc_dir
 run atmos-encode bootstrap_51.wav atmos_enc_direct.mp4 256 6 codec=ac4 coding=direct dialnorm=27
 run_ac4_frames_check atmos_enc_direct.mp4
 run decode atmos_enc_direct.mp4 atmos_enc_direct.wav atmos_enc_direct_dir
+# --- AC-4 content signing (libs/ac4/ERRATA.md) --------------------------------
+# One signature over the whole stream, written after the last sync frame, with the operator's own
+# key and chain. Nothing is built into forge, so this makes a throwaway root and signer with openssl
+# (and skips with a message where there is none: the commands below are still named in this file).
+# Each signature carries a random nonce, so the signed files are removed once they have been read:
+# the cross-tier mode above diffs every file this script leaves behind. FFmpeg has no part in it -
+# its raw AC-4 demuxer takes the trailer for five more packets - so the frame count that is compared
+# is forge's own, signed against unsigned.
+run_fails() {
+    local want=$1
+    shift
+    count=$((count + 1))
+    echo "[$count] (exit $want expected) $*"
+    local got=0
+    "$CLI" "$@" >/dev/null 2>&1 || got=$?
+    if [[ "$got" != "$want" ]]; then
+        echo "forge $* exited $got, not $want" >&2
+        exit 1
+    fi
+}
+if command -v openssl >/dev/null 2>&1; then
+    mkdir -p cs
+    openssl ecparam -name prime256v1 -genkey -noout -out cs/root.key
+    openssl req -new -x509 -key cs/root.key -sha256 -days 30 -subj "/CN=Matrix Root CA" \
+        -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" \
+        -out cs/root.pem
+    openssl ecparam -name prime256v1 -genkey -noout -out cs/signer.key
+    openssl req -new -key cs/signer.key -sha256 \
+        -subj "/CN=Matrix Content Signer/title=Code\/Content Signer" -out cs/signer.csr
+    printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n' > cs/signer.ext
+    openssl x509 -req -in cs/signer.csr -CA cs/root.pem -CAkey cs/root.key -CAcreateserial \
+        -sha256 -days 30 -extfile cs/signer.ext -out cs/signer.pem
+    cat cs/signer.pem cs/root.pem > cs/chain.pem
+    run ac4-sign ac4_stereo_192.ac4 cs/signed.ac4 content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem
+    run ac4-verify cs/signed.ac4 unanchored-ok
+    run ac4-verify cs/signed.ac4 check-content
+    run decode cs/signed.ac4 cs/signed.wav verify-content trust-anchor=cs/root.pem
+    run decode cs/signed.ac4 cs/signed_report.wav check-content
+    run probe cs/signed.ac4
+    run ac4-encode "$FIXTURES/reference_stereo.wav" cs/encoded.ac4 192 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/encoded.ac4 trust-anchor=cs/root.pem
+    run atmos-encode bootstrap_51.wav cs/atmos.ac4 256 6 codec=ac4 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/atmos.ac4 trust-anchor=cs/root.pem
+    # What must be refused: no anchor, nothing signed, a changed byte, a key nobody asked for.
+    run_fails 6 ac4-verify cs/signed.ac4
+    run_fails 6 ac4-verify ac4_stereo_192.ac4 trust-anchor=cs/root.pem
+    run_fails 1 ac4-encode "$FIXTURES/reference_stereo.wav" cs/unasked.ac4 192 content-key=cs/signer.key
+    run_fails 2 decode ac4_stereo_192.ac4 cs/refused.wav verify-content trust-anchor=cs/root.pem
+    # Signed against unsigned: the same frames decode.
+    decoded_plain=$("$CLI" decode ac4_stereo_192.ac4 cs/plain.wav | sed -n 's/^decoded \([0-9]*\) AC-4 frames.*/\1/p')
+    decoded_signed=$("$CLI" decode cs/signed.ac4 cs/signed_again.wav | sed -n 's/^decoded \([0-9]*\) AC-4 frames.*/\1/p')
+    if [[ -z "$decoded_plain" ]] || [[ "$decoded_plain" != "$decoded_signed" ]]; then
+        echo "forge decoded '$decoded_plain' frames unsigned and '$decoded_signed' signed" >&2
+        exit 1
+    fi
+    cmp cs/plain.wav cs/signed_again.wav
+    # OpenSSL's reading of the same signature (tools/checks/check_content_signature_openssl.py).
+    python3 "$CHECKS_DIR/check_content_signature_openssl.py" --forge "$CLI"
+    rm -rf cs
+else
+    echo "openssl not found: skipping AC-4 content signing (ac4-sign, ac4-verify, sign-content, verify-content)"
+fi
 # Phase E5: frame rates other than the native one, the average and variable
 # rates, I-frames at an interval, and the metadata options, raw and in MP4,
 # where 29.97 fps counts at 240 000 Hz (TS 103 190-2 Table E.1) and the
