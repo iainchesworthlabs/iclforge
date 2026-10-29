@@ -106,10 +106,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     v3.7 §10.2.1 and also decoded under restart sync 0x31EB, which it used to refuse (`hb_noise_type1_lsb_bypass`). The twelve FFmpeg
     streams whose matrix sets the flag (every 24 bit stereo stream; `python3 tools/checks/check_truehd_coverage.py --list`) decode
     exactly as FFmpeg's decoder does.
-12. **The scale of `peak_data_rate` (§4.4, ERRATA 30).** The specification says raw x 200 x a rate multiplier; FFmpeg's
-    streams hold raw values that make raw x rate / 16 equal 9.6 Mbps at every rate. The encoder writes raw =
-    peak_data_rate_bps x 16 / rate (18 Mbps by default, Blu-ray's) and keeps the stream within it. Which scale does a
-    player's FIFO model use?
+12. **The scale of `peak_data_rate` (§4.4, ERRATA 30).** The specification said raw x 200 x a rate multiplier; FFmpeg's
+    streams hold raw values that make raw x rate / 16 equal 9.6 Mbps at every rate. TH spec v3.9 §4.4 answers it (TH-12): the unit is
+    bits per second, `(raw x group 1 sample rate + 8) >> 4`, with no x 200 factor (raw 6000 at 48 kHz is Blu-ray's 18 Mbit/s); the
+    field feeds a player's buffer model and changes no decoding. The encoder writes raw = peak_data_rate_bps x 16 / rate rounded down
+    (18 Mbps by default, Blu-ray's), the largest value whose rate does not exceed the declared one, and keeps the stream within it;
+    `MajorSync::peak_data_rate_bps()` and `forge probe` (text and the JSON member `peak_data_rate_bps`) give the rate.
+    **Confirmed by TH spec v3.9 §4.4.**
 13. **The lower presentations of a 6 or 8 channel stream (§2.2, §10.5, ERRATA 31).** FFmpeg's encoder writes no downmix:
     substream 0 holds L and R as they are. The encoder does the same by default (`DownmixMode::kNone`) and can write
     the 2, 6 and 8 channel presentations as downmixes that the later substreams' matrices undo
@@ -485,11 +488,14 @@ substream only, so its strict decode of these streams checks that the full prese
 about the downmix; the library's tests read the 2 and 6 channel presentations back and compare them with the formula
 (**provisional, owner to confirm the gains and the limiter**; open question 13).
 
-**39. Channel assignment codes (§13.1, §13.2).** §13.2 lists 0x0B as 5.1 and 0x0F as 7.1. §13.1's bit table, which the
+**39. Channel assignment codes (§13.1, §13.2).** §13.2 listed 0x0B as 5.1 and 0x0F as 7.1. §13.1's bit table, which the
 streams follow, makes 0x0F L R, C, LFE, Ls Rs (bits 0 to 3: 5.1), 7.1 0x4F (with Lrs Rrs, bit 6) and 0x0B L R C Ls Rs
 (5.0). FFmpeg's 5.1 streams carry 0xF, and its strict decode of this library's 7.1 streams (0x4F) is exact. The library
 follows §13.1. 0x13 ("additional heights") and 0x17 ("full Atmos configuration") name no layout the bit table can say and are
-not used. **Provisional, owner to confirm.**
+not used. TH spec v3.9 §13.2 now says the same: the field is a bitmask, 0x0B is 5.0, 0x0F 5.1, 0x4F 7.1, and the "Atmos codes" do
+not exist (TH-16). Every mapping of an assignment to channels, to a WAV mask or to a count goes through
+`channels_of_assignment` and `channel_count_of_assignment`, which read the bits; nothing in the tree used the old table
+(`test_checks.cpp` holds the four codes and shows 0x13 and 0x17 as plain bit sets). **Confirmed by TH spec v3.9 §13.2.**
 
 **40. Blocks per access unit (§3.3, §8.1, §8.4).** The specification says an access unit holds 40 samples and 8 blocks (§3.3,
 §8.1), and §8.4 a block of 40 samples and "8 blocks per access unit = 320 samples": the three cannot all hold. FFmpeg's streams

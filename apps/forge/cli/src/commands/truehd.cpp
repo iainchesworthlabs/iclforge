@@ -644,6 +644,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                     static_cast<std::uint64_t>(info->samples_per_access_unit));
         json.member("variable_rate", major_sync.is_vbr);
         json.member("peak_data_rate", static_cast<std::uint64_t>(major_sync.peak_data_rate));
+        json.member("peak_data_rate_bps", major_sync.peak_data_rate_bps());
         json.member("object_substream", info->has_object_substream);
         json.member("extra_data_units", extra_data_units);
         json.member("ac3_core_frames", static_cast<std::uint64_t>(ac3_core_frames));
@@ -672,8 +673,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         fmt::println("{:<16}{} Hz", "sample rate", info->sample_rate);
         fmt::println("{:<16}{} ({} channel(s) in substream order)", "substreams",
                      info->num_substreams, channels_text);
-        fmt::println("{:<16}{}, peak data rate field {}", "rate",
-                     major_sync.is_vbr ? "variable" : "constant", major_sync.peak_data_rate);
+        fmt::println("{:<16}{}, peak data rate {} bit/s (field {})", "rate",
+                     major_sync.is_vbr ? "variable" : "constant", major_sync.peak_data_rate_bps(),
+                     major_sync.peak_data_rate);
         if (info->has_object_substream) {
             fmt::println("{:<16}present (read as a 16-channel substream, not rendered)",
                          "object substream");

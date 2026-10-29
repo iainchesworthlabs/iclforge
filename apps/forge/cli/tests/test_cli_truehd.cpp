@@ -241,6 +241,8 @@ TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][trueh
     CHECK(text.find("300 (40 sample(s) each)") != std::string::npos);
     CHECK(text.find("48000 Hz") != std::string::npos);
     CHECK(text.find("2, 6 channel(s)") != std::string::npos);
+    // TH spec §4.4 (v3.9): the peak data rate is (raw * rate + 8) >> 4 bits per second.
+    CHECK(text.find("peak data rate 9597000 bit/s (field 3199)") != std::string::npos);
 
     REQUIRE(run_cli("probe \"" + fixture("mlp_st96_s24.mlp").string() + "\" json=1", log) == 0);
     const auto document = nlohmann::json::parse(read_text(log));
@@ -252,6 +254,8 @@ TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][trueh
     CHECK(stream["channels"][0] == 2);
     CHECK(stream["access_units"] == 300);
     CHECK(stream["samples_per_access_unit"] == 80);
+    CHECK(stream["peak_data_rate"] == 1599);
+    CHECK(stream["peak_data_rate_bps"] == 9594000);
     CHECK(stream["segment_failures"] == 0);
     CHECK(stream["skipped_bytes"] == 0);
 }

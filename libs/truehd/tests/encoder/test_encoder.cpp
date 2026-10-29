@@ -325,6 +325,58 @@ TEST_CASE("the declared peak data rate is kept or the encoder says it cannot",
     }
 }
 
+TEST_CASE("the peak data rate field is the declared rate in the unit of TH spec 4.4",
+          "[truehd][encoder][rate]") {
+    // (raw * group 1 sample rate + 8) >> 4 bits per second (TH spec §4.4, v3.9): raw 6000 at 48 kHz
+    // is Blu-ray's 18 Mbit/s. The encoder writes the largest raw value that does not exceed the
+    // declared rate, so the rate a reader derives is within one raw step below it.
+    for (const std::uint32_t rate : {44100U, 48000U, 88200U, 96000U, 176400U, 192000U}) {
+        for (const std::uint32_t declared : {18'000'000U, 9'600'000U, 12'345'678U, 1'000'000U}) {
+            EncoderConfig config;
+            config.sample_rate = rate;
+            config.channels = 2;
+            config.peak_data_rate_bps = declared;
+            config.allow_rate_violations = true;
+            const Encoded encoded = encode_all(config, make_pcm(2, 40 * 12, 24, 3));
+            REQUIRE_FALSE(encoded.units.empty());
+            auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+            REQUIRE(parsed.has_value());
+            REQUIRE(parsed->major_sync.has_value());
+            const std::uint64_t derived = parsed->major_sync->peak_data_rate_bps();
+            CAPTURE(rate, declared, parsed->major_sync->peak_data_rate);
+            CHECK(derived <= declared);
+            CHECK(derived + rate / 16U + 1U > declared);
+        }
+    }
+    EncoderConfig bluray;
+    auto encoded = encode_all(bluray, make_pcm(2, 40 * 12, 24, 3));
+    auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->major_sync.has_value());
+    CHECK(parsed->major_sync->peak_data_rate == 6000);
+    CHECK(parsed->major_sync->peak_data_rate_bps() == 18'000'000);
+}
+
+TEST_CASE("the peak data rate of a major sync is read in bits per second",
+          "[truehd][io]") {
+    // The figures TH spec §4.4 gives (raw 6000 at 48 kHz is 18 Mbit/s, 3200 is 9.6 Mbit/s) and
+    // the fields of the FFmpeg-made fixtures (3199 at 48 kHz, 3482 at 44.1, 1599 at 96, 799 at 192).
+    const auto rate_of = [](std::uint16_t raw, std::uint32_t format_info) {
+        MajorSync sync;
+        sync.format_info = format_info;
+        sync.peak_data_rate = raw;
+        return sync.peak_data_rate_bps();
+    };
+    CHECK(rate_of(6000, 0x00000001) == 18'000'000);
+    CHECK(rate_of(3200, 0x00000001) == 9'600'000);
+    CHECK(rate_of(3199, 0x00000001) == 9'597'000);
+    CHECK(rate_of(3482, 0x80000001) == 9'597'263);   // 44.1 kHz: (3482 * 44100 + 8) >> 4
+    CHECK(rate_of(1599, 0x10000001) == 9'594'000);   // 96 kHz
+    CHECK(rate_of(799, 0x20000001) == 9'588'000);    // 192 kHz
+    CHECK(rate_of(0, 0x00000001) == 0);
+    CHECK(rate_of(0x7FFF, 0x20000001) == (std::uint64_t{0x7FFF} * 192000U + 8U) / 16U);
+}
+
 TEST_CASE("a payload handed to the encoder is framed as extra data and comes back",
           "[truehd][encoder][extra]") {
     EncoderConfig config;

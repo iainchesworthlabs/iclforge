@@ -77,7 +77,7 @@ struct MajorSync {
     std::uint16_t flags = 0;  // TH spec §4.1: 0x4000 in an MLP stream FFmpeg writes, 0 in TrueHD
     std::uint16_t reserved = 0;
     bool is_vbr = false;
-    std::uint16_t peak_data_rate = 0;          // 15 bits; TH spec §4.4
+    std::uint16_t peak_data_rate = 0;          // 15 bits; TH spec §4.4, see peak_data_rate_bps()
     std::uint8_t num_substreams = 1;           // 4 bits
     std::uint8_t extended_substream_info = 0;  // 2 bits
     std::uint8_t extended_reserved = 0;        // the 2 bits after it
@@ -118,6 +118,12 @@ struct MajorSync {
     [[nodiscard]] unsigned mlp_channel_arrangement() const noexcept { return format_info & 0x1FU; }
 
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_hz(ratebits()); }
+    // TH spec §4.4 (v3.9): the peak data rate in bits per second, (raw * group1 sample rate + 8) >> 4
+    // for the 15-bit field `peak_data_rate`: raw 6000 at 48 kHz is Blu-ray's 18 Mbit/s. The field
+    // feeds a player's buffer model and changes no decoding.
+    [[nodiscard]] std::uint64_t peak_data_rate_bps() const noexcept {
+        return (std::uint64_t{peak_data_rate} * sample_rate() + 8U) >> 4U;
+    }
     friend bool operator==(const MajorSync&, const MajorSync&) = default;
 };
 

@@ -95,6 +95,34 @@ TEST_CASE("channel assignments list their speakers in stream order", "[truehd][f
     CHECK(channel_count_of_mlp_arrangement(31) == -1);
 }
 
+TEST_CASE("the common channel assignments are bitmasks, not an enumeration (TH spec 13.2)",
+          "[truehd][format]") {
+    // TH spec v3.9 §13.2: 0x01 stereo, 0x0B 5.0, 0x0F 5.1, 0x4F 7.1. The earlier 0x0B = 5.1,
+    // 0x0F = 7.1, 0x13 and 0x17 do not exist: 0x13 is bits 0, 1 and 4 (L R, C, Lvh Rvh) and 0x17
+    // adds the LFE to it, and there are no Atmos codes.
+    struct Case {
+        std::uint32_t assignment;
+        std::vector<Channel> channels;
+    };
+    const std::vector<Case> cases{
+        {0x01, {Channel::kL, Channel::kR}},
+        {0x0B, {Channel::kL, Channel::kR, Channel::kC, Channel::kLs, Channel::kRs}},
+        {0x0F,
+         {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLs, Channel::kRs}},
+        {0x4F,
+         {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLs, Channel::kRs,
+          Channel::kLrs, Channel::kRrs}},
+        {0x13, {Channel::kL, Channel::kR, Channel::kC, Channel::kLvh, Channel::kRvh}},
+        {0x17,
+         {Channel::kL, Channel::kR, Channel::kC, Channel::kLfe, Channel::kLvh, Channel::kRvh}},
+    };
+    for (const Case& c : cases) {
+        CAPTURE(c.assignment);
+        CHECK(channels_of_assignment(c.assignment) == c.channels);
+        CHECK(channel_count_of_assignment(c.assignment) == static_cast<int>(c.channels.size()));
+    }
+}
+
 TEST_CASE("the lossless fold shifts a sample by the matrix channel its output channel takes",
           "[truehd][checks]") {
     // ERRATA entry 12 (provisional): not by the output channel's position. With the identity
