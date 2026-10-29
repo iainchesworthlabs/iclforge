@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: a Common Encryption MP4 is refused by name, and one with a clear sample entry beside a protected one no longer comes out as audio
+  (G1 to G5 of `planning/cenc-conformance.md`).** The MP4 reader skipped an `enca` sample entry as an unknown codec, took the first
+  `ac-3`, `ec-3` or `ac-4` entry of a track and ignored which entry a sample uses. A file with a clear `ec-3` entry and a `cenc` `enca`
+  entry, which is how a packager writes a clear lead-in, was read as clear: on the committed six-access-unit fixture `forge demux` exited 0
+  and wrote six access units, the last four of them ciphertext. Any other protected track said "no 'ac-3'/'ec-3'/'ac-4' track". The reader now
+  reads `sinf`, `frma`, `schm` and `tenc`, never selects a track that has a protected sample entry (the whole track is refused, at
+  `moov`, so `demux()`, `Reader` and a pipe agree) and says `track 1 is protected (cenc, original format ec-3, default KID
+  a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90); decryption is not supported`; `forge demux`, `decode` and the other commands exit 2 and write
+  nothing, `probe` exits 1 as it does for every failure. A protected track beside a readable one is listed under `container.other_tracks`
+  with a new `protection` member (an object, or `null` for a clear track; the schema stays `iclforge.probe/1`). Nothing decrypts, and a
+  key is not read: the read side is a plan in `planning/cenc-read-side.md`. The documents now say that the EMDF `protection` field is an
+  authenticity tag and has nothing to do with content protection. The reader gains `DemuxError::kProtectedTrack`, `Protection`,
+  `describe_refusal()`, `Reader::refused_tracks()` and `list_refused_tracks()`; three small protected files from
+  `tools/generators/gen_cenc_reader_fixtures.py` are the MP4 fuzz harness's seeds and the tests' input.
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

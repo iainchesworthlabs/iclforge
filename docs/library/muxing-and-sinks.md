@@ -208,6 +208,18 @@ around them) knows which it is. A sample whose range runs past `size` ends deliv
 `demux` does for a truncated file. `forge demux` uses it for a file path, and keeps the chunked
 `Reader` for a pipe.
 
+**A protected track is refused, not read.** A track whose sample entry is `enca` is encrypted with
+Common Encryption (ISO/IEC 23001-7) and holds ciphertext. The reader reads its `sinf` (`frma`, `schm`,
+`tenc`), never selects the track, and returns `DemuxError::kProtectedTrack` when it was the only
+candidate; `describe_refusal(refused)` says which track, with its scheme, original format and default
+KID, and `Reader::refused_tracks()` or `list_refused_tracks()` supplies the tracks. A protected track
+beside a readable one is listed in `Demuxed::skipped` with its `Protection`. A track that holds a clear
+sample entry beside a protected one, the layout of a clear lead-in, is refused whole: the entry a
+sample belongs to is named per chunk or per fragment, and reading only the clear entry would return
+a truncated programme as if it were all of it. Nothing here decrypts or reads a key. See
+[the CENC audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md)
+and [the read-side plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md).
+
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
 twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
 `lfeon`, `bit_rate_code` or `data_rate_kbps`, `num_ind_sub`/`num_dep_sub`/`chan_loc`, and —

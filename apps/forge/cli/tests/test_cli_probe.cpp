@@ -1105,9 +1105,9 @@ TEST_CASE("probe lists the tracks of a Matroska karaoke video that it does not r
         // The array's text, whitespace stripped, so that the indentation is not what is checked.
         const std::string array = json_array(document, "other_tracks");
         CHECK(array.find("{\"track\":1,\"kind\":\"video\",\"codec_id\":\"V_MPEG4/ISO/AVC\","
-                         "\"language\":\"eng\"}") != std::string::npos);
+                         "\"language\":\"eng\",\"protection\":null}") != std::string::npos);
         CHECK(array.find("{\"track\":4,\"kind\":\"text\",\"codec_id\":\"S_TEXT/UTF8\","
-                         "\"language\":\"fra\"}") != std::string::npos);
+                         "\"language\":\"fra\",\"protection\":null}") != std::string::npos);
         // The track that is read is the container's own `track`, not an entry here.
         CHECK(array.find("\"track\":3") == std::string::npos);
         CHECK(json_field(document, "track") == "3");

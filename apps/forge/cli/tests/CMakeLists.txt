@@ -46,6 +46,11 @@ target_compile_definitions(iclforge-forge-cli-tests PRIVATE
 # not. A path for the same reason ICLFORGE_EXTERNAL_BASELINE_DIR is one.
 target_compile_definitions(iclforge-forge-cli-tests PRIVATE
     "ICLFORGE_FUZZ_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/ac3/fuzz/seeds\"")
+# test_cli_containers.cpp refuses the protected MP4s that are also the MP4 fuzz harness's seeds
+# (tools/generators/gen_cenc_reader_fixtures.py makes them), read in place and named by path for the
+# same reason ICLFORGE_FUZZ_SEED_DIR is.
+target_compile_definitions(iclforge-forge-cli-tests PRIVATE
+    "ICLFORGE_MP4_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/containers/fuzz/seeds/fuzz_mp4_demux\"")
 # test_cli_karaoke_example.cpp probes the karaoke example's committed stream and encodes its
 # committed parts, which it reads from the example's own folder: the folder is what the example
 # ships, so it is read in place and not copied to testdata/.

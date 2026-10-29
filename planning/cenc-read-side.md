@@ -80,7 +80,7 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
 | Area | State after the refusal fix |
 |---|---|
 | `libs/containers/src/mp4/reader.cpp` | Reads `sinf`, `frma`, `schm`, `schi`, `tenc` of an `enca` or `encv` entry into `mp4::Protection` and refuses the track with `DemuxError::kProtectedTrack`. Reads no `senc`, `saiz`, `saio`, `sgpd`, `sbgp` or `pssh`. Selects no track by KID. |
-| `libs/base/crypto` | SHA-256, HMAC-SHA-256 and `SigningKey` (operator-supplied, zeroized, loaded from a path or the environment). No AES. |
+| `libs/base/src/crypto` | SHA-256, HMAC-SHA-256 and `SigningKey` (operator-supplied, zeroized, loaded from a path or the environment). No AES. |
 | `tools/checks/projects.json` | `containers` may use `base` only. mbedTLS is linked by `libs/sendspin`, behind Hearth's vcpkg feature. |
 | `tools/generators/cenc_make_protected.py` | Writes protected fragmented MP4 in all four schemes and the clear-lead and rotation layouts; checked against GPAC and FFmpeg (M5 to M7). Needs the `cryptography` package. |
 | Docs | [IAMF](../docs/library/iamf.md) already states the precedent: Common Encryption would be the module's first third-party dependency, so a protected IA track is refused. |
@@ -90,9 +90,9 @@ where in the NIST documents they sit; the section numbers stay [recalled] until 
 ### 5.1 Where the cipher lives
 
 AES-128 is a block cipher with no codec in it, and `libs/containers` may use only `libs/base`, so
-the block cipher goes in `libs/base/crypto` beside SHA-256, as `aes128.hpp`. The scheme logic (the
+the block cipher goes in `libs/base/src/crypto` beside SHA-256, with a header `aes128.hpp`. The scheme logic (the
 counter layout, the CBC chain, the pattern, the partial-block rule) is CENC's, not AES's, and goes
-in `libs/containers` in a file of its own (`cenc_cipher.cpp`, internal to `src/mp4/`), so that
+in `libs/containers` in a file of its own (`cenc_cipher.cpp`, internal to the MP4 reader's source directory), so that
 `libs/base` stays a primitive and `libs/containers` stays the one place that knows the standard.
 
 | | Own AES in `libs/base` | AES from mbedTLS |
@@ -125,7 +125,7 @@ is not a constraint: a byte-oriented AES at several tens of MB/s decrypts a 768 
 
 The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `object-signing.md`):
 
-- A `ContentKey` type in `libs/base/crypto/content_key.hpp`: owns 16 bytes, zeroizes on destruction
+- A `ContentKey` type in `content_key.hpp`, beside `signing_key.hpp`: owns 16 bytes, zeroizes on destruction
   with volatile writes, copies scrub their own bytes. A `KeyId` is 16 plain bytes (a KID is not
   secret: it is in the MPD and in `tenc`).
 - A `ContentKeyring`: KID to key, many entries, no iteration that prints a key.
@@ -146,7 +146,7 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
   sketch was `forge demux key=...`. The plan uses `content-key=<path>` and offers no inline form on
   the command line (decision D4).
 - **Library API.** `mp4::ReadOptions` gains a non-owning pointer to a `ContentKeyring`. Callers
-  that never set it get the Part 1 refusal, unchanged.
+  that never set it get today's refusal, unchanged.
 
 ### 5.3 The MP4 reader
 
@@ -154,7 +154,7 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
 
 - `ReadOptions::keys` (the keyring, non-owning), `ReadOptions::max_aux_bytes` (bounds the per-sample
   IV table the way `max_samples` bounds the size table).
-- `ReadTrack::protection` (an optional `Protection`, as Part 1 builds it, now also carrying the
+- `ReadTrack::protection` (an optional `Protection`, as the refusal fix builds it, now also carrying the
   constant IV) and `ReadTrack::decrypted` (true when the samples handed back were decrypted).
 - **Zero-copy ends for a protected track.** `demux()` returns spans into the caller's buffer, and
   decrypted bytes are not there. `Demuxed` gains an owned arena for the decrypted samples and its
@@ -165,7 +165,7 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
   nothing else), `kBadAuxInfo` (no `senc` where a per-sample IV is needed, a count that does not
   match, an IV size that disagrees with `tenc`) and `kUnsupportedProtection` (a pattern or
   subsample map the reader declines). `describe()` gains the three sentences; the detail (which
-  KID, which pattern) comes the way Part 1's does, from the track list.
+  KID, which pattern) comes the way the protected-track detail does today, from the track list.
 
 **Parse.**
 
@@ -206,7 +206,7 @@ track" and exits as an input error. A test with a wrong key proves it.
 
 ### 5.4 Clear lead-in and key rotation
 
-Part 1 refuses a track whose `stsd` holds any protected entry, whatever the other entries are,
+Today the reader refuses a track whose `stsd` holds any protected entry, whatever the other entries are,
 because the reader cannot tell the lead-in from the rest. With keys, phase 3 reads
 `sample_description_index` per sample (`stsc`, `tfhd`, `trex`) and `seig` per sample, hands clear
 samples through untouched, decrypts the protected ones and picks the key by the sample's KID. The
@@ -225,7 +225,7 @@ One option, parsed where `signing-key=` is, read by the shared entry
 (`elementary_stream_from_bytes` for `probe`, `decode`, `qc`, `levels`, `remux`, `fmp4`; the chunked
 `Reader` and `demux_seekable` for `demux`). Without it the refusal is unchanged. `probe --json`
 gains `container.protection` (scheme, original format, KID, IV size, pattern, `decrypted`); the
-object is additive, with the `other_tracks[].protection` member of Part 1. Hearth and Crucible, and
+object is additive, beside the `other_tracks[].protection` member the refusal fix added. Hearth and Crucible, and
 the Python and C bindings, take no key in this plan (D5).
 
 ## 6. What would never be added
@@ -248,7 +248,7 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and section 8 of the
 | 3. FFmpeg, strict | Independent decrypt of `cenc`, `cbc1`, `cens`, `cbcs` full-sample audio in progressive and default-base-is-moof layouts, `-decryption_key`, packet hashes equal ours (M4, M5). | GPAC's base-offset layout and everything with a clear lead or a rotation |
 | 4. GPAC `MP4Box -decrypt` | All four schemes and four codecs; multi-entry `stsd`, `seig`, two keys (M3, M12). | Its own reading of the standard; it forces audio to 1:0 |
 | 5. In-repo decoder | The decrypted E-AC-3 or AC-4 decodes bit-exactly as the clear stream does, and the `dec3` and `dac4` survive. The strongest rung and the only one for JOC at 7.1.4. | Whether the ciphertext is what a packager writes |
-| 6. Generated fixtures | `tools/generators/cenc_make_protected.py` makes protected files from forge-made clear ones; a nightly job beside `ffmpeg-validate` runs rungs 3 and 4 over them and skips when a tool is missing (G20). Small committed fixtures (Part 1 added three) cover the unit tests. | The generator and the reader share the author's reading of the rules |
+| 6. Generated fixtures | `tools/generators/cenc_make_protected.py` makes protected files from forge-made clear ones; a nightly job beside `ffmpeg-validate` runs rungs 3 and 4 over them and skips when a tool is missing (G20). Three small committed fixtures (the refusal fix added them) cover the unit tests. | The generator and the reader share the author's reading of the rules |
 | 7. Negative and leak tests | Wrong key (sync-word check), missing key, truncated `senc`; the key never reaches stdout, stderr or a written file in hex, base64 or raw; the key scrubs. | n/a |
 | 8. Fuzz | `fuzz_mp4_demux` gains a keyring so the decrypt paths run, with the protected fixtures as seeds; ASan and UBSan. | n/a |
 | 9. Somebody else's streams | Shaka's Clear Key demo asset is AAC, not Dolby, and its key was not obtained (M8). Keep looking for a Dolby stream with a published key; Dolby's browser test kit lists `cbcs` streams, unverified. | n/a |
@@ -301,7 +301,7 @@ The scale is ROADMAP.md's: S an afternoon, M a day or two, L a focused week.
 | 0 | Obtain ISO/IEC 23001-7 and the CMAF clauses IOP-6 cites; replace every [recalled] row in section 3 of the audit and in 5.3; settle counter width, `cens` partial block, pattern 0:0 and 1:9, subsample CBC rules | all | S (the owner's purchase) |
 | 1 | `aes128` in `libs/base` with the rung 1 tests; `content_key.hpp` and the keyring with path, env, file format, zeroize and the leak test | G8, G21 | M |
 | 2 | `senc` and `tenc` parse, scheme dispatch, `cenc` and `cens` full-sample, `cbc1` and `cbcs` full-sample, key by KID, the arena, new errors, rungs 2 and 5, fuzz | G7, G9, G10 | L |
-| 3 | `command` wiring (`content-key=`, shared entry, `demux` paths), the plausibility check, `probe --json` completion, documentation, CLI tests, rungs 3, 4, 7 | G6 | M |
+| 3 | Command wiring (`content-key=`, shared entry, `demux` paths), the plausibility check, `probe --json` completion, documentation, CLI tests, rungs 3, 4, 7 | G6 | M |
 | 4 | Clear lead and `seig` rotation, `pssh` exposure, optional subsample maps | G11, G12 | M |
 | 5 | Nightly oracle job over generated fixtures | G20 | M |
 
@@ -312,7 +312,7 @@ the result checked.
 ## 10. Decisions for the owner
 
 - **D1. Go or stop.** Build the read side at all, given section 8, and take advice on the legal
-  position first. The refusal that says why (Part 1) stands either way.
+  position first. The refusal that says why stands either way.
 - **D2. Where AES lives.** Own implementation in `libs/base` (recommended), or mbedTLS for
   `libs/containers` with a `projects.json` exception, a notices fragment and a dependency on every
   lane.
@@ -332,7 +332,7 @@ the result checked.
   (recommended), or add a separate `demux_decrypt()` and keep `demux()` strictly zero-copy.
 - **D9. Wrong-key check.** In `apps/shared/media` per codec (recommended), or an optional callback
   in `ReadOptions` for library users.
-- **D10. Fixtures.** The three small committed fixtures from Part 1 stay; whether more belong in
+- **D10. Fixtures.** The three small committed fixtures stay; whether more belong in
   `testdata/` or are generated in CI from the generator (audit D8).
 - **D11. The standard.** Who obtains ISO/IEC 23001-7 and by when; the work stops at phase 0 without
   it.

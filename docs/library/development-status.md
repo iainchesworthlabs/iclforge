@@ -272,6 +272,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | **Mux** | MP4 / ISOBMFF | 🟢 | High | Essential | Mux + demux; AC-3 / E-AC-3 / AC-4 |
 | | MP4 `moov`-after-`mdat` demux from a file | 🟢 | Low | Optional | `demux_seekable()`: the boxes are walked jumping over `mdat`, then each sample is read where the table says, in bounded memory; `forge demux` takes it for a path |
 | | MP4 `moov`-after-`mdat` demux from a pipe | 🔴🔵 | Low | Optional | A pipe cannot go back for the sample table, so the chunk-fed `Reader` refuses it with the reason (a file path, or the batch `demux()`, reads it) |
+| | MP4 protected tracks (Common Encryption, `enca`) | 🔴🔵 | Low | Optional | Recognised and refused by name, with the scheme, original format and default KID (`DemuxError::kProtectedTrack`); a track with a clear entry beside a protected one is refused whole. Nothing decrypts: [the read-side plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md) |
 | | Fragmented MP4 / CMAF | 🟢 | High | Essential | Init + media segments; AC-4 by TS 103 190-2 Annex H (fragments start at I-frames, `ca4m`/`ca4s` brands, Annex G's descriptors) |
 | | Matroska | 🟢 | Medium | Important | Mux + demux for AC-3 and E-AC-3 |
 | | Matroska AC-4 | 🔴🔵 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 (checked against the codec registry 2026-10-10) |
