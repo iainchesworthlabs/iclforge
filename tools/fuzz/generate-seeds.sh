@@ -39,7 +39,8 @@ OUT="$WORK/seeds"
 
 mkdir -p "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
          "$OUT/fuzz_signing_verify" "$OUT/fuzz_iec61937_unwrap" \
-         "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse"
+         "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse" "$OUT/fuzz_content_signature" \
+         "$OUT/fuzz_ac4_content_signature"
 
 run() { "$ICLFORGE_CLI" "$@" >/dev/null; }
 
@@ -59,6 +60,61 @@ add_seed() {
 # synthesise for a format it only reads.
 echo "==> AC-4: the checked-in DEE baseline, as a parser seed"
 add_seed "fuzz_ac4_parse" "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
+
+# Content signing: a short stream signed with a throwaway root and signer that openssl makes here
+# and nothing keeps, and the parts of that signature as the two harnesses read them. fuzz_content_
+# signature takes a mode byte first (see the harness): 0 Thrift, 1 DER, 2 text, 3 blob, 4 blob
+# verified, 5 certificates, 6 base64. No private key is written to a seed: the one text seed that
+# a key loader reads is a bare scalar of no value to anyone.
+echo "==> AC-4 content signature: a short stream signed with a throwaway key, and its parts"
+if command -v openssl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    cs="$WORK/content-signature"
+    mkdir -p "$cs"
+    python3 - "$cs/tone.wav" <<'PY'
+import math, struct, sys, wave
+with wave.open(sys.argv[1], "wb") as w:
+    w.setnchannels(2)
+    w.setsampwidth(2)
+    w.setframerate(48000)
+    w.writeframes(b"".join(
+        struct.pack("<hh", int(6000 * math.sin(2 * math.pi * 440 * n / 48000)),
+                    int(6000 * math.sin(2 * math.pi * 660 * n / 48000)))
+        for n in range(6144)))
+PY
+    openssl ecparam -name prime256v1 -genkey -noout -out "$cs/root.key"
+    openssl req -new -x509 -key "$cs/root.key" -sha256 -days 30 -subj "/CN=Seed Root CA" \
+        -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" \
+        -out "$cs/root.pem"
+    openssl ecparam -name prime256v1 -genkey -noout -out "$cs/signer.key"
+    openssl req -new -key "$cs/signer.key" -sha256 \
+        -subj "/CN=Seed Content Signer/title=Code\/Content Signer" -out "$cs/signer.csr"
+    printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n' > "$cs/signer.ext"
+    openssl x509 -req -in "$cs/signer.csr" -CA "$cs/root.pem" -CAkey "$cs/root.key" \
+        -CAcreateserial -sha256 -days 30 -extfile "$cs/signer.ext" -out "$cs/signer.pem"
+    cat "$cs/signer.pem" "$cs/root.pem" > "$cs/chain.pem"
+    run ac4-encode "$cs/tone.wav" "$cs/plain.ac4" 64
+    run ac4-sign "$cs/plain.ac4" "$cs/signed.ac4" content-key="$cs/signer.key" \
+        content-chain="$cs/chain.pem"
+    plain_size="$(wc -c < "$cs/plain.ac4")"
+    signed_size="$(wc -c < "$cs/signed.ac4")"
+    tail -c +"$((plain_size + 1))" "$cs/signed.ac4" > "$cs/blob.bin"
+    cp "$cs/signed.ac4" "$OUT/fuzz_ac4_content_signature/ac4-signed-stereo-64.ac4"
+    cp "$cs/plain.ac4" "$OUT/fuzz_ac4_content_signature/ac4-unsigned-stereo-64.ac4"
+    head -c "$((signed_size - 700))" "$cs/signed.ac4" \
+        > "$OUT/fuzz_ac4_content_signature/ac4-signed-cut-in-trailer.ac4"
+    seed="$OUT/fuzz_content_signature"
+    { printf '\000'; cat "$cs/blob.bin"; } > "$seed/thrift-blob.bin"
+    { printf '\001'; openssl x509 -in "$cs/signer.pem" -outform DER; } > "$seed/der-signer.bin"
+    { printf '\002'; cat "$cs/chain.pem"; } > "$seed/text-pem-chain.bin"
+    { printf '\002'; head -c 32 /dev/zero | tr '\000' '\021'; } > "$seed/text-bare-scalar.bin"
+    { printf '\003'; cat "$cs/blob.bin"; } > "$seed/blob-parse.bin"
+    { printf '\004'; cat "$cs/blob.bin"; } > "$seed/blob-verify.bin"
+    { printf '\005'; openssl x509 -in "$cs/root.pem" -outform DER
+      openssl x509 -in "$cs/signer.pem" -outform DER; } > "$seed/certs-der-pair.bin"
+    { printf '\006'; base64 -w0 "$cs/blob.bin"; } > "$seed/blob-base64.bin"
+else
+    echo "    openssl or python3 not found: the content signature seeds are left as committed"
+fi
 
 # The IAB seed comes from examples/encode_iab.cpp's own --write-fixture mode,
 # the one tools/ci/run_codec_matrix.sh drives, so it needs that example built -

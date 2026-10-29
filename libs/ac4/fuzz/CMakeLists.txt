@@ -48,3 +48,11 @@ endif()
 if(ICLFORGE_BUILD_AC4)
     iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4)
 endif()
+
+# iclforge::ac4::locate_signature_trailer, verify_stream and the rest of the content signature's
+# stream joins (libs/ac4/src/io/content_signature.cpp): where the sync frames stop, which bytes the
+# digest covers, and the blob handed on to the Thrift and X.509 readers (fuzz_content_signature, in
+# libs/base/fuzz). Its seeds are signed streams made with a throwaway key.
+if(ICLFORGE_BUILD_AC4)
+    iclforge_add_fuzzer(fuzz_ac4_content_signature iclforge::ac4)
+endif()

@@ -102,8 +102,8 @@ is a set of specific properties rather than a language guarantee:
 
 What runs against it:
 
-- **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
-  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `tools/fuzz/run.sh`'s
+- **Twenty-six libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
+  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-three are in `tools/fuzz/run.sh`'s
   default list and drive the entry points in the table above for crashes and undefined
   behaviour — format sniffing and the metadata edit and insert (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
   `fuzz_mp4_demux`, `fuzz_mpegts_demux`), the AC-3 and E-AC-3 decoders (`fuzz_ac3_decode`,
@@ -114,7 +114,10 @@ What runs against it:
   (`fuzz_signing_verify`), the OSC parser (`fuzz_osc_parse`) and Sendspin's four
   (`fuzz_sendspin_json`, `fuzz_sendspin_handshake`, `fuzz_sendspin_messages`,
   `fuzz_sendspin_frames`) — and `fuzz_ac4_encode`, which runs the AC-4 encoder over the
-  configurations and input it takes and holds it to the decoder. Two more
+  configurations and input it takes and holds it to the decoder. Two press an AC-4 stream's
+  content signature, which arrives with the file it signs: `fuzz_ac4_content_signature` (where the
+  sync frames stop and what the digest covers) and `fuzz_content_signature` (the Thrift, DER,
+  X.509, PEM and credential readers, and the verifier that joins them). Two more
   (`fuzz_differential_ac3_decode`, `fuzz_differential_eac3_decode`) decode the same mutated
   bytes with FFmpeg as well and diff the PCM, so a *wrong* decode that does not crash is caught
   too. The last, `fuzz_adm_parse`, is built only when `ICLFORGE_BUILD_ADM` is on — see

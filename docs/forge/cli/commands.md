@@ -997,6 +997,47 @@ options, each only here:
 
 The status line gives the access units, restart intervals, bytes, the percentage of the PCM, and the substreams.
 
+### AC-4 content signing: `ac4-sign`, `ac4-verify`
+
+An AC-4 stream can carry one signature over the whole stream, made with the operator's own P-256 key
+and certificate chain and written after the last sync frame, so a signed file plays as the unsigned
+one. Nothing signs or checks unless it is asked to, the key and chain are yours (nothing of any
+issuer's ships), and a signature that checks out against a chain nothing you trust vouches for is
+reported as `chain unanchored`, never as valid. The API and the checks are in
+[Signing](../../library/signing.md#ac-4-content-signing).
+
+```bash
+forge ac4-sign in.ac4 signed.ac4 content-key=signer.key content-chain=chain.pem
+forge ac4-verify signed.ac4 trust-anchor=root.pem          # exit 0: valid and anchored
+forge ac4-verify signed.ac4                                # exit 6: checks out, chain unanchored
+forge ac4-verify signed.ac4 unanchored-ok                  # exit 0, still reported as unanchored
+forge ac4-verify signed.ac4 check-content                  # print what it finds, exit 0
+forge ac4-encode in.wav out.ac4 192 sign-content content-key=signer.key content-chain=chain.pem
+forge decode signed.ac4 out.wav verify-content trust-anchor=root.pem   # refuses before it decodes
+```
+
+`sign-content` (on `ac4-encode`, and on `atmos-encode`, `atmos-adm` and `atmos-iab` with `codec=ac4`)
+signs the file after it is written. The key and chain are checked first, with a throwaway digest, so a
+key that does not belong to its chain or a `signed-date=` outside the certificates' validity fails
+before the encode and writes nothing. It is refused for `-` (a pipe), for an MP4 (no carriage is
+implemented there) and for E-AC-3 output. `verify-content` on `decode` stops (exit 2) unless the
+signature, the chain and an anchor all check, before anything is decoded; `check-content` prints the
+checks and plays on. The exit code of `ac4-verify` is 0 for valid and anchored, 6 for anything else.
+
+`verify-time=` says when every certificate must be valid: `now` (the default, and the specification's),
+`signed` (the date the signer wrote, which is only as good as the signer), `ignore`, or an instant
+`YYYY-MM-DDTHH:MM:SS` in UTC. The report names the time it used. The leaf must carry the title
+`Code/Content Signer` unless `leaf-title=` says otherwise (`any` checks none). `pin=` takes a
+certificate's SHA-1 (40 hex digits) or SHA-256 (64) fingerprint and trusts that certificate wherever it
+appears in the chain; `trust-anchor=` takes a certificate file. Both repeat. The options are listed in
+[options and grammars](metadata-options.md); an option that says how to
+sign or check, without the command that signs or checks, is refused rather than dropped.
+
+`probe` shows a signature without a key and without checking it: a `content sig` line in the table
+and a `stream.content_signature` member in the JSON (`null` without one; otherwise `verified: false`,
+`readable`, `size_bytes`, `problem`, `signer`, `signer_serial`, `signed_date`, `signing_method`,
+`certificates`, `publisher`, `application`). The trailer is not a parse error.
+
 ### Damaged frames: `conceal=`
 
 `decode`, `monitor` and `spatial` stop on a frame that will not decode. `conceal=` substitutes
@@ -1314,7 +1355,8 @@ here. `crc_valid` is a boolean, true when no sync frame failed its CRC, where AC
 number of syncframes that passed. `parse_failures` is 0 or 1, because the walk keeps only the
 first error; `first_parse_error` names that error (`truncated`, `lost_sync` or
 `unsupported_bitstream_version`) and is `null` when there was none. **Exit code** follows the same
-rule as AC-3/E-AC-3: 0 only when every sync frame's CRC passed and every frame parsed.
+rule as AC-3/E-AC-3: 0 only when every sync frame's CRC passed and every frame parsed. A content
+signature after the last sync frame is not an error here (`stream.content_signature` describes it).
 
 `qc` is `loudness`'s bitstream-aware counterpart: `loudness` measures a *source* WAV before encoding, `qc` measures what a stream actually *delivers* after encoding and decoding it back, and checks that against what the stream's own metadata claims:
 

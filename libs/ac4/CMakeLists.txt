@@ -106,6 +106,7 @@ set(_ac4_meta_sources
 set(_ac4_inspector_sources
     src/core/toc.cpp
     src/io/carriage.cpp
+    src/io/content_signature.cpp
     src/io/elementary.cpp)
 
 # What the decoder and the encoder compute alike: the tables generated from the

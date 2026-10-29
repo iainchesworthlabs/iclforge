@@ -299,6 +299,17 @@ its own, four so far:
 `fuzz_ac4_encode` has no regression inputs: a violation aborts, and libFuzzer
 keeps the input.
 
+`fuzz_ac4_content_signature` and `fuzz_content_signature` (an AC-4 stream's content signature, which
+arrives with the file it signs) were added without a libFuzzer run: the machine they were written
+on had Clang without the libFuzzer and sanitizer runtimes. They compile under GCC 13 with the
+project's warning set, and were run there under AddressSanitizer and UndefinedBehaviorSanitizer
+with a coverage-blind replay driver (the seeds and regression inputs, then mutants of them with a
+fixed seed: 300,000 for `fuzz_content_signature`, 20,000 for `fuzz_ac4_content_signature`, whose
+every execution runs the verifier eight times) with nothing found. That shows the corpus is clean
+and says little about what coverage-guided mutation would reach, so the first `tools/fuzz/run.sh`
+run of each is still owed. Their `regressions/` hold hand-built boundary inputs (the walk that finds the trailer,
+Thrift counts and lengths past the blob, DER lengths past the end), not crashes.
+
 The corpus `tools/fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
 `tools/checks/ac4_syntax_differential.py` (`--inputs <directory>`), which reads
 every frame of each file through both syntax transcriptions, the decoder's and
@@ -461,6 +472,8 @@ way the fixed findings used to.
 | `fuzz_oamd_parse`      | `iclforge::objects::oba::parse_payload` - TS 103 420 §5's `object_audio_metadata_payload`, as recovered from an EMDF payload with id 11 |
 | `fuzz_joc_parse`       | `iclforge::ac3::oba::joc::parse_payload` - TS 103 420 §6's `joc()` payload: Huffman-coded coefficients into a matrix sized from the stream's own numbers |
 | `fuzz_signing_verify`  | `iclforge::ac3::signing::verify_atmos_stream` + `verify_atmos_frame` - operator-supplied stream, operator-supplied key, no CRC check in front of either |
+| `fuzz_ac4_content_signature` | `iclforge::ac4::locate_signature_trailer`, `signed_content_digest`, `summarise_signature`, `strip_signature` and `verify_stream` on a raw AC-4 stream - the walk that finds where the sync frames stop and the digest boundary, then the verifier under each way of judging time, with and without the blob's own certificates as trust anchors |
+| `fuzz_content_signature` | The Thrift binary reader, DER and X.509 (`parse_certificate`), PEM and base64, the key and certificate loaders, `parse_content_signature`, `validate_chain` and `verify_content_signature`; the first input byte picks the entry point. The certificates are inside the signature, so they are as untrusted as the stream |
 | `fuzz_osc_parse`       | `iclforge::objects::oba::parse_osc_packet` - the OSC 1.0 wire form of a live object-position update (live OSC object positions), reached straight from a UDP datagram by `iclforge::audio::LivePositionSource` whenever `positions=osc:<port>` is in play. No CRC, no container, no bitstream ahead of it at all - this project's first NETWORK-facing input rather than a file or capture-device one; see `docs/threat-model.md` |
 | `fuzz_adm_parse`       | `iclforge::adm::parse_bw64(std::istream&)` - BW64/RF64 chunks plus an arbitrary ADM XML document. Opt-in, see below |
 | `fuzz_sendspin_json`   | `iclforge::sendspin::json::Document::parse` - the JSON of every Sendspin message, the first code a network peer's bytes reach on hearth's server and on a sink. Every accessor runs on every value parsed, and the document is written back out and parsed again, which must give the same text; `TokenStorage` and `count_tokens` must agree with a parse into fixed storage |

@@ -25,6 +25,7 @@
 #include "iclforge/ac4/decoder/frame.hpp"
 #include "iclforge/ac4/encoder/config.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "content_signature.hpp"
 #include "encode.hpp"
 
 // ac4-encode: WAV to AC-4 through iclforge::ac4::Encoder (libs/ac4/src/encoder), as a raw stream
@@ -238,6 +239,9 @@ struct Input {
 
 int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                    const forge_cli::Options& meta) {
+    if (const int refused = check_sign_content_request(out_path, meta); refused != kExitOk) {
+        return refused;
+    }
     if (!meta.ac4_objects_path.empty()) {
         return run_ac4_encode_objects(in_path, out_path, bitrate, meta);
     }
@@ -729,7 +733,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
         rate_mode_name(config.rate_mode),
         encoder->delay_samples() + encoder->decoder_delay_samples(),
         native ? "" : ", to the nearest sample");
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace forge_cli::commands

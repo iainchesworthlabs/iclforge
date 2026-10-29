@@ -5,6 +5,11 @@ iclforge_add_test_binary(iclforge-base-tests PROJECT base SOURCES
     test_crc16.cpp
     test_meters.cpp
     test_crypto.cpp
+    test_ecdsa_p256.cpp
+    test_x509_chain.cpp
+    test_credentials.cpp
+    test_thrift_binary.cpp
+    test_content_signature.cpp
     test_expected_payload_padding.cpp
     test_number_parse.cpp
     test_range_for_temporaries.cpp)

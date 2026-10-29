@@ -418,7 +418,13 @@ Ac4Summary summarize_ac4(std::span<const std::byte> data) {
             }
         }
     }
-    if (scanned.stopped_at.has_value() && !summary.parse_error.has_value()) {
+    // A content signature follows the last sync frame, which is where the frames are meant to
+    // stop, so the scan ending there is not a parse error.
+    summary.content_signature = iclforge::ac4::summarise_signature(data);
+    const auto trailer = iclforge::ac4::locate_signature_trailer(data);
+    const bool trailer_follows = trailer.has_value() && trailer->present &&
+                                 trailer->content_size == scanned.stopped_at_offset;
+    if (scanned.stopped_at.has_value() && !summary.parse_error.has_value() && !trailer_follows) {
         summary.parse_error = scanned.stopped_at;
     }
     if (summary.first_frame.has_value()) {
@@ -857,6 +863,32 @@ void write_ac4_stream(JsonSink& json, const Ac4Summary& summary) {
         json.member_null("first_parse_error");
     }
     json.end_object();
+
+    // null without a content signature. "verified" is always false: probe reads the signature, it
+    // is not given a trust anchor to check it against (forge ac4-verify).
+    json.key("content_signature");
+    if (summary.content_signature.present) {
+        const iclforge::ac4::SignatureSummary& signature = summary.content_signature;
+        json.begin_object();
+        json.member("verified", false);
+        json.member("readable", signature.readable);
+        json.member("size_bytes", static_cast<std::uint64_t>(signature.blob_size));
+        if (signature.readable) {
+            json.member_null("problem");
+            json.member("signer", signature.signer);
+            json.member("signer_serial", signature.signer_serial);
+            json.member("signed_date", signature.signed_date);
+            json.member("signing_method", signature.signing_method);
+            json.member("certificates", static_cast<std::uint64_t>(signature.certificates));
+            json.member("publisher", signature.publisher);
+            json.member("application", signature.application);
+        } else {
+            json.member("problem", signature.problem);
+        }
+        json.end_object();
+    } else {
+        json.value_null();
+    }
 
     json.key("ac4");
     if (!summary.first_frame.has_value()) {

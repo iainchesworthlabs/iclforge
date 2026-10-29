@@ -61,6 +61,7 @@
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -1745,6 +1746,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.gate_objects = true;
             continue;
         }
+        if (token == "sign-content") {
+            out.sign_content = true;
+            continue;
+        }
+        if (token == "verify-content") {
+            out.verify_content = true;
+            continue;
+        }
+        if (token == "check-content") {
+            out.check_content = true;
+            continue;
+        }
+        if (token == "unanchored-ok") {
+            out.unanchored_ok = true;
+            continue;
+        }
         if (token == "verify") {
             out.verify = true;
             continue;
@@ -3337,6 +3354,81 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.signing_keys.emplace_back(value);
             continue;
         }
+        if (key == "content-key") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: content-key= needs a private key file path");
+                return false;
+            }
+            out.content_key = std::string{value};
+            continue;
+        }
+        if (key == "content-chain") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: content-chain= needs a certificate file path");
+                return false;
+            }
+            out.content_chains.emplace_back(value);
+            continue;
+        }
+        if (key == "trust-anchor") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: trust-anchor= needs a certificate file path");
+                return false;
+            }
+            out.trust_anchors.emplace_back(value);
+            continue;
+        }
+        if (key == "pin") {
+            // A SHA-1 (40 hex digits) or SHA-256 (64) fingerprint; the colons a tool prints
+            // between the bytes are allowed.
+            std::size_t hex_digits = 0;
+            bool clean = !value.empty();
+            for (const char c : value) {
+                if (c == ':') {
+                    continue;
+                }
+                clean = clean && std::isxdigit(static_cast<unsigned char>(c)) != 0;
+                ++hex_digits;
+            }
+            if (!clean || (hex_digits != 40 && hex_digits != 64)) {
+                fmt::println(stderr,
+                             "error: pin= is a certificate fingerprint: 40 hex digits (SHA-1) or "
+                             "64 (SHA-256), colons allowed (got '{}')",
+                             token);
+                return false;
+            }
+            out.pins.emplace_back(value);
+            continue;
+        }
+        if (key == "leaf-title") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: leaf-title= needs a title, or 'any' to check none");
+                return false;
+            }
+            out.leaf_title = std::string{value};
+            continue;
+        }
+        if (key == "signed-date") {
+            if (!iclforge::base::crypto::parse_iso8601_utc(value).has_value()) {
+                fmt::println(stderr, "error: signed-date= is YYYY-MM-DDTHH:MM:SS in UTC (got '{}')",
+                             token);
+                return false;
+            }
+            out.signed_date = std::string{value};
+            continue;
+        }
+        if (key == "verify-time") {
+            if (value != "now" && value != "signed" && value != "ignore" &&
+                !iclforge::base::crypto::parse_iso8601_utc(value).has_value()) {
+                fmt::println(stderr,
+                             "error: verify-time= is now, signed, ignore or YYYY-MM-DDTHH:MM:SS in "
+                             "UTC (got '{}')",
+                             token);
+                return false;
+            }
+            out.verify_time = std::string{value};
+            continue;
+        }
         if (key == "programme") {
             // §E2.3.1.2 numbers independent substreams I0-I7, so the id is
             // the whole of what selects a programme - there is no separate
@@ -3403,6 +3495,63 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         fmt::println(stderr, "error: unknown option '{}'", token);
         print_meta_usage();
         return false;
+    }
+    // AC-4 content signing is opt-in and belongs to a few commands; asking for it elsewhere is
+    // said, not dropped.
+    {
+        const bool signs_content = command == "ac4-encode" || command == "atmos-encode" ||
+                                   command == "atmos-adm" || command == "atmos-iab" ||
+                                   command == "ac4-sign";
+        const bool checks_content = command == "decode" || command == "ac4-verify";
+        const bool signing_given = out.sign_content || !out.content_key.empty() ||
+                                   !out.content_chains.empty() || out.signed_date.has_value();
+        const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
+                                    !out.trust_anchors.empty() || !out.pins.empty() ||
+                                    out.verify_time != "now";
+        if (signing_given && !signs_content) {
+            fmt::println(stderr,
+                         "error: sign-content, content-key=, content-chain= and signed-date= sign "
+                         "AC-4 output: ac4-encode, atmos-encode codec=ac4 and ac4-sign take them");
+            return false;
+        }
+        if (checking_given && !checks_content) {
+            fmt::println(stderr,
+                         "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin= "
+                         "and verify-time= check an AC-4 content signature: decode and ac4-verify "
+                         "take them");
+            return false;
+        }
+        if (out.leaf_title.has_value() && !signs_content && !checks_content) {
+            fmt::println(stderr, "error: leaf-title= is for the AC-4 content-signature commands");
+            return false;
+        }
+        if (out.verify_content && out.check_content) {
+            fmt::println(stderr,
+                         "error: verify-content refuses a signature that does not check and "
+                         "check-content only reports it - give one, not both");
+            return false;
+        }
+        // Where signing or checking has to be asked for, the options that only say how are not
+        // taken for the asking: a key given to an encoder that was not told sign-content would
+        // otherwise be dropped, and an unsigned file reads exactly like a signature that failed.
+        const bool signing_asked = out.sign_content || command == "ac4-sign";
+        const bool checking_asked =
+            out.verify_content || out.check_content || command == "ac4-verify";
+        if (signs_content && !signing_asked &&
+            (signing_given || (out.leaf_title.has_value() && !checks_content))) {
+            fmt::println(
+                stderr,
+                "error: content-key=, content-chain=, signed-date= and leaf-title= say how "
+                "to sign, and nothing is signed unless sign-content asks for it");
+            return false;
+        }
+        if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
+            fmt::println(stderr,
+                         "error: trust-anchor=, pin=, unanchored-ok, verify-time= and leaf-title= "
+                         "say how to check, and nothing is checked unless verify-content or "
+                         "check-content asks for it");
+            return false;
+        }
     }
     // One says "refuse the command on a mismatch", the other "play the bed on
     // one": asking for both has no answer, and silently preferring either

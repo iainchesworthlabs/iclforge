@@ -5,6 +5,7 @@ iclforge_add_test_binary(iclforge-ac4-tests PROJECT ac4 SOURCES
     core/test_toc.cpp
     core/test_presentation_configs.cpp
     io/test_splitter.cpp
+    io/test_content_signature.cpp
     core/test_toc_syntax.cpp
     core/test_acpl.cpp
     core/test_acpl_exact.cpp
