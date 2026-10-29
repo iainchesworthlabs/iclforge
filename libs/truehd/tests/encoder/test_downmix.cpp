@@ -163,4 +163,10 @@ TEST_CASE("a downmix of a stereo stream is the stream, and layouts it cannot fol
     REQUIRE(!Encoder::create(loud).has_value());
     loud.downmix_gains.centre = 2.5;
     REQUIRE(!Encoder::create(loud).has_value());
+    // TH spec §10.5: DEE rejects a coefficient of magnitude 16 or more; the encoder's own limit,
+    // what the matrix coefficient word carries, is below that (ERRATA.md entry 49).
+    loud.downmix_gains.centre = 16.0;
+    REQUIRE(!Encoder::create(loud).has_value());
+    loud.downmix_gains.centre = 1.99;
+    REQUIRE(Encoder::create(loud).has_value());
 }

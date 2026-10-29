@@ -135,6 +135,61 @@ TEST_CASE("a major sync and a restart header open every restart interval and no 
     }
 }
 
+TEST_CASE("the restart sync of a substream follows TH spec 7.2: 0x31EB unless it is the last of a "
+          "presentation",
+          "[truehd][encoder][stream]") {
+    // TH spec §7.2 (v3.9): a non-Atmos substream carries 0x31EA or 0x31EB whatever its index, and
+    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation,
+    // which is to say unless the stream has a third; the third (8 channel) substream carries 0x31EB
+    // (the owner's Blu-ray has 0x31EA in substream 0 and 0x31EB in 1 and 2). 0x31EC is the Atmos
+    // substream's and the encoder writes none.
+    struct Case {
+        int channels;
+        std::vector<std::uint16_t> syncs;
+    };
+    const std::vector<Case> cases{
+        {2, {kRestartSyncStandard}},
+        {6, {kRestartSyncStandard, kRestartSyncStandard}},
+        {7, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
+        {8, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
+    };
+    for (const Case& c : cases) {
+        for (const bool downmix : {false, true}) {
+            if (downmix && c.channels < 6) {
+                continue;
+            }
+            CAPTURE(c.channels, downmix);
+            EncoderConfig config;
+            config.channels = c.channels;
+            config.restart_interval_units = 8;
+            if (downmix) {
+                config.downmix = DownmixMode::kStandard;
+            }
+            const Encoded encoded = encode_all(config, make_pcm(c.channels, 40 * 20, 24, 6));
+            REQUIRE_FALSE(encoded.units.empty());
+            auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+            REQUIRE(parsed.has_value());
+            REQUIRE(static_cast<std::size_t>(parsed->num_substreams) == c.syncs.size());
+            for (std::size_t index = 0; index < c.syncs.size(); ++index) {
+                iclforge::BitReader bits(parsed->segments[index]);
+                REQUIRE(bits.read(1) == 1);
+                REQUIRE(bits.read(1) == 1);
+                auto restart = read_restart_header(bits, parsed->segments[index], true);
+                REQUIRE(restart.has_value());
+                CAPTURE(index);
+                CHECK(restart->sync == c.syncs[index]);
+            }
+            // Every restart header of the stream, not only the first.
+            Decoder decoder;
+            for (const EncodedAccessUnit& unit : encoded.units) {
+                auto decoded = decoder.decode(unit.bytes);
+                REQUIRE(decoded.has_value());
+            }
+            CHECK(decoder.counters().lossless_check_failures == 0);
+        }
+    }
+}
+
 TEST_CASE("a restart gap of 2 to 7 units is refused", "[truehd][encoder][config]") {
     for (const int gap : {0, 2, 3, 7, -1}) {
         EncoderConfig config;

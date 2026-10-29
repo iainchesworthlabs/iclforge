@@ -262,6 +262,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     value of an Atmos stream, or a bit field (bit 0 the 8-channel extension, bit 1 the 16-channel)? **Recommendation:** treat it as a bit
     field, which fits 0, 1, 2 and 3, and keep the library's reading until the owner says.
 
+47. **The restart syncs of §2.3, §20.1 and Appendix A (§7.2).** v3.9 §7.2 says 0x31EC marks the 16-channel Atmos substream only and a
+    non-Atmos substream carries 0x31EA or 0x31EB whatever its index. §2.3 and §20.1 still say all substreams share one 13-bit restart sync
+    (0x18F5, with `noise_type` as the 14th bit, which cannot tell 0x31EC apart), and Appendix A lists 0x31EB for "substreams 0/1" and
+    0x31EC for "substreams 2/3". **Recommendation:** follow §7.2 (the library does) and bring the three places in line.
+48. **Downmix gains beyond 2 (§10.5, entry 49).** DEE takes any coefficient of magnitude below 16 (32 for Atmos), with the output shift
+    for headroom; the encoder takes 0 to 1.99. Should it take more, and negative ones? **Recommendation:** not until a mix needs it.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -605,6 +612,24 @@ question 2) has 0x43 there: four substreams, the upper pair 0, the low pair 3, a
 §14.2, which the old reading never looked for. The pair is now read and written the other way round and any non-zero value of the low
 pair means an extended substream; §4.5 lists 0, 1 and 2 and the disc has 3, which the table does not say. `test_access_unit.cpp` holds
 the byte. **Confirmed by the Blu-ray; the meaning of 3 is open (question 46).**
+
+**48. The restart sync of substream 1 (§7.2; TH spec v3.9).** v3.9 §7.2: a non-Atmos substream uses 0x31EA or 0x31EB whatever its index,
+0x31EC marks the 16-channel Atmos substream only, and substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel
+presentation (the third, 8 channel substream of a non-Atmos 7.1 stream carries 0x31EB too). The owner's Blu-ray agrees: 0x31EA in
+substream 0, 0x31EB in 1 and 2, 0x31EC in 3. The encoder wrote 0x31EB only for a substream with a channel above 5 (entry 32); it now
+writes it for substream 1 of every stream that has a third substream (7 and 8 channels, with or without the downmix presentations) and
+0x31EA for the last substream of a 5.1 or stereo stream. The matrices of such a substream carry the 4-bit noise shift, zero, and no noise
+channel coefficients (entry 32); FFmpeg's strict decode of those streams is exact (`verify_truehd_encode_interop.py`, the 7 and 8 channel
+cases), and `test_encoder.cpp` reads the syncs. The decoder takes 0x31EA, 0x31EB and 0x31EC in any substream and ties nothing but the
+`huff_lsbs` limit (31) to 0x31EC; v3.9 says only that 0x31EC marks the Atmos substream, so it does not refuse it elsewhere. §2.3, §20.1
+and Appendix A still show the earlier reading (one shared 13-bit sync 0x18F5; 0x31EB for substreams 0 and 1; 0x31EC for substreams 2 and
+3): question 47. **Confirmed by TH spec v3.9 §7.2** (its stated confidence is medium-high).
+
+**49. Downmix coefficients (§10.5; TH spec v3.9).** DEE range-checks the downmix coefficients it is given by magnitude: it rejects
+`|c| >= 16`, or `>= 32` for an Atmos substream. The encoder's `DownmixGains` (centre, surround, LFE, rear to surround) are refused
+outside 0 to 1.99, which keeps them inside DEE's bound and below the 2 the 16 bit matrix coefficient (`frac_bits` 14) can carry; a gain
+between 2 and 16, or a negative one, would need a coarser `frac_bits` and the output shift DEE uses for headroom (question 48). Nothing
+changed. `test_downmix.cpp` holds the refusal.
 
 ## Atmos, spec v3.6
 

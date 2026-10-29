@@ -98,12 +98,16 @@ struct StageSpec {
     return {StageSpec{0, 1}, StageSpec{2, six - 1}, StageSpec{six, channels - 1}};
 }
 
-// FFmpeg's decoder takes a substream of more than 6 channels (a channel above 5) only when its
-// restart sync has noise_type set, 0x31EB, whether or not the stream uses noise (ERRATA.md entry
-// 32; provisional, owner to confirm). The noise shift and seed are zero and no matrix draws on a
-// noise channel.
-[[nodiscard]] bool noise_flag(const StageSpec& stage) noexcept {
-    return stage.last_row > 5;
+// The restart sync of a substream (TH spec §7.2, v3.9): 0x31EA, or 0x31EB (noise_type set) where
+// the substream is not the last one of its presentation. FFmpeg's decoder takes a substream of more
+// than 6 channels (a channel above 5) only with noise_type set, whether or not the stream uses
+// noise (ERRATA.md entry 32), and §7.2 says substream 1 SHALL carry 0x31EB unless it is the last
+// substream of a 6 channel presentation, i.e. unless the stream has no third substream (ERRATA.md
+// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are zero
+// and no matrix draws on a noise channel.
+[[nodiscard]] bool noise_flag(const StageSpec& stage, std::size_t index,
+                              std::size_t stage_count) noexcept {
+    return stage.last_row > 5 || (index == 1 && stage_count > 2);
 }
 
 [[nodiscard]] bool is_pair(Channel left, Channel right) noexcept {
@@ -1163,7 +1167,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             context.min_chan = stage.spec.first_row;
             context.max_chan = stage.spec.last_row;
             context.max_matrix_chan = stage.spec.last_row;
-            context.noise_type = noise_flag(stage.spec);
+            context.noise_type = noise_flag(stage.spec, s, stage_count);
             context.presence_flags = presence::kAll;
 
             // The coding in force at the start of this access unit's first block is rebuilt by the
@@ -1192,7 +1196,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     if (restart_here) {
                         RestartHeader restart;
                         restart.sync =
-                            noise_flag(stage.spec) ? kRestartSyncNoise : kRestartSyncStandard;
+                            noise_flag(stage.spec, s, stage_count) ? kRestartSyncNoise
+                                                                   : kRestartSyncStandard;
                         restart.output_timing = static_cast<std::uint16_t>(first_sample & 0xFFFFU);
                         restart.min_chan = static_cast<std::uint8_t>(stage.spec.first_row);
                         restart.max_chan = static_cast<std::uint8_t>(stage.spec.last_row);
