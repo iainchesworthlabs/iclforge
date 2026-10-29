@@ -1074,29 +1074,34 @@ std::vector<std::byte> oamd_substream() {
     return w.bytes();
 }
 
-// The frame of an A-JOC substream (one downmix signal, one object), a direct-coded
+// The frame of an A-JOC substream (`n_dmx_signals` downmix signals, one object), a direct-coded
 // substream, their OAMD substream and the presentation substream. `b_iframe` is the audio
 // substreams' b_audio_ndot, which is what makes one of them an I-frame (Part 1 4.3.3.2.7).
 std::vector<std::byte> object_group_frame(bool b_iframe,
                                           const std::vector<std::vector<std::byte>>& substreams,
-                                          int sequence_counter = 1) {
+                                          int sequence_counter = 1, int md_compat = 0,
+                                          int n_dmx_signals = 1, bool b_lfe = false,
+                                          bool with_object = true) {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {.sequence_counter = sequence_counter, .b_iframe_global = b_iframe});
     PresV1 p;
     p.presentation_substream = 3;
+    p.md_compat = md_compat;
     ac4_toc_test::presentation_v1(toc, p);
     toc.flag(true);   // b_substreams_present
     toc.flag(false);  // b_hsf_ext
-    toc.flag(false);  // b_single_substream
-    toc.put(0, 2);    // two substreams
+    toc.flag(!with_object);  // b_single_substream
+    if (with_object) {
+        toc.put(0, 2);  // two substreams
+    }
     toc.flag(false);  // b_channel_coded
     toc.flag(true);   // b_oamd_substream
     toc.flag(true);   // b_oamd_ndot
     ac4_toc_test::substream_index(toc, 2);
     toc.flag(true);   // b_ajoc
-    toc.flag(false);  // b_lfe
+    toc.flag(b_lfe);  // b_lfe
     toc.flag(false);  // b_static_dmx
-    toc.put(0, 4);    // n_fullband_dmx_signals_minus1: one signal
+    toc.put(static_cast<std::uint64_t>(n_dmx_signals - 1), 4);  // n_fullband_dmx_signals_minus1
     toc.flag(true);   // bed_dyn_obj_assignment(): b_dyn_objects_only
     toc.flag(false);  // b_oamd_common_data_present
     toc.put(0, 4);    // n_fullband_upmix_signals_minus1: one object
@@ -1105,14 +1110,16 @@ std::vector<std::byte> object_group_frame(bool b_iframe,
     toc.flag(false);  // b_bitrate_info
     toc.flag(b_iframe);  // b_audio_ndot: the substream is an I-frame
     ac4_toc_test::substream_index(toc, 0);
-    toc.flag(false);  // b_ajoc: a direct-coded substream
-    toc.put(1, 3);    // n_objects_code: one object
-    toc.flag(true);   // b_dynamic_objects
-    toc.flag(false);  // b_lfe
-    toc.flag(false);  // b_sf_multiplier
-    toc.flag(false);  // b_bitrate_info
-    toc.flag(b_iframe);  // b_audio_ndot: the substream is an I-frame
-    ac4_toc_test::substream_index(toc, 1);
+    if (with_object) {
+        toc.flag(false);  // b_ajoc: a direct-coded substream
+        toc.put(1, 3);    // n_objects_code: one object
+        toc.flag(true);   // b_dynamic_objects
+        toc.flag(false);  // b_lfe
+        toc.flag(false);  // b_sf_multiplier
+        toc.flag(false);  // b_bitrate_info
+        toc.flag(b_iframe);  // b_audio_ndot: the substream is an I-frame
+        ac4_toc_test::substream_index(toc, 1);
+    }
     toc.flag(false);  // b_content_type
     ac4_toc_test::index_table(toc, ac4_toc_test::sizes_of(substreams));
     toc.align();
@@ -1382,4 +1389,79 @@ TEST_CASE("an A-JOC substream of more upmix signals than the decoder describes i
         constexpr std::uint32_t kIntMax = std::numeric_limits<int>::max();
         CHECK(ajoc.n_fullband_upmix_signals == static_cast<int>(std::min(c.signals, kIntMax)));
     }
+}
+
+namespace {
+
+// The presentation substream of an A-JOC presentation with a 5.1 downmix, as Dolby's level 4
+// streams write it: an object presentation (b_obj_loud_corr 1) that also reads the core's custom
+// downmix flag and loudness corrections.
+std::vector<std::byte> core_presentation() {
+    BitWriter w;
+    w.flag(false);  // b_additional_data
+    w.put(20, 7);   // dialnorm_bits
+    w.flag(false);  // b_further_loudness_info
+    w.put(1, 5);    // drc_metadata_size_value
+    w.flag(false);  // b_more_bits
+    w.flag(false);  // b_drc_present
+    w.flag(false);  // b_associated
+    w.flag(false);  // b_stereo_dmx_coeff: custom_dmx_data() of a presentation with a core
+    w.flag(true);   // b_obj_loud_corr
+    w.flag(false);  // b_corr_for_immersive_out
+    w.flag(true);   // b_loro_loud_comp
+    w.put(8, 5);    // loro_dmx_loud_corr
+    w.flag(false);  // b_ltrt_loud_comp
+    w.flag(false);  // b_loud_comp: loud_corr_5_X
+    w.flag(false);  // b_loud_comp: loud_corr_core_5_X
+    w.flag(false);  // b_loud_comp: loud_corr_core_loro and _ltrt
+    w.flag(false);  // b_loud_comp: loud_corr_9_X_4
+    w.align();
+    return w.bytes();
+}
+
+// The frame of a presentation of `md_compat` over an adaptive A-JOC substream of five downmix
+// signals and an LFE alone in its group (a direct-coded object beside it would leave no core,
+// Part 2 pseudocode 26), parsed with its records.
+iclforge::ac4::FrameReport parse_core_presentation(int md_compat,
+                                                   std::vector<iclforge::ac4::SyntaxRecord>& records) {
+    const auto keep = [&records](const iclforge::ac4::SyntaxRecord& record) {
+        records.push_back(record);
+    };
+    iclforge::ac4::DecoderConfig config;
+    config.syntax = keep;
+    iclforge::ac4::Decoder decoder(config);
+    const auto report = decoder.parse(object_group_frame(
+        true, {ajoc_audio(), object_audio(), oamd_substream(), core_presentation()}, 1, md_compat, 5,
+        true, false));
+    REQUIRE(report.has_value());
+    return *report;
+}
+
+long named_records(const std::vector<iclforge::ac4::SyntaxRecord>& records, int substream,
+                   std::string_view name) {
+    return std::count_if(records.begin(), records.end(), [&](const iclforge::ac4::SyntaxRecord& r) {
+        return r.substream == substream && r.name == name;
+    });
+}
+
+}  // namespace
+
+TEST_CASE("a level 4 presentation over a 5.1 A-JOC downmix has a core, so its presentation substream reads the core's fields",
+          "[ac4][decoder][frames]") {
+    // Dolby's OBI level 4 streams (md_compat 4, five downmix signals and an LFE) end every
+    // presentation substream with these fields, which ETSI TS 103 190-2 V1.3.1 reads only where the
+    // downmix is static. libs/ac4/ERRATA.md, "md_compat 4".
+    std::vector<iclforge::ac4::SyntaxRecord> records;
+    const iclforge::ac4::FrameReport report = parse_core_presentation(4, records);
+    check_read(find(report, 3), SubstreamReport::Kind::kPresentation);
+    CHECK(named_records(records, 3, "b_stereo_dmx_coeff") == 1);
+    CHECK(named_records(records, 3, "loro_dmx_loud_corr") == 1);
+}
+
+TEST_CASE("a presentation below level 4 over the same downmix has no core, as Part 2 says",
+          "[ac4][decoder][frames]") {
+    std::vector<iclforge::ac4::SyntaxRecord> records;
+    const iclforge::ac4::FrameReport report = parse_core_presentation(3, records);
+    CHECK(find(report, 3).kind == SubstreamReport::Kind::kPresentation);
+    CHECK(named_records(records, 3, "b_stereo_dmx_coeff") == 0);
 }

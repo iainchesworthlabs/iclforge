@@ -4579,6 +4579,22 @@ syntax and reconstruction:
 - **`forge probe` names 12 channels for a 5.1.4 stream** (L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr) where the
   decode writes 10 (no Lb, Rb).
 
+Dolby's Spott reference files (`docs/verification.md`, "A second source") add four more:
+
+- **OTT00234** (`ac-4.02.01.01`, four presentations): frame 1 stops with "tools_metadata_size does not
+  match the drc_frame() and dialog_enhancement() read". Not investigated.
+- **Level 4** (`ac-4.02.01.04`, `md_compat` 4): read by observation from one stream, OTTEP00129, with a 5.1
+  core for a five-signal adaptive A-JOC downmix (`libs/ac4/ERRATA.md`, "md_compat 4"). Whether other
+  downmix counts have a core at level 4 needs another stream.
+- **`forge decode` exits 0 when a stream loses most of its frames** (96 % for OTTEP00128 before its fix):
+  it prints "N frames waiting for an I-frame produced no output" and nothing else. A policy (non-zero in a
+  strict mode, a loud warning with the count otherwise) is not made, and nor is the check of `forge probe`
+  and the other users of the counter.
+- **E-AC-3 changing layout mid-stream** (`run_decode_eac3`, `apps/forge/cli/src/commands/decode.cpp`) is
+  handled silently: concatenating a 5.1 and a stereo Spott period file exits 0, with the later frames
+  dropped or cut to the first slots, where the AC-3 and AC-4 paths stop with kExitInput. Not changed; the
+  policy (error, split output, or render to the first layout) is the owner's call.
+
 ## Coordination
 
 - Branch names are `<type>/<kebab-name>` with the type `feature`, `bugfix`, `hotfix`, `docs` or

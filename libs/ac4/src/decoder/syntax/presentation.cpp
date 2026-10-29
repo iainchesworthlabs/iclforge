@@ -430,6 +430,9 @@ int superset_ch_mode_core(int a, int b) noexcept {
     return superset_in(kChModeCoreChannels, a, b);
 }
 
+// Table 55 reserves md_compat 4; Dolby's level 4 streams use it (libs/ac4/ERRATA.md, "md_compat 4").
+constexpr int kObservedLevel4 = 4;
+
 PresentationContext presentation_context_v1(const iclforge::ac4::Toc& toc,
                                             const iclforge::ac4::PresentationInfoV1& presentation) {
     PresentationContext ctx;
@@ -515,7 +518,10 @@ PresentationContext presentation_context_v1(const iclforge::ac4::Toc& toc,
                     break;
                 case iclforge::ac4::GroupSubstream::Kind::kAjoc:
                     b_obj_or_ajoc = true;
-                    if (substream.ajoc && substream.ajoc->b_static_dmx) {
+                    if (substream.ajoc &&
+                        (substream.ajoc->b_static_dmx ||
+                         (presentation.md_compat == kObservedLevel4 &&
+                          substream.ajoc->n_fullband_dmx_signals == 5))) {
                         pres_ch_mode_core = superset_ch_mode_core(
                             pres_ch_mode_core, substream.ajoc->b_lfe ? 4 : 3);
                     } else {

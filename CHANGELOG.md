@@ -10,6 +10,16 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: the AC-4 decoder decoded only the I-frames of Dolby's object-based test streams, and refused its level 4 stream.** An A-JOC
+  substream after an I-frame that sent no dialogue configuration (`b_dmx_de_cfg` 0, as Dolby's Spott streams send in every frame) was
+  refused as missing its I-frame, so OTT00232 decoded 80 frames of 2,000 and OTTEP00128 32 of 750 and `forge decode` exited 0; an I-frame
+  now says there are no dialogue objects, and the frames after it read none. Spott's OTTEP00129 (`ac-4.02.01.04`, "OBI L4") has a version 1
+  presentation of `md_compat` 4, which Part 2 Table 55 reserves and the decoder refused ("no presentation this decoder can select"): 4 is
+  now taken as the level it names (selected by a decoder of level 4 or more, 7 by default; 5 and 6 stay reserved), and in such a
+  presentation an adaptive A-JOC substream of five downmix signals has a 5.1 core, whose custom downmix and loudness fields the presentation
+  substream carries (each of its 4,450 presentation substreams now ends at its size). OTT00234 (`ac-4.02.01.01`, four presentations) still
+  stops at frame 1 ("tools_metadata_size does not match the drc_frame() and dialog_enhancement() read"). Readings and evidence in
+  `libs/ac4/ERRATA.md`, "A-JOC's dialogue enhancement data across frames" and "md_compat 4".
 - **Fixed: the AC-4 decoder refused Dolby's immersive stereo test streams ("sect_cb 12 to 15 name no codebook").** Immersive stereo
   (`presentation_version` 2) is signalled with `channel_mode` 0b1111000, or 0b1111001 when it is made from Dolby Atmos content (Dolby's
   AC-4 in MPEG-DASH specification, in the Online Delivery Kit). The decoder read only the first as stereo, and read the second as 7.1

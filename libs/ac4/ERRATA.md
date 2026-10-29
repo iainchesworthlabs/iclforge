@@ -2252,9 +2252,10 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   4.3.3.3.8 and Table 86, p. 76.
 - **Text:** a decoder of compatibility level n "shall not decode (i.e. select) presentations with md_compat
   > n"; a disabled presentation "shall not be selected"; a decoder decodes presentation versions 1 and 2,
-  and version 0 is Part 1's; Table 55 reserves md_compat 4 to 6 and calls 7 "Unrestricted".
+  and version 0 is Part 1's; Table 55 reserves md_compat 4 to 6 and calls 7 "Unrestricted" (but see
+  "md_compat 4" below for 4).
 - **Reading:** a presentation can be selected when its presentation_version is 0, 1 or 2, its md_compat is
-  one its table defines (Table 55: 0 to 3 and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
+  one its table defines (Table 55: 0 to 3, 4 as below, and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
   level, the stream has not disabled it, it carries audio (a single substream or group, or
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
   channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
@@ -2265,6 +2266,34 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   system that wants the choice of a level 3 receiver, the floor DVB and ATSC set, lowers it
   (`DecoderConfig::level`, `md-compat=`). It was 3 until 2026-10-10.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.
+
+#### md_compat 4
+
+- **Where:** Part 2 6.3.2.2.3 and Table 55, p. 157 (md_compat 4 to 6 reserved); 6.3.3.1.28, Table 71
+  and Pseudocode 26, p. 172 (`pres_ch_mode_core`: an A-JOC substream has a core only where `b_static_dmx`
+  is true); 6.2.2.3 (`custom_dmx_data()` and `loud_corr()` read from it).
+- **What the streams do:** Dolby's Spott test stream OTTEP00129 (codecs `ac-4.02.01.04`, "OBI L4") has one
+  version 1 presentation of `md_compat` 4 over an adaptive A-JOC substream of five downmix signals and an
+  LFE (`b_static_dmx` 0, 20 upmix signals). Its presentation substream is 19 bytes in an I-frame, and read
+  as Part 2 reads it (no core) leaves the last byte unread in each of its 186 I-frames. Read with a 5.1
+  core (`pres_ch_mode_core` 4) every presentation substream of its 4,450 frames ends exactly at its size:
+  `b_stereo_dmx_coeff` 0, `b_obj_loud_corr` 1, `b_loro_loud_comp` 1 with `loro_dmx_loud_corr` 8, and
+  `b_loud_comp` 0 for the other corrections, the last of them `loud_corr_9_X_4`. Dolby's AC-4 white paper (6.1)
+  says a level 3 decoder, the one every consumer device has, ignores presentations of a higher level; the
+  public ETSI text (V1.3.1, 2025-07 is the latest) defines no level 4.
+- **Reading:** md_compat 4 in a version 1 presentation is the level it names, so a decoder of level 4 or
+  more (7 by default) selects it and one of level 3 does not; 5 and 6 stay reserved. In a presentation of
+  md_compat 4 an adaptive A-JOC substream of five downmix signals has a core, 5.0 or 5.1 by `b_lfe`, as a
+  static one does, so `custom_dmx_data()` and `loud_corr()` read the core's fields. Nothing else changes for
+  any other md_compat: an md_compat 0 to 3 presentation is read exactly as Part 2 says.
+- **Open:** whether Dolby's level 4 gives every adaptive A-JOC substream a core, or only five downmix
+  signals, or only md_compat 4. Streams with another downmix count at level 4 would show it; none is in
+  hand, so the narrowest reading that fits is taken. The decoder claims no level 4 constraints (a track
+  limit): Table 55 gives none for it.
+- **Evidence:** Observation: OTTEP00129 decodes 4,450 of 4,450 frames to 21 objects and 12 channels, and
+  the two transcriptions' traces agree (`tools/checks/ac4_syntax_differential.py --inputs`).
+  `test_frames.cpp` builds the presentation substream with the core's fields for md_compat 4 and 3, and
+  the selection table has the cases for levels 3, 4 and 7.
 
 #### The order of the preferences
 

@@ -1433,6 +1433,41 @@ byte 0, tries the file as AC-3 and stops. With the tags skipped, the frames are 
 stream's, byte for byte. The gap is in format detection and not in the decoder, and is recorded in
 `planning/ac4.md`.
 
+**A second source: Dolby's Spott reference files.** Thirteen audio-only MP4 files from Dolby's public test
+application (not in the kit, not committed, local only), each a codecs string in its name: four E-AC-3
+(`OTTEP00104` to `OTTEP00107`, `ec-3`: stereo, 5.1 and Atmos JOC 5.1.4 and 16 objects) and nine AC-4. The
+full SHA-256 of each:
+
+| File | SHA-256 |
+|---|---|
+| `OTT00232_ac-4-02-01-03.mp4` | `5be9f9cd8a3677ae57aa764b851ea6e000e50b31c709aa30229649c326dda4fd` |
+| `OTT00234_ac-4-02-01-01.mp4` | `fbff5c71109be23f887f515540754a0f29587080fb2289daf6b77f16d84c0738` |
+| `OTT00236_ac-4-02-01-02.mp4` | `7c11949f25ca7c3a34ed7858d66876ef0987945f8ad00381b636ecd26a57290e` |
+| `OTTEP00104_ec-3.mp4` | `3094de6b7b70e1be7a8175d7368d265ef0247afc082672adbaa52bbf2dec1dd0` |
+| `OTTEP00105_ec-3.mp4` | `150f99900ecbe00e5ceab707387689f9d50b2a87bcbe0f535b76b84e81fe5d5e` |
+| `OTTEP00106_ec-3.mp4` | `49bba472ab6b6e77e263766334d7b17a9a2d6170a68360b851c4cb7b5754d96e` |
+| `OTTEP00107_ec-3.mp4` | `9f901a50d1e8d86935ae55bc9ceb1af1df8f38f3c6a042bbae2bbdc3e296f15b` |
+| `OTTEP00124_ac-4-02-02-00.mp4` | `2476c74cf1571fdd317d3c784e3170782992b39186fd7555405a6713ed92f012` |
+| `OTTEP00125_ac-4-02-01-02.mp4` | `8f52849d67cfde99ea002709d5ae9511fa7d82c1922a48fafe7687737289f716` |
+| `OTTEP00126_ac-4-02-01-00.mp4` | `62714617e177366413afbe41f2ed05a8dddc131934dcd7e6b5a24df96dcd1943` |
+| `OTTEP00127_ac-4-02-01-01.mp4` | `08d7efce67fcbd4652603263f972cd6877229aa4bdb45a1ea71f3c89306b8f2e` |
+| `OTTEP00128_ac-4-02-01-03.mp4` | `6ac2f5887a5122e83849d160233cfa7fa480dad50363e86fcd76ac7cc6b76d42` |
+| `OTTEP00129_ac-4-02-01-04.mp4` | `deb68aa1d5f60b8f7ef4edddc7ce1a192d1b05fc15c0e34a7fef61c7cd42376d` |
+
+| AC-4 stream | Result | Evidence |
+|---|---|---|
+| `OTTEP00124` (`02-02-00`, immersive stereo), `OTTEP00126` (`02-01-00`, 2.0), `OTTEP00127` (`02-01-01`, 5.1), `OTTEP00125` (`02-01-02`, 5.1.4), `OTT00236` (`02-01-02`, 5 presentations) | decode in full | 800 frames each (2,000 for `OTT00236`); per-channel levels plausible |
+| `OTT00232` (`02-01-03`, A-JOC 7 downmix + 9 upmix) | decodes in full since 2026-10-29 | 2,000 of 2,000 frames; it decoded the 80 I-frames before |
+| `OTTEP00128` (`02-01-03`, "OBI L3", 16 objects) | decodes in full since 2026-10-29 | 750 of 750 frames; it decoded 32 before; traces of the two transcriptions agree |
+| `OTTEP00129` (`02-01-04`, "OBI L4", 5 downmix + 20 upmix) | decodes in full since 2026-10-29 | 4,450 of 4,450 frames, 21 objects; traces agree; refused before as no selectable presentation |
+| `OTT00234` (`02-01-01`, 4 presentations) | **not decoded** | frame 1: "tools_metadata_size does not match the drc_frame() and dialog_enhancement() read"; not investigated |
+
+The four E-AC-3 files decode in full (the integration build's run), and the stereo and 5.1 ones agree
+with FFmpeg's decode at lag 0, at 23.8 and 27.9 dB overall, which is the range this project's dither-on
+third-party E-AC-3 streams give and not a failure. Dolby's muxer (Bento4 here) writes `channelcount` 2 in
+every ec-3 sample entry, the 5.1 and JOC files included, so a reader must take the channel count from the
+stream and not from the sample entry. `tools/checks/check_ac4_kit_streams.py` does not read these files yet.
+
 ### The decoder's presentations
 
 Phase D7 adds the choice among a stream's presentations (Part 2 4.8.2) and the mixing of a

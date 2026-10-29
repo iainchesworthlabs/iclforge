@@ -10,7 +10,8 @@ A presentation can be selected when the decoder can decode it: every substream i
 channel-coded substream in this elementary stream, in one of the channel modes the decoder renders
 (Table 56's 0 to 15), at 48 or 44.1 kHz; its presentation_version is 0, 1 or 2 (Part 2 clause
 6.3.2.3.1); it carries audio (presentation_config 0 to 5, or a single substream or group); its
-md_compat is one the tables define (Part 1 Table 86: 0 to 4 and 7; Part 2 Table 55: 0 to 3 and 7)
+md_compat is one the tables define (Part 1 Table 86: 0 to 4 and 7; Part 2 Table 55: 0 to 3 and 7,
+and 4 as Dolby's level 4 streams use it)
 and within the decoder's level; and the stream has not disabled it (b_enable_presentation).
 
 Of those, the one a system asks for by presentation_id, else by position, else the one that best
@@ -125,8 +126,9 @@ def selectable(toc, p, level):
     md_compat = p.get('md_compat')
     if md_compat is None:
         return False
-    reserved = range(4, 7) if toc['substream_groups'] is not None else range(5, 7)
-    return md_compat not in reserved and md_compat <= level
+    # Part 2 Table 55 reserves 4 to 6; Dolby's level 4 streams use 4 (libs/ac4/ERRATA.md,
+    # "md_compat 4"), so 5 and 6 are the reserved values left, as in Part 1.
+    return md_compat not in range(5, 7) and md_compat <= level
 
 
 def _primary(tag):
