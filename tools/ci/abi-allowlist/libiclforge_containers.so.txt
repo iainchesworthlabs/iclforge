@@ -82,6 +82,7 @@ iclforge::containers::mp4::Reader::Reader(iclforge::containers::mp4::Reader&&)
 iclforge::containers::mp4::Reader::finish()
 iclforge::containers::mp4::Reader::operator=(iclforge::containers::mp4::Reader&&)
 iclforge::containers::mp4::Reader::push(std::span<std::byte const, 18446744073709551615ul>, std::function<void (std::span<std::byte const, 18446744073709551615ul>)> const&)
+iclforge::containers::mp4::Reader::refused_tracks() const
 iclforge::containers::mp4::Reader::samples_read() const
 iclforge::containers::mp4::Reader::track() const
 iclforge::containers::mp4::Reader::track_found() const
@@ -97,11 +98,17 @@ iclforge::containers::mp4::build_hls_master_playlist[abi:cxx11](std::span<iclfor
 iclforge::containers::mp4::build_hls_media_playlist[abi:cxx11](iclforge::containers::mp4::AudioTrack const&, std::span<iclforge::containers::mp4::MediaSegment const, 18446744073709551615ul>, iclforge::containers::mp4::HlsOptions const&)
 iclforge::containers::mp4::build_hls_media_playlist[abi:cxx11](iclforge::containers::mp4::AudioTrack const&, std::span<iclforge::containers::mp4::SegmentInfo const, 18446744073709551615ul>, iclforge::containers::mp4::HlsOptions const&)
 iclforge::containers::mp4::demux(std::span<std::byte const, 18446744073709551615ul>, iclforge::containers::mp4::ReadOptions const&)
+iclforge::containers::mp4::demux_seekable(std::function<unsigned long (unsigned long, std::span<std::byte, 18446744073709551615ul>)> const&, unsigned long, std::function<void (iclforge::containers::mp4::ReadTrack const&)> const&, std::function<void (std::span<std::byte const, 18446744073709551615ul>)> const&, iclforge::containers::mp4::ReadOptions const&)
 iclforge::containers::mp4::describe(iclforge::containers::mp4::DemuxError)
 iclforge::containers::mp4::describe(iclforge::containers::mp4::MuxError)
+iclforge::containers::mp4::describe[abi:cxx11](iclforge::containers::mp4::Protection const&)
+iclforge::containers::mp4::describe_refusal[abi:cxx11](std::span<iclforge::containers::mp4::SkippedTrack const, 18446744073709551615ul>)
+iclforge::containers::mp4::format_kid[abi:cxx11](std::array<unsigned char, 16ul> const&)
 iclforge::containers::mp4::fragment(iclforge::containers::mp4::AudioTrack const&, std::span<std::span<std::byte const, 18446744073709551615ul> const, 18446744073709551615ul>, iclforge::containers::mp4::FragmentOptions const&)
 iclforge::containers::mp4::fragment(iclforge::containers::mp4::AudioTrack const&, std::span<std::vector<std::byte, std::allocator<std::byte> > const, 18446744073709551615ul>, iclforge::containers::mp4::FragmentOptions const&)
 iclforge::containers::mp4::hls_codec_string(iclforge::containers::mp4::AudioTrack const&)
+iclforge::containers::mp4::list_refused_tracks(std::function<unsigned long (unsigned long, std::span<std::byte, 18446744073709551615ul>)> const&, unsigned long, iclforge::containers::mp4::ReadOptions const&)
+iclforge::containers::mp4::list_refused_tracks(std::span<std::byte const, 18446744073709551615ul>, iclforge::containers::mp4::ReadOptions const&)
 iclforge::containers::mp4::mux(iclforge::containers::mp4::AudioTrack const&, std::span<std::span<std::byte const, 18446744073709551615ul> const, 18446744073709551615ul>, iclforge::containers::mp4::MuxOptions const&)
 iclforge::containers::mp4::mux(iclforge::containers::mp4::AudioTrack const&, std::span<std::vector<std::byte, std::allocator<std::byte> > const, 18446744073709551615ul>, iclforge::containers::mp4::MuxOptions const&)
 iclforge::containers::mp4::segment_info(iclforge::containers::mp4::MediaSegment const&)
