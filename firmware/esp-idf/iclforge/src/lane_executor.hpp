@@ -46,7 +46,9 @@ class TaskExecutor final : public iclforge::base::Executor {
     // Starts the worker on `core` at `priority`, with its stack in PSRAM where `stack_in_psram`
     // asks for it and there is PSRAM to give (the decode task's is there, and the internal RAM
     // of a part with Wi-Fi up is the scarce thing); false, and lanes() 1, if the task cannot be
-    // made.
+    // made. A stack asked for in internal RAM goes to PSRAM when there is no internal block to
+    // hold it (the P4X's screen, TDM queue and 40 KB decode stack leave one of 7 KB): a lane
+    // whose stack is read through the cache is better than a decoder on one core.
     bool start(BaseType_t core, UBaseType_t priority, std::uint32_t stack_bytes,
                bool stack_in_psram) {
         if (worker_ != nullptr) {
@@ -55,10 +57,18 @@ class TaskExecutor final : public iclforge::base::Executor {
         quit_.store(false);
         exited_.store(false);
         with_caps_ = false;
-        if (stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+        const bool have_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+        const bool internal_fits =
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >=
+            stack_bytes + kInternalSlackBytes;
+        if (have_psram && (stack_in_psram || !internal_fits)) {
             with_caps_ = xTaskCreatePinnedToCoreWithCaps(
                              &TaskExecutor::entry, "decode-lane", stack_bytes, this, priority,
                              &worker_, core, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
+            if (with_caps_ && !stack_in_psram) {
+                std::printf("player: decode lane stack in PSRAM: no internal block of %lu bytes\n",
+                            static_cast<unsigned long>(stack_bytes + kInternalSlackBytes));
+            }
         }
         stack_bytes_ = stack_bytes;
         if (with_caps_) {
@@ -142,6 +152,9 @@ class TaskExecutor final : public iclforge::base::Executor {
     }
 
    private:
+    // What a task's control block and alignment take beside its stack.
+    static constexpr std::uint32_t kInternalSlackBytes = 1024;
+
     void drain(std::size_t lane) {
         for (;;) {
             std::uint32_t cursor = cursor_.load(std::memory_order_acquire);

@@ -74,37 +74,6 @@
           "eac3-2.0-sendspin": 2
         },
         "play_heap_free_bytes": {
-          "eac3-2.0-sendspin": 2048
-        },
-        "note": "Measured on S3a (2026-10-12, five plays a row after eight restarts, both S3 images). The S3's E-AC-3 stream over Sendspin glitched two plays of five in each profile (11 to 17 late chunks at the start of the stream, which is 0.35 to 0.55 s of audio) and one of four in the probes, so a play that glitches is the common case and the baseline's two are allowed two more (a stream that glitches every time is 5 of 5). Its least internal heap while it plays was 2,935 and 2,539 bytes (6.6 KB after AC-3 streams in the same boot, 59.8 KB on the first stream of a boot), so a play that takes 2,048 of it is the regression (the s3-n16r8 baseline re-recorded on 2026-10-25 under the 4 KB PSRAM limit reads 79,131 on that row and 103,023 on the AC-3 one); the AC-3 row's heap reads 24 to 58 KB and has no tolerance."
-      },
-      "plays": [
-        {
-          "id": "ac3-2.0",
-          "stream": "ac3-2.0"
-        },
-        {
-          "id": "eac3-2.0",
-          "stream": "eac3-2.0"
-        },
-        {
-          "id": "ac3-2.0-sendspin",
-          "stream": "ac3-2.0",
-          "via": "sendspin"
-        },
-        {
-          "id": "eac3-2.0-sendspin",
-          "stream": "eac3-2.0",
-          "via": "sendspin"
-        }
-      ]
-    },
-    "s3-n16r8-ac4": {
-      "tolerance": {
-        "glitched_plays": {
-          "eac3-2.0-sendspin": 2
-        },
-        "play_heap_free_bytes": {
           "eac3-2.0-sendspin": 2048,
           "ac4-20-music-sendspin": 2048
         },
@@ -266,8 +235,28 @@
           "stream": "ac3-5.1",
           "layout": "9.1.6",
           "slots": 16
+        },
+        {
+          "id": "ac4-20-music",
+          "stream": "ac4-20-music"
+        },
+        {
+          "id": "ac4-20-acpl",
+          "stream": "ac4-20-acpl"
+        },
+        {
+          "id": "ac4-51-music",
+          "stream": "ac4-51-music"
+        },
+        {
+          "id": "ac4-20-companding",
+          "stream": "ac4-20-companding"
         }
-      ]
+      ],
+      "tolerance": {
+        "relative": 0.12,
+        "note": "As p4-rev1's: the AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself."
+      }
     }
   }
 }

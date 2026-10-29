@@ -91,9 +91,8 @@ it, and the other stacks this page spells are held to it too. The list, generate
 | `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` | `hearth-sink-esp32c6-16mb` | C6 |
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none |
 | `p4-rev1` | `hw`, `p4`, `sendspin`, `ac4` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
-| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
-| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
-| `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `ac4`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | `hearth-sink-esp32s3` | S3a, S3b |
 
 <!-- sink-profiles:end -->
 
@@ -654,13 +653,14 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
 ```
 
 `sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,
 D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
-network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) goes with the AC-4 decoder
-and not here: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with it, and the cache bought AC-3 and E-AC-3 nothing.
+network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) and `sdkconfig.ac4` are
+in the S3 release image since 2026-10-29: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with the cache at the 16 KB allocation
+limit and leaves 60 KB free at the end of its lap at the 4 KB limit the image keeps (`sdkconfig.psram-4k`), and the cache is what holds the AC-4 plays in real time.
 
 [An ESP32-S3 sink](../../docs/hearth/sink-esp32-s3.md) takes a board
 through this step by step: flashing, joining a network, pairing, groups,

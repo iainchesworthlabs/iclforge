@@ -67,7 +67,7 @@ idf.py -p PORT flash monitor
 **Chip revision v3.x with the 7-inch panel** (the image CI publishes as `hearth-sink-esp32p4-rev3`):
 
 ```bash
-idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi" build
+idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.panel;sdkconfig.panel-dsi" build
 ```
 
 **A board with no panel, to see the screen** (any P4; the picture is read back over HTTP,
@@ -84,9 +84,10 @@ idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.h
 | `sdkconfig.panel` | LVGL's heap in PSRAM, TrueType fonts, right-to-left text |
 | `sdkconfig.panel-null` / `sdkconfig.panel-dsi` | The frame buffer with no panel, or the 7-inch MIPI DSI panel |
 
-AC-4 is `sdkconfig.ac4`: in the v1.x release profile since the fold of `p4-rev1-ac4` into `p4-rev1`, and not in the v3.x one, whose
-internal RAM beside the screen cannot hold the decoder's second lane
-([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
+AC-4 is `sdkconfig.ac4`, in both release profiles: since the fold of `p4-rev1-ac4` into `p4-rev1` and, on 2026-10-29, into `p4-rev3`,
+an image of either revision decodes AC-3, E-AC-3 and AC-4. The v3.x image keeps the decode task's stack of an HTTP play in PSRAM
+(`sdkconfig.p4-rev3`): the screen leaves it 74 KB of internal RAM at the start of a play, and an AC-4 5.1 play leaves 8 to 10 KB of it at its
+tightest ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
 [ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
 
 ## On the v1.x board

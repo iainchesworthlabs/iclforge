@@ -268,7 +268,7 @@ class TheFile(unittest.TestCase):
     ) -> None:
         spec = self.data["profiles"]["p4-rev3"]
         self.assertEqual(
-            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
+            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "ac4", "panel", "panel-dsi"]
         )
         self.assertEqual(spec["target"], "esp32p4")
         # The kit (chip v3.2) ran this image on 2026-10-20; it is the only board of that silicon.
@@ -342,8 +342,9 @@ class TheFile(unittest.TestCase):
         second (an S3 over Sendspin falls behind at 29.97), a P4 with the decoder at 6 channels
         and no rate limit; no other profile lists it."""
         listed = {
-            "s3-n16r8-ac4": ("1", "2", "25"),
+            "s3-n16r8": ("1", "2", "25"),
             "p4-rev1": ("1", "6", "0"),
+            "p4-rev3": ("1", "6", "0"),
         }
         for ident, spec in self.data["profiles"].items():
             locked = spec["locked"]
@@ -359,7 +360,7 @@ class TheFile(unittest.TestCase):
                 self.assertEqual(got[2], "0", ident)
 
     def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
-        for ident in ("s3-n16r8-ac4", "p4-rev1"):
+        for ident in ("s3-n16r8", "p4-rev1", "p4-rev3"):
             locked = self.data["profiles"][ident]["locked"]
             self.assertEqual(
                 locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
@@ -373,7 +374,6 @@ class TheFile(unittest.TestCase):
         checked = set(re.findall(r'"\$profile" verify ([a-z0-9-]+)', text))
         board_builds = {
             "s3-n16r8",
-            "s3-n16r8-ac4",
             "c6-16mb",
             "c6-4mb",
             "p4-rev1",
@@ -419,7 +419,7 @@ class TheFile(unittest.TestCase):
             self.assertIn("if: ${{ !cancelled() }}", step.split("run: |")[0], head)
         # the S3 profile builds, the QEMU twin and the S3 image upload; the C6 and P4 builds
         # and their upload
-        self.assertGreaterEqual(len(guarded), 10, guarded)
+        self.assertGreaterEqual(len(guarded), 9, guarded)
         package = text[text.index("\n  package-esp32-firmware:") :]
         self.assertIn("if: ${{ !cancelled() && inputs.run_esp }}", package.split("steps:")[0])
 
@@ -819,7 +819,7 @@ class ExpectedConsole(unittest.TestCase):
     def test_the_release_profile_expects_the_http_stack_in_psram(self) -> None:
         """The 2026-10-12 failure, as a line a build has to print."""
         lines = sp.expected_console(sp.load(), "s3-n16r8")
-        self.assertIn("player: decode stack 32768 bytes in PSRAM", lines)
+        self.assertIn("player: decode stack 40960 bytes in PSRAM", lines)
 
 
 class Snapshot(unittest.TestCase):

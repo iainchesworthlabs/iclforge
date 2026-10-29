@@ -544,11 +544,14 @@ class Run(unittest.TestCase):
     def run_rows(self, stand_in: StandIn, profile: str, **kwargs):
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
         if "only" not in kwargs:
-            # the /play rows: a Sendspin row is played by the test server (test_suite_sendspin.py)
+            # the /play rows the stand-in has a behaviour for (every profile but the C6's has AC-4
+            # rows now, which only the tests that name them play): a Sendspin row is played by the
+            # test server (test_suite_sendspin.py)
             kwargs["only"] = [
                 row["id"]
                 for row in bs.plan(self.suite, profile)
                 if row.get("via", "play") == "play"
+                and Path(self.suite["streams"][row["stream"]]["file"]).name in stand_in.behaviours
             ]
         return bs.run_suite(
             board,
@@ -825,23 +828,23 @@ class Run(unittest.TestCase):
         pin = self.pins["ac4_20_music"]
         good = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash=pin)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **good}, **{}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **good}, **{}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertEqual(results[0].findings, [])
         self.assertEqual(results[0].decoder_permille, 480)
         wrong = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0123456789abcdef")}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **wrong}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **wrong}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("is not the host's" in f for f in results[0].findings))
         zero = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0" * 16)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **zero}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **zero}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("AC4_PCM_HASH=1" in f for f in results[0].findings))
@@ -896,6 +899,7 @@ class Boot(unittest.TestCase):
                 "http://127.0.0.1:1",
                 {},
                 repeat=3,
+                only=["ac3-2.0", "eac3-2.0"],
                 sleep=0.01,
                 timeout=5.0,
             )

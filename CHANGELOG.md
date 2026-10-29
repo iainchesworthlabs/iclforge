@@ -13,9 +13,24 @@ See [README.md](README.md) for the project overview and
 - **Changed: the ESP32-P4 v1.x release image decodes AC-4 as well as AC-3 and E-AC-3.** `p4-rev1` takes the AC-4 decoder
   (`sdkconfig.ac4`) that `p4-rev1-ac4` held apart, with the same locked values and the decode stacks at 40,960 bytes; the
   profile `p4-rev1-ac4` is gone, `p4-rev1` is what it was (the same hash, so P4a's baseline stands) and its app budget
-  is 3,400,000 bytes against the 4 MiB slot. The v3.x (P4X) image is not changed: on the kit the AC-4 image left too little
-  internal RAM for the decoder's second lane (`planning/ac4-in-release-images.md`). The S3 and the C6 are unchanged: the C6
-  cannot hold the decoder beside Wi-Fi, and the S3 needs the measured configuration in the same page.
+  is 3,400,000 bytes against the 4 MiB slot. The v3.x (P4X) and S3 images follow in the next entry; the C6 cannot hold the
+  decoder beside Wi-Fi (`planning/ac4-in-release-images.md`).
+- **Changed: the ESP32-S3 and the ESP32-P4X (v3.x) release images decode AC-4 as well as AC-3 and E-AC-3.** `s3-n16r8` takes the
+  decoder and the 64 KB data cache (`sdkconfig.ac4`, `sdkconfig.s3-dcache`) and keeps its 4 KB allocation limit: the image is 2,621,600
+  bytes (budget 2,750,000), the board boots with 75 KB of internal RAM free in place of 110, an E-AC-3 stream leaves 44 KB, and E-AC-3 JOC
+  7.1.4, 9.1.6 and 5.1.4 plays have 60 KB free at the end of their lap; its baseline is re-recorded on S3a and the AC-4 profile `s3-n16r8-ac4` is gone. `p4-rev3`
+  takes the decoder with the HTTP play's decode stack in PSRAM: 3,811,472 bytes (budget 3,950,000, slot 4,194,304), AC-4 5.1 at 0.68 of a
+  frame's duration on the kit with the PCM the host pins, AC-3, E-AC-3 and the 9.1.6 TDM row as fast as before; its baseline is re-recorded
+  on the kit. The C6 stays AC-3 and E-AC-3 only.
+- **Fixed: a play could not start on a board whose internal RAM is short, though PSRAM was free.** The player placed the decode task's
+  stack, and the AC-4 decoder's second lane its stack, in internal RAM and gave up when no block held it (on the P4X, after the I2S queue,
+  the largest block is 37,888 bytes: an AC-3 play with a 40,960-byte stack could not start its decode task and an AC-4 5.1 play ran on
+  one core at 1.3 to 1.4 of real time). Each reads the largest internal block first and takes PSRAM when it is too small; where the stack fits
+  it stays internal, as the baselines were measured.
+- **Fixed: `GET /log` lost the tail of every console line over 128 bytes on a board with no host on its USB console.** The
+  USB-Serial-JTAG console fails every write with EIO while no host is on the port, and the log's tee passed that failure to stdio, which then dropped
+  the rest of the line it was writing: the ring held `...decoder_us=89608 decoder` where the line goes on to its PCM hash, and the board suite
+  could not read an AC-4 play's figures. The write is reported whole (the console stays best effort).
 - **Fixed: an ESP32-S3 sink could stop answering on the network, with its CPUs, lwIP and its Wi-Fi association alive, in the
   middle of a Sendspin session.** With Wi-Fi's buffers in PSRAM ESP-IDF leaves the TCP out-of-order queue unbounded, and the
   part's 32 dynamic receive buffers could all be held by one connection's queue, so that the retransmission that would fill the

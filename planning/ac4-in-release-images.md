@@ -1,12 +1,16 @@
 # AC-4 in the Hearth sink's release images
 
-**Status, 2026-10-29.** A measurement of what one shipping image per board would carry if it decoded AC-3, E-AC-3 and AC-4
-together, and of what stops it where it cannot. Twelve images were built on `main` at `956572141`; sizes and static RAM are
-from those builds, boot heap and play figures are the boards' recorded baselines and the platform pages' board runs, and every
-figure that is an estimate says so. Nothing is pushed. No board was touched for those builds; the S3 sections that follow them
-were measured on the S3 at 192.168.1.156 on the evening of 2026-10-28 (leased, then put back as found). It is the follow-up to
+**Status, 2026-10-29 (written in two parts the same day).** A measurement of what one shipping image per board would carry if it
+decoded AC-3, E-AC-3 and AC-4 together, and of what stops it where it cannot, and then, on the owner's go-ahead ("if we need to fold
+the profiles together, that's fine. The budget can be grown"), the folds themselves: **the S3, the P4 v1.x and the P4X images now
+decode all three, and the C6 stays AC-3 and E-AC-3 only.** Twelve images were built on `main` at `956572141`; sizes and static RAM
+are from those builds. Boot heap and play figures are the boards' recorded baselines, the platform pages' board runs and, for the
+S3 and the P4X after the fold, the boards' runs of 2026-10-29 (S3a recorded, S3b held to it, the kit recorded); every figure that
+is an estimate says so. The S3 hang's fix and the P4 v1.x fold are
+[#1697](https://github.com/iainchesworthlabs/iclforge/pull/1697); the S3 and P4X folds are its follow-up. It is the follow-up to
 [decision 42](ac4.md#decisions-of-2026-10-10) and to the profile split of 2026-10-12
-([`esp32-platform-profiles.md`](esp32-platform-profiles.md#profiles)).
+([`esp32-platform-profiles.md`](esp32-platform-profiles.md#profiles)). Boards: the S3s at 192.168.1.156 and .45 and the P4X kit,
+each leased and put back as found.
 
 ## Answer
 
@@ -16,9 +20,9 @@ image, 2 KB of static internal RAM, 8 to 16 KB of internal stack and the decoder
 
 | Board | One image with AC-3, E-AC-3 and AC-4 today? | What stops it | Cheapest change |
 |---|---|---|---|
-| P4 rev 1.3 (`p4-rev1`) | **Yes** | nothing technical: 2.73 MB of a 4 MiB slot, 295 KB of heap at boot, AC-4 5.1 takes 59% of a frame | fold the `ac4` fragment into `p4-rev1` (the 8 locked keys `p4-rev1-ac4` already differs by) and re-record the baseline on P4a |
-| P4 rev 3.x (`p4-rev3`, the P4X kit) | **Not as the image is today: the kit ran it** | on the kit the AC-4 image leaves 28.7 KB of internal RAM (7.4 KB in one block) once the decode stack is taken, so the decoder's second lane, a 24,576-byte stack, cannot be made: AC-4 5.1 then runs at 1.3 to 1.4 of real time with underruns, and the suite's AC-3, E-AC-3 and TDM rows failed an allocation; the image also leaves 425 KB of slot | the lane's stack in PSRAM (the S3 has it there) or a lane only for AC-4 streams, found and measured on the kit; then fold, with the budget at about 3,900,000 |
-| S3 (`s3-n16r8`) | **Not today; the blockers are found and both are small** | a Wi-Fi receive-buffer deadlock that is S3-only (`LWIP_TCP_OOSEQ_MAX_PBUFS` is 0 on the S3 and 4 on the P4 and C6) and was **not the AC-4 decoder** (the release profile showed it too); then the E-AC-3 heap policy, which one image can have | one config line for the deadlock (soaked on the board, below); then `ac4` and `s3-dcache` into `s3-n16r8` with `psram-4k` kept, the app budget to about 2,750,000, and a re-record on both S3s |
+| P4 rev 1.3 (`p4-rev1`) | **Yes, folded** (#1697) | nothing technical: 2.73 MB of a 4 MiB slot, 295 KB of heap at boot, AC-4 5.1 takes 59% of a frame | done: the `ac4` fragment is in `p4-rev1`, the same hash as the old AC-4 profile, so P4a's baseline stands |
+| P4 rev 3.x (`p4-rev3`, the P4X kit) | **Yes, folded** (follow-up PR) | the kit's first run of the AC-4 image failed: after the I2S queue the largest internal block was 37,888 bytes, under the 40,960-byte decode stack (AC-3 and E-AC-3 plays could not start) and the 24,576-byte lane stack (AC-4 5.1 ran on one core at 1.3 to 1.4 of real time), and the board's `GET /log` lost the tail of every long line, so the suite could not read the AC-4 rows | done: a stack goes to PSRAM when no internal block holds it, the HTTP play's decode stack is locked in PSRAM on `p4-rev3`, `log_write` reports the console's failed write whole; 3,811,472 bytes against a budget of 3,950,000, AC-4 5.1 at 0.68 of a frame, AC-3, E-AC-3 and TDM as fast as before |
+| S3 (`s3-n16r8`) | **Yes, folded** (follow-up PR) | a Wi-Fi receive-buffer deadlock that is S3-only (`LWIP_TCP_OOSEQ_MAX_PBUFS` is 0 on the S3 and 4 on the P4 and C6) and was **not the AC-4 decoder** (the release profile showed it too); then the E-AC-3 heap policy, which one image can have | done: the bound (#1697), then `ac4` and `s3-dcache` in `s3-n16r8` with `psram-4k` kept, budget 2,750,000, S3a recorded and S3b held to it; 2,621,600 bytes, 75.5 KB of heap at boot, E-AC-3 leaves 44 KB |
 | C6 (`c6-16mb`, `c6-4mb`) | **No, out** | RAM: the decoder's floor is 286,365 bytes of heap and the part has 117 KB beside Wi-Fi; the 4 MB part also has no slot for it (1.21 MB over) | none that fits; decision 42 stands |
 
 ## What was built
@@ -94,7 +98,7 @@ docs' tables follow.
 | Least free in a play | AC-3 and E-AC-3 with the panel: 48.9 to 65.7 KB | AC-4 5.1: 9.7 to 10.4 KB on 2026-10-20, 11 to 15 KB after the TDM queue fix (#1607); the decoder takes what is left by design |
 | Decoder time in a Sendspin burst, kit at 400 MHz | AC-3 5.1 ms, E-AC-3 4.5 ms (layout 9.1.6) | AC-4 2.0 12.7 ms (30%), AC-4 5.1 29.3 to 29.6 ms at layout 5.1 on the glass (69%), 31.7 ms at 9.1.6 (74%); the glass adds 10% |
 
-**Verdict, first reading (from [the kit's own runs of 2026-10-20](karaoke-p4x-panel.md#ac-4-51-at-400-mhz) and my builds): yes, with three things the owner should decide. Revised below by the kit's run of 2026-10-29: not as the image is built today.**
+**Verdict, first reading (from [the kit's own runs of 2026-10-20](karaoke-p4x-panel.md#ac-4-51-at-400-mhz) and my builds): yes, with three things the owner should decide. Revised below by the kit's first run of 2026-10-29 (not as the image was built), and again by the fixes that followed it (yes).**
 
 - **Flash.** The image fits an OTA slot with 10.1% to spare; the 2,900,000 budget is a tripwire the owner set on 2026-10-25
   and has to move to about 3,900,000 (leaving 294 KB to the slot). The slot is then the only limit, and 473 KB of the image is
@@ -120,17 +124,52 @@ board suite with the `measure` overlay (`--record` refused the run, as it must).
 | AC-3 2.0, E-AC-3 2.0 and the 5.1 TDM row | `state=failed, frames=0`, one failed allocation each (not read to the allocation: the log ring held the later plays) |
 | The internal heap's least in an AC-4 play | 8,423 to 8,491 bytes |
 
-So the P4X cannot take the AC-4 profile as it is built today: with the screen, the 16-slot TDM queue, both networks and the
-40 KB decode stacks internal (they are internal on the P4), the AC-4 profile's lane worker has no room, and an AC-3 or E-AC-3 play
-fails an allocation it did not before. The cheapest changes, none made: the lane worker's stack in PSRAM (the S3 keeps it there, 16 KB;
-`ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM` is 0 on the P4); a lane only for an AC-4 stream, so that AC-3 and E-AC-3 plays never ask
-for it; the decode stack at 36 KB (the decoder used 20 to 25 KB in the plays recorded). Each wants the kit again.
+**What the log said (the same day, after the first run was read again).** The log ring was read by following `X-Log-Next` (a
+`GET /log` answers 4,096 bytes at a time) and the failed allocations named themselves: at an AC-3 play's start the board had 79,687 bytes
+of internal heap free, largest block 55,296; after the I2S sink's queue, 57,519 free and the largest block 37,888, and
+`heap_caps_malloc could not allocate 40960 bytes (caps 0x804); player: could not start the decode task`. That is the AC-4 image's
+decode stack (40,960 bytes, internal on this part) against a block 3 KB too small, and it failed every AC-3 and E-AC-3 play, not only
+the AC-4 ones; the lane stack (24,576) met a 7,424-byte block in the AC-4 plays. Nothing was wrong with the decoder.
 
-**Done on this branch for `p4-rev3`: nothing.** It was folded in and taken out again, so the branch holds the profile as it was
-(budget 2,900,000, no AC-4), and its baseline of 2026-10-26 stands. When the lane has room, the fold is the same eight values, the
-four AC-4 HTTP rows and a budget of 3,900,000 (131,000 over the image, 294,000 under the slot: the AC-4 decoder is a million
-bytes of the slot, and what is left is about three features' worth, so a 6 MiB slot pair is the structural answer if it keeps
-growing).
+**A second finding, in the log itself.** With the AC-4 plays passing their allocations, the suite still could not read them ("no PCM
+hash on the AC-4 line", "the verdict line says result=None"): the ring held `...decoder_us=89608 decoder` where the line goes on for
+another 150 bytes, cut at exactly 128 characters, and the boot's `sink:` line cut the same way. ESP-IDF's USB-Serial-JTAG console
+fails every write with `EIO` while no host is on the port (`usb_serial_jtag_vfs.c`, `usb_serial_jtag_write`), the kit's COM7 was
+no longer there, and `log_write` returned the console's failure to stdio, which drops the rest of what it had buffered after a failed
+write. The ring itself had been given every chunk it saw; stdio stopped giving it the rest. `log_write` now reports the write whole
+(the console stays best effort). Any board of this firmware with no cable on its USB console had the fault.
+
+**What was changed on this branch, and what the kit said after each:**
+
+1. `player.cpp`: the HTTP play's decode task takes its stack in PSRAM when the largest internal block, read just before, is under the
+   stack and a kilobyte; where it fits the stack stays internal, as the baselines were measured. `lane_executor.hpp` does the same for the
+   decoder's second lane. AC-3, E-AC-3 and the TDM row then passed.
+2. `log.cpp`: `log_write` returns the whole write. The AC-4 rows then read, and their PCM hashes equal the host's pins
+   (`f860e51f602ae753`, `e8b8cfa716dd0e1c`, `5b93c61c57566b0c`, and `6d36d7d2e8a070e9` for the 5.1 row).
+3. One AC-4 5.1 play in about ten still failed (`could not start the fetch task`, 25,499 free and a largest block of 6,656): the numbers fit
+   the check in 1 having found a big enough block that time (70,247 free and a largest block of 51,200 at the play's start, 25,499 free
+   after the sink and a 40,960-byte stack), leaving the stack internal and the fetch task's 8,192-byte stack no block. So
+   `sdkconfig.p4-rev3` locks `DECODE_STACK_IN_PSRAM=1` (the S3's setting; the kit's internal RAM is what the screen, the TDM queue and the
+   networks leave it), and 24 AC-4 5.1 plays in a row then all finished with no failed allocation. In PSRAM the stack costs the
+   decoders nothing measurable on the kit: AC-3 2.0 56 permille of a frame (the baseline of 2026-10-26 had 55), E-AC-3 42 (42), the 5.1
+   TDM row 143 (142).
+4. The AC-4 internal-allocation limit (`below=`) was swept on the kit at 16,384, 8,192, 4,096 and 1,024 (6 plays each): the peak of
+   internal use, 61.7 to 65.8 KB, and the least free, 7.7 to 8.9 KB, did not move, so the limit is not what the decoder takes from
+   this part's internal RAM and it stays at 16,384.
+
+| The kit, `p4-rev3` as folded (recorded 2026-10-29, five plays a row, three boots) | |
+|---|---|
+| Free internal heap at boot (worst of 3) | 86,967, largest block 56,320 (the baseline of 2026-10-26: 104,523 and 69,632) |
+| AC-3 2.0, E-AC-3 2.0, AC-3 5.1 onto 9.1.6 (16 slots) | 56, 42 and 143 permille of a frame; no underrun |
+| AC-4 2.0 A-SPX, A-CPL, companding | 261, 317 and 320 permille |
+| AC-4 5.1 onto 9.1.6 | 676 permille (673 to 694; the kit's run of 2026-10-20 had 650 to 740) |
+| Internal heap's least in an AC-4 5.1 play | 8.3 to 9.7 KB (24 plays); the decoder takes what is left by design |
+| Image | 3,811,472 bytes: 382,832 under the slot, 138,528 under the budget of 3,950,000 |
+
+**Not measured:** AC-4 through Sendspin on the kit (the suite's server would have to pair with the owner's kit, which the suite's
+rows for it have never done: its Sendspin player takes its 40,960-byte decode stack at boot, internal, and its lane stack in PSRAM
+already, and the P4a runs the same path in its baseline); the Meters view and AC-4 together; a soak. The slot is not "plenty" on
+this board: 383 KB under it, about three features' worth, so a 6 MiB slot pair is the structural answer if the image keeps growing.
 
 ## ESP32-S3 (`s3-n16r8`)
 
@@ -162,6 +201,15 @@ slot left, 2.5 MB of the 8 MB PSRAM for code and constants). What stood in the w
    this work. Without the cache, 2.0 A-SPX is 0.61 of a frame on the HTTP path against 0.50 with it (the table in
    `sdkconfig.s3-dcache`), which is why the Kconfig default stops listing AC-4 on a 32 KB cache.
 4. **The budget** moves from 1,750,000 to about 2,750,000 (the image is 2,621,328). Not a blocker.
+
+**Done (2026-10-29).** `s3-n16r8` has the fragments `hw`, `psram`, `psram-4k`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache`, the AC-4 profile's locked
+values with the allocation limit at 4,096, a budget of 2,750,000 and the AC-4 profile's play list; `s3-n16r8-ac4` and CI's separate AC-4
+build are gone, and the release build is the AC-4 build (2,621,600 bytes). S3a recorded the baseline (the suite's recording
+run: eight boots, five plays a row, every row ok, the three AC-4 PCM hashes the host's); S3b, a different board, then ran it against
+that baseline with every row ok and the figures within a few percent (boot 75,731 against 75,503; the least heap of the Sendspin
+rows 63.6, 44.2, 47.5 and 74.1 KB against 64.3, 44.1, 47.4 and 74.1). E-AC-3 JOC 5.1.4, 7.1.4 and 9.1.6 streams
+(`testdata/object-fixture/dee_joc_*.ec3`) played three times each on S3b over HTTP with no failed allocation and no underrun, 60 KB of
+internal heap free at the end of the lap from 79.8 KB at the start. S3a then ran the suite against that baseline 11 more times with the first folded image (three boots and two plays a row each; about 1 h 36 min of suite with the recording run): no stall, no timeout, no failed allocation, and ten runs held to the baseline. One (run 9) flagged `ac4-20-music-sendspin`, 2 of 2 plays glitched against the baseline's 0 of 5 (one underrun, one resynchronisation, one late chunk), in a run that overlapped S3b's rollback to its as-found image on the same network. The image built from the merged branch (the stack fallbacks and the log fix, 2,621,840 bytes) then ran the suite three more times on S3a with nothing else running: every row ok, no regression, boot 75,551 to 75,731 bytes free.
 
 ## The S3 hang, read on the board (2026-10-28)
 
@@ -218,7 +266,7 @@ to PSRAM (`SPIRAM_TRY_ALLOCATE_WIFI_LWIP`). The resolved sdkconfigs of the targe
 | the release profile (no AC-4), diagnostic in | stalled at 11 minutes (an AC-3 stream, 100 KB free, 32 of 32 out) |
 | the plain release profile (no AC-4), no diagnostic | clean, twice (and twice in finding 28) |
 | **the recommended configuration below, `LWIP_TCP_OOSEQ_MAX_PBUFS=4`, diagnostic in** | **clean** (three full runs, 51 minutes), receive buffers out at most 4; the same configuration without the line stalled twice (finding 28's `psram4k-rec` images) |
-| **the same, no diagnostic, with the `measure` overlay** (the image the board suite records) | **clean** (two full runs): every row ok, the three AC-4 `POST /play` rows' PCM hashes equal the host's pins (`f860e51f602ae753`, `e8b8cfa716dd0e1c`, `5b93c61c57566b0c`) |
+| **the same, no diagnostic, with the `measure` overlay** (the image the board suite records) | **clean** (two full runs; then, as the folded profile on S3a, 14 more (11 on the first folded image, 3 on the merged branch's) more, below): every row ok, the three AC-4 `POST /play` rows' PCM hashes equal the host's pins (`f860e51f602ae753`, `e8b8cfa716dd0e1c`, `5b93c61c57566b0c`) |
 
 **Established:** the stall is a Wi-Fi receive-buffer exhaustion with lwIP, Wi-Fi and the CPUs alive and the heap not short; the
 unbounded out-of-order queue is how this part is configured and how the P4 and C6 are not; bounding it removed the stall in the
@@ -257,12 +305,14 @@ What each costs:
 **Recommendation: C**, with the receive-buffer fix. In `profiles.json` that is `s3-n16r8` taking the `ac4` and `s3-dcache`
 fragments after `s3-fast` and keeping `psram-4k`; the locked values that move are the cache (6 keys), the AC-4 keys (8, as for
 `p4-rev1`, plus `SENDSPIN_AC4_MAX_FRAME_RATE` 25), the two decode stacks (40,960, in PSRAM on this part) and the budget; and
-`s3-n16r8-ac4` goes. Not measured, and owed to the board run that re-records the baselines: E-AC-3 7.1.4 and JOC streams with the
-64 KB cache and the 4 KB limit (the release profile's 70 KB or more becomes about 38 KB), AC-4 over Sendspin on the second S3, and
-a soak of hours.
+`s3-n16r8-ac4` goes. It was recommended before the board run that re-records the baselines; that run then measured what was owed:
+E-AC-3 JOC 5.1.4, 7.1.4 and 9.1.6 streams with the 64 KB cache and the 4 KB limit leave 60 KB free at the end of the lap (the
+estimate was about 38 KB), AC-4 over Sendspin ran on the second S3 as on the first, and the soak is the fifteen suite runs under the
+S3 verdict above (hours of it are still owed).
 
-**Done on this branch:** the one line, `CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS=4` in `sdkconfig.psram` with its reason. **Not done:** the
-fold of the S3 profiles, which changes the release image's locked values and needs both S3s to be re-recorded.
+**Done:** the one line, `CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS=4` in `sdkconfig.psram` with its reason (#1697), and the fold of the S3
+profile as recommended (the follow-up): `s3-n16r8` is policy C. The 4 KB limit's old comment in `sdkconfig.psram-4k` ("its board suite
+hung at the first play") was the out-of-order queue, not the limit, and says so now.
 
 ## ESP32-C6 (`c6-16mb`, `c6-4mb`)
 
@@ -301,19 +351,21 @@ measurement was made.
   `main` (`ci.yml`, `verify --size-json`). A `p4-rev3` image at 90% of its slot is a case for adding it to the gate's list.
 - **The profile guard** (`_profiles.yml`) configures every profile and holds its locked keys: folding is a `profiles.json`
   change with a new profile hash and a board run, as the file's `note` says.
-- **Builds:** `_build.yml` already builds `s3-n16r8-ac4` and `p4-rev1-ac4` (not run). Folding removes those two and makes the
-  release builds 1 MB larger.
+- **Builds:** `_build.yml` built `s3-n16r8-ac4` and `p4-rev1-ac4` (not run); both steps are gone and the release builds are 1 MB
+  larger. The PR tier does not run the S3 QEMU leg, so the first run of the S3 release shape with the decoder and the 64 KB cache
+  under QEMU is the nightly's.
 - **QEMU** runs only the S3 release shape (`s3-n16r8` with `qemu-net`); there is none for the P4 or the C6, and no AC-4 QEMU
   leg. An S3 release image with the decoder would run its boot gate with 2 KB less heap and the decoder idle.
 - **The board suite** (`board_suite.py`) refuses a baseline recorded under another hash: every folded profile needs its run.
 
 ## What could not be determined
 
-- Boot heap and least-free of every AC-4 variant that has no baseline (`p4-rev3` + AC-4 beyond the kit's scratch run, the C6):
-  the boot figures for those are the static difference added to a recorded one.
-- On the S3: E-AC-3 7.1.4 and JOC streams under the recommended policy; the second S3; a soak of hours; whether the diagnostic
-  or the bound on the out-of-order queue is what made the A-CPL stream glitch more in the runs above; which segment loss starts
-  the receive-buffer stall; why the profile with the decoder reaches it more often than the release profile.
+- AC-4 through Sendspin on the P4X kit, the Meters view and AC-4 together, and a soak on the kit.
+- On the S3: a soak of more than the 15 suite runs above (the stall needs hours to rule out, not minutes); whether the
+  diagnostic or the bound on the out-of-order queue is what made the A-CPL stream glitch more in the diagnostic runs (the folded
+  image's A-CPL over Sendspin glitches 4 of 5 plays in the recording run, where the AC-4 profile's baseline had 2 and 3 of 5: the stream is
+  0.69 of a frame on this part and always has been marginal); which segment loss starts the receive-buffer stall; why the profile
+  with the decoder reached it more often than the release profile.
 - AC-4 2.0 through Sendspin on an S3 with the 32 KB cache (A-SPX 0.61 on the HTTP path is the nearest figure).
 - Any C6 time.
 
