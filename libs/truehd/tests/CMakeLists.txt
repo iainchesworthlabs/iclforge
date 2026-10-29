@@ -5,6 +5,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     io/test_access_unit.cpp
     io/test_elementary.cpp
     io/test_elementary_resync.cpp
+    io/test_evolution.cpp
     decoder/test_decoder.cpp
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp
@@ -17,7 +18,10 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder.cpp
     encoder/test_signals.cpp)
 
-target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json)
+# iclforge::objects only for test_evolution.cpp, which holds this library's reading of the evolution
+# frame to the EMDF container reader E-AC-3 streams go through (libs/truehd itself links base alone).
+target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json
+    iclforge::objects)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/.
 target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)

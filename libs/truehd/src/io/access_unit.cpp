@@ -64,6 +64,13 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
 
 }  // namespace
 
+std::optional<ExtraData> read_extra_data(std::span<const std::byte> bytes) {
+    if (bytes.size() < 2) {
+        return std::nullopt;
+    }
+    return parse_extra_data(bytes);
+}
+
 std::size_t access_unit_length_bytes(std::span<const std::byte> data) noexcept {
     return data.size() < 2 ? 0 : std::size_t{be16(data, 0) & 0xFFFU} * 2U;
 }

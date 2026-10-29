@@ -55,7 +55,14 @@ restart header; `kLenient` counts it (`DecoderCounters`) and decodes on. The las
 on a unit boundary carries an end-of-stream marker; the decoder removes the padding samples it counts
 (`padding_samples`). Decoding does not allocate once a stream is running (the buffers are sized when the decoder is
 built), apart from a change of major sync and an extra data field longer than 256 bytes. The extra data of a unit is
-not interpreted: `extra_data` hands back its bytes.
+not decoded: `extra_data` hands back its bytes. `read_extra_data` and `read_evolution`
+(`iclforge/truehd/io/evolution.hpp`) read them into plain structures, as a reading that waits for the owner: the
+check nibble, the framing and the parity are reported (not enforced), and the evolution payload is read as the
+bit-level container of TH spec v3.6 section 15.4 (version, key id, payloads with their configuration and bytes, and the
+protection field, which is returned and not verified). `EvolutionFrame::oamd()` hands out the bytes of payload id 11, the
+object audio metadata, for a program that links `iclforge::objects` to parse with `iclforge::objects::oba::parse_payload`;
+this library links `iclforge::base` and nothing else. `forge probe` prints what it finds. The reading is provisional
+(`libs/truehd/ERRATA.md`, questions 20 to 22).
 
 The syntax is also written: `write_restart_header`, `write_block_header`, `write_major_sync` and
 `write_access_unit_prefix` are the readers' inverses, which the encoder is built on.
@@ -165,7 +172,8 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
   of it equals this library's with `shr7` read as 16 bits (ERRATA question 5, provisional).
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.
 - The block data CRC is not checked, only the length it follows.
-- The evolution frame and the object audio metadata in the extra data are carried as bytes, not read.
+- The evolution frame is read (provisionally) and the object audio metadata in it is handed out as bytes; nothing
+  decodes from either, and the signature and protection bytes are not verified.
 - The encoder does not write an IIR filter, LSB bypass, a negative output shift, heavy DRC, noise or MLP
   (`ExperimentalTools::iir` and `lsb_bypass` are refused with a reason), nor the Atmos substream. Against FFmpeg's
   encoder the streams are smaller on most material and larger at 192 kHz (the specification's order 4 against

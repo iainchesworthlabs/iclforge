@@ -88,6 +88,13 @@ write_access_unit_prefix(const std::optional<MajorSync>& major_sync,
                          std::span<const SubstreamEntry> entries, std::uint16_t input_timing,
                          std::size_t total_bytes);
 
+// The extra data of a unit read from its own bytes (everything after the last segment, from the
+// header word on), as parse_access_unit does: the same checks, reported and not enforced. Empty
+// when there are fewer than two bytes. For a caller that holds the extra data apart from its unit
+// (a test, a tool that built it).
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<ExtraData> read_extra_data(
+    std::span<const std::byte> bytes);
+
 // The unit's length in bytes from its first two bytes, 0 if there are fewer than two (TH spec
 // §3.3).
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::size_t access_unit_length_bytes(

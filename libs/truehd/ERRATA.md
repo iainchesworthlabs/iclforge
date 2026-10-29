@@ -303,7 +303,7 @@ the flag. FFmpeg accepts a zero CRC byte (question 9), so the CRC has no oracle.
 the specification lays them out: a header word (`header_check_nibble`, `extra_data_length`), a word with
 `evo_reserved` and `evo_frame_byte_length`, the payload, zero padding, and the parity byte; the length is taken as the
 words of the whole extra data less one (question 19), and the decoder does not depend on it. The payload
-is carried as opaque bytes. `terminatorB` (0x1234) is read right after the last block's flag of substream 3. No stream
+is carried as opaque bytes (read, provisionally, as an evolution frame: "Atmos, spec v3.6", F). `terminatorB` (0x1234) is read right after the last block's flag of substream 3. No stream
 FFmpeg writes has either. FFmpeg's strict decode of `hb_extra_data` returns the samples and no payload, so the extra data's
 layout has no oracle; `terminatorB` is in `hb_sixteen_channels`, whose restart sync 0x31EC FFmpeg refuses
 (`testdata/truehd/handbuilt/`).
@@ -679,3 +679,39 @@ channels; the constraints of §15.16; the extra data framing, its check nibble a
 Where the owner's text and the public text differ, nothing but a stream or the owner decides: A5, A7, A12, A15 (the container) and B4 to B6, B10 to
 B12, B16, B18, B21 to B26, B28, B29 (the z sign), B31, B32, B34, B36, B38 and B41 (the payload). The library follows the standard in all of them
 (`iclforge::objects` already does) and says so in the question.
+
+### F. The reader (provisional)
+
+`libs/truehd/include/iclforge/truehd/io/evolution.hpp` reads what questions 20 to 22 leave open, in the form the owner's text and the
+standard agree on, so that a real stream can say which is right. **Provisional, owner to confirm**: no stream here has an evolution
+frame, and the owner has not said that §15.4 and not §16.3 is what real streams carry.
+
+- `read_extra_data(bytes)` is `parse_access_unit`'s own extra data reading, for bytes held apart from their unit. `read_evolution(extra)`
+  reports the check nibble (§16.2), the framing, the parity (§16.4), `evo_reserved` zero (§16.8) and the capacity rule (§16.8, with
+  `extra_data_length` as the words less one, question 19), none enforced, and reads `evolution_payload` as `evo_frame()`.
+- `parse_evolution_frame(bytes, reading)` returns the version, the key id, each payload (id, configuration, bytes), the protection field
+  (the two length codes and the bytes), the length in bits and whether the bits after it are all zero, or an `EvolutionError` of one of ten
+  kinds, each with the bit offset of the field that failed. `EvolutionFrame::oamd()` is the payload with id 11. The protection bytes are
+  returned, not verified; no signature is looked at.
+- Two readings. `kEmdf` (the default) is the EMDF container as `iclforge::objects` reads it for E-AC-3; `kSpec36` is §15.4 to the letter
+  (rows A2, A5, A7, A12, A15). `forge probe` reads every frame both ways and says which read.
+- The library links `iclforge::base` alone. The OAMD payload is parsed by a program that links `iclforge::objects` too, through
+  `iclforge::objects::oba::parse_payload(bytes)`, which takes a bare payload: **no change to libs/ac3 or libs/objects is needed**. (The
+  EMDF reader there, `parse_container`, wants the sync word and a length in front of the body; the tests give it those four bytes, and
+  `forge` has no need of it.)
+- Tests: `libs/truehd/tests/io/test_evolution.cpp` reads the vectors `tools/references/truehd_evolution.py` writes
+  (`testdata/truehd/evolution/vectors.json`: 133 hand-built extra data regions, each read under both readings by the Python transcription,
+  with a vector for each of the ten error kinds, every version 0 to 3, key ids 0 to 7 and beyond, every configuration flag, payload sizes at
+  the edges of the size coding, every combination of protection codes, padding, a bad nibble, a bad parity and truncations), a frame
+  written out bit by bit, `iclforge::objects::emdf::build_container`'s output (whose body is an `evo_frame()` under `kEmdf`), and 6,000
+  random frames of random shape, whole and damaged, and 40,000 random byte strings, each compared with `parse_container`: the same payload
+  ids, sizes, bytes and configuration, or both refuse. The two differ only where Annex H defines nothing (a version other than 0, which
+  `parse_container` refuses and this reads) and that is asserted, not allowed silently. The last test takes an OAMD payload from
+  `iclforge::objects`, frames it with the encoder, decodes the stream, reads the extra data back and parses payload 11.
+- Each check was removed in turn (22 mutations: the primary protection code refusal, the payload id escape, the reserved bit after
+  `smploffst`, the read-more flag, the terminator and payload size checks, the trailing-bits scan, the parity, nibble, reserved and capacity
+  reports, the escape cap of `kSpec36`, the protection order, the discard flag, the version and key id escapes, the first-payload rule,
+  the widths of `proc_allowed`, the group id and the codec data, the error kind of a missing terminator and the two-byte minimum of
+  `read_extra_data`) and `ctest -L truehd` failed each time.
+- What this does not show: that any TrueHD stream looks like this. The vectors, the Python transcription and the C++ reader share one
+  author's reading of §15.4; the E-AC-3 reader does not, and is why `kEmdf` is the default.

@@ -21,6 +21,7 @@ iclforge_add_library(truehd
         src/encoder/encoder.cpp
         src/io/access_unit.cpp
         src/io/elementary.cpp
+        src/io/evolution.cpp
         src/io/major_sync.cpp
     DEPENDS base
     PRIVATE_INCLUDES
