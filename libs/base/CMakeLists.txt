@@ -273,6 +273,11 @@ iclforge_add_library(base
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
         src/crypto/ecdsa_p256.cpp
+        src/crypto/der.cpp
+        src/crypto/x509.cpp
+        src/crypto/pem.cpp
+        src/crypto/chain.cpp
+        src/crypto/credentials.cpp
         src/crypto/signing_key.cpp
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
@@ -293,5 +298,6 @@ add_dependencies(iclforge_base_objects iclforge_version)
 # /wd4996 on the whole target.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(src/cpu_features.cpp src/crypto/signing_key.cpp
+        src/crypto/credentials.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
