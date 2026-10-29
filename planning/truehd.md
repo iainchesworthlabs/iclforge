@@ -182,7 +182,14 @@ Each entry: what the specification says, the reading taken, and the evidence. En
    once the owner agrees.
 2. **The old branch.** `feature/truehd-atmos-support` is not fetched, read or reused; the module is
    written fresh from the specification under the present clean-room ruling.
-3. **FFmpeg as arbiter.** Where the specification contradicts itself, the reading under which
+3. **Downmix by default.** For 5.1 and 7.1 the encoder makes the 2-channel (and for 7.1 the
+   6-channel) presentation a fold-down of the full mix (C and the surrounds at -3 dB, the
+   limiter scaling the fold down when it would clip), undone losslessly by the upper substreams'
+   matrices. FFmpeg's encoder instead carries the first two channels as the 2-channel
+   presentation. The fold costs bits, signal-dependently: on the 5.1 golden master's source
+   it costs about half again (136 KB against 91 KB unfolded; FFmpeg writes 111 KB).
+   `truehd-downmix=0` (EncoderConfig::downmix = false) gives FFmpeg's layout.
+4. **FFmpeg as arbiter.** Where the specification contradicts itself, the reading under which
    FFmpeg's decoder accepts our streams and our decoder reproduces FFmpeg's streams is taken, and
    each is listed in the register and in `libs/mlp/ERRATA.md`.
 
@@ -195,5 +202,5 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 | 2 | decoder | core done 2026-10-29: `libs/mlp/src/decoder/decoder.cpp` decodes all eleven FFmpeg golden masters exactly (`iclforge-mlp-tests "[gold]"`), 2-channel presentation of 5.1, typed errors. Not yet exercised: IIR filters, matrices in upper substreams, 8 and 16 channels (need our encoder) |
 | 3 | encoder | core done 2026-10-29: plan (presentations, downmix with limiter, decorrelation), filter pool (FIR by Levinson-Durbin, FIR+IIR by two-stage least squares), exact Huffman costing, FIFO schedule, self-verification. Streams of 1 to 8 channels at 44.1 to 192 kHz, 16 to 24 bit decode exactly in our decoder and in FFmpeg's. Next: block-size choice, rate-control test |
 | 4 | Atmos | not started |
-| 5 | library surface, CLI, docs | not started |
-| 6 | tests and gates | FFmpeg golden masters committed (`testdata/truehd/ffmpeg`, `tools/generators/gen_truehd_ffmpeg_gold.py`); interop script, DEE harness, fuzz, CI wiring not started |
+| 5 | library surface, CLI, docs | forge `truehd-encode`, and TrueHD in `decode`, `probe` (table and json=1), `transcode` landed 2026-10-29; public headers core/, io/, decoder/, encoder/. Docs, CHANGELOG, ROADMAP not yet |
+| 6 | tests and gates | FFmpeg golden masters committed; `tools/checks/verify_truehd_interop.py` legs 1 to 3 pass locally (137 checks with --quick); leg 4 needs Atmos. DEE harness, fuzz, CI wiring not started |
