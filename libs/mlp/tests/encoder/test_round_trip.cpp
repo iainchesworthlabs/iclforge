@@ -137,3 +137,29 @@ TEST_CASE("mlp encoder round-trips random signals over the configuration space",
         round_trip(pcm, config, "random-" + std::to_string(trial));
     }
 }
+
+TEST_CASE("mlp encoder round-trips 7.1 under each matrix option", "[mlp][encoder]") {
+    // Eight different signals, so that a channel order or substream mix-up shows.
+    const std::size_t frames = 4800;
+    std::vector<std::int32_t> pcm(frames * 8);
+    std::mt19937 rng(71U);
+    for (std::size_t n = 0; n < frames; ++n) {
+        for (int c = 0; c < 8; ++c) {
+            const double v = 0.4 * std::sin(0.002 * static_cast<double>(n) * (c + 1)) +
+                             0.05 * std::uniform_real_distribution<double>(-1.0, 1.0)(rng);
+            pcm[n * 8 + static_cast<std::size_t>(c)] =
+                static_cast<std::int32_t>(std::lround(v * 8388607.0));
+        }
+    }
+    for (const bool downmix : {false, true}) {
+        for (const bool decorrelate : {false, true}) {
+            EncoderConfig config;
+            config.channels = 8;
+            config.downmix = downmix;
+            config.decorrelate = decorrelate;
+            round_trip(pcm, config,
+                       std::string("seven-one-") + (downmix ? "downmix" : "plain") +
+                           (decorrelate ? "-decorrelated" : ""));
+        }
+    }
+}

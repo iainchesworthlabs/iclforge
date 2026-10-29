@@ -135,7 +135,12 @@ std::expected<void, Error> Decoder::State::apply(SubstreamState& st, const Block
         for (int i = 0; i < b.matrix->count; ++i) {
             const PrimitiveMatrix& p = b.matrix->matrices[static_cast<std::size_t>(i)];
             // Section 17 gives no generator for the noise channels (P27).
-            for (int ch = max + 1; ch <= max + 2; ++ch) {
+            // Noise type 1's per-matrix noise (P37) is likewise unspecified: a matrix that asks
+            // for it is refused the same way.
+            if (st.ctx.noise_type && p.noise_shift != 0) {
+                return std::unexpected(Error::kNoiseChannel);
+            }
+            for (int ch = max + 1; ch <= max + 2 && !st.ctx.noise_type; ++ch) {
                 if (((p.coeff_present >> ch) & 1U) != 0 &&
                     p.coeffs[static_cast<std::size_t>(ch)] != 0) {
                     return std::unexpected(Error::kNoiseChannel);
@@ -241,7 +246,7 @@ std::expected<int, Error> Decoder::State::segment(int index, const detail::Segme
         const int min = rh.min_chan;
         const int max = rh.max_chan;
         const int mmc = rh.max_matrix_chan;
-        const int inputs = max + 1 + kNoiseChannels;
+        const int inputs = max + 1 + st.ctx.noise_inputs();
         const bool wide = rh.sync_word == kRestartSyncC;
         const std::int64_t limit = wide ? (std::int64_t{1} << 31) : (std::int64_t{1} << 23);
         const int channels = mmc + 1;

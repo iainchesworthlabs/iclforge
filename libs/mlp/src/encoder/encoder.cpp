@@ -490,7 +490,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             ctx.min_chan = sp.min_chan;
             ctx.max_chan = sp.max_chan;
             ctx.max_matrix_chan = sp.max_matrix_chan;
-            ctx.noise_type = false;
+            ctx.noise_type = (sp.sync_word & 1U) != 0;
             ctx.max_matrices = sp.max_matrices;
             for (std::size_t b = 0; b < spans.size(); ++b) {
                 const BlockSpan& span = spans[b];

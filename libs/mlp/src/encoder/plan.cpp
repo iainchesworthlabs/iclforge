@@ -13,6 +13,9 @@ namespace {
 
 constexpr double kMinus3dB = 0.70710678118654752;
 
+// The restart sync word of substream 2 (P5).
+constexpr std::uint16_t kSubstream2Sync = 0x31EB;
+
 // Which side a speaker label is on, for the fold-downs: -1 left, 1 right, 0 centre, 2 LFE.
 int side(std::string_view label) {
     if (label == "LFE" || label == "LFE2") {
@@ -85,18 +88,17 @@ std::expected<Plan, Error> make_plan(int channels, std::uint16_t assignment, boo
         add(2, std::min(channels, 6) - 1, kRestartSyncA, 8);
     }
     if (channels > 6) {
-        add(6, std::min(channels, 8) - 1, kRestartSyncA, 8);
+        add(6, std::min(channels, 8) - 1, kSubstream2Sync, 8);
     }
     if (channels > 8) {
         add(8, channels - 1, kRestartSyncC, 15);
     }
     // format_info (5.1): FFmpeg writes 1 in both the six- and eight-channel assignments of a
-    // stereo stream, and the 5.1 assignment in both for 5.1 (P25).
-    p.sixch_assignment = static_cast<std::uint8_t>((channels <= 2   ? kAssignStereo
-                                                    : channels <= 6 ? p.assignment
-                                                                    : kAssign51) &
-                                                   0x1FU);
-    p.eightch_assignment = channels <= 2 ? kAssignStereo : p.assignment;
+    // stereo stream, and the 5.1 assignment in both for 5.1 (P25). A mono stream names its one
+    // channel in both: FFmpeg's decoder checks a presentation's channel count against them.
+    p.sixch_assignment =
+        static_cast<std::uint8_t>((channels <= 6 ? p.assignment : kAssign51) & 0x1FU);
+    p.eightch_assignment = p.assignment;
     // 6.4's substream_info: FFmpeg writes 0x14 with one substream and 0x3C with two. The values
     // for three and four are this encoder's (P34): bit 6 for the 8-channel presentation and bit 7
     // for the 16-channel one, which 6.4 names.

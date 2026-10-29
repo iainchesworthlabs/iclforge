@@ -226,6 +226,9 @@ struct BlockContext {
     int max_matrix_chan = 0;
     bool noise_type = false;
     int max_matrices = kMaxPrimitiveMatrices;
+    // The noise channels a primitive matrix takes coefficients for past max_chan: two with noise
+    // type 0, none with noise type 1 (P21, P37).
+    [[nodiscard]] int noise_inputs() const noexcept { return noise_type ? 0 : kNoiseChannels; }
 };
 
 // Section 10.2, with P21's max_chan + 3 inputs.
@@ -235,7 +238,7 @@ std::expected<void, Error> transfer(Io& io, Field<Io, MatrixParams> m, const Blo
     if (m.count > ctx.max_matrices) {
         return fail(io, Error::kMatrixCount);
     }
-    const int inputs = ctx.max_chan + 1 + kNoiseChannels;
+    const int inputs = ctx.max_chan + 1 + ctx.noise_inputs();
     for (int i = 0; i < m.count; ++i) {
         auto& p = m.matrices[static_cast<std::size_t>(i)];
         io.u(4, p.output_channel, "matrix_out_ch");

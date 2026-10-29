@@ -64,7 +64,10 @@ struct RestartHeader {
     std::uint8_t crc = 0;                                // as read; the writer computes it
 
     // P22: the sync word's last bit is the noise type; 0x31EC's substream has none.
-    [[nodiscard]] bool noise_type() const noexcept { return sync_word == kRestartSyncB; }
+    // The sync word's last bit is the noise type (P22, P37): 0 (0x31EA, 0x31EC) puts two noise
+    // channels among a primitive matrix's inputs; 1 (0x31EB) gives each matrix a noise shift
+    // instead, and its inputs are the channels alone.
+    [[nodiscard]] bool noise_type() const noexcept { return (sync_word & 1U) != 0; }
 };
 
 // Section 9.2. Coefficients and states as coded; the effective coefficient is coeff << coeff_shift
