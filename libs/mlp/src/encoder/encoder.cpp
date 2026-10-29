@@ -337,7 +337,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
         ++stats.limited_downmixes;
     }
 
-    // Per channel and access unit: the filter and the coding of the coded channels.
+    // Per channel and block: the filter and the coding of the coded channels.
     struct BlockChoice {
         bool new_fir = false;
         bool new_iir = false;
@@ -345,41 +345,36 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
         CodingParams coding;
         std::vector<std::int32_t> residuals;
     };
-    // The blocks: one per access unit, but the restart's first eight samples are a block of their
-    // own, coded with no prediction. FFmpeg's decoder does not clear the filters' history at a
-    // restart header, and its encoder codes the first eight samples after every restart
-    // unpredicted, which flushes that history whichever way a decoder treats it (P35); this
-    // encoder does the same, so that its streams decode alike in both and from any restart.
+    // The blocks, per substream. A restart's first eight samples are a block of their own, coded
+    // with no prediction: FFmpeg's decoder does not clear the filters' history at a restart
+    // header, and its encoder codes the first eight samples after every restart unpredicted,
+    // which flushes that history whichever way a decoder treats it (P35); this encoder does the
+    // same, so that its streams decode alike in both and from any restart. Every other access
+    // unit is one block or two, whichever its substream's channels code in fewer bits (8.4: block
+    // sizes are multiples of 8, so a 40-sample unit splits as 16 and 24).
     struct BlockSpan {
         int unit;
         int start;
         int size;
         bool flat;
     };
-    std::vector<BlockSpan> spans;
-    for (int u = 0; u < units; ++u) {
-        if (u == 0) {
-            spans.push_back({0, 0, kMinBlockSize, true});
-            spans.push_back({0, kMinBlockSize, spa - kMinBlockSize, false});
-        } else {
-            spans.push_back({u, u * spa, spa, false});
-        }
-    }
-    std::vector<std::vector<BlockChoice>> blocks(static_cast<std::size_t>(channels),
-                                                 std::vector<BlockChoice>(spans.size()));
+    std::array<std::vector<BlockSpan>, kMaxSubstreams> spans_of{};
+    std::vector<std::vector<BlockChoice>> blocks(static_cast<std::size_t>(channels));
     std::array<int, kMaxSubstreams> max_lsbs{};
     auto& coder = coders[0];
+
+    // The pool of interval-wide designs, per channel: order 0, linear prediction of every order
+    // on the whole interval, and FIR + IIR pairs by two-stage least squares.
+    std::vector<std::vector<FilterDesign>> pools(static_cast<std::size_t>(channels));
     for (int c = 0; c < channels; ++c) {
         ChannelCoder& cc = coder[static_cast<std::size_t>(c)];
         cc = ChannelCoder{};  // a restart: the decoder's state is reset (P15)
         // After a restart the decoder holds huff_lsbs 24, which is lsbs_bits 24 - quant.
         cc.coding = CodingParams{0, 24 - ip.quant, 0};
         const auto& x = ip.coded[static_cast<std::size_t>(c)];
-        // The pool's interval-wide designs.
-        std::vector<FilterDesign> pool;
-        pool.push_back(FilterDesign{});  // order 0
-        const auto whole = lpc(x, config.max_fir_order);
-        for (const auto& coeffs : whole) {
+        auto& pool = pools[static_cast<std::size_t>(c)];
+        pool.push_back(FilterDesign{});
+        for (const auto& coeffs : lpc(x, config.max_fir_order)) {
             if (!coeffs.empty()) {
                 if (auto d = quantise(coeffs, {})) {
                     pool.push_back(*d);
@@ -400,111 +395,174 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
                 }
             }
         }
-        std::vector<std::int32_t> residuals;
-        for (std::size_t b = 0; b < spans.size(); ++b) {
-            const BlockSpan& span = spans[b];
-            const auto at = static_cast<std::size_t>(span.start);
-            const auto size = static_cast<std::size_t>(span.size);
-            const auto block = std::span(x).subspan(at, size);
-            std::vector<Candidate> cands;
-            if (span.flat) {
-                cands.push_back(Candidate{FilterDesign{}, false});
-            } else {
-                // The filter in place, the interval's pool, and the block's own designs from it
-                // and up to three access units before it.
-                cands.push_back(Candidate{cc.design, true});
-                for (const auto& d : pool) {
-                    cands.push_back(Candidate{d, false});
-                }
-                const std::size_t look =
-                    std::min<std::size_t>(at, static_cast<std::size_t>(3 * spa));
-                const auto window = std::span(x).subspan(at - look, look + size);
-                for (const auto& coeffs : lpc(window, config.max_fir_order)) {
-                    if (!coeffs.empty()) {
-                        if (auto d = quantise(coeffs, {})) {
-                            cands.push_back(Candidate{*d, false});
-                        }
+    }
+
+    // One channel's best filter and coding for one block, from the channel's state `cc`: the
+    // filter in place, the pool, and the block's own designs from it and up to three access units
+    // before it, ranked by the sum of absolute residuals and the best four costed exactly with
+    // the decoder's arithmetic.
+    struct BlockResult {
+        BlockChoice choice;
+        ChannelFilter end;
+        std::int64_t bits = kInfiniteCost;
+    };
+    std::vector<std::int32_t> scratch;
+    auto choose_block = [&](const ChannelCoder& cc, int c, const BlockSpan& span) {
+        const auto& x = ip.coded[static_cast<std::size_t>(c)];
+        const auto at = static_cast<std::size_t>(span.start);
+        const auto size = static_cast<std::size_t>(span.size);
+        const auto block = std::span(x).subspan(at, size);
+        std::vector<Candidate> cands;
+        if (span.flat) {
+            cands.push_back(Candidate{FilterDesign{}, false});
+        } else {
+            cands.push_back(Candidate{cc.design, true});
+            for (const auto& d : pools[static_cast<std::size_t>(c)]) {
+                cands.push_back(Candidate{d, false});
+            }
+            const std::size_t look = std::min<std::size_t>(at, static_cast<std::size_t>(3 * spa));
+            const auto window = std::span(x).subspan(at - look, look + size);
+            for (const auto& coeffs : lpc(window, config.max_fir_order)) {
+                if (!coeffs.empty()) {
+                    if (auto d = quantise(coeffs, {})) {
+                        cands.push_back(Candidate{*d, false});
                     }
                 }
             }
-            // A cheap first pass: the sum of absolute residuals ranks the candidates; the best
-            // few are costed exactly.
-            struct Ranked {
-                std::int64_t score;
-                std::size_t index;
-            };
-            std::vector<Ranked> ranked;
-            for (std::size_t k = 0; k < cands.size(); ++k) {
-                if (!run(cc.filter, cands[k].design, cands[k].keep, ip.quant, block, residuals,
-                         nullptr)) {
-                    continue;
-                }
-                std::int64_t sum = 0;
-                for (const std::int32_t r : residuals) {
-                    sum += std::abs(std::int64_t{r});
-                }
-                ranked.push_back({sum, k});
+        }
+        struct Ranked {
+            std::int64_t score;
+            std::size_t index;
+        };
+        std::vector<Ranked> ranked;
+        for (std::size_t k = 0; k < cands.size(); ++k) {
+            if (!run(cc.filter, cands[k].design, cands[k].keep, ip.quant, block, scratch,
+                     nullptr)) {
+                continue;
             }
-            std::sort(ranked.begin(), ranked.end(),
-                      [](const Ranked& x1, const Ranked& x2) { return x1.score < x2.score; });
+            std::int64_t sum = 0;
+            for (const std::int32_t r : scratch) {
+                sum += std::abs(std::int64_t{r});
+            }
+            ranked.push_back({sum, k});
+        }
+        std::sort(ranked.begin(), ranked.end(),
+                  [](const Ranked& x1, const Ranked& x2) { return x1.score < x2.score; });
+        BlockResult best;
+        const std::size_t exact = std::min<std::size_t>(ranked.size(), 4);
+        for (std::size_t k = 0; k < exact; ++k) {
+            const Candidate& cand = cands[ranked[k].index];
+            ChannelFilter end_state;
+            if (!run(cc.filter, cand.design, cand.keep, ip.quant, block, scratch, &end_state)) {
+                continue;
+            }
+            const bool fir_changed = !cand.keep && !same_filter(cand.design.fir, cc.design.fir);
+            const bool iir_changed = !cand.keep && !same_filter(cand.design.iir, cc.design.iir);
+            std::int64_t bits = 0;
+            if (fir_changed) {
+                bits += filter_bits(cand.design.fir);
+            }
+            if (iir_changed) {
+                bits += filter_bits(cand.design.iir);
+            }
+            const CodingChoice coding = choose_coding(scratch, cc.coding, 24 - ip.quant);
+            if (coding.bits >= kInfiniteCost) {
+                continue;
+            }
+            bits += coding.bits;
+            if (fir_changed || iir_changed) {
+                bits += header_bits(coding.params, cc.coding, true) -
+                        header_bits(coding.params, cc.coding, false);
+            }
+            if (bits < best.bits) {
+                best.bits = bits;
+                best.choice.new_fir = fir_changed;
+                best.choice.new_iir = iir_changed;
+                best.choice.design = cand.keep ? cc.design : cand.design;
+                best.choice.coding = coding.params;
+                best.choice.residuals = scratch;
+                best.end = end_state;
+            }
+        }
+        return best;
+    };
+
+    for (int u = 0; u < units; ++u) {
+        const int first = u * spa;
+        for (int ss = 0; ss < plan.substreams; ++ss) {
+            const auto& sp = plan.sub[static_cast<std::size_t>(ss)];
+            std::vector<std::vector<BlockSpan>> options;
+            if (u == 0) {
+                options.push_back(
+                    {{0, 0, kMinBlockSize, true}, {0, kMinBlockSize, spa - kMinBlockSize, false}});
+            } else {
+                options.push_back({{u, first, spa, false}});
+                const int half = spa / 2 / kMinBlockSize * kMinBlockSize;
+                if (half >= kMinBlockSize) {
+                    options.push_back(
+                        {{u, first, half, false}, {u, first + half, spa - half, false}});
+                }
+            }
             std::int64_t best_bits = kInfiniteCost;
-            BlockChoice best;
-            ChannelFilter best_state;
-            const std::size_t exact = std::min<std::size_t>(ranked.size(), 4);
-            for (std::size_t k = 0; k < exact; ++k) {
-                const Candidate& cand = cands[ranked[k].index];
-                ChannelFilter end_state;
-                if (!run(cc.filter, cand.design, cand.keep, ip.quant, block, residuals,
-                         &end_state)) {
-                    continue;
+            std::size_t best_option = 0;
+            std::vector<std::vector<BlockResult>> best_results;
+            for (std::size_t o = 0; o < options.size(); ++o) {
+                // Each block costs its header bits too: block_header_exists and
+                // last_block_in_segment, and a block size that changes is sent (10 bits).
+                std::int64_t total = static_cast<std::int64_t>(options[o].size()) * 2 +
+                                     (options[o].size() > 1 ? 20 : 0);
+                std::vector<std::vector<BlockResult>> results(options[o].size());
+                bool feasible = true;
+                for (int ch = sp.min_chan; ch <= sp.max_chan && feasible; ++ch) {
+                    ChannelCoder trial = coder[static_cast<std::size_t>(ch)];
+                    for (std::size_t b = 0; b < options[o].size(); ++b) {
+                        BlockResult r = choose_block(trial, ch, options[o][b]);
+                        if (r.bits >= kInfiniteCost) {
+                            feasible = false;
+                            break;
+                        }
+                        total += r.bits;
+                        trial.filter = r.end;
+                        trial.design = r.choice.design;
+                        trial.coding = r.choice.coding;
+                        results[b].push_back(std::move(r));
+                    }
                 }
-                const bool fir_changed = !cand.keep && !same_filter(cand.design.fir, cc.design.fir);
-                const bool iir_changed = !cand.keep && !same_filter(cand.design.iir, cc.design.iir);
-                int bits = 0;
-                if (fir_changed) {
-                    bits += filter_bits(cand.design.fir);
-                }
-                if (iir_changed) {
-                    bits += filter_bits(cand.design.iir);
-                }
-                const CodingChoice coding = choose_coding(residuals, cc.coding, 24 - ip.quant);
-                if (coding.bits >= kInfiniteCost) {
-                    continue;
-                }
-                const std::int64_t total =
-                    bits + coding.bits +
-                    (fir_changed || iir_changed ? header_bits(coding.params, cc.coding, true) -
-                                                      header_bits(coding.params, cc.coding, false)
-                                                : 0);
-                if (total < best_bits) {
+                if (feasible && total < best_bits) {
                     best_bits = total;
-                    best.new_fir = fir_changed;
-                    best.new_iir = iir_changed;
-                    best.design = cand.keep ? cc.design : cand.design;
-                    best.coding = coding.params;
-                    best.residuals = residuals;
-                    best_state = end_state;
+                    best_option = o;
+                    best_results = std::move(results);
                 }
             }
             if (best_bits >= kInfiniteCost) {
                 return std::unexpected(Error::kFilterOverload);
             }
-            if (best.new_fir || best.new_iir) {
-                ++stats.filter_changes;
+            for (std::size_t b = 0; b < options[best_option].size(); ++b) {
+                spans_of[static_cast<std::size_t>(ss)].push_back(options[best_option][b]);
+                for (int ch = sp.min_chan; ch <= sp.max_chan; ++ch) {
+                    BlockResult& r = best_results[b][static_cast<std::size_t>(ch - sp.min_chan)];
+                    ChannelCoder& cc = coder[static_cast<std::size_t>(ch)];
+                    if (r.choice.new_fir || r.choice.new_iir) {
+                        ++stats.filter_changes;
+                    }
+                    if (r.choice.design.iir.order > 0) {
+                        ++stats.iir_blocks;
+                    } else if (r.choice.design.fir.order > 0) {
+                        ++stats.fir_blocks;
+                    } else {
+                        ++stats.unfiltered_blocks;
+                    }
+                    cc.filter = r.end;
+                    cc.design = r.choice.design;
+                    cc.coding = r.choice.coding;
+                    max_lsbs[static_cast<std::size_t>(ss)] = std::max(
+                        max_lsbs[static_cast<std::size_t>(ss)], r.choice.coding.lsbs + ip.quant);
+                    blocks[static_cast<std::size_t>(ch)].push_back(std::move(r.choice));
+                }
             }
-            if (best.design.iir.order > 0) {
-                ++stats.iir_blocks;
-            } else if (best.design.fir.order > 0) {
-                ++stats.fir_blocks;
-            } else {
-                ++stats.unfiltered_blocks;
+            if (options[best_option].size() > 1 && u > 0) {
+                ++stats.split_units;
             }
-            cc.filter = best_state;
-            cc.design = best.design;
-            const int ss = plan.substream_of(c);
-            max_lsbs[static_cast<std::size_t>(ss)] =
-                std::max(max_lsbs[static_cast<std::size_t>(ss)], best.coding.lsbs + ip.quant);
-            blocks[static_cast<std::size_t>(c)][b] = std::move(best);
         }
     }
 
@@ -541,6 +599,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             ctx.max_matrix_chan = sp.max_matrix_chan;
             ctx.noise_type = (sp.sync_word & 1U) != 0;
             ctx.max_matrices = sp.max_matrices;
+            const auto& spans = spans_of[static_cast<std::size_t>(ss)];
             for (std::size_t b = 0; b < spans.size(); ++b) {
                 const BlockSpan& span = spans[b];
                 if (span.unit != u) {

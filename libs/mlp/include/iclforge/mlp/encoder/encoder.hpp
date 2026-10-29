@@ -84,6 +84,8 @@ struct EncoderStats {
     std::uint64_t iir_blocks = 0;
     std::uint64_t unfiltered_blocks = 0;
     std::uint64_t filter_changes = 0;
+    // Access units a substream coded as two blocks rather than one, over every substream.
+    std::uint64_t split_units = 0;
     std::uint64_t decorrelation_matrices = 0;  // over every restart interval
     std::uint64_t limited_downmixes = 0;       // intervals whose downmix the limiter reduced
 };
