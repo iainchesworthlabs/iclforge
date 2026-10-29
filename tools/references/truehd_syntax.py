@@ -248,6 +248,12 @@ class Substream:
         lossless_check = bits.read(8)
         bits.read(16)
         self.ch_assign = [bits.read(6) for _ in range(self.max_matrix_chan + 1)]
+        # TH spec 7.4: ch_assign maps matrix channels to output channels, so output channel p takes
+        # the matrix channel m with ch_assign[m] == p (ERRATA 42). A value that repeats leaves an
+        # output channel with no matrix channel, which is refused (ERRATA question 41).
+        if sorted(self.ch_assign) != list(range(self.max_matrix_chan + 1)):
+            raise StreamError("ch_assign is not a permutation of the matrix channels")
+        self.output_source = [self.ch_assign.index(p) for p in range(self.max_matrix_chan + 1)]
         crc_bit = bits.pos
         stored = bits.read(8)
         if crc8_restart(segment, start, crc_bit) != stored:
@@ -410,12 +416,13 @@ def decode_block(sub, bits, rows, first):
             for noise in range(NOISE_CHANNELS):  # the noise channels follow the matrix channels
                 total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
             row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
-    # The output: ch_assign picks the matrix channel, the output shift is applied (ERRATA 12).
+    # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
+    # output shift (ERRATA 12).
     output_rows = []
     for i in range(size):
         out_row = []
         for ch in range(sub.max_matrix_chan + 1):
-            value = rows[first + i][sub.ch_assign[ch]]
+            value = rows[first + i][sub.output_source[ch]]
             shift = sub.output_shift[ch]
             out_row.append(s32(value << shift) if shift >= 0 else value >> -shift)
         output_rows.append(out_row)
@@ -423,7 +430,7 @@ def decode_block(sub, bits, rows, first):
             sub.interval = 0
         for ch, value in enumerate(out_row):
             # The shift is the matrix channel the output channel takes (ERRATA 12, provisional).
-            sub.interval ^= (value & 0xFFFFFF) << sub.ch_assign[ch]
+            sub.interval ^= (value & 0xFFFFFF) << sub.output_source[ch]
             sub.interval &= 0xFFFFFFFF
     return output_rows
 

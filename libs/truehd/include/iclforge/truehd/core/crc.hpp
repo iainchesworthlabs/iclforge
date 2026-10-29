@@ -48,10 +48,10 @@ namespace iclforge::truehd {
 // encoder fold the samples the same way, through these two functions, so that they cannot disagree.
 //
 // One output sample enters the fold masked to its low 24 bits and shifted left by the *matrix
-// channel* the output channel takes (`ch_assign[output channel]`), not by the output channel's
-// position. In a stream whose ch_assign is the identity the two are the same, which is every stream
-// FFmpeg's encoder writes; FFmpeg's decoder shifts by the matrix channel (`hb_matrices.thd`,
-// ERRATA entry 12). **Provisional, owner to confirm** (open question 6).
+// channel* the output channel takes (the channel `ch_assign` assigns to it: ERRATA entry 42), not by
+// the output channel's position. In a stream whose ch_assign is the identity the two are the same,
+// which is every stream FFmpeg's encoder writes; FFmpeg's decoder shifts by the matrix channel
+// (`hb_matrices.thd`, ERRATA entry 12). **Provisional, owner to confirm** (open question 6).
 [[nodiscard]] constexpr std::uint32_t lossless_fold_step(std::uint32_t fold, std::uint32_t sample,
                                                          unsigned matrix_channel) noexcept {
     return matrix_channel >= 32 ? fold : fold ^ ((sample & 0xFFFFFFU) << matrix_channel);

@@ -155,23 +155,25 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
     return static_cast<std::int32_t>(static_cast<std::uint32_t>(value) << 8U) >> 8;
 }
 
-// The output of a block: each output channel from the matrix channel `ch_assign` names, shifted
-// by its output shift, folded into the lossless check (TH spec §7.3) and, when `pcm` is not null,
-// written as 24 bit samples, `out_channels` to a sample time. Returns the new fold.
+// The output of a block: each output channel from the matrix channel `source_channel` names for it
+// (the decoder builds that from ch_assign, which assigns matrix channels to output channels:
+// ERRATA.md entry 42), shifted by its output shift, folded into the lossless check (TH spec §7.3)
+// and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
+// the new fold.
 [[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
-                                                 const std::uint8_t* ch_assign,
+                                                 const std::uint8_t* source_channel,
                                                  const std::int8_t* output_shift,
                                                  const std::int32_t* rows, std::ptrdiff_t stride,
                                                  std::int32_t* pcm, std::uint32_t fold) {
     for (int i = 0; i < block; ++i) {
         const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         for (int ch = 0; ch < out_channels; ++ch) {
-            const std::int32_t source = row[ch_assign[ch]];
+            const std::int32_t source = row[source_channel[ch]];
             const int shift = output_shift[ch];
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
-            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), ch_assign[ch]);
+            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), source_channel[ch]);
             if (pcm != nullptr) {
                 pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
             }

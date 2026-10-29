@@ -187,11 +187,11 @@ TEST_CASE("noise generator 0 runs on a 16 bit shr7, as in FFmpeg's decode",
 
 TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
           "[truehd][handbuilt][ffmpeg-derived]") {
-    // ERRATA entry 12: the fold shifts by ch_assign[output channel]. The stream's first writer
-    // shifted by the output position and stored 0x23 for its second restart interval; FFmpeg's
-    // decode of it said "Lossless check failed - expected 23, calculated ec". The stream carries
-    // 0xEC now, and tools/checks/verify_truehd_interop.py's FFmpeg leg decodes it without that
-    // message.
+    // ERRATA entries 12 and 42: the fold shifts by the matrix channel the output channel takes.
+    // The stream's first writer shifted by the output position and stored 0x23 for its second
+    // restart interval; FFmpeg's decode of it said "Lossless check failed - expected 23, calculated
+    // ec". The stream carries 0xEC now, and tools/checks/verify_truehd_interop.py's FFmpeg leg
+    // decodes it without that message.
     const std::vector<std::byte> stream = read_file(dir() + "/hb_matrices.thd");
     ElementaryReader reader(stream);
     std::vector<int> checks;

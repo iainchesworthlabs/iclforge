@@ -173,7 +173,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         }
     }
 
-    SECTION("the output takes the matrix channel ch_assign names, shifts it, and folds it") {
+    SECTION("the output takes the matrix channel it is given, shifts it, and folds it") {
         const std::array<std::uint8_t, 3> assign = {2, 0, 1};
         const std::array<std::int8_t, 3> shift = {0, 2, -3};
         std::array<std::int32_t, kBlock * 3> pcm{};

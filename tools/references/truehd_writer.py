@@ -316,13 +316,20 @@ def write_light_block_header(w, sub, size):
         w.put(0, 1)
 
 
+def output_sources(ch_assign):
+    """The matrix channel each output channel takes: output p takes the matrix channel m with
+    ch_assign[m] == p (TH spec 7.4, ERRATA 42)."""
+    return [ch_assign.index(p) for p in range(len(ch_assign))]
+
+
 def lossless_fold(rows, ch_assign):
     """The check of the interval whose output rows these are: each sample shifted by the matrix
-    channel its output channel takes (ERRATA 12, provisional)."""
+    channel its output channel takes (ERRATA 12, 42; provisional)."""
     fold = 0
+    sources = output_sources(ch_assign)
     for row in rows:
         for ch, value in enumerate(row):
-            fold ^= (value & 0xFFFFFF) << ch_assign[ch]
+            fold ^= (value & 0xFFFFFF) << sources[ch]
             fold &= 0xFFFFFFFF
     return ref.fold_check(fold)
 
@@ -570,9 +577,10 @@ def case_matrices():
     sources[3] = [v & ~1 for v in sources[3]]  # shifted left by 1 at the output
     assign = [1, 0, 2, 3, 5, 4]
     shifts = [0, 0, 0, 1, 0, 0]
-    # matrix channel m carries the output position j that ch_assign[j] == m
+    # matrix channel m carries the output position j = ch_assign[m] (TH spec 7.4, ERRATA 42; the
+    # permutation is its own inverse, so the other reading gives the same stream)
     x = [None] * 6
-    for j, m in enumerate(assign):
+    for m, j in enumerate(assign):
         x[m] = [v >> shifts[j] for v in sources[j]]
     a, b, d, e = 41, -23, 90, -61
     pre = [list(col) for col in x]

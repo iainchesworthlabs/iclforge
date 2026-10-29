@@ -62,7 +62,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    --handbuilt` (`hb_noise_generator_0`).
 6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The FFmpeg-made
    streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
-   `ch_assign` is the identity. FFmpeg's decoder shifts by `ch_assign[output channel]`: its strict decode of a stream
+   `ch_assign` is the identity. FFmpeg's decoder shifts by the matrix channel an output channel takes (entry 42 says which way `ch_assign` reads): its strict decode of a stream
    built with a permuted `ch_assign` and the position shift says `Lossless check failed - expected 23, calculated ec`
    (the first `hb_matrices.thd`, its major sync patched to a channel assignment FFmpeg accepts), and 0xEC is the fold
    shifted by the matrix channel. The committed `hb_matrices` carries 0xEC and FFmpeg decodes it to the stream's signal
@@ -184,6 +184,15 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     on the library's side before it compares. Evidence: `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/`
     (replay it with `ICLFORGE_DIFF_MEASURE_ONLY=1` to see the outcome).
 
+41. **A `ch_assign` that is not a permutation (§7.4, entry 42).** §7.4 says only that each value is at most
+    `max_matrix_chan`. A stream whose values repeat leaves an output channel with no matrix channel. The decoder refuses
+    it (`kBadParameter`). FFmpeg's decoder does not: an output channel nobody was assigned takes matrix channel 0, and of
+    two matrix channels with one output the later wins (the differential fuzzer's second finding, entry 42). No stream
+    sets such a `ch_assign`, so nothing says which is meant. Should the decoder refuse it, or follow FFmpeg?
+    Recommendation: refuse, since a decode that plays channel 0 twice is not what any encoder meant. Evidence:
+    `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/ch-assign-repeats-an-output-channel`, which FFmpeg
+    decodes and the library refuses.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -249,7 +258,7 @@ FFmpeg stream tried (19 exploration streams and the 12 fixtures, TrueHD and MLP)
 **12. The lossless check (§7.3).** The specification XORs the three low bytes of each sample. The streams: for every
 sample of every output channel of the substream, `acc ^= (sample & 0xFFFFFF) << channel` (32-bit), and the check is
 `acc ^ acc>>8 ^ acc>>16 ^ acc>>24` in its low byte, where "channel" is the matrix channel the output channel takes
-(`ch_assign[output channel]`; the output position until the FFmpeg evidence of open question 6 corrected it). It covers the output of the substream after the output shift, from
+(the channel `ch_assign` assigns to the output channel, entry 42; the output position until the FFmpeg evidence of open question 6 corrected it). It covers the output of the substream after the output shift, from
 the restart header before to the one after (the header carries the check of the interval that *ends* at it; the first
 header's value checks nothing). `explore27.py set/m51_48.thd 1000 1`: stored 129, 8, 13, 125, 180, 146 and the
 channel-shifted fold gives 129, 8, 13, 125, 180, 146; the plain byte fold gives 17, 41, 214, 201, 40, 103. The library's
@@ -445,6 +454,26 @@ which §7.5's non-splice rule forbids (a gap under 8 must be followed by one of 
 such a stream exactly (the quick matrix of `verify_truehd_encode_interop.py` has the case); and neither the encoder nor the
 decoder models §18.1's 30,000-byte FIFO, the encoder keeping the peak rate unit by unit (entry 37), a weaker rule than the
 buffer.
+
+**42. Which way `ch_assign` reads (§7.1, §7.4).** §7.4: "The 6-bit `ch_assign` field maps matrix channels to output
+channels." The library first read `ch_assign[output channel]` as the matrix channel that output channel takes. The two
+readings are one permutation and its inverse, and they are the same whenever the permutation is its own inverse: the
+identity, which is every stream FFmpeg's encoder writes, and a swap, which is the permutation `hb_matrices` carries
+(`[1, 0, 2, 3, 5, 4]`). No fixture told them apart. The differential fuzzer found a stream that does: `truehd_c40_s16.thd`
+with the third substream's `ch_assign` changed to `[0, 1, 2, 2]` (and the checks put right). FFmpeg's strict decode gave
+the outputs 0 to 3 the matrix channels 0, 1, 3 and 0: for each matrix channel `m` in order, output `ch_assign[m]` takes
+matrix channel `m` (so the later of two assignments to output 2 wins), and the output nobody was assigned (3) keeps its
+initial matrix channel 0. That is the reading of §7.4's sentence taken literally, `ch_assign[matrix channel]` being the
+output channel. The library now reads it so: output channel `p` takes the matrix channel `m` with `ch_assign[m] == p`, and
+the lossless check shifts by that `m`. For a permutation that is not its own inverse (`[1, 2, 0]`) the two readings
+decode differently. Evidence: a clean three-cycle, `ch_assign` `[1, 2, 0]`, in a three-channel stream made with
+`tools/references/truehd_writer.py` (two or more restart intervals, three FIR channels): FFmpeg's strict decode of it
+gives the samples the new reading gives, the lossless check included (no warning), and not those of the first reading;
+the committed `tools/references/truehd_syntax.py` agrees. `libs/truehd/tests/decoder/test_channel_assignment.cpp` builds
+the same kind of stream and holds the output and the lossless check to the new reading. Is this the way the owner's
+specification means §7.4? **Provisional, owner to confirm** (open question 41 is the related one). A `ch_assign` with a
+repeated value is refused. Not added to `testdata/truehd/handbuilt`: that set is the fixtures' (a stream with a cyclic
+`ch_assign` should join it).
 
 ## Atmos, spec v3.6
 

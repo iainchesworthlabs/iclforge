@@ -74,6 +74,9 @@ struct SubstreamState {
     int matrix_count = 0;
     std::array<MatrixPlan, kMaxMatrices> matrices{};
     std::array<std::int8_t, kMaxChannels> output_shift{};
+    // The matrix channel each output channel takes: ch_assign read the way TH spec §7.4 words it,
+    // `ch_assign[matrix channel]` being the output channel (ERRATA.md entry 42).
+    std::array<std::uint8_t, kMaxChannels> output_source{};
     std::array<std::uint8_t, kMaxChannels> quant_step{};
     std::array<ChannelState, kMaxChannels> channels{};
     // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds
@@ -229,6 +232,24 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
                        "max_matrix_chan above the stream type's limit (TH spec §10.3)"));
     }
 
+    // TH spec §7.4: ch_assign maps the matrix channels to output channels. Each value is at most
+    // max_matrix_chan (read_restart_header refuses the rest), and for the map to give every output
+    // channel a matrix channel the values are a permutation (ERRATA.md entry 42: FFmpeg's decoder
+    // gives an output channel nobody was assigned matrix channel 0 and the last of two matrix
+    // channels the output they share; no stream says that is meant, so it is refused).
+    std::array<std::uint8_t, kMaxChannels> output_source{};
+    unsigned assigned = 0;
+    for (int matrix_channel = 0; matrix_channel <= header->max_matrix_chan; ++matrix_channel) {
+        const unsigned output = header->ch_assign[static_cast<std::size_t>(matrix_channel)];
+        if ((assigned & (1U << output)) != 0) {
+            return std::unexpected(make_error(
+                ErrorKind::kBadParameter,
+                "ch_assign gives two matrix channels one output channel (TH spec §7.4)"));
+        }
+        assigned |= 1U << output;
+        output_source[output] = static_cast<std::uint8_t>(matrix_channel);
+    }
+
     // TH spec §7.3: this header carries the check of the interval that ends here.
     if (state.running && state.interval_open) {
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
@@ -260,6 +281,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     }
     state.running = true;
     state.restart = *header;
+    state.output_source = output_source;
     state.context.min_chan = header->min_chan;
     state.context.max_chan = header->max_chan;
     state.context.max_matrix_chan = header->max_matrix_chan;
@@ -545,14 +567,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
 
-    // The output: each channel from the matrix channel ch_assign names, shifted, and folded into
-    // the check.
+    // The output: each channel from the matrix channel ch_assign assigns to it, shifted, and folded
+    // into the check.
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_output");
         std::int32_t* const pcm_base =
             pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
         state.interval_fold = kernels::assign_output(
-            block, out_channels, restart.ch_assign.data(), state.output_shift.data(), matrix_base,
+            block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
             kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
     }
     state.interval_open = true;

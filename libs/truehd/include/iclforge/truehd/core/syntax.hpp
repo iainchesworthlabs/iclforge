@@ -63,8 +63,10 @@ struct RestartHeader {
     // The 16 bits that end the fixed part; TH spec §7.1 lists several fields in them that cannot
     // all fit. Zero in every stream checked; carried as read.
     std::uint16_t tail = 0;
-    std::array<std::uint8_t, kMaxChannels> ch_assign{};  // 6 bits each, max_matrix_chan + 1 of them
-    std::uint8_t crc = 0;                                // as read; the writer computes it
+    // 6 bits each, max_matrix_chan + 1 of them: ch_assign[m] is the output channel matrix channel m
+    // goes to (TH spec §7.4; ERRATA.md entry 42). The decoder requires a permutation.
+    std::array<std::uint8_t, kMaxChannels> ch_assign{};
+    std::uint8_t crc = 0;  // as read; the writer computes it
 
     // TH spec §7.2: the low bit of the first two syncs; 0x31EC has none.
     [[nodiscard]] bool noise_type() const noexcept { return sync == kRestartSyncNoise; }
