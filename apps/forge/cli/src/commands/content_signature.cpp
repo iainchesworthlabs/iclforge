@@ -179,13 +179,14 @@ void warn_about_signer_information(const Options& meta, std::string_view option,
 // check, as CS spec v2.6 section 6.1 steps 3 and 4 say; check-content, which reports what it finds
 // and carries on, judges them at the date the signature records unless verify-time= says otherwise.
 // verify-content is also the strict reading of the operator metadata of section 5.3 (the signer
-// nonce and the publisher UUID decide the verdict); everywhere else they are reported. The publisher
-// UUID is not in the signing certificate (v2.6), so it is compared only with the accounts
+// nonce and the publisher UUID decide the verdict); everywhere else they are reported. The
+// publisher UUID is not in the signing certificate (v2.6), so it is compared only with the accounts
 // expect-publisher-uuid= names, and with none it is reported.
 struct VerifyMaterial {
     std::vector<crypto::Certificate> anchors;
     std::vector<crypto::CertificatePin> pins;
-    std::vector<std::string> expected_publishers;  // the UUIDs of the accounts expect-publisher-uuid= names
+    std::vector<std::string>
+        expected_publishers;  // the UUIDs of the accounts expect-publisher-uuid= names
     crypto::TimeBasis basis = crypto::TimeBasis::kNow;
     std::int64_t instant = 0;
     std::string title;
