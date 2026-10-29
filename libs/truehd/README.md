@@ -1,7 +1,7 @@
 # iclforge::truehd
 
 The Dolby TrueHD and MLP bitstream, a lossless decoder and an encoder, written from the owner's *Dolby TrueHD (MLP) Reference
-Specification* v3.5 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
+Specification* v3.9 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
 [planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
 
@@ -61,12 +61,12 @@ names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/l
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
 The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
-do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, noise generator 0, the block data check,
-the end-of-stream marker, extra data, the directory's DRC word and the 16-channel substream. They are held to the signal each
-was made from, by this decoder and by `tools/references/truehd_syntax.py`, and FFmpeg's strict decode of eleven of the fifteen
-returns that signal too (`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the
-other four). The extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream have no external
-oracle.
+do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, noise generators 0 and 1, a negative
+output shift, 16 bit MLP words, the block data check, terminators, the end-of-stream marker, extra data, the directory's DRC word
+and the 16-channel substream. They are held to the signal each was made from, by this decoder and by
+`tools/references/truehd_syntax.py`, and FFmpeg's strict decode of eighteen of the twenty-eight returns that signal too
+(`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the other ten). The extra data's
+layout, the DRC word's values, the block data CRC, the terminators and the 16-channel substream have no external oracle.
 
 `tools/checks/verify_truehd_encode_interop.py --encoder <iclforge-truehd-encode-tool>` encodes 43 cases and requires FFmpeg's strict decode of each
 to equal the source; `tools/ci/fuzz_truehd_encoder_space.py` does the same for random legal configurations against adversarial PCM

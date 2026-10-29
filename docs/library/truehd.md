@@ -3,7 +3,7 @@
 `iclforge/truehd/decoder/decoder.hpp`, with the bitstream layer under it in `iclforge/truehd/core/` and
 `iclforge/truehd/io/`, all in the library `iclforge::truehd`. A reader, a lossless decoder and an encoder for Dolby
 TrueHD (`0xF8726FBA`, Blu-ray and HD DVD) and MLP (`0xF8726FBB`, DVD-Audio) elementary streams, written
-from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5 ("TH spec" in the code). The library links
+from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.9 ("TH spec" in the code). The library links
 `iclforge::base` and nothing else; the Atmos substream and the object metadata are phase T2b
 ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)).
 
@@ -47,6 +47,12 @@ while (const auto unit = reader.next()) {
 }
 ```
 
+A stream may have bytes in front of its first access unit (the owner's timecode fixtures have a 16 byte packet there). `find_stream_start`
+and the reader look for the first offset, at most `kMaxLeadingBytes` (64 KiB) in, at which a unit reads with a valid major sync CRC
+and the unit after it reads too (or is cut short by the end of the data with a consistent header). `ElementaryReader::leading_bytes()`
+says how many were skipped, `forge truehd-decode` and `forge probe` warn with the count (a warning, not an error), and what the
+bytes hold is not looked into.
+
 `decode()` gives no samples and no error for a unit that comes before the first major sync or before a
 substream's first restart header (a stream joined partway). `Presentation` picks the substreams read: `kBest`
 (0 to 2, the default), `k2ch`, `k6ch`, `k8ch` or `kAll` (substream 3 too). `Strictness::kStrict` makes a failed check
@@ -57,8 +63,8 @@ on a unit boundary carries an end-of-stream marker; the decoder removes the padd
 built), apart from a change of major sync and an extra data field longer than 256 bytes. The extra data of a unit is
 not decoded: `extra_data` hands back its bytes. `read_extra_data` and `read_evolution`
 (`iclforge/truehd/io/evolution.hpp`) read them into plain structures, as a reading that waits for the owner: the
-check nibble, the framing and the parity are reported (not enforced), and the evolution payload is read as the
-bit-level container of TH spec v3.6 section 15.4 (version, key id, payloads with their configuration and bytes, and the
+check nibble (the four nibbles of the header word XOR to 0xF, §16.2; a zero header word is padding), the framing and the parity are reported (not enforced), and the evolution payload is read as the
+bit-level container of TH spec section 15.4 (version, key id, payloads with their configuration and bytes, and the
 protection field, which is returned and not verified). `EvolutionFrame::oamd()` hands out the bytes of payload id 11, the
 object audio metadata, for a program that links `iclforge::objects` to parse with `iclforge::objects::oba::parse_payload`;
 this library links `iclforge::base` and nothing else. `forge probe` prints what it finds. The reading is provisional
@@ -149,12 +155,13 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 | FFmpeg's strict decode of the streams this library's **encoder** writes (`tools/checks/verify_truehd_encode_interop.py`, with `--forge` it runs `forge truehd-encode`; the codec matrix's encode legs and the gold-reference gate also run it) | 43 cases: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, real music, speech and 5.1 programme material and synthetic signals chosen to be hard (full-scale squares, impulses, silence, DC, noise, level steps), the downmix presentations, restart intervals of 1, 8 and 128 units, lengths that are not whole units | FFmpeg: sample for sample, 43 of 43 |
 | `tools/ci/fuzz_truehd_encoder_space.py`, random legal configurations against adversarial PCM, and the libFuzzer harness `fuzz_truehd_encode` | the encoder's whole configuration space, FFmpeg's strict decode of each stream | FFmpeg: sample for sample |
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 25, and the hand-built streams | none beyond the two readings agreeing |
-| Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 11 of the 15; the manifest names what FFmpeg does with the other 4. **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
-| DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent | the sources |
+| Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1 (at 48, 96 and 192 kHz), a negative output shift and an output shift on a moved channel, a 16 bit MLP stream, terminators of both kinds, several matrices with a permuted `ch_assign`, an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 18 of the 28; the manifest names what FFmpeg does with the other 10 (it refuses the 16-channel and limit streams and a stream with a terminator, applies no negative output shift, and clears the low bits of a 16 bit MLP stream). **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
+| DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent; 13 of them are in `testdata/truehd-dee` (11 pass, the two at 96 kHz differ from their sources in the encoder, none fail) | the sources |
+| The owner's Blu-ray (an Atmos 7.1 stream of four substreams), analysed on the owner's machine | `planning/truehd-disc-findings.md`: every lossless-check interval of the 2, 6 and 8 channel presentations, the 8 channel output against FFmpeg's | the disc's own lossless checks, and FFmpeg |
 
-FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient, the Atmos substream or
-extra data. The hand-built streams carry the first, second and fourth and extra data, and FFmpeg's decoder reads them to the
-same samples; 7.1 is checked through this library's encoder. What FFmpeg does not read has no external oracle: the extra data's
+FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient or shift, the Atmos substream or
+extra data. The hand-built streams carry all of them but the Atmos substream, and FFmpeg's decoder reads them to the
+same samples, except a negative output shift (which it does not apply) and a 16 bit MLP stream with bits below bit 8 (which it clears); 7.1 is checked through this library's encoder. What FFmpeg does not read has no external oracle: the extra data's
 layout, the DRC word's values, the block data CRC, the 16-channel substream (FFmpeg refuses its restart sync `0x31EC`) and
 the end-of-stream marker in every unit (FFmpeg returns two of the twenty units of the hand-built stream).
 [Validation](../verification.md#truehd-and-mlp) says what that leaves.
@@ -165,13 +172,13 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
   filter coefficients and states, `output_shift` above `max_shift`, the extra data's length against the unit, the restart-gap
   rules. The encoder does not model the 30,000-byte FIFO of §18.1 and writes a restart interval of 1 unit throughout when
   asked, which §7.5 forbids. `libs/truehd/ERRATA.md` entry 41 lists them.
-- Noise generator 1: LSB bypass, or a matrix with a non-zero noise shift, under restart sync `0x31EB` is refused with
-  `ErrorKind::kUnsupported`, because the 256-entry table the noise comes from is not in the specification yet (§17.4).
-  A `0x31EB` restart with neither decodes: FFmpeg's streams of more than 6 channels use it, and its matrices carry no
-  noise coefficients. Generator 0, the default (`0x31EA`), is decoded from the
-  specification's LFSR: two noise channels follow the matrix channels and enter through ordinary matrix
-  coefficients. No stream FFmpeg writes uses a non-zero noise coefficient; a hand-built stream does, and FFmpeg's strict decode
-  of it equals this library's with `shr7` read as 16 bits (ERRATA question 5, provisional).
+- Noise: both generators are decoded. Generator 1 (restart sync `0x31EB`) fills a buffer from the 256-entry table of TH spec §17.4
+  for every access unit and a matrix with a non-zero `matrix_noise_shift` adds a value of it to its sum (the buffer size, the start
+  index and the stride are measured against FFmpeg and wait for the owner: ERRATA entry 44, question 43). LSB bypass is one explicit bit a
+  sample from the block data under either sync and has nothing to do with the generators (§10.2.1). Generator 0, the default
+  (`0x31EA`), is decoded from the specification's LFSR: two noise channels follow the matrix channels and enter through ordinary matrix
+  coefficients; `shr7` is 16 bits (§17.2). No stream FFmpeg writes uses a non-zero noise coefficient or shift; hand-built streams do, and
+  FFmpeg's strict decode of them equals this library's.
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.
 - The block data CRC is not checked, only the length it follows.
 - The evolution frame is read (provisionally) and the object audio metadata in it is handed out as bytes; nothing

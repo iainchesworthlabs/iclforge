@@ -682,7 +682,7 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
 | TrueHD and MLP, 1 to 6 channels, as FFmpeg's encoders write them | yes | yes |
-| TrueHD with an IIR filter, LSB bypass, noise generator 0, a permuted `ch_assign` or the block data check | yes, on hand-built streams (its encoders do not write them) | yes ([TrueHD and MLP](#truehd-and-mlp)) |
+| TrueHD with an IIR filter, LSB bypass, noise generator 0 or 1, a negative output shift, a permuted `ch_assign` or the block data check | yes, on hand-built streams (its encoders do not write them) | yes ([TrueHD and MLP](#truehd-and-mlp)) |
 | TrueHD with the 16-channel substream (restart sync `0x31EC`) | no, it refuses it | yes, held to a hand-built stream only |
 | TrueHD 7.1, as this library's encoder writes it | yes | yes |
 | A TrueHD MAT burst, read | no: FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT | yes, to the access units that went in |

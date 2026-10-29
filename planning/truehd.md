@@ -5,14 +5,19 @@ Atmos substream and its object metadata, and the front ends. This page is the pl
 [ROADMAP.md](../ROADMAP.md); what ships is in [docs/library/capabilities.md](../docs/library/capabilities.md) once it lands.
 
 As of 2026-10-29: phase T1 is built and its checks pass (the bitstream layer, the decoder, `forge decode` and `forge probe`; bit-exact with
-FFmpeg on its fixtures, the rest held to hand-built streams, which FFmpeg's decoder reads too except the 16-channel substream). Phase T2 waits on the owner's answers to the questions below and in
+FFmpeg on its fixtures, the rest held to hand-built streams, which FFmpeg's decoder reads too except the 16-channel substream). The
+decoder follows TH spec v3.9 where it answers the open questions (noise generator 1 and its table, the output shift by matrix channel,
+the lossless check, the filter history across a restart, the extra data's check nibble, the terminators, `peak_data_rate`, the
+channel assignment bitmask, the restart syncs of §7.2), scored on the owner's Blu-ray and on the 13 DEE fixtures of
+`testdata/truehd-dee` (11 pass, 2 at 96 kHz unexplained, none fail). Phase T2 waits on the owner's answers to the questions below and in
 [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md).
 
 ## Sources, and what they are
 
-- **The specification.** The owner supplied *Dolby TrueHD (MLP) Reference Specification* (versions 3.0 to 3.6, 2026-10-28 and
-  29; v3.6 is the one used, and it changes §15 only) and says parts of it derive from analysis of the Dolby Encoding Engine (DEE) and of FFmpeg, and
-  takes responsibility for that. It is not in the tree. Code and docs cite it as "TH spec §n" (section) or "TH spec App. X".
+- **The specification.** The owner supplied *Dolby TrueHD (MLP) Reference Specification* (versions 3.0 to 3.9, 2026-10-28 and
+  29; v3.9 is the one used: v3.7 supplied the noise generator 1 table and answered many of the questions below, v3.9 reads §7.2's restart
+  syncs and §19.1's apodising filters differently) and says parts of it derive from analysis of the Dolby Encoding Engine (DEE) and of
+  FFmpeg, and takes responsibility for that. It is not in the tree. Code and docs cite it as "TH spec §n" (section) or "TH spec App. X".
   It contradicts itself and the streams in places and is silent in others: every such place is a numbered entry in
   [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md), and the ones that need the owner are listed first there.
 - **Streams from FFmpeg's encoder.** FFmpeg's `truehd` and `mlp` encoders write streams the project can decode, and its decoder
@@ -20,7 +25,8 @@ FFmpeg on its fixtures, the rest held to hand-built streams, which FFmpeg's deco
   source is not read here (the rule AC-4's oracles follow); its output is.
 - **Streams from DEE.** The owner decided on 2026-09-26 that these are test inputs only: decoded, compared with their known
   source and passed through, with no analysis of how Dolby's encoder made them. Nothing in this plan or in `libs/truehd`
-  reads one to learn the format. `tools/generators/gen_dee_gold.py` makes the set, which stays on the owner's machine.
+  reads one to learn the format. `tools/generators/gen_dee_gold.py` makes the set, which stays on the owner's machine apart from the 13
+  streams committed in `testdata/truehd-dee` (the owner's decision of 2026-10-29), which the scorer reads.
 - **Not used:** the branch `feature/truehd-atmos-support` (23 commits, 1,155 behind `main` on 2026-09-29). The ROADMAP says no
   TrueHD decoder reads its block layout and that it carries non-redistributable reference PDFs, so it is superseded by this
   library and nothing is read from it or ported. The ROADMAP row that points at it is corrected.
@@ -64,37 +70,45 @@ Ranked as in [CONTRIBUTING.md](../CONTRIBUTING.md#oracles), for this codec.
    writes, and its encoder's streams through this library's decoder. Bit-exact in both directions. FFmpeg 6.1.1 here, 8.x in
    CI. FFmpeg's encoder writes 1 to 6 channels (stereo and 5.1 are the layouts used), 44.1 to 192 kHz, 16 and 24 bits, with
    one or two substreams. It does not write the Atmos substream, 7.1, noise generation, an IIR filter that is not trivial, or
-   LSB bypass. Hand-built streams carry noise generation, an IIR filter and LSB bypass, and FFmpeg's decoder reads them to
-   the same samples; this library's encoder writes 7.1, which FFmpeg also decodes. The Atmos substream (restart sync 0x31EC) is refused by FFmpeg, so it has no
+   LSB bypass. Hand-built streams carry noise generators 0 and 1 (at 48, 96 and 192 kHz), an IIR filter and its states, and LSB bypass
+   (under either restart sync), and FFmpeg's decoder reads them to the same samples; this library's encoder writes 7.1, which FFmpeg also decodes. The Atmos substream (restart sync 0x31EC) is refused by FFmpeg, so it has no
    external oracle.
 2. **`tools/references/truehd_syntax.py`**, an independent transcription of the syntax and of the inverse filters and
    matrices, compared with the C++ decoder on the committed fixtures and on the hand-built streams. It is the second reader
    of the features FFmpeg's decoder does not read (the extra data, the Atmos substream).
-3. **DEE's streams** of known sources, scored by `tools/checks/score_truehd_decode.py` on the owner's machine (the set is not
-   committed). DEE's licence ends on 2026-11-06 and is not renewed, so the set has to be made before then. The legs worth
+3. **DEE's streams** of known sources, scored by `tools/checks/score_truehd_decode.py` on the owner's machine (the full set of 131 is
+   not committed; 13 of its streams are, in `testdata/truehd-dee`, for scoring only: nothing reads one to learn the format). DEE's licence
+   ends on 2026-11-06 and is not renewed, so the set had to be made before then. The legs worth
    having, all in `gen_dee_gold.py`'s `truehd` group: 2ch, 6ch and 8ch at 48 and 96 kHz and 16 and 24 bits from tones, music,
    noise, sweeps and film; the 8ch-with-downmix-substreams and independent-2ch presentations; each 2ch format; DRC per
    presentation; dialogue normalisation values; and `--optimize-data-rate`. A TrueHD Atmos leg would be the only external
    check of the sixteen-channel substream, and `--presentation atmos` with an ADM master is how `gen_dee_gold.py --masters`
    asks for one (DEE refuses it for the AC-3 family; whether it refuses it for TrueHD is not known).
 4. **Hand-built streams** from the Python writer, for the features no encoder here writes. FFmpeg's decoder reads most of them
-   (`tools/checks/verify_truehd_interop.py --handbuilt`), and its behaviour decided four readings the specification leaves open
-   (ERRATA questions 5, 6 and 18, and entry 21).
+   (`tools/checks/verify_truehd_interop.py --handbuilt`), and its behaviour decided readings the specification left open
+   (ERRATA questions 5, 6 and 18, and entries 21 and 44; v3.9 has since confirmed most of them).
+5. **The owner's Blu-ray**, analysed by the owner on the owner's machine (`planning/truehd-disc-findings.md`): an Atmos 7.1 stream of
+   four substreams whose lossless checks, with the 2, 6 and 8 channel presentations, are the strongest check of the decoder on a
+   stream a Dolby encoder wrote.
 
 ## Decisions for the owner
 
-These are also the first section of ERRATA.md, with the evidence; ERRATA.md has seven more (generator 1's noise table, the lossless check's
-channel shift, negative output shifts, IIR state, the block data CRC, heavy DRC, where a bypassed LSB comes from) that T1 found.
+These are also the first section of ERRATA.md, with the evidence; ERRATA.md has more that T1 found. TH spec v3.9 answered several of them
+(generator 1's noise table and the LSB bypass, the lossless check's channel shift, negative output shifts, IIR state, the extra data's
+length and check nibble, `extra_channel_meaning_length`'s unit, the terminators, `peak_data_rate`, the channel assignment bitmask); each says
+so in ERRATA.md, with the provisional marks the owner asked to keep until the DEE set has scored them. Still open: the block data CRC, where heavy
+DRC sits on the wire, the width of `zero_samples`, where the extension's length nibble sits, which way `ch_assign` is worded, the details of
+noise generator 1 (question 43), the PACE layering, and the payload of the evolution frame.
 
 1. What the evolution payload holds on the wire (TH spec §16.3, §16.6). Since v3.4 it is an outer Thrift container with the typed
    payload entries (the object audio metadata) and a nested `ContentSignature`, and §16.3.3 lists the outer field IDs, the digest scope
    and per-frame or per-stream signing as unconfirmed on the specification's side too. T1 carries the extra data as opaque bytes and
    T2b writes nothing until the owner has these. v3.6 adds a second description of the same bytes (a bit-level container, §15.4);
    ERRATA.md question 22 asks which real streams carry, and `forge probe` on a real Atmos track answers it.
-2. The unit and meaning of `extra_channel_meaning_length` and the size of a major sync that carries it (TH spec §14.2).
-   The decoder finds the size by the CRC.
-3. Whether the terminators of TH spec §16.5 (`0xD234E`, `0x348D3`, `0x1234`) are written. FFmpeg's encoder writes none, and
-   the decoder accepts streams with or without them.
+2. The unit of `extra_channel_meaning_length` is answered (TH spec v3.9 §14.2: `length + 1` words, and the owner's Blu-ray has 1); where
+   its nibble sits against the first word is question 44. The decoder finds the size by the CRC, trying the sizes the length gives first.
+3. The terminators of TH spec §16.5 (`0xD234E`, `0x348D3`, `0x1234`) are answered: DEE can write them, Dolby's Blu-ray encoder writes
+   none (planning/truehd-disc-findings.md), the decoder accepts streams with or without them, and this encoder writes none.
 4. Which presentation a plain `forge decode` gives for a stream with the sixteen-channel substream.
    (T1: `best`, substreams 0 to 2; `truehd-presentation=all` reads substream 3.)
 5. Whether a `forge` run on TrueHD or MLP refuses an option it does not apply or warns about it (ERRATA.md question 21). It

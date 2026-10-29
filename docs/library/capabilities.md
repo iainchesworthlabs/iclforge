@@ -159,18 +159,19 @@ cost of one branch per occurrence when it is not set.
 ### TrueHD and MLP
 
 `iclforge::truehd` reads and decodes TrueHD and MLP elementary streams losslessly ([TrueHD and MLP](truehd.md)). It is written
-from the owner's TrueHD (MLP) Reference Specification v3.5; `libs/truehd/ERRATA.md` records where that and the streams disagree.
+from the owner's TrueHD (MLP) Reference Specification v3.9; `libs/truehd/ERRATA.md` records where that and the streams disagree.
 
 | Capability | Status | Checked against |
 |---|---|---|
 | Access units, major sync (CRC-16), substream directory, restart header (CRC-8), segment parity and CRC-8 | read and written | FFmpeg's strict decode of its encoders' streams |
 | Substreams 0 to 2 (up to 8 channels), 44.1 to 192 kHz, 16 and 24 bits, MLP and TrueHD | decoded | FFmpeg: 25 fixtures, sample for sample |
 | FIR prediction, Huffman and raw residuals, one matrix set, quantiser step, output shift, lossless check | decoded | FFmpeg |
-| IIR filter, LSB bypass, several matrices, a permuted `ch_assign` and an output shift, block data length | decoded | FFmpeg's strict decode of hand-built streams, sample for sample (`verify_truehd_interop.py --handbuilt`) |
+| IIR filter (with its `new_states`), LSB bypass, several matrices, a permuted `ch_assign`, an output shift (also negative, and on a moved channel), 16 bit MLP words, block data length | decoded | FFmpeg's strict decode of hand-built streams, sample for sample, except the negative shift and the low bits of 16 bit MLP words, which FFmpeg does not apply (`verify_truehd_interop.py --handbuilt`) |
 | Extra data, the directory's DRC word | decoded; the extra data is carried as bytes | FFmpeg decodes the streams that carry them and returns neither: the layouts have **no oracle** |
-| End-of-stream marker in every unit, 16-channel substream 3 | decoded | **none**: FFmpeg returns two of twenty units, and refuses the substream's restart sync; hand-built streams only |
+| End-of-stream marker in every unit, terminators of both kinds, 16-channel substream 3 | decoded | **none**: FFmpeg returns two of twenty units, refuses a stream with the shifted terminator, and refuses the substream's restart sync; hand-built streams only |
 | Noise generator 0 (`0x31EA`): two noise channels through matrix coefficients | decoded | FFmpeg's strict decode of a hand-built stream, sample for sample (`shr7` is 16 bits as FFmpeg reads it; provisional) |
-| Noise generator 1 (`0x31EB`) | decoded; refused when a matrix has a non-zero noise shift or an LSB bypass | FFmpeg, for a 7.1 stream's third substream written with it; the specification gives no table for the bypassed bits |
+| Noise generator 1 (`0x31EB`): the table of TH spec §17.4, a non-zero matrix noise shift, LSB bypass | decoded | FFmpeg's strict decode of hand-built streams at 48, 96 and 192 kHz, sample for sample; the buffer size, start index and stride are measured against FFmpeg (ERRATA entry 44, question 43) |
+| Leading bytes before the first major sync | skipped (at most 64 KiB), with a warning; the next unit has to read too | a hand-built stream with junk in front; the owner's fixture with a 16 byte packet in front |
 | Heavy DRC in the restart header | not read | the specification does not place it in the header |
 | Encoder: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, restart intervals, output shift and quantiser step, pair matrices, FIR prediction up to order 8, codebook and offset choice, the declared peak rate and 75 ms latency, extra data framing, self-verification | written (`forge truehd-encode`, `iclforge_truehd_encoder_*`) | FFmpeg's strict decode, sample for sample (43 cases and a fuzzer) |
 | Encoder: the 2 and 6 channel presentations as downmixes (`DownmixMode::kStandard`) | written | FFmpeg for the full presentation; nothing checks the downmix itself |
@@ -293,8 +294,7 @@ load-bearing enough to flag up front:
     FFmpeg's, because the specification gives none; reading MAT has no reference at all, and no
     Dolby decoder, disc player or receiver has read a stream or a burst written here. The
     16-channel substream, the extra data and the end-of-stream marker in every unit were checked
-    only against streams built for the purpose. The Atmos substream, noise generator 1 with a
-    non-zero shift, heavy DRC, content signing and every binding but the C API are not built.
+    only against streams built for the purpose. The Atmos substream, heavy DRC, content signing and every binding but the C API are not built.
 
 !!! warning "AC-4 objects have no second decoder, and no receiver has taken AC-4"
     The decoder refuses core decoding and any layout but as coded of a 22.2 source, and, at 96 or
