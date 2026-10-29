@@ -70,7 +70,7 @@ sample or is wrong. FFmpeg's `truehd` and `mlp` encoders and its decoder are the
 | MP4 | An `mlpa` sample entry with a `dmlp` box, in both directions |
 | Matroska | An `A_TRUEHD` track, in both directions |
 | MPEG-2 transport stream | Blu-ray's `stream_type` `0x83`, in both directions |
-| HDMI and S/PDIF | **MAT** (Metadata-enhanced Audio Transmission): 24 access units packed into one burst of IEC 61937 data type 22. The library packs and unpacks the bursts; nothing has been played into a receiver |
+| HDMI and S/PDIF | **MAT** (Metadata-enhanced Audio Transport): 24 access units packed into one burst of IEC 61937 data type 22. The library packs and unpacks the bursts; nothing has been played into a receiver |
 
 The specification gives no byte layout for any of these. Each is what FFmpeg's muxer writes, so each
 has one outside reference. [TrueHD in the containers](../library/muxing-and-sinks.md#truehd-in-the-containers)

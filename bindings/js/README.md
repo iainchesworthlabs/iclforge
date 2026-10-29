@@ -2,7 +2,8 @@
 
 A streaming AC-3/E-AC-3 (Dolby Digital/Digital Plus) decoder for the browser, compiled from
 [`iclforge::ac3`](https://github.com/iainchesworthlabs/iclforge) to WebAssembly. The
-`iclforge-wasm-decoder/ac4` export decodes and encodes AC-4 ([AC-4](#ac-4)).
+`iclforge-wasm-decoder/ac4` export decodes and encodes AC-4 ([AC-4](#ac-4)). The library's TrueHD
+and MLP codec is not compiled into any WebAssembly module here, so this package has no TrueHD.
 Built because a browser cannot be relied on to decode EC-3:
 [Chrome reports a decoder error](https://github.com/videojs/http-streaming/issues/1297) when an EC-3
 track turns up in an MPD, in a report that has been open since 2023. This package is an embeddable

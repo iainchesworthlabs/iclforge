@@ -8,7 +8,11 @@
 
 /* iclforge's C API: a stable, minimal C-callable surface
  * over the encode/decode core, for bindings and embedding by callers that
- * cannot or do not want to link C++23.
+ * cannot or do not want to link C++23. It covers AC-3, E-AC-3 and Atmos
+ * (OAMD + JOC), AC-4 and TrueHD/MLP, each in its own section below, and the
+ * lyrics reader. The Rust crates wrap this header; the Python and WebAssembly
+ * bindings reach the C++ libraries directly. No binding wraps the TrueHD
+ * section yet.
  *
  * Conventions used throughout:
  *   - Every handle type (iclforge_encoder_t, iclforge_decoded_frame_t, ...)
@@ -2500,8 +2504,9 @@ ICLFORGE_C_EXPORT iclforge_lyrics_word_state_t iclforge_lyrics_word_state(
 /* --------------------------------------------------------------------- *
  * TrueHD and MLP: iclforge::truehd
  *
- * A lossless decoder for Dolby TrueHD (0xF8726FBA) and MLP (0xF8726FBB) streams: the
- * samples that come out are the samples that went in, 24 bits wide, bit for bit. Declared
+ * A lossless decoder for Dolby TrueHD (0xF8726FBA) and MLP (0xF8726FBB) streams, and an
+ * encoder for TrueHD further down: the samples that come out are the samples that went in,
+ * 24 bits wide, bit for bit. Declared
  * either way, like the AC-4 section above: a library built with ICLFORGE_BUILD_TRUEHD off
  * answers every function with ICLFORGE_ERROR_UNSUPPORTED (a NULL, 0 or "" where the type
  * allows), and ICLFORGE_HAS_TRUEHD (iclforge_c/version.h) says which library a program was

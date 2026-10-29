@@ -2,7 +2,7 @@
 
 A stable, minimal C-callable surface over `iclforge::ac3`'s encode/decode core —
 AC-3, E-AC-3 and Atmos (OAMD + JOC) — and over the AC-4 decoder and encoder ([AC-4](#ac-4)) and the
-TrueHD and MLP decoder ([TrueHD and MLP](#truehd-and-mlp)), for bindings and embedding by callers that cannot or do not want to link C++23. The whole surface is
+TrueHD and MLP decoder and TrueHD encoder ([TrueHD and MLP](#truehd-and-mlp)), for bindings and embedding by callers that cannot or do not want to link C++23. The whole surface is
 one header,
 [`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/capi/include/iclforge_c/iclforge.h),
 plain C11 with no C++ type crossing it anywhere — only opaque handles and POD structs. It is a

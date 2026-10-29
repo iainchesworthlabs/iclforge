@@ -69,7 +69,7 @@ forge probe out.ac4
 forge decode out.ac4 out.wav
 ```
 
-The TrueHD stream is lossless: `forge decode out.thd back.wav` gives the samples that went in.
+The TrueHD stream is lossless: `forge decode out.thd back.wav` gives the samples that went in, as a 24-bit WAV.
 
 `forge help` lists every command and `forge help <command>` gives one command's options; the
 [CLI reference](forge/cli/index.md) has the grammars.

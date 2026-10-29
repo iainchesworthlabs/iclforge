@@ -163,10 +163,10 @@ scheduled workflows are separate.
 
 | Check | Codecs | Runs |
 |---|---|---|
-| The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams | AC-3, E-AC-3, AC-4 | Gate, queue, after a merge, nightly |
+| The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams, and the tests that read the owner's AC-4 content-signature sample skip when `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` is unset | AC-3, E-AC-3, AC-4, TrueHD | Gate, queue, after a merge, nightly |
 | The unit tests of the oracle scripts (`tools/checks`, `tools/ci`), which include the AC-4 syntax digests and presentation tables | all | The gate's static job |
-| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones) | AC-3, E-AC-3 | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
-| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, and the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
+| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones), and for TrueHD a bit-exact comparison with FFmpeg's strict decode of the committed fixtures and of `forge truehd-encode`'s stream | AC-3, E-AC-3, TrueHD | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
+| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
 | Hearth's engine against the AC-4 gain formulas (`gain_ac4_decode.py --engine`) | AC-4 | After a merge, nightly |
 | The ASan + UBSan leg with the codec matrix, and the TSan leg | all | Nightly |
 | `Fuzz Regress` | all | Every push to `main`, and every pull request unless the repository variable `PAUSE_NONESSENTIAL_CI` is `true` |
@@ -175,7 +175,7 @@ scheduled workflows are separate.
 | `Interop`: eight FATE excerpts | AC-3, E-AC-3 | Daily, and on pull requests that change the decode path |
 | `tools/checks/ac4_syntax_differential.py`, 3,000 mutated DEE frames and 800 synthetic tables of contents at a fixed seed | AC-4 | Daily, in the SonarCloud workflow, where it feeds the coverage scan and does not gate |
 | `tools/checks/check_install_consumer.sh`, and the ABI gate (advisory until the API freeze) | all | Nightly |
-| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams and `check_dolby_spott_streams.py` on the Spott files (both are Dolby's and not in the tree); listening | AC-4 mostly | Locally, by hand |
+| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams and `check_dolby_spott_streams.py` on the Spott files (both are Dolby's and not in the tree); `score_truehd_decode.py` on DEE's TrueHD streams (kept on the owner's machine; DEE's licence ends on 2026-11-06); listening | AC-4 mostly, TrueHD for the DEE scorer | Locally, by hand |
 | Dolby's Online Delivery Kit tools, `check_dolby_*.py` ([below](#dolbys-online-delivery-kit-tools)) | AC-3, E-AC-3, AC-4 containers | Locally, by hand; skip when the tools are absent |
 
 `PAUSE_NONESSENTIAL_CI` is a pause the workflows describe as temporary: while it is `true`, pull
@@ -671,6 +671,9 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | TrueHD and MLP, 1 to 6 channels, as FFmpeg's encoders write them | yes | yes |
 | TrueHD with an IIR filter, LSB bypass, noise generator 0, a permuted `ch_assign` or the block data check | yes, on hand-built streams (its encoders do not write them) | yes ([TrueHD and MLP](#truehd-and-mlp)) |
 | TrueHD with the 16-channel substream (restart sync `0x31EC`) | no, it refuses it | yes, held to a hand-built stream only |
+| TrueHD 7.1, as this library's encoder writes it | yes | yes |
+| A TrueHD MAT burst, read | no: FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT | yes, to the access units that went in |
+| The TrueHD Atmos substream's objects, and the evolution frame | refused or not read | not built: the frame's bytes are carried |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
@@ -693,7 +696,9 @@ what forge writes: the structure is that of one sample and one specification
 ([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
 and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
 demuxer takes the trailer for five more packets, so ffprobe does not agree with forge's frame count on
-a signed file; forge's own decode of the signed and unsigned stream is what is compared.
+a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart: nothing signs or
+verifies a TrueHD stream, and the owner's specification lists the evolution frame's signature layout as unconfirmed
+([Object signing](concepts/object-signing.md#sibling-truehd-evolution)).
 
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
 it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's
@@ -2472,6 +2477,9 @@ covered where it's most relevant rather than repeated here:
   E-AC-3/Atmos passthrough over HDMI to a real AV receiver, with object audio confirmed
   reconstructable (not just the panned bed). Verification specific to this one Android app on this
   one Shield + receiver pair, not a general claim about Android as a platform.
+- [TrueHD and MLP](#truehd-and-mlp) — nothing has reached hardware: no Dolby decoder, disc player or receiver has read a
+  TrueHD stream or a MAT burst this project wrote, no sound device is sent one (`PassthroughSink` has no TrueHD format), and
+  Hearth and Crucible do not link the library. Its only outside reader is FFmpeg.
 - [AC-4 passthrough](library/muxing-and-sinks.md) — no receiver found accepts AC-4, so no AC-4
   burst has reached hardware; ALSA's and Android's paths send the bursts as opaque data (ALSA's
   runs against ALSA's `null` device), and Windows, PipeWire and macOS cannot send AC-4 at all.

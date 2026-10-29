@@ -4,8 +4,8 @@ Every program in [`examples/`](https://github.com/iainchesworthlabs/iclforge/tre
 builds by default (`ICLFORGE_BUILD_EXAMPLES=ON`) and registers as a `ctest` entry named
 `example.<name>`, so "the examples still work" is checked by the same command as everything else
 (`read_adm`, `encode_adm`, and `encode_iab` additionally need
-`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` and `ac4_content_signature` need `ICLFORGE_BUILD_AC4` and the two C programs
-`ICLFORGE_BUILD_CAPI`, both on by default). These programs are
+`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` and `ac4_content_signature` need `ICLFORGE_BUILD_AC4`, the C programs
+`ICLFORGE_BUILD_CAPI`, and the two TrueHD ones `ICLFORGE_BUILD_TRUEHD` as well, all on by default). These programs are
 also the source the library pages excerpt from — each page's "Full program" link lands on one of
 them.
 
@@ -70,6 +70,8 @@ them.
 |---|---|---|
 | [`capi_encode_decode`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_decode.c) | Encode/decode AC-3 through `iclforge_c/iclforge.h` — plain C, not C++, so the build itself proves the header is C-usable. | [C API](c-api.md) |
 | [`capi_encode_eac3`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_eac3.c) | Encode a 5.1.2 E-AC-3 access unit (a bed plus one dependent substream) through the C API and decode it back. | [C API](c-api.md) |
+| [`capi_decode_truehd`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_decode_truehd.c) | Decode a TrueHD or MLP stream to raw 24-bit PCM through the C API. | [C API](c-api.md#truehd-and-mlp) |
+| [`capi_encode_truehd`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_truehd.c) | Encode a stereo tone as TrueHD through the C API and decode it back; the codec is lossless, so every sample must return. | [C API](c-api.md#truehd-and-mlp) |
 
 ## Python
 

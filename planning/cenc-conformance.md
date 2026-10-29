@@ -174,7 +174,7 @@ audio packet with `transport_scrambling_control` set (`kScrambled`); the PMT's C
 |---|---|---|---|
 | G22 | DRM-system payloads (Widevine protobuf, PlayReady header, FairPlay), license acquisition, `Laurl`, HDCP output control, secure decode. | Outside the standard (DASH-IF IOP-6 4.1) and listed as a non-goal in `planning/topology.md:489`. | N/A |
 | G23 | Subsample and NAL-aware rules for video. | Audio only. G7 still reads an audio subsample map. | N/A |
-| G24 | TrueHD (`mlpa`) in CENC. | `libs/containers` has no `mlpa` support, the TrueHD library is separate, and IOP-8 lists `mlpa` only in its older "additional" table. Disc TrueHD Atmos is under AACS [recalled]. | N/A |
+| G24 | TrueHD (`mlpa`) in CENC. | At the audit `libs/containers` had no `mlpa` support; it has it now (2026-10-29, `planning/truehd.md` T2c1), and the reader's protected-entry parse lists `mlpa` among the Dolby formats it refuses by name. No fixture or test covers a protected `mlpa` track, so that refusal is read from the code and not run. IOP-8 lists `mlpa` only in its older "additional" table. Disc TrueHD Atmos is under AACS [recalled]. | N/A |
 | G25 | Bitstream passthrough of decrypted JOC to HDMI or S/PDIF. | Platform and DRM policy. A decrypting reader would make this reachable from Hearth and Crucible, which is a policy question for the owner (D5). | N/A |
 
 Count: 25 gaps (13 blocking, 4 major, 8 minor) and 4 not-applicable items. G1 to G5 are
@@ -602,8 +602,8 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and says what each r
   Hearth and Crucible, whose passthrough would then send decrypted JOC to a receiver (G25).
 - **D6. Manifests.** Whether `forge fmp4` should write `ContentProtection` and key tags when given a
   protected input, or leave manifests to a packager.
-- **D7. TrueHD.** Decide when the TrueHD library lands. No CMAF profile exists for `mlpa` in the
-  documents read here.
+- **D7. TrueHD.** The TrueHD library and its MP4 carriage have landed (G24). Decide whether a protected `mlpa` track
+  needs a fixture, and whether it is ever read. No CMAF profile exists for `mlpa` in the documents read here.
 - **D8. Fixtures.** Whether small protected fixtures belong in `testdata/` or are generated in CI from
   the generator.
 - **D9. AC-4 scope.** Dolby's AC-4 needs the subsample map and the 1:9 pattern (G26, G27); its
