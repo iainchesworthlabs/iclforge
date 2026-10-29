@@ -13,7 +13,9 @@
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "multi_track_files.hpp"
 #include "platform/process.hpp"
 
 // `forge decode` and `forge probe` on TrueHD and MLP streams: the real binary, run as a subprocess,
@@ -477,5 +479,71 @@ TEST_CASE("truehd-encode options, containers and refusals", "[forge-cli][truehd]
               kExitUsage);
         CHECK(run_cli("truehd-encode " + in + out + "truehd-fir-order=9", log) == kExitUsage);
         CHECK(run_cli("decode " + in + out + "truehd-restart=8", log) == kExitUsage);
+    }
+}
+
+// A Blu-ray remux has its TrueHD track first. The commands that read TrueHD take it, as the first
+// track of the file; the commands that do not (qc, transcode and the rest) take the AC-3 or E-AC-3
+// track after it, where they played it before TrueHD tracks were read, and refuse a file with
+// TrueHD alone by name.
+TEST_CASE("a command that does not read TrueHD takes the track after a TrueHD one",
+          "[forge-cli][truehd]") {
+    namespace mt = iclforge::test::multi_track;
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "remux.log";
+    const std::vector<std::byte> truehd = read_bytes(fixture("truehd_m51_s24.thd"));
+    const std::vector<std::byte> eac3 = read_bytes(
+        fs::path{ICLFORGE_GOLDEN_AUDIO_DIR} / "reference_51_eac3_448k_cplbndstrce0.ec3");
+    const auto scanned = iclforge::ac3::io::scan(eac3);
+    REQUIRE(scanned.has_value());
+    const auto truehd_units = mt::split_truehd(truehd);
+    REQUIRE(truehd_units.size() > 3);
+
+    const auto write = [&dir](const std::string& name, const std::vector<std::byte>& bytes) {
+        const fs::path path = dir / name;
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        REQUIRE(out.good());
+        return path;
+    };
+    const std::array<mt::Track, 2> both{
+        mt::Track{.codec = mt::Codec::kTruehd, .units = truehd_units},
+        mt::Track{.codec = mt::Codec::kEac3, .units = scanned->access_units}};
+    const std::array<mt::Track, 1> alone{
+        mt::Track{.codec = mt::Codec::kTruehd, .units = truehd_units}};
+    const fs::path remux = write("remux.mkv", mt::matroska_file(both));
+    const fs::path truehd_only = write("truehd_only.mkv", mt::matroska_file(alone));
+
+    SECTION("probe reads the first track, TrueHD") {
+        REQUIRE(run_cli("probe \"" + remux.string() + "\"", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("codec           TrueHD") != std::string::npos);
+        CHECK(text.find("other tracks    audio track 2 'A_EAC3'") != std::string::npos);
+    }
+
+    SECTION("qc measures the E-AC-3 track") {
+        REQUIRE(run_cli("qc \"" + remux.string() + "\"", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("(E-AC-3,") != std::string::npos);
+        CHECK(text.find("does not read") == std::string::npos);
+    }
+
+    SECTION("transcode reads the E-AC-3 track") {
+        const fs::path out = dir / "transcoded.ac3";
+        REQUIRE(run_cli("transcode \"" + remux.string() + "\" \"" + out.string() + "\"", log) == 0);
+        const std::vector<std::byte> written = read_bytes(out);
+        REQUIRE(written.size() > 2);
+        CHECK(written[0] == std::byte{0x0B});
+        CHECK(written[1] == std::byte{0x77});
+    }
+
+    SECTION("a file with TrueHD alone is refused by name") {
+        CHECK(run_cli("qc \"" + truehd_only.string() + "\"", log) == kExitUsage);
+        CHECK(read_text(log).find("which 'qc' does not read") != std::string::npos);
+        CHECK(run_cli("transcode \"" + truehd_only.string() + "\" \"" +
+                          (dir / "refused.ac3").string() + "\"",
+                      log) == kExitUsage);
+        CHECK(read_text(log).find("which 'transcode' does not read") != std::string::npos);
     }
 }

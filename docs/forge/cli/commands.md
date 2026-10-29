@@ -975,7 +975,9 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 `bluray` or nothing, and `dvb` or `atsc` is a usage error, as `bluray` is for every other codec. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `transcode`, `qc`, `fmp4`, `monitor` and `play` do not read TrueHD and say so (exit status 1). The layouts
+reads either back. `transcode`, `qc`, `fmp4`, `monitor` and `play` do not read TrueHD and say so (exit status 1). In a file
+with several audio tracks the commands that read TrueHD take the first, and these five take the first of another codec, so a
+Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD alone is refused. The layouts
 are FFmpeg's, a single oracle in each direction, and nothing has been played into a receiver or a disc player
 ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
 

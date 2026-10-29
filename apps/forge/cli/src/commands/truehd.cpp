@@ -405,7 +405,7 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
 
 int run_probe_truehd(std::string_view in_path, const Options& meta) {
     std::size_t ac3_core_frames = 0;
-    const auto stream = read_elementary_stream(in_path, &ac3_core_frames);
+    const auto stream = read_elementary_stream(in_path, /*reads_truehd=*/true, &ac3_core_frames);
     if (stream.empty()) {
         return kExitUsage;
     }

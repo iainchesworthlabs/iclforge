@@ -985,7 +985,7 @@ int play_via_ac3_transcode(std::string_view in_path, const std::string& device_i
 }  // namespace
 
 int run_play(std::string_view in_path, int device_index, const Options& meta) {
-    const auto stream = read_elementary_stream(in_path);
+    const auto stream = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (stream.empty()) {
         return kExitInput;
     }

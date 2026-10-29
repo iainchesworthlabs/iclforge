@@ -1225,8 +1225,9 @@ std::optional<std::vector<iclforge::ac3::eac3::chanmap::Location>> own_coding_mo
 
 int run_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   std::string_view layout, const Options& meta) {
-    // A stream inside a container is read as decode reads it.
-    auto bytes = read_elementary_stream(in_path);
+    // A stream inside a container is read as decode reads it, but for a TrueHD track, which
+    // this refuses: a file with another track after it gives that one.
+    auto bytes = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (bytes.empty()) {
         return kExitInput;
     }

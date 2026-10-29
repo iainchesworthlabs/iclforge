@@ -1199,7 +1199,15 @@ std::vector<std::byte> read_all(std::string_view path);
 // For a TrueHD transport stream (stream_type 0x83), or a file that opens with an AC-3 core and then
 // TrueHD, the AC-3 frames between the access units are set aside; `ac3_core_frames`, when given,
 // receives how many, and the stream says so on stderr.
+//
+// A file with more than one audio track gives its first, whatever the codec, to a caller that
+// reads TrueHD (`reads_truehd`, the default: decode, probe, levels, loudness and the container
+// commands). A command that does not read it (qc, play, monitor, transcode, fmp4) says false and
+// gets the first track of another codec, so that a Blu-ray remux with its TrueHD track first is
+// read as its AC-3 or E-AC-3 one. A file with TrueHD alone is returned whole for the command to
+// refuse by name (refuse_truehd).
 [[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path,
+                                                            bool reads_truehd = true,
                                                             std::size_t* ac3_core_frames = nullptr);
 
 // Wraps iclforge::ac3::io::read_wav to honor the "-" stdin convention (is_stdio_path

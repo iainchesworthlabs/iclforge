@@ -1260,7 +1260,7 @@ int run_qc(std::string_view in_path, const Options& meta) {
     const bool rendered_layout = meta.qc_rendered_layout;
     const std::optional<int> want_programme = meta.programme;
     const std::optional<iclforge::ac3::plan::LayoutId> objects_layout = meta.qc_objects_layout;
-    const auto stream = read_elementary_stream(in_path);
+    const auto stream = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (stream.empty()) {
         return kExitInput;
     }

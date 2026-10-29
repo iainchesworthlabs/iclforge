@@ -232,7 +232,7 @@ int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
 }  // namespace
 
 int run_monitor(std::string_view in_path, int device_index, const Options& meta) {
-    const auto raw = read_elementary_stream(in_path);
+    const auto raw = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (raw.empty()) {
         return kExitInput;
     }

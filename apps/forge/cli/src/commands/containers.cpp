@@ -740,7 +740,7 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
     // read_elementary_stream also takes a Matroska, MP4 or MPEG-TS input, as
     // mkv/mp4/ts do: 'ac4-encode' and 'mp4' write MP4, which this fragments
     // as readily as the raw stream.
-    auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (raw.empty()) {
         return kExitInput;
     }
