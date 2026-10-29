@@ -62,13 +62,15 @@ class Reader:
 
     def take(self, n: int) -> bytes:
         if n < 0 or self.pos + n > len(self.data):
-            raise ValueError(f"read of {n} bytes at {self.pos} runs past the {len(self.data)}-byte blob")
+            raise ValueError(
+                f"read of {n} bytes at {self.pos} runs past the {len(self.data)}-byte blob"
+            )
         out = self.data[self.pos : self.pos + n]
         self.pos += n
         return out
 
     def value(self, ttype: int):
-        if ttype == T_BOOL or ttype == T_BYTE:
+        if ttype in (T_BOOL, T_BYTE):
             return self.take(1)[0]
         if ttype == T_I16:
             return struct.unpack(">h", self.take(2))[0]
@@ -172,7 +174,7 @@ class Check:
 
 
 def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(command, capture_output=True, text=True, **kwargs)
+    return subprocess.run(command, capture_output=True, text=True, check=False, **kwargs)
 
 
 def make_pki(openssl: str, work: Path) -> None:
@@ -185,22 +187,92 @@ def make_pki(openssl: str, work: Path) -> None:
 
     for name in ("root", "issuing", "signer"):
         sh("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", f"{name}.key")
-    sh("req", "-new", "-x509", "-key", "root.key", "-sha256", "-days", "30",
-       "-subj", "/C=AU/O=ICL Forge Test/CN=Test Root CA",
-       "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign",
-       "-out", "root.pem")
-    (work / "ca.ext").write_text("basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n")
-    (work / "signer.ext").write_text("basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n")
-    sh("req", "-new", "-key", "issuing.key", "-sha256", "-subj", "/C=AU/O=ICL Forge Test/CN=Test Issuing CA",
-       "-out", "issuing.csr")
-    sh("x509", "-req", "-in", "issuing.csr", "-CA", "root.pem", "-CAkey", "root.key", "-CAcreateserial",
-       "-sha256", "-days", "30", "-extfile", "ca.ext", "-out", "issuing.pem")
-    sh("req", "-new", "-key", "signer.key", "-sha256",
-       "-subj", "/C=AU/O=ICL Forge Test/CN=Test Content Signer/title=Code\\/Content Signer", "-out", "signer.csr")
-    sh("x509", "-req", "-in", "signer.csr", "-CA", "issuing.pem", "-CAkey", "issuing.key", "-CAcreateserial",
-       "-sha256", "-days", "30", "-extfile", "signer.ext", "-out", "signer.pem")
+    sh(
+        "req",
+        "-new",
+        "-x509",
+        "-key",
+        "root.key",
+        "-sha256",
+        "-days",
+        "30",
+        "-subj",
+        "/C=AU/O=ICL Forge Test/CN=Test Root CA",
+        "-addext",
+        "basicConstraints=critical,CA:TRUE",
+        "-addext",
+        "keyUsage=critical,keyCertSign",
+        "-out",
+        "root.pem",
+    )
+    (work / "ca.ext").write_text(
+        "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n"
+    )
+    (work / "signer.ext").write_text(
+        "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n"
+    )
+    sh(
+        "req",
+        "-new",
+        "-key",
+        "issuing.key",
+        "-sha256",
+        "-subj",
+        "/C=AU/O=ICL Forge Test/CN=Test Issuing CA",
+        "-out",
+        "issuing.csr",
+    )
+    sh(
+        "x509",
+        "-req",
+        "-in",
+        "issuing.csr",
+        "-CA",
+        "root.pem",
+        "-CAkey",
+        "root.key",
+        "-CAcreateserial",
+        "-sha256",
+        "-days",
+        "30",
+        "-extfile",
+        "ca.ext",
+        "-out",
+        "issuing.pem",
+    )
+    sh(
+        "req",
+        "-new",
+        "-key",
+        "signer.key",
+        "-sha256",
+        "-subj",
+        "/C=AU/O=ICL Forge Test/CN=Test Content Signer/title=Code\\/Content Signer",
+        "-out",
+        "signer.csr",
+    )
+    sh(
+        "x509",
+        "-req",
+        "-in",
+        "signer.csr",
+        "-CA",
+        "issuing.pem",
+        "-CAkey",
+        "issuing.key",
+        "-CAcreateserial",
+        "-sha256",
+        "-days",
+        "30",
+        "-extfile",
+        "signer.ext",
+        "-out",
+        "signer.pem",
+    )
     (work / "chain.pem").write_text(
-        (work / "signer.pem").read_text() + (work / "issuing.pem").read_text() + (work / "root.pem").read_text()
+        (work / "signer.pem").read_text()
+        + (work / "issuing.pem").read_text()
+        + (work / "root.pem").read_text()
     )
 
 
@@ -243,40 +315,81 @@ def analyse_blob(blob: bytes, work: Path, openssl: str, check: Check) -> dict:
         all(isinstance(v, ByteList) for v in byte_lists.values()),
         "every byte list is a Thrift list of BYTE elements: " + ", ".join(byte_lists),
     )
-    structs = [content_signature, signer_info, signer_info[10], entry, signed_info, signed_info[6], signed_info[7][0], signature_data]
-    check.ok(all(st["order"] == sorted(st["order"]) for st in structs), "fields are written in ascending id order in every struct")
+    structs = [
+        content_signature,
+        signer_info,
+        signer_info[10],
+        entry,
+        signed_info,
+        signed_info[6],
+        signed_info[7][0],
+        signature_data,
+    ]
+    check.ok(
+        all(st["order"] == sorted(st["order"]) for st in structs),
+        "fields are written in ascending id order in every struct",
+    )
 
     # The signer-information digest is over the bytes as received.
     check.ok(
         hashlib.sha256(signer_info_bytes).digest() == signed_info[6][32],
-        "SHA-256 of the signer information, as received, is the digest the signed information holds",
+        "SHA-256 of the signer information, as received, is the digest in the signed information",
     )
 
     # The certificates: a wrapper, then DER back to back.
     wrapped = bytes(signer_info[10][4])
     check.ok(
-        wrapped[0] == 0x40 and wrapped[1] == 0x82 and int.from_bytes(wrapped[2:4], "big") == len(wrapped) - 4,
+        wrapped[0] == 0x40
+        and wrapped[1] == 0x82
+        and int.from_bytes(wrapped[2:4], "big") == len(wrapped) - 4,
         "the certificates start with a 40 82 LL LL wrapper whose length is the rest of the list",
     )
     certificates = der_sequences(wrapped[4:])
     for index, der in enumerate(certificates):
         (work / f"carried{index}.der").write_bytes(der)
-        parsed = run([openssl, "x509", "-inform", "DER", "-in", f"carried{index}.der", "-noout", "-subject"], cwd=work)
-        check.ok(parsed.returncode == 0, f"openssl reads carried certificate {index} of {len(certificates)}")
-        pem = run([openssl, "x509", "-inform", "DER", "-in", f"carried{index}.der", "-outform", "PEM"], cwd=work).stdout
+        parsed = run(
+            [openssl, "x509", "-inform", "DER", "-in", f"carried{index}.der", "-noout", "-subject"],
+            cwd=work,
+        )
+        check.ok(
+            parsed.returncode == 0,
+            f"openssl reads carried certificate {index} of {len(certificates)}",
+        )
+        pem = run(
+            [openssl, "x509", "-inform", "DER", "-in", f"carried{index}.der", "-outform", "PEM"],
+            cwd=work,
+        ).stdout
         (work / f"carried{index}.pem").write_text(pem)
 
     # The ECDSA signature, over the bytes of the signed information.
     r, s = signature_data[4][b"ecc_r_value"], signature_data[4][b"ecc_s_value"]
-    check.ok(len(r) == 32 and len(s) == 32, f"r and s are raw 32-byte values, not DER: {len(r)} and {len(s)}")
+    check.ok(
+        len(r) == 32 and len(s) == 32,
+        f"r and s are raw 32-byte values, not DER: {len(r)} and {len(s)}",
+    )
     (work / "signature.der").write_bytes(ecdsa_sig_value(r, s))
     (work / "signed_info.bin").write_bytes(signed_info_bytes)
     (work / "content_digest.bin").write_bytes(bytes(content_digest))
-    public_key = run([openssl, "x509", "-in", f"carried{len(certificates) - 1}.pem", "-pubkey", "-noout"], cwd=work)
+    public_key = run(
+        [openssl, "x509", "-in", f"carried{len(certificates) - 1}.pem", "-pubkey", "-noout"],
+        cwd=work,
+    )
     (work / "signer_pub.pem").write_text(public_key.stdout)
 
     def dgst(message: str) -> subprocess.CompletedProcess:
-        return run([openssl, "dgst", "-sha256", "-verify", "signer_pub.pem", "-signature", "signature.der", message], cwd=work)
+        return run(
+            [
+                openssl,
+                "dgst",
+                "-sha256",
+                "-verify",
+                "signer_pub.pem",
+                "-signature",
+                "signature.der",
+                message,
+            ],
+            cwd=work,
+        )
 
     verify = dgst("signed_info.bin")
     check.ok(
@@ -286,14 +399,34 @@ def analyse_blob(blob: bytes, work: Path, openssl: str, check: Check) -> dict:
     damaged = bytearray(signed_info_bytes)
     damaged[len(damaged) // 2] ^= 0x01
     (work / "damaged_info.bin").write_bytes(bytes(damaged))
-    check.ok(dgst("damaged_info.bin").returncode != 0, "the same check refuses the signed information with one bit changed")
+    check.ok(
+        dgst("damaged_info.bin").returncode != 0,
+        "the same check refuses the signed information with one bit changed",
+    )
     # The reading CS spec v2.3 gives (the content digest is what is signed) must not verify.
-    check.ok(dgst("content_digest.bin").returncode != 0, "the signature does not verify over SHA-256 of the content digest")
+    check.ok(
+        dgst("content_digest.bin").returncode != 0,
+        "the signature does not verify over SHA-256 of the content digest",
+    )
     raw_digest = run(
-        [openssl, "pkeyutl", "-verify", "-pubin", "-inkey", "signer_pub.pem", "-sigfile", "signature.der", "-in", "content_digest.bin"],
+        [
+            openssl,
+            "pkeyutl",
+            "-verify",
+            "-pubin",
+            "-inkey",
+            "signer_pub.pem",
+            "-sigfile",
+            "signature.der",
+            "-in",
+            "content_digest.bin",
+        ],
         cwd=work,
     )
-    check.ok(raw_digest.returncode != 0, "the signature does not verify with the content digest taken as the hash that was signed")
+    check.ok(
+        raw_digest.returncode != 0,
+        "the signature does not verify with the content digest taken as the hash that was signed",
+    )
     return {"content_digest": bytes(content_digest), "certificates": certificates}
 
 
@@ -307,18 +440,28 @@ def check_sample(blob_path: Path, work: Path, openssl: str, check: Check) -> Non
     for index in range(1, count - 1):
         command += ["-untrusted", f"carried{index}.pem"]
     command.append(f"carried{count - 1}.pem")
-    ignoring_time = run(command[:2] + ["-no_check_time"] + command[2:], cwd=work)
-    check.ok(ignoring_time.returncode == 0, "openssl verify chains the last certificate to the first, ignoring validity times")
+    ignoring_time = run([*command[:2], "-no_check_time", *command[2:]], cwd=work)
+    check.ok(
+        ignoring_time.returncode == 0,
+        "openssl verify chains the last certificate to the first, ignoring validity times",
+    )
     with_time = run(command, cwd=work)
-    # Only the reason: openssl's first line names the certificate, which is not this script's to print.
-    reasons = re.findall(r"error \d+ at \d+ depth lookup: [^\n]*", with_time.stdout + with_time.stderr)
+    # Only the reason: openssl's first line names the certificate, which is not this script's to
+    # print.
+    reasons = re.findall(
+        r"error \d+ at \d+ depth lookup: [^\n]*", with_time.stdout + with_time.stderr
+    )
     detail = "; ".join(reasons) if reasons else "no error"
-    print(f"  info  the same with validity times checked today: exit {with_time.returncode}: {detail}")
-    text = run([openssl, "x509", "-in", f"carried{count - 1}.pem", "-noout", "-text"], cwd=work).stdout
+    print(
+        f"  info  the same with validity times checked today: exit {with_time.returncode}: {detail}"
+    )
+    text = run(
+        [openssl, "x509", "-in", f"carried{count - 1}.pem", "-noout", "-text"], cwd=work
+    ).stdout
     check.ok("ecdsa-with-SHA256" in text, "the signing certificate is signed ecdsa-with-SHA256")
     check.ok(
         "CA:TRUE" in text,
-        "the signing certificate also carries BasicConstraints CA:TRUE, which a verifier must not reject",
+        "the signing certificate also carries BasicConstraints CA:TRUE, which a verifier accepts",
     )
 
 
@@ -329,25 +472,45 @@ def check_forge(forge: str, work: Path, openssl: str, check: Check) -> None:
     def forge_run(*arguments: str) -> subprocess.CompletedProcess:
         return run([forge, *arguments], cwd=work)
 
-    check.ok(forge_run("ac4-encode", "tone.wav", "plain.ac4", "192").returncode == 0, "forge ac4-encode writes the unsigned stream")
-    signed = forge_run("ac4-sign", "plain.ac4", "signed.ac4", "content-key=signer.key", "content-chain=chain.pem")
-    if not check.ok(signed.returncode == 0, "forge ac4-sign signs it with the OpenSSL-made key and chain"):
+    check.ok(
+        forge_run("ac4-encode", "tone.wav", "plain.ac4", "192").returncode == 0,
+        "forge ac4-encode writes the unsigned stream",
+    )
+    signed = forge_run(
+        "ac4-sign", "plain.ac4", "signed.ac4", "content-key=signer.key", "content-chain=chain.pem"
+    )
+    if not check.ok(
+        signed.returncode == 0, "forge ac4-sign signs it with the OpenSSL-made key and chain"
+    ):
         print(signed.stderr, file=sys.stderr)
         return
 
     plain = (work / "plain.ac4").read_bytes()
     stream = (work / "signed.ac4").read_bytes()
     boundary = syncframe_end(stream)
-    check.ok(stream[:boundary] == plain and boundary == len(plain), "the sync frames are the unsigned stream's, byte for byte")
+    check.ok(
+        stream[:boundary] == plain and boundary == len(plain),
+        "the sync frames are the unsigned stream's, byte for byte",
+    )
 
     parts = analyse_blob(stream[boundary:], work, openssl, check)
     check.ok(
         hashlib.sha256(stream[:boundary]).digest() == parts["content_digest"],
         "SHA-256 of the sync frames is the content digest in the signed information",
     )
-    check.ok(len(parts["certificates"]) == 3, f"three certificates are carried (root, issuing CA, signer): {len(parts['certificates'])}")
-    verified = run([openssl, "verify", "-CAfile", "root.pem", "-untrusted", "issuing.pem", "signer.pem"], cwd=work)
-    check.ok(verified.returncode == 0, f"openssl verify chains the signer to the root: {verified.stdout.strip() or verified.stderr.strip()}")
+    check.ok(
+        len(parts["certificates"]) == 3,
+        f"three certificates are carried (root, issuing CA, signer): {len(parts['certificates'])}",
+    )
+    verified = run(
+        [openssl, "verify", "-CAfile", "root.pem", "-untrusted", "issuing.pem", "signer.pem"],
+        cwd=work,
+    )
+    check.ok(
+        verified.returncode == 0,
+        "openssl verify chains the signer to the root: "
+        + (verified.stdout.strip() or verified.stderr.strip()),
+    )
     check.ok(
         (work / "carried2.pem").read_text() == (work / "signer.pem").read_text(),
         "the last carried certificate is the signer's certificate exactly",
@@ -356,7 +519,10 @@ def check_forge(forge: str, work: Path, openssl: str, check: Check) -> None:
     check.ok("Code/Content Signer" in subject, "the signer carries the title the spec asks for")
 
     # forge agrees, and refuses what is damaged.
-    check.ok(forge_run("ac4-verify", "signed.ac4", "trust-anchor=root.pem").returncode == 0, "forge ac4-verify accepts it against the same root")
+    check.ok(
+        forge_run("ac4-verify", "signed.ac4", "trust-anchor=root.pem").returncode == 0,
+        "forge ac4-verify accepts it against the same root",
+    )
     flipped = bytearray(stream)
     flipped[len(plain) // 2] ^= 0x01
     (work / "flipped.ac4").write_bytes(bytes(flipped))
@@ -367,12 +533,20 @@ def check_forge(forge: str, work: Path, openssl: str, check: Check) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     modes = parser.add_mutually_exclusive_group(required=True)
-    modes.add_argument("--forge", help="the forge executable: sign a stream it encodes, and read that")
-    modes.add_argument("--sample", help="a bare content signature blob to read; nothing of forge is run")
+    modes.add_argument(
+        "--forge", help="the forge executable: sign a stream it encodes, and read that"
+    )
+    modes.add_argument(
+        "--sample", help="a bare content signature blob to read; nothing of forge is run"
+    )
     parser.add_argument("--openssl", default="openssl")
-    parser.add_argument("--keep", action="store_true", help="keep the working directory and print it")
+    parser.add_argument(
+        "--keep", action="store_true", help="keep the working directory and print it"
+    )
     args = parser.parse_args()
 
     if shutil.which(args.openssl) is None:
