@@ -12,6 +12,12 @@ iclforge_add_test_binary(iclforge-containers-tests PROJECT containers SOURCES
 
 target_link_libraries(iclforge-containers-tests PRIVATE iclforge::containers iclforge::ac3 iclforge::ac4)
 
+# mp4/test_mp4_reader.cpp reads the protected MP4s that are also the MP4 fuzz harness's seeds
+# (tools/generators/gen_cenc_reader_fixtures.py makes them). A path, for the reason the CLI tests'
+# ICLFORGE_FUZZ_SEED_DIR is one: ctest runs the binary from the build tree.
+target_compile_definitions(iclforge-containers-tests PRIVATE
+    "ICLFORGE_MP4_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/containers/fuzz/seeds/fuzz_mp4_demux\"")
+
 # The IAMF writer and reader (libs/containers/src/iamf) are gated by their own ICLFORGE_BUILD_IAMF
 # (default ON, see the root CMakeLists.txt's own option()).
 if(ICLFORGE_BUILD_IAMF)
