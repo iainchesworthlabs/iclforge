@@ -58,15 +58,18 @@ presets, and compiler-detection errors.
 
 ## Encode and decode from the command line
 
-`forge` reads the format from the stream, so one `decode` command takes AC-3, E-AC-3 or AC-4.
-With a 48 kHz stereo `in.wav`:
+`forge` reads the format from the stream, so one `decode` command takes AC-3, E-AC-3, AC-4,
+TrueHD or MLP. With a 48 kHz stereo `in.wav`:
 
 ```bash
 forge encode in.wav out.ac3 448 couple
 forge ac4-encode in.wav out.ac4 192
+forge truehd-encode in.wav out.thd
 forge probe out.ac4
 forge decode out.ac4 out.wav
 ```
+
+The TrueHD stream is lossless: `forge decode out.thd back.wav` gives the samples that went in.
 
 `forge help` lists every command and `forge help <command>` gives one command's options; the
 [CLI reference](forge/cli/index.md) has the grammars.

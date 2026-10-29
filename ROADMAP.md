@@ -8,7 +8,7 @@ library's capability record, see
 Detailed design lives in [`planning/`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning)
 and product `design/` records — linked below, not copied here.
 
-Last reviewed: 2026-10-13. Reconciliation source:
+Last reviewed: 2026-10-13; the TrueHD, AC-4 content signing and Common Encryption rows, 2026-10-29. Reconciliation source:
 [`planning/roadmap-inventory.md`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning/roadmap-inventory.md).
 
 ## How to read this
@@ -88,27 +88,53 @@ C version macros; release criteria written.
 `inline namespace v1`; make the ABI gate **required** (today advisory — see `_ci-core.yml`
 `ABI_ENFORCE`).
 
-### Library — TrueHD module (was IM5, L)
+### Library — TrueHD module (was IM5, Partial)
 
-In progress as `libs/truehd` (`iclforge::truehd`, `ICLFORGE_BUILD_TRUEHD`), written from the owner's
-specification and checked against FFmpeg's encoder and decoder: [`planning/truehd.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md).
-Phase T1 (the bitstream layer, the lossless decoder, and `forge decode` and `forge probe`) is done: bit-exact with FFmpeg on its
-fixtures, with the features its encoders do not write checked against hand-built streams, which FFmpeg's decoder reads too
-except for the 16-channel substream. The containers, the Forge commands
-(including `forge truehd-encode`), the C API and the CI legs against FFmpeg are done too; the Atmos substream, and the Python,
-JavaScript and Rust bindings, follow (was UX10). The branch `feature/truehd-atmos-support` is superseded: no TrueHD
-decoder reads its block layout and it carries non-redistributable PDFs, so nothing is taken from it.
-Dolby Encoding Engine's TrueHD streams of known sources (2, 6 and 8
-channels, 48 and 96 kHz, 16 and 24 bits, several presentations), made by
-`tools/generators/gen_dee_gold.py` while DEE's licence runs (it ends on 2026-11-06), are kept
-locally for what the clean-room rule below allows.
+`libs/truehd` (`iclforge::truehd`, `ICLFORGE_BUILD_TRUEHD`, on by default) is built and checked against FFmpeg. It is written from the
+owner's TrueHD (MLP) Reference Specification, which is not in the tree, and every place that specification and the streams disagree is an entry
+or an open question in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md). The plan is
+[`planning/truehd.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md); what ships is in [CHANGELOG.md](https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md) and
+[TrueHD and MLP in the library](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/truehd.md). This table keeps what is unfinished. The branch `feature/truehd-atmos-support`
+is superseded: no TrueHD decoder reads its block layout and it carries non-redistributable PDFs, so nothing is taken from it.
 
-**Authenticity note (for that branch):** TrueHD carries a separate keyed check from DD+ EMDF
-object signing — **Evolution frame protection**, a truncated HMAC-SHA-256 over the access unit
-and the Evolution frame. Open decoders (e.g. truehdd `--evo-key`) optionally verify it with an
-operator-supplied key; without a key they decode unchecked. When authenticity policy lands for
-MLP (multi-key verify / unchecked / licensed soft-gate), wire it to Evolution HMAC, not to
-`iclforge::ac3::signing`'s EMDF path. See [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution).
+| Layer | State |
+|---|---|
+| Decoder and encoder (`libs/truehd`) | **Built** (phases T1 and T2a of the plan). The decoder reads TrueHD and MLP: substreams 0 to 2 and a generic 16-channel substream 3, 44.1 to 192 kHz, 16 and 24 bits, bit-exact with FFmpeg's strict decode on its 12 committed fixtures; an IIR filter, LSB bypass, noise generator 0, several matrices, the block data check and extra data are checked against 12 hand-built streams, of which FFmpeg's decoder reads 9. The encoder writes TrueHD, 1 to 8 channels of 16, 20 or 24 bits, and FFmpeg's strict decode returns every sample in 43 cases and a fuzzer. **Not done:** noise generator 1 with a non-zero noise shift or an LSB bypass (the specification has no table; refused), heavy DRC (the streams do not show where its bits sit), and in the encoder an IIR filter, LSB bypass, a negative output shift, heavy DRC, noise and MLP; nothing outside this library reads the encoder's 2 and 6 channel downmix presentations |
+| Containers and carriage (`libs/containers`) | **Built** (phase T2c1). MP4 (`mlpa`, `dmlp`), Matroska (`A_TRUEHD`), MPEG-TS (`stream_type` 0x83, Blu-ray profile) and MAT (IEC 61937 data type 22), in both directions, bit-exact with FFmpeg's muxers. **Not done:** every layout has one oracle, FFmpeg, and FFmpeg's `spdif` demuxer reads no MAT stream, so reading MAT has none; nothing has been played into a receiver or a disc player; an M2TS writer and the TrueHD-plus-AC-3-core arrangement of a disc ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)) |
+| Applications (`forge`) | **Built** (phase T2c2). `decode`, `probe`, `levels`, `loudness`, `mkv`, `mp4`, `ts`, `spdif`, `unspdif`, `demux`, `remux` and `truehd-encode`; the codec matrix, the gold-reference gate and the FFmpeg Validate job hold them to FFmpeg's strict decode. **Not done:** `transcode`, `qc`, `fmp4`, `monitor` and `play` refuse a TrueHD input; the Forge GUI, Hearth and Crucible do not link the library; the project file does not name `truehd-encode`; `truehd-encode` refuses an `.mlp` name |
+| C API and bindings | The C API (`iclforge_truehd_*`, decode and encode) is **Built**. **Not done:** the Python, JavaScript (WebAssembly) and Rust bindings (was UX10); each is a follow-up on the C API alone |
+| Atmos substream and object audio metadata (phase T2b) | **Blocked** on the owner's answers about the evolution payload ([`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), open questions 1 and 2). The decoder carries a substream's extra data as bytes and reads none of it |
+| Content signing for TrueHD | **Not built.** The owner's specification describes the evolution payload as the container AC-4's content signature uses, but lists its field IDs and the digest scope as unconfirmed (§16.3.3). `iclforge::base::crypto` is codec-neutral and would carry it; see the AC-4 content signing row below and [Signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/signing.md#the-seam-for-other-codecs) |
+| Scoring against Dolby Encoding Engine | `tools/checks/score_truehd_decode.py` has been run on streams this tree made and not on DEE's. DEE's licence ends on 2026-11-06 and is not renewed; the set of known-source TrueHD streams (2, 6 and 8 channels, 48 and 96 kHz, 16 and 24 bits, several presentations) is made by `tools/generators/gen_dee_gold.py` and stays on the owner's machine |
+
+Parity with E-AC-3 in every product and tool is the next section.
+
+### TrueHD and E-AC-3 as equals (Proposed)
+
+The owner's direction is that TrueHD and E-AC-3 (DD+) are equal first-class citizens: where one has a row, the other has a row with its
+honest status. Round 1 of the audit compares each area with E-AC-3 and writes a planning document per area; this section links each when it
+lands and takes its sizes (the scale above) from it. Nothing below is started.
+
+| Area | Today | Wanted |
+|---|---|---|
+| Forge CLI | The commands in the row above; the usage line of `probe` does not name `.thd` or `.mlp` | The four refused commands, MLP encoding, the project file, the usage text |
+| Forge GUI | Nothing: no page opens, plays, inspects, checks or encodes TrueHD | An Open stream, QC, player and encode route for TrueHD |
+| Crucible | Not linked; Crucible uses the AC-3, E-AC-3 and Atmos codec only | A decision on what a lossless stream means for a capture product |
+| Hearth desktop player | Not linked; a `.thd` file is not a kind it reads | Playback to local outputs, MAT to a receiver, the Media and Decoder pages |
+| Hearth for Android and the ESP32 sinks | Not linked | Pass-through of the coded stream where the device takes it; decoding on a sink is a feasibility question (rate and channel count against memory) |
+| Library bindings | The C API only | Python, JavaScript (WebAssembly) and Rust |
+| Performance and platform kernels | TrueHD is not in the speed, memory or kernel benchmarks or in the trend pages | Series beside E-AC-3's; SIMD kernels where a profile shows they matter |
+| CI | The Linux gate, codec matrix and nightly FFmpeg Validate run the TrueHD checks; every platform leg builds and tests the library | The platform and fuzz legs held to E-AC-3's standard |
+| Fixtures and the owner's disc soundtracks | 12 FFmpeg-made fixtures and 12 hand-built streams are committed; DEE's set and the owner's discs stay local | Offline checks that read a directory named by an environment variable and skip without it; nothing from a disc is committed |
+| Fuzzing and static analysis | libFuzzer harnesses for the parser, decoder, encoder and MAT unwrap; an encoder-space search | Seeds, corpora and campaigns as E-AC-3's; the nightly analysis alerts for `libs/truehd` triaged |
+| Documentation | This sweep: [`planning/documentation-sweep.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/documentation-sweep.md) | Round 2 folds the audits' matrices into the status pages |
+
+**Content signing (TrueHD).** Two accounts of the evolution frame's check exist and neither has been checked against a stream. An earlier
+note in this project, taken from the superseded branch, described a truncated HMAC-SHA-256 over the access unit and the evolution frame. The
+owner's specification (v3.4 and later) describes the payload as the same `ContentSignature` container, in Thrift and under the same
+`pace-ccjf1` scheme, as [AC-4's content signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/signing.md#ac-4-content-signing). The specification is the later source
+and the one the code follows, so any TrueHD verification would sit on `iclforge::base::crypto`, not on `iclforge::ac3::signing`'s EMDF path.
+See [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution).
 
 ### Crucible — cross-platform product (was UX12, Partial)
 
@@ -150,8 +176,9 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 |---|---|---|
 | **IAMF** (was IM3) | `libs/containers/src/iamf`: v2.0 reader and writer — channel-based and object-based `ipcm` elements, scalable channel reconstruction, Opus / AAC-LC / FLAC packets carried, Parameter Blocks, trimming, raw OBU streams, ISO-BMFF and fragments | Nothing planned. Known and accepted: encoding and decoding Opus, AAC-LC and FLAC (the module links no codec; packets are carried), Common Encryption (needs AES, and the module has no third-party dependency), rendering to a playback layout and mixing (section 7.4 leaves the algorithms to the Open Audio Renderer) |
 | **IAB** (was IM1) | Reader, `AudioDataDLC` decode, writer and DLC encoder, spread and zone control into the Atmos bridge, ST 2067-201 MXF Track File write | A Track File checked by an IMF packager or validator |
-| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; `verify-objects` with one or several `signing-key=` (a keyring: a frame is good under any key; hard fail); `gate-objects`, the licensed soft-gate (tag mismatch / unsigned → bed-only, decode continues); default decode reconstructs objects **unchecked** (FOSS-style) | Nothing planned. Known and accepted: this project ships no key, so a Dolby-licensed decoder accepting its objects is a personal-use path only — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
-| **AC-4 content signing** | `iclforge::base::crypto` (codec-neutral: ECDSA P-256, DER/X.509 chain, Thrift, the `pace-ccjf1` signature) and `iclforge::ac4` `io/content_signature.hpp`: a signature after the last sync frame of a raw `.ac4`; `forge ac4-sign`, `ac4-verify`, `sign-content`, `verify-content`, `check-content`; the operator's own key and chain, opt-in, strict and report modes; checked against OpenSSL and the owner's sample | Fifteen open questions for the owner at the top of `libs/ac4/ERRATA.md` (the validity-time default, carriage in an MP4, signer metadata, ...). Carriage in an MP4, a second entry, revocation and other digests are not implemented. The two fuzz harnesses have not yet run under libFuzzer. Known and accepted: no issuer's key or certificate ships, so a Dolby-issued credential is the operator's to supply — [Signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/signing.md#ac-4-content-signing) |
+| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; `verify-objects` with one or several `signing-key=` (a keyring: a frame is good under any key; hard fail); `gate-objects`, the licensed soft-gate (tag mismatch / unsigned → bed-only, decode continues); default decode reconstructs objects **unchecked** (FOSS-style) | Nothing planned. Known and accepted: this project ships no key, so a Dolby-licensed decoder accepting its objects is a personal-use path only — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#decode-modes). This is E-AC-3's EMDF tag; AC-4's is the next row, and TrueHD's is not built (see the TrueHD module above) |
+| **AC-4 content signing** | `iclforge::base::crypto` (codec-neutral: ECDSA P-256, DER/X.509 chain, Thrift, the `pace-ccjf1` signature) and `iclforge::ac4` `io/content_signature.hpp`: a signature after the last sync frame of a raw `.ac4`; `forge ac4-sign` and `ac4-verify`, and the options `sign-content` (`ac4-encode`, `atmos-encode codec=ac4`) and `verify-content` and `check-content` (`decode`); the operator's own key and chain, opt-in, strict and report modes; checked against OpenSSL and the owner's sample, which is kept outside the repository and read from `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` (the tests that need it skip when it is unset) | Fifteen open questions for the owner at the top of `libs/ac4/ERRATA.md` (the validity-time default, carriage in an MP4, signer metadata, ...). Carriage in an MP4, a second entry, revocation and other digests are not implemented. The two fuzz harnesses have not yet run under libFuzzer. Known and accepted: no issuer's key or certificate ships, so a Dolby-issued credential is the operator's to supply — [Signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/signing.md#ac-4-content-signing). **TrueHD has no counterpart yet** (see the TrueHD module above) |
+| **Dolby reference content** (the AC-4 kit's streams, Spott's files, the Online Delivery Kit tools) | `tools/checks/check_ac4_kit_streams.py` holds the decoder to the kit's 12 AC-4 streams (every frame decodes, the sample count the frame count gives, the channels the presentation names, loudness against the declared LKFS); `check_dolby_mp4_boxes.py`, `check_dolby_demux_roundtrip.py` and `check_dolby_cenc.py` compare forge's MP4, DASH, HLS and MPEG-TS and the protection boxes of 108 protected files with Dolby's `mp4drop` and `streamdemuxer`; of the nine AC-4 files from Dolby's public test application eight decode in full, since two decoder fixes of 2026-10-29 (an A-JOC substream with no dialogue configuration, and `md_compat` 4). All of it is optional and local, skips without the tools or the files, and commits nothing of Dolby's | OTT00234 stops at frame 1 (its tools metadata size); HLS packed audio with ID3v2 tags is not read; `forge decode` exits 0 when a stream loses most of its frames; streamdemuxer answers "Need a key for decryption" whatever key it is given, so no decryption leg runs; Dolby's hosted StreamValidator refused the automated browser (HTTP 403); `check_ac4_kit_streams.py` does not read the Spott files. Dolby-made TrueHD streams exist only as DEE's, on the owner's machine. [Validation]({base}docs/verification.md#dolbys-online-delivery-kit-tools), [AC-4 plan]({base}planning/ac4.md#open-after-dolbys-kit-streams-2026-10-29) |
 | **Multi-programme E-AC-3** | `programme2=`..`programme8=` authoring via CLI (all eight §E2.3.1.2 substreams, full per-programme `mixmdate`/`bsmod` metadata); receiver-side mixing of an associated service into the main (`AssociatedServiceMixer`, `forge decode associated=`: §E3.10's scales, per-channel trims and pan) | Playing it live in Hearth: `forge monitor associated=` mixes an associated service into the main as it plays, and Hearth does not yet — see [capabilities](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md) |
 | **Encoder reproducibility** (was VX12) | Audit done; `ilogb` fix landed; sixteen real-programme streams in the bitstream-hash gate, identical on MSVC, clang-cl, GCC 16 and Clang 22 on the x86-64 and generic kernels, Linux arm64 and macOS (libc++), after the delta-segment selection stopped depending on `std::nth_element`'s tie choice | The float32 encoder's pins, which no longer match a fresh GCC build; fixed-point transient port optional |
 | **Listening test** (was VX9) | Apparatus in `tools/listening/` | **No session run yet** — see [`tools/listening/responses/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/listening/responses/README.md) |
@@ -169,7 +196,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 | Perceptual encoder criterion calibration | EQ13 follow-on; `kPerceptual` | EQ14 |
 | QC delivery report file | `forge qc` writes stdout today | [`planning/qc-report.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/qc-report.md) |
 | DAW / NLE host plugin | Feasibility study only | [`planning/host-plugin.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/host-plugin.md) |
-| Common Encryption (ISO/IEC 23001-7) for E-AC-3, AC-3 and AC-4 in MP4 | Refusal built; nothing decrypts and nothing writes protected tracks. A protected `ec-3`, `ac-3` or `ac-4` track is refused with its scheme, original format and default KID, also when the file holds a clear sample entry beside the protected one (the whole track is refused, so no ciphertext is read as audio). Reading with an operator's keys is a plan (**L** and more, two weeks), awaiting the owner's decisions. Writing protected files and the manifests are gaps G13 to G19 of the audit. A Matroska audio track with `ContentEncryption` and an MPEG-TS audio PID with scrambled packets are refused too. AC-4 protected tracks are also listed under Out of scope below | [`planning/cenc-conformance.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md), [`planning/cenc-read-side.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md) |
+| Common Encryption (ISO/IEC 23001-7) for E-AC-3, AC-3, AC-4 and TrueHD in MP4 | Refusal built; nothing decrypts and nothing writes protected tracks. A protected `ec-3`, `ac-3` or `ac-4` track is refused with its scheme, original format and default KID, also when the file holds a clear sample entry beside the protected one (the whole track is refused, so no ciphertext is read as audio). A protected `mlpa` (TrueHD) track takes the same path in the reader's code, and no fixture or test covers it (the audit's G24 predates TrueHD in the containers). Reading with an operator's keys is a plan (about two and a half focused weeks), awaiting the owner's decisions. Writing protected files and the manifests are gaps G13 to G19 of the audit. A Matroska audio track with `ContentEncryption` and an MPEG-TS audio PID with scrambled packets are refused too. AC-4 protected tracks are also listed under Out of scope below | [`planning/cenc-conformance.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md), [`planning/cenc-read-side.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md) |
 | ESP32 sink tiers (C6 / C61 / S3 / P4) on one ES9080 PCB | Modular MCU: C6 2.0 / one DAC (shipped); C61 5.1 desired (no board); S3 ≤7.1.4 no ecpl / both DACs @ 16-bit (shipped); P4 ≤9.1.6 full tools desired / both DACs @ 32-bit on one I2S. P4 reopened only as best tier; its probe and hosted-Wi-Fi sink are built, its TDM output and the PCB are not | [`planning/esp32-sink-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md) |
 | vcpkg git registry | Consumers install via `vcpkg install iclforge` | DR3 |
 | winget and ConanCenter | Manifests staged; CLA and submission pending | DR4 |
@@ -182,7 +209,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 
 | Item | Blocker | Was |
 |---|---|---|
-| TrueHD interoperability with shipping decoders | Non-public MLP reference material; clean-room policy (IM6) | IM6 |
+| TrueHD checked against a Dolby decoder, a disc player or a receiver | The library is checked against FFmpeg's encoder and decoder only. DEE's streams can be scored only on the owner's machine while its licence runs (it ends on 2026-11-06), and nothing has been played into a receiver or a player. Black-box analysis of Dolby streams is out of scope below | IM6 |
 | macOS notarisation and Windows Authenticode | Certificates and accounts, not code (Known gap since 0.8.0-beta.2) | DR6 |
 
 ---

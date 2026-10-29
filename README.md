@@ -33,25 +33,29 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 ICL Forge is a clean-room AC-3, E-AC-3, AC-4 and Dolby Atmos codec, written from the published
-standards in C++23, and the applications built on it.
+standards in C++23, a TrueHD and MLP codec written from a specification the project's owner
+supplied, and the applications built on them.
 
 | Component | What it is | Docs |
 |---|---|---|
 | **The library** — `iclforge::<library>` | Encodes and decodes AC-3 and E-AC-3, including Atmos objects through JOC, decodes and encodes AC-4 and TrueHD, and decodes MLP. Includes container, metadata, quality, and platform-audio libraries, with C, Python, Rust, and WebAssembly interfaces that decode and encode AC-4 as well as AC-3 and E-AC-3 (TrueHD is in the C interface only so far). | [Library](docs/library/index.md), [capabilities](docs/library/capabilities.md) |
-| **Forge** — `forge` + `forge-gui` | CLI and GUI for encoding, decoding, inspection, quality checks, and live audio. `forge` reads and writes AC-4, and so does the GUI: its QC, player, and object pages read it, and its encoder page and Objects tab write it, objects included; substreams, presentations, and the other layouts stay with the command line. Both build AC-3 and E-AC-3 karaoke streams, the GUI in a Karaoke flow. | [Forge](docs/forge/index.md), [CLI](docs/forge/cli/index.md), [GUI](docs/forge/gui/index.md) |
-| **Crucible** — `crucible` | Captures desktop applications separately and positions them in an Atmos scene. Runs on Windows and Linux; macOS code builds in CI but has not run with audio hardware. | [Crucible](docs/crucible/index.md), [install](docs/crucible/install.md) |
-| **Hearth** — `hearth` | Plays streams through speakers, a receiver, or network sinks. The desktop player decodes for local outputs, passes AC-3 and E-AC-3 to a receiver chosen in its output picker, plays to network sinks, plays AC-4, and has a Karaoke page with timed lyrics and a microphone. The ESP32-S3 and ESP32-C6 sinks play in Sendspin groups on hardware; an ESP32-P4 or ESP32-S3 sink built with the AC-4 decoder takes AC-4 in a group, and the published sink images have that decoder off. Hearth for Android is a sink for Android TV that passes AC-3 and E-AC-3 to a receiver; it is built from source and has no release package. | [Hearth](docs/hearth/index.md), [user guide](docs/hearth/desktop-player.md), [Android](docs/hearth/android.md), [Karaoke](docs/karaoke/index.md) |
+| **Forge** — `forge` + `forge-gui` | CLI and GUI for encoding, decoding, inspection, quality checks, and live audio. `forge` reads and writes AC-4, and so does the GUI: its QC, player, and object pages read it, and its encoder page and Objects tab write it, objects included; substreams, presentations, and the other layouts stay with the command line. `forge` also decodes, inspects and wraps TrueHD and MLP and encodes TrueHD; the GUI does not open, play, check or encode either. Both build AC-3 and E-AC-3 karaoke streams, the GUI in a Karaoke flow. | [Forge](docs/forge/index.md), [CLI](docs/forge/cli/index.md), [GUI](docs/forge/gui/index.md) |
+| **Crucible** — `crucible` | Captures desktop applications separately and positions them in an Atmos scene. Runs on Windows and Linux; macOS code builds in CI but has not run with audio hardware. It uses the AC-3, E-AC-3 and Atmos codec only, so it has no AC-4 and no TrueHD. | [Crucible](docs/crucible/index.md), [install](docs/crucible/install.md) |
+| **Hearth** — `hearth` | Plays streams through speakers, a receiver, or network sinks. The desktop player decodes for local outputs, passes AC-3 and E-AC-3 to a receiver chosen in its output picker, plays to network sinks, plays AC-4, and has a Karaoke page with timed lyrics and a microphone. The ESP32-S3 and ESP32-C6 sinks play in Sendspin groups on hardware; an ESP32-P4 or ESP32-S3 sink built with the AC-4 decoder takes AC-4 in a group, and the published sink images have that decoder off. Hearth for Android is a sink for Android TV that passes AC-3 and E-AC-3 to a receiver; it is built from source and has no release package. Hearth does not play TrueHD or MLP. | [Hearth](docs/hearth/index.md), [user guide](docs/hearth/desktop-player.md), [Android](docs/hearth/android.md), [Karaoke](docs/karaoke/index.md) |
 
-The AC-3, E-AC-3 and AC-4 codecs link no other codec library, FFmpeg included. The FFmpeg
+The AC-3, E-AC-3, AC-4 and TrueHD codecs link no other codec library, FFmpeg included. The FFmpeg
 command-line tools, and a librempeg build for AC-4, are used during development as independent
 decoders to check output against; the build does not depend on them. Hearth's Sendspin transport
 links libFLAC and Opus for the audio formats Sendspin itself defines.
 
-**Standards and trademarks.** "Dolby", "Dolby Digital" and "Dolby Atmos" are trademarks of
-Dolby Laboratories. This project implements the openly published standards — ATSC A/52:2018
-(of which E-AC-3 is normative Annex E), ETSI TS 102 366, ETSI TS 103 420 and ETSI TS 103 190
-(AC-4) — and is not affiliated with, endorsed by, or certified by Dolby Laboratories. Code and
-documentation use the technical names AC-3, E-AC-3 and AC-4. Whether the patents reading on
+**Standards and trademarks.** "Dolby", "Dolby Digital", "Dolby TrueHD" and "Dolby Atmos" are
+trademarks of Dolby Laboratories. This project implements the openly published standards — ATSC
+A/52:2018 (of which E-AC-3 is normative Annex E), ETSI TS 102 366, ETSI TS 103 420 and ETSI TS
+103 190 (AC-4) — and is not affiliated with, endorsed by, or certified by Dolby Laboratories.
+TrueHD and MLP have no openly published standard: that codec is written from a specification
+supplied by the project's owner, who says parts of it derive from analysis of Dolby's encoder and
+of FFmpeg and takes responsibility for that ([the plan](planning/truehd.md#sources-and-what-they-are)).
+Code and documentation use the technical names AC-3, E-AC-3, AC-4 and TrueHD. Whether the patents reading on
 these formats matter for your use is your problem to assess, not something this project
 resolves.
 
@@ -100,6 +104,21 @@ or objects. See
 [where the oracles do not reach](docs/verification.md#where-the-oracles-dont-reach) and
 [Validation: AC-4](docs/verification.md#ac-4). No listening panel has been run; published quality
 values are waveform or model-based measures.
+
+**TrueHD and MLP.** The library is checked against FFmpeg's `truehd` and `mlp` encoders and
+decoder, which is all the independent checking it has: no Dolby decoder, disc player or receiver has
+read what it writes, and the MP4, Matroska, MPEG-TS and IEC 61937 (MAT) layouts are FFmpeg's, each
+with FFmpeg as its one oracle. The Atmos substream and its object metadata, noise generator 1 and
+heavy DRC are not built, and neither are the Python, JavaScript and Rust bindings, Hearth, Crucible
+or the Forge GUI. See [Capabilities](docs/library/capabilities.md#truehd-and-mlp) and
+[Validation: TrueHD](docs/verification.md#truehd-and-mlp).
+
+**Content signing and protected files.** An AC-4 stream can carry a content signature that the
+operator makes with their own key and certificate chain (`forge ac4-sign`, `ac4-verify`); no key or
+certificate ships, and nothing is signed or checked unless asked. Nothing signs or checks a
+TrueHD stream. An MP4 whose audio is protected (Common Encryption) is refused by name; nothing
+decrypts it. See [Signing](docs/library/signing.md#ac-4-content-signing) and
+[Common Encryption](ROADMAP.md#proposed).
 
 **AC-4 containers and receivers.** Matroska registers no codec ID for AC-4, so `forge mkv` refuses
 it; MP4, CMAF and MPEG-TS carry it. No receiver found accepts AC-4 over IEC 61937, so no AC-4 burst
@@ -198,7 +217,8 @@ forge decode out.ac4 out.wav
 ```
 
 `forge`'s commands cover encoding, decoding, muxing, inspection, QC and live capture, for AC-3,
-E-AC-3 and AC-4; run it with no arguments for the full listing.
+E-AC-3 and AC-4, and decoding, inspection, muxing and encoding for TrueHD (`forge truehd-encode`);
+run it with no arguments for the full listing.
 `forge-gui` is a Qt Quick front end over the same library: file and live-capture encoding, a plan
 view for placing objects, channel-level metering, QC, a stream player, an object inspector, a
 Karaoke flow and project files.
@@ -216,7 +236,9 @@ platform-independent, since every coding decision Forge or Crucible makes is a c
 `iclforge::ac3`, or into the AC-4 library for AC-4. What each check reaches and where it runs out:
 [Validation](docs/verification.md). AC-4 is checked against Dolby Encoding Engine's streams,
 MediaInfo's readings, librempeg's decoder and a second transcription of its syntax:
-[Validation: AC-4](docs/verification.md#ac-4).
+[Validation: AC-4](docs/verification.md#ac-4). TrueHD is lossless, so FFmpeg's strict decode of
+what the library writes, and of what FFmpeg's encoders write, is held to the source sample for
+sample: [Validation: TrueHD](docs/verification.md#truehd-and-mlp).
 The quality numbers themselves — gated SNR and ViSQOL MOS-LQO trends, and a release-by-release
 comparison against FFmpeg and Dolby DEE — live on [Quality trend](docs/quality-trend.md) and
 [Landscape](docs/landscape.md) instead of as a snapshot here that could drift stale.
@@ -225,7 +247,7 @@ Validation runs both ways. Every release also publishes a
 [conformance vector set](docs/conformance-vectors.md): 60 AC-3, E-AC-3 and Atmos streams covering
 each coding tool, layout and sample rate this encoder produces, with the source PCM, expected
 decode hashes and a manifest saying which of them FFmpeg can and cannot read — so another
-implementation has something concrete to test against. The set has no AC-4 streams. No free ATSC
+implementation has something concrete to test against. The set has no AC-4 or TrueHD streams. No free ATSC
 or ETSI conformance bitstreams exist publicly.
 
 Before linking the decoder against bytes from the internet, read the
@@ -256,15 +278,18 @@ libs/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, and the EMD
 libs/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
                 presentation inspector, the decoder and the encoder, laid out as libs/ac3 is (core/,
                 io/, decoder/, encoder/); no iclforge::ac3 dependency
+libs/truehd/    iclforge::truehd — the TrueHD and MLP codec, from the owner's specification: the
+                bitstream layer, the lossless decoder and the encoder; links iclforge::base only
 libs/containers/ iclforge::containers — codec-blind carriage, no iclforge::ac3 dependency, in parts
                 (iclforge::containers::<part>): iec61937 (burst packing and detection for AC-3,
-                E-AC-3 and AC-4), matroska (MKV), mp4 (MP4/ISOBMFF plus fMP4/CMAF + HLS/DASH),
-                mpegts (MPEG-2 Transport Stream) and iamf (IAMF v2.0 OBU/ISOBMFF, fed from an
-                E-AC-3 decode), each a writer and a reader
+                E-AC-3 and AC-4, and TrueHD's MAT), matroska (MKV), mp4 (MP4/ISOBMFF plus fMP4/CMAF
+                + HLS/DASH), mpegts (MPEG-2 Transport Stream) and iamf (IAMF v2.0 OBU/ISOBMFF, fed
+                from an E-AC-3 decode), each a writer and a reader; TrueHD rides in the first four
+                (mlpa, A_TRUEHD, stream_type 0x83, MAT)
 libs/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
 libs/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader, and the bridge from the
                 object graph it parses to the Atmos encoder's input (opt-in, needs Boost)
-libs/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode
+libs/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3, AC-4 and TrueHD encode/decode
                 cores, for bindings and callers that do not link C++23
 libs/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (desktop tools and the
                 ESP32 sink); built with the hearth feature, not as part of the codec library
@@ -380,11 +405,12 @@ The published site is
 `docs/` with MkDocs.
 
 - [Quick start](docs/quickstart.md) — install Forge, build from source, or flash a Hearth sink.
-- [Concepts](docs/concepts/index.md) — AC-3, E-AC-3, Atmos, and JOC without assumed domain knowledge.
+- [Concepts](docs/concepts/index.md) — AC-3, E-AC-3, Atmos, JOC, AC-4 and TrueHD without assumed domain knowledge.
 - [Platforms](docs/platforms/index.md) — operating systems, boards, browser support, and evidence.
 - [Capabilities](docs/library/capabilities.md) — the authority for supported codec features and limits.
 - [Karaoke](docs/karaoke/index.md) — playing, timing, singing and making karaoke streams.
 - [AC-4 in the library](docs/library/ac4.md) — the AC-4 decoder and encoder API.
+- [TrueHD and MLP in the library](docs/library/truehd.md) — the TrueHD decoder and encoder API.
 - [Validation](docs/verification.md) — checks, independent references, and coverage gaps.
 - [Performance and quality](docs/performance-quality.md) — current measures and append-only trend histories.
 - [Contributing](CONTRIBUTING.md) — repository structure, documentation ownership, and validation requirements.
