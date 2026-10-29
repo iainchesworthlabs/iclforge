@@ -563,13 +563,14 @@ constexpr std::array<Command, 49> kCommands{{
      "identified by its own magic bytes, not by the file name",
      topic::kStdio,
      Needs::kNothing, [](const Args& x) { return run_demux(x.str(1), x.str(2)); }},
-    {"remux", 3, "<in.mkv|in.mp4|in.ts> <out.mkv|out.mp4|out.ts> [dvb|atsc]",
+    {"remux", 3, "<in.mkv|in.mp4|in.ts> <out.mkv|out.mp4|out.ts> [dvb|atsc|bluray]",
      "container-to-container: the input is identified by its magic bytes, the output by its "
      "extension, and everything either declares is re-derived from the bitstream - the dec3-repair "
-     "case",
+     "case. A .ts output without a profile is DVB for AC-3, E-AC-3 and AC-4, and Blu-ray for "
+     "TrueHD and MLP, which only bluray carries",
      topic::kTs | topic::kMeta,
      Needs::kNothing,
-     [](const Args& x) { return run_remux(x.str(1), x.str(2), x.str(3, "dvb"), x.meta); }},
+     [](const Args& x) { return run_remux(x.str(1), x.str(2), x.str(3), x.meta); }},
     {"devices", 1, "", "input and loopback capture endpoints", topic::kNone,
      Needs::kCapture,
      [](const Args&) { return run_devices(); }},

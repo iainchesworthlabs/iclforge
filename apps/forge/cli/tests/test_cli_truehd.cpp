@@ -882,3 +882,48 @@ TEST_CASE("cut, cat, metadata and normalize refuse a TrueHD stream by name, and 
         CHECK_FALSE(fs::exists(out));
     }
 }
+
+TEST_CASE("a TrueHD transport stream is Blu-ray's, and remux defaults to it",
+          "[forge-cli][truehd][containers]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "profile.log";
+    const std::vector<std::byte> stream = read_bytes(tone.thd);
+    const fs::path mkv = tone.dir / "profile.mkv";
+    REQUIRE(run_cli("mkv " + cli_arg(tone.thd) + cli_arg(mkv), log) == 0);
+
+    SECTION("ts takes bluray or no profile") {
+        const fs::path plain = tone.dir / "profile_plain.ts";
+        const fs::path named = tone.dir / "profile_named.ts";
+        REQUIRE(run_cli("ts " + cli_arg(tone.thd) + cli_arg(plain), log) == 0);
+        CHECK(read_text(log).find("Blu-ray profile") != std::string::npos);
+        REQUIRE(run_cli("ts " + cli_arg(tone.thd) + cli_arg(named) + "bluray", log) == 0);
+        CHECK(read_bytes(plain) == read_bytes(named));
+    }
+    SECTION("remux to a transport stream without a profile writes the Blu-ray one") {
+        // remux used to pass dvb when no profile was named, and ts refuses dvb for TrueHD with
+        // advice (leave the profile out) that remux could not follow.
+        const fs::path out = tone.dir / "profile_remux.ts";
+        const fs::path back = tone.dir / "profile_remux.thd";
+        REQUIRE(run_cli("remux " + cli_arg(mkv) + cli_arg(out), log) == 0);
+        REQUIRE(run_cli("demux " + cli_arg(out) + cli_arg(back), log) == 0);
+        CHECK(read_bytes(back) == stream);
+        const fs::path named = tone.dir / "profile_remux_named.ts";
+        REQUIRE(run_cli("remux " + cli_arg(mkv) + cli_arg(named) + "bluray", log) == 0);
+        CHECK(read_bytes(named) == read_bytes(out));
+    }
+    SECTION("dvb and atsc are refused, naming Blu-ray") {
+        for (const std::string profile : {"dvb", "atsc"}) {
+            DYNAMIC_SECTION(profile) {
+                const fs::path out = tone.dir / ("profile_" + profile + ".ts");
+                fs::remove(out);
+                CHECK(run_cli("ts " + cli_arg(tone.thd) + cli_arg(out) + profile, log) == kExitUsage);
+                CHECK(read_text(log).find("leave the profile out or use bluray") !=
+                      std::string::npos);
+                CHECK(run_cli("remux " + cli_arg(mkv) + cli_arg(out) + profile, log) == kExitUsage);
+                CHECK(read_text(log).find("leave the profile out or use bluray") !=
+                      std::string::npos);
+                CHECK_FALSE(fs::exists(out));
+            }
+        }
+    }
+}
