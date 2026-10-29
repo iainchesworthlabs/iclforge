@@ -72,7 +72,7 @@ struct StageSpec {
     [[nodiscard]] int coded() const noexcept { return last_row - first_row + 1; }
 };
 
-// How the channels are spread over substreams (ERRATA.md entry 23): FFmpeg's TrueHD encoder puts
+// How the channels are spread over substreams (ERRATA.md entry 31): FFmpeg's TrueHD encoder puts
 // two channels in substream 0 and the rest in substream 1; a third substream takes the last two of
 // an eight channel stream. At 176.4 and 192 kHz TH spec §9.6 allows one substream only.
 [[nodiscard]] std::vector<StageSpec> stage_layout(int channels, unsigned ratebits,
@@ -85,7 +85,7 @@ struct StageSpec {
     }
     // The 6 channel presentation is the channels of the major sync's six channel field, the low
     // four bits of the assignment (L R, C, LFE, Ls Rs): its substream must hold exactly that many
-    // rows, or FFmpeg's decoder rejects the stream (ERRATA.md entry 25).
+    // rows, or FFmpeg's decoder rejects the stream (ERRATA.md entry 33).
     int six = channel_count_of_assignment(assignment & 0xFU);
     if (six < 3 || six >= channels) {
         six = 6;
@@ -95,7 +95,7 @@ struct StageSpec {
 
 // FFmpeg's decoder takes a substream of more than 6 channels (a channel above 5) only when its
 // restart sync has noise_type set, 0x31EB, whether or not the stream uses noise (ERRATA.md entry
-// 24; provisional, owner to confirm). The noise shift and seed are zero and no matrix draws on a
+// 32; provisional, owner to confirm). The noise shift and seed are zero and no matrix draws on a
 // noise channel.
 [[nodiscard]] bool noise_flag(const StageSpec& stage) noexcept {
     return stage.last_row > 5;
@@ -539,7 +539,7 @@ MajorSync Encoder::Impl::make_major_sync() const {
     sync.is_vbr = true;
     // TH spec §4.4 says raw * 200 * a rate factor; FFmpeg's streams hold 3199 at 48 kHz, 1599 at
     // 96, 799 at 192 and 3482 at 44.1: raw * rate / 16 is 9.6 Mbps in all four (ERRATA.md entry
-    // 22). Provisional, owner to confirm.
+    // 30). Provisional, owner to confirm.
     const std::uint64_t raw = std::min<std::uint64_t>(
         0x7FFF, (std::uint64_t{config.peak_data_rate_bps} * 16U) / config.sample_rate);
     sync.peak_data_rate = static_cast<std::uint16_t>(raw);
@@ -678,7 +678,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
 
     // --- matrices, then the rows each stage codes --------------------------------------------
     // FFmpeg's decoder gives a later substream the rows an earlier one decoded as they were
-    // before that earlier substream's matrices (ERRATA.md entry 15, corrected): a matrix of
+    // before that earlier substream's matrices (ERRATA.md entry 34): a matrix of
     // substream 0 shapes substream 0's own output and is invisible to substream 1. So a pair
     // decorrelated by a matrix has the matrix in every substream that decodes both its rows, and
     // each substream's own decode (a 2 channel decode reads substream 0 alone) still gets the

@@ -115,7 +115,7 @@ struct Decoder::Impl {
     std::optional<MajorSync> major_sync;
     std::array<SubstreamState, kMaxSubstreams> substreams;
     std::vector<std::int32_t> rows;
-    std::vector<std::int32_t> matrixed;  // a substream's rows after its matrices (ERRATA.md, 15)
+    std::vector<std::int32_t> matrixed;  // a substream's rows after its matrices (ERRATA.md entry 34)
     std::vector<std::int32_t> pcm;
     std::vector<std::byte> extra_data;
     std::vector<Channel> layout_eight;  // the channels of the major sync's eight-channel assignment
@@ -493,7 +493,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
 
     // The primitive matrices (TH spec §10), in the order the block header listed them. They work
     // on a copy of the block's rows: the next substream starts from the rows this one decoded
-    // before its matrices, as FFmpeg's decoder gives them (ERRATA.md, 15).
+    // before its matrices, as FFmpeg's decoder gives them (ERRATA.md entry 34).
     std::int32_t* const matrix_base =
         matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);

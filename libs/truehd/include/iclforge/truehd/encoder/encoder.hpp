@@ -32,7 +32,7 @@
 //   - codes each block's residual with one of the three codebooks of TH spec App. C or raw, the
 //     one a bit count says is shortest, with the offset and the raw width to match (TH spec §11).
 // Channels are spread over substreams the way FFmpeg's TrueHD encoder spreads them: the first two
-// in substream 0, the next four in substream 1, the last two in substream 2 (ERRATA.md, entry 23),
+// in substream 0, the next four in substream 1, the last two in substream 2 (ERRATA.md, entry 31),
 // or, with a downmix presentation requested, as the 2 channel, 6 channel and 8 channel
 // presentations of TH spec §2.2 whose lower presentations are downmixes that the later
 // substreams' matrices undo exactly.

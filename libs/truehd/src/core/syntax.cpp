@@ -86,7 +86,7 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 // The coefficients a matrix sends: one for each matrix channel and, in a stream without noise_type,
 // the two noise channels after them (ERRATA.md entry 8). With noise_type set the matrix sends the
 // matrix channels' coefficients alone and a 4 bit noise shift after them, which is what TH spec
-// §10.2 lists (ERRATA.md entry 24; provisional, owner to confirm).
+// §10.2 lists (ERRATA.md entry 32; provisional, owner to confirm).
 [[nodiscard]] int matrix_coefficients(const BlockContext& context) noexcept {
     return context.max_matrix_chan + 1 + (context.noise_type ? 0 : kNoiseChannels);
 }

@@ -46,6 +46,20 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
 9. **The block data CRC (§8.1, App. B).** Polynomial 0x63; the initial value and the bytes covered are not given and
    no stream sets `data_check_present`. The library checks `block_data_bits` (the length) and does not check the CRC.
 
+10. **The scale of `peak_data_rate` (§4.4, ERRATA 30).** The specification says raw x 200 x a rate multiplier; FFmpeg's
+    streams hold raw values that make raw x rate / 16 equal 9.6 Mbps at every rate. The encoder writes raw =
+    peak_data_rate_bps x 16 / rate (18 Mbps by default, Blu-ray's) and keeps the stream within it. Which scale does a
+    player's FIFO model use?
+11. **The lower presentations of a 6 or 8 channel stream (§2.2, §10.5, ERRATA 31).** FFmpeg's encoder writes no downmix:
+    substream 0 holds L and R as they are. The encoder does the same by default (`DownmixMode::kNone`) and can write
+    the 2, 6 and 8 channel presentations as downmixes that the later substreams' matrices undo
+    (`DownmixMode::kStandard`). Which does a Blu-ray authoring flow expect, and with which gains and limiter?
+12. **FIR order at 176.4 and 192 kHz (§9.6, ERRATA 35).** The specification limits substream 0 to order 4 there; FFmpeg's
+    encoder writes order 7. The encoder follows the specification and writes streams about 5 % larger than FFmpeg's.
+13. **`substream_info` and `extended_substream_info` for three substreams (§4.5, §6.4, ERRATA 17).** The encoder writes 0x3C
+    and 0 for a stream of three substreams because that is what FFmpeg's streams have for two. FFmpeg's decoder
+    accepts them; nothing shows what a Blu-ray player expects.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -170,3 +184,65 @@ every channel is `huff_type` 0 with `huff_lsbs` 24. The bit that gives each pres
 **21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
 the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as
 this reads (**no oracle**).
+
+## Encoder (phase T2a)
+
+Entries 30 and up come from writing a stream and reading it back in FFmpeg's strict decode
+(`tools/checks/verify_truehd_encode_interop.py`). That is a stronger check of a reading than decoding FFmpeg's own
+streams: the encoder writes things FFmpeg's encoder never does, and FFmpeg's decoder says whether they are right.
+
+**30. `peak_data_rate` (§4.4).** FFmpeg's streams hold 3199 at 48 kHz, 3482 at 44.1, 1599 at 96 and 799 at 192 (the bytes
+after the signature: `8c 7f`, `8d 9a`, `86 3f`, `83 1f`; the top bit is `is_vbr`). raw x rate / 16 is 9.597, 9.597, 9.594
+and 9.588 Mbps; raw x 200 is 640, 696, 320 and 160 kbps for streams of 1 to 4 Mbps. The encoder reads the field as
+raw x rate / 16 and writes `peak_data_rate_bps x 16 / rate`. Nothing decodes differently. **Provisional, owner to
+confirm** (Q10).
+
+**31. How the channels are spread over substreams.** FFmpeg's TrueHD 5.1 streams have two substreams: substream 0 codes
+rows 0 and 1 (L, R), substream 1 rows 2 to 5, `ch_assign` is the identity and there are no matrices
+(`dump_struct.py truehd_m51_s24.thd`); a 2 channel decode therefore gives L and R unchanged. The encoder spreads
+channels the same way, and puts rows 6 and 7 of an 8 channel stream in a third substream. At 176.4 and 192 kHz a stream
+has one substream (§9.6). FFmpeg writes no 7.1 stream, so the three substream form has FFmpeg's decoder as its only
+check: it decodes it (entries 32 to 34).
+
+**32. A substream above 6 channels (§7.2, §10.2).** A stream whose third substream (rows 6 and 7) has restart sync 0x31EA
+is refused by FFmpeg's decoder: `9 channels (more than the maximum supported by the decoder) is not implemented`, then
+`No restart header present in substream 2` for every unit. The same stream with that substream's sync 0x31EB
+(`noise_type` 1) decodes. A matrix in a `noise_type` substream sends one coefficient flag for each matrix channel and a
+4 bit noise shift after them; the two flags for the noise channels that entry 8 found in the streams without noise are
+absent. With them FFmpeg reports `Invalid channel 15 specified as output from matrix` and `substream 2 length
+mismatch`; without them the 29 intervals of a 3 s 7.1 stream decode bit-exactly. The encoder writes 0x31EB for a
+substream whose last row is above 5, with a zero seed, zero shifts and no matrix drawing on a noise channel. The decoder
+accepts a `noise_type` restart when no matrix uses a noise channel and refuses it otherwise (the generator is still not
+defined, Q5). **Provisional, owner to confirm.**
+
+**33. FFmpeg's channel order and the six channel field.** For 7 and 8 channel streams FFmpeg's decode returns the channels
+in the order of its own layout bits: a stream in the order L R C LFE Ls Rs Lrs Rrs comes back as L R C LFE Lrs Rrs Ls Rs
+(columns 0 1 2 3 6 7 4 5), and L R C Ls Rs Lrs Rrs as columns 0 1 2 5 6 3 4. A 7 channel stream whose substream 1 held
+6 rows while `sixch_decoder_channel_assignment` named 5 channels (0x0B) was refused with `channel count mismatch`; with
+substream 1 holding the 5 rows the field names (Lrs and Rrs in substream 2) it decodes. The rule used: substream 1
+holds as many rows as the assignment's low four bits name. **Provisional, owner to confirm.**
+
+**34. A substream's matrices (§2.3, §20.2; corrects entry 15).** Entry 15 had substream 1 take the rows substream 0
+produced after its matrices. FFmpeg's decoder gives it the rows before them: a 3 channel stream with a matrix in
+substream 0 alone decodes with the matrix's output channel equal to its pre-matrix value (`L - R` where `L` was
+expected) in every restart interval that has one, and the same stream with the matrix also in substream 1 decodes
+bit-exactly. So a substream's matrices shape that substream's own output and nothing a later substream reads. The
+decoder now works on a copy of the rows for the matrices and the output. The encoder puts a pair's matrix in every
+substream that decodes both rows. **Provisional, owner to confirm.**
+
+**35. FIR order at 176.4 and 192 kHz (§9.6).** `dump_struct.py truehd_st192_s24.thd` shows FFmpeg's 192 kHz stereo stream
+with order 7 filters, where §9.6 allows 4 in substream 0. The encoder obeys the specification: its 192 kHz stereo stream
+is 5.5 % larger than FFmpeg's (`verify_truehd_encode_interop.py`, `music-st192-s24`). Q12.
+
+**36. The restart header's `max_*` fields (§7.1, entry 7).** FFmpeg writes `max_shift` 0 and `max_lsbs` 18 and 19 (24 bit
+sources, first interval) and 10 with `max_shift` 7 (a 16 bit source), `max_bits` and `max_bits_repeat` 21 for stereo and
+mono and 24 for 5.1, always equal to each other. `max_shift` is the output shift and `max_lsbs` the largest `huff_lsbs`
+the interval sends; the other two vary in a way no simple rule explains. The encoder writes the output shift, the
+largest `huff_lsbs` it uses in the interval, and 24 for both others. FFmpeg's decoder does not use them.
+**Provisional.**
+
+**37. `input_timing` and the rate model (§3.4, §18).** FFmpeg's units carry `(n - 1) x samples_per_unit` mod 65536, and its
+restart headers `output_timing` = the first sample of the unit mod 65536. The encoder writes the same unless the unit
+could not arrive at the declared peak rate in time: the unit may start to arrive when the previous one has finished and
+no sooner than one unit duration after the previous start (§3.4), and the stream fails (or counts a `rate_violation`) if
+a unit would finish arriving later than 75 ms after its slot (§18).
