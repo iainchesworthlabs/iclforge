@@ -5,6 +5,7 @@
 | Capability | Pi 4B (64-bit) | Pi 5 (64-bit) | Pi 3 |
 |---|---|---|---|
 | C++ library | **Published**<br>confirmed on hardware<br>Linux aarch64 packages | **Published**<br>not run<br>expected through Linux aarch64 | **Unavailable**<br>not supported |
+| TrueHD and MLP decode and encode | **Source**<br>not run<br>expected through Linux aarch64; not run on the Pi | **Source**<br>not run<br>expected through Linux aarch64 | **Unavailable**<br>not supported |
 | Forge CLI and GUI | **Published**<br>confirmed on hardware<br>Linux aarch64 packages | **Published**<br>not run<br>expected through Linux aarch64 | **Unavailable**<br>not supported |
 | Crucible | **Next release**<br>confirmed on hardware<br>Linux aarch64 package path | **Next release**<br>not run<br>expected through Linux aarch64 | **Unavailable**<br>not supported |
 | Live capture and PCM monitor | **Source**<br>confirmed on hardware<br>Linux backends | **Source**<br>not run<br>expected through Linux backends | **Unavailable** |

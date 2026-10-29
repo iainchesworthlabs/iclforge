@@ -204,6 +204,11 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 
 ## TrueHD / MLP
 
+Written from the owner's TrueHD (MLP) Reference Specification, which has no published counterpart; the reading taken wherever it and the
+streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (19 open questions for the owner). Every row below is the peer of a row in the
+E-AC-3 and AC-4 sections above; where TrueHD is not built the row says so. The Priority and Criticality of a row that is not built are
+provisional until the parity audits of [the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) land.
+
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
 | **Codec** | TrueHD and MLP decoder (`iclforge::truehd`) | 🟢 | Medium | Important | Substreams 0 to 2 and a generic 16-channel substream 3, FIR and IIR, matrices with LSB bypass, Huffman and raw residuals, every check; bit-exact with FFmpeg on 12 fixtures. [TrueHD and MLP](truehd.md) |
@@ -211,10 +216,25 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | IIR, LSB bypass, block data length, permuted `ch_assign`, extra data, 16-channel substream | 🟡 | Medium | Important | Decoded. FFmpeg's strict decode of hand-built streams returns the signal for the first four and for extra data; the extra data's layout and the 16-channel substream (FFmpeg refuses its restart sync) have no external oracle: twelve hand-built streams |
 | | Noise generator 0 | 🟡 | Low | Nice-to-have | Decoded from the specification's LFSR (§17.2), `shr7` 16 bits as FFmpeg reads it (ERRATA question 5, provisional); FFmpeg's strict decode of one hand-built stream equals it |
 | | Noise generator 1, heavy DRC | 🔴 | Low | Nice-to-have | Refused (`kUnsupported`) or not read: generator 1's 256-entry table is not in the specification yet, and the streams do not show where heavy DRC's bits sit (ERRATA open questions 5 and 10) |
-| | `forge decode` and `forge probe` | 🟢 | Medium | Important | `.thd` and `.mlp`; 24-bit WAV in the stream's channel order, strict or lenient |
-| | Evolution frame HMAC (authenticity) | 🔴 | Medium | Important | Distinct from DD+ EMDF `iclforge::ac3::signing`; truncated HMAC-SHA-256 on Evolution frames (cf. truehdd `--evo-key`). Note on IM5 / [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
-| | Shipping TrueHD interop | 🟡 | Low | Out-of-scope | FFmpeg's streams and decoder agree with this one; DEE's streams are scored on the owner's machine; the clean-room ruling (IM6) is the owner's |
-| | Passthrough device lists | 🟡 | Low | Nice-to-have | ELD / capability enums mention TrueHD; a decoder is on `main`, the carriage (MAT, IEC 61937) is phase T2c |
+| | Atmos substream (16 channels), object audio metadata, the evolution frame | 🔴 | Medium | Important | Not built (phase T2b). The decoder carries a unit's extra data as bytes and reads none of it. Blocked on the owner's answers about the evolution payload (ERRATA open questions 1 and 2). Atmos in E-AC-3 is JOC, in the Atmos / JOC section above |
+| | Content signing (evolution frame) | 🔴 | Medium | Important | Not built. The owner's specification describes the payload as the `ContentSignature` container that [AC-4's content signature](#ac-4-etsi-ts-103-190-1-2) uses, and lists its field IDs and digest scope as unconfirmed; an older note described a truncated HMAC-SHA-256. `iclforge::base::crypto` is codec-neutral and would carry it, never `iclforge::ac3::signing`'s EMDF path. [Signing](signing.md#the-seam-for-other-codecs), [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
+| **Applications** | `forge decode` and `forge probe` | 🟢 | Medium | Important | `.thd` and `.mlp`; 24-bit WAV in the stream's channel order, strict or lenient; `probe` checks every unit |
+| | `forge levels`, `loudness`, `mkv`, `mp4`, `ts`, `spdif`, `unspdif`, `demux`, `remux`, `truehd-encode` | 🟢 | Medium | Important | A `.thd`, a `.mlp` or a container holding one; `ts` writes Blu-ray's profile and refuses `dvb` and `atsc`; `truehd-encode` refuses an `.mlp` name. The codec matrix, the gold-reference gate and FFmpeg Validate hold them to FFmpeg's strict decode |
+| | `forge transcode`, `qc`, `fmp4`, `monitor`, `play` | 🔴 | Medium | Important | Refused with exit status 1 and the command's reason. `fmp4` has none to give beyond "no CMAF, HLS or DASH signalling is defined here" |
+| | Forge project file (`.forgeproj`) | 🔴 | Low | Optional | The project file's commands do not name `truehd-encode` |
+| | Forge GUI, Hearth, Crucible | 🔴 | Medium | Important | Not built: none links `iclforge::truehd` (`tools/checks/projects.json`). The GUI has no TrueHD route in Open stream, QC, the player or the encoder pages; Hearth's engine and Crucible's capture have none; no sink firmware, the Android demo or browser module has the library |
+| **Bindings** | C API: decode and encode | 🟢 | Medium | Important | `iclforge_truehd_*`; the fixtures decode through it to FFmpeg's SHA-256 and their PCM encodes and decodes again; `examples/capi_decode_truehd.c` and `capi_encode_truehd.c` run under ctest. [C API](c-api.md#truehd-and-mlp) |
+| | Python, JavaScript (WebAssembly) and Rust bindings | 🔴 | Medium | Important | Not built; each is a follow-up on the C API alone ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md#not-done-in-t2c)) |
+| **Carriage** | MP4 `mlpa` / `dmlp` | 🟢 | Medium | Important | Mux, fragment and demux; the layout is FFmpeg's muxer's, one oracle, and no Dolby document was found. [TrueHD in the containers](muxing-and-sinks.md#truehd-in-the-containers) |
+| | Matroska `A_TRUEHD` | 🟢 | Medium | Important | Mux and demux; FFmpeg's muxer and demuxer in both directions |
+| | MPEG-TS `stream_type` 0x83 (Blu-ray profile) | 🟢 | Medium | Important | Written with the `HDMV` registration; read with or without it, at 188 and 192 bytes; DVB and ATSC refused; no M2TS mode |
+| | IEC 61937 MAT (data type 22) pack and unpack | 🟢 | Medium | Important | 24 access units to a 61,440-byte burst, equal to FFmpeg's `spdif` output byte for byte at 44.1, 48, 96 and 192 kHz; FFmpeg reads no MAT of its own, so reading has no oracle; nothing has been played into a receiver |
+| | Fragmented MP4 / CMAF, HLS, DASH | 🔴 | Low | Optional | The container library can fragment an `mlpa` track; no codec string or signalling is defined, and `forge fmp4` refuses |
+| | `PassthroughSink` and device capability lists | 🔴 | Medium | Important | Not built: `BitstreamFormat` names AC-3, E-AC-3 and AC-4 only, and the ELD parser tracks a TrueHD format as "other" |
+| | MP4 protected tracks (Common Encryption, `enca`) | 🔴 | Low | Optional | A protected `mlpa` track takes the reader's refusal-by-name path (`DemuxError::kProtectedTrack`) by reading the code; no fixture or test covers it. [The audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md)'s G24 predates `mlpa` in the containers |
+| **Verification** | Shipping TrueHD interop | 🟡 | Low | Out-of-scope | Checked against FFmpeg's encoders and decoder only. DEE's streams are scored on the owner's machine by `score_truehd_decode.py`, which has not yet run on DEE's; no Dolby decoder, player or receiver has read output. Black-box analysis of Dolby streams is out of scope, the owner's ruling |
+| | Fuzzing and the encoder-space search | 🟡 | Medium | Important | libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_mat_unwrap`, and `fuzz_truehd_encoder_space.py`, which crosses random legal configurations with adversarial PCM against FFmpeg's strict decode. `libs/truehd/fuzz` has no `seeds/` or `regressions/` directory yet, and no differential harness against FFmpeg's decoder as E-AC-3's `fuzz_differential_eac3_decode` is |
+| | Performance, memory and kernel benchmarks | 🔴 | Medium | Important | TrueHD is in none of `iclforge-perf`, `iclforge-bench`, `iclforge-membench` or `iclforge-kernelbench`, or in the trend pages |
 
 ---
 
@@ -281,21 +301,22 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Legacy core+E-AC-3 extension sample entry | 🟢 | Medium | Important | An `ec-3` entry whose `dec3` carries the core's `bsid` (TS 102 366 F.6.2.5, §E2.3.1.2); MP4, fMP4 and MPEG-TS, both profiles. Matroska: see below |
 | | `dac4` + MPEG-TS DVB registration | 🟢 | Medium | Important | AC-4 carriage |
 | | MPEG-TS AC-4 ATSC profile (A/342-2) | 🔴🔵 | Low | Optional | A/342-2 constrains TS 103 190-2 for ATSC 3.0, which carries audio as ISO BMFF segments (ROUTE/DASH, MMT): there is no MPEG-2 TS mapping to write. Explicitly refused; the DVB path carries AC-4 in TS and fMP4/DASH is the ATSC 3.0 shape |
-| **Mux** | MP4 / ISOBMFF | 🟢 | High | Essential | Mux + demux; AC-3 / E-AC-3 / AC-4 |
+| **Mux** | MP4 / ISOBMFF | 🟢 | High | Essential | Mux + demux; AC-3 / E-AC-3 / AC-4, and TrueHD (`mlpa`, see [TrueHD / MLP](#truehd-mlp)) |
 | | MP4 `moov`-after-`mdat` demux from a file | 🟢 | Low | Optional | `demux_seekable()`: the boxes are walked jumping over `mdat`, then each sample is read where the table says, in bounded memory; `forge demux` takes it for a path |
 | | MP4 `moov`-after-`mdat` demux from a pipe | 🔴🔵 | Low | Optional | A pipe cannot go back for the sample table, so the chunk-fed `Reader` refuses it with the reason (a file path, or the batch `demux()`, reads it) |
 | | MP4 protected tracks (Common Encryption, `enca`) | 🔴🔵 | Low | Optional | Recognised and refused by name, with the scheme, original format and default KID (`DemuxError::kProtectedTrack`); a track with a clear entry beside a protected one is refused whole. Nothing decrypts: [the read-side plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md) |
 | | Fragmented MP4 / CMAF | 🟢 | High | Essential | Init + media segments; AC-4 by TS 103 190-2 Annex H (fragments start at I-frames, `ca4m`/`ca4s` brands, Annex G's descriptors) |
-| | Matroska | 🟢 | Medium | Important | Mux + demux for AC-3 and E-AC-3 |
+| | Matroska | 🟢 | Medium | Important | Mux + demux for AC-3 and E-AC-3, and for TrueHD (`A_TRUEHD`) |
 | | Matroska AC-4 | 🔴🔵 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 (checked against the codec registry 2026-10-10) |
 | | Matroska AC-3 core + E-AC-3 extension | 🔴🔵 | Low | Optional | Refused: `A_AC3` is `bsid` 10 and below and `A_EAC3` is 11 to 16, and no ID names a stream that is both; an ID of our own is one no other reader could name. `forge decode` reads it, MP4 and MPEG-TS carry it |
-| | MPEG-TS (DVB + ATSC for AC-3/E-AC-3) | 🟢 | High | Essential | Mux + demux; descriptors from `scan` |
+| | MPEG-TS (DVB + ATSC for AC-3/E-AC-3; Blu-ray for TrueHD) | 🟢 | High | Essential | Mux + demux; descriptors from `scan`; TrueHD is `stream_type` 0x83 |
 | | Multi-programme container mux (MP4, fMP4, MPEG-TS) | 🟢 | Medium | Optional | Every programme rides in each sample / PES payload with a `dec3` block each (TS 102 366 F.2, A/52 Annex G §3.3); `programme=N` writes one alone, renumbered as substream 0 |
 | | Multi-programme container mux (Matroska) | 🟡🔵 | Medium | Optional | One track, so the first programme with a warning, or the one `programme=N` picks (one file per programme). A track per programme is a muxer this project does not have, and `A_EAC3`'s text names single syncframes |
 | **Streaming** | HLS playlists | 🟡🔵 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; read back through FFmpeg's `hls` demuxer at the exact access-unit count. Apple's validator is macOS-only and no player here reads the signalling, so the manifest's meaning has nothing to be measured against |
 | | DASH MPD + Dolby supplemental descriptors | 🟡🔵 | Medium | Important | Valid against ISO/IEC 23009-1's schema (`verify_dash_schema.py`, in `interop.yml`) and read back through FFmpeg's `dash` demuxer, which ignores the descriptors; the descriptors' meaning has no JOC-aware player to be measured against |
 | **Transport** | IEC 61937 burst pack (AC-3 + E-AC-3) | 🟢 | High | Essential | vs FFmpeg / MS docs |
 | | IEC 61937 burst unpack (`unspdif`) | 🟢 | Medium | Optional | Inverse of pack |
+| | IEC 61937 MAT burst pack + unpack (TrueHD, data type 22) | 🟢 | Medium | Important | Equal to FFmpeg's `spdif` output byte for byte; reading has no oracle; no device has received one ([TrueHD / MLP](#truehd-mlp)) |
 | | IEC 61937-14 AC-4 burst pack + unpack | 🟢 | Medium | Important | The four burst types, their periods and sequences at every frame rate from the standard's tables, checked against a second transcription; no device here accepts AC-4 |
 | **Edit** | In-place metadata rewrite | 🟢 | Medium | Optional | `dialnorm`, `dialnorm2`, `compr`, `compr2`, `bsmod`, `dsurmod` on a field the stream transmits, CRCs re-stamped, audio bit-identical |
 | | Metadata insert (E-AC-3) | 🟢 | Medium | Optional | Adds `compr`, `compr2`, `bsmod`, `dsurmod` to every independent substream that lacks them: the frame grows by a word or two (`frmsiz`, `auxbits` padding, CRC); refused by name on block start information or auxiliary data. FFmpeg 8.0.1 decodes it to the same samples |
@@ -417,9 +438,9 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder landed (T1); eleven questions for the specification's owner | 🟡 |
-| Evolution frame HMAC | Authenticity policy on MLP (parallel to EMDF; not `iclforge::ac3::signing`) | 🔴 |
-| DVD Forum MLP reference | Shipping interop (IM6) | 🔴 |
+| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 19 questions for the specification's owner, the first being the evolution payload | 🟡 |
+| Evolution frame | Content signing (the container of the specification v3.4 and later, or the older truncated HMAC note): field IDs and digest scope unconfirmed | 🔴 |
+| MLP reference material | Shipping interop (IM6): no Dolby decoder, player or receiver has read output | 🔴 |
 
 ---
 
