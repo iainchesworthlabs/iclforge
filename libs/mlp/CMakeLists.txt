@@ -30,6 +30,7 @@ set(_mlp_encoder_sources
     src/encoder/rate_control.cpp)
 
 set(_mlp_io_sources
+    src/io/elementary.cpp
     src/io/extra_data.cpp)
 
 iclforge_add_library(mlp
