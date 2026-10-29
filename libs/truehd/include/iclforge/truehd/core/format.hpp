@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "iclforge/truehd/export.hpp"
+
 // The constants, the sample rates and the channel vocabulary of a TrueHD / MLP stream. "TH spec" is
 // the owner's Dolby TrueHD (MLP) Reference Specification, v3.5 (planning/truehd.md names its status
 // and where it disagrees with the streams; each such place is an entry of libs/truehd/ERRATA.md).
@@ -104,20 +106,23 @@ enum class Channel : std::uint8_t {
     kLfe2,
 };
 
-[[nodiscard]] std::string_view channel_name(Channel channel) noexcept;
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::string_view channel_name(Channel channel) noexcept;
 
 inline constexpr int kChannelAssignmentBits = 13;
 
 // The channels a 13-bit TrueHD channel assignment (TH spec §13.1; format_info's eightch field, or
 // its low five bits for the sixch field) lists, in stream order. Empty for 0.
-[[nodiscard]] std::vector<Channel> channels_of_assignment(std::uint32_t assignment);
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::vector<Channel> channels_of_assignment(
+    std::uint32_t assignment);
 
 // The number of channels a TrueHD channel assignment lists.
-[[nodiscard]] int channel_count_of_assignment(std::uint32_t assignment) noexcept;
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT int channel_count_of_assignment(
+    std::uint32_t assignment) noexcept;
 
 // TH spec App. D: the channel count of an MLP channel arrangement (format_info's low five bits for
 // 0xBB). -1 for an index the table leaves reserved.
-[[nodiscard]] int channel_count_of_mlp_arrangement(unsigned arrangement) noexcept;
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT int channel_count_of_mlp_arrangement(
+    unsigned arrangement) noexcept;
 
 // TH spec §1.4: the word length group1_bits / group2_bits index. 0 for a reserved code.
 [[nodiscard]] constexpr int mlp_word_bits(unsigned code) noexcept {

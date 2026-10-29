@@ -30,6 +30,10 @@ iclforge::truehd::Encoder::stats() const
 iclforge::truehd::Encoder::substreams() const
 iclforge::truehd::Encoder::~Encoder()
 iclforge::truehd::access_unit_length_bytes(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::truehd::channel_count_of_assignment(unsigned int)
+iclforge::truehd::channel_count_of_mlp_arrangement(unsigned int)
+iclforge::truehd::channel_name(iclforge::truehd::Channel)
+iclforge::truehd::channels_of_assignment(unsigned int)
 iclforge::truehd::default_channel_assignment(int)
 iclforge::truehd::extra_data_check_nibble(unsigned int)
 iclforge::truehd::huffman_code(int, int)
