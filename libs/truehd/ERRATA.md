@@ -269,6 +269,20 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
 48. **Downmix gains beyond 2 (§10.5, entry 49).** DEE takes any coefficient of magnitude below 16 (32 for Atmos), with the output shift
     for headroom; the encoder takes 0 to 1.99. Should it take more, and negative ones? **Recommendation:** not until a mix needs it.
 
+49. **What the packet ahead of the first access unit is (entry 50).** DEE's timecode streams start with 16 bytes before the first access
+    unit. The library skips them (a bounded search for a major sync that reads and is followed by an access unit that reads) and
+    says how many; it does not read them. Is the packet something a decoder should carry (a timecode to report), and is the limit of 64 KiB
+    right? **Recommendation:** skip and warn, as now; carry it only when something needs the timecode.
+50. **The 96 kHz legs of the DEE gold set (v3.9 §19.1).** `thd-fx-2ch-music-96k24` and `thd-fx-8ch-tones-96k24` decode in forge with every
+    lossless-check interval ok, to the samples FFmpeg 6.1.1's strict decode gives, and not to their sources (about -47 dB on music and
+    tones, -10 dB on noise and a sweep for the whole set). The decoder is therefore giving what the encoder coded. The FFmpeg-made
+    fixtures at 88.2, 96, 176.4 and 192 kHz (`truehd_st88_s24`, `truehd_st96_s24`, `mlp_st96_s24`, `truehd_st176_s24`, `truehd_st192_s24`)
+    decode to FFmpeg's strict decode bit for bit with every check ok, the encoder's 44.1 to 192 kHz streams decode to their inputs here and
+    in FFmpeg (`verify_truehd_encode_interop.py`), and `hb_noise_generator_1_96k` and `_192k` hold the hand-built path at those rates. So
+    the codec is lossless at every rate here, and what differs is upstream of the stream. v3.9 §19.1 makes the apodising filters a
+    configuration option and no longer explains it. **Open; the scorer reports the legs as UNEXPLAINED.** **Recommendation:** ask what DEE
+    does to a 96 kHz input before coding (a resampler or a filter that its options name) rather than look in the decoder.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -630,6 +644,22 @@ and Appendix A still show the earlier reading (one shared 13-bit sync 0x18F5; 0x
 outside 0 to 1.99, which keeps them inside DEE's bound and below the 2 the 16 bit matrix coefficient (`frac_bits` 14) can carry; a gain
 between 2 and 16, or a negative one, would need a coarser `frac_bits` and the output shift DEE uses for headroom (question 48). Nothing
 changed. `test_downmix.cpp` holds the refusal.
+
+**50. Bytes ahead of the first access unit (§3.1; the DEE gold set's timecode streams).** A raw TrueHD file may start with something that is not
+an access unit: DEE's streams made with an embedded timecode (`thd-fx-2ch-music-48k24-timecode` and four more) have a packet of 16 bytes
+ahead of the first access unit, which `forge` took for an AC-3 file ("no 0x0B77 sync word where a frame should begin") because detection
+wanted a major sync at byte 4. What the packet holds was not looked at and is not decided here. The library's `ElementaryReader` already
+passed bytes to find a major sync; `find_stream_start` now gives the rule for the start, which the reader, `probe_stream` and `forge`'s
+detection share: the first access unit has to read (its check nibble, its major sync with a good CRC-16, its directory), and when it is
+not at byte 0 the unit after it has to read too (or the data ends inside it with a header that reads), the search stopping at
+`kMaxLeadingBytes` (64 KiB) so that bytes which only look like a major sync are not a stream. The bytes passed are
+`ElementaryReader::leading_bytes()`, a part of `skipped_bytes()` that is a warning ("N byte(s) ahead of the first access unit are not
+part of the stream and are skipped"), not an error: `forge decode` exits 0 and its strict decode goes on, `probe` exits 0 and its JSON
+has `leading_bytes` beside `skipped_bytes` (which stays the loss after the first unit). `probe` looks at the first 80 KiB of a file or
+pipe to tell what it is, where it looked at 4 KiB. A stream with an AC-3 core in front or between its units is not changed: the unit after
+the first has to read, and an AC-3 frame is not one. Held by `test_elementary.cpp` (the rule, with decoys, a single unit, the limit and
+noise) and `test_cli_truehd.cpp` (a fixture with 1, 28 and 4096 bytes of three fills in front: same PCM, a warning, exit 0). The
+timecode fixture scores PASS. **Provisional, owner to confirm** (question 49).
 
 ## Atmos, spec v3.6
 

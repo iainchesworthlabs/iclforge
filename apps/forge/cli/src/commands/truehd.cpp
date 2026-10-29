@@ -353,7 +353,11 @@ void warn_truehd_options_unused(const Options& meta, std::string_view stream_pat
 }
 
 bool is_truehd_stream(std::span<const std::byte> stream) noexcept {
-    return stream.size() >= 8 && th::starts_with_major_sync(stream.subspan(4));
+    // A TrueHD or MLP stream starts with an access unit whose major sync follows its four header
+    // bytes, or has some bytes of something else ahead of that (a timecode or other packet some
+    // muxers put in front): find_stream_start says which, and not for bytes that only look like a
+    // major sync.
+    return stream.size() >= 8 && th::find_stream_start(stream).has_value();
 }
 
 std::optional<CoreStrip> strip_ac3_core(std::span<const std::byte> stream) {
@@ -439,12 +443,21 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     std::size_t index = 0;
     std::string layout_text;
     bool failed = false;
+    bool leading_said = false;
     while (true) {
-        const std::size_t skipped_before = reader.skipped_bytes();
+        const std::size_t skipped_before = reader.skipped_bytes() - reader.leading_bytes();
         const auto unit = reader.next();
-        if (reader.skipped_bytes() != skipped_before) {
+        if (!leading_said && reader.leading_bytes() != 0) {
+            // Bytes ahead of the first access unit are not a loss of the stream.
+            fmt::println(stderr,
+                         "warning: {}: {} byte(s) ahead of the first access unit are not part of "
+                         "the stream and are skipped",
+                         in_path, reader.leading_bytes());
+            leading_said = true;
+        }
+        if (reader.skipped_bytes() - reader.leading_bytes() != skipped_before) {
             fmt::println(stderr, "{}: {} bytes before access unit {} do not read as one", in_path,
-                         reader.skipped_bytes() - skipped_before, index);
+                         reader.skipped_bytes() - reader.leading_bytes() - skipped_before, index);
             if (!meta.truehd_lenient) {
                 failed = true;
                 break;
@@ -606,7 +619,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         structure.decode(stream);
     }
     const std::uint64_t unreadable = info->access_units > units ? info->access_units - units : 0;
-    const bool damaged = segment_failures != 0 || unreadable != 0 || reader.skipped_bytes() != 0;
+    const std::size_t lost_bytes = reader.skipped_bytes() - reader.leading_bytes();
+    const bool damaged = segment_failures != 0 || unreadable != 0 || lost_bytes != 0;
 
     const th::MajorSync& major_sync = info->major_sync;
     std::string channels_text;
@@ -652,7 +666,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("segments_checked", segments);
         json.member("segment_failures", segment_failures);
         json.member("unreadable_units", unreadable);
-        json.member("skipped_bytes", static_cast<std::uint64_t>(reader.skipped_bytes()));
+        json.member("skipped_bytes", static_cast<std::uint64_t>(lost_bytes));
+        json.member("leading_bytes", static_cast<std::uint64_t>(reader.leading_bytes()));
         json.key("evolution");
         evolution.write_json(json);
         if (want_structure) {
@@ -691,7 +706,13 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         fmt::println(
             "{:<16}{} of {} segment(s) pass their parity and CRC; {} unreadable unit(s); {} "
             "skipped byte(s)",
-            "checks", segments - segment_failures, segments, unreadable, reader.skipped_bytes());
+            "checks", segments - segment_failures, segments, unreadable, lost_bytes);
+        if (reader.leading_bytes() != 0) {
+            fmt::println(stderr,
+                         "warning: {}: {} byte(s) ahead of the first access unit are not part of "
+                         "the stream and are skipped",
+                         in_path, reader.leading_bytes());
+        }
         evolution.print_text();
         if (want_structure) {
             structure.print_text();

@@ -42,6 +42,79 @@ constexpr std::uint8_t kObjectSubstreamBit = 0x80;  // TH spec §6.4: substream_
     }
 }
 
+// The XOR of every nibble of `bytes`.
+[[nodiscard]] unsigned nibble_fold(std::span<const std::byte> bytes) noexcept {
+    unsigned folded = 0;
+    for (const std::byte b : bytes) {
+        folded ^= std::to_integer<unsigned>(b);
+    }
+    return ((folded >> 4U) ^ folded) & 0xFU;
+}
+
+// For a unit whose length runs past `data`: false when its header and directory, which `data` holds
+// (or the unit's start does not reach so far, and nothing can be said), do not XOR to 0xF as TH
+// spec §3.2 says. A unit that carries a major sync is not looked at (its directory follows a
+// major sync of a size only a parse finds).
+[[nodiscard]] bool truncated_unit_header_checks(std::span<const std::byte> data,
+                                                int substreams) noexcept {
+    if (data.size() < kAccessUnitHeaderBytes) {
+        return true;
+    }
+    if (starts_with_major_sync(data.subspan(kAccessUnitHeaderBytes))) {
+        return true;
+    }
+    std::size_t offset = kAccessUnitHeaderBytes;
+    for (int i = 0; i < substreams; ++i) {
+        if (offset + 2 > data.size()) {
+            return true;
+        }
+        const bool extra_word = (std::to_integer<unsigned>(data[offset]) & 0x80U) != 0;
+        offset += extra_word ? 4U : 2U;
+    }
+    if (offset > data.size()) {
+        return true;
+    }
+    return (nibble_fold(data.first(kAccessUnitHeaderBytes)) ^
+            nibble_fold(data.subspan(kAccessUnitHeaderBytes, offset - kAccessUnitHeaderBytes))) ==
+           0xFU;
+}
+
+}  // namespace
+
+std::optional<std::size_t> find_stream_start(std::span<const std::byte> data,
+                                             std::size_t max_leading) noexcept {
+    std::size_t search_from = kAccessUnitHeaderBytes;
+    while (true) {
+        const std::size_t sync = find_major_sync(data, search_from);
+        if (sync == kNotFound || sync - kAccessUnitHeaderBytes > max_leading) {
+            return std::nullopt;
+        }
+        const std::size_t start = sync - kAccessUnitHeaderBytes;
+        if (const auto unit = parse_access_unit(data.subspan(start), 0, true)) {
+            if (start == 0) {
+                return start;
+            }
+            const std::size_t after = start + unit->length_bytes();
+            if (after == data.size()) {
+                return start;  // the stream is this one unit
+            }
+            const auto second = parse_access_unit(data.subspan(after), unit->num_substreams, true);
+            if (second) {
+                return start;
+            }
+            // A second unit whose length runs past `data` is a stream cut short, if its header
+            // and directory, which are there, read.
+            if (after < data.size() && second.error().kind == ErrorKind::kTruncated &&
+                truncated_unit_header_checks(data.subspan(after), unit->num_substreams)) {
+                return start;
+            }
+        }
+        search_from = sync + 1;
+    }
+}
+
+namespace {
+
 // The restart header, when the segment begins with one: its first block's two flag bits, then the
 // header.
 [[nodiscard]] std::optional<RestartHeader> restart_of_segment(std::span<const std::byte> segment) {
@@ -59,10 +132,11 @@ constexpr std::uint8_t kObjectSubstreamBit = 0x80;  // TH spec §6.4: substream_
 }  // namespace
 
 std::expected<StreamInfo, Error> probe_stream(std::span<const std::byte> data) {
-    const std::size_t first = find_unit_with_major_sync(data, 0);
-    if (first == kNotFound) {
+    const std::optional<std::size_t> start = find_stream_start(data);
+    if (!start) {
         return std::unexpected(Error{ErrorKind::kBadSync, "no access unit with a major sync"});
     }
+    const std::size_t first = *start;
     auto first_unit = parse_access_unit(data.subspan(first), 0, true);
     if (!first_unit) {
         return std::unexpected(first_unit.error());
@@ -99,14 +173,15 @@ ElementaryReader::ElementaryReader(std::span<const std::byte> data) noexcept : d
 std::optional<std::span<const std::byte>> ElementaryReader::next() {
     if (!started_) {
         started_ = true;
-        const std::size_t first = find_unit_with_major_sync(data_, 0);
-        if (first == kNotFound) {
+        const std::optional<std::size_t> first = find_stream_start(data_);
+        if (!first) {
             skipped_ += data_.size();
             pos_ = data_.size();
             return std::nullopt;
         }
-        skipped_ += first;
-        pos_ = first;
+        skipped_ += *first;
+        leading_ = *first;
+        pos_ = *first;
     }
     while (pos_ + kAccessUnitHeaderBytes <= data_.size()) {
         const std::span<const std::byte> rest = data_.subspan(pos_);

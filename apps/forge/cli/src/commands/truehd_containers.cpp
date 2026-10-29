@@ -88,11 +88,17 @@ std::optional<Scan> scan_stream(std::span<const std::byte> stream, std::string_v
             scan.padding_samples += (*decoded)->padding_samples;
         }
     }
-    if (reader.skipped_bytes() != 0) {
+    if (reader.leading_bytes() != 0) {
+        fmt::println(stderr,
+                     "warning: {}: {} byte(s) ahead of the first access unit are not part of the "
+                     "stream and are left out",
+                     in_path, reader.leading_bytes());
+    }
+    if (reader.skipped_bytes() != reader.leading_bytes()) {
         fmt::println(
             stderr,
             "warning: {}: {} byte(s) between access units do not read as one and are left out",
-            in_path, reader.skipped_bytes());
+            in_path, reader.skipped_bytes() - reader.leading_bytes());
     }
     if (scan.units.empty() || scan.channels == 0) {
         fmt::println(stderr, "error: {}: no access unit decoded", in_path);

@@ -181,6 +181,65 @@ TEST_CASE("forge decode gives every fixture's PCM as a 24-bit WAV", "[forge-cli]
     }
 }
 
+TEST_CASE("bytes ahead of the first access unit are a warning, not an error",
+          "[forge-cli][truehd]") {
+    // A packet some muxers put in front of the stream (a timecode, say): forge skips it to the
+    // first access unit with a major sync that reads and is followed by one that reads, says how
+    // many bytes it passed, and the PCM is the stream's.
+    const fs::path dir = scratch_dir();
+    const std::vector<std::byte> stream = read_bytes(fixture("truehd_st48_s24.thd"));
+    const fs::path clean_wav = dir / "junk_clean.wav";
+    REQUIRE(run_cli("decode \"" + fixture("truehd_st48_s24.thd").string() + "\" \"" +
+                        clean_wav.string() + "\"",
+                    dir / "junk_clean.log") == 0);
+    const Wav clean = read_wav(clean_wav);
+
+    for (const std::size_t junk : {1U, 28U, 4096U}) {
+        for (const unsigned fill : {0x00U, 0x5AU, 0xF8U}) {
+            CAPTURE(junk, fill);
+            std::vector<std::byte> bytes(junk, static_cast<std::byte>(fill));
+            bytes.insert(bytes.end(), stream.begin(), stream.end());
+            const fs::path path = dir / ("junk_" + std::to_string(junk) + ".thd");
+            {
+                std::ofstream out{path, std::ios::binary};
+                out.write(reinterpret_cast<const char*>(bytes.data()),
+                          static_cast<std::streamsize>(bytes.size()));
+            }
+            const fs::path wav_path = dir / ("junk_" + std::to_string(junk) + ".wav");
+            const fs::path log = dir / ("junk_" + std::to_string(junk) + ".log");
+            REQUIRE(run_cli("decode \"" + path.string() + "\" \"" + wav_path.string() + "\"",
+                            log) == 0);
+            const std::string text = read_text(log);
+            CHECK(text.find("warning: ") != std::string::npos);
+            CHECK(text.find(std::to_string(junk) +
+                            " byte(s) ahead of the first access unit are not part of the stream") !=
+                  std::string::npos);
+            CHECK(text.find("error") == std::string::npos);
+            CHECK(read_wav(wav_path).s32le == clean.s32le);
+
+            const fs::path probe_log = dir / ("junk_probe_" + std::to_string(junk) + ".json");
+            REQUIRE(run_cli("probe \"" + path.string() + "\" json=1", probe_log) == 0);
+            // The warning is on stderr, in the same file: the JSON follows it.
+            const std::string probe_text = read_text(probe_log);
+            const auto document = nlohmann::json::parse(probe_text.substr(probe_text.find('{')));
+            CHECK(document["truehd"]["leading_bytes"] == junk);
+            CHECK(document["truehd"]["skipped_bytes"] == 0);
+            CHECK(document["truehd"]["access_units"] == 300);
+        }
+    }
+
+    // Bytes that only look like a stream are still not one.
+    std::vector<std::byte> noise(5000, std::byte{0x5A});
+    const fs::path noise_path = dir / "junk_noise.bin";
+    {
+        std::ofstream out{noise_path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(noise.data()),
+                  static_cast<std::streamsize>(noise.size()));
+    }
+    CHECK(run_cli("decode \"" + noise_path.string() + "\" \"" + (dir / "noise.wav").string() + "\"",
+                  dir / "noise.log") != 0);
+}
+
 TEST_CASE("forge decode names the 5.1 layout in the WAV and the status", "[forge-cli][truehd]") {
     const fs::path dir = scratch_dir();
     const fs::path log = dir / "layout.log";

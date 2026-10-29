@@ -34,14 +34,28 @@ struct StreamInfo {
     bool has_object_substream = false;  // a fourth substream, or substream_info's Atmos bit
 };
 
-// Reads the first major sync in `data` (the data may start anywhere before it) and the restart
-// headers after it. kBadSync if there is none.
+// How far ahead of its first access unit a stream may start in `data` (a timecode or other packet
+// some muxers put in front of it, bytes of another stream): the search for the first major sync
+// stops there.
+inline constexpr std::size_t kMaxLeadingBytes = 65536;
+
+// Where a TrueHD or MLP stream starts in `data`: the offset of its first access unit, which may
+// have up to `max_leading` bytes of something else ahead of it. At offset 0 the unit has to read
+// (its header's check nibble, its major sync with a good CRC, its directory). Anywhere else it has
+// to read and the unit after it has to read too, when `data` holds that one whole (a stream's bytes
+// that run out inside it do not count against it), so that bytes which only look like a major sync
+// are not taken for a stream.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<std::size_t> find_stream_start(
+    std::span<const std::byte> data, std::size_t max_leading = kMaxLeadingBytes) noexcept;
+
+// Reads the first major sync in `data` (find_stream_start: the data may start up to
+// kMaxLeadingBytes before it) and the restart headers after it. kBadSync if there is none.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<StreamInfo, Error> probe_stream(
     std::span<const std::byte> data);
 
 // Hands out the access units of a stream held in memory, one at a time. It starts at the first
-// major sync (the 4 bytes before it are the unit's header). After a unit that does not read it
-// looks for the next major sync, and counts the bytes it passed.
+// major sync (find_stream_start; the 4 bytes before it are the unit's header). After a unit that
+// does not read it looks for the next major sync, and counts the bytes it passed.
 class ICLFORGE_TRUEHD_EXPORT ElementaryReader {
    public:
     explicit ElementaryReader(std::span<const std::byte> data) noexcept;
@@ -50,7 +64,10 @@ class ICLFORGE_TRUEHD_EXPORT ElementaryReader {
     // stream.
     [[nodiscard]] std::optional<std::span<const std::byte>> next();
 
+    // Bytes passed over, the ones ahead of the first unit included.
     [[nodiscard]] std::size_t skipped_bytes() const noexcept { return skipped_; }
+    // The part of skipped_bytes() that came before the first unit: not a loss of the stream.
+    [[nodiscard]] std::size_t leading_bytes() const noexcept { return leading_; }
     [[nodiscard]] std::size_t units_read() const noexcept { return units_; }
     [[nodiscard]] std::size_t offset() const noexcept { return pos_; }
 
@@ -58,6 +75,7 @@ class ICLFORGE_TRUEHD_EXPORT ElementaryReader {
     std::span<const std::byte> data_;
     std::size_t pos_ = 0;
     std::size_t skipped_ = 0;
+    std::size_t leading_ = 0;
     std::size_t units_ = 0;
     int substreams_ = 0;
     bool started_ = false;

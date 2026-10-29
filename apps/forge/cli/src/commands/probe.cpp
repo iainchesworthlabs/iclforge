@@ -38,6 +38,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
 #include "container_input.hpp"
 #include "probe_json.hpp"
 #include "truehd.hpp"
@@ -695,6 +696,11 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
     return summary.crc_failures > 0 || summary.parse_error ? 1 : 0;
 }
 
+// How much of a file or pipe is looked at to tell what it is: a TrueHD or MLP stream may have up to
+// kMaxLeadingBytes of something else ahead of its first access unit (libs/truehd/ERRATA.md,
+// question 49), and its first access unit and the header of the next must follow.
+constexpr std::size_t kProbeHeadBytes = iclforge::truehd::kMaxLeadingBytes + 16384;
+
 // The bytes already taken from a pipe to tell what the stream is, given back ahead of the rest of
 // it: a pipe cannot be read twice, and the AC-3 family's reader below pulls forward from the start.
 class ReplayBuffer final : public std::streambuf {
@@ -758,7 +764,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
     std::unique_ptr<ReplayBuffer> replay;
     std::istream replayed{nullptr};
     if (is_stdio_path(in_path)) {
-        std::array<char, 4096> head{};
+        std::vector<char> head(kProbeHeadBytes);
         std::cin.read(head.data(), static_cast<std::streamsize>(head.size()));
         const auto got = static_cast<std::size_t>(std::cin.gcount());
         std::cin.clear();
@@ -781,7 +787,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
     }
     if (!is_stdio_path(in_path)) {
         // The sniff decides within a few hundred bytes (sniff_container).
-        std::array<char, 4096> head{};
+        std::vector<char> head(kProbeHeadBytes);
         file.read(head.data(), static_cast<std::streamsize>(head.size()));
         const auto got = static_cast<std::size_t>(file.gcount());
         file.clear();
