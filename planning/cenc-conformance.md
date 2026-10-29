@@ -10,7 +10,7 @@ implemented, and nothing here starts the work. Status lives in [ROADMAP.md](../R
 The tree does not conform and never claimed to. It has no code that reads or writes `senc`, `saiz`,
 `saio`, `tenc`, `pssh`, `seig` groups, `ContentProtection` descriptors or HLS key tags, and it has no
 AES. A search of the whole tree and a run of `forge` on 71 protected MP4 files from three
-independent producers confirm this: 65 files are refused with a message that does not say why, and 6
+producers confirm this: 65 files are refused with a message that does not say why, and 6
 are accepted wrongly. All 6 hold a clear sample entry beside a protected one, which is how real
 packagers write a clear lead-in, and `forge demux` writes their ciphertext out as audio with exit
 code 0. The gap register has 21 gaps and 4 not-applicable items: 11 blocking, 4 major and 6 minor.
@@ -68,16 +68,16 @@ optional feature; **N/A** means outside the standard or outside this project's r
 | Aux info type | Implicit (flag 0) in every file measured. | [measured]; semantics [recalled] | M3, M7 |
 | Subsample maps | A `senc` flag marks subsample entries. Audio files from GPAC, Shaka Packager and FFmpeg (AAC) all have flag 0: the whole sample is the protected range. A reader must still accept a subsample map. | [measured] for the three producers; [recalled] for the flag | M3, M7 |
 | IV and counter | IV sizes 8 and 16 bytes in CTR and CBC. | [seen] | PlayReady page (fetch); GPAC page (fetch) |
-| `pssh` | Version 0 or 1; version 1 lists KIDs. A common SystemID `1077efec-c0b2-4d02-ace3-3c1e52e2fb4b` with an empty data field. Boxes sit in `moov` and may sit in `moof`; in DASH they belong in the MPD, and `moof` copies must be present in each CMAF chunk that starts with an independent sample. | [seen] | W3C "cenc" init data 4; DASH-IF IOP-6 6.3 |
+| `pssh` | Version 0 or 1; version 1 lists KIDs. A common SystemID `1077efec-c0b2-4d02-ace3-3c1e52e2fb4b` with an empty data field. Boxes sit in `moov` and may sit in `moof`; in DASH they should be in the MPD rather than the initialization segment, and `moof` copies must be present in each CMAF chunk that starts with an independent sample. | [seen] | W3C "cenc" init data 4; DASH-IF IOP-6 6.3 |
 | Key rotation | A `seig` sample group overrides the KID per sample group. Alternatively a new Period carries a new default KID. | [seen] | W3C stream format, 3; DASH-IF IOP-6 9.2 and 9.3 |
 | Fragments | Defaults live in `tenc` in `moov`. Each `traf` carries its own `senc`, and optional `sgpd` and `sbgp`. | [seen] | DASH-IF IOP-6 6.2 |
 | Clear lead | "Streams may contain a mixture of encrypted and unencrypted samples": `tenc` sets the default and a `seig` entry with `isProtected` 0 overrides it. A packager can instead supply an encrypted and an unencrypted sample description and point each sample at one. | [seen] | W3C stream format, 1 and 3; Apple HLS Authoring Specification 13.10 (fetch) |
 | Multiple KIDs | In a DASH presentation every Representation of an Adaptation Set uses one key; different keys go in different Adaptation Sets. A `pssh` v1 can list several KIDs. | [seen] | DASH-IF IOP-6 6.4; W3C "cenc" init data 4.2 |
 | DASH signalling | `ContentProtection` with `schemeIdUri="urn:mpeg:dash:mp4protection:2011"`, `value` = scheme and `cenc:default_KID`, on the Adaptation Set; then one system-specific `urn:uuid:<systemid>` descriptor per DRM, with `cenc:pssh`. | [seen]; the same shape [measured] in Shaka Packager's MPD | DASH-IF IOP-6 7.2 and 7.3; M8 |
 | HLS signalling | `EXT-X-KEY` and `EXT-X-SESSION-KEY` with `METHOD=SAMPLE-AES`. "fMP4 Media Segments are encrypted using the 'cbcs' scheme". E-AC-3 in other segment formats uses Apple's Sample Encryption specification, which is not CENC. FairPlay uses key format `com.apple.streamingkeydelivery`. | [seen] | RFC 8216 4.3.2.4; Apple HLS Authoring Specification 13.2 and 13.3 (fetch) |
-| CMAF constraints | CMAF limits the schemes (IOP-6 6.4 points at its clause 8.2.3) and DASH-IF recommends offering both `cbcs` and `cenc`. CMAF brands for a protected track and any more detailed rule. | [seen] for the first two; [recalled] for brands | DASH-IF IOP-6 1 and 6.4 |
+| CMAF constraints | CMAF limits the schemes (IOP-6 6.4 points at its clause 8.2.3) and DASH-IF recommends offering both `cbcs` and `cenc`. The brands for a protected track and any further rule are in CMAF itself, which I could not read. | [seen] for the first two; [recalled] for brands | DASH-IF IOP-6 1 and 6.4 |
 | Dolby: `dec3` JOC | `flag_ec3_extension_type_a` and `complexity_index_type_a` in `EC3SpecificBox`, which must stay intact in the `enca` entry. | [seen] | ETSI TS 103 420 V1.2.1 8.3.2; Dolby Mux-40 (fetch) |
-| Dolby: DASH | `@codecs` is `ec-3`. Two `SupplementalProperty` descriptors, `tag:dolby.com,2018:dash:EC3_ExtensionType:2018` with value `JOC` and `tag:dolby.com,2018:dash:EC3_ExtensionComplexityIndex:2018` with the complexity index. They sit beside `ContentProtection`. | [seen]; descriptor order in the MPD schema [recalled] | ETSI TS 103 420 D.2.1 and D.2.2; DASH-IF IOP-8 5.3.2 |
+| Dolby: DASH | `@codecs` is `ec-3`. Two `SupplementalProperty` descriptors, `tag:dolby.com,2018:dash:EC3_ExtensionType:2018` with value `JOC` and `tag:dolby.com,2018:dash:EC3_ExtensionComplexityIndex:2018` with the complexity index. Nothing in the Dolby text conflicts with a `ContentProtection` descriptor on the same Adaptation Set. | [seen]; that the two coexist, and their order in the MPD schema, [recalled] | ETSI TS 103 420 D.2.1 and D.2.2; DASH-IF IOP-8 5.3.2 |
 | Dolby: HLS | `CHANNELS="<N>/JOC"` on the audio rendition; `ec-3` stays the codec. | [seen] | Apple HLS Authoring Specification, appendix (fetch) |
 | Dolby: brands | `ceac` (E-AC-3 core), `ceao` (object audio), `ca4s` and `ca4m` (AC-4). | [seen] | ETSI TS 102 366 J.3; TS 103 420 E.5; DASH-IF IOP-8 Table 4-1 |
 | Dolby: no CENC rules | TS 103 420 V1.2.1 and TS 103 190-2 V1.3.1 contain no text on encryption: no subsample, pattern or IV rule is Dolby-specific. | [measured] by text search of both PDFs | M9 |
@@ -87,15 +87,15 @@ optional feature; **N/A** means outside the standard or outside this project's r
 
 | Component (file) | Read side | Write side | Evidence | Gap |
 |---|---|---|---|---|
-| MP4 reader: `demux`, `Reader`, `demux_seekable` (`libs/containers/src/mp4/reader.cpp`) | Takes a track only if a sample entry is `ac-3`, `ec-3` or `ac-4`; an `enca` entry is skipped by its length and the track is listed as skipped. With no other audio track the verdict is `kNoAudioTrack`, whose text says nothing about protection. `sinf`, `senc`, `saiz`, `saio`, `pssh`, `sgpd`, `sbgp` are skipped as unknown boxes. The `stsd` loop takes the first matching entry and ignores `sample_description_index` in `stsc` and `tfhd`. | none | `:59-61` entry types; `:570-573` first entry and match; `:610` other entries skipped; `:411-417` selection needs a matching entry; `:631-632` `stsc` third field unread; `:740-742` `tfhd` index skipped; `:939-955` unknown boxes skipped; `:1041` `kNoAudioTrack`. 65 of 71 files refused: M6 | G1 G2 G6 G7 G11 G12 |
+| MP4 reader: `demux`, `Reader`, `demux_seekable` (`libs/containers/src/mp4/reader.cpp`) | Takes a track only if a sample entry is `ac-3`, `ec-3` or `ac-4`; an `enca` entry is skipped by its length and the track is listed as skipped. With no other audio track the verdict is `kNoAudioTrack`, whose text says nothing about protection. `sinf`, `senc`, `saiz`, `saio`, `pssh`, `sgpd`, `sbgp` are skipped as unknown boxes. The `stsd` loop takes the first matching entry and ignores `sample_description_index` in `stsc` and `tfhd`. | none | `:59-61` entry types; `:570-573` first entry and match; `:610` other entries skipped; `:411-417` selection needs a matching entry; `:630-632` `stsc` third field unread; `:740-742` `tfhd` index skipped; `:939-955` unknown boxes skipped; `:1041` `kNoAudioTrack`. 65 of 71 files refused: M6 | G1 G2 G6 G7 G11 G12 |
 | MP4 writer: `mux` (`mp4.cpp`, `isobmff_detail.hpp`) | none | One track, one `stsd` entry (`entry_count` 1) named by `codec_id` with its `dac3`, `dec3` or `dac4`. No `sinf`, no `pssh`, no aux info. `AudioTrack` has no key or KID field. | `isobmff_detail.hpp:202-235`; `mp4.hpp:75-107`; `mp4.cpp:52-108` | G13 G14 |
-| CMAF writer: `fragment`, `FragmentWriter` (`fragment.cpp`) | none | `moof` holds `mfhd` and one `traf` of `tfhd`, `tfdt`, `trun` only. Brands `iso6`, `cmfc`, optional `ceao` and caller brands. No `cenc` or `cbcs` brand, no `ceac`. | `:190-196` `tfhd`; `:247-302` `moof`; `:43`, `:53-66` brands; `:172` one `mvex` | G13 G14 G15 G19 |
-| DASH helper (`dash.cpp`) | none | One `AdaptationSet` with `AudioChannelConfiguration`, the two Dolby JOC `SupplementalProperty` descriptors and caller `SupplementalProperty` entries. No `ContentProtection` element and no `xmlns:cenc`. The profile is fixed at `isoff-live`. | `:88-122` descriptors; `:117-120` caller descriptors; `:165-177` `AdaptationSet`; `:205` profile; `dash.hpp:22-82` options. `forge fmp4` output on a JOC stream: M10 | G17 |
+| CMAF writer: `fragment`, `FragmentWriter` (`fragment.cpp`) | none | `moof` holds `mfhd` and one `traf` of `tfhd`, `tfdt`, `trun` only. Brands `iso6`, `cmfc`, optional `ceao` and caller brands. No `cenc` or `cbcs` brand, no `ceac`. | `:190-196` `tfhd`; `:247-302` `moof`; `:43`, `:53-67` brands; `:102-118` `trex` and `mvex` | G13 G14 G15 G19 |
+| DASH helper (`dash.cpp`) | none | One `AdaptationSet` with `AudioChannelConfiguration`, the two Dolby JOC `SupplementalProperty` descriptors and caller `SupplementalProperty` entries. No `ContentProtection` element and no `xmlns:cenc`. The profile is fixed at `isoff-live`. | `:88-122` descriptors; `:117-120` caller descriptors; `:165-177` `AdaptationSet`; `:205`, `:228` profile; `dash.hpp:22-82` options. `forge fmp4` output on a JOC stream: M10 | G17 |
 | HLS helper (`hls.cpp`) | none | `#EXT-X-MAP`, `#EXTINF`, `#EXT-X-MEDIA` with `CHANNELS`, `#EXT-X-STREAM-INF`. No `EXT-X-KEY`, no `EXT-X-SESSION-KEY`. | `:48-82` media playlist; `:72` MAP; `:130-143` master | G18 |
 | Matroska (`matroska/ebml_detail.hpp`, `reader.cpp`) | No `ContentEncodings` (ID 0x6D80) in the element list; a track that declares encryption is read as clear. | Writer has no encryption elements. | `ebml_detail.hpp:22-73`; M11 | G4 |
 | MPEG-TS (`mpegts/reader.cpp`) | The packet header parse reads PUSI, PID and adaptation control and drops the two scrambling bits; no CA descriptor is read. | none | `:438-448`; M11 | G5 |
 | IAMF (`iamf/container.cpp`) | Recognises `enca` > `sinf` > `frma` = `iamf` and returns `kUnsupported` for a file whose IA tracks are all protected. The only protected-content code in the tree. | none | `:681-702`, `:715-722`, `:1207-1211`; `tests/iamf/test_iamf_coded.cpp:547-556`; `docs/library/iamf.md:141,227-229` | none (a precedent) |
-| IEC 61937 (`iec61937/`) | no protection concept | none | search of `src/iec61937` | N/A |
+| IEC 61937 (`libs/containers/src/iec61937`) | no protection concept | none | search of that directory for the terms of section 1 | N/A |
 | E-AC-3 `dec3` (`libs/ac3/src/io/dec3.cpp`) | n/a | Builds `dec3` with the JOC extension flag and complexity index from the bitstream. | `:199-213`. Output `0e00200f00010c` for the JOC fixture; FFmpeg writes `0e00200f0000` (M2) | constraint on G13 |
 | AC-4 `dac4` (`libs/ac4/src/io/carriage.cpp`) | n/a | Builds `dac4`, the RFC 6381 string and the DASH descriptors. | `:530`, `:693`, `:849-868` | constraint on G13 |
 | Container input (`apps/shared/media/src/container_input.cpp`) | `elementary_stream_from_bytes` passes the MP4 error text through; an AC-4 track is re-wrapped in sync frames after demux, so decryption must come first. | none | `:360-401` | G1 G2 |
@@ -161,7 +161,8 @@ conformance defects of today's readers and docs; G6 to G21 are features never cl
 
 Working directory `$W` holds the files. `forge` is the binary built from 8f2d70b5. Keys and KIDs
 are made up: KID `a1b2c3d4e5f60718293a4b5c6d7e8f90`, key `00112233445566778899aabbccddeeff`.
-Throwaway scripts ran the loops; the commands below are what they ran.
+Throwaway scripts ran the loops; the commands below are what they ran. The file writer of M5 to
+M7 is in the repository, `tools/generators/cenc_make_protected.py`.
 
 **M1. Clear inputs.**
 
@@ -244,6 +245,8 @@ M7. M3 gave 40 and M2 gave 4 that carry protection boxes over clear samples. Tha
 files.
 
 ```
+python3 tools/generators/cenc_make_protected.py eac3_forge.mp4 eac3_cenc.mp4 cenc
+python3 tools/generators/cenc_make_protected.py eac3_forge.mp4 eac3_cbcs_lead.mp4 cbcs --variant leader_entry
 forge probe FILE ; forge demux FILE out.es ; forge decode FILE out.wav
 forge remux FILE out.mkv ; forge fmp4 FILE outdir
 ```
@@ -292,9 +295,10 @@ are `unencrypted`. Its two Clear Key sets are AAC. So no encrypted Dolby stream 
 was available.
 
 **M9. The Dolby specs on encryption.** `pdftotext` on TS 102 366 V1.4.1, TS 103 420 V1.2.1 and TS
-103 190-2 V1.3.1, then a search for `encrypt`, `cenc`, `cbcs`, `sinf`, `enca`, `frma`, `pssh`, `DRM`,
-`protect`: TS 102 366 has the three sentences cited in section 3 (Annex F and J) and nothing else; the
-other two have no hit.
+103 190-2 V1.3.1, then a search for `encrypt`, `cenc`, `cbcs`, `sinf`, `enca`, `frma`, `pssh`,
+`common encryption`, `23001-7` and `DRM`. TS 102 366 mentions encryption in four places (F.3.0, F.3.2,
+F.5.2 and J.1.3.1), quoted in section 3 and in section 7; the other two have no hit. The word
+`protect` appears in them only for the EMDF protection fields.
 
 **M10. What `forge fmp4` writes for the JOC fixture.**
 
@@ -323,9 +327,9 @@ and `leader_entry` also decrypt in GPAC and not in FFmpeg.
 | Premise | What the evidence shows | Source |
 |---|---|---|
 | ISO/IEC 23001-7 governs how protected Atmos JOC streams are encrypted and decrypted "uniformly across DRM systems". | The standard fixes the sample ciphers, the boxes that signal them, key identifiers and `pssh`. It defines no DRM system; key acquisition and the rules for output and robustness are DRM-specific. | [seen] DASH-IF IOP-6 4.1, 4.3 |
-| One encrypted stream plays everywhere. | `cenc` and `cbcs` do not decrypt each other. DASH-IF recommends offering both. PlayReady supports `cbcs` from client 4.0, and calls `cens` and `cbc1` "allowed and technically doable ... but not supported". Widevine lists `cenc` on every platform, `cbcs` on Android 7 and later and other platforms, `cbc1` only on Chromecast, `cens` nowhere. HLS fMP4 is `cbcs`. | [seen] IOP-6 1, 6.4; PlayReady page (fetch); Widevine overview (fetch); RFC 8216 4.3.2.4 |
+| One encrypted stream plays everywhere. | `cenc` and `cbcs` do not decrypt each other. DASH-IF recommends offering both. PlayReady supports `cbcs` from client 4.0, and calls `cens` and `cbc1` "allowed and technically doable ... but not supported". Widevine lists `cenc` on every platform in its table, `cbcs` on Android 7 and later and most other platforms, `cbc1` only on Chromecast and `cens` on none. HLS fMP4 is `cbcs`. | [seen] IOP-6 1, 6.4; PlayReady page (fetch); Widevine overview (fetch); RFC 8216 4.3.2.4 |
 | FairPlay takes only `cbcs`. | For HLS fMP4, `cbcs` is what the RFC requires, and Apple's specification wants FairPlay content as `SAMPLE-AES` with the key format `com.apple.streamingkeydelivery`. I did not find a statement about other uses of FairPlay. | [seen] RFC 8216 4.3.2.4; Apple 13.2, 13.3 (fetch) |
-| Profiles such as CMAF or DASH-IF IOP restrict schemes and patterns. | Confirmed for schemes (IOP-6 6.4). For patterns, Apple's specification says video must use 1:9 and does not give one for audio; Shaka Packager applies crypt and skip counts to video only. | [seen] IOP-6 6.4; Apple 13.7 (fetch); Shaka (fetch) |
+| Profiles such as CMAF or DASH-IF IOP restrict schemes and patterns. | Confirmed for schemes (IOP-6 6.4). For patterns, Apple's specification says video must use 1:9, and I found no pattern rule for audio in it; Shaka Packager applies crypt and skip counts to video only. | [seen] IOP-6 6.4; Apple 13.7 (fetch); Shaka (fetch) |
 | Audio is normally full-sample encrypted, with no subsample map. | Confirmed in files from GPAC, Shaka Packager and FFmpeg (AAC): `senc` flag 0. A reader still has to accept a map. | [measured] M3, M7 |
 | TrueHD Atmos on disc is protected by AACS, not CENC, so CENC concerns E-AC-3 JOC and AC-4. | Consistent with the audio profiles: IOP-8 lists `ceac`, `ca4s` and `ca4m` as CMAF audio profiles and `mlpa` only as an older additional format. AACS I could not check. | [seen] IOP-8 Table 4-1, 4-2; [recalled] AACS |
 | "Protected" means encrypted. | In this repository "protection" also names the EMDF authenticity tag that gates object decoding in Dolby's decoder. It has no relation to CENC. | [seen] `docs/library/capabilities.md:229-233` |
@@ -362,10 +366,10 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and says what each r
 |---|---|---|
 | 1. In-repo decoder | Decrypted samples decode bit-exactly as the clear stream does; the Dolby configuration boxes survive. | That the ciphertext is what another packager writes or reads. |
 | 2. FFmpeg, strict (`-xerror -err_detect crccheck+bitstream+buffer+explode`) | Independent decrypt of `cenc`, `cbc1`, `cens` and `cbcs` full-sample audio in progressive and default-base-is-moof layouts (M4, M5). | Encryption (it writes no valid AC-3, E-AC-3 or AC-4, M2); AC-4 content; multi-entry `stsd`, `seig`, rotation and GPAC's base-offset layout. |
-| 3. GPAC `MP4Box`, another implementation | Encrypt and decrypt for all four schemes and four codecs; multi-entry `stsd`, `seig` and two keys. | A second opinion on the standard: it shares authors' reading with nobody here, but it forces audio to a 1:0 pattern. Not a Dolby validator. |
+| 3. GPAC `MP4Box`, another implementation | Encrypt and decrypt for all four schemes and four codecs; multi-entry `stsd`, `seig` and two keys. | Its own reading of the standard; it forces audio to a 1:0 pattern. Not a Dolby validator. |
 | 3b. Somebody else's streams | Structure of real packager output (the Shaka file: two sample entries, `pssh` v1, `senc` flag 0). | Dolby audio: none was found. Keep looking: Dolby's browser test kit lists `cbcs` streams, unverified. |
 | 4. A Python reference in `tools/references/` | A second transcription of the sample-encryption rules and box syntax, once the standard is in hand. | A shared misreading. |
-| 5. Dolby Reference Player | Playback of a protected stream where it supports one. | Anything about boxes. |
+| 5. Dolby Reference Player | Not tried; whether it plays protected input is unknown. | Anything about boxes. |
 | The standard itself | Every [recalled] row, the 1:9 audio case, counter width, partial blocks. | Interoperability. |
 | Known-answer tests for AES | FIPS 197 and SP 800-38A vectors; OpenSSL as a cross-check. | Mode use inside CENC. |
 
@@ -375,9 +379,9 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and says what each r
   write protected files; or both. The project's earlier position for IAMF is "a packager can protect
   the file this module writes" (`docs/library/iamf.md:227-229`); the same answer fits E-AC-3 and AC-4
   today, with the Dolby signalling kept intact (M10 shows a packager that does).
-- **D2. Where AES lives.** In `libs/base/crypto` from the NIST documents, like SHA-256 ("no
-  third-party dependency by design"), since `libs/containers` may use only `base`; or through mbedTLS,
-  which only Hearth's vcpkg feature carries today.
+- **D2. Where AES lives.** In `libs/base` beside SHA-256, written from the NIST documents (FIPS 197,
+  SP 800-38A) as SHA-256 is ("no third-party dependency by design"), since `libs/containers` may use
+  only `base`; or through mbedTLS, which only Hearth's vcpkg feature carries today.
 - **D3. Keys.** Bring-your-own-key as with the signing key: KID and key pairs from an operator-owned
   file or the environment, never in the repository, never printed. Whether the project should decrypt
   commercial content at all, given DRM licence terms, is for the owner; the repository's stance on
