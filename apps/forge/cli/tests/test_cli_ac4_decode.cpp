@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
@@ -419,4 +420,90 @@ TEST_CASE("qc refuses AC-4 at 96 kHz by name where its loudness meter is not mad
     CHECK(read_log(log).find(
               "decodes at 96000 Hz, and the loudness meter is made for 44.1 and 48 kHz only") !=
           std::string::npos);
+}
+
+namespace {
+
+// DEE's immersive stereo leg (A-SPX, so a frame needs the I-frame's configuration) without its first
+// sync frame, an I-frame, written to `out`: the frames up to the
+// next I-frame wait for one and produce no output. Returns the frames it holds.
+std::size_t without_first_frame(const fs::path& out) {
+    std::ifstream in{leg("ac4-ims-film-96-24"), std::ios::binary};
+    REQUIRE(in.good());
+    const std::vector<char> chars{std::istreambuf_iterator<char>{in},
+                                  std::istreambuf_iterator<char>{}};
+    std::vector<std::byte> bytes(chars.size());
+    std::ranges::transform(chars, bytes.begin(), [](char c) { return static_cast<std::byte>(c); });
+    const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(bytes);
+    REQUIRE(scan.frames.size() > 1);
+    std::ofstream file{out, std::ios::binary};
+    REQUIRE(file.is_open());
+    const auto first = static_cast<std::ptrdiff_t>(scan.frames[1].offset);
+    file.write(chars.data() + first, static_cast<std::streamsize>(chars.size()) - first);
+    return scan.frames.size() - 1;
+}
+
+// What "N frames waiting for an I-frame produced no output, of T in the stream; ... the other M"
+// says (decode) or "...; the measurement is of the other M" (qc): N, T and M, or zeros where the
+// text says nothing.
+std::array<std::size_t, 3> frame_loss_warning(const std::string& text) {
+    const std::string waiting_marker = " frames waiting for an I-frame produced no output, of ";
+    const auto at = text.find(waiting_marker);
+    if (at == std::string::npos) {
+        return {0, 0, 0};
+    }
+    std::size_t begin = at;
+    while (begin > 0 && std::isdigit(static_cast<unsigned char>(text[begin - 1])) != 0) {
+        --begin;
+    }
+    const auto waiting = static_cast<std::size_t>(std::stoul(text.substr(begin, at - begin)));
+    const auto total =
+        static_cast<std::size_t>(std::stoul(text.substr(at + waiting_marker.size())));
+    const auto other = text.find("the other ", at);
+    REQUIRE(other != std::string::npos);
+    return {waiting, total, static_cast<std::size_t>(std::stoul(text.substr(other + 10)))};
+}
+
+}  // namespace
+
+TEST_CASE("decode says on stderr how many frames of an AC-4 stream produced no output, and exits 0",
+          "[cli][ac4][frame-loss]") {
+    const auto dir = scratch_dir();
+    const auto stream = dir / "frame_loss.ac4";
+    const std::size_t frames = without_first_frame(stream);
+    const auto wav = dir / "frame_loss.wav";
+    const auto out_log = dir / "frame_loss.out.log";
+    const auto err_log = dir / "frame_loss.err.log";
+    const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" decode " +
+                                quoted(stream) + " " + quoted(wav) + " > " + quoted(out_log) +
+                                " 2> " + quoted(err_log);
+    CHECK(iclforge::test::platform::run_shell(command) == 0);
+    INFO(read_log(err_log));
+    const auto [waiting, total, decoded] = frame_loss_warning(read_log(err_log));
+    CHECK(waiting >= 1);
+    CHECK(decoded >= 1);
+    CHECK(total == frames);
+    CHECK(waiting + decoded == total);
+    // The report on stdout is not where it is said.
+    CHECK(read_log(out_log).find("waiting for an I-frame") == std::string::npos);
+}
+
+TEST_CASE("qc says how many frames waited for an I-frame, and a stream that loses none says nothing",
+          "[cli][ac4][frame-loss]") {
+    const auto dir = scratch_dir();
+    const auto cut_log = dir / "frame_loss_qc.log";
+    const auto cut = dir / "frame_loss_qc.ac4";
+    const std::size_t frames = without_first_frame(cut);
+    CHECK(run_cli("qc " + quoted(cut), cut_log) == 0);
+    INFO(read_log(cut_log));
+    const auto [waiting, total, measured] = frame_loss_warning(read_log(cut_log));
+    CHECK(waiting >= 1);
+    CHECK(total == frames);
+    CHECK(waiting + measured == total);
+
+    const auto whole_log = dir / "frame_loss_whole.log";
+    CHECK(run_cli("decode " + quoted(leg("ac4-ims-film-96-24")) + " " +
+                      quoted(dir / "frame_loss_whole.wav"),
+                  whole_log) == 0);
+    CHECK(read_log(whole_log).find("waiting for an I-frame") == std::string::npos);
 }

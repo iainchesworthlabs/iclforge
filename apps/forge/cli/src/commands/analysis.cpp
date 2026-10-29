@@ -784,6 +784,13 @@ std::optional<std::size_t> decode_ac4_as_coded(
         fmt::println(stderr, "error: {}: no frame decoded; the stream sent no I-frame", in_path);
         return std::nullopt;
     }
+    if (decoded_frames < scan.frames.size()) {
+        fmt::println(stderr,
+                     "warning: {}: {} frames waiting for an I-frame produced no output, of {} in "
+                     "the stream; the measurement is of the other {}",
+                     in_path, scan.frames.size() - decoded_frames, scan.frames.size(),
+                     decoded_frames);
+    }
     return decoded_frames;
 }
 

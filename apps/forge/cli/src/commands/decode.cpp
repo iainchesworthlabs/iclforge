@@ -815,8 +815,12 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         }
     }
     if (waiting_frames > 0) {
-        status_println(status, "          {} frames waiting for an I-frame produced no output",
-                       waiting_frames);
+        // On stderr whatever the report goes to: a run that loses frames still exits 0 (what exit
+        // code a loss should give is open, planning/ac4.md), so this line is what says so.
+        fmt::println(stderr,
+                     "warning: {} frames waiting for an I-frame produced no output, of {} in the "
+                     "stream; the output holds the other {}",
+                     waiting_frames, scan.frames.size(), decoded_frames);
     }
     if (concealed_frames > 0) {
         status_println(status, "          {} of them concealed ({})", concealed_frames,
