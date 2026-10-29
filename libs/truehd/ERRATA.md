@@ -245,8 +245,8 @@ is refused by FFmpeg's decoder: `9 channels (more than the maximum supported by 
 absent. With them FFmpeg reports `Invalid channel 15 specified as output from matrix` and `substream 2 length
 mismatch`; without them the 29 intervals of a 3 s 7.1 stream decode bit-exactly. The encoder writes 0x31EB for a
 substream whose last row is above 5, with a zero seed, zero shifts and no matrix drawing on a noise channel. The decoder
-accepts a `noise_type` restart when no matrix uses a noise channel and refuses it otherwise (the generator is still not
-defined, Q5). **Provisional, owner to confirm.**
+accepts a `noise_type` restart and refuses only the matrices that need generator 1's table (below; the table is still
+not available, Q5). **Provisional, owner to confirm.**
 
 As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects
 noise from generator 1's table, which is not available. The decoder refuses it (`ErrorKind::kUnsupported`), as it
