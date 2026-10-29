@@ -12,7 +12,8 @@ sample or the gate fails. The legs, in the order they run:
      tools/generators/gen_truehd_ffmpeg_gold.py), each checked first against the SHA-256 its
      manifest pins, and must give back each source exactly.
   3. forge round trip: encode, then forge's decode, must give back each leg-1 source exactly,
-     and probe must describe the stream it wrote.
+     and probe must describe the stream it wrote; and the same in Matroska (A_TRUEHD), where
+     FFmpeg's decode of forge's .mkv must equal the source too.
   4. Atmos: forge encodes a 7.1 bed with eight objects and their object audio metadata into a
      16-channel substream; forge's decode must return the bed, the objects and the metadata;
      FFmpeg must decode the stream without error, and what it exposes of it (the presentation
@@ -229,6 +230,28 @@ def legs_1_and_3(gate: Gate, cli: str, ffmpeg: str, work: Path, quick: bool) -> 
                        f"({first_difference(ff_lower, wav_s32(ffmpeg, ours))})")
 
 
+def leg_matroska(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:
+    print("leg 3b: TrueHD in Matroska (A_TRUEHD), through both decoders")
+    for ch, rate, bits in ((2, 48000, 16), (6, 96000, 24), (8, 48000, 24)):
+        name = f"mkv-{ch}ch-{rate // 1000}k-{bits}"
+        source = work / f"{name}.wav"
+        mkv = work / f"{name}.mkv"
+        write_wav(source, synthesise(ch, rate, bits, int(0.1 * rate), 500 + ch), rate, bits)
+        r = run([cli, "truehd-encode", str(source), str(mkv)])
+        if r.returncode != 0:
+            gate.check(False, f"{name}: forge encode ({r.stderr.decode().strip()})")
+            continue
+        want = wav_s32(ffmpeg, source)
+        status, got, messages = ffmpeg_s32(ffmpeg, mkv)
+        gate.check(status == 0 and got == want,
+                   f"{name}: FFmpeg's decode of the .mkv equals the source "
+                   f"({first_difference(got, want)}{'; ' + messages if messages else ''})")
+        decoded = work / f"{name}.forge.wav"
+        r = run([cli, "decode", str(mkv), str(decoded)])
+        gate.check(r.returncode == 0 and wav_s32(ffmpeg, decoded) == want,
+                   f"{name}: forge's decode of the .mkv equals the source")
+
+
 def leg_2(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:
     print("leg 2: forge decodes FFmpeg's golden masters")
     manifest = json.loads((GOLD / "manifest.json").read_text())
@@ -312,6 +335,7 @@ def main() -> int:
         work.mkdir(parents=True, exist_ok=True)
         gate = Gate()
         legs_1_and_3(gate, args.cli, args.ffmpeg, work, args.quick)
+        leg_matroska(gate, args.cli, args.ffmpeg, work)
         leg_2(gate, args.cli, args.ffmpeg, work)
         leg_4(gate, args.cli, args.ffmpeg, work)
     print(f"\n{gate.passed} checks passed, {len(gate.failures)} failed")

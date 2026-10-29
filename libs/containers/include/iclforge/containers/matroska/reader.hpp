@@ -21,7 +21,7 @@
 // for, and hands each frame back as opaque bytes. It has NO dependency on
 // iclforge::ac3 and no knowledge of AC-3 - what comes out is whatever the muxer
 // put in. The one place it names a codec is track auto-selection
-// (kCodecAc3/kCodecEac3, the same two CodecID strings the writer already
+// (kCodecAc3/kCodecEac3/kCodecTrueHd, the CodecID strings the writer
 // declares); a caller that wants some other track says so by number.
 //
 // Two shapes, mirroring the write side exactly:
@@ -120,7 +120,7 @@ struct SkippedTrack {
 // would exhaust a machine.
 struct ReadOptions {
     // The track to extract. 0 auto-selects: the first audio TrackEntry whose
-    // CodecID is kCodecEac3 or kCodecAc3. Any other value names a
+    // CodecID is kCodecEac3, kCodecAc3 or kCodecTrueHd. Any other value names a
     // TrackNumber explicitly and accepts whatever CodecID it carries, which
     // is how a caller reads a track this module has no opinion about.
     std::uint64_t track_number = 0;

@@ -32,6 +32,8 @@ namespace iclforge::containers::matroska {
 // Matroska CodecID strings (the Matroska codec mappings registry).
 inline constexpr std::string_view kCodecEac3 = "A_EAC3";
 inline constexpr std::string_view kCodecAc3 = "A_AC3";
+// TrueHD (MLP): one access unit a block, no CodecPrivate (truehd-spec.md 21.4).
+inline constexpr std::string_view kCodecTrueHd = "A_TRUEHD";
 
 enum class MuxError : std::uint8_t {
     kNoFrames,

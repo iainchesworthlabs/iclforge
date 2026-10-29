@@ -17,6 +17,7 @@
 #include "../exit_codes.hpp"
 #include "decode.hpp"
 #include "encode.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
 #include "iclforge/mlp/decoder/decoder.hpp"
 #include "iclforge/mlp/encoder/atmos.hpp"
 #include "iclforge/mlp/encoder/encoder.hpp"
@@ -326,7 +327,29 @@ int run_truehd_encode(std::string_view in_wav, std::string_view out_path, const 
                    ? kExitUsage
                    : kExitRuntime;
     }
-    if (!write_bytes(out_path, *stream)) {
+    // A .mkv output is the stream's access units as Matroska blocks under A_TRUEHD (21.4).
+    std::vector<std::byte> file = std::move(*stream);
+    if (out_path.ends_with(".mkv")) {
+        const mlp::ScanResult walk = mlp::scan(file);
+        std::vector<std::span<const std::byte>> units;
+        for (const auto& u : walk.units) {
+            units.push_back(std::span(file).subspan(u.offset, u.size));
+        }
+        iclforge::containers::matroska::AudioTrack track;
+        track.codec_id = std::string{iclforge::containers::matroska::kCodecTrueHd};
+        track.sample_rate = pcm->sample_rate;
+        track.channels = pcm->channels;
+        track.samples_per_frame =
+            static_cast<std::uint32_t>(mlp::samples_per_access_unit(pcm->sample_rate));
+        auto mkv = iclforge::containers::matroska::mux(track, units);
+        if (!mkv) {
+            fmt::println(stderr, "error: Matroska: {}",
+                         iclforge::containers::matroska::describe(mkv.error()));
+            return kExitRuntime;
+        }
+        file = std::move(*mkv);
+    }
+    if (!write_bytes(out_path, file)) {
         fmt::println(stderr, "error: cannot write {}", out_path);
         return kExitOutput;
     }
