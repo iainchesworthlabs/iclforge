@@ -20,9 +20,9 @@
 namespace iclforge::mlp::detail {
 
 struct CodingParams {
-    int huff_type = 0;   // 0 raw, 1 to 3 the codebooks of Appendix C
-    int lsbs = 0;        // huff_lsbs (= lsbs_bits)
-    int offset = 0;      // huff_offset, 15 bits signed
+    int huff_type = 0;  // 0 raw, 1 to 3 the codebooks of Appendix C
+    int lsbs = 0;       // huff_lsbs (= lsbs_bits)
+    int offset = 0;     // huff_offset, 15 bits signed
 };
 
 inline constexpr std::int64_t kInfiniteCost = std::numeric_limits<std::int64_t>::max() / 4;
@@ -41,8 +41,10 @@ struct CodingChoice {
 // offset saves the 16 bits of a new one, and keeping its type and width saves the channel's
 // parameter bits, which `header_bits` returns. Searches every huff_type, the widths around the
 // residuals' spread and the offsets that centre them.
+// `max_lsbs` is the widest lsbs_bits the channel can take: 24 less its quantiser step, since
+// huff_lsbs, which is lsbs_bits plus the step, is at most 24 (8.3).
 [[nodiscard]] CodingChoice choose_coding(std::span<const std::int32_t> residuals,
-                                         const CodingParams& current);
+                                         const CodingParams& current, int max_lsbs = 24);
 
 // The block header bits a channel's coding parameters cost against the decoder's current ones:
 // the huff_type and huff_lsbs fields (7) when the channel's parameters are sent at all, and a new

@@ -8,7 +8,8 @@ cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH _mlp_root)
 
 iclforge_add_test_binary(iclforge-mlp-tests PROJECT mlp SOURCES
     core/test_stream_info.cpp
-    decoder/test_ffmpeg_gold.cpp)
+    decoder/test_ffmpeg_gold.cpp
+    encoder/test_round_trip.cpp)
 
 target_link_libraries(iclforge-mlp-tests PRIVATE iclforge::mlp iclforge::base_headers)
 target_include_directories(iclforge-mlp-tests PRIVATE "${_mlp_root}/src")
