@@ -149,6 +149,9 @@ void verify(std::span<const std::byte> payload) {
             policy.trust_anchors = anchors;
             policy.required_leaf_title.clear();
             policy.require_digital_signature = false;
+            // The signer information of CS spec v2.5 5.3 as a condition of the verdict, which
+            // reads the nonce and the publisher UUID against the signer certificate's subject.
+            policy.operator_metadata = crypto::OperatorMetadata::kRequire;
             (void)crypto::verify_content_signature(payload, digest, policy);
         }
     }
