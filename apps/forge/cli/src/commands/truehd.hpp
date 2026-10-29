@@ -95,6 +95,13 @@ int run_levels_truehd(std::span<const std::byte> stream, std::string_view in_pat
 int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_path,
                         const Options& meta);
 
+// `metadata` of a TrueHD stream (truehd_tools.cpp): the channel meaning of TH spec section 14.1 set in
+// every major sync of the file's content `bytes`, re-stamping each one's CRC, and written to `out_path`.
+// E-AC-3's own options are refused by name. Provisional, no oracle until the DEE set (libs/truehd/
+// ERRATA.md, questions 51 to 55).
+int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
+                        std::string_view out_path, const Options& meta);
+
 // `truehd-encode`: the PCM in a WAV, coded losslessly as TrueHD (iclforge::truehd::Encoder) into a
 // bare .thd, or wrapped as .mkv, .mp4 or a Blu-ray .ts. The WAV's channel mask names its speakers
 // (libs/truehd/ERRATA.md, open question 16); a WAV with none is taken in the order `decode` writes

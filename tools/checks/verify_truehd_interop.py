@@ -10,7 +10,11 @@ For every fixture in testdata/truehd/manifest.json:
   * each decoder given with --decoder (a program run as `PROGRAM STREAM OUT.s32`, writing 32-bit
     little-endian PCM, the 24-bit sample shifted left by 8, as `ffmpeg -f s32le` does) gives the
     same PCM;
-  * with --forge PATH, `forge decode` gives it too (its 24-bit WAV, read back as 32-bit words);
+  * with --forge PATH, `forge decode` gives it too (its 24-bit WAV, read back as 32-bit words), and
+    `forge metadata` sets the channel meaning of TH spec section 14.1 in a copy without re-encoding:
+    only the channel meaning and the CRC of each major sync change (checked here byte by byte),
+    FFmpeg's strict decode of the copy and forge's give the same PCM, and `forge probe` gives the
+    values back;
   * with --reference, tools/references/truehd_syntax.py gives it too.
 
 The codec is lossless, so any difference is a decoder that is wrong. Exit status 1 on any
@@ -102,6 +106,106 @@ def run_forge(forge, path, scratch, options=()):
         return wav_as_s32le(out.read_bytes()), ""
     except ValueError as error:
         return None, str(error)
+
+
+# The channel meaning `forge metadata` is asked to write (TH spec section 14.1; provisional, with no
+# oracle until the DEE set), and the same as the probe's JSON gives it back.
+META_OPTIONS = [
+    "truehd-dialnorm-2ch=40",
+    "truehd-dialnorm-6ch=27",
+    "truehd-dialnorm-8ch=24",
+    "truehd-mix-level-2ch=33",
+    "truehd-mix-level-6ch=17",
+    "truehd-mix-level-8ch=49",
+    "truehd-source-format-6ch=5",
+    "truehd-source-format-8ch=38",
+    "truehd-control-2ch=on",
+    "truehd-control-6ch=off",
+    "truehd-control-8ch=on",
+    "truehd-heavy-drc-start-up-gain=-9",
+    "truehd-drc-start-up-gain=21",
+]
+MAJOR_SYNC_BYTES = 28  # without the 16-channel extension; the fixtures have none
+CHANNEL_MEANING_AT = 18  # from the sync word, TH spec 4.1: 8 bytes, then the CRC-16
+
+
+def major_sync_windows(data):
+    """The byte ranges of a TrueHD stream an edit of the channel meaning may change: for every
+    access unit that opens with a major sync, its 8 channel meaning bytes and the 2 CRC bytes after
+    them (TH spec 3.3: a unit's length, in 16-bit words, is the low 12 bits of its first word)."""
+    windows, offset = [], 0
+    while offset + 2 <= len(data):
+        length = (int.from_bytes(data[offset : offset + 2], "big") & 0xFFF) * 2
+        if length < 4 or offset + length > len(data):
+            break
+        sync = offset + 4
+        if data[sync : sync + 3] == b"\xf8\x72\x6f":
+            windows.append((sync + CHANNEL_MEANING_AT, sync + MAJOR_SYNC_BYTES))
+        offset += length
+    return windows
+
+
+def check_metadata(forge, path, fixture, have_ffmpeg, scratch):
+    """The problems with `forge metadata` of a TrueHD fixture: more than the channel meaning and
+    CRCs changed, a decode of the copy (FFmpeg's strict one, forge's) differs from the manifest's,
+    or the probe does not give the values back. An MLP stream is refused (exit 1) and writes
+    nothing."""
+    patched = scratch / "patched.thd"
+    patched.unlink(missing_ok=True)
+    result = subprocess.run(
+        [forge, "metadata", str(path), str(patched), *META_OPTIONS],
+        capture_output=True,
+        check=False,
+    )
+    if fixture["codec"] != "truehd":
+        if result.returncode != 1 or patched.exists():
+            return ["forge metadata did not refuse an MLP stream with exit 1"]
+        return []
+    if result.returncode != 0 or not patched.exists():
+        return ["forge metadata failed: " + result.stderr.decode(errors="replace").strip()]
+    before, after = path.read_bytes(), patched.read_bytes()
+    windows = major_sync_windows(before)
+    if len(before) != len(after) or not windows:
+        return ["forge metadata changed the length of the stream, or found no major sync"]
+    problems = []
+    changed = [i for i in range(len(before)) if before[i] != after[i]]
+    if any(not any(lo <= i < hi for lo, hi in windows) for i in changed):
+        problems.append("forge metadata changed a byte outside the channel meaning and the CRCs")
+    if not changed:
+        problems.append("forge metadata changed nothing")
+    if have_ffmpeg:
+        pcm, error = ffmpeg_pcm(patched, "truehd")
+        if pcm is None:
+            problems.append(f"ffmpeg strict decode of the patched stream failed: {error}")
+        elif sha256(pcm) != fixture["pcm_sha256"]:
+            problems.append("ffmpeg's strict decode of the patched stream is not the manifest's")
+    pcm, error = run_forge(forge, patched, scratch)
+    if pcm is None:
+        problems.append(f"forge decode of the patched stream failed: {error}")
+    elif sha256(pcm) != fixture["pcm_sha256"]:
+        problems.append("forge decode of the patched stream differs from the manifest")
+    probe = subprocess.run(
+        [forge, "probe", str(patched), "json=1"], capture_output=True, check=False
+    )
+    try:
+        meaning = json.loads(probe.stdout)["truehd"]["channel_meaning"]
+        presentations = meaning["presentations"]
+        values = (
+            meaning["distinct_in_stream"],
+            meaning["heavy_drc_start_up_gain"],
+            meaning["drc_start_up_gain"],
+            [presentations[name]["dialogue_norm"] for name in ("2ch", "6ch", "8ch")],
+            [presentations[name]["mix_level"] for name in ("2ch", "6ch", "8ch")],
+            [presentations[name]["control_enabled"] for name in ("2ch", "6ch", "8ch")],
+            presentations["6ch"]["source_format"],
+            presentations["8ch"]["source_format"],
+        )
+        expected = (1, -9, 21, [40, 27, 24], [33, 17, 49], [True, False, True], 5, 38)
+        if values != expected:
+            problems.append(f"forge probe gives {values} for the patched stream, not {expected}")
+    except (ValueError, KeyError, TypeError):
+        problems.append("forge probe json=1 of the patched stream has no channel_meaning")
+    return problems
 
 
 def reference_pcm(path, presentation):
@@ -323,6 +427,7 @@ def main():
                     problems.append(f"forge decode failed: {error}")
                 elif sha256(pcm) != fixture["pcm_sha256"]:
                     problems.append("forge decode differs from the manifest")
+                problems += check_metadata(args.forge, path, fixture, have_ffmpeg, scratch)
             for name, command in decoders:
                 pcm, error = run_decoder(command, path, scratch)
                 if pcm is None:

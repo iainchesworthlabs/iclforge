@@ -10,6 +10,16 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge metadata` sets a TrueHD stream's channel meaning (TH spec §14.1) in a finished stream, without re-encoding it.** The
+  `truehd-dialnorm-6ch=` family of options `truehd-encode` takes sets the named fields in every major sync, which repeat at each restart, and
+  re-stamps each one's CRC-16 (polynomial 0x002D); no other check covers the major sync, so every other byte is copied and the audio is the
+  same. `iclforge::truehd::edit_channel_meaning()` does the rewrite in place (bytes the reader does not take for an access unit, and the
+  16-channel extension, are left alone). Held by: all 21 TrueHD fixtures patched (the four MLP ones are refused) and decoded by FFmpeg's strict decode and by
+  `forge decode` to the manifest's PCM, only the 8 channel-meaning bytes and the CRC of each major sync differing (checked byte by byte in
+  `tools/checks/verify_truehd_interop.py --forge`), and the same for the encoder's streams in the codec matrix; unit tests that fail without
+  the CRC re-stamp and without the range check. It refuses by name an option of E-AC-3's `metadata`, a call that names no field, a value
+  outside its field's width and an MLP stream, and the `truehd-` options on an AC-3 or E-AC-3 stream. **Provisional, with no oracle until the
+  DEE set** (`libs/truehd/ERRATA.md`, questions 51 to 55). The audit's T3 and the metadata half of P3.
 - **Added: `forge probe` shows a TrueHD stream's channel meaning (TH spec §14.1), in text and in JSON.** A `channel meaning` line with a line for
   each presentation (2, 6 and 8 channels: control-enabled bit, dialogue norm as the number and as -n dBFS, mix level, source format) and one for
   the two DRC start-up gains; in JSON a `channel_meaning` object under `truehd` (`null` for MLP, whose bytes at that place the specification does not

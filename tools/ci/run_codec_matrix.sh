@@ -1642,13 +1642,13 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
 done
 
 # Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
-# cut, cat, metadata and normalize once stopped with AC-3's sync error (exit 2); the other
+# cut, cat and normalize once stopped with AC-3's sync error (exit 2); the other
 # transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
 # dropped (a verification flag above all, which must never exit 0 without verifying). play and
 # monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
 # this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by cut, cat, metadata, normalize, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied"
+echo "[$count] truehd is refused by cut, cat, normalize, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata refuses E-AC-3's options)"
 th_in=th_truehd_st48_s24.thd
 for refused in "cut $th_in th_refused.thd 0.05 0.1" \
     "cat th_refused.thd $th_in $th_in" \
@@ -1780,6 +1780,40 @@ sys.exit(0 if meaning["heavy_drc_start_up_gain"] == -9 and meaning["drc_start_up
          and meaning["presentations"]["8ch"]["source_format"] == 38
          and [meaning["presentations"][name]["control_enabled"] for name in ("2ch", "6ch", "8ch")] == [True, False, True]
          else 1)'
+done
+
+# `metadata` sets the same fields in a finished stream without re-encoding it: every major sync is
+# rewritten under its CRC and nothing else changes. FFmpeg's strict decode of the patched stream must
+# give what it gave for the original, forge's decode must equal it, the probe must give the values,
+# and a second pass with the same values must change no byte. FFmpeg's own streams and forge's.
+for stream in th_truehd_m51_s24.thd th_truehd_st48_s24.thd th_truehd_st192_s24.thd \
+    th_truehd_mono48_s24.thd th_truehd_st48_s16.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    run metadata "$stream" "meta_$stream" "${thd_meaning_options[@]}"
+    count=$((count + 1))
+    echo "[$count] truehd metadata $stream: ffmpeg's strict decode and forge's decode of the patched stream equal the original's"
+    truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig.s32"
+    truehd_ffmpeg_pcm "meta_$stream" -f truehd >"meta_$stream.s32"
+    cmp -s "$stream.orig.s32" "meta_$stream.s32" || {
+        echo "ffmpeg's strict decode of meta_$stream differs from its decode of $stream" >&2
+        exit 1
+    }
+    run decode "meta_$stream" "meta_$stream.wav"
+    truehd_ffmpeg_pcm "meta_$stream.wav" >"meta_$stream.wav.s32"
+    cmp -s "meta_$stream.wav.s32" "meta_$stream.s32" || {
+        echo "forge's decode of meta_$stream differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+    "$CLI" probe "meta_$stream" json=1 | python3 -c '
+import json, sys
+meaning = json.load(sys.stdin)["truehd"]["channel_meaning"]
+sys.exit(0 if meaning["distinct_in_stream"] == 1 and meaning["drc_start_up_gain"] == 21
+         and meaning["presentations"]["6ch"]["dialogue_norm"] == 27
+         and meaning["presentations"]["8ch"]["source_format"] == 38 else 1)'
+    run metadata "meta_$stream" "meta_again_$stream" "${thd_meaning_options[@]}"
+    cmp -s "meta_$stream" "meta_again_$stream" || {
+        echo "a second metadata pass with the same values changed meta_$stream" >&2
+        exit 1
+    }
 done
 
 # The streams forge wrote, in the containers forge writes: encode straight into each, read it back

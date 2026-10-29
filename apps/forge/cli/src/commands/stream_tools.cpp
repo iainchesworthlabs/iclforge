@@ -89,10 +89,6 @@ std::string_view truehd_reason(std::string_view command) {
         return "a join needs the second stream to open with a major sync and to match the "
                "first's shape, and this build does not join them yet";
     }
-    if (command == "metadata") {
-        return "its dialogue norm, mix level and DRC start-up gain are in the major sync under a "
-               "CRC, and this build does not rewrite them yet";
-    }
     return "it writes the dialogue norm, which this build does not write for TrueHD or MLP yet";
 }
 
@@ -1586,9 +1582,26 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
 }
 
 int run_metadata(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path, "metadata");
+    // A TrueHD or MLP stream keeps its dialogue norm, mix level and the rest in the major sync, under
+    // its own CRC; truehd_tools.cpp rewrites those. The options of that rewrite are TrueHD's alone.
+    auto bytes = read_all(in_path);
+    if (bytes.empty()) {
+        fmt::println(stderr, "error: cannot read {}", in_path);
+        return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_metadata_truehd(std::move(bytes), in_path, out_path, meta);
+    }
+    if (!meta.thd_meaning.empty()) {
+        fmt::println(stderr,
+                     "error: {} is not a TrueHD stream: the truehd- options of metadata set the "
+                     "channel meaning of TH spec section 14, which only TrueHD has",
+                     in_path);
+        return kExitUsage;
+    }
+    auto loaded = scan_loaded(std::move(bytes), in_path);
     if (!loaded.has_value()) {
-        return loaded.error();
+        return kExitInput;
     }
     const auto before = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     if (!before.has_value()) {

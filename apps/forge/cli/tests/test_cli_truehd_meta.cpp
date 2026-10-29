@@ -95,6 +95,40 @@ std::vector<th::ChannelMeaning> meanings_of(const fs::path& stream) {
     return out;
 }
 
+// True when `before` and `after` are streams of one length that differ only in the channel meaning
+// and the CRC of their major syncs (TH spec 14.1: 8 bytes at 18 from the sync word, and the last
+// two).
+bool differ_only_in_major_syncs(const fs::path& before, const fs::path& after) {
+    const std::vector<std::byte> a = read_bytes(before);
+    const std::vector<std::byte> b = read_bytes(after);
+    if (a.size() != b.size()) {
+        return false;
+    }
+    std::vector<bool> allowed(a.size(), false);
+    th::ElementaryReader reader(a);
+    while (const auto unit = reader.next()) {
+        if (unit->size() < 8 || !th::starts_with_major_sync(unit->subspan(4))) {
+            continue;
+        }
+        const std::size_t sync = static_cast<std::size_t>(unit->data() - a.data()) + 4;
+        const auto parsed = th::parse_major_sync(unit->subspan(4), true);
+        if (!parsed) {
+            return false;
+        }
+        for (std::size_t i = 18; i < 26; ++i) {
+            allowed[sync + i] = true;
+        }
+        allowed[sync + parsed->size_bytes - 2] = true;
+        allowed[sync + parsed->size_bytes - 1] = true;
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (a[i] != b[i] && !allowed[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // The 5.1 fixture as a 24-bit WAV, a source for `truehd-encode`.
 fs::path source_wav(const fs::path& dir) {
     static fs::path made;
@@ -403,5 +437,202 @@ TEST_CASE("forge probe shows the channel meaning of a TrueHD stream",
         CHECK(nlohmann::json::parse(read_text(log))["truehd"]["channel_meaning"].is_null());
         REQUIRE(run_cli("probe " + cli_arg(fixture("mlp_st48_s24.mlp")), log) == 0);
         CHECK_FALSE(contains(read_text(log), "channel meaning"));
+    }
+}
+
+TEST_CASE("forge metadata sets the channel meaning of a TrueHD stream without re-encoding it",
+          "[forge-cli][truehd][truehd-meta][metadata]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "metadata.log";
+
+    SECTION("every fixture: every major sync carries the values, nothing else changes") {
+        const std::string set = std::string{kEveryOption};
+        for (const char* name :
+             {"truehd_m51_s24.thd", "truehd_st48_s24.thd", "truehd_mono48_s24.thd",
+              "truehd_st192_s24.thd", "truehd_c50_s16.thd", "truehd_st44_s24.thd",
+              "truehd_st48_s24_gap8.thd", "truehd_st88_s24.thd"}) {
+            DYNAMIC_SECTION(name) {
+                const fs::path in = fixture(name);
+                const fs::path out = dir / (std::string{"meta_"} + name);
+                fs::remove(out);
+                REQUIRE(run_cli("metadata " + cli_arg(in) + cli_arg(out) + set, log) == 0);
+                const std::string text = read_text(log);
+                CHECK(contains(text, "rewrote the channel meaning of "));
+                CHECK(contains(text, " major syncs ("));
+                CHECK(contains(text, "(audio untouched)"));
+                CHECK(contains(text, "6ch dialogue norm"));
+                CHECK(contains(text, "0 -> 27"));
+                CHECK(contains(text, "2ch control"));
+                CHECK(contains(text, "off -> on"));
+                CHECK(contains(text, "provisional, no oracle until the DEE set"));
+                const auto before = meanings_of(in);
+                const auto after = meanings_of(out);  // each major sync read with its CRC checked
+                REQUIRE(after.size() == before.size());
+                REQUIRE_FALSE(after.empty());
+                for (const th::ChannelMeaning& meaning : after) {
+                    CHECK(meaning == every_option_meaning());
+                }
+                CHECK(differ_only_in_major_syncs(in, out));
+                // The audio is the same, sample for sample.
+                const fs::path a = dir / "meta_a.wav";
+                const fs::path b = dir / "meta_b.wav";
+                REQUIRE(run_cli("decode " + cli_arg(in) + cli_arg(a), log) == 0);
+                REQUIRE(run_cli("decode " + cli_arg(out) + cli_arg(b), log) == 0);
+                CHECK(read_bytes(a) == read_bytes(b));
+            }
+        }
+    }
+
+    SECTION("only the fields named change, and probe shows them") {
+        const fs::path out = dir / "meta_one.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(fixture("truehd_m51_s24.thd")) + cli_arg(out) +
+                            "truehd-dialnorm-6ch=24 truehd-mix-level-6ch=9",
+                        log) == 0);
+        th::ChannelMeaning expected;
+        expected.sixch_dialogue_norm = 24;
+        expected.sixch_mix_level = 9;
+        for (const th::ChannelMeaning& meaning : meanings_of(out)) {
+            CHECK(meaning == expected);
+        }
+        const std::string text = read_text(log);
+        CHECK_FALSE(contains(text, "2ch"));
+        REQUIRE(run_cli("probe " + cli_arg(out), log) == 0);
+        CHECK(contains(read_text(log),
+                       "  6ch           control off, dialogue norm 24 (-24 dBFS), mix level 9, "
+                       "source format 0\n"));
+        // A second edit changes that one field and keeps the first's.
+        const fs::path again = dir / "meta_two.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(out) + cli_arg(again) + "truehd-control-6ch=on",
+                        log) == 0);
+        expected.sixch_control_enabled = true;
+        for (const th::ChannelMeaning& meaning : meanings_of(again)) {
+            CHECK(meaning == expected);
+        }
+    }
+
+    SECTION("the same values again change no byte, and the input can be the output") {
+        const fs::path first = dir / "meta_same_1.thd";
+        const fs::path second = dir / "meta_same_2.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(fixture("truehd_st48_s24.thd")) + cli_arg(first) +
+                            "truehd-dialnorm-2ch=31",
+                        log) == 0);
+        REQUIRE(run_cli("metadata " + cli_arg(first) + cli_arg(second) + "truehd-dialnorm-2ch=31",
+                        log) == 0);
+        CHECK(contains(read_text(log), "rewrote the channel meaning of 0 of "));
+        CHECK(contains(read_text(log), "the stream already had these values"));
+        CHECK(read_bytes(second) == read_bytes(first));
+        REQUIRE(run_cli("metadata " + cli_arg(first) + cli_arg(first) + "truehd-dialnorm-2ch=5",
+                        log) == 0);
+        CHECK(meanings_of(first).front().twoch_dialogue_norm == 5);
+    }
+
+    SECTION("the stream on stdout is the file") {
+        const fs::path file = dir / "meta_stdout_file.thd";
+        const fs::path piped = dir / "meta_stdout.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(fixture("truehd_m51_s24.thd")) + cli_arg(file) +
+                            "truehd-dialnorm-6ch=20",
+                        log) == 0);
+        const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" metadata " +
+                                    cli_arg(fixture("truehd_m51_s24.thd")) +
+                                    "- truehd-dialnorm-6ch=20 quiet > \"" + piped.string() + "\"";
+        REQUIRE(iclforge::test::platform::run_shell(command) == 0);
+        CHECK(read_bytes(piped) == read_bytes(file));
+    }
+
+    SECTION("a stream with a different meaning in its major syncs is said so") {
+        // Two streams joined: each carries its own, and the edit changes the field in both.
+        const fs::path source = source_wav(dir);
+        const fs::path a = dir / "meta_join_a.thd";
+        const fs::path b = dir / "meta_join_b.thd";
+        const fs::path joined = dir / "meta_join.thd";
+        REQUIRE(run_cli("truehd-encode " + cli_arg(source) + cli_arg(a) +
+                            "truehd-restart=8 truehd-dialnorm-6ch=10",
+                        log) == 0);
+        REQUIRE(run_cli("truehd-encode " + cli_arg(source) + cli_arg(b) +
+                            "truehd-restart=8 truehd-dialnorm-6ch=20",
+                        log) == 0);
+        std::vector<std::byte> bytes = read_bytes(a);
+        const std::vector<std::byte> more = read_bytes(b);
+        bytes.insert(bytes.end(), more.begin(), more.end());
+        {
+            std::ofstream out{joined, std::ios::binary};
+            out.write(reinterpret_cast<const char*>(bytes.data()),
+                      static_cast<std::streamsize>(bytes.size()));
+        }
+        const fs::path out = dir / "meta_join_out.thd";
+        REQUIRE(run_cli("metadata " + cli_arg(joined) + cli_arg(out) + "truehd-mix-level-6ch=7",
+                        log) == 0);
+        CHECK(contains(read_text(log), "the major syncs carried 2 different channel meanings"));
+        std::set<unsigned> norms;
+        for (const th::ChannelMeaning& meaning : meanings_of(out)) {
+            norms.insert(meaning.sixch_dialogue_norm);
+            CHECK(meaning.sixch_mix_level == 7);
+        }
+        CHECK(norms == std::set<unsigned>{10, 20});
+    }
+}
+
+TEST_CASE("forge metadata of a TrueHD stream refuses what it cannot do, by name",
+          "[forge-cli][truehd][truehd-meta][metadata]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "metadata_refused.log";
+    const fs::path out = dir / "metadata_refused.thd";
+    const std::string in = cli_arg(fixture("truehd_m51_s24.thd"));
+
+    SECTION("nothing to change") {
+        fs::remove(out);
+        CHECK(run_cli("metadata " + in + cli_arg(out), log) == kExitUsage);
+        CHECK(contains(read_text(log), "nothing to change"));
+        CHECK(contains(read_text(log), "truehd-dialnorm-2ch="));
+        CHECK_FALSE(fs::exists(out));
+    }
+    SECTION("E-AC-3's options are not applied to TrueHD, and say so") {
+        for (const char* option : {"dialnorm=27", "dialnorm2=27", "bsmod=2", "dsurmod=1", "insert",
+                                   "drc=film-standard"}) {
+            DYNAMIC_SECTION(option) {
+                fs::remove(out);
+                CHECK(run_cli("metadata " + in + cli_arg(out) + "truehd-dialnorm-6ch=27 " + option,
+                              log) == kExitUsage);
+                const std::string text = read_text(log);
+                CHECK(contains(text, std::string{"metadata does not apply "} + option));
+                CHECK_FALSE(fs::exists(out));
+            }
+        }
+    }
+    SECTION("an option of another command is an unknown one, and nothing is written") {
+        for (const char* option : {"compr=0x40", "truehd-restart=8", "truehd-downmix=standard"}) {
+            DYNAMIC_SECTION(option) {
+                fs::remove(out);
+                CHECK(run_cli("metadata " + in + cli_arg(out) + "truehd-dialnorm-6ch=27 " + option,
+                              log) == kExitUsage);
+                CHECK_FALSE(fs::exists(out));
+            }
+        }
+    }
+    SECTION("a value outside its field's width, by name") {
+        fs::remove(out);
+        CHECK(run_cli("metadata " + in + cli_arg(out) + "truehd-dialnorm-6ch=32", log) ==
+              kExitUsage);
+        CHECK(contains(read_text(log), "truehd-dialnorm-6ch is a whole number from 0 to 31"));
+        CHECK_FALSE(fs::exists(out));
+    }
+    SECTION("an MLP stream, whose bytes at that place the specification does not describe") {
+        CHECK(run_cli("metadata " + cli_arg(fixture("mlp_st48_s24.mlp")) + cli_arg(out) +
+                          "truehd-dialnorm-6ch=27",
+                      log) == kExitUsage);
+        CHECK(contains(read_text(log), "MLP"));
+        CHECK_FALSE(fs::exists(out));
+    }
+    SECTION("a stream that is not TrueHD takes none of these options") {
+        const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
+        REQUIRE(fs::exists(ec3));
+        CHECK(run_cli("metadata " + cli_arg(ec3) + cli_arg(dir / "metadata_refused.ec3") +
+                          "truehd-dialnorm-6ch=27",
+                      log) == kExitUsage);
+        CHECK(contains(read_text(log), "is not a TrueHD stream"));
+        // and E-AC-3's own metadata is still written
+        const fs::path rewritten = dir / "metadata_rewritten.ec3";
+        REQUIRE(run_cli("metadata " + cli_arg(ec3) + cli_arg(rewritten) + "dialnorm=20", log) == 0);
+        CHECK(contains(read_text(log), "dialnorm 31 -> 20"));
     }
 }

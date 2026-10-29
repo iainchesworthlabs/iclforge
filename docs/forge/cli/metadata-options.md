@@ -1300,7 +1300,7 @@ Omitting `preset=` entirely leaves `qc` in measure-and-report mode — every num
 just no PASS/FAIL verdict and nothing to gate on. See [Commands → `qc`](commands.md#decoding-inspection) for the
 full report format and the exit-code convention this drives.
 
-## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`)
+## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`, `metadata`)
 
 ```text
 decode, levels and loudness of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
@@ -1338,7 +1338,8 @@ truehd-encode (after the positional arguments):
   verify            decode every access unit as it is coded and compare it with the input
 ```
 
-The channel meaning of TH spec section 14, written into every major sync. Per presentation, 2, 6 and 8 channels, each refused by name outside its field's width; a field
+The channel meaning of TH spec section 14, written into every major sync (and set in a finished stream by `metadata`,
+with the same options). Per presentation, 2, 6 and 8 channels, each refused by name outside its field's width; a field
 left out is 0 and a control bit off, as in FFmpeg's streams. **Provisional, no oracle until the DEE set** (FFmpeg writes
 zeros): the specification gives the widths and, for the 6 and 8 channel dialogue norms, a unit (n is -n dBFS), and gives
 no unit for the mix level, no table for the source format and no word on what a control bit gates
@@ -1346,7 +1347,7 @@ no unit for the mix level, no table for the source format and no word on what a 
 51 to 55):
 
 ```text
-truehd-encode (after the positional arguments):
+truehd-encode and metadata, of TrueHD (after the positional arguments):
   truehd-dialnorm-2ch=0..63    truehd-dialnorm-6ch=0..31    truehd-dialnorm-8ch=0..31
                     the presentation's dialogue norm (6 bits for 2 channels, 5 for the others)
   truehd-mix-level-2ch=0..63   truehd-mix-level-6ch=0..63   truehd-mix-level-8ch=0..63

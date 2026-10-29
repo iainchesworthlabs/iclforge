@@ -38,6 +38,7 @@ iclforge::truehd::channel_meaning_problem(iclforge::truehd::ChannelMeaning const
 iclforge::truehd::channel_name(iclforge::truehd::Channel)
 iclforge::truehd::channels_of_assignment(unsigned int)
 iclforge::truehd::default_channel_assignment(int)
+iclforge::truehd::edit_channel_meaning(std::span<std::byte, 18446744073709551615ul>, iclforge::truehd::ChannelMeaningEdit const&)
 iclforge::truehd::extra_data_check_nibble(unsigned int)
 iclforge::truehd::huffman_code(int, int)
 iclforge::truehd::major_sync_crc(std::span<std::byte const, 18446744073709551615ul>)

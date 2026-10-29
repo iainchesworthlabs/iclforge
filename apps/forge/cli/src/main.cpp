@@ -470,10 +470,13 @@ constexpr std::array<Command, 49> kCommands{{
      [](const Args& x) {
          return run_transcode(x.str(1), x.str(2), x.u32(3, 0), x.str(4), x.meta);
      }},
-    {"metadata", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3>",
+    {"metadata", 3, "<in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>",
      "rewrite dialnorm/compr/bsmod/dsurmod on an existing stream and re-stamp its CRCs; the "
-     "audio is copied through untouched, not re-encoded",
-     topic::kStreamTools,
+     "audio is copied through untouched, not re-encoded. A TrueHD stream's channel meaning (TH "
+     "spec section 14: dialogue norm, mix level, source format and control bit per presentation, "
+     "and the two DRC start-up gains) is set in every major sync, with its CRC, from "
+     "truehd-dialnorm-6ch= and the options like it; provisional, no oracle until the DEE set",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_metadata(x.str(1), x.str(2), x.meta); }},
     {"normalize", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3>",

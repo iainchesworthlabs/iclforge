@@ -1449,7 +1449,7 @@ TEST_CASE("levels and loudness take truehd-presentation= and truehd-check=",
     }
 }
 
-TEST_CASE("cut, cat, metadata and normalize refuse a TrueHD stream by name, and say why",
+TEST_CASE("cut, cat and normalize refuse a TrueHD stream by name, and say why",
           "[forge-cli][truehd][refusals]") {
     // They read it as AC-3 and stopped with an AC-3 frame-sync error, exit 2, that said nothing of
     // the codec.
@@ -1465,7 +1465,6 @@ TEST_CASE("cut, cat, metadata and normalize refuse a TrueHD stream by name, and 
     const std::vector<Refusal> refusals{
         {"cut", in + cli_arg(out) + "0.05 0.1", "major sync"},
         {"cat", cli_arg(out) + in + in, "major sync"},
-        {"metadata", in + cli_arg(out) + "dialnorm=27", "CRC"},
         {"normalize", in + cli_arg(out), "dialogue norm"},
     };
     for (const Refusal& item : refusals) {
