@@ -19,6 +19,10 @@ using detail::ChannelFilter;
 using detail::EffectiveMatrix;
 using detail::LosslessCheck;
 
+// Section 9.3's filter overload, applied where it can do harm: a prediction past what the
+// filters' 32-bit state can hold (P32).
+constexpr std::int64_t kPredictionLimit = std::int64_t{1} << 31;
+
 // The termination word some streams end a segment with (3.5, P7), accepted and skipped.
 constexpr std::uint32_t kTerminationWord = 0xD234E000U;
 
@@ -264,7 +268,9 @@ std::expected<int, Error> Decoder::State::segment(int index, const detail::Segme
                 v += st.huff_offset[c];
                 const std::int64_t residual = v * (std::int64_t{1} << quant);
                 const std::int64_t prediction = st.filters[c].predict(quant);
-                if (prediction >= limit || prediction < -limit) {
+                // A prediction may overshoot the sample range near full scale; FFmpeg's streams
+                // do (P32). What must not overflow is the 32-bit state the filters hold.
+                if (prediction >= kPredictionLimit || prediction < -kPredictionLimit) {
                     return std::unexpected(Error::kFilterOverload);
                 }
                 const std::int64_t x = residual + prediction;
