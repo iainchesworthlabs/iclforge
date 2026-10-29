@@ -72,6 +72,28 @@ See [README.md](README.md) for the project overview and
   decoder to substream 3's limits in v3.6 (restart sync 0x31EC, 15 matrices, `huff_lsbs` 29 to 31, values past 24 bits before the matrices):
   the decoder already accepts all of it, and the refusal of `huff_lsbs` above the limit now names both limits. `libs/truehd/ERRATA.md`
   sets sections 15.4 to 15.15 of v3.6 against ETSI TS 103 420 statement by statement, with 18 new questions for the owner (22 to 39).
+- **Fixed: the TrueHD decoder read `ch_assign` as the inverse of what the specification says, and now refuses a `ch_assign` that repeats a
+  value.** TH spec §7.4: the field "maps matrix channels to output channels". The decoder took output channel `p` from matrix channel
+  `ch_assign[p]`; FFmpeg's decoder, and the sentence, give output `ch_assign[m]` the matrix channel `m`, so output `p` takes the `m` with
+  `ch_assign[m] == p`, and the lossless check shifts by that `m`. A permutation and its inverse are the same for the identity and for a swap, which
+  is every stream the project holds, so no fixture told them apart; the differential fuzzer found it with `truehd_c40_s16.thd` and one
+  `ch_assign` value changed. A stream with a three-cycle (`[1, 2, 0]`), made with `tools/references/truehd_writer.py`, decodes to the samples
+  the new reading gives in FFmpeg's strict decode, the lossless check included, and the committed streams decode as before. A repeated value
+  leaves an output channel with no matrix channel; FFmpeg plays matrix channel 0 for it, the library stops with `kBadParameter`. The
+  Python transcription and the writer read the field the same way. `libs/truehd/ERRATA.md` entry 42 and question 41; two more questions the
+  harness raised are 40 (the word length of an MLP stream) and 42 (a changed major sync and the filter histories).
+- **Added: fuzz seeds, dictionaries, a repairing mutator and a differential harness for TrueHD, and seeds for the content signature and the
+  protected MP4 boxes.** `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_mat_unwrap` were built and in no run list;
+  they are in `tools/fuzz/run.sh`'s default targets now, with seeds made by `tools/fuzz/truehd-seeds.py` from `testdata/truehd` and a
+  dictionary of the sync words. `libs/truehd/fuzz/truehd_mutator.hpp` rewrites a stream's checks (the unit's nibble, the major sync CRC, the
+  restart header CRC, a segment's parity and CRC, the extra data's nibble and parity) after each mutation, and the library's tests hold it to the
+  committed streams. `fuzz_differential_truehd_decode` decodes the same bytes with the library and with FFmpeg's strict decoder and requires
+  equal samples when both read the whole stream cleanly; it runs in `fuzz-differential` in steps that cannot fail the job until it has a clean
+  record against the FFmpeg the runners install, and in `fuzz-nightly`. `fuzz_content_signature` goes from 8 seeds to 31,
+  `fuzz_ac4_content_signature` from 3 to 11, made by `tools/fuzz/signature-seeds.py` under keys that are thrown away, and nine protected files
+  join `fuzz_mp4_demux`'s (`cenc_make_protected.py` takes `mlpa`). `tools/checks/check_fuzz_harnesses.py` fails on a harness that is not
+  registered, in no run list or without seeds; it names `fuzz_iamf_parse` as a known gap. Ten-minute runs of each found nothing in the
+  harnesses that were already there; `tools/fuzz/README.md` has the table.
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,

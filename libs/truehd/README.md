@@ -16,7 +16,7 @@ It links `iclforge::base` and nothing else. The option is `ICLFORGE_BUILD_TRUEHD
 | `include/iclforge/truehd/decoder/` | `decoder.hpp`: `Decoder`, `DecoderConfig`, `DecodedAccessUnit`, `DecoderCounters` |
 | `include/iclforge/truehd/encoder/` | `encoder.hpp`: `Encoder`, `EncoderConfig`, `EncodedAccessUnit`, `EncoderStats`, `DownmixMode` |
 | `src/` | the same split; `core/huffman.hpp` holds the codebooks |
-| `tests/`, `fuzz/` | Catch2 tests, `iclforge-truehd-encode-tool`, and the libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_truehd_encode` |
+| `tests/`, `fuzz/` | Catch2 tests, `iclforge-truehd-encode-tool`, and the libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_differential_truehd_decode` (with `fuzz/seeds`, `fuzz/dictionaries`, `fuzz/regressions` and the mutator that repairs a stream's checks) |
 
 ## Decoding
 

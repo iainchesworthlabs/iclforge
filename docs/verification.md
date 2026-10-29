@@ -75,14 +75,15 @@ In rough order of strength:
    are not redistributable and are not used here.
 5. **Fuzzing, in both directions.** Into the decoder: the libFuzzer harnesses under `fuzz/` drive
    the codecs' untrusted-input entry points looking for crashes and undefined behaviour
-   (ASan+UBSan). There are 26, listed in [Threat model](threat-model.md#memory-safety-posture);
+   (ASan+UBSan). There are 32, listed in [Threat model](threat-model.md#memory-safety-posture);
    AC-4's are `fuzz_ac4_parse` (the inspector and the sync-frame splitter), `fuzz_ac4_decode`
    (the syntax layer and the reconstruction to PCM), `fuzz_ac4_encode`, and for the content
    signature `fuzz_ac4_content_signature` (where the sync frames stop and what the digest covers)
    and `fuzz_content_signature` (the Thrift, DER, X.509, PEM and verification readers it hands
-   the trailer to). Two differential
+   the trailer to). Three differential
    harnesses decode each mutated stream with both this project's decoder and FFmpeg's and diff
-   the PCM; they cover AC-3 and E-AC-3, since FFmpeg does not decode AC-4. CI runs them:
+   the PCM; they cover AC-3, E-AC-3 and TrueHD (whose rule is stricter, since the codec is lossless:
+   a stream both decode without a complaint must give equal samples), because FFmpeg does not decode AC-4. CI runs them:
    `Fuzz Regress` replays the checked-in seed and regression corpora on every push and on pull
    requests (a repository variable can pause the pull-request run; see
    [Where each check runs](#where-each-check-runs)), `Fuzz Short` and `Fuzz Differential` add a
@@ -105,6 +106,18 @@ In rough order of strength:
    through the GF(2) polynomial inverse it has to be solved with — while leaving one mutation in
    four unrepaired so the rejection path itself stays reachable. AC-4's decoder does not refuse a
    frame on its CRC, so its harnesses need no such mutator.
+
+   TrueHD's reader meets the same wall at five doors: the unit's check nibble, the major sync's CRC-16,
+   the restart header's CRC-8, a segment's parity byte and CRC-8, and the extra data's nibble and parity
+   byte. `fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_differential_truehd_decode` carry a mutator
+   (`libs/truehd/fuzz/truehd_mutator.hpp`) that rewrites them with the library's own routines after each
+   mutation, leaving one mutation in four unrepaired. The lossless check is a function of the decoded
+   samples and is not repaired. The differential harness found three disagreements with FFmpeg in its
+   first ten minutes: an MLP stream of 16-bit words that codes a bit below the word, a `ch_assign` read
+   the wrong way round (fixed: `libs/truehd/ERRATA.md` entry 42) and a changed major sync, which resets
+   the library's filter histories and not FFmpeg's (`ERRATA.md` questions 40 to 42 hold the two open
+   ones and the refusal of a repeated `ch_assign`). [`tools/fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md)
+   has the runs.
 
    Out of the encoder: `tools/ci/fuzz_encoder_space.py` (AC-3) and
    `tools/ci/fuzz_eac3_encoder_space.py` (E-AC-3) draw random legal encoder

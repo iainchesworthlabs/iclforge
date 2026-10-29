@@ -205,7 +205,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 ## TrueHD / MLP
 
 Written from the owner's TrueHD (MLP) Reference Specification, which has no published counterpart; the reading taken wherever it and the
-streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (39 open questions for the owner). Every row below is the peer of a row in the
+streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (42 open questions for the owner). Every row below is the peer of a row in the
 E-AC-3 and AC-4 sections above; where TrueHD is not built the row says so. The Priority and Criticality of a row that is not built are
 provisional until the parity audits of [the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) land.
 
@@ -233,7 +233,7 @@ provisional until the parity audits of [the roadmap](https://github.com/iainches
 | | `PassthroughSink` and device capability lists | 🔴 | Medium | Important | Not built: `BitstreamFormat` names AC-3, E-AC-3 and AC-4 only, and the ELD parser tracks a TrueHD format as "other" |
 | | MP4 protected tracks (Common Encryption, `enca`) | 🔴 | Low | Optional | A protected `mlpa` track takes the reader's refusal-by-name path (`DemuxError::kProtectedTrack`) by reading the code; no fixture or test covers it. [The audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md)'s G24 predates `mlpa` in the containers |
 | **Verification** | Shipping TrueHD interop | 🟡 | Low | Important | Checked against FFmpeg's encoders and decoder only. DEE's streams are scored on the owner's machine by `score_truehd_decode.py`, which has not yet run on DEE's; no Dolby decoder, player or receiver has read output. Black-box analysis of Dolby streams is out of scope, the owner's ruling |
-| | Fuzzing and the encoder-space search | 🟡 | Medium | Important | libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_mat_unwrap`, and `fuzz_truehd_encoder_space.py`, which crosses random legal configurations with adversarial PCM against FFmpeg's strict decode. `libs/truehd/fuzz` has no `seeds/` or `regressions/` directory yet, the harnesses are not in `tools/fuzz/run.sh`'s default target list, and there is no differential harness against FFmpeg's decoder as E-AC-3's `fuzz_differential_eac3_decode` is |
+| | Fuzzing and the encoder-space search | 🟡 | Medium | Important | libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_mat_unwrap`, in `tools/fuzz/run.sh`'s default target list with seeds made from the fixtures, a dictionary and a mutator that puts a stream's checks right after a mutation; `fuzz_differential_truehd_decode`, which holds the library's strict decode to FFmpeg's sample for sample and found three disagreements in its first ten minutes (one fixed: `ch_assign` read the wrong way round; two for the owner); and `fuzz_truehd_encoder_space.py`, which crosses random legal configurations with adversarial PCM against FFmpeg's strict decode. The differential harness's CI steps cannot fail the job until they have a clean record against the FFmpeg the runners install, and runs longer than ten minutes have not been made |
 | | Performance, memory and kernel benchmarks | 🟡 | Medium | Important | Four workloads (stereo and 5.1, encode and decode) are in `iclforge-perf`, `iclforge-bench`, `iclforge-membench` and, as kernels, `iclforge-kernelbench`, and in the trend pages. Not built: instruction counts and image sizes on the Cortex-M3 and ESP32, a minimum-footprint profile, and measured numbers in the platform pages ([the audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-performance.md)) |
 
 ---
@@ -438,7 +438,7 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 39 questions for the specification's owner, the first being the evolution payload | 🟡 |
+| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 42 questions for the specification's owner, the first being the evolution payload | 🟡 |
 | Evolution frame | Content signing (the container of the specification v3.4 and later, or the older truncated HMAC note): field IDs and digest scope unconfirmed | 🔴 |
 | MLP reference material | Shipping interop (IM6): no Dolby decoder, player or receiver has read output | 🔴 |
 
