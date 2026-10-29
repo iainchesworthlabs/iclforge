@@ -1963,14 +1963,12 @@ def ajoc_dmx_de_data(r, ctx, num_dmx_signals, num_umx_signals):
         flags = _field(r, num_umx_signals, 'de_main_dlg_flag')
         st['ajoc_dlg_obj'] = bin(flags).count('1')
     elif ctx.b_iframe:
-        st.pop('ajoc_dlg_obj', None)
+        st['ajoc_dlg_obj'] = 0
     if not b_keep:
         num_dlg_obj = st.get('ajoc_dlg_obj')
         if num_dlg_obj is None:
-            if not ctx.b_iframe:
-                raise SyntaxFail('de_dlg_dmx_coeff_idx needs a dialogue configuration no I-frame '
-                                 'has sent')
-            return
+            raise SyntaxFail('de_dlg_dmx_coeff_idx needs the dialogue objects of an I-frame, and '
+                             'none has been read')
         for _ in range(num_dlg_obj * num_dmx_signals):
             _dlg_dmx_coeff_idx(r)
 

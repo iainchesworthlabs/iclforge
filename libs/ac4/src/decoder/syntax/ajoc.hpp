@@ -99,6 +99,9 @@ struct AjocDmxDeConfig {
 };
 
 struct AjocDmxDeState {
+    // Set once an I-frame or a configuration has said what the dialogue objects are, which may be
+    // none: `config` unset after that means no dialogue objects, and before it means unknown.
+    bool known = false;
     std::optional<AjocDmxDeConfig> config;
     // de_dlg_dmx_coeff in fifteenths (Table 82), [dlg * num_dmx + dmxo].
     std::vector<std::uint8_t> coeff;

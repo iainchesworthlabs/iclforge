@@ -670,10 +670,21 @@ random payloads, reach the rest.
   1 §4.3.14.3.2 sets Gmax to 0 dB where an I-frame sends no `de_max_gain`, leaving no dialogue objects. The
   coefficients are read where the syntax says, `b_keep_dmx_de_coeffs` 0; "ignored" means that in an I-frame
   or with a new configuration nothing is kept from before, so a 1 there leaves no coefficients rather than
-  reading ones the syntax does not send. A frame that is not an I-frame and needs coefficients read for a
-  configuration no frame has sent fails as missing its I-frame.
-- **Evidence:** Text. Chromium's stream sends the configuration in every frame with no dialogue objects and
-  `b_keep_dmx_de_coeffs` 0.
+  reading ones the syntax does not send. A frame that is not an I-frame, with no I-frame or configuration
+  read before it, has not been told how many dialogue objects there are and fails as missing its I-frame.
+  After an I-frame that sent no configuration there are none, so the loop reads nothing: the decoder keeps
+  that apart from "not known yet" (`AjocDmxDeState::known`; the Python transcription keeps a count of 0
+  where it kept no count).
+- **A first reading that was wrong:** the decoder took "no configuration" after an I-frame for "no
+  I-frame has sent one" and refused every frame after such an I-frame whose `b_keep_dmx_de_coeffs` was 0,
+  as missing its I-frame. Spott's A-JOC streams send `b_dmx_de_cfg` 0 in every frame and
+  `b_keep_dmx_de_coeffs` 0 in all of them (Dolby's OTT00232, OTTEP00128 and OTTEP00129): the first two
+  decoded only their I-frames, 80 of 2,000 frames and 32 of 750, and `forge decode` said so on one line
+  and exited 0; the third stopped earlier, at its presentation substream (see below).
+- **Evidence:** Text for the reading. Observation for the fault: Chromium's stream sends the configuration
+  in every frame with no dialogue objects, and Spott's three never send one. `test_frames.cpp` builds the
+  frames: an I-frame without a configuration followed by frames of none, a frame of none with no I-frame
+  before it, and a configuration of one dialogue object kept across a frame that sends its coefficient.
 
 #### ajoc_num_dpoints of 3
 
