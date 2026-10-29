@@ -260,6 +260,9 @@ class Substream:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
         self.interval = None
+        # The filters' histories run on across a restart (ERRATA 13, provisional): FFmpeg's decoder
+        # keeps them, the specification says a restart resets all state.
+        previous = getattr(self, "channels", None) if self.running else None
         self.running = True
         self.flags = 0xFF
         self.block_size = 8
@@ -267,6 +270,10 @@ class Substream:
         self.output_shift = [0] * (self.max_matrix_chan + 1)
         self.quant = [0] * (self.max_chan + 1)
         self.channels = [Channel() for _ in range(self.max_chan + 1)]
+        if previous:
+            for channel, old in zip(self.channels, previous, strict=False):
+                channel.fir_history = list(old.fir_history)
+                channel.iir_history = list(old.iir_history)
 
     def block_header(self, bits):
         if bits.read(1):

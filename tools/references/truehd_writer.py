@@ -150,18 +150,16 @@ class Stream:
 # --- the residuals ----------------------------------------------------------------------------
 
 
-def residuals(channel, coded, restart_samples):
+def residuals(channel, coded):
     """The residual of each sample (ERRATA 13): the coded value less the prediction, in units of
-    2^quant. The filters' histories start at zero at each restart."""
+    2^quant. The filters' histories start at zero at the first restart and run on across the later
+    ones, as FFmpeg's decoder runs them (provisional, owner to confirm)."""
     fir, iir = channel.fir, channel.iir
     shift = fir[1] if fir else (iir[1] if iir else 0)
     out = []
     fir_history = [0] * 8
     iir_history = [0] * 8
-    for n, value in enumerate(coded):
-        if n % restart_samples == 0:
-            fir_history = [0] * 8
-            iir_history = [0] * 8
+    for value in coded:
         prediction = 0
         if fir:
             prediction += sum(h * c for h, c in zip(fir_history, fir[0], strict=False))
@@ -306,8 +304,8 @@ def write_light_block_header(w, sub, size):
 
 
 def lossless_fold(rows, ch_assign):
-    """The check of the interval whose output rows these are: each sample shifted by the matrix channel
-    its output channel takes (ERRATA 12, provisional)."""
+    """The check of the interval whose output rows these are: each sample shifted by the matrix
+    channel its output channel takes (ERRATA 12, provisional)."""
     fold = 0
     for row in rows:
         for ch, value in enumerate(row):
@@ -337,7 +335,7 @@ def build_stream(stream):
         lsb_limit = 31 if sub.sync == 0x31EC else 24
         for ch in range(sub.min_chan, sub.max_chan + 1):
             channel = sub.channels[ch]
-            res[ch] = residuals(channel, sub.coded[ch], interval)
+            res[ch] = residuals(channel, sub.coded[ch])
             coding[ch] = choose_coding(channel, res[ch], lsb_limit)
         prepared.append((coding, res))
 
@@ -358,7 +356,8 @@ def build_stream(stream):
                 w.put(1 if restart_here else 0, 1)
                 if restart_here:
                     previous = list(range(first - interval, first)) if unit else []
-                    check = lossless_fold([sub.output[i] for i in previous], sub.ch_assign) if previous else 0
+                    rows = [sub.output[i] for i in previous]
+                    check = lossless_fold(rows, sub.ch_assign) if previous else 0
                     w.append(write_restart_header(sub, check))
                     write_full_block_header(w, sub, coding, size)
                 else:

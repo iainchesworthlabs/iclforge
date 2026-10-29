@@ -84,8 +84,9 @@ struct Predictors {
 [[nodiscard]] int filter_header_bits(const FilterSpec& filter) noexcept;
 
 // The prediction of the FIR filter for sample `t` of `history`: sum(coeff[k] * history[t - 1 - k])
-// >> shift, with history before the start taken as zero (TH spec §9.4; the decoder's history is
-// zero after a restart).
+// >> shift, with history before the start of `history` taken as zero (TH spec §9.4). The encoder
+// asks only for samples after the unfiltered first block of a restart interval, so the zeros are
+// never used (ERRATA.md entry 13).
 [[nodiscard]] std::int64_t fir_prediction(const FilterSpec& filter,
                                           std::span<const std::int32_t> history,
                                           std::size_t t) noexcept;

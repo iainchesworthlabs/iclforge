@@ -95,6 +95,17 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
     owner to confirm**). A stream whose major sync does not name the channels for its count (the assignment has fewer
     speakers than the channels) is refused by `loudness` and measured by `levels`, which needs no weights.
 
+18. **Filter histories across a restart (§7.1, §9.4, §9.5; entry 13).** §7.1 says a restart "resets all codec state". FFmpeg's
+    decoder keeps the FIR and IIR filters' histories across a restart, and the library follows it. The evidence is a
+    stream that filters from the first sample after a restart: the hand-built `hb_filters`, `hb_extra_data`,
+    `hb_drc_word` and `hb_lsb_bypass` (and `hb_marker_last`, `hb_noise_type1`, `hb_data_check`, which share the coding)
+    decode to the same samples in FFmpeg's strict decode and in the library when the histories run on; a library that
+    zeroed them differed from the first sample of the second interval, by the contribution of the previous interval's
+    last samples. Streams from FFmpeg's encoder are not affected, because their first block after a restart is not
+    filtered and fills the history before the first filtered sample. Does the specification mean the history to
+    survive, or does a restart zero it and FFmpeg differ from the reference decoder? **Provisional, owner to confirm.**
+    Evidence: `python3 tools/checks/verify_truehd_interop.py --handbuilt` (the FFmpeg leg for the hand-built set).
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -171,7 +182,8 @@ is FFmpeg's, found with a stream that permutes it (`python3 tools/checks/verify_
 **13. The FIR and IIR histories (§9.4, §9.5).** The FIR filter predicts from the channel's previous *outputs*. The
 "IIR" filter predicts from its previous *residuals* (`output - prediction`), not from previous outputs. The
 prediction is `sum >> coeff_q` with one shift for both filters (§9.3 says they are equal); the output is
-`(prediction + residual) & ~((1 << quant_step) - 1)`. Histories are kept across blocks and zeroed at a restart.
+`(prediction + residual) & ~((1 << quant_step) - 1)`. Histories are kept across blocks and, as FFmpeg's decoder does it, across a restart; they start at zero at the
+first one (open question 18, **provisional**; the specification says a restart resets all state).
 
 **14. The end-of-stream marker (§3.5, §16.5).** The last access unit of a stream whose length is not a multiple of
 the unit size ends every segment with 32 bits: `0xD234E` (20 bits, `terminatorA`) and a 12-bit count of the samples of

@@ -241,7 +241,21 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
         }
     }
 
+    // ERRATA.md entry 13 (provisional, owner to confirm, open question 18): a restart resets the
+    // coding parameters but not the filter histories. TH spec §7.1 says a restart resets all codec
+    // state; FFmpeg's decoder keeps the last outputs of a channel's FIR filter and the last
+    // residuals of its IIR filter across it, so a stream whose first block after a restart is
+    // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
+    // not running (the first restart, or the first after an error) starts from zero.
+    const auto previous = state.channels;
+    const bool carry_history = state.running;
     state = SubstreamState{};
+    if (carry_history) {
+        for (std::size_t c = 0; c < kMaxChannels; ++c) {
+            state.channels[c].fir_history = previous[c].fir_history;
+            state.channels[c].iir_history = previous[c].iir_history;
+        }
+    }
     state.running = true;
     state.restart = *header;
     state.context.min_chan = header->min_chan;

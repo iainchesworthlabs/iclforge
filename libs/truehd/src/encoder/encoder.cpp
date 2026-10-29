@@ -22,7 +22,10 @@ using Plane = std::vector<std::int32_t>;
 
 // TH spec §8.4 and ERRATA.md entry 19: the block size after a restart is 8 until a header says
 // otherwise. FFmpeg's streams start each restart interval with a block of 8 that is not filtered
-// (the filter has no history yet) and then use blocks of a whole access unit.
+// and then use blocks of a whole access unit. The decoder keeps the filter histories across a
+// restart (ERRATA.md entry 13), but those 8 samples fill the longest history a filter has (8
+// entries) before the first filtered sample, so the encoder's prediction never reaches back past
+// the restart and does not depend on which reading of the specification is right.
 constexpr int kFirstBlock = 8;
 constexpr int kMatrixShift = 14;    // ERRATA.md entry 8: coefficients are scaled to 2^-14
 constexpr int kMatrixFracBits = 4;  // a coefficient is sent in 1/16 steps, 6 bits

@@ -110,6 +110,40 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
     }
 }
 
+TEST_CASE("the filters' histories run on across a restart, as in FFmpeg's decode",
+          "[truehd][handbuilt][ffmpeg-derived]") {
+    // ERRATA entry 13, open question 18. hb_filters restarts every 16 access units (640 samples)
+    // and filters from the first sample after the restart. The 16 values are FFmpeg 6.1.1's strict
+    // decode of the stream (major sync format_info 0x0050A001, which FFmpeg needs and the
+    // library does not read, CRC fixed up): samples 636..643 of both channels. A decoder that
+    // zeroed the histories at the restart differs from sample 640.
+    constexpr std::size_t kFirst = 636;
+    constexpr std::array<std::array<std::int32_t, 2>, 8> kFfmpeg{{{-327458, -70839},
+                                                                  {-235891, 12679},
+                                                                  {-149264, 84069},
+                                                                  {-66977, 143105},
+                                                                  {9747, 189754},
+                                                                  {79803, 224382},
+                                                                  {144297, 248880},
+                                                                  {201579, 262857}}};
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_filters.thd");
+    Decoder decoder{DecoderConfig{}};
+    ElementaryReader reader(stream);
+    std::vector<std::int32_t> pcm;
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        pcm.insert(pcm.end(), (*decoded)->pcm.begin(), (*decoded)->pcm.end());
+    }
+    REQUIRE(pcm.size() >= 2 * (kFirst + kFfmpeg.size()));
+    for (std::size_t i = 0; i < kFfmpeg.size(); ++i) {
+        CAPTURE(kFirst + i);
+        CHECK(pcm[2 * (kFirst + i)] == kFfmpeg[i][0]);
+        CHECK(pcm[2 * (kFirst + i) + 1] == kFfmpeg[i][1]);
+    }
+}
+
 TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
           "[truehd][handbuilt][ffmpeg-derived]") {
     // ERRATA entry 12: the fold shifts by ch_assign[output channel]. The stream's first writer
