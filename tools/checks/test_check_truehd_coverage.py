@@ -51,6 +51,8 @@ class Census(unittest.TestCase):
         self.assertTrue(census("hb_output_shift_negative.thd")["output_shift_negative"])
         self.assertTrue(census("hb_output_shift_permuted.thd")["output_shift_on_moved_channel"])
         self.assertFalse(census("hb_matrices.thd")["output_shift_on_moved_channel"])
+        self.assertTrue(census("hb_ch_assign_changes.thd")["ch_assign_changes"])
+        self.assertFalse(census("hb_output_shift_permuted.thd")["ch_assign_changes"])
         self.assertTrue(census("hb_mlp_word16.thd")["mlp_word16_low_bits"])
         self.assertFalse(census("hb_filters.thd")["mlp_word16_low_bits"])
 

@@ -2353,8 +2353,8 @@ only, and part of the second has no outside reader.
    block data check, terminators, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
-   it: for eighteen of the twenty-eight it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
-   `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` and an output shift (also on a moved channel),
+   it: for nineteen of the twenty-nine it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
+   `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` (also one that changes at each restart) and an output shift (also on a moved channel),
    noise generator 0, noise generator 1 at 48, 96 and 192 kHz, the block data
    length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other ten: with the marker in
    every unit FFmpeg returns two of the twenty units; it refuses the 16-channel streams and the one at substream 3's limits, whose
@@ -2365,7 +2365,7 @@ only, and part of the second has no outside reader.
    does not read stays without an outside reader: the layout of the extra data, the values of the DRC word, the block data CRC,
    and the 16-channel substream; for those a misreading of the specification is in the writer and in both decoders alike.
    `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
-   (71 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
+   (72 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
    the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
    failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set

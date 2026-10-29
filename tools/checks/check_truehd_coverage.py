@@ -86,6 +86,7 @@ REQUIRED.update(
         "a 16 bit MLP stream with bits set below bit 8": lambda r: r["mlp_word16_low_bits"],
         "a quantiser step": lambda r: bool(r["quant_steps"]),
         "a permuted ch_assign": lambda r: r["ch_assign_permuted"],
+        "a ch_assign that changes between restart headers": lambda r: r["ch_assign_changes"],
         "a noise shift in the restart header": lambda r: r["noise_shift"],
         "a noise seed in the restart header": lambda r: r["noise_seed"],
         "the block data check": lambda r: r["data_check"],

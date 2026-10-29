@@ -102,12 +102,18 @@ class Substream:
         noise_shift=0,
         noise_seed=0,
         matrix_noise_shift=0,
+        ch_assign_cycle=None,
     ):
         self.min_chan, self.max_chan, self.mm = min_chan, max_chan, mm
         self.channels = channels  # {ch: Channel}
         self.output = output
         self.coded = coded  # {ch: [samples]}
-        self.ch_assign = ch_assign or list(range(mm + 1))
+        self.ch_assign = ch_assign or (
+            ch_assign_cycle[0] if ch_assign_cycle else list(range(mm + 1))
+        )
+        # The ch_assign of each restart interval in turn, for a stream whose assignment changes
+        # between restart headers: interval k takes ch_assign_cycle[k % len(ch_assign_cycle)].
+        self.ch_assign_cycle = ch_assign_cycle or [self.ch_assign]
         # (out, frac_bits, lsb_bypass, {channel: coefficient}[, noise shift]); the noise shift is
         # the matrix's own under noise_type 1 and defaults to `matrix_noise_shift`
         self.matrices = list(matrices)
@@ -119,6 +125,11 @@ class Substream:
         self.noise_seed = noise_seed
         # The 4 bit noise shift every matrix carries under noise_type 1 (sync 0x31EB, TH spec 10.2).
         self.matrix_noise_shift = matrix_noise_shift
+
+
+def assign_of(sub, interval):
+    """The ch_assign of the restart interval with this index."""
+    return sub.ch_assign_cycle[interval % len(sub.ch_assign_cycle)]
 
 
 # The channel assignment (TH spec 13.1) for a channel count, as the library's encoder takes it.
@@ -264,7 +275,7 @@ def write_filter(w, flt, is_iir, state=None):
         w.put(0, 1)  # new_states / the FIR filter's flag (ERRATA 9)
 
 
-def write_restart_header(sub, check, timing=0):
+def write_restart_header(sub, check, timing=0, assign=None):
     w = BitWriter()
     w.put(sub.sync, 14)
     w.put(timing, 16)
@@ -277,7 +288,7 @@ def write_restart_header(sub, check, timing=0):
     w.put(1 if sub.data_check else 0, 1)
     w.put(check, 8)
     w.put(0, 16)
-    for ch in sub.ch_assign:
+    for ch in assign or sub.ch_assign:
         w.put(ch, 6)
     bits = BitWriter()
     bits.append(w)
@@ -403,8 +414,9 @@ def build_stream(stream):
                 if restart_here:
                     previous = list(range(first - interval, first)) if unit else []
                     rows = [sub.output[i] for i in previous]
-                    check = lossless_fold(rows, sub.ch_assign) if previous else 0
-                    w.append(write_restart_header(sub, check))
+                    this = unit // stream.restart_interval
+                    check = lossless_fold(rows, assign_of(sub, this - 1)) if previous else 0
+                    w.append(write_restart_header(sub, check, assign=assign_of(sub, this)))
                     write_full_block_header(w, sub, coding, size)
                 else:
                     write_light_block_header(w, sub, size)
@@ -877,6 +889,43 @@ def case_output_shift_permuted():
     )
 
 
+def case_ch_assign_changes():
+    """ch_assign changes between restart headers, as the owner's second disc does ((4, 5, 1, 0, 2,
+    3) to (4, 5, 2, 1, 0, 3) there). The filters' histories belong to the matrix channels (TH spec
+    9.6), and a restart header does not clear them, so each matrix channel's filters run on
+    through a change, over a coded signal that now carries another output position. Every channel
+    has a FIR filter, so a decoder that forgets its histories at the change decodes the first
+    samples after it to other values."""
+    units, restart_interval = 48, 8
+    n = 40 * units
+    cycle = [[4, 5, 1, 0, 2, 3], [4, 5, 2, 1, 0, 3]]
+    wanted = [tone(n, 130 + p, 2**21) for p in range(6)]  # by output position
+    length = 40 * restart_interval
+    coded = {m: [wanted[cycle[(i // length) % 2][m]][i] for i in range(n)] for m in range(6)}
+    channels = {
+        0: Channel(fir=filt([96, -32], 6), huff_type=1),
+        1: Channel(fir=filt([48], 6), iir=filt([20, -8], 6), huff_type=3),
+        2: Channel(fir=filt([64, 16, -8], 6), huff_type=2),
+        3: Channel(fir=filt([40], 6)),
+        4: Channel(fir=filt([72, -24], 6), iir=filt([12], 6), huff_type=1),
+        5: Channel(fir=filt([56], 6), huff_type=3),
+    }
+    sub = Substream(
+        0,
+        5,
+        5,
+        channels,
+        list(zip(*wanted, strict=True)),
+        coded,
+        ch_assign_cycle=cycle,
+    )
+    return (
+        Stream([sub], n, restart_interval=restart_interval),
+        "ch_assign (4, 5, 1, 0, 2, 3) and (4, 5, 2, 1, 0, 3) in turn at each restart, FIR and IIR",
+        ["ch_assign", "ch_assign_changes", "fir", "iir"],
+    )
+
+
 def case_output_shift_negative():
     """A negative output shift is valid and scales the output down by an arithmetic right shift
     (TH spec 8.2.1): the coded values are the output shifted up, with low bits that the shift
@@ -1127,6 +1176,7 @@ CASES = {
     "hb_matrices": case_matrices,
     "hb_iir_state": case_iir_state,
     "hb_output_shift_permuted": case_output_shift_permuted,
+    "hb_ch_assign_changes": case_ch_assign_changes,
     "hb_output_shift_negative": case_output_shift_negative,
     "hb_mlp_word16": case_mlp_word16,
     "hb_noise_generator_0": case_noise,

@@ -61,10 +61,10 @@ names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/l
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
 The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
-do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign`, noise generators 0 and 1, a negative
+do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign` (also one that changes at each restart), noise generators 0 and 1, a negative
 output shift, 16 bit MLP words, the block data check, terminators, the end-of-stream marker, extra data, the directory's DRC word
 and the 16-channel substream. They are held to the signal each was made from, by this decoder and by
-`tools/references/truehd_syntax.py`, and FFmpeg's strict decode of eighteen of the twenty-eight returns that signal too
+`tools/references/truehd_syntax.py`, and FFmpeg's strict decode of nineteen of the twenty-nine returns that signal too
 (`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the other ten). The extra data's
 layout, the DRC word's values, the block data CRC, the terminators and the 16-channel substream have no external oracle.
 

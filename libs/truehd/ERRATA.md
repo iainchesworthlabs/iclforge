@@ -227,7 +227,11 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     group rates of an MLP stream) or substream count and not for the rest of `format_info`; `test_handbuilt.cpp` rewrites the
     channel assignment word of every later major sync of `hb_filters` and holds the decode to the unchanged one. A restart header
     that changes `max_matrix_chan` inside a stream keeps the histories (FFmpeg does too; v3.9 permits a reset there, and no stream
-    does it). **Confirmed by TH spec v3.9 §9.6; awaiting the DEE score.** The differential harness
+    does it). A restart header that changes `ch_assign` keeps them too, which the owner's second disc needs (its restart headers change
+    `ch_assign` between `(4, 5, 1, 0, 2, 3)` and `(4, 5, 2, 1, 0, 3)` inside the stream): `hb_ch_assign_changes` cycles those two
+    assignments at every restart of a six-channel stream whose channels all have a FIR filter, FFmpeg 6.1.1's strict decode returns its
+    signal, and `test_handbuilt.cpp` holds the decode to it (the test fails when the decoder drops the histories at such a restart).
+    **Confirmed by TH spec v3.9 §9.6; awaiting the DEE score.** The differential harness
     (`libs/truehd/fuzz/differential_oracle.hpp`) still skips a stream whose major syncs differ; it could stop. Evidence:
     `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/major-sync-format-info-changes-mid-stream`.
 
@@ -996,7 +1000,7 @@ is entry 32: three substreams, the third with sync 0x31EB, made by the encoder a
 The stream `hb_substream3_limits` is made by `tools/references/truehd_writer.py`: four substreams, the last of 16 channels with sync 0x31EC,
 `max_matrix_chan` 15 and 15 primitive matrices on channels 8 to 15, two channels with a FIR filter of gain -5.9 and two with an IIR filter whose
 residual reaches 2^28, `huff_lsbs` 29 to 31, terminatorB. `python3 tools/checks/verify_truehd_interop.py --handbuilt --forge forge --reference`
-holds `forge decode` and the Python reference to its signal (28 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
+holds `forge decode` and the Python reference to its signal (29 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
 Only PCM of 24 bits is given back: a value of an object channel that needs more would lose its top bits in the output (and in the lossless check,
 which folds the low three bytes), and v3.6 says nothing about the width (question 35).
 

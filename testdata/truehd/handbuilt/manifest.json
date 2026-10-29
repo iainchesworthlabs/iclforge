@@ -132,6 +132,29 @@
       "pcm_sha256": "784814eada02e51f8610e8ace9db0736d661bda5fc15f9687901605225e43dd6"
     },
     {
+      "name": "hb_ch_assign_changes",
+      "file": "hb_ch_assign_changes.thd",
+      "description": "ch_assign (4, 5, 1, 0, 2, 3) and (4, 5, 2, 1, 0, 3) in turn at each restart, FIR and IIR",
+      "features": [
+        "ch_assign",
+        "ch_assign_changes",
+        "fir",
+        "iir"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 6,
+      "access_units": 48,
+      "pcm_samples": 1920,
+      "stream_sha256": "56a3f4bb17daa4a37ab6c9ed4ef54bd093884623730cbc39fb02562bd24cd78d",
+      "pcm_sha256": "4db822d1ecb3f975fc2f70d34bec3b8569cb6fac651d389a27a21f7a320b0b14"
+    },
+    {
       "name": "hb_output_shift_negative",
       "file": "hb_output_shift_negative.thd",
       "description": "negative output shifts -1 and -3: an arithmetic right shift of the coded values",

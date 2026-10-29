@@ -235,6 +235,74 @@ TEST_CASE("a major sync that changes only the channel assignment keeps the filte
     CHECK(decode_all(units) == plain);
 }
 
+TEST_CASE("a restart header that changes ch_assign keeps the filters' histories",
+          "[truehd][handbuilt][ffmpeg-derived]") {
+    // TH spec §9.6 and §7.4: the histories belong to the matrix channels, and ch_assign only says
+    // which output position each of them takes, so a restart header that changes it (the owner's
+    // second disc changes (4, 5, 1, 0, 2, 3) to (4, 5, 2, 1, 0, 3) between restarts) neither
+    // clears a history nor changes what the matrix channels hold. hb_ch_assign_changes cycles
+    // those two assignments at every restart of a six-channel stream whose channels all have a
+    // FIR filter, over a coded signal that follows the assignment (the Python writer works the
+    // signal out from the output positions, independently of the library; FFmpeg 6.1.1's strict
+    // decode returns it too). A decoder that forgets a history at the change, or reads the new
+    // assignment the old way round, decodes the interval after it to other samples.
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_ch_assign_changes.thd");
+    std::vector<std::vector<std::uint8_t>> assignments;
+    {
+        ElementaryReader reader(stream);
+        while (const auto unit = reader.next()) {
+            auto parsed = parse_access_unit(*unit, 1);
+            REQUIRE(parsed.has_value());
+            iclforge::BitReader bits(parsed->segments[0]);
+            if (bits.read(1) == 1 &&
+                bits.read(1) == 1) {  // block_header_exists, restart_header_exists
+                auto restart = read_restart_header(bits, parsed->segments[0], true);
+                REQUIRE(restart.has_value());
+                REQUIRE(restart->max_matrix_chan == 5);
+                assignments.emplace_back(restart->ch_assign.begin(),
+                                         restart->ch_assign.begin() + 6);
+            }
+        }
+    }
+    REQUIRE(assignments.size() >= 4);
+    const std::vector<std::uint8_t> first = {4, 5, 1, 0, 2, 3};
+    const std::vector<std::uint8_t> second = {4, 5, 2, 1, 0, 3};
+    for (std::size_t k = 0; k < assignments.size(); ++k) {
+        CAPTURE(k);
+        CHECK(assignments[k] == (k % 2 == 0 ? first : second));
+    }
+
+    std::ifstream manifest_file(dir() + "/manifest.json");
+    const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
+    std::string wanted;
+    for (const nlohmann::json& fixture : manifest["fixtures"]) {
+        if (fixture["name"] == "hb_ch_assign_changes") {
+            wanted = fixture["pcm_sha256"];
+        }
+    }
+    REQUIRE_FALSE(wanted.empty());
+
+    Decoder decoder;
+    std::vector<std::byte> pcm_bytes;
+    ElementaryReader reader(stream);
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        for (const std::int32_t sample : (*decoded)->pcm) {
+            // s32le with the 24 bit sample in the top bytes, as the manifest's hash is made
+            const auto word = static_cast<std::uint32_t>(sample) << 8U;
+            for (unsigned shift = 0; shift < 32; shift += 8) {
+                pcm_bytes.push_back(static_cast<std::byte>((word >> shift) & 0xFFU));
+            }
+        }
+    }
+    CHECK(decoder.counters().lossless_check_failures == 0);
+    CHECK(decoder.counters().lossless_checks_ok >= 4);
+    CHECK(pcm_bytes.size() == 1920U * 6U * 4U);
+    CHECK(hex(iclforge::base::crypto::sha256(pcm_bytes)) == wanted);
+}
+
 TEST_CASE("hb_matrices carries the lossless check FFmpeg calculates for it",
           "[truehd][handbuilt][ffmpeg-derived]") {
     // ERRATA entries 12 and 42: the fold shifts by the matrix channel the output channel takes.

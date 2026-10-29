@@ -45,6 +45,8 @@ class Census:
         self.iir_state_shift = False  # an IIR new_states with a non-zero state_shift
         self.quant_steps = set()
         self.ch_assign_permuted = False
+        self.ch_assign_changes = False  # a substream's ch_assign changes between restart headers
+        self.last_assign = {}
         self.noise_shift = False
         self.noise_seed = False
         self.data_check = False
@@ -83,6 +85,9 @@ def census_of(data):
         c.data_check |= bool(self.data_check)
         c.restart_syncs.add(0x31EB if self.noise_type else 0x31EA)  # 0x31EC reads as 0x31EA/B
         c.ch_assign_permuted |= self.ch_assign != sorted(self.ch_assign)
+        previous = c.last_assign.get(id(self))
+        c.ch_assign_changes |= previous is not None and previous != self.ch_assign
+        c.last_assign[id(self)] = list(self.ch_assign)
 
     def block_header(self, bits):
         original["block_header"](self, bits)
@@ -215,6 +220,7 @@ def _syntax_facts(c):
         "iir_state_shift": c.iir_state_shift,
         "quant_steps": sorted(c.quant_steps),
         "ch_assign_permuted": c.ch_assign_permuted,
+        "ch_assign_changes": c.ch_assign_changes,
         "noise_shift": c.noise_shift,
         "noise_seed": c.noise_seed,
         "data_check": c.data_check,
