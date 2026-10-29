@@ -172,6 +172,19 @@ if(ICLFORGE_BUILD_AC4)
     endif()
 endif()
 
+# truehd_round_trip demonstrates the TrueHD encoder and decoder (libs/mlp), which link nothing of
+# iclforge::ac3 either. It makes its own source, so ctest runs it with no arguments, and it fails
+# when the round trip is not exact. libs/mlp is built only with ICLFORGE_BUILD_MLP and outside the
+# minimal profiles, so the target's existence is the condition.
+if(TARGET iclforge::mlp)
+    add_executable(truehd_round_trip truehd_round_trip.cpp)
+    target_link_libraries(truehd_round_trip PRIVATE iclforge::mlp iclforge::warnings iclforge::fmt)
+    set_target_properties(truehd_round_trip PROPERTIES FOLDER examples)
+    if(ICLFORGE_BUILD_TESTS)
+        add_test(NAME "example.truehd_round_trip" COMMAND truehd_round_trip)
+    endif()
+endif()
+
 # Run them under ctest when tests are on, so "the examples still work" is
 # checked by the same command as everything else.
 if(ICLFORGE_BUILD_TESTS)

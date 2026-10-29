@@ -1,7 +1,9 @@
 # Decoding
 
 This page covers AC-3 and E-AC-3. AC-4 has a decoder of its own, `iclforge::ac4::Decoder`, with its own
-controls, presentations and objects, and none of `iclforge::ac3::io` reads it: see [AC-4](ac4.md).
+controls, presentations and objects, and none of `iclforge::ac3::io` reads it: see [AC-4](ac4.md). TrueHD's
+lossless decoder is `iclforge::mlp::Decoder`, with its own framing in `iclforge::mlp`: see
+[TrueHD](truehd.md).
 
 ## Reading a stream: `iclforge::ac3::io::scan`
 

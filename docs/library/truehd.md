@@ -133,6 +133,9 @@ out.insert(out.end(), tail->begin(), tail->end());
 A restart interval is coded once all of it has arrived, so output lags input by up to
 `restart_interval` access units; `iclforge::mlp::encode_stream()` does a whole buffer in one call.
 
+Full program: [`examples/truehd_round_trip.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/truehd_round_trip.cpp),
+which encodes 5.1 in pieces and decodes both presentations.
+
 Channels are in the order of section 13.1's channel assignment: 2 channels L R; 6 channels L R C
 LFE Ls Rs; 8 channels L R C LFE Ls Rs Lrs Rrs. Two channels make one substream, six make two (the
 2-channel and 6-channel presentations), eight make three (2, 6 and 8). `channel_assignment`

@@ -69,6 +69,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/iab/ac3iab.hpp`, `model.hpp`, `mxf.hpp` | **Experimental** — see below; not part of the `v1.0.0` freeze despite being installed and default-on today. |
 | `iclforge/containers/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
 | `iclforge/ac4/core/toc.hpp`, `iclforge/ac4/decoder/decoder.hpp`, `iclforge/ac4/encoder/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
+| `iclforge/mlp/decoder/decoder.hpp`, `iclforge/mlp/encoder/encoder.hpp`, `iclforge/mlp/encoder/atmos.hpp`, `iclforge/mlp/io/*.hpp`, `iclforge/mlp/core/*.hpp` | **Experimental** — the TrueHD (MLP) decoder, encoder and Atmos path, installed and default-on; see below. |
 | `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
 | `iclforge/base/crypto/signing_key.hpp`, `iclforge/ac3/signing/emdf_atmos_signer.hpp` | Public. |
@@ -176,10 +177,9 @@ not. Its own model is still being built out (the MXF track-file wrapping is read
 see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
 the Public tier above until this page deliberately promotes it. The same designation applies to
-`iclforge::mlp` when the TrueHD/MLP branch lands (itself already
-scoped as "an explicitly experimental module" gated behind its own `ICLFORGE_BUILD_MLP` — this
-page's policy just confirms that plan rather than overriding it; real interoperability, `IM6`,
-stays separately blocked on MLP/FBA source material that isn't public). A new module defaults to
+`iclforge::mlp`, the TrueHD codec ([TrueHD](truehd.md)), gated behind its own
+`ICLFORGE_BUILD_MLP`: its decoder and encoder agree exactly with FFmpeg's, and interoperability
+with Dolby's own decoders (`IM6`) is untried. A new module defaults to
 Experimental from its first merge, and only leaves that tier through a deliberate, documented
 decision on this page, the same way `iclforge::iab` will. `iclforge::render` is one: it began in
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the

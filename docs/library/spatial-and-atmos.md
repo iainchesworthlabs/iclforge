@@ -491,6 +491,16 @@ authored position and gain into one metadata update a frame
 (`apps/shared/media/src/ac4_objects_core.hpp`). `ObjectScene`, `motion.hpp` and `AtmosEncoder` know nothing
 of AC-4.
 
+### TrueHD Atmos
+
+TrueHD carries Atmos differently from E-AC-3 and AC-4: the objects are coded losslessly, each a
+channel of a 16-channel substream beside a 7.1 bed, and their metadata rides in each access unit's
+extra data as an `iclforge::objects` OAMD payload (`iclforge::objects::oba::build_payload`, the same
+serialisation the E-AC-3 path uses). `iclforge::mlp::AtmosEncoder` takes the objects' metadata as
+`iclforge::objects::oba::DynamicObject` states over time and renders the objects into the bed for
+the 8-channel presentation a player without Atmos plays; `iclforge::mlp::decode_atmos` gives back
+the bed, the objects and the metadata. See [TrueHD → Atmos](truehd.md#atmos).
+
 ## Objects-or-nothing: `AtmosConfig::emit_object_metadata`
 
 Whether to emit the EMDF object container (OAMD + JOC) at all. On by default: an object-aware

@@ -4,7 +4,7 @@ Every program in [`examples/`](https://github.com/iainchesworthlabs/iclforge/tre
 builds by default (`ICLFORGE_BUILD_EXAMPLES=ON`) and registers as a `ctest` entry named
 `example.<name>`, so "the examples still work" is checked by the same command as everything else
 (`read_adm`, `encode_adm`, and `encode_iab` additionally need
-`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` needs `ICLFORGE_BUILD_AC4` and the two C programs
+`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` needs `ICLFORGE_BUILD_AC4`, `truehd_round_trip` `ICLFORGE_BUILD_MLP`, and the two C programs
 `ICLFORGE_BUILD_CAPI`, both on by default). These programs are
 also the source the library pages excerpt from — each page's "Full program" link lands on one of
 them.
@@ -26,6 +26,7 @@ them.
 | [`decode_stream`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/decode_stream.cpp) | Scan an unknown elementary stream, then decode it with the right decoder. | [Decoding](decoding.md) |
 | [`decode_robustness`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/decode_robustness.cpp) | Skip a damaged mid-stream frame and keep decoding. | [Decoding](decoding.md) |
 | [`decode_ac4`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/decode_ac4.cpp) | Decode an AC-4 stream that arrives in pieces, by block, with a television's output settings, then read its presentations and metadata. `ctest` hands it a committed stream. | [AC-4 decoding](ac4.md) |
+| [`truehd_round_trip`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/truehd_round_trip.cpp) | Encode 5.1 PCM to lossless TrueHD in pieces, decode the 6-channel presentation back to the exact source and the 2-channel presentation as its fold-down. | [TrueHD](truehd.md) |
 | [`stream_edit`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/stream_edit.cpp) | Where each access unit starts, a metadata rewrite that leaves the audio bit-identical, and a cut that rejoins byte for byte. | [Decoding](decoding.md) |
 | [`level_metering`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/level_metering.cpp) | Decode and meter: per-channel peak/RMS plus the speaker-ring energy vector. | [Muxing & sinks](muxing-and-sinks.md) |
 | [`qc_report`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/qc_report.cpp) | Decode, measure BS.1770-4/Tech 3342, and check named QC delivery gates. | [Metadata](metadata.md) |

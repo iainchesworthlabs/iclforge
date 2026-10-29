@@ -104,6 +104,7 @@ nav:
           - ADM → Atmos bridging: library/adm-bridge.md
           - IAMF reading and writing: library/iamf.md
           - AC-4 decoding and encoding: library/ac4.md
+          - TrueHD (MLP) decoding and encoding: library/truehd.md
           - Measuring quality: library/quality.md
           - Object signing: library/signing.md
           - Header map: library/header-map.md

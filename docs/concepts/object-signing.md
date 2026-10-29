@@ -238,12 +238,16 @@ the app streams the unsigned `bed51`-equivalent, always safe on any receiver.
 
 ## Sibling: TrueHD Evolution
 
-This page is **E-AC-3 / EMDF** object signing only. TrueHD uses a different keyed check —
-**Evolution frame protection** (truncated HMAC-SHA-256 over the access unit and the Evolution
-frame). That seam belongs on the TrueHD/MLP branch (`feature/truehd-atmos-support`, roadmap IM5),
-not in `iclforge::ac3::signing`. Open tools such as truehdd expose it as an optional `--evo-key`; decode
-without a key stays unchecked. Any future multi-key verify / licensed soft-gate for MLP should
-target Evolution HMAC, parallel to but separate from the EMDF policy on this page.
+This page is **E-AC-3 / EMDF** object signing only. TrueHD's content protection is a separate
+question, with two sources that disagree: the TrueHD specification the codec is written from
+(section 22) names the `pace-ccjf1` ECDSA content signature, carried in an access unit's extra
+data, and this page used to describe a truncated HMAC-SHA-256 over the access unit and the
+Evolution frame, as open tools such as truehdd verify with an optional `--evo-key`. Neither is
+implemented. `iclforge::mlp` carries a signature as an evolution payload
+(`EvolutionPayloadType::kContentSignature`) through the encoder's `SignatureHook` and hands it
+back from the decoder, unchecked, so that whichever scheme is chosen can be added without
+changing the stream layout; [TrueHD](../library/truehd.md#content-signatures) has the detail.
+Whatever is chosen stays separate from `iclforge::ac3::signing`'s EMDF path.
 
 ## Sibling: AC-4
 

@@ -10,6 +10,21 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: a TrueHD (MLP) decoder and lossless encoder, with Atmos, as `iclforge::mlp` (Experimental).** `libs/mlp`, behind
+  `ICLFORGE_BUILD_MLP` (on by default; the vcpkg feature and Conan option `truehd`), written from a clean-room specification with
+  FFmpeg as a black-box arbiter where the text contradicts itself (`planning/truehd.md` lists each reading, `libs/mlp/ERRATA.md` the
+  corrected syntax). The decoder gives every presentation (2, 6, 8 and 16 channels) at 44.1 to 192 kHz, checks every CRC, parity and
+  lossless check, starts at any major sync, and reports the DRC metadata and evolution payloads; it decodes FFmpeg's eleven golden masters
+  (`testdata/truehd/ffmpeg`) to their sources exactly. The encoder takes 1 to 8 channels of 16 to 24-bit PCM, builds the lower
+  presentations as fold-downs (or, with `downmix` off, as FFmpeg does), chooses decorrelation matrices, FIR and IIR filters, Huffman
+  coding and block sizes by exact cost, schedules against `peak_data_rate`, and decodes every access unit it writes before handing it
+  over; its streams are 13 to 34 % smaller than FFmpeg's for stereo on the golden masters' sources. Atmos: a 7.1 bed and up to eight
+  objects in a 16-channel substream, the object audio metadata in evolution payloads (`AtmosEncoder`, `decode_atmos`). forge gains
+  `truehd-encode`, `truehd-atmos-encode` and `truehd-atmos-decode`, and `decode`, `probe` and `transcode` read and write TrueHD; Matroska
+  carries it as `A_TRUEHD`. `tools/checks/verify_truehd_interop.py`, in CI, holds FFmpeg's decode of forge's streams to their sources,
+  and `tools/checks/verify_truehd_dee_gold.py` decodes the Dolby Encoding Engine's masters where they are. Not done: the noise generator
+  (not specified; streams that use it are refused), IEC 61937 and MPEG-TS carriage, and a content signature scheme (the carriage is
+  there; the scheme is the owner's decision). See [TrueHD](docs/library/truehd.md).
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

@@ -1129,8 +1129,9 @@ void print_command_index(std::span<const CommandInfo> commands) {
 }
 
 void print_usage(std::span<const CommandInfo> commands) {
-    fmt::println("Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52), "
-                 "AC-4 (ETSI TS 103 190) and TrueHD (MLP) encoder/decoder");
+    fmt::println(
+        "Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52), "
+        "AC-4 (ETSI TS 103 190) and TrueHD (MLP) encoder/decoder");
     fmt::println("");
     print_command_index(commands);
     print_unavailable_reasons(commands);

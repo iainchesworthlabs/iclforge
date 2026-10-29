@@ -1,10 +1,10 @@
 # TrueHD (MLP): a decoder, an encoder and Atmos
 
-!!! note "Status as of 2026-10-29: phase 0 (this design) drafted; nothing built yet"
+!!! note "Status as of 2026-10-29: phases 0 to 6 done on `feature/truehd-codec`, with the gaps listed under Status"
     Written on 2026-10-29 as the plan for `iclforge::mlp`, a TrueHD (MLP) encoder and decoder with
     Atmos, built fresh from the clean-room specification `truehd-spec.md` (version 3.0, 2026-10-29,
-    supplied by the owner and kept outside the repository). The [Status](#status) section is kept
-    current as each phase lands.
+    supplied by the owner and kept outside the repository), and refined as the implementation showed
+    where the plan was wrong. The [Status](#status) section is the state of each phase.
 
 ## Scope
 
@@ -30,7 +30,9 @@ out like `libs/ac4`:
 
 Out of scope for this round: either content signing scheme (see
 [decision 1](#decisions-needing-owner-review)), passthrough integration beyond IEC 61937 data type 22
-and MAT framing, and GUI front ends.
+and MAT framing, and GUI front ends. Of the transports, Matroska `A_TRUEHD` is built; IEC 61937
+data type 22 with MAT framing, and MPEG-TS stream type 0x83, are not, because the specification
+does not give enough to build them (P39, P40).
 
 ## Sources and the clean-room position
 
@@ -58,27 +60,36 @@ read or reused ([decision 2](#decisions-needing-owner-review)).
 
 ```
 libs/mlp/
-  CMakeLists.txt, README.md, ERRATA.md
+  CMakeLists.txt, README.md (generated), ERRATA.md
   include/iclforge/mlp/
+    core/error.hpp              Error, one value per check point, describe()
     core/stream_info.hpp        major sync, format info, channel meaning, presentations
-    decoder/decoder.hpp         Decoder, DecoderConfig, DecodedAccessUnit, errors
-    encoder/encoder.hpp         Encoder, EncoderConfig, EncoderStats
+    core/syntax.hpp             the structures: access unit header, substream directory,
+                                restart header, block header and decoding parameters
+    decoder/decoder.hpp         Decoder, DecoderConfig, DecodedAccessUnit, decode_stream
+    encoder/encoder.hpp         Encoder, EncoderConfig, EncoderStats, encode_stream
+    encoder/atmos.hpp           AtmosEncoder, render_gains, decode_atmos
     io/elementary.hpp           access-unit framing of a .thd / .mlp byte stream, probe
     io/extra_data.hpp           evolution payload carriage (the signing hook)
   src/
-    core/   syntax.hpp/.cpp     the shared field descriptions (read and write from one table)
-            crc.hpp/.cpp        CRC-8 0x1D, CRC-16 0x2D, parity, check nibble
-            huffman.hpp/.cpp    the Appendix C codebooks, consteval-checked
-            filters.hpp/.cpp    FIR / IIR prediction, shared by encoder and decoder
-            matrix.hpp/.cpp     primitive matrices, shared
-            lossless_check.*
-    decoder/ decoder.cpp, substream.cpp, block.cpp, presentation.cpp
-    encoder/ encoder.cpp, analysis (matrix, lpc, filter pool), coder (huffman choice),
-             rate_control.cpp (FIFO model), writer.cpp
-    io/     elementary.cpp, extra_data.cpp, probe.cpp
-    atmos/  oamd_carriage.cpp   OAMD to and from evolution payloads via libs/objects
-  tests/    one binary, ctest label mlp
-  fuzz/     fuzz_mlp_parse.cpp, fuzz_mlp_decode.cpp, seeds/
+    core/   syntax.hpp          the shared field descriptions (read and write from one table)
+            syntax_io.hpp       the bit reader and writer those descriptions run over
+            access_unit.*       access unit framing, major sync read and write
+            crc.hpp             CRC-8 0x1D, CRC-16 0x2D, the substream CRC 0x63, parity, check nibble
+            huffman.hpp         the Appendix C codebooks, consteval-checked
+            reconstruct.hpp     FIR / IIR prediction, primitive matrices, output shift, lossless
+                                check: the arithmetic the encoder and decoder share
+            stream_info.cpp
+    decoder/ decoder.cpp        substreams, blocks, presentations, checks
+    encoder/ plan.*             presentations, downmix folds with their limiter, decorrelation
+             analysis.*         LPC (Levinson-Durbin), two-stage least squares, quantisation
+             coder.*            Huffman parameter choice by exact cost, sample writing
+             rate_control.*     the FIFO schedule (P33)
+             encoder.cpp        the interval loop, block-size choice, writer, self-check
+    io/     elementary.cpp, extra_data.cpp
+    atmos/  atmos.cpp           the Atmos encoder and decoder, OAMD via libs/objects
+  tests/    one binary, iclforge-mlp-tests
+  fuzz/     fuzz_mlp_decode.cpp, fuzz_mlp_encode.cpp, seeds/
 ```
 
 The module links `iclforge::base` (bit reader and writer, CRC helpers, speakers) and
@@ -93,14 +104,14 @@ The module links `iclforge::base` (bit reader and writer, CRC helpers, speakers)
 | 6 substream directory | `core/syntax` `SubstreamDirectoryEntry` |
 | 7 restart header | `core/syntax` `RestartHeader` |
 | 8 block header, channel parameters | `core/syntax` `BlockHeader`, `ChannelParams` |
-| 9 filters | `core/filters` |
-| 10 primitive matrices | `core/matrix` |
+| 9 filters | `src/core/reconstruct.hpp` `ChannelFilter`; encoder `analysis` |
+| 10 primitive matrices | `src/core/reconstruct.hpp` `matrix_output`; encoder `plan` |
 | 11, Appendix C Huffman | `core/huffman` |
 | 12 DRC | `decoder/decoder.hpp` `DrcMetadata` |
-| 15, 16 OAMD, evolution | `io/extra_data`, `atmos/oamd_carriage` |
+| 15, 16 OAMD, evolution | `io/extra_data`, `atmos/atmos.cpp` |
 | 18 FIFO | `encoder/rate_control` |
-| 21 transport | `libs/containers` (IEC 61937 type 22, MAT; Matroska `A_TRUEHD`; MPEG-TS 0x83) |
-| Appendix E | `decoder` `ErrorCode` values, one per check point |
+| 21 transport | `libs/containers` Matroska `A_TRUEHD`; IEC 61937 type 22, MAT and MPEG-TS 0x83 not built (P39, P40) |
+| Appendix E | `core/error.hpp` `Error` values, one per check point |
 
 ## Test and oracle plan
 
@@ -110,9 +121,9 @@ The module links `iclforge::base` (bit reader and writer, CRC helpers, speakers)
 2. Property tests: random channel count, rate, depth, block size, silence, full scale, clipping
    edges and noise; encode then decode, and the PCM must be identical.
 3. FFmpeg golden masters in `testdata/truehd/` made by
-   `tools/generators/gen_truehd_ffmpeg_gold.py` (never in CI): 2, 6 and 8 channels, 48 and 96 kHz,
-   16 and 24 bit, with a SHA-256 manifest of each stream and its source. Our decoder must reproduce
-   each source.
+   `tools/generators/gen_truehd_ffmpeg_gold.py` (never in CI): 2 and 6 channels (FFmpeg's encoder
+   stops at 5.1), 44.1 to 192 kHz, 16 and 24 bit, one source not a whole number of access units,
+   with a SHA-256 manifest of each stream and its source. Our decoder must reproduce each source.
 4. DEE masters: a harness reads `ICLFORGE_DEE_GOLD_DIR` (the local set of
    `tools/generators/gen_dee_gold.py`), decodes every TrueHD leg with our decoder and FFmpeg and
    requires both to equal the source where the manifest says audio was not altered; it skips with a
@@ -120,8 +131,8 @@ The module links `iclforge::base` (bit reader and writer, CRC helpers, speakers)
    `testdata/` for the owner to commit.
 5. `tools/checks/verify_truehd_interop.py`: forge encode then FFmpeg decode equals the source;
    forge decode of the committed FFmpeg streams equals the source; forge round trip; Atmos round
-   trip of bed, objects and OAMD, and FFmpeg decodes the Atmos stream without error. Wired into
-   `_build.yml` and `interop.yml`.
+   trip of bed, objects and OAMD, and FFmpeg decodes the Atmos stream without error; the same in
+   Matroska. Wired into `_ci-linux.yml` (quick) and `interop.yml` (full).
 
 ## Spec problem register
 
@@ -167,6 +178,8 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 | P36 | 8.2, 9.3 | `output_shift` is a 4-bit signed field, so at most 7 | A source's trailing zeros past 7 go to the quantiser step: a 16-bit source in 24-bit words is shift 7 with step 1, as FFmpeg codes it | FFmpeg's 16-bit streams; ours decode exactly in FFmpeg |
 | P37 | 10.2, 17 | The two noise mechanisms | Noise type 0: a primitive matrix takes coefficients for `max_chan + 3` inputs, the last two noise channels, and no noise shift. Noise type 1: it takes coefficients for `max_chan + 1` inputs and is followed by a 4-bit `matrix_noise_shift`. With no generator given (P27), our decoder refuses a non-zero noise coefficient or noise shift, and our encoder writes neither | Of eight layouts tried offline on two streams, only this one gives the output channels FFmpeg's decoder reported misreading (10 and 13); written this way the streams decode exactly |
 | P38 | 13.1, (FFmpeg) | FFmpeg's channel order | FFmpeg outputs a 7.1 presentation in its native order, the rear pair (13.1 bit 6, Lrs and Rrs) before the side pair (bit 3, Ls and Rs); stereo and 5.1 come out in 13.1's order. 6.1 (13.1's 0x08F, Cs in bit 7) comes out with Cs before the side pair. The interop gate compares in FFmpeg's order | Our streams decode in FFmpeg equal to the source under the orders 0 1 2 3 6 7 4 5 (7.1) and 0 1 2 3 6 4 5 (6.1) |
+| P39 | 21.1, 21.3 | IEC 61937 data type 22 and MAT: only sizes are given (a 61,440-byte MAT frame holding 24 access units), with no MAT frame syntax (its header, the codes between access units, the padding rule) and no burst preamble values | Not built: a MAT writer made from the sizes alone could not be shown to be accepted by any receiver, and none is available here to try. `forge spdif` does not take TrueHD | Specification text only |
+| P40 | 21.2 | MPEG-TS stream type 0x83: the stream type is given, and nothing of the PES layout (whether Blu-ray's AC-3 core shares the PID, how access units align to PES packets) | Not built this round; Matroska carries TrueHD instead. `forge ts` does not take TrueHD | Specification text only |
 | P17 | 22, ROADMAP | Signing: pace-ccjf1 ECDSA in the specification, truncated HMAC-SHA-256 in ROADMAP.md and `docs/concepts/object-signing.md` | carriage only, no scheme | [decision 1](#decisions-needing-owner-review) |
 
 ## Decisions needing owner review
@@ -206,10 +219,10 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 
 | Phase | What | State |
 |---|---|---|
-| 0 | this design | drafted 2026-10-29 |
-| 1 | bitstream layer | core done 2026-10-29: structures, one syntax description (`libs/mlp/src/core/syntax.hpp`), access unit framing, CRCs, Huffman; `iclforge-mlp-tests` passes. Extra data container and public `io/elementary.hpp` next. A scratch Python model that decodes all four FFmpeg test streams exactly is at `/tmp/claude-0/-home-claude/4316ae20-e191-53b7-a454-66eafc52d7e3/scratchpad/exp/model.py` (outside the repository, may be lost) |
-| 2 | decoder | core done 2026-10-29: `libs/mlp/src/decoder/decoder.cpp` decodes all eleven FFmpeg golden masters exactly (`iclforge-mlp-tests "[gold]"`), 2-channel presentation of 5.1, typed errors. Not yet exercised: IIR filters, matrices in upper substreams, 8 and 16 channels (need our encoder) |
-| 3 | encoder | core done 2026-10-29: plan (presentations, downmix with limiter, decorrelation), filter pool (FIR by Levinson-Durbin, FIR+IIR by two-stage least squares), exact Huffman costing, FIFO schedule, self-verification. Streams of 1 to 8 channels at 44.1 to 192 kHz, 16 to 24 bit decode exactly in our decoder and in FFmpeg's. Next: block-size choice, rate-control test |
+| 0 | this design | done 2026-10-29, kept current: layout, spec map and register as built (P1 to P40), six decisions for the owner |
+| 1 | bitstream layer | done 2026-10-29: structures with one syntax description (`libs/mlp/src/core/syntax.hpp`) for parser and writer, access unit framing, every CRC, parity and check nibble, Huffman, the extra data container (P16), `io/elementary.hpp` scan and probe |
+| 2 | decoder | done 2026-10-29: every presentation (2, 6, 8, 16), 44.1 to 192 kHz, FIR and IIR, upper-substream matrices, random access, DRC metadata, evolution payloads, typed errors; decodes all eleven FFmpeg golden masters exactly (`iclforge-mlp-tests "[gold]"`). Refuses noise (P27, P37) and DVD-Audio MLP |
+| 3 | encoder | done 2026-10-29: plan (presentations, downmix with limiter, decorrelation), filter pool (FIR by Levinson-Durbin, FIR+IIR by two-stage least squares), exact Huffman costing, one or two blocks per access unit by exact cost, FIFO schedule with `kRateExceeded` (tested), self-verification. Streams of 1 to 8 channels at 44.1 to 192 kHz, 16 to 24 bit decode exactly in ours and FFmpeg's; 13 to 34 % smaller than FFmpeg's for stereo, 3 to 23 % for 5.1 with `downmix` off, on the golden masters' sources |
 | 4 | Atmos | done 2026-10-29: `iclforge/mlp/encoder/atmos.hpp` (AtmosEncoder, decode_atmos, render_gains), forge `truehd-atmos-encode`/`truehd-atmos-decode`; bed, objects and OAMD round-trip exactly; FFmpeg decodes the stream as its 8-channel presentation, equal to ours |
-| 5 | library surface, CLI, docs | forge `truehd-encode`, and TrueHD in `decode`, `probe` (table and json=1), `transcode` landed 2026-10-29; public headers core/, io/, decoder/, encoder/. Docs, CHANGELOG, ROADMAP not yet |
-| 6 | tests and gates | FFmpeg golden masters committed; `verify_truehd_interop.py` passes all four legs locally (204 checks, full matrix); DEE harness `verify_truehd_dee_gold.py` and exporter `export_dee_truehd_gold.py` exercised on a mock set; fuzz harnesses `fuzz_mlp_decode`/`fuzz_mlp_encode` (libFuzzer not linkable here: no compiler-rt; run under GCC ASan+UBSan with a mutation driver, 400,000 decode and 3,000 encode inputs clean). CI wiring next |
+| 5 | library surface, CLI, docs | done 2026-10-29: public headers core/, io/, decoder/, encoder/; forge `truehd-encode` (also to `.mkv`), `truehd-atmos-encode`, `truehd-atmos-decode`, TrueHD in `decode`, `probe` (bare or Matroska, table and json=1) and `transcode`; Matroska `A_TRUEHD` in `libs/containers`; `docs/library/truehd.md` and cross-references (header map, capabilities, API stability, examples, spatial and Atmos, decoding, commands, object signing); `examples/truehd_round_trip.cpp`; CHANGELOG; ROADMAP IM5/IM6/UX10, roadmap inventory and development status. Not built: IEC 61937/MAT (P39), MPEG-TS 0x83 (P40), GUI |
+| 6 | tests and gates | done 2026-10-29: unit and property tests (`iclforge-mlp-tests`, 26 cases); FFmpeg golden masters committed; `verify_truehd_interop.py` (213 checks locally, five legs, Matroska included) in `_ci-linux.yml` (quick) and `interop.yml` (full, FFmpeg 8.0.1 pinned); DEE harness `verify_truehd_dee_gold.py` and exporter `export_dee_truehd_gold.py` exercised on a mock set only (the DEE set is on the owner's machine); fuzz harnesses `fuzz_mlp_decode`/`fuzz_mlp_encode` (libFuzzer not linkable here: no compiler-rt; run under GCC ASan+UBSan with a mutation driver, 400,000 decode and 3,000 encode inputs clean). Not run here: CI itself, FFmpeg 8.0.1 (only 6.1.1 locally), the install consumer check |
