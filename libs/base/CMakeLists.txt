@@ -278,6 +278,8 @@ iclforge_add_library(base
         src/crypto/pem.cpp
         src/crypto/chain.cpp
         src/crypto/credentials.cpp
+        src/crypto/thrift_binary.cpp
+        src/crypto/content_signature.cpp
         src/crypto/signing_key.cpp
     PUBLIC_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/cpu-probe-${ICLFORGE_CPU_PROBE_DIR}"
