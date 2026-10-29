@@ -7,6 +7,8 @@
 #include <numbers>
 
 #include "core/huffman.hpp"
+#include "iclforge/base/detail/cpu_features.hpp"
+#include "internal/avx2/coded_bits_avx2.hpp"
 
 namespace iclforge::truehd::detail {
 
@@ -64,8 +66,41 @@ constexpr CodeTable kCodes = make_code_table();
 
 }  // namespace
 
+namespace {
+
+// Blocks shorter than this are counted by the scalar body: the vector body sets up a table and a
+// handful of constants, which a block of two vectors does not repay. A block is 8 to 160 samples
+// a channel.
+constexpr std::size_t kMinVectorBlock = 16;
+
+}  // namespace
+
 int coded_bits(std::span<const std::int32_t> residuals, int quant,
                const ChannelCoding& coding) noexcept {
+    const int lb = static_cast<int>(coding.lsbs) - quant;
+    if (lb >= 0 && residuals.size() >= kMinVectorBlock && iclforge::internal::cpu::has_avx2()) {
+        const std::int64_t centre = centre_term(coding.type, lb) - coding.offset;
+        // |centre| is below 2^27 for every coding the encoder tries (a 24 bit width and a 15 bit
+        // offset); a caller that gives more is counted in 64 bits below.
+        if (centre > -(std::int64_t{1} << 28) && centre < (std::int64_t{1} << 28)) {
+            const int fast =
+                coding.type == 0
+                    ? internal::avx2::raw_bits(residuals, static_cast<std::int32_t>(centre), lb,
+                                               kInfeasible)
+                    : internal::avx2::huffman_bits(
+                          residuals, static_cast<std::int32_t>(centre), lb, kMinSymbol,
+                          kMaxSymbol[coding.type], kCodes.length[coding.type].data(),
+                          kMaxSampleBits, kInfeasible);
+            if (fast != internal::avx2::kUnhandled) {
+                return fast;
+            }
+        }
+    }
+    return coded_bits_reference(residuals, quant, coding);
+}
+
+int coded_bits_reference(std::span<const std::int32_t> residuals, int quant,
+                         const ChannelCoding& coding) noexcept {
     const int lb = static_cast<int>(coding.lsbs) - quant;
     if (lb < 0) {
         return kInfeasible;

@@ -404,8 +404,14 @@ void add_truehd_kernels(std::vector<KernelResult>& results,
             g_sink += out[kInterval / 2];
         }));
     }
+    // The bit count as the encoder calls it (the AVX2 body where the CPU has it, ICLFORGE_SIMD_TIER=sse2
+    // takes it away), and the scalar reference it is held to bit for bit, so the pair is the tier's
+    // worth on this machine.
     results.push_back(time_kernel("truehd_coded_bits", [&] {
         g_sink += th::detail::coded_bits(residual[0], 0, coding[0]);
+    }));
+    results.push_back(time_kernel("truehd_coded_bits_reference", [&] {
+        g_sink += th::detail::coded_bits_reference(residual[0], 0, coding[0]);
     }));
     results.push_back(time_kernel("truehd_choose_coding", [&] {
         g_sink += th::detail::choose_coding(residual[0], 0, {}, 0).data_bits;

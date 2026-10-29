@@ -11,6 +11,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_fixture_features.cpp
     decoder/test_handbuilt.cpp
     decoder/test_kernels.cpp
+    encoder/test_coded_bits_simd.cpp
     encoder/test_coding.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
@@ -21,6 +22,24 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 # build), so the tests that exercise them compile coding.cpp themselves and see src/.
 target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
+
+# The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason
+# coding.cpp is: its symbols are hidden in a shared build. ICLFORGE_TRUEHD_AVX2_DIR is empty whenever
+# libs/truehd did not build the tier (ICLFORGE_AVX2=OFF, or a target that is not x86-64), and then the
+# stub the library compiled in its place is compiled here as well; the test cases skip themselves on
+# a CPU or a build without the tier (iclforge::internal::cpu::has_avx2()).
+if(ICLFORGE_TRUEHD_AVX2_DIR)
+    target_sources(iclforge-truehd-tests PRIVATE "${ICLFORGE_TRUEHD_AVX2_DIR}/coded_bits_avx2.cpp")
+    if(ICLFORGE_IS_MSVC_LIKE)
+        set_source_files_properties("${ICLFORGE_TRUEHD_AVX2_DIR}/coded_bits_avx2.cpp" PROPERTIES
+            COMPILE_OPTIONS "/arch:AVX2")
+    else()
+        set_source_files_properties("${ICLFORGE_TRUEHD_AVX2_DIR}/coded_bits_avx2.cpp" PROPERTIES
+            COMPILE_OPTIONS "-mavx2")
+    endif()
+else()
+    target_sources(iclforge-truehd-tests PRIVATE ../src/internal/avx2/none/coded_bits_avx2.cpp)
+endif()
 
 # iclforge-truehd-encode-tool - WAV in, TrueHD out, for tools/checks/verify_truehd_encode_interop.py
 # and tools/ci/fuzz_truehd_encoder_space.py until the forge encode command replaces it.

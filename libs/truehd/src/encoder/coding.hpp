@@ -32,6 +32,12 @@ inline constexpr int kMaxSampleBits = 29;  // TH spec §11.4: a Huffman coded sa
 [[nodiscard]] int coded_bits(std::span<const std::int32_t> residuals, int quant,
                              const ChannelCoding& coding) noexcept;
 
+// coded_bits in plain scalar arithmetic: the reference the AVX2 body (src/internal/avx2) is held
+// to, and what coded_bits runs where that body is not built, not available on the CPU, or given a
+// residual outside +-2^30.
+[[nodiscard]] int coded_bits_reference(std::span<const std::int32_t> residuals, int quant,
+                                       const ChannelCoding& coding) noexcept;
+
 struct CodingChoice {
     ChannelCoding coding;
     int data_bits = kInfeasible;  // the block's sample data
