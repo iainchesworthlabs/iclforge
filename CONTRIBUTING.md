@@ -325,7 +325,8 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    matrix actually encodes with, after a token that appeared only as an unrelated option's *value*
    produced a false pass. So a new layout, tool token or command needs a matching matrix entry in
    the same change, or CI says so — see that script's own header for what it does and does not
-   catch.
+   catch. It also requires a leg for each command whose usage names a TrueHD file, for each
+   `truehd-…=` option and for each option of the AC-4 content signature block.
 
    Both of those walk a *hand-enumerated* list of command lines against one bootstrap tone, so
    neither has any notion of option *combinations* or of the input material. The same job's

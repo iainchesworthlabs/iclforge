@@ -97,6 +97,38 @@ channel shift, negative output shifts, IIR state, the block data CRC, heavy DRC,
 4. Which presentation a plain `forge decode` gives for a stream with the sixteen-channel substream.
    (T1: `best`, substreams 0 to 2; `truehd-presentation=all` reads substream 3.)
 
+## CI: what each lane holds for TrueHD, and what is open
+
+Audited and closed on 2026-10-29 against the lanes that hold E-AC-3 (AC-4 where it is the closer comparison). "Covered" means a
+lane builds or runs the TrueHD, crypto or signing code; the other words say what keeps it out.
+
+| Lane | State |
+|---|---|
+| Static job (layering, namespaces, project pages, packaging, doc paths, Sonar scope, ruff, shellcheck, actionlint) | Covered. The packaging check and the ESP-IDF target check failed on this branch and are fixed (below). New: the fixture manifest check and the fixture feature check. |
+| Pull-request gate: Linux GCC build, every ctest case, gold-reference gate | Covered. The gate decodes every manifest stream against FFmpeg's decode bit for bit and round-trips the encoder on the 5.1 reference. |
+| Codec matrix and its coverage check | Covered. The decode legs follow the manifest (25 streams), the signing section runs every option of the usage block, and the coverage check now reads the TrueHD commands and options and the signature options. |
+| FFmpeg Validate (nightly, `ci:deep`) | Covered: decode, hand-built streams, encoder, encoder-space regressions, containers, fixture features, Blu-ray layout stand-ins. FFmpeg is pinned to 8.0.1 here. The hand-built manifest was written against 6.1.1; for another major version the leg holds only the streams FFmpeg decodes to the whole signal and prints a notice, which cannot fail the job. Not run against 8.0.1 (not available to the agent). |
+| ASan and UBSan leg | Covered: the full ctest run and the codec matrix, signing and TrueHD sections included. |
+| TSan leg | Not applicable. It runs the cases tagged `concurrency`; E-AC-3 has none, and the TrueHD and crypto code has no mutable static or thread state. |
+| Coverage | `libs/truehd` had no row; it has 84 line and 74 branch, under 87.1 and 79.7 measured on its own tests. `libs/base` takes the crypto under its existing floor. |
+| Speed trend and real-time guard | Added: `truehd_51_decode` in `iclforge-bench` and `iclforge-perf`. No TrueHD memory series (`iclforge-membench`) and no kernel series; those are the performance audit's. |
+| Shared-library pass and ABI gate | Were broken: five exported-by-header functions of `libs/truehd` were not exported, so `forge` and the TrueHD tests did not link. Fixed; the export allowlists name the crypto, signing and MP4 reader functions. |
+| Minimum-footprint presets, ESP-IDF component, minimal AC-4 archive | Were broken: configure stopped at the root's guard, and the minimal AC-4 archive carried the signing source. Fixed, with tests. |
+| Packages | The vcpkg port and the Conan recipe offer `truehd` (off by default, like `ac4`). CMake install and the CPack library component are generic. The Python wheel builds the library without using it. |
+| Windows MSVC, clang-cl, macOS | Not run here. Read: five sources lacked the per-file `/wd4996` the project uses for `getenv` and `fopen` (added). The new library sources compile with Clang 18 at MSVC's constexpr step limit and `-Wconversion -Wsign-conversion` clean. Nothing assumes GCC or Linux. |
+| CodeQL, MSVC analysis | Covered: both build the full preset. |
+| clang-tidy | Not covered, and not for AC-4 either: `static-analysis.yml` lists `ac3`, `objects`, `render`, `base`, `dsp`, parts of `containers` and the CLI. `libs/ac4` and `libs/truehd` are in none of them. |
+| Fuzz regress, short and nightly | Not covered: `tools/fuzz/run.sh` lists no TrueHD harness (the three have no seeds yet). The fuzzing task's. |
+
+Open, for the owner:
+
+1. Should the vcpkg port and the Conan recipe offer `truehd` (done, off by default), or pin it off until a program that ships needs it?
+2. Should TrueHD be a column of the README badges and the performance cards? It is now; accuracy and memory read "no data" for it, as AC-4's did.
+3. `ICLFORGE_BUILD_TRUEHD=OFF` with tests on is supported by the CMake files (the C API's absent file and its test) and built by no lane. Build it in
+   one, or refuse it in the root as `ICLFORGE_BUILD_AC4=OFF` is?
+4. The AC-4 and TrueHD libraries are outside clang-tidy's list. Add them (a first nightly with findings), or leave them to CodeQL and Sonar?
+5. Forge writes the TrueHD WAV with `std::fopen`, which takes an ANSI path on Windows; a non-ASCII path needs `std::ofstream` or a wide path.
+
 ## Not in scope here
 
 Encrypted or signed content (the AC-4 workstream's signing machinery is the intended carrier for TH spec §22; it is not
