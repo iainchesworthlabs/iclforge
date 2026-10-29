@@ -10,9 +10,10 @@
 #include "iclforge/containers/matroska/reader.hpp"
 #include "truehd/truehd_stream.hpp"
 
-// TrueHD in Matroska (libs/containers/ERRATA.md, entry C7): CodecID A_TRUEHD, no CodecPrivate, one whole access
-// unit to a SimpleBlock, keyframe set where the unit opens with a major sync. FFmpeg's muxer and demuxer are the
-// oracle (tools/checks/verify_truehd_containers.py); these cases hold the round trip and the block flags.
+// TrueHD in Matroska (libs/containers/ERRATA.md, entry C7): CodecID A_TRUEHD, no CodecPrivate, one
+// whole access unit to a SimpleBlock, keyframe set where the unit opens with a major sync. FFmpeg's
+// muxer and demuxer are the oracle (tools/checks/verify_truehd_containers.py); these cases hold the
+// round trip and the block flags.
 
 namespace {
 
@@ -34,10 +35,12 @@ mkv::AudioTrack track_of(const TruehdStream& stream) {
                            .bit_depth = 24};
 }
 
-// The flags byte of every SimpleBlock (element 0xA3) in a file, by walking for the id: the writer's blocks are
-// track vint 0x81, two timestamp bytes, the flags byte. The scan is only sound on a file whose frames are known
-// not to contain 0xA3 0x?? 0x81, so it checks the structure it finds against the frame sizes.
-std::vector<std::uint8_t> block_flags(const std::vector<std::byte>& file, const TruehdStream& stream) {
+// The flags byte of every SimpleBlock (element 0xA3) in a file, by walking for the id: the writer's
+// blocks are track vint 0x81, two timestamp bytes, the flags byte. The scan is only sound on a file
+// whose frames are known not to contain 0xA3 0x?? 0x81, so it checks the structure it finds against
+// the frame sizes.
+std::vector<std::uint8_t> block_flags(const std::vector<std::byte>& file,
+                                      const TruehdStream& stream) {
     std::vector<std::uint8_t> flags;
     std::size_t unit = 0;
     for (std::size_t i = 0; i + 8 < file.size() && unit < stream.units.size(); ++i) {
@@ -71,8 +74,9 @@ std::vector<std::uint8_t> block_flags(const std::vector<std::byte>& file, const 
 }  // namespace
 
 TEST_CASE("an A_TRUEHD file round-trips whole access units", "[truehd][matroska]") {
-    for (const char* name : {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd",
-                             "truehd_st192_s24.thd", "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
+    for (const char* name :
+         {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd",
+          "truehd_st192_s24.thd", "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
         SECTION(name) {
             const TruehdStream stream = load(name);
             mkv::MuxOptions options;
@@ -87,8 +91,8 @@ TEST_CASE("an A_TRUEHD file round-trips whole access units", "[truehd][matroska]
             CHECK(demuxed->track.channels == stream.channels);
             REQUIRE(demuxed->frames.size() == stream.units.size());
             for (std::size_t i = 0; i < stream.units.size(); ++i) {
-                REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(), demuxed->frames[i].begin(),
-                                   demuxed->frames[i].end()));
+                REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(),
+                                   demuxed->frames[i].begin(), demuxed->frames[i].end()));
             }
         }
     }
@@ -96,7 +100,8 @@ TEST_CASE("an A_TRUEHD file round-trips whole access units", "[truehd][matroska]
 
 TEST_CASE("only the access units with a major sync are keyframes", "[truehd][matroska]") {
     const TruehdStream stream = load("truehd_m51_s24.thd");
-    REQUIRE(std::count(stream.major.begin(), stream.major.end(), true) < static_cast<std::ptrdiff_t>(stream.units.size()));
+    REQUIRE(std::count(stream.major.begin(), stream.major.end(), true) <
+            static_cast<std::ptrdiff_t>(stream.units.size()));
 
     mkv::MuxOptions options;
     options.key_frames = stream.major;
@@ -146,10 +151,12 @@ TEST_CASE("key_frames must be one flag a frame", "[truehd][matroska]") {
     const TruehdStream stream = load("truehd_st48_s24.thd");
     mkv::MuxOptions options;
     options.key_frames = {true, false};
-    CHECK(mkv::mux(track_of(stream), stream.units, options).error() == mkv::MuxError::kInvalidOptions);
+    CHECK(mkv::mux(track_of(stream), stream.units, options).error() ==
+          mkv::MuxError::kInvalidOptions);
 }
 
-TEST_CASE("the TrueHD bit depth is written when asked for and left out otherwise", "[truehd][matroska]") {
+TEST_CASE("the TrueHD bit depth is written when asked for and left out otherwise",
+          "[truehd][matroska]") {
     const TruehdStream stream = load("truehd_st48_s24.thd");
     const auto with = mkv::mux(track_of(stream), stream.units);
     mkv::AudioTrack bare = track_of(stream);
@@ -160,8 +167,8 @@ TEST_CASE("the TrueHD bit depth is written when asked for and left out otherwise
     // BitDepth is EBML id 0x6264, one byte of size and the value, in the Audio element.
     const auto has_depth = [](const std::vector<std::byte>& file) {
         for (std::size_t i = 0; i + 4 < file.size(); ++i) {
-            if (file[i] == std::byte{0x62} && file[i + 1] == std::byte{0x64} && file[i + 2] == std::byte{0x81} &&
-                file[i + 3] == std::byte{24}) {
+            if (file[i] == std::byte{0x62} && file[i + 1] == std::byte{0x64} &&
+                file[i + 2] == std::byte{0x81} && file[i + 3] == std::byte{24}) {
                 return true;
             }
         }

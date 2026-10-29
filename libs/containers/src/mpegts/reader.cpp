@@ -236,8 +236,8 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
     const std::size_t program_info_length =
         ((static_cast<std::size_t>(byte_at(section, 10)) & 0x0FU) << 8U) | byte_at(section, 11);
     std::size_t at = 12 + program_info_length;
-    // The program-level descriptors: only the registration descriptor 'HDMV' matters, and only to say which
-    // form of TrueHD signalling follows.
+    // The program-level descriptors: only the registration descriptor 'HDMV' matters, and only to
+    // say which form of TrueHD signalling follows.
     bool hdmv = false;
     for (std::size_t d = 12; d + 2 <= std::min(at, section.size() - 4);) {
         const std::size_t length = byte_at(section, d + 1);
@@ -280,7 +280,8 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
         if (stream_type == kStreamTypeTruehd) {
             truehd = true;
             matched = true;
-            signalling = hdmv ? CodecSignalling::kHdmvStreamType : CodecSignalling::kBareTruehdStreamType;
+            signalling =
+                hdmv ? CodecSignalling::kHdmvStreamType : CodecSignalling::kBareTruehdStreamType;
         }
 
         // ATSC names the codec in stream_type itself.

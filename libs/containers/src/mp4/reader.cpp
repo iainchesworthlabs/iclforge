@@ -117,8 +117,9 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
     out.eac3 = box_type == kDec3;
     out.payload.assign(payload.begin(), payload.end());
     if (box_type == kDmlp) {
-        // 'dmlp' (ERRATA C3): format_info(32) peak_data_rate(15) reserved(1) reserved(32). The fields are read
-        // when the box is long enough and left at zero when it is not; the bytes are kept either way.
+        // 'dmlp' (ERRATA C3): format_info(32) peak_data_rate(15) reserved(1) reserved(32). The
+        // fields are read when the box is long enough and left at zero when it is not; the bytes
+        // are kept either way.
         out.mlp = true;
         if (payload.size() >= 6) {
             out.mlp_format_info = get_u32(payload, 0);
@@ -441,20 +442,18 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
         if (top.type == kTrak) {
             bool selected_now = false;
             if (s.in_trak && !s.track_found && s.pending.has_entry) {
-                const bool wanted = options.track_id != 0
-                                        ? s.pending.track_id == options.track_id
-                                        : (s.pending.entry_type == kAc3Entry ||
-                                           s.pending.entry_type == kEc3Entry ||
-                                           s.pending.entry_type == kAc4Entry ||
-                                           s.pending.entry_type == kMlpaEntry);
+                const bool wanted =
+                    options.track_id != 0
+                        ? s.pending.track_id == options.track_id
+                        : (s.pending.entry_type == kAc3Entry || s.pending.entry_type == kEc3Entry ||
+                           s.pending.entry_type == kAc4Entry || s.pending.entry_type == kMlpaEntry);
                 if (wanted) {
                     s.track = ReadTrack{
                         .track_id = s.pending.track_id,
-                        .codec_id =
-                            std::string{s.pending.entry_type == kAc3Entry      ? kCodecAc3
-                                        : s.pending.entry_type == kAc4Entry   ? kCodecAc4
-                                        : s.pending.entry_type == kMlpaEntry ? kCodecTruehd
-                                                                              : kCodecEac3},
+                        .codec_id = std::string{s.pending.entry_type == kAc3Entry    ? kCodecAc3
+                                                : s.pending.entry_type == kAc4Entry  ? kCodecAc4
+                                                : s.pending.entry_type == kMlpaEntry ? kCodecTruehd
+                                                                                     : kCodecEac3},
                         .sample_rate = s.pending.sample_rate,
                         .channels = s.pending.channels,
                         .timescale = s.pending.timescale,
@@ -618,9 +617,10 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
             track.entry_type = entry.type;
             track.channels = static_cast<int>(get_u16(body, fields + 16));
             const std::uint32_t rate_field = get_u32(body, fields + 24);
-            // 16.16 fixed point, except in 'mlpa', where the field holds the rate as a plain integer (ERRATA
-            // C2). A plain rate always has a non-zero low half (no rate is a multiple of 65,536), a 16.16 one
-            // of the same rate never does, which tells a file written either way apart.
+            // 16.16 fixed point, except in 'mlpa', where the field holds the rate as a plain
+            // integer (ERRATA C2). A plain rate always has a non-zero low half (no rate is a
+            // multiple of 65,536), a 16.16 one of the same rate never does, which tells a file
+            // written either way apart.
             track.sample_rate = (entry.type == kMlpaEntry && (rate_field & 0xFFFFU) != 0)
                                     ? rate_field
                                     : rate_field >> 16U;
@@ -644,9 +644,10 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
                                                   static_cast<std::size_t>(config.size) -
                                                       config.header_bytes));
                     if (config.type == kDmlp) {
-                        // dmlp's ratebits are the rate the decoder uses; they win over the sample entry's field
-                        // when they name one (ERRATA C2).
-                        const std::uint32_t hz = mlp_rate_hz(track.codec_config.mlp_format_info >> 28U);
+                        // dmlp's ratebits are the rate the decoder uses; they win over the sample
+                        // entry's field when they name one (ERRATA C2).
+                        const std::uint32_t hz =
+                            mlp_rate_hz(track.codec_config.mlp_format_info >> 28U);
                         if (hz != 0) {
                             track.sample_rate = hz;
                         }

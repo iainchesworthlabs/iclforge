@@ -355,8 +355,8 @@ std::optional<MuxError> validate(const AudioTrack& track, const FragmentOptions&
         (track.sample_rate > std::numeric_limits<std::uint16_t>::max() &&
          track.codec_id != kCodecTruehd) ||
         track.samples_per_frame == 0 || track.codec_config.empty() ||
-        (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 && track.codec_id != kCodecAc4 &&
-         track.codec_id != kCodecTruehd)) {
+        (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 &&
+         track.codec_id != kCodecAc4 && track.codec_id != kCodecTruehd)) {
         return MuxError::kInvalidTrack;
     }
     if (options.frames_per_fragment == 0 ||

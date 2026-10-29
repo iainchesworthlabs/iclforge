@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: TrueHD in MP4, Matroska, MPEG-TS and MAT.** `iclforge::containers` carries whole TrueHD access units in an `mlpa`
+  MP4 track (with its `dmlp` box, plain and fragmented), an `A_TRUEHD` Matroska track, a Blu-ray-profile MPEG-TS stream
+  (stream_type 0x83 and the `HDMV` registration; the reader also takes 192-byte packets and a bare 0x83) and 24-unit MAT bursts
+  of IEC 61937 data type 22. TH spec §21 gives no layout for any of them, so each is what FFmpeg's muxer writes: 120 legs of
+  `tools/checks/verify_truehd_containers.py` pass in both directions, and every whole MAT frame equals FFmpeg's `spdif` output
+  byte for byte at 44.1, 48, 96 and 192 kHz. FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT, so reading MAT
+  has no oracle; nothing here has been played into a receiver or a disc player. The readers and `iclforge-truehd-container-tool`
+  have fuzz seeds, a `fuzz_mat_unwrap` harness and tests; the open questions are in `libs/containers/ERRATA.md`.
+
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

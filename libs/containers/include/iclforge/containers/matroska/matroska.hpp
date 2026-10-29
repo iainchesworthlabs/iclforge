@@ -32,15 +32,15 @@ namespace iclforge::containers::matroska {
 // Matroska CodecID strings (the Matroska codec mappings registry).
 inline constexpr std::string_view kCodecEac3 = "A_EAC3";
 inline constexpr std::string_view kCodecAc3 = "A_AC3";
-// Dolby TrueHD: no CodecPrivate, one access unit (its 4-byte header included) to a SimpleBlock, as FFmpeg's
-// muxer writes it (libs/containers/ERRATA.md, entry C7).
+// Dolby TrueHD: no CodecPrivate, one access unit (its 4-byte header included) to a SimpleBlock, as
+// FFmpeg's muxer writes it (libs/containers/ERRATA.md, entry C7).
 inline constexpr std::string_view kCodecTruehd = "A_TRUEHD";
 
 enum class MuxError : std::uint8_t {
     kNoFrames,
-    kInvalidTrack,   // zero/negative channels or sample rate, or an empty codec id
-    kFrameTooLarge,  // a single frame beyond what one SimpleBlock can carry
-    kInvalidOptions, // MuxOptions::key_frames is neither empty nor one flag a frame
+    kInvalidTrack,    // zero/negative channels or sample rate, or an empty codec id
+    kFrameTooLarge,   // a single frame beyond what one SimpleBlock can carry
+    kInvalidOptions,  // MuxOptions::key_frames is neither empty nor one flag a frame
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
@@ -53,7 +53,8 @@ struct AudioTrack {
     // compute the segment duration. An E-AC-3 access unit is 1536.
     std::uint32_t samples_per_frame = 1536;
     std::string language{"und"};
-    // The Audio element's BitDepth; 0 writes none. FFmpeg's TrueHD muxer writes the stream's 16, 20 or 24.
+    // The Audio element's BitDepth; 0 writes none. FFmpeg's TrueHD muxer writes the stream's 16, 20
+    // or 24.
     std::uint32_t bit_depth = 0;
 };
 
@@ -64,9 +65,10 @@ struct MuxOptions {
     // truncated file mostly playable.
     std::uint32_t cluster_ms = 1000;
     std::string writing_app{"iclforge"};
-    // Whether each frame is a keyframe, one flag a frame (the SimpleBlock flags' bit 7). Empty: every frame is
-    // one, as every AC-3 and E-AC-3 frame is. A TrueHD access unit is only one where it carries a major sync.
-    // A list of another length than the frames is kInvalidOptions. Writer takes the flag frame by frame.
+    // Whether each frame is a keyframe, one flag a frame (the SimpleBlock flags' bit 7). Empty:
+    // every frame is one, as every AC-3 and E-AC-3 frame is. A TrueHD access unit is only one where
+    // it carries a major sync. A list of another length than the frames is kInvalidOptions. Writer
+    // takes the flag frame by frame.
     std::vector<bool> key_frames{};
 };
 

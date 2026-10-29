@@ -11,10 +11,11 @@
 #include "iclforge/containers/iec61937/mat.hpp"
 #include "truehd/truehd_stream.hpp"
 
-// TrueHD MAT (libs/containers/ERRATA.md, entries M1 to M7). The layout is read off FFmpeg's `spdif` muxer, so
-// the strongest check is its bytes: the digests below are SHA-256 of what FFmpeg 6.1.1 wrote for each fixture
-// (tools/checks/verify_truehd_containers.py compares live against whatever FFmpeg is installed). The rest is the
-// layout stated independently of the packer, and the ways a burst can be wrong.
+// TrueHD MAT (libs/containers/ERRATA.md, entries M1 to M7). The layout is read off FFmpeg's `spdif`
+// muxer, so the strongest check is its bytes: the digests below are SHA-256 of what FFmpeg 6.1.1
+// wrote for each fixture (tools/checks/verify_truehd_containers.py compares live against whatever
+// FFmpeg is installed). The rest is the layout stated independently of the packer, and the ways a
+// burst can be wrong.
 
 namespace {
 
@@ -74,12 +75,18 @@ TEST_CASE("MAT frames equal the bursts of FFmpeg's spdif muxer", "[truehd][mat][
         const char* sha256;
     };
     const Case cases[] = {
-        {"truehd_st48_s24.thd", 12, "c20a5ff99de7d4a4484c3de7e6dbe0dd35084bc08510077583935cde26ccd891"},
-        {"truehd_m51_s24.thd", 12, "1ada58264dd8f15cf2b7c72c26e4982994285985d78f7964058c574092eb2f5d"},
-        {"truehd_st96_s24.thd", 12, "4c1a8080759a4aacc4e92d218a0abe1927d0fb6db269ff1958177690e71fc0e5"},
-        {"truehd_st44_s24.thd", 11, "f3427a6df4c6978a9b7ae154d007649e9414b8d4ab6f4ef5fb91e102b8bbcec4"},
-        {"truehd_st192_s24.thd", 12, "c44757dce20038c45b2b8c65e36c6d78306380142d11cde10800df48fc268399"},
-        {"truehd_mono48_s24.thd", 12, "76a81c83a3be456482e87ae87874c82ef36ec3bf13506d3e980457dd2677f82b"},
+        {"truehd_st48_s24.thd", 12,
+         "c20a5ff99de7d4a4484c3de7e6dbe0dd35084bc08510077583935cde26ccd891"},
+        {"truehd_m51_s24.thd", 12,
+         "1ada58264dd8f15cf2b7c72c26e4982994285985d78f7964058c574092eb2f5d"},
+        {"truehd_st96_s24.thd", 12,
+         "4c1a8080759a4aacc4e92d218a0abe1927d0fb6db269ff1958177690e71fc0e5"},
+        {"truehd_st44_s24.thd", 11,
+         "f3427a6df4c6978a9b7ae154d007649e9414b8d4ab6f4ef5fb91e102b8bbcec4"},
+        {"truehd_st192_s24.thd", 12,
+         "c44757dce20038c45b2b8c65e36c6d78306380142d11cde10800df48fc268399"},
+        {"truehd_mono48_s24.thd", 12,
+         "76a81c83a3be456482e87ae87874c82ef36ec3bf13506d3e980457dd2677f82b"},
     };
     for (const Case& c : cases) {
         SECTION(c.file) {
@@ -87,7 +94,8 @@ TEST_CASE("MAT frames equal the bursts of FFmpeg's spdif muxer", "[truehd][mat][
             const std::vector<std::byte> carrier = wrap(stream);
             REQUIRE(carrier.size() % mat::kMatBurstBytes == 0);
             REQUIRE(carrier.size() / mat::kMatBurstBytes >= c.whole_frames);
-            const std::span<const std::byte> whole{carrier.data(), c.whole_frames * mat::kMatBurstBytes};
+            const std::span<const std::byte> whole{carrier.data(),
+                                                   c.whole_frames * mat::kMatBurstBytes};
             CHECK(hex(iclforge::base::crypto::sha256(whole)) == c.sha256);
         }
     }
@@ -98,27 +106,33 @@ TEST_CASE("a MAT burst has the layout ERRATA M1 to M6 record", "[truehd][mat]") 
     const std::vector<std::byte> carrier = wrap(stream);
     REQUIRE(carrier.size() >= mat::kMatBurstBytes);
     // Pa Pb Pc Pd as 16-bit little-endian words: F872 4E1F 0016 EFF0.
-    CHECK(std::equal(carrier.begin(), carrier.begin() + 8, make({0x72, 0xF8, 0x1F, 0x4E, 0x16, 0x00, 0xF0, 0xEF}).begin()));
+    CHECK(std::equal(carrier.begin(), carrier.begin() + 8,
+                     make({0x72, 0xF8, 0x1F, 0x4E, 0x16, 0x00, 0xF0, 0xEF}).begin()));
 
     const std::vector<std::byte> burst = natural({carrier.data(), mat::kMatBurstBytes});
     const std::span<const std::byte> payload{burst.data() + 8, mat::kMatPayloadBytes};
     CHECK(std::equal(payload.begin(), payload.begin() + 20,
-                     make({0x07, 0x9E, 0x00, 0x03, 0x84, 0x01, 0x01, 0x01, 0x80, 0x00, 0x56, 0xA5, 0x3B, 0xF4, 0x81,
-                           0x83, 0x49, 0x80, 0x77, 0xE0})
+                     make({0x07, 0x9E, 0x00, 0x03, 0x84, 0x01, 0x01, 0x01, 0x80, 0x00,
+                           0x56, 0xA5, 0x3B, 0xF4, 0x81, 0x83, 0x49, 0x80, 0x77, 0xE0})
                          .begin()));
-    CHECK(std::equal(payload.begin() + 30708, payload.begin() + 30720,
-                     make({0xC3, 0xC1, 0x42, 0x49, 0x3B, 0xFA, 0x82, 0x83, 0x49, 0x80, 0x77, 0xE0}).begin()));
-    CHECK(std::equal(payload.begin() + 61408, payload.begin() + 61424,
-                     make({0xC3, 0xC2, 0xC0, 0xC4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x97, 0x11}).begin()));
+    CHECK(std::equal(
+        payload.begin() + 30708, payload.begin() + 30720,
+        make({0xC3, 0xC1, 0x42, 0x49, 0x3B, 0xFA, 0x82, 0x83, 0x49, 0x80, 0x77, 0xE0}).begin()));
+    CHECK(std::equal(
+        payload.begin() + 61408, payload.begin() + 61424,
+        make({0xC3, 0xC2, 0xC0, 0xC4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x97, 0x11}).begin()));
     // The 8 bytes Pd does not count.
-    CHECK(std::all_of(payload.begin() + 61424, payload.end(), [](std::byte b) { return b == std::byte{0}; }));
+    CHECK(std::all_of(payload.begin() + 61424, payload.end(),
+                      [](std::byte b) { return b == std::byte{0}; }));
 
-    // Access unit 0 opens at 20; access unit k at 2560 * k, whole and followed by zeros to its slot's end.
+    // Access unit 0 opens at 20; access unit k at 2560 * k, whole and followed by zeros to its
+    // slot's end.
     for (std::size_t k = 0; k < mat::kMatAccessUnitsPerFrame; ++k) {
         const std::size_t at = k == 0 ? 20 : 2560 * k;
         const auto& unit = stream.units[k];
         INFO("slot " << k);
-        REQUIRE(std::equal(unit.begin(), unit.end(), payload.begin() + static_cast<std::ptrdiff_t>(at)));
+        REQUIRE(std::equal(unit.begin(), unit.end(),
+                           payload.begin() + static_cast<std::ptrdiff_t>(at)));
         const std::size_t limit = k == 11 ? 30708 : k == 23 ? 61408 : 2560 * (k + 1);
         CHECK(std::all_of(payload.begin() + static_cast<std::ptrdiff_t>(at + unit.size()),
                           payload.begin() + static_cast<std::ptrdiff_t>(limit),
@@ -134,7 +148,8 @@ TEST_CASE("MAT unwraps to the access units it was given, in either word order", 
     REQUIRE(units.has_value());
     REQUIRE(units->size() == stream.units.size());
     for (std::size_t i = 0; i < units->size(); ++i) {
-        CHECK(std::equal((*units)[i].begin(), (*units)[i].end(), stream.units[i].begin(), stream.units[i].end()));
+        CHECK(std::equal((*units)[i].begin(), (*units)[i].end(), stream.units[i].begin(),
+                         stream.units[i].end()));
     }
 
     // The same bursts with every 16-bit word swapped, the big-endian carrier.
@@ -144,8 +159,10 @@ TEST_CASE("MAT unwraps to the access units it was given, in either word order", 
     CHECK(*swapped == *units);
 }
 
-TEST_CASE("a last MAT frame that is not full is padded, and its empty slots read as nothing", "[truehd][mat]") {
-    const TruehdStream stream = load("truehd_st48_s24.thd");  // 300 access units: 12 frames and 12 over
+TEST_CASE("a last MAT frame that is not full is padded, and its empty slots read as nothing",
+          "[truehd][mat]") {
+    const TruehdStream stream =
+        load("truehd_st48_s24.thd");  // 300 access units: 12 frames and 12 over
     mat::MatPacker packer;
     std::size_t bursts = 0;
     for (const auto& unit : stream.units) {
@@ -202,9 +219,11 @@ TEST_CASE("a damaged MAT carrier is refused, not misread", "[truehd][mat]") {
         CHECK(mat::unwrap_mat_stream(bad).error() == mat::MatError::kNotMat);
     }
     SECTION("each code word is checked") {
-        for (const std::size_t at : {std::size_t{8 + 5}, std::size_t{8 + 30708 + 3}, std::size_t{8 + 61408 + 1}}) {
+        for (const std::size_t at :
+             {std::size_t{8 + 5}, std::size_t{8 + 30708 + 3}, std::size_t{8 + 61408 + 1}}) {
             std::vector<std::byte> bad = carrier;
-            // Flip a byte; the carrier is in swapped word order, so index the byte whose partner stays put.
+            // Flip a byte; the carrier is in swapped word order, so index the byte whose partner
+            // stays put.
             bad[at ^ 1U] ^= std::byte{0x40};
             INFO("code byte at payload offset " << at - 8);
             CHECK(mat::unwrap_mat_stream(bad).error() == mat::MatError::kBadCode);

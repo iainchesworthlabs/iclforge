@@ -79,12 +79,12 @@ enum class DemuxError : std::uint8_t {
 // PID, and a registration descriptor is a format identifier. A caller
 // remuxing back out wants to know which it was.
 enum class CodecSignalling : std::uint8_t {
-    kAtscStreamType,           // stream_type 0x81 / 0x87
-    kDvbDescriptor,            // stream_type 0x06 + AC3_descriptor / Enhanced_AC3_descriptor
-    kRegistrationDescriptor,   // format_identifier 'AC-3' / 'EAC3'
-    kDvbExtensionDescriptor,   // stream_type 0x06 + extension descriptor 0x7F/0x15 (AC-4)
-    kHdmvStreamType,           // stream_type 0x83 under a program-level 'HDMV' registration (TrueHD)
-    kBareTruehdStreamType,     // stream_type 0x83 alone, as FFmpeg's muxer writes it (TrueHD)
+    kAtscStreamType,          // stream_type 0x81 / 0x87
+    kDvbDescriptor,           // stream_type 0x06 + AC3_descriptor / Enhanced_AC3_descriptor
+    kRegistrationDescriptor,  // format_identifier 'AC-3' / 'EAC3'
+    kDvbExtensionDescriptor,  // stream_type 0x06 + extension descriptor 0x7F/0x15 (AC-4)
+    kHdmvStreamType,          // stream_type 0x83 under a program-level 'HDMV' registration (TrueHD)
+    kBareTruehdStreamType,    // stream_type 0x83 alone, as FFmpeg's muxer writes it (TrueHD)
 };
 
 struct ReadStream {
@@ -97,9 +97,10 @@ struct ReadStream {
     // is meaningless - the payload is TS 103 190 sync frames, not A/52 ones,
     // and this module hands its PES bytes back without framing them.
     bool ac4 = false;
-    // Dolby TrueHD (stream_type 0x83, TH spec §21.2). The reader is more permissive here than FFmpeg's demuxer,
-    // which needs the HDMV registration: signalling says which of the two forms was found (ERRATA C8). The PES
-    // payloads, concatenated, are the elementary stream; a PES holds one or several whole access units.
+    // Dolby TrueHD (stream_type 0x83, TH spec §21.2). The reader is more permissive here than
+    // FFmpeg's demuxer, which needs the HDMV registration: signalling says which of the two forms
+    // was found (ERRATA C8). The PES payloads, concatenated, are the elementary stream; a PES holds
+    // one or several whole access units.
     bool truehd = false;
     CodecSignalling signalling = CodecSignalling::kAtscStreamType;
     // The detected grid: 188 (TS), 192 (M2TS) or 204 (TS with RS parity).

@@ -11,10 +11,11 @@
 #include "iclforge/containers/mpegts/reader.hpp"
 #include "truehd/truehd_stream.hpp"
 
-// TrueHD in MPEG-TS (libs/containers/ERRATA.md, entry C8): stream_type 0x83 (TH spec §21.2) and, for FFmpeg's
-// demuxer to name it, a program-level 'HDMV' registration descriptor. FFmpeg is the oracle in both directions
-// (tools/checks/verify_truehd_containers.py); these cases hold the round trip, the refusals, the two signalling
-// forms the reader tells apart and the 192-byte grid of a Blu-ray transport stream.
+// TrueHD in MPEG-TS (libs/containers/ERRATA.md, entry C8): stream_type 0x83 (TH spec §21.2) and,
+// for FFmpeg's demuxer to name it, a program-level 'HDMV' registration descriptor. FFmpeg is the
+// oracle in both directions (tools/checks/verify_truehd_containers.py); these cases hold the round
+// trip, the refusals, the two signalling forms the reader tells apart and the 192-byte grid of a
+// Blu-ray transport stream.
 
 namespace {
 
@@ -71,12 +72,13 @@ std::uint32_t crc32_mpeg2(std::span<const std::byte> data) {
     return crc;
 }
 
-// The same transport stream with the program-level descriptors taken out of every PMT: stream_type 0x83 alone,
-// the way FFmpeg's muxer writes it.
+// The same transport stream with the program-level descriptors taken out of every PMT: stream_type
+// 0x83 alone, the way FFmpeg's muxer writes it.
 std::vector<std::byte> without_program_descriptors(std::vector<std::byte> file) {
     for (std::size_t at = 0; at + kPacket <= file.size(); at += kPacket) {
-        const auto pid = static_cast<std::uint16_t>(((std::to_integer<unsigned>(file[at + 1]) & 0x1FU) << 8U) |
-                                                    std::to_integer<unsigned>(file[at + 2]));
+        const auto pid =
+            static_cast<std::uint16_t>(((std::to_integer<unsigned>(file[at + 1]) & 0x1FU) << 8U) |
+                                       std::to_integer<unsigned>(file[at + 2]));
         if (pid != kPmtPid || (std::to_integer<unsigned>(file[at + 1]) & 0x40U) == 0) {
             continue;
         }
@@ -98,8 +100,8 @@ std::vector<std::byte> without_program_descriptors(std::vector<std::byte> file) 
         for (int shift = 24; shift >= 0; shift -= 8) {
             bare.push_back(static_cast<std::byte>((crc >> static_cast<unsigned>(shift)) & 0xFFU));
         }
-        std::fill(file.begin() + static_cast<std::ptrdiff_t>(section), file.begin() + static_cast<std::ptrdiff_t>(at + kPacket),
-                  std::byte{0xFF});
+        std::fill(file.begin() + static_cast<std::ptrdiff_t>(section),
+                  file.begin() + static_cast<std::ptrdiff_t>(at + kPacket), std::byte{0xFF});
         std::copy(bare.begin(), bare.end(), file.begin() + static_cast<std::ptrdiff_t>(section));
     }
     return file;
@@ -108,8 +110,9 @@ std::vector<std::byte> without_program_descriptors(std::vector<std::byte> file) 
 }  // namespace
 
 TEST_CASE("a Blu-ray transport stream round-trips the access units", "[truehd][mpegts]") {
-    for (const char* name : {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd",
-                             "truehd_st192_s24.thd", "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
+    for (const char* name :
+         {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd",
+          "truehd_st192_s24.thd", "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
         SECTION(name) {
             const TruehdStream stream = load(name);
             const auto file = ts::mux(track_of(stream), stream.units, bluray());
@@ -129,7 +132,9 @@ TEST_CASE("a Blu-ray transport stream round-trips the access units", "[truehd][m
     }
 }
 
-TEST_CASE("stream_type 0x83 without the HDMV registration is still TrueHD, and says how it was found", "[truehd][mpegts]") {
+TEST_CASE(
+    "stream_type 0x83 without the HDMV registration is still TrueHD, and says how it was found",
+    "[truehd][mpegts]") {
     const TruehdStream stream = load("truehd_st48_s24.thd");
     const auto file = ts::mux(track_of(stream), stream.units, bluray());
     REQUIRE(file.has_value());
@@ -141,14 +146,16 @@ TEST_CASE("stream_type 0x83 without the HDMV registration is still TrueHD, and s
     CHECK(concatenated(*demuxed) == stream_bytes(stream));
 }
 
-TEST_CASE("a 192-byte grid, the Blu-ray packet with its TP_extra_header, reads the same", "[truehd][mpegts]") {
+TEST_CASE("a 192-byte grid, the Blu-ray packet with its TP_extra_header, reads the same",
+          "[truehd][mpegts]") {
     const TruehdStream stream = load("truehd_m51_s24.thd");
     const auto file = ts::mux(track_of(stream), stream.units, bluray());
     REQUIRE(file.has_value());
     std::vector<std::byte> grid;
     for (std::size_t at = 0; at + kPacket <= file->size(); at += kPacket) {
         // TP_extra_header: copy_permission_indicator(2) and a 30-bit arrival time stamp.
-        grid.insert(grid.end(), {std::byte{0}, std::byte{0}, std::byte{0}, static_cast<std::byte>((at / kPacket) & 0xFF)});
+        grid.insert(grid.end(), {std::byte{0}, std::byte{0}, std::byte{0},
+                                 static_cast<std::byte>((at / kPacket) & 0xFF)});
         grid.insert(grid.end(), file->begin() + static_cast<std::ptrdiff_t>(at),
                     file->begin() + static_cast<std::ptrdiff_t>(at + kPacket));
     }
@@ -190,15 +197,18 @@ TEST_CASE("TrueHD is Blu-ray's alone, and Blu-ray writes nothing else", "[truehd
     CHECK(ts::Writer::create(track_of(stream), dvb).error() == ts::MuxError::kInvalidOptions);
 }
 
-TEST_CASE("a descriptor loop that overruns the program info does not read as HDMV", "[truehd][mpegts]") {
+TEST_CASE("a descriptor loop that overruns the program info does not read as HDMV",
+          "[truehd][mpegts]") {
     const TruehdStream stream = load("truehd_st48_s24.thd");
     auto file = ts::mux(track_of(stream), stream.units, bluray());
     REQUIRE(file.has_value());
-    // Every PMT: raise the registration descriptor's length past the program info. The reader must stop at the
-    // end of the program info, not read on out of it, and so must not take the descriptor for HDMV.
+    // Every PMT: raise the registration descriptor's length past the program info. The reader must
+    // stop at the end of the program info, not read on out of it, and so must not take the
+    // descriptor for HDMV.
     for (std::size_t at = 0; at + kPacket <= file->size(); at += kPacket) {
-        const auto pid = static_cast<std::uint16_t>(((std::to_integer<unsigned>((*file)[at + 1]) & 0x1FU) << 8U) |
-                                                    std::to_integer<unsigned>((*file)[at + 2]));
+        const auto pid = static_cast<std::uint16_t>(
+            ((std::to_integer<unsigned>((*file)[at + 1]) & 0x1FU) << 8U) |
+            std::to_integer<unsigned>((*file)[at + 2]));
         if (pid == kPmtPid) {
             (*file)[at + 5 + 12 + 1] = std::byte{0x7F};
         }

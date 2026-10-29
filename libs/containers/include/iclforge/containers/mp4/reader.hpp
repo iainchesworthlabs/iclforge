@@ -60,12 +60,12 @@ struct ReaderState;
 }  // namespace detail
 
 enum class DemuxError : std::uint8_t {
-    kNotIsobmff,       // no box structure worth calling ISOBMFF
-    kTruncated,        // the input ends before the track or its samples
-    kMalformed,        // a box, sample table or fragment layout that cannot be parsed
-    kNoAudioTrack,     // no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (see ReadOptions::track_id)
-    kLimitExceeded,    // a box size, sample count or nesting depth beyond ReadOptions
-    kMoovAfterMdat,    // Reader only: the sample table follows the data it indexes
+    kNotIsobmff,     // no box structure worth calling ISOBMFF
+    kTruncated,      // the input ends before the track or its samples
+    kMalformed,      // a box, sample table or fragment layout that cannot be parsed
+    kNoAudioTrack,   // no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (see ReadOptions::track_id)
+    kLimitExceeded,  // a box size, sample count or nesting depth beyond ReadOptions
+    kMoovAfterMdat,  // Reader only: the sample table follows the data it indexes
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);

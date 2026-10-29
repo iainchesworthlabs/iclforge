@@ -218,8 +218,8 @@ inline Bytes build_sample_entry(const AudioTrack& track) {
     const bool truehd = track.codec_id == kCodecTruehd;
     put_u32(body, truehd ? track.sample_rate : track.sample_rate << 16);
 
-    const std::string_view config_fourcc = track.codec_id == kCodecAc3     ? "dac3"
-                                           : track.codec_id == kCodecAc4   ? "dac4"
+    const std::string_view config_fourcc = track.codec_id == kCodecAc3      ? "dac3"
+                                           : track.codec_id == kCodecAc4    ? "dac4"
                                            : track.codec_id == kCodecTruehd ? "dmlp"
                                                                             : "dec3";
     put_box(body, config_fourcc, track.codec_config);

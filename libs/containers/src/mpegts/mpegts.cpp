@@ -805,9 +805,9 @@ Bytes build_atsc_eac3_descriptor(const ServiceInfo& s) {
     return d;
 }
 
-// The program-level registration_descriptor (ISO/IEC 13818-1 §2.6.8) with format_identifier 'HDMV'. FFmpeg's
-// demuxer names stream_type 0x83 as TrueHD only under it: without it ffprobe reports an unknown codec (the
-// libs/containers/ERRATA.md entry C8 has the experiment).
+// The program-level registration_descriptor (ISO/IEC 13818-1 §2.6.8) with format_identifier 'HDMV'.
+// FFmpeg's demuxer names stream_type 0x83 as TrueHD only under it: without it ffprobe reports an
+// unknown codec (the libs/containers/ERRATA.md entry C8 has the experiment).
 [[nodiscard]] Bytes build_hdmv_registration_descriptor() {
     Bytes d;
     put_descriptor_header(d, 0x05, 4);
@@ -868,7 +868,8 @@ Bytes build_pmt_section(std::uint16_t program_number, std::uint16_t audio_pid,
     // PID this program has and mux() always stamps a PCR on it (see
     // mpegts.hpp's header comment on why once per access unit is enough).
     put_be16(body, static_cast<std::uint16_t>(0xE000u | (audio_pid & 0x1FFFu)));
-    // reserved(4)='1111', program_info_length(12): none but the Blu-ray profile's registration descriptor.
+    // reserved(4)='1111', program_info_length(12): none but the Blu-ray profile's registration
+    // descriptor.
     put_be16(body, static_cast<std::uint16_t>(0xF000u | (program_info.size() & 0x0FFFu)));
     body.insert(body.end(), program_info.begin(), program_info.end());
     body.insert(body.end(), es_loop.begin(), es_loop.end());
@@ -1142,12 +1143,11 @@ std::expected<std::vector<std::byte>, MuxError> mux(
     const Bytes descriptor = build_descriptor(track, options.profile);
     const Bytes pat_section =
         build_pat_section(options.transport_stream_id, options.program_number, options.pmt_pid);
-    const Bytes pmt_section =
-        build_pmt_section(options.program_number, options.audio_pid,
-                          stream_type_for(track, options.profile), descriptor,
-                          options.profile == BroadcastProfile::kBluray
-                              ? build_hdmv_registration_descriptor()
-                              : Bytes{});
+    const Bytes pmt_section = build_pmt_section(options.program_number, options.audio_pid,
+                                                stream_type_for(track, options.profile), descriptor,
+                                                options.profile == BroadcastProfile::kBluray
+                                                    ? build_hdmv_registration_descriptor()
+                                                    : Bytes{});
 
     // PTS and PCR share one 90 kHz clock derived from the cumulative sample
     // count, the same way iclforge::containers::matroska::mux derives its millisecond timestamps -

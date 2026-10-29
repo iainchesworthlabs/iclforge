@@ -12,10 +12,10 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 
-// What the container tests and the container tool need to know about a TrueHD elementary stream: its access
-// units, which of them open with a major sync, and the numbers a container's track description carries. The
-// containers library knows no codec (tools/checks/projects.json), so this is the one place the tests meet the
-// truehd library: a test-support header, not part of either.
+// What the container tests and the container tool need to know about a TrueHD elementary stream:
+// its access units, which of them open with a major sync, and the numbers a container's track
+// description carries. The containers library knows no codec (tools/checks/projects.json), so this
+// is the one place the tests meet the truehd library: a test-support header, not part of either.
 
 namespace iclforge::containers::testing {
 
@@ -24,8 +24,8 @@ struct TruehdStream {
     std::vector<std::span<const std::byte>> units;  // whole access units, views into `bytes`
     std::vector<bool> major;                        // per unit: it opens with a major sync
     truehd::StreamInfo info;
-    int channels = 0;           // of the best presentation the stream has
-    int padding_samples = 0;    // the end-of-stream marker's count (ERRATA 14 of libs/truehd)
+    int channels = 0;         // of the best presentation the stream has
+    int padding_samples = 0;  // the end-of-stream marker's count (ERRATA 14 of libs/truehd)
     std::uint32_t samples_per_unit = 0;
 };
 
@@ -41,13 +41,14 @@ struct TruehdStream {
 
 [[nodiscard]] inline bool write_file(const std::string& path, std::span<const std::byte> bytes) {
     std::ofstream out(path, std::ios::binary);
-    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    out.write(reinterpret_cast<const char*>(bytes.data()),
+              static_cast<std::streamsize>(bytes.size()));
     return out.good();
 }
 
-// The units of an in-memory stream. The result holds views into `stream.bytes`, so it is returned by value
-// from a function that builds it in place and must not be copied or moved afterwards: the vector's buffer
-// moves with it, which keeps the views valid.
+// The units of an in-memory stream. The result holds views into its own `bytes`, so it must not be
+// copied: a copy's views would point into the original's buffer. Moving it is safe, because a
+// vector's buffer moves with it.
 [[nodiscard]] inline std::optional<TruehdStream> load_truehd_bytes(std::vector<std::byte> bytes) {
     TruehdStream stream;
     stream.bytes = std::move(bytes);

@@ -11,10 +11,11 @@
 #include "iclforge/containers/mp4/reader.hpp"
 #include "truehd/truehd_stream.hpp"
 
-// TrueHD in MP4: the 'mlpa' sample entry and its 'dmlp' box (libs/containers/ERRATA.md, entries C1 to C6). The
-// layout is FFmpeg's, a single oracle; tools/checks/verify_truehd_containers.py has FFmpeg read and write these
-// files. What these cases hold is the part the library can state by itself: the bytes of the box against what
-// FFmpeg wrote, a round trip through the writer and the reader, and the ways the reader meets a file that differs.
+// TrueHD in MP4: the 'mlpa' sample entry and its 'dmlp' box (libs/containers/ERRATA.md, entries C1
+// to C6). The layout is FFmpeg's, a single oracle; tools/checks/verify_truehd_containers.py has
+// FFmpeg read and write these files. What these cases hold is the part the library can state by
+// itself: the bytes of the box against what FFmpeg wrote, a round trip through the writer and the
+// reader, and the ways the reader meets a file that differs.
 
 namespace {
 
@@ -38,8 +39,9 @@ mp4::AudioTrack track_of(const TruehdStream& stream) {
         .sample_rate = stream.info.sample_rate,
         .channels = stream.channels,
         .samples_per_frame = stream.samples_per_unit,
-        .codec_config = mp4::build_dmlp_payload({.format_info = stream.info.major_sync.format_info,
-                                                 .peak_data_rate = stream.info.major_sync.peak_data_rate}),
+        .codec_config =
+            mp4::build_dmlp_payload({.format_info = stream.info.major_sync.format_info,
+                                     .peak_data_rate = stream.info.major_sync.peak_data_rate}),
     };
 }
 
@@ -52,7 +54,8 @@ std::vector<std::byte> bytes_of(std::initializer_list<int> values) {
 }
 
 // Where a four-character code first occurs, or npos.
-std::size_t find_code(const std::vector<std::byte>& file, std::string_view code, std::size_t from = 0) {
+std::size_t find_code(const std::vector<std::byte>& file, std::string_view code,
+                      std::size_t from = 0) {
     for (std::size_t i = from; i + code.size() <= file.size(); ++i) {
         if (std::equal(code.begin(), code.end(), file.begin() + static_cast<std::ptrdiff_t>(i),
                        [](char c, std::byte b) { return static_cast<std::byte>(c) == b; })) {
@@ -72,9 +75,10 @@ std::uint32_t be32(const std::vector<std::byte>& file, std::size_t at) {
 
 }  // namespace
 
-TEST_CASE("dmlp is the stream's format_info and peak data rate, as FFmpeg writes it", "[truehd][mp4]") {
-    // FFmpeg 6.1.1's 'dmlp' for the stereo 48 kHz fixture: format_info 0x0050A001, peak_data_rate 3,199 in the top
-    // 15 bits of the next word (0x18FE), then 32 reserved bits.
+TEST_CASE("dmlp is the stream's format_info and peak data rate, as FFmpeg writes it",
+          "[truehd][mp4]") {
+    // FFmpeg 6.1.1's 'dmlp' for the stereo 48 kHz fixture: format_info 0x0050A001, peak_data_rate
+    // 3,199 in the top 15 bits of the next word (0x18FE), then 32 reserved bits.
     CHECK(mp4::build_dmlp_payload({.format_info = 0x0050A001, .peak_data_rate = 0x0C7F}) ==
           bytes_of({0x00, 0x50, 0xA0, 0x01, 0x18, 0xFE, 0x00, 0x00, 0x00, 0x00}));
     // ... and for the 5.1 one: 0x0007800F with the same peak rate.
@@ -85,10 +89,11 @@ TEST_CASE("dmlp is the stream's format_info and peak data rate, as FFmpeg writes
           bytes_of({0x00, 0x00, 0x00, 0x00, 0xFF, 0xFE, 0x00, 0x00, 0x00, 0x00}));
 }
 
-TEST_CASE("an 'mlpa' file round-trips whole access units, with the track described", "[truehd][mp4]") {
+TEST_CASE("an 'mlpa' file round-trips whole access units, with the track described",
+          "[truehd][mp4]") {
     for (const char* name :
-         {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd", "truehd_st192_s24.thd",
-          "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
+         {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st96_s24.thd",
+          "truehd_st192_s24.thd", "truehd_st44_s24.thd", "truehd_mono48_s24.thd"}) {
         SECTION(name) {
             const TruehdStream stream = load(name);
             mp4::MuxOptions options;
@@ -100,8 +105,8 @@ TEST_CASE("an 'mlpa' file round-trips whole access units, with the track describ
             REQUIRE(demuxed.has_value());
             REQUIRE(demuxed->samples.size() == stream.units.size());
             for (std::size_t i = 0; i < stream.units.size(); ++i) {
-                REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(), demuxed->samples[i].begin(),
-                                   demuxed->samples[i].end()));
+                REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(),
+                                   demuxed->samples[i].begin(), demuxed->samples[i].end()));
             }
             const mp4::ReadTrack& track = demuxed->track;
             CHECK(track.codec_id == "mlpa");
@@ -115,21 +120,26 @@ TEST_CASE("an 'mlpa' file round-trips whole access units, with the track describ
             // The stss lists exactly the access units that open with a major sync.
             const std::size_t stss = find_code(*file, "stss");
             REQUIRE(stss != std::string_view::npos);
-            const auto expected = static_cast<std::uint32_t>(std::count(stream.major.begin(), stream.major.end(), true));
+            const auto expected = static_cast<std::uint32_t>(
+                std::count(stream.major.begin(), stream.major.end(), true));
             CHECK(be32(*file, stss + 8) == expected);
         }
     }
 }
 
-TEST_CASE("the sample rate of an 'mlpa' entry is a plain integer, whatever the rate", "[truehd][mp4]") {
-    // ERRATA C2: 16.16 fixed point cannot hold 96,000 or 192,000, and FFmpeg writes the integer in every case.
-    for (const char* name : {"truehd_st48_s24.thd", "truehd_st96_s24.thd", "truehd_st192_s24.thd"}) {
+TEST_CASE("the sample rate of an 'mlpa' entry is a plain integer, whatever the rate",
+          "[truehd][mp4]") {
+    // ERRATA C2: 16.16 fixed point cannot hold 96,000 or 192,000, and FFmpeg writes the integer in
+    // every case.
+    for (const char* name :
+         {"truehd_st48_s24.thd", "truehd_st96_s24.thd", "truehd_st192_s24.thd"}) {
         const TruehdStream stream = load(name);
         const auto file = mp4::mux(track_of(stream), stream.units);
         REQUIRE(file.has_value());
         const std::size_t entry = find_code(*file, "mlpa");
         REQUIRE(entry != std::string_view::npos);
-        // 4 (type) + 6 reserved + 2 data_reference_index + 8 reserved + 2 channelcount + 2 samplesize + 4 = 28 .
+        // 4 (type) + 6 reserved + 2 data_reference_index + 8 reserved + 2 channelcount + 2
+        // samplesize + 4 = 28 .
         CHECK(be32(*file, entry + 4 + 24) == stream.info.sample_rate);
     }
 }
@@ -161,8 +171,9 @@ TEST_CASE("the reader takes an 'mlpa' sample rate written either way", "[truehd]
 }
 
 TEST_CASE("without a usable rate code in dmlp the sample entry's field decides", "[truehd][mp4]") {
-    // ratebits 0xF names no rate (TH spec §1.4), so the field is all the reader has, and it has to read it as the
-    // integer FFmpeg writes (a low half of 0x7700 here) or as 16.16 (a low half of zero).
+    // ratebits 0xF names no rate (TH spec §1.4), so the field is all the reader has, and it has to
+    // read it as the integer FFmpeg writes (a low half of 0x7700 here) or as 16.16 (a low half of
+    // zero).
     const TruehdStream stream = load("truehd_st96_s24.thd");
     mp4::AudioTrack track = track_of(stream);
     track.codec_config = mp4::build_dmlp_payload({.format_info = 0xF0000000U, .peak_data_rate = 1});
@@ -184,13 +195,15 @@ TEST_CASE("without a usable rate code in dmlp the sample entry's field decides",
 }
 
 TEST_CASE("an edit drops the padding samples of the last access unit", "[truehd][mp4]") {
-    const TruehdStream stream = load("truehd_st44_s24.thd");  // 276 units of 40 samples, 15 of them padding
+    const TruehdStream stream =
+        load("truehd_st44_s24.thd");  // 276 units of 40 samples, 15 of them padding
     REQUIRE(stream.padding_samples == 15);
     mp4::MuxOptions options;
     options.edit = mp4::MuxOptions::Edit{
         .start_samples = 0,
-        .duration_samples = static_cast<std::uint64_t>(stream.units.size()) * stream.samples_per_unit -
-                            static_cast<std::uint64_t>(stream.padding_samples)};
+        .duration_samples =
+            static_cast<std::uint64_t>(stream.units.size()) * stream.samples_per_unit -
+            static_cast<std::uint64_t>(stream.padding_samples)};
     const auto file = mp4::mux(track_of(stream), stream.units, options);
     REQUIRE(file.has_value());
     const auto demuxed = mp4::demux(*file);
@@ -215,8 +228,8 @@ TEST_CASE("a fragmented 'mlpa' file round-trips the same access units", "[truehd
     REQUIRE(demuxed.has_value());
     REQUIRE(demuxed->samples.size() == stream.units.size());
     for (std::size_t i = 0; i < stream.units.size(); ++i) {
-        REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(), demuxed->samples[i].begin(),
-                           demuxed->samples[i].end()));
+        REQUIRE(std::equal(stream.units[i].begin(), stream.units[i].end(),
+                           demuxed->samples[i].begin(), demuxed->samples[i].end()));
     }
     CHECK(demuxed->track.codec_id == "mlpa");
     CHECK(demuxed->track.codec_config.mlp_format_info == stream.info.major_sync.format_info);
@@ -239,8 +252,8 @@ TEST_CASE("a damaged 'mlpa' file is refused or read short, never misread", "[tru
         std::vector<std::byte> bad = *file;
         const std::size_t dmlp = find_code(bad, "dmlp");
         REQUIRE(dmlp != std::string_view::npos);
-        // Shrink the box to its header plus two bytes: size 10, the rest of the old box becomes junk the entry
-        // walk then reads as a box of its own, so patch the entry's size to match.
+        // Shrink the box to its header plus two bytes: size 10, the rest of the old box becomes
+        // junk the entry walk then reads as a box of its own, so patch the entry's size to match.
         const auto set32 = [&](std::size_t at, std::uint32_t v) {
             for (std::size_t i = 0; i < 4; ++i) {
                 bad[at + i] = static_cast<std::byte>((v >> (24U - 8U * i)) & 0xFFU);
@@ -251,21 +264,23 @@ TEST_CASE("a damaged 'mlpa' file is refused or read short, never misread", "[tru
         set32(dmlp - 4, 10);
         const std::size_t entry = find_code(bad, "mlpa") - 4;
         set32(entry, be32(bad, entry) - 8);
-        // The sample tables follow the entry in the file; the size changes shift nothing the reader reads from
-        // here on because the bytes are only reinterpreted, not moved. A truncated stsd must not crash it.
+        // The sample tables follow the entry in the file; the size changes shift nothing the reader
+        // reads from here on because the bytes are only reinterpreted, not moved. A truncated stsd
+        // must not crash it.
         const auto demuxed = mp4::demux(bad);
         if (demuxed.has_value()) {
             CHECK(demuxed->track.codec_config.mlp_format_info == 0);
         }
     }
     SECTION("a file cut in the media data gives the samples that are whole, or an error") {
-        const std::vector<std::byte> cut(file->begin(), file->begin() + static_cast<std::ptrdiff_t>(file->size() / 2));
+        const std::vector<std::byte> cut(
+            file->begin(), file->begin() + static_cast<std::ptrdiff_t>(file->size() / 2));
         const auto demuxed = mp4::demux(cut);
         if (demuxed.has_value()) {
             CHECK(demuxed->samples.size() < stream.units.size());
             for (std::size_t i = 0; i < demuxed->samples.size(); ++i) {
-                CHECK(std::equal(stream.units[i].begin(), stream.units[i].end(), demuxed->samples[i].begin(),
-                                 demuxed->samples[i].end()));
+                CHECK(std::equal(stream.units[i].begin(), stream.units[i].end(),
+                                 demuxed->samples[i].begin(), demuxed->samples[i].end()));
             }
         }
     }

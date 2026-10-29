@@ -1,12 +1,13 @@
-// A small command-line tool over the TrueHD container code, for tools/checks/verify_truehd_containers.py
-// to drive against FFmpeg without the forge CLI (planning/truehd.md, phase T2c: the CLI is a later phase).
+// A small command-line tool over the TrueHD container code, for
+// tools/checks/verify_truehd_containers.py to drive against FFmpeg without the forge CLI
+// (planning/truehd.md, phase T2c: the CLI is a later phase).
 //
 //   iclforge-truehd-container-tool mux   <mp4|mp4frag|mkv|ts|mat> <in.thd> <out>
 //   iclforge-truehd-container-tool demux <mp4|mkv|ts|mat>          <in>     <out.thd>
 //   iclforge-truehd-container-tool info  <mp4|mkv|ts|mat>          <in>
 //
-// `demux` writes the access units back to back, which is a raw .thd stream. `info` prints one `key=value` pair a
-// line, for the script to read.
+// `demux` writes the access units back to back, which is a raw .thd stream. `info` prints one
+// `key=value` pair a line, for the script to read.
 
 #include <fmt/format.h>
 
@@ -43,7 +44,8 @@ int fail(std::string_view what) {
     return kExitFailure;
 }
 
-[[nodiscard]] std::vector<std::byte> concatenate(std::span<const std::span<const std::byte>> parts) {
+[[nodiscard]] std::vector<std::byte> concatenate(
+    std::span<const std::span<const std::byte>> parts) {
     std::vector<std::byte> out;
     for (const auto& part : parts) {
         out.insert(out.end(), part.begin(), part.end());
@@ -57,9 +59,9 @@ mp4::AudioTrack mp4_track(const TruehdStream& stream) {
         .sample_rate = stream.info.sample_rate,
         .channels = stream.channels,
         .samples_per_frame = stream.samples_per_unit,
-        .codec_config = mp4::build_dmlp_payload(
-            {.format_info = stream.info.major_sync.format_info,
-             .peak_data_rate = stream.info.major_sync.peak_data_rate}),
+        .codec_config =
+            mp4::build_dmlp_payload({.format_info = stream.info.major_sync.format_info,
+                                     .peak_data_rate = stream.info.major_sync.peak_data_rate}),
     };
 }
 
@@ -70,7 +72,8 @@ int mux(std::string_view format, const std::string& in, const std::string& out) 
     }
     std::vector<std::byte> bytes;
     if (format == "mp4" || format == "mp4frag") {
-        // An edit list drops the padding samples the last access unit's end-of-stream marker counts.
+        // An edit list drops the padding samples the last access unit's end-of-stream marker
+        // counts.
         const std::uint64_t total =
             static_cast<std::uint64_t>(stream->units.size()) * stream->samples_per_unit;
         if (format == "mp4") {
@@ -100,12 +103,11 @@ int mux(std::string_view format, const std::string& in, const std::string& out) 
     } else if (format == "mkv") {
         mkv::MuxOptions options;
         options.key_frames = stream->major;
-        const auto muxed = mkv::mux(
-            mkv::AudioTrack{.codec_id = std::string{mkv::kCodecTruehd},
-                            .sample_rate = stream->info.sample_rate,
-                            .channels = stream->channels,
-                            .samples_per_frame = stream->samples_per_unit},
-            stream->units, options);
+        const auto muxed = mkv::mux(mkv::AudioTrack{.codec_id = std::string{mkv::kCodecTruehd},
+                                                    .sample_rate = stream->info.sample_rate,
+                                                    .channels = stream->channels,
+                                                    .samples_per_frame = stream->samples_per_unit},
+                                    stream->units, options);
         if (!muxed) {
             return fail(mkv::describe(muxed.error()));
         }
@@ -140,7 +142,8 @@ struct Demuxed {
     std::vector<std::pair<std::string, std::string>> facts;
 };
 
-std::expected<Demuxed, std::string> demux_file(std::string_view format, const std::vector<std::byte>& file) {
+std::expected<Demuxed, std::string> demux_file(std::string_view format,
+                                               const std::vector<std::byte>& file) {
     Demuxed out;
     const auto add = [&](std::string key, auto value) {
         out.facts.emplace_back(std::move(key), fmt::to_string(value));
@@ -205,7 +208,9 @@ int demux(std::string_view format, const std::string& in, const std::string& out
     if (!demuxed) {
         return fail(demuxed.error());
     }
-    return iclforge::containers::testing::write_file(out, demuxed->stream) ? 0 : fail("cannot write " + out);
+    return iclforge::containers::testing::write_file(out, demuxed->stream)
+               ? 0
+               : fail("cannot write " + out);
 }
 
 int info(std::string_view format, const std::string& in) {
@@ -234,8 +239,11 @@ int main(int argc, char** argv) {
     if (args.size() == 3 && args[0] == "info") {
         return info(args[1], args[2]);
     }
-    fmt::println(stderr, "usage: iclforge-truehd-container-tool mux <mp4|mp4frag|mkv|ts|mat> <in.thd> <out>");
-    fmt::println(stderr, "       iclforge-truehd-container-tool demux <mp4|mkv|ts|mat> <in> <out.thd>");
+    fmt::println(
+        stderr,
+        "usage: iclforge-truehd-container-tool mux <mp4|mp4frag|mkv|ts|mat> <in.thd> <out>");
+    fmt::println(stderr,
+                 "       iclforge-truehd-container-tool demux <mp4|mkv|ts|mat> <in> <out.thd>");
     fmt::println(stderr, "       iclforge-truehd-container-tool info <mp4|mkv|ts|mat> <in>");
     return kExitUsage;
 }

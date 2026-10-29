@@ -9,15 +9,15 @@ namespace iclforge::containers::iec61937 {
 
 namespace {
 
-// ERRATA M6: the three code words, in the payload's own byte order, as FFmpeg's `spdif` muxer writes them for
-// TrueHD. TH spec §21.3 names no code word.
-constexpr std::array<std::uint8_t, kMatStartCodeBytes> kStartCode{0x07, 0x9E, 0x00, 0x03, 0x84, 0x01, 0x01,
-                                                                  0x01, 0x80, 0x00, 0x56, 0xA5, 0x3B, 0xF4,
-                                                                  0x81, 0x83, 0x49, 0x80, 0x77, 0xE0};
-constexpr std::array<std::uint8_t, kMatMiddleCodeBytes> kMiddleCode{0xC3, 0xC1, 0x42, 0x49, 0x3B, 0xFA,
-                                                                    0x82, 0x83, 0x49, 0x80, 0x77, 0xE0};
-constexpr std::array<std::uint8_t, kMatEndCodeBytes> kEndCode{0xC3, 0xC2, 0xC0, 0xC4, 0x00, 0x00, 0x00, 0x00,
-                                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x97, 0x11};
+// ERRATA M6: the three code words, in the payload's own byte order, as FFmpeg's `spdif` muxer
+// writes them for TrueHD. TH spec §21.3 names no code word.
+constexpr std::array<std::uint8_t, kMatStartCodeBytes> kStartCode{
+    0x07, 0x9E, 0x00, 0x03, 0x84, 0x01, 0x01, 0x01, 0x80, 0x00,
+    0x56, 0xA5, 0x3B, 0xF4, 0x81, 0x83, 0x49, 0x80, 0x77, 0xE0};
+constexpr std::array<std::uint8_t, kMatMiddleCodeBytes> kMiddleCode{
+    0xC3, 0xC1, 0x42, 0x49, 0x3B, 0xFA, 0x82, 0x83, 0x49, 0x80, 0x77, 0xE0};
+constexpr std::array<std::uint8_t, kMatEndCodeBytes> kEndCode{
+    0xC3, 0xC2, 0xC0, 0xC4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x97, 0x11};
 
 constexpr std::size_t kMiddleSlot = 11;
 constexpr std::size_t kLastSlot = kMatAccessUnitsPerFrame - 1;
@@ -39,7 +39,9 @@ constexpr std::size_t kMinAccessUnitBytes = 4;
     return (slot + 1) * kMatSlotBytes;
 }
 
-[[nodiscard]] std::uint8_t u8(std::byte b) { return std::to_integer<std::uint8_t>(b); }
+[[nodiscard]] std::uint8_t u8(std::byte b) {
+    return std::to_integer<std::uint8_t>(b);
+}
 
 // The access unit's own length from its first two bytes, or 0 when they say none.
 [[nodiscard]] std::size_t length_of(std::span<const std::byte> bytes) {
@@ -79,7 +81,8 @@ void put_bytes(std::span<std::byte> out, std::size_t at, std::span<const std::ui
         burst[(2 * i)] = static_cast<std::byte>(preamble[i] >> 8U);
         burst[(2 * i) + 1] = static_cast<std::byte>(preamble[i] & 0xFFU);
     }
-    std::copy(payload.begin(), payload.end(), burst.begin() + static_cast<std::ptrdiff_t>(kMatPreambleBytes));
+    std::copy(payload.begin(), payload.end(),
+              burst.begin() + static_cast<std::ptrdiff_t>(kMatPreambleBytes));
     put_bytes(burst, kMatPreambleBytes, kStartCode);
     put_bytes(burst, kMatPreambleBytes + kMatMiddleCodeOffset, kMiddleCode);
     put_bytes(burst, kMatPreambleBytes + kMatEndCodeOffset, kEndCode);
@@ -99,7 +102,8 @@ std::size_t mat_slot_capacity(std::size_t slot) {
 std::string_view describe(MatError error) {
     switch (error) {
         case MatError::kNotAnAccessUnit:
-            return "not a TrueHD access unit: fewer than four bytes, an odd length, or a length field that "
+            return "not a TrueHD access unit: fewer than four bytes, an odd length, or a length "
+                   "field that "
                    "disagrees with the bytes";
         case MatError::kAccessUnitTooLarge:
             return "access unit larger than a MAT slot holds";
@@ -173,8 +177,8 @@ std::expected<std::vector<std::vector<std::byte>>, MatError> unwrap_mat_stream(
     if (carrier.empty()) {
         return out;
     }
-    // The first burst's Pa and Pb give the word order: F872 4E1F as bytes F8 72 4E 1F is big-endian, as
-    // 72 F8 1F 4E little-endian (the order FFmpeg's muxer writes).
+    // The first burst's Pa and Pb give the word order: F872 4E1F as bytes F8 72 4E 1F is
+    // big-endian, as 72 F8 1F 4E little-endian (the order FFmpeg's muxer writes).
     if (carrier.size() < 4) {
         return std::unexpected(MatError::kNoSync);
     }
@@ -191,19 +195,23 @@ std::expected<std::vector<std::vector<std::byte>>, MatError> unwrap_mat_stream(
         if (carrier.size() - pos < kMatBurstBytes) {
             return std::unexpected(MatError::kTruncatedBurst);
         }
-        std::copy_n(carrier.begin() + static_cast<std::ptrdiff_t>(pos), kMatBurstBytes, burst.begin());
+        std::copy_n(carrier.begin() + static_cast<std::ptrdiff_t>(pos), kMatBurstBytes,
+                    burst.begin());
         if (little_endian) {
             swap_words(burst);
         }
-        if (u8(burst[0]) != 0xF8 || u8(burst[1]) != 0x72 || u8(burst[2]) != 0x4E || u8(burst[3]) != 0x1F) {
+        if (u8(burst[0]) != 0xF8 || u8(burst[1]) != 0x72 || u8(burst[2]) != 0x4E ||
+            u8(burst[3]) != 0x1F) {
             return std::unexpected(MatError::kNoSync);
         }
         const std::uint16_t pc = static_cast<std::uint16_t>((u8(burst[4]) << 8U) | u8(burst[5]));
         if ((pc & 0x1FU) != (kMatPc & 0x1FU)) {
             return std::unexpected(MatError::kNotMat);
         }
-        const std::span<const std::byte> payload{burst.data() + kMatPreambleBytes, kMatPayloadBytes};
-        if (!matches(payload, 0, kStartCode) || !matches(payload, kMatMiddleCodeOffset, kMiddleCode) ||
+        const std::span<const std::byte> payload{burst.data() + kMatPreambleBytes,
+                                                 kMatPayloadBytes};
+        if (!matches(payload, 0, kStartCode) ||
+            !matches(payload, kMatMiddleCodeOffset, kMiddleCode) ||
             !matches(payload, kMatEndCodeOffset, kEndCode)) {
             return std::unexpected(MatError::kBadCode);
         }
