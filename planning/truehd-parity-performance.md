@@ -166,7 +166,7 @@ here is two and a bit restart intervals):
 | `mlp_st44_s16` / `mlp_st48_s24` / `mlp_st96_s24` / `mlp_m51_s24` | 3.40, 267 / 4.40, 189 / 6.14, 136 / 8.09, 103 | not written (the encoder writes TrueHD only) |
 
 The slowest decode is stereo at 192 kHz (81 times real time), because an access unit there holds 160 samples; per second of audio the cost
-follows channels times sample rate. A 7.1 stream at 96 kHz is four sixths of a second of 5.1 work more: about 2.7 times 5.1 at 48 kHz.
+follows channels times sample rate. A 7.1 stream at 96 kHz is 8/6 times 2, or 2.7 times, the work of 5.1 at 48 kHz.
 
 **Where a decode goes**, in instructions (callgrind, `-O2 -g`, inside `Decoder::decode`, attributed by source line to the kernels):
 
@@ -183,8 +183,8 @@ follows channels times sample rate. A 7.1 stream at 96 kHz is four sixths of a s
 
 callgrind counts every iteration of a `rep`-prefixed instruction, so the 8 to 16 % for `memset` and `memcpy` is an overcount on
 hardware; the rows buffers they clear are 10 columns wide for any channel count (`kRowStride`), which is wasteful, and a candidate for a
-change that is not SIMD. The filters are a recurrence: each output is in the next sample's sum. Of the 1.2 million predictions in the 5.1
-run, 44 % have a sum above 2^31 (section 5).
+change that is not SIMD. The filters are a recurrence: each output is in the next sample's sum. Of the 3.9 million predictions in the 18-input run of section 5,
+45 % have a sum above 2^31.
 
 **Where an encode goes** (5.1, 16-bit source, one call with the lot; the same shares hold for a call a unit once the buffer fix below is in):
 
@@ -256,7 +256,7 @@ compilers emit for an eight-tap sum (clang 18, `-O2`, loop unrolled and not vect
 | x86-64 | `imul` on 64-bit registers | 3.9 | the measured baseline |
 | AArch64 | `smaddl` | 2.0 | about half of x86's |
 | Cortex-M3 and M4 | `smlal` (32 by 32 into 64) | 3.0 | as x86; no soft-float to pay, the decoder has none |
-| Cortex-M0 and M0+ | none: `__aeabi_lmul` per tap | 13.0 and a library call | the multiply is a call; a decode costs about a tenth of the speed |
+| Cortex-M0 and M0+ | none: `__aeabi_lmul` per tap | 13.0 and a library call | the multiply is a library call per tap |
 | ESP32-C3 and C6 (RV32IMC) | `mul` and `mulh` (two instructions), then a carry chain | 7.5 | about twice x86's per tap |
 | ESP32-P4 (RV32IMAFC, PIE) | as RV32IMC; PIE not used | 7.5 | as the C6, at 360 MHz |
 | ESP32-S3 (LX7) | `mull` and `mulsh` of the 32-bit multiplier option; PIE's multiply-accumulate is 8 and 16 bits wide | not compiled: no Xtensa target in clang here | like RV32IMC; I could not check PIE's accumulator width against a manual, and say so |
@@ -276,10 +276,10 @@ six synthetic signals of 1 to 8 channels):
 | Variant | Bytes identical to the `double` encoder | Stream size against it | Decodes to the source |
 |---|---|---|---|
 | `double`, `std::cos` replaced by a correctly rounded cosine (stands for another C library's last bit) | 18 of 18 | identical | 18 of 18 |
-| `float` internals in the four analysis functions | 0 of 18 | 0.0 % to +78 %: +10 % at the fixtures' rates, +10 % to +78 % on the real 16-bit stereo and 5.1, none on the synthetic | 18 of 18 |
+| `float` internals in the four analysis functions | 0 of 18 | -0.02 % to +78 %: +3 % to +47 % on the eight fixtures' material, +10 % to +78 % on `reference_51.wav`, none on the six synthetic signals | 18 of 18 |
 
 A `float` analysis is not a tier: the autocorrelation of 24-bit samples over 5,120 terms needs about 53 bits, and the predictors it gives
-cost up to 78 % of the stream on real audio (103,496 bytes became 184,088 for the 16-bit stereo reference). An exact integer
+cost up to 78 % more stream on real audio (103,496 bytes became 184,088 for the 16-bit stereo reference). An exact integer
 autocorrelation (an `int64` or `__int128` sum; the products reach 2^48 and the sum 2^61) would remove the order dependence that stops a
 vectorised sum being bit-identical to the scalar one, and would fix the encoder's bytes across platforms, at the cost of changing them once:
 the Levinson recursion and the quantiser stay `double`, which the project's flags (`-ffp-contract=off`) already make the same on every
