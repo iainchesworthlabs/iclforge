@@ -130,22 +130,23 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 
 | # | Where | Problem | Reading | Evidence |
 |---|---|---|---|---|
-| P1 | 1.2, 3.3, 8.4, F | Samples per access unit given as 40 and as 320; 3.3 also says "[16, 256)"; "8 blocks per access unit" at 40 samples gives 5-sample blocks, which contradicts the block size range 8 to 160 in multiples of 8 | open | |
+| P1 | 1.2, 3.3, 8.4, F | Samples per access unit given as 40 and as 320; 3.3 also says "[16, 256)"; "8 blocks per access unit" at 40 samples gives 5-sample blocks, which contradicts the block size range 8 to 160 in multiples of 8 | An access unit is 1/1200 s: 40 samples at 44.1 and 48 kHz, 80 at 88.2 and 96 kHz, 160 at 176.4 and 192 kHz. "8 blocks" and 320 are wrong | FFmpeg streams: `output_timing` advances 640 per 16 access units at 48 kHz and 1280 at 96 kHz; `input_timing` steps 40 at 48 kHz |
 | P2 | 4.4 | `rate_multiplier` is not defined; 15 bits of 200 bps cannot reach the 18 Mbps the text cites | open | |
 | P3 | 9.1, 9.2 | Four filter "types" against two filters, A (FIR) and B (IIR) | Two filters per channel, A and B; the four "types" are combinations of their orders | 9.2's syntax |
 | P4 | Appendix C | Huffman tables | All three codebooks are prefix-free; each leaves exactly two 9-bit words unused (`000000000`, `010000000`), both with a zero ninth bit, which agrees with 11.4's escape rule | Kraft sum 255/256, checked `consteval` |
-| P5 | 2.3, 7.2, A | Restart sync words for substreams 1 to 3: 2.3 gives 0x31EB for 1 and 0x31EC for 2 and 3; 7.2 lets 0x31EA serve substream 1 and 0x31EB substream 2 | open | |
-| P6 | 7.1 | Restart sync word width (14 bits) | open | |
+| P5 | 2.3, 7.2, A | Restart sync words for substreams 1 to 3: 2.3 gives 0x31EB for 1 and 0x31EC for 2 and 3; 7.2 lets 0x31EA serve substream 1 and 0x31EB substream 2 | 0x31EA is valid in substreams 0 and 1; FFmpeg writes it in both substreams of a 5.1 stream. 0x31EB and 0x31EC to be settled by crafted streams | FFmpeg 5.1 stream, both restart headers |
+| P6 | 7.1 | Restart header: 14-bit sync, then a `noise_type` bit, then `output_timing`; then 19 reserved bits, and later `max_shift`, `max_lsbs`, `max_bits`, `max_bits_repeat` | No separate `noise_type` bit: `output_timing` follows the 14-bit sync directly. The "19 reserved bits" are `max_shift` 4, `max_lsbs` 5, `max_bits` 5, `max_bits_repeat` 5, and the second copy of those fields, the hires bit and `heavy_drc_present` do not exist. Order: sync 14, output_timing 16, min_chan 4, max_chan 4, max_matrix_chan 4, noise_shift 4, noisegen_seed 23, max_shift 4, max_lsbs 5, max_bits 5, max_bits_repeat 5, data_check_present 1, lossless_check 8, reserved 16, ch_assign 6 x (max_matrix_chan + 1), CRC 8 | Restart-header CRC verifies over 107 FFmpeg headers at this extent only |
 | P7 | 3.5, A | Termination word 0xD234E000 (32 bits) against a "substream 3 terminator" 0x1234 | open | |
-| P8 | 6.2, 8.1 | `restart_header_exists` appears both at the start of a substream segment and inside each block header; "8 blocks" per segment against a `last_block_in_segment` bit | open | |
+| P8 | 6.2, 8.1 | `restart_header_exists` appears both at the start of a substream segment and inside each block header; "8 blocks" per segment against a `last_block_in_segment` bit | A segment is blocks only: each block starts with `block_header_exists`, then `restart_header_exists` inside it; 6.2's segment-level bit is the first block's. Block count is open | FFmpeg segments start `11` then the 0x31EA sync |
 | P9 | 4.1 | `flags`: bit 14 is inside the non-reserved mask 0xD800 yet SHALL be clear | open | |
 | P10 | 11.1, 11.3 | Raw-only samples (`huff_type` 0) read `huff_lsbs` bits in 11.1 and use `lsbs_bits` in 11.3 | open | |
 | P11 | 8.2 | `param_presence_flags` is read but no field says which parameter each bit gates | open | |
-| P12 | 4.1, B | CRC-16 0x2D and CRC-8 0x1D: initial value, reflection and covered bytes not given | open | |
-| P13 | 6.2, B | Parity: which bytes are XORed, and Appendix B's "CRC-8 (parity) 0x63" | open | |
+| P12 | 4.1, B | CRC-16 0x2D and CRC-8 0x1D: initial value, reflection and covered bytes not given | Every MLP CRC is the unaugmented polynomial remainder, MSB first: bits are shifted into the register's low end and the register is reduced when its top bit leaves. Major sync: 0x2D, initial 0, over the 26 bytes before the CRC field. Restart header: 0x1D, initial 0, from the sync word to the end of `ch_assign` | Major sync: 5 FFmpeg streams (channel meaning bytes are zero there, so bytes 24 and 25 are confirmed by a crafted stream). Restart header: 107 headers |
+| P13 | 6.2, B | Parity: which bytes are XORed, and Appendix B's "CRC-8 (parity) 0x63" | `substream_end_ptr` counts 16-bit words from the end of the substream directory. Parity byte = XOR of every segment byte before it, XOR 0xA9. The substream CRC uses polynomial 0x63, not 0x1D, unaugmented remainder with initial value 0xA2 over the segment bytes before the parity byte | 1,320 FFmpeg segments, every one |
 | P14 | 7.3 | Lossless check: which samples (before or after matrixing, which channels) and where the value for an interval is carried | open | |
 | P15 | 9.4, 9.5 | IIR state update `(residual - predicted) << state_shift` and the order of A and B in inverse prediction | open | |
 | P16 | 16.1 | Extra data length field: "12 bits" with "4 bits part of AU header parity" | open | |
+| P18 | brief | FFmpeg 6.1.1's `truehd` encoder takes at most 5.1 (mono to 5.1(side)); asked for 7.1 it silently writes 5.0 | FFmpeg golden masters are 2 and 6 channel only; 8 channel interoperability rests on our encoder and FFmpeg's decoder | `ffmpeg -h encoder=truehd`; a 7.1 WAV came back as 5.0 |
 | P17 | 22, ROADMAP | Signing: pace-ccjf1 ECDSA in the specification, truncated HMAC-SHA-256 in ROADMAP.md and `docs/concepts/object-signing.md` | carriage only, no scheme | [decision 1](#decisions-needing-owner-review) |
 
 ## Decisions needing owner review
@@ -170,7 +171,7 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 | Phase | What | State |
 |---|---|---|
 | 0 | this design | drafted 2026-10-29 |
-| 1 | bitstream layer | not started |
+| 1 | bitstream layer | in progress: CRC, parity and restart header layout settled from FFmpeg streams (P1, P6, P12, P13) |
 | 2 | decoder | not started |
 | 3 | encoder | not started |
 | 4 | Atmos | not started |
