@@ -34,7 +34,7 @@
   // one figure each - "2.0 dB SNR", "2009 KB/frame" - and a reader took them for the project's
   // headline numbers: they were the tightest E-AC-3 check and the AC-4 5.1 encoder's allocator
   // traffic, which say nothing about each other.
-  const CODECS = ["AC-3", "E-AC-3", "AC-4"];
+  const CODECS = ["AC-3", "E-AC-3", "AC-4", "TrueHD"];
 
   // The `codec` field of a gold-reference record (main.jsonl) and of a tool-comparison one.
   const QUALITY_CODECS = { "ac3": "AC-3", "eac3": "E-AC-3" };
@@ -66,6 +66,7 @@
     "ac4_stereo_decode": ["AC-4", "stereo decode"],
     "ac4_51_encode": ["AC-4", "5.1 encode"],
     "ac4_51_decode": ["AC-4", "5.1 decode"],
+    "truehd_51_decode": ["TrueHD", "5.1 decode"],
   };
 
   const LAYOUTS = { "1": "mono", "2": "stereo", "6": "5.1", "8": "7.1" };

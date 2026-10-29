@@ -46,7 +46,7 @@
 
     "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"], "lanes": ["core"], "purpose": "The library's example programs, in C++ and Python."},
 
-    "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "dsp"], "lanes": ["core"], "exposes": ["tests/support/"], "purpose": "What every test binary is built with (iclforge::test_support) and the performance tests."}
+    "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "dsp", "truehd"], "lanes": ["core"], "exposes": ["tests/support/"], "purpose": "What every test binary is built with (iclforge::test_support) and the performance tests."}
   },
   "exceptions": [
     {

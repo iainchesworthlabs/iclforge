@@ -16,6 +16,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
+#include "truehd_bench.hpp"
 
 // Real-time throughput regression guard.
 //
@@ -32,7 +33,7 @@
 // It covers both directions of both generations plus the object path: the
 // AC-3 and Atmos/JOC encoders it was written for, and - since encoder/decode benchmarks -
 // the E-AC-3 encoder and all three decoders, which had no real-time gate of
-// any kind - and AC-4's encoder and decoder, at stereo and 5.1. A decoder
+// any kind - and AC-4's encoder and decoder, at stereo and 5.1, and the TrueHD decoder at 5.1. A decoder
 // is the half of the codec that runs on the least capable hardware there is
 // (a set-top box, a phone, the WASM demo in a browser tab), so "faster than
 // real time" is a harder requirement there than it is on the encode side,
@@ -72,6 +73,8 @@ constexpr double kSlackFactor = 2.0;
 constexpr int kDecodeSourceFrames = 40;
 // The object count every Atmos case here uses, encode and decode alike.
 constexpr int kObjects = 4;
+// TrueHD frames to decode (40 access units, 33.3 ms of 5.1 at 48 kHz, each): a second.
+constexpr int kTrueHdFrames = 30;
 
 double real_time_budget_seconds(int frames) {
     return static_cast<double>(frames) * iclforge::ac3::kSamplesPerFrame / kSampleRate;
@@ -318,4 +321,26 @@ TEST_CASE("the AC-4 stereo decoder stays faster than real time") {
 TEST_CASE("the AC-4 5.1 decoder stays faster than real time") {
     check_ac4_decode("AC-4 5.1 decode", perf::ac4_bench::five_one_config(),
                      perf::ac4_bench::kFiveOneChannels);
+}
+
+// A frame is 40 TrueHD access units (33.3 ms), decoded back to back from a stream the TrueHD encoder wrote
+// from the same fixture. The budget is the sum of the frames' durations, as for the other decoders.
+TEST_CASE("the TrueHD 5.1 decoder stays faster than real time") {
+    const auto run = perf::truehd_bench::time_decode(fixture(), kTrueHdFrames,
+                                                     perf::truehd_bench::kWarmupUnits);
+    if (!run.built) {
+        SKIP("this build has no TrueHD library (ICLFORGE_BUILD_TRUEHD=OFF)");
+    }
+    INFO(run.error);
+    REQUIRE(run.error.empty());
+    REQUIRE_FALSE(run.frame_ms.empty());
+    double elapsed_ms = 0.0;
+    for (const double ms : run.frame_ms) {
+        elapsed_ms += ms;
+    }
+    const double frames = static_cast<double>(run.frame_ms.size());
+    INFO("TrueHD 5.1 decode: " << run.frame_ms.size() << " frames in " << elapsed_ms << "ms ("
+                               << (elapsed_ms / frames) << "ms/frame); real-time budget is "
+                               << (run.budget_ms * frames) << "ms");
+    CHECK(elapsed_ms < kSlackFactor * run.budget_ms * frames);
 }

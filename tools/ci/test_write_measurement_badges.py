@@ -58,6 +58,7 @@ AC4_BUDGET = 2048 / 48.0
 # rejects them as ambiguous characters in a string.
 MULTIPLICATION_SIGN = chr(0xD7)
 EN_DASH = chr(0x2013)
+EM_DASH = chr(0x2014)
 
 
 def record(channels_db, thresholds_db, leg="macos-llvm", codec="ac3", bitrate_kbps=448,
@@ -126,7 +127,8 @@ class AccuracyBadgeTest(unittest.TestCase):
 
         got = badges.accuracy_badge([lowest_snr, tightest_margin])
         self.assertEqual(got["message"],
-                         "AC-3 5.1 448 kbps: 58.1 dB | E-AC-3 no data | AC-4 no data")
+                         "AC-3 5.1 448 kbps: 58.1 dB | E-AC-3 no data | AC-4 no data"
+                         " | TrueHD no data")
         self.assertEqual(got["color"], badges.GREEN)
 
     def test_per_channel_breach_is_amber_where_the_scalar_test_stayed_green(self):
@@ -157,7 +159,8 @@ class AccuracyBadgeTest(unittest.TestCase):
             {"leg": "macos-llvm", "codec": "ac3", "worst_db": 58.4, "threshold_db": 57.0},
         ]
         got = badges.accuracy_badge(legacy)
-        self.assertEqual(got["message"], "AC-3 58.4 dB | E-AC-3 no data | AC-4 no data")
+        self.assertEqual(
+            got["message"], "AC-3 58.4 dB | E-AC-3 no data | AC-4 no data | TrueHD no data")
         self.assertEqual(got["color"], badges.GREEN)
 
     def test_legacy_and_per_channel_records_compare_on_one_scale(self):
@@ -215,7 +218,8 @@ class AccuracyBadgeTest(unittest.TestCase):
         got = badges.accuracy_badge(rows)
         self.assertEqual(
             got["message"],
-            "AC-3 5.1 448 kbps: 58.1 dB | E-AC-3 stereo 128 kbps transient: 2.0 dB | AC-4 no data")
+            "AC-3 5.1 448 kbps: 58.1 dB | E-AC-3 stereo 128 kbps transient: 2.0 dB | AC-4 no data"
+            " | TrueHD no data")
 
     def test_a_breach_in_one_codec_colours_the_whole_badge_amber(self):
         breached = eac3_transient(snr=0.8, floor=1.0)
@@ -237,16 +241,19 @@ class AccuracyBadgeTest(unittest.TestCase):
         alone = badges.accuracy_badge([], ac4)
         self.assertEqual(
             alone["message"],
-            "AC-3 no data | E-AC-3 no data | AC-4 Dolby streams: 16.7 dB min, MOS-LQO 4.39")
+            "AC-3 no data | E-AC-3 no data | AC-4 Dolby streams: 16.7 dB min, MOS-LQO 4.39"
+            " | TrueHD no data")
         self.assertEqual(alone["color"], badges.INFO)
 
         beside = badges.accuracy_badge([record([58.1, 63.8], [56.0, 62.0])], ac4)
         self.assertEqual(beside["color"], badges.GREEN)
-        self.assertTrue(beside["message"].endswith("AC-4 Dolby streams: 16.7 dB min, MOS-LQO 4.39"))
+        self.assertTrue(beside["message"].endswith(
+            "AC-4 Dolby streams: 16.7 dB min, MOS-LQO 4.39 | TrueHD no data"))
 
         # A stream with only one of the two scores shows that one.
         only_mos = badges.accuracy_badge([], [{"leg": "x", "mos_lqo": 4.5}])
-        self.assertTrue(only_mos["message"].endswith("AC-4 Dolby streams: MOS-LQO 4.50"))
+        self.assertTrue(only_mos["message"].endswith(
+            "AC-4 Dolby streams: MOS-LQO 4.50 | TrueHD no data"))
 
         summary = badges.ac4_quality(ac4)
         self.assertEqual((summary["snr_leg"], summary["mos"], summary["mos_leg"],
@@ -273,7 +280,19 @@ class AccuracyBadgeTest(unittest.TestCase):
         self.assertEqual(badges.layout_of({"channels_db": [1.0] * 3}), "3 channels")
 
 
+TRUEHD_BUDGET = 40 * 40 / 48.0  # a frame of forty 40-sample access units at 48 kHz, in ms
+
+
 class SpeedBadgeTest(unittest.TestCase):
+    def test_truehd_is_held_to_its_own_frame(self):
+        """A TrueHD frame is 33.3 ms (bench_encoder.cpp's truehd_51_decode), not A/52's 32 ms."""
+        rows = [perf("truehd_51_decode", 0.2, TRUEHD_BUDGET)]
+        got = badges.speed_badge(rows)
+        self.assertEqual(
+            got["message"],
+            "AC-3 no data | E-AC-3 no data | AC-4 no data | TrueHD 5.1 decode: 167x")
+        self.assertEqual(got["color"], badges.GREEN)
+
     def test_speed_is_the_slowest_workload_of_each_codec(self):
         """Each codec is held to its own rows, and the words say which one won."""
         rows = [
@@ -285,7 +304,8 @@ class SpeedBadgeTest(unittest.TestCase):
         got = badges.speed_badge(rows)
         self.assertEqual(
             got["message"],
-            "AC-3 5.1 encode: 8x | E-AC-3 Atmos 4-object encode: 4x | AC-4 5.1 encode: 11x")
+            "AC-3 5.1 encode: 8x | E-AC-3 Atmos 4-object encode: 4x | AC-4 5.1 encode: 11x"
+            " | TrueHD no data")
         self.assertEqual(got["color"], badges.GREEN)
 
     def test_speed_ranks_workloads_by_their_multiple_and_not_by_ms_per_frame(self):
@@ -349,7 +369,7 @@ class MemoryBadgeTest(unittest.TestCase):
         self.assertEqual(
             b["message"],
             "AC-3 5.1 decode: 42 KB | E-AC-3 Atmos 4-object decode: 80 KB | "
-            "AC-4 5.1 encode: 2009 KB")
+            "AC-4 5.1 encode: 2009 KB | TrueHD no data")
         self.assertEqual(b["label"], "allocation per frame (heaviest workload)")
 
     def test_allocation_has_no_gate_so_it_is_not_coloured_by_one(self):
@@ -373,7 +393,7 @@ class MemoryBadgeTest(unittest.TestCase):
         self.assertEqual(
             b["message"],
             "AC-3 5.1 encode: 2.0 KiB | E-AC-3 5.1 enhanced-coupling encode: 14.3 KiB | "
-            "AC-4 5.1 encode: 11.5 KiB")
+            "AC-4 5.1 encode: 11.5 KiB | TrueHD no data")
         self.assertEqual(b["color"], badges.AMBER)
 
     def test_live_growth_is_amber_from_the_warning_line_and_not_only_above_it(self):
@@ -392,7 +412,9 @@ class MemoryBadgeTest(unittest.TestCase):
     def test_missing_fields_are_no_data_for_that_codec(self):
         b = badges.growth_badge([mem("ac3_51_encode", 1, growth=None),
                                  mem("ac4_51_encode", 1, growth=100)])
-        self.assertEqual(b["message"], "AC-3 no data | E-AC-3 no data | AC-4 5.1 encode: 0.1 KiB")
+        self.assertEqual(
+            b["message"],
+            "AC-3 no data | E-AC-3 no data | AC-4 5.1 encode: 0.1 KiB | TrueHD no data")
         self.assertEqual(badges.growth_badge([])["message"], badges.NO_DATA)
 
     def test_a_workload_the_table_does_not_list_is_refused(self):
@@ -404,14 +426,15 @@ class MemoryBadgeTest(unittest.TestCase):
 
 # The naming convention WORKLOADS documents: what a config's first word says about its codec.
 PREFIX_CODEC = {"ac3": "AC-3", "plain": "AC-3", "eac3": "E-AC-3", "ecpl": "E-AC-3",
-                "atmos": "E-AC-3", "ac4": "AC-4"}
+                "atmos": "E-AC-3", "ac4": "AC-4", "truehd": "TrueHD"}
 
 
 class WorkloadTableTest(unittest.TestCase):
     """The table that says which codec a `config` belongs to, and how to say it."""
 
     def test_names_follow_the_prefix_convention(self):
-        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4."""
+        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4, truehd_*
+        TrueHD."""
         for config, (codec, _words) in badges.WORKLOADS.items():
             with self.subTest(config=config):
                 self.assertEqual(codec, PREFIX_CODEC[config.split("_")[0]])
@@ -585,19 +608,25 @@ class SiteScriptsRenderTest(unittest.TestCase):
             cards = self.render(*flags)
             with self.subTest(surface="page" if flags else "strip"):
                 self.assertEqual(self.figures(cards["Speed"]),
-                                 {"AC-3": "8x", "E-AC-3": "4x", "AC-4": "11x"})
+                                 {"AC-3": "8x", "E-AC-3": "4x", "AC-4": "11x", "TrueHD": EM_DASH})
                 self.assertEqual(self.figures(cards["Decode accuracy"]),
-                                 {"AC-3": "58.1 dB", "E-AC-3": "2.0 dB", "AC-4": "16.7 dB"})
+                                 {"AC-3": "58.1 dB", "E-AC-3": "2.0 dB", "AC-4": "16.7 dB",
+                                  "TrueHD": EM_DASH})
                 self.assertEqual(self.figures(cards["Allocation per frame"]),
-                                 {"AC-3": "42 KB", "E-AC-3": "80 KB", "AC-4": "2009 KB"})
+                                 {"AC-3": "42 KB", "E-AC-3": "80 KB", "AC-4": "2009 KB",
+                                  "TrueHD": EM_DASH})
                 self.assertEqual(self.figures(cards["Live growth"]),
-                                 {"AC-3": "2.0 KiB", "E-AC-3": "14.3 KiB", "AC-4": "11.5 KiB"})
+                                 {"AC-3": "2.0 KiB", "E-AC-3": "14.3 KiB", "AC-4": "11.5 KiB",
+                                  "TrueHD": EM_DASH})
                 for card, badge in (("Speed", "speed"), ("Decode accuracy", "accuracy"),
                                     ("Allocation per frame", "memory"), ("Live growth", "growth")):
                     for line in cards[card]["lines"]:
                         codec_part = next(p for p in made[badge]["message"].split(" | ")
                                           if p.startswith(line["codec"] + " "))
-                        self.assertIn(self.as_badge(line["figure"]), codec_part)
+                        # A codec with no series reads "no data" on the badge and an em dash on
+                        # the card.
+                        figure = self.as_badge(line["figure"])
+                        self.assertIn("no data" if figure == EM_DASH else figure, codec_part)
                 # The colours are the badges' colours.
                 self.assertEqual(cards["Speed"]["chip"], "ok")
                 self.assertEqual(cards["Decode accuracy"]["chip"], "ok")
@@ -857,7 +886,9 @@ class HistoryAndMainTest(unittest.TestCase):
         code, out = self.run_main()
         self.assertEqual(code, 0)
         speed = json.loads((self.dir / "badges" / "speed.json").read_text())
-        self.assertEqual(speed["message"], "AC-3 5.1 encode: 8x | E-AC-3 no data | AC-4 no data")
+        self.assertEqual(
+            speed["message"],
+            "AC-3 5.1 encode: 8x | E-AC-3 no data | AC-4 no data | TrueHD no data")
         self.assertEqual(speed["schemaVersion"], 1)
         for name in ("accuracy", "memory", "growth"):
             data = json.loads((self.dir / "badges" / f"{name}.json").read_text())
@@ -904,7 +935,8 @@ class HistoryAndMainTest(unittest.TestCase):
         data = json.loads((self.dir / "badges" / "accuracy.json").read_text())
         self.assertEqual(
             data["message"],
-            "AC-3 no data | E-AC-3 no data | AC-4 Dolby streams: 34.9 dB min, MOS-LQO 4.70")
+            "AC-3 no data | E-AC-3 no data | AC-4 Dolby streams: 34.9 dB min, MOS-LQO 4.70"
+            " | TrueHD no data")
 
     def test_main_fails_on_an_unlisted_workload_and_writes_nothing(self):
         """The forcing function on main: a new workload has to be classified.

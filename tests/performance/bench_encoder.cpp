@@ -19,7 +19,8 @@
 // object path: three encoders (AC-3, E-AC-3 with its tools on `auto`, and
 // Atmos/JOC) and the three decoders that read what they produce, and AC-4's
 // encoder and decoder at stereo and 5.1, each held to AC-4's own 2 048-sample
-// frame rather than A/52's 1 536 (ac4_bench.hpp). Before PF1
+// frame rather than A/52's 1 536 (ac4_bench.hpp), and the TrueHD decoder at 5.1, forty access units
+// (33.3 ms) to the frame (truehd_bench.hpp). Before PF1
 // the E-AC-3 encoder - the largest single source file in the codec - and
 // every decode path had no ms/frame series at all, so a regression in any of
 // them was invisible to this page. The decode series are timed off streams
@@ -52,6 +53,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
+#include "truehd_bench.hpp"
 
 namespace {
 
@@ -103,6 +105,9 @@ public:
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
                 .count());
     }
+
+    // A frame whose time was taken elsewhere (truehd_bench.cpp times its own decode calls).
+    void add_frame(double ms) { per_frame_ms_.push_back(ms); }
 
     [[nodiscard]] Result result(std::string name) const {
         const auto frames = static_cast<int>(per_frame_ms_.size());
@@ -441,6 +446,24 @@ Result bench_ac4_decode(std::string name, const std::vector<std::vector<std::byt
     return r;
 }
 
+// A frame is 40 access units decoded back to back (33.3 ms of 5.1 at 48 kHz), timed together against
+// that duration. The stream is the encoder's own, from the same fixture: truehd_bench.hpp.
+Result bench_truehd_decode(std::string name, const perf::truehd_bench::DecodeRun& run) {
+    if (!run.built || !run.error.empty() || run.frame_ms.empty()) {
+        std::fprintf(stderr, "%s: %s\n", name.c_str(),
+                     run.built ? run.error.c_str()
+                               : "this build has no TrueHD library (ICLFORGE_BUILD_TRUEHD=OFF)");
+        std::exit(1);
+    }
+    FrameTimer timer{static_cast<int>(run.frame_ms.size())};
+    for (const double ms : run.frame_ms) {
+        timer.add_frame(ms);
+    }
+    Result r = timer.result(std::move(name));
+    r.budget_ms_per_frame = run.budget_ms;
+    return r;
+}
+
 void write_json(const std::vector<Result>& results, const std::string& path) {
     std::ofstream out(path);
     out << "{\n  \"real_time_budget_ms_per_frame\": " << real_time_budget_ms(1)
@@ -565,6 +588,17 @@ int main(int argc, char** argv) {
         results.push_back(bench_ac4_decode(
             "ac4_51_decode", perf::ac4_bench::encode_frames(
                                  ac4_five_one, perf::ac4_bench::five_one_config(), kFrames)));
+    }
+    if (wanted("truehd_51_decode")) {
+        const auto run = perf::truehd_bench::time_decode(audio, perf::truehd_bench::kFrames,
+                                                         perf::truehd_bench::kWarmupUnits);
+        if (!run.built && only.empty()) {
+            // A build without the TrueHD library has no series for it, as one without Atmos would not;
+            // asking for it by name is the only way to make that an error.
+            fmt::printf("%-20s skipped: this build has no TrueHD library\n", "truehd_51_decode");
+        } else {
+            results.push_back(bench_truehd_decode("truehd_51_decode", run));
+        }
     }
     if (results.empty()) {
         std::fprintf(stderr, "iclforge-bench: --only matched no workload\n");
