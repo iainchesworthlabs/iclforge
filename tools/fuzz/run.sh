@@ -14,7 +14,8 @@
 #
 # The differential harnesses (fuzz_differential_ac3_decode,
 # fuzz_differential_eac3_decode - differential decoder fuzzing: same mutated bytes decoded by
-# both iclforge and FFmpeg, PCM diffed - see libs/ac3/fuzz/differential_oracle.hpp)
+# both iclforge and FFmpeg, PCM diffed - see libs/ac3/fuzz/differential_oracle.hpp - and
+# fuzz_differential_truehd_decode, whose rule is libs/truehd/fuzz/differential_oracle.hpp's)
 # are NOT in the default target list `run`/`regress` use with no arguments:
 # they need `ffmpeg` on PATH and are much slower per-exec, so name them
 # explicitly, e.g. `tools/fuzz/run.sh run fuzz_differential_ac3_decode`. CI's
@@ -40,8 +41,9 @@ ARTIFACT_DIR="${ICLFORGE_FUZZ_ARTIFACT_DIR:-$REPO_ROOT/build/fuzz-artifacts}"
 SECONDS_PER_TARGET="${ICLFORGE_FUZZ_SECONDS:-60}"
 
 # The crash-only targets fuzz-regress/fuzz-short/fuzz-nightly run by
-# default. The two differential targets (fuzz_differential_ac3_decode,
-# fuzz_differential_eac3_decode - differential decoder fuzzing) are deliberately NOT in this
+# default. The three differential targets (fuzz_differential_ac3_decode,
+# fuzz_differential_eac3_decode and fuzz_differential_truehd_decode - differential decoder
+# fuzzing) are deliberately NOT in this
 # list: they need `ffmpeg` on PATH and are much slower per-exec (a real
 # FFmpeg process per comparable input), so they get their own CI job
 # (fuzz.yml's fuzz-differential) that names them explicitly, the same way
@@ -134,6 +136,7 @@ seed_source_for() {
         fuzz_differential_eac3_decode) echo fuzz_eac3_decode ;;
         fuzz_ac4_decode)               echo fuzz_ac4_parse ;;
         fuzz_truehd_decode)            echo fuzz_truehd_parse ;;
+        fuzz_differential_truehd_decode) echo fuzz_truehd_parse ;;
         *)                              echo "$1" ;;
     esac
 }

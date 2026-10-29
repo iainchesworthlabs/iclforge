@@ -478,6 +478,7 @@ way the fixed findings used to.
 | `fuzz_truehd_decode`   | `iclforge::truehd::Decoder::decode` over the units `ElementaryReader` finds, in every presentation, strict and lenient, and over the bytes as one unit - the block headers, filters, matrices and residuals are all sized from the stream. Its seeds and dictionary are `fuzz_truehd_parse`'s |
 | `fuzz_truehd_encode`   | `iclforge::truehd::Encoder` over the configuration the input's first eight bytes choose (rate, channels, width, restart interval, FIR order, matrix search, downmix, chunk size) and the 16-bit PCM after them, with the encoder's own verification on: what it writes must decode back to the PCM, and an encode that does not is a trap |
 | `fuzz_mat_unwrap`      | `iclforge::containers::iec61937::unwrap_mat_stream` and `MatPacker` - TrueHD in MAT bursts, whose 24 slots each open with a self-declared length. The units unwrapped are wrapped again and must unwrap to the same units |
+| `fuzz_differential_truehd_decode` | The path of `fuzz_truehd_decode` in strict mode, then FFmpeg's strict decode of the same bytes; the codec is lossless, so when both decode the input cleanly the samples must be equal. Not in the default list; see "TrueHD and MLP" under "Differential mode" below |
 | `fuzz_osc_parse`       | `iclforge::objects::oba::parse_osc_packet` - the OSC 1.0 wire form of a live object-position update (live OSC object positions), reached straight from a UDP datagram by `iclforge::audio::LivePositionSource` whenever `positions=osc:<port>` is in play. No CRC, no container, no bitstream ahead of it at all - this project's first NETWORK-facing input rather than a file or capture-device one; see `docs/threat-model.md` |
 | `fuzz_adm_parse`       | `iclforge::adm::parse_bw64(std::istream&)` - BW64/RF64 chunks plus an arbitrary ADM XML document. Opt-in, see below |
 | `fuzz_sendspin_json`   | `iclforge::sendspin::json::Document::parse` - the JSON of every Sendspin message, the first code a network peer's bytes reach on hearth's server and on a sink. Every accessor runs on every value parsed, and the document is written back out and parsed again, which must give the same text; `TokenStorage` and `count_tokens` must agree with a parse into fixed storage |
@@ -598,7 +599,7 @@ not pass the fourth is refused before its first block. So a mutation that change
 unit but its checks is thrown away at one of them, and nothing it did to the fields behind them is
 read, which is the loss the AC-3 mutator above exists for, in a format with more doors.
 
-`fuzz_truehd_parse` and `fuzz_truehd_decode` define a custom
+`fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_differential_truehd_decode` define a custom
 mutator (`libs/truehd/fuzz/truehd_mutator.hpp`): libFuzzer's own mutation first, then a walk over
 the result as access units, from the first major sync, each unit's length being the 12-bit word
 count that opens it, and a rewrite of the five checks with the library's own routines
@@ -683,6 +684,44 @@ compare anything at all (silently a no-op otherwise, same as running without
 corpora rather than duplicating those files (`tools/fuzz/run.sh`'s
 `seed_source_for`) - same bytes, same decode path, just with an extra
 comparison bolted on.
+
+### TrueHD and MLP
+
+`fuzz_differential_truehd_decode` does the same for TrueHD and MLP with one difference that
+matters: the codec is lossless, so there is no agreement floor to calibrate. The rule is written
+in `libs/truehd/fuzz/differential_oracle.hpp`, and is this:
+
+- The library must have decoded the whole input cleanly: its elementary reader reads every byte as
+  access units with none skipped, the strict decoder returns samples for every unit (no error, no
+  wait for a restart header), no check and no lossless check failed, and every unit has the
+  format of the first.
+- FFmpeg must have decoded it cleanly: its strict decode (`-xerror -err_detect
+  crccheck+bitstream+buffer+explode`, as `tools/checks/verify_truehd_interop.py` runs it) exits 0
+  **and writes nothing to its standard error at `-v warning`**. FFmpeg does not stop at a failed
+  lossless check: it logs "Lossless check failed - expected 00, calculated 8d" as a warning, exits
+  0 and writes the samples (`libs/truehd/ERRATA.md`, entry 20), so a clean exit status says
+  nothing about the samples. Any warning takes the case out of the comparison, not only that one,
+  because the text of FFmpeg's other warnings has not been read here.
+- When both hold the samples must be equal: the same rate, the same channel count, the same number
+  of samples, every sample. FFmpeg returns a 7 or 8 channel stream's channels in its own order, so
+  a mismatch is retried with both decoders' channels sorted, and only what still differs is a
+  divergence.
+
+Everything else is skipped without comment: a stream either decoder refuses, a stream FFmpeg warns
+about or declines (it refuses restart sync 0x31EC, and warns that it does not implement a block
+data check), or a disagreement on the rate or channel count. `ICLFORGE_DIFF_MEASURE_ONLY=1` prints
+which of these each input was and never aborts; replaying the committed seeds that way gives 33
+equal (one in another channel order), one refused by FFmpeg and two it warns about, and the
+library refusing the joined stream (strict decode stops at the join, `ERRATA.md` question 20).
+That the harness can fail was shown by changing one sample of the library's decode: it aborted on
+the first seed.
+
+It has the repairing mutator, unlike the AC-3 pair, and for the opposite reason to the one given
+for them. A TrueHD stream the strict library decode accepts needs five checks and the lossless
+check of every restart interval to hold, so without the repair a mutation almost never leaves one,
+and the harness would spend its budget on inputs the first rule skips. Whatever the repair leaves
+for FFmpeg is a mutation in the fields that decode to the same samples or in the last interval,
+which nothing checks.
 
 ## The other direction: the encoder's input space
 
@@ -956,8 +995,8 @@ instead of spending its budget on bytes that get rejected before line one of
 the parser.
 
 The TrueHD and MLP corpora are made by `tools/fuzz/truehd-seeds.py` from the streams of
-`testdata/truehd` and nothing else. `fuzz_truehd_parse`, whose seeds `fuzz_truehd_decode` shares,
-holds a cut of every fixture and hand-built stream: the
+`testdata/truehd` and nothing else. `fuzz_truehd_parse`, whose seeds and dictionary
+`fuzz_truehd_decode` and `fuzz_differential_truehd_decode` share, holds a cut of every fixture and hand-built stream: the
 head of each, up to its second major sync (a few kilobytes), so that there are streams of every
 rate from 44.1 to 192 kHz, of one to eight channels, of one to four substreams, with restart
 gaps of 8 and 128 units, in TrueHD and MLP, and one hand-built stream for each syntax path
@@ -1028,7 +1067,7 @@ gitignored; `tools/fuzz/run.sh` creates it on demand.
   harnesses (every harness in `tools/fuzz/run.sh`'s default list), push only (not
   pull_request, to keep PR turnaround unaffected).
 - `fuzz-differential` - the same 60-second-per-harness mutation budget, push
-  only, but over ONLY the two differential harnesses (see "Differential
+  only, but over ONLY the three differential harnesses (see "Differential
   mode" above) - a separate job rather than folded into `fuzz-short` because
   it needs `ffmpeg` installed and is much slower per-exec (an FFmpeg process
   per comparable input), so sharing a budget with the crash-only harnesses
@@ -1037,7 +1076,7 @@ gitignored; `tools/fuzz/run.sh` creates it on demand.
 - `fuzz-nightly` - a 10-minute-per-harness mutation budget (the
   `seconds_per_target` input, default 600) on a daily schedule (03:17 UTC), plus
   `workflow_dispatch` with a configurable budget for an on-demand deeper run.
-  It runs the default list, then the two differential harnesses in steps of
+  It runs the default list, then the three differential harnesses in steps of
   their own, each with its regression replay first. It restores `fuzz/corpus/`
   from the Actions cache and saves it again, so a night starts from the last
   one's grown corpus.
