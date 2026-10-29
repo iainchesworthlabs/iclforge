@@ -95,7 +95,7 @@ decodes and folds instead. It also needs a signing key, because the decoder rebu
 from a signed stream; without one the stream is a 5.1 bed and stereo is the fold.
 
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
-can carry. It writes E-AC-3 and AC-3 only, and has no AC-4 mode.
+can carry. It writes E-AC-3 and AC-3 only, and has no AC-4 or TrueHD mode.
 
 You can **pin** a mode to stop Crucible changing its mind, and **choose the endpoint** you hear
 it on rather than letting the policy pick. An impossible pin leaves the automatic choice standing

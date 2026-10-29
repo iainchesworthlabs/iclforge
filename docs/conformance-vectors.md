@@ -9,7 +9,9 @@ It exists because nothing else free does. ATSC A/52 and ETSI TS 102 366 are both
 documents, but neither body distributes conformance bitstreams publicly, and Dolby's own test
 material is licensed. Someone writing an AC-3 or E-AC-3 decoder from the standard has the text
 and nothing to check their reading of it against. The set covers AC-3 and E-AC-3 only; it has no
-AC-4 vector (see [What it does not prove](#what-it-does-not-prove)).
+AC-4 vector (see [What it does not prove](#what-it-does-not-prove)) and no TrueHD vector. TrueHD's checked-in
+streams are FFmpeg's, in [`testdata/truehd/`](https://github.com/iainchesworthlabs/iclforge/tree/main/testdata/truehd),
+and are not published as a release asset.
 
 ## Getting it
 

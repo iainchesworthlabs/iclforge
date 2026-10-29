@@ -10,6 +10,13 @@ audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group
 [Using the desktop player](desktop-player.md) walks through the window with a picture of each
 page. This page is the reference.
 
+!!! note "TrueHD and MLP are not played by Hearth"
+    The ICL Forge library decodes and encodes TrueHD, but Hearth does not link it. The desktop player's folder picker lists the
+    kinds `.ac3`, `.ec3`, `.ac4`, `.mp4`, `.mkv` and `.ts`, and `.thd` and `.mlp` are not among them; no sink (the ESP32 firmware or
+    Hearth for Android) takes TrueHD, as a bitstream or decoded; and `forge play` and `monitor` refuse it. What the library has is
+    in [TrueHD and MLP](../library/truehd.md); the roadmap row for Hearth's TrueHD work is
+    [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
+
 ## The desktop player
 
 `hearth` runs on Windows, Linux, and macOS with a Qt 6.8 or later kit, and builds as the

@@ -123,7 +123,10 @@ with no signing key, or on a receiver that takes AC-3 only, the stream is a 5.1 
 bed. Crucible has no AC-4 path. It captures what applications play as PCM and places it as
 Atmos objects for a receiver, and no receiver found accepts AC-4
 ([planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md),
-decision 20).
+decision 20). Crucible has no TrueHD path either: it does not link the TrueHD library, and it
+never sends a receiver a TrueHD bitstream, although a receiver's own list of what it accepts may
+name TrueHD (the troubleshooting page quotes one). Whether a lossless stream has a place in a
+capture product is open ([the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed)).
 
 ## Objects need a signing key
 
