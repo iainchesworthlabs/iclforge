@@ -59,6 +59,11 @@ struct Member {
     // 1 at 44.1 and 48 kHz, 2 at 96 kHz and 4 at 192 kHz (Part 1 Table 89's sf_multiplier): the
     // factor the substream's sampling frequency is of the stream's base rate.
     int rate_multiplier = 1;
+    // The source layout an immersive channel mode carried (Part 2 clauses 6.3.2.7.3 to 6.3.2.7.5):
+    // b_4_back_channels_present and top_channels_present, which leave out the channels a 5.1.4
+    // stream sends as 7.1.4 without Lb and Rb.
+    bool backs = true;
+    int tops = 3;
 };
 
 // What decode() needs of a presentation.

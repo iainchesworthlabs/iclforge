@@ -24,6 +24,7 @@
 #include "iclforge/base/bitreader.hpp"
 #include "pcm/downmix.hpp"
 #include "pcm/drc.hpp"
+#include "pcm/renderer.hpp"
 #include "oba/isf.hpp"
 #include "oba/objects.hpp"
 #include "pcm/routing.hpp"
@@ -1124,13 +1125,25 @@ void report_downmix(const detail::StereoDmxCoeff& coeff, DownmixInfo& out) {
         static_cast<DownmixInfo::Preferred>(std::clamp(coeff.preferred_dmx_method, 0, 3));
 }
 
-// The channels a member's channel mode has, where decode() renders it.
-void speakers_into(int ch_mode, std::vector<Speaker>& out) {
+// The channels a member's channel mode has, where decode() renders it. An immersive mode's are the
+// ones its source layout had (b_4_back_channels_present and top_channels_present), as decode()
+// writes them as coded: a 5.1.4 stream is sent as 7.1.4 and has no Lb and Rb.
+void speakers_into(int ch_mode, bool backs, int tops, std::vector<Speaker>& out) {
     out.clear();
-    if (ch_mode >= 0) {
-        const std::span<const Speaker> speakers = detail::speakers_of(ch_mode);
-        out.assign(speakers.begin(), speakers.end());
+    if (ch_mode < 0) {
+        return;
     }
+    if (detail::is_immersive(ch_mode)) {
+        const detail::ImmersiveLayout layout{
+            .backs = backs,
+            .tops = tops,
+            .lfe = ch_mode == detail::ch_mode::k7_1_4 || ch_mode == detail::ch_mode::k9_1_4,
+            .screen = detail::has_fronts(ch_mode)};
+        out = detail::render_plan(layout, DownmixTarget::kAsCoded).speakers;
+        return;
+    }
+    const std::span<const Speaker> speakers = detail::speakers_of(ch_mode);
+    out.assign(speakers.begin(), speakers.end());
 }
 
 // decode_by_block()'s blocks: the samples a frame leaves over, held for the
@@ -2083,11 +2096,13 @@ void Decoder::Impl::report_presentations(const Toc& toc, int level) {
                                         ? std::optional<int>{from.content_classifier}
                                         : std::nullopt;
             to.language = from.language;
-            speakers_into(from.ch_mode, to.speakers);
+            speakers_into(from.ch_mode, from.backs, from.tops, to.speakers);
             to.sample_rate_hz = toc.sample_rate_hz * from.rate_multiplier;
         }
         const std::optional<std::size_t> anchor = detail::anchor_member(plan);
-        speakers_into(anchor ? plan.members[*anchor].ch_mode : -1, info.speakers);
+        speakers_into(anchor ? plan.members[*anchor].ch_mode : -1,
+                      anchor ? plan.members[*anchor].backs : true,
+                      anchor ? plan.members[*anchor].tops : 3, info.speakers);
         info.sample_rate_hz =
             anchor ? toc.sample_rate_hz * plan.members[*anchor].rate_multiplier : 0;
         info.decodable = plan.decodable;

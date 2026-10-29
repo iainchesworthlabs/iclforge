@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
@@ -486,6 +487,46 @@ TEST_CASE("decode says on stderr how many frames of an AC-4 stream produced no o
     CHECK(waiting + decoded == total);
     // The report on stdout is not where it is said.
     CHECK(read_log(out_log).find("waiting for an I-frame") == std::string::npos);
+}
+
+namespace {
+
+// The dwChannelMask of a WAVE_FORMAT_EXTENSIBLE file, 0 for a plain header.
+std::uint32_t wav_channel_mask_of(const fs::path& wav) {
+    std::ifstream in{wav, std::ios::binary};
+    std::array<char, 44> head{};
+    in.read(head.data(), static_cast<std::streamsize>(head.size()));
+    REQUIRE(in.gcount() == 44);
+    const auto byte = [&head](std::size_t i) {
+        return static_cast<std::uint32_t>(static_cast<unsigned char>(head[i]));
+    };
+    if ((byte(20) | (byte(21) << 8U)) != 0xFFFEU) {
+        return 0;
+    }
+    return byte(40) | (byte(41) << 8U) | (byte(42) << 16U) | (byte(43) << 24U);
+}
+
+std::uint32_t decoded_mask(const std::string& leg_name, const std::string& tag) {
+    const auto dir = scratch_dir();
+    const auto stream = decoded_stream(leg(leg_name), kSanitizedFrames, dir / (tag + ".ac4"));
+    const auto wav = dir / (tag + ".wav");
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(wav), dir / (tag + ".log")) == 0);
+    return wav_channel_mask_of(wav);
+}
+
+}  // namespace
+
+TEST_CASE("an AC-4 decode of three channels or more says in its WAV header which speaker each is",
+          "[cli][ac4][wav-mask]") {
+    // As the AC-3 and E-AC-3 paths write 5.1: front pair, centre, LFE and the surround pair (0x3F).
+    CHECK(decoded_mask("ac4-51-music-192", "mask_51") == 0x3FU);
+    // 5.1.4 adds the four height speakers: Table E2.5's Vhl and Vhr at the top front, Lts and Rts at
+    // the top back.
+    const std::uint32_t mask_514 = decoded_mask("ac4-514-tones-256", "mask_514");
+    CHECK((mask_514 & 0x3FU) == 0x3FU);
+    CHECK(std::popcount(mask_514) == 10);
+    // A stereo file has nothing to disambiguate and keeps the plain header.
+    CHECK(decoded_mask("ac4-20-music-192", "mask_20") == 0);
 }
 
 TEST_CASE("qc says how many frames waited for an I-frame, and a stream that loses none says nothing",

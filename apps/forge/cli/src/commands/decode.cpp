@@ -56,6 +56,7 @@
 namespace forge_cli::commands {
 
 using iclforge::apps::ac4_bed_acmod;
+using iclforge::apps::ac4_location;
 using iclforge::apps::ac4_meter_rank;
 using iclforge::apps::ac4_order;
 using iclforge::apps::ac4_wav_rank;
@@ -710,8 +711,23 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
             } else {
                 speakers = pcm.speakers;
             }
+            // Which speaker each WAV position is, for three channels or more, as the AC-3 and
+            // E-AC-3 paths write it: a header that says so, and none where a channel has no
+            // WAVEFORMATEXTENSIBLE speaker (plan::wav_channel_mask()).
+            const std::vector<std::size_t> wav_order = ac4_order(speakers, ac4_wav_rank);
+            std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+            for (const std::size_t c : wav_order) {
+                const auto location = ac4_location(speakers[c]);
+                if (!location.has_value()) {
+                    in_wav_order.clear();
+                    break;
+                }
+                in_wav_order.push_back(*location);
+            }
+            const std::uint32_t wav_mask =
+                in_wav_order.size() == wav_order.size() ? plan::wav_channel_mask(in_wav_order) : 0;
             if (!sink.open(out_path, static_cast<std::uint32_t>(pcm.sample_rate_hz),
-                           speakers.size(), ac4_order(speakers, ac4_wav_rank))) {
+                           speakers.size(), wav_order, wav_mask)) {
                 fmt::println(stderr, "error: cannot open {} for writing", out_path);
                 return kExitOutput;
             }

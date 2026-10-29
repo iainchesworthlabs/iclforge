@@ -66,6 +66,8 @@ Member& add_member(PresentationPlan& plan, std::size_t& count, std::optional<int
     m.ch_mode = -1;
     m.iframe = !b_iframe.empty() && b_iframe.front();
     m.coding = Coding::kChannel;
+    m.backs = true;
+    m.tops = 3;
     return m;
 }
 
@@ -76,6 +78,10 @@ void add_member(PresentationPlan& plan, std::size_t& count, const ChannelSubstre
                            content);
     m.ch_mode = chan.ch_mode.value_or(-1);
     m.rate_multiplier = rate_multiplier_of(chan.sf_multiplier);
+    if (chan.original_content) {
+        m.backs = chan.original_content->b_4_back_channels_present;
+        m.tops = chan.original_content->top_channels_present;
+    }
 }
 
 // Whether decode() turns an object audio substream into PCM: at 48 or 44.1
