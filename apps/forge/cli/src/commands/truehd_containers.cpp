@@ -311,7 +311,7 @@ bool is_mat_carrier(std::span<const std::byte> carrier) noexcept {
     if (at + 8 > carrier.size()) {
         return false;
     }
-    const auto b = [&](std::size_t i) { return std::to_integer<std::uint8_t>(carrier[at + i]); };
+    const auto b = [&](std::size_t i) { return std::to_integer<std::uint32_t>(carrier[at + i]); };
     const bool little = b(0) == 0x72 && b(1) == 0xF8 && b(2) == 0x1F && b(3) == 0x4E;
     const bool big = b(0) == 0xF8 && b(1) == 0x72 && b(2) == 0x4E && b(3) == 0x1F;
     if (!little && !big) {

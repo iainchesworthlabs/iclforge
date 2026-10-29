@@ -373,7 +373,7 @@ TEST_CASE("truehd playback: on a layout the stream does not fill, the renderer p
     for (std::size_t frame = 0; frame < forge.samples; ++frame) {
         const double coded_left = forge.pcm[frame * 6] / 8388608.0;
         const double coded_centre = forge.pcm[frame * 6 + 2] / 8388608.0;
-        const double heard_left = played.slots[0][frame];
+        const double heard_left = static_cast<double>(played.slots[0][frame]);
         differs = differs || std::abs(heard_left - coded_left) > 1e-6;
         energy_in += coded_centre * coded_centre;
         energy_out += (heard_left - coded_left) * (heard_left - coded_left);

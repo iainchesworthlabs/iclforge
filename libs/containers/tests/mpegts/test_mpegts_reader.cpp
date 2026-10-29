@@ -1395,7 +1395,7 @@ Bytes scrambled(Bytes ts, std::uint16_t pid, std::uint8_t control, std::size_t f
             std::to_integer<std::uint16_t>(ts[at + 2]));
         if (packet_pid == pid && at / 188 >= first) {
             const auto byte3 = std::to_integer<std::uint8_t>(ts[at + 3]);
-            ts[at + 3] = static_cast<std::byte>((byte3 & 0x3FU) | (control << 6U));
+            ts[at + 3] = static_cast<std::byte>((byte3 & 0x3FU) | (static_cast<unsigned>(control) << 6U));
         }
     }
     return ts;
