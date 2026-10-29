@@ -81,8 +81,9 @@ has the detail.
 Dolby Atmos reaches TrueHD differently from E-AC-3. E-AC-3 carries Atmos as [JOC side
 information](atmos-joc.md) inside the ordinary stream. TrueHD carries it as a 16 channel substream
 and an **evolution frame** holding the object audio metadata, with an optional content signature.
-ICL Forge does not build either: the decoder carries the evolution frame's bytes and reads none of
-them, because the owner's specification lists the frame's layout as unconfirmed. See
+ICL Forge decodes the 16 channel substream as 16 channels and reads the evolution frame into plain
+structures, provisionally, because the owner's specification gives two accounts of the frame's layout and
+neither has been checked against a stream; nothing renders the objects, and no Atmos stream is written. See
 [Capabilities](../library/capabilities.md#truehd-and-mlp) for what is and is not built.
 
 ## Where to go next
