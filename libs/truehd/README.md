@@ -1,7 +1,7 @@
 # iclforge::truehd
 
 The Dolby TrueHD and MLP bitstream and a lossless decoder, written from the owner's *Dolby TrueHD (MLP) Reference
-Specification* v3.3 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
+Specification* v3.5 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
 [planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
 
@@ -43,3 +43,7 @@ so those have no external oracle (see the plan).
 
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
+The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
+do not write: an IIR filter, LSB bypass, several matrices, the block data check, the end-of-stream marker, extra data,
+the directory's DRC word and the 16-channel substream. They have no external oracle: they are held to the signal each
+was made from, by this decoder and by `tools/references/truehd_syntax.py`.

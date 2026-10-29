@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `iclforge::truehd`, a TrueHD and MLP reader and lossless decoder, and `forge decode` and `forge probe` for `.thd` and `.mlp`
+  streams.** Written from the owner's TrueHD (MLP) Reference Specification v3.5 and checked against the streams FFmpeg's `truehd` and `mlp`
+  encoders write: the decoder gives the samples FFmpeg's strict decode gives for 12 committed fixtures (`testdata/truehd/`, 1, 2 and 6
+  channels, 44.1 to 192 kHz, 16 and 24 bits) and for 19 more while it was written, and `tools/references/truehd_syntax.py`, an
+  independent transcription, gives the same digests. It decodes substreams 0 to 2 and the generic 16-channel substream 3, the FIR and IIR
+  filters, the matrices with LSB bypass, the Huffman and raw residuals, and checks the check nibble, the CRCs, the parity bytes and the
+  lossless check of every restart interval. The specification and the streams disagree in 23 places (`libs/truehd/ERRATA.md`, which also
+  lists the eleven questions only the specification's owner can answer); one was the end-of-stream marker, a 32-bit field in the last unit
+  that counts its padding samples, which FFmpeg's decoder removes and this one does too. An IIR filter, LSB bypass, noise generator 0, several matrices,
+  the block data check, extra data and the 16-channel substream have **no external oracle**: eleven hand-built streams
+  (`tools/references/truehd_writer.py`) are held to the signal each was made from. Noise generator 1 (its table is not available) and heavy DRC are not decoded.
+  `forge decode` writes a 24-bit WAV in the stream's channel order (`truehd-presentation=`, `truehd-check=strict|lenient`; a strict decode
+  of a damaged stream exits 2); `forge probe` checks every unit and exits 1 on a failure. The encoder, the Atmos substream and the
+  containers are phase T2 (`planning/truehd.md`).
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
   and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has

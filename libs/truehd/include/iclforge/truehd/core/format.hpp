@@ -8,7 +8,7 @@
 #include <vector>
 
 // The constants, the sample rates and the channel vocabulary of a TrueHD / MLP stream. "TH spec" is
-// the owner's Dolby TrueHD (MLP) Reference Specification, v3.3 (planning/truehd.md names its status
+// the owner's Dolby TrueHD (MLP) Reference Specification, v3.5 (planning/truehd.md names its status
 // and where it disagrees with the streams; each such place is an entry of libs/truehd/ERRATA.md).
 
 namespace iclforge::truehd {
@@ -22,7 +22,7 @@ inline constexpr std::uint8_t kMajorSyncByte2 = 0x6F;
 inline constexpr std::uint8_t kTrueHdStreamByte = 0xBA;
 inline constexpr std::uint8_t kMlpStreamByte = 0xBB;
 
-// TH spec §4.3 (v3.3): 0xB752 for both stream types. v3.0 gave TrueHD 0xB753; no stream has it
+// TH spec §4.3 (v3.3 to v3.5): 0xB752 for both stream types. v3.0 gave TrueHD 0xB753; no stream has it
 // (ERRATA.md).
 inline constexpr std::uint16_t kSignature = 0xB752;
 

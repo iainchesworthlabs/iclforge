@@ -5,7 +5,7 @@ decodes AC-3 and E-AC-3, including E-AC-3 streams with Dolby Atmos objects repre
 Joint Object Coding (JOC). It also provides loudness metering, level analysis, and quality
 measurement. It links five libraries that know no codec: `iclforge::base`, `iclforge::dsp`,
 `iclforge::objects`, `iclforge::render` and `iclforge::containers::iec61937`. AC-4 has libraries of its own
-beside it, which share no code with it ([AC-4](ac4.md)).
+beside it, which share no code with it ([AC-4](ac4.md)). So does TrueHD and MLP ([TrueHD and MLP](truehd.md)), which links `iclforge::base` only.
 
 Other targets provide container writing, IAB and ADM/BW64 reading, IAMF reading and writing, object signing,
 platform audio, and AC-4 decoding and encoding. Build and linkage requirements differ by target.

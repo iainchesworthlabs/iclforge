@@ -664,6 +664,8 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 type 2 substream (`strmtyp` 2, "previously coded in AC-3") | yes | yes |
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
+| TrueHD and MLP, 1 to 6 channels, as FFmpeg's encoders write them | yes | yes |
+| TrueHD with an IIR filter, LSB bypass, 7.1, extra data or the 16-channel substream | no stream to try | yes, held to hand-built streams ([TrueHD and MLP](#truehd-and-mlp)) |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
@@ -2041,6 +2043,31 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
   sample, and every burst puts the stream's first frame at the same time, within 1 ms. A
   presentation the listener chose that a sink would not choose itself reaches the group as PCM
   alone.
+
+## TrueHD and MLP
+
+`iclforge::truehd` ([TrueHD and MLP](library/truehd.md)) is checked in three tiers, and the third has no outside reader.
+
+1. **FFmpeg's strict decode** (`-err_detect crccheck+bitstream+buffer+explode`) of the streams its `truehd` and `mlp`
+   encoders write. The codec is lossless, so a decode either equals FFmpeg's sample for sample or is wrong: 12 committed
+   fixtures (`testdata/truehd/`, 1, 2 and 6 channels, 44.1 to 192 kHz, 16 and 24 bits, both stream types) are held to the
+   SHA-256 of FFmpeg's decode by the library's test, by `forge decode` (`tools/checks/verify_truehd_interop.py --forge`)
+   and by `tools/references/truehd_syntax.py`, an independent transcription. Nineteen more streams were compared
+   while the decoder was written. That comparison found the check values, the matrix scaling, the lossless check's fold
+   and a marker FFmpeg's decoder obeys and the specification does not describe (`libs/truehd/ERRATA.md`): the last access unit
+   of a stream whose length is not a multiple of the unit carries a 32-bit marker with the number of padding samples,
+   which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's.
+2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
+   do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
+   block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. **None has
+   an external oracle.** They are held to the signal each was made from, so a decoder that is wrong shows; but the writer
+   follows ERRATA.md's reading of the specification, and a misreading is in the writer and in both decoders alike.
+3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
+   is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
+   would be the only outside check of that substream.
+
+Not covered: noise generator 1 (its table is not available) and heavy DRC (refused or not read), and the block data CRC (the length is checked, the
+algorithm is not known).
 
 ## What untrusted input is checked against
 

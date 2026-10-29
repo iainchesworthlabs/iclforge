@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """An independent transcription of the TrueHD and MLP syntax and of the lossless decode.
 
-It is written from the owner's TrueHD (MLP) Reference Specification (v3.3) and from what the
+It is written from the owner's TrueHD (MLP) Reference Specification (v3.5) and from what the
 streams of FFmpeg's encoders show (libs/truehd/ERRATA.md says where the two differ), in plain
 Python with no code shared with libs/truehd. The C++ decoder is held to it on the committed
 fixtures (--check), and both are held to FFmpeg's strict decode
@@ -169,6 +169,11 @@ def parity_substream(payload):
     return parity
 
 
+def int8(value):
+    value &= 0xFF
+    return value - 256 if value & 0x80 else value
+
+
 def s32(value):
     value &= 0xFFFFFFFF
     return value - (1 << 32) if value & 0x80000000 else value
@@ -235,8 +240,8 @@ class Substream:
         self.min_chan = bits.read(4)
         self.max_chan = bits.read(4)
         self.max_matrix_chan = bits.read(4)
-        bits.read(4)  # noise_shift
-        bits.read(23)  # noisegen_seed
+        self.noise_shift = bits.read(4)
+        self.noise_seed = bits.read(23)
         bits.read(19)  # max_shift, max_lsbs, max_bits, max_bits_repeat (ERRATA 7)
         self.data_check = bits.read(1)
         lossless_check = bits.read(8)
@@ -247,7 +252,7 @@ class Substream:
         if crc8_restart(segment, start, crc_bit) != stored:
             raise StreamError("restart header CRC")
         if sync == 0x31EB:
-            raise StreamError("noise_type 1 is not supported")
+            raise StreamError("noise_type 1: its noise table is not available")
         if self.running and self.interval is not None:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
@@ -299,8 +304,6 @@ class Substream:
                 coeffs.append(
                     bits.signed(frac_bits + 2) << (MATRIX_SHIFT - frac_bits) if bits.read(1) else 0
                 )
-            if any(coeffs[self.max_matrix_chan + 1 :]):
-                raise StreamError("a matrix that uses a noise channel")
             matrices.append((out, coeffs, lsb_bypass))
         return matrices
 
@@ -334,6 +337,8 @@ def residual(bits, channel, quant):
 def decode_block(sub, bits, rows, first):
     """Decode one block into rows[first:first + block_size], which the substreams share."""
     size = sub.block_size
+    expected_bits = bits.read(16) if sub.data_check else None
+    start = bits.pos
     for row in rows[first : first + size]:
         for column in range(sub.max_matrix_chan + 1):
             if sub.index == 0:
@@ -347,7 +352,9 @@ def decode_block(sub, bits, rows, first):
         for ch in range(sub.min_chan, sub.max_chan + 1):
             rows[first + i][ch] = residual(bits, sub.channels[ch], sub.quant[ch])
     if sub.data_check:
-        raise StreamError("data_check_present is not supported by the reference")
+        if bits.pos - start != expected_bits:
+            raise StreamError("block data length")
+        bits.read(8)  # block_data_crc: the algorithm is not known (ERRATA open question 9)
     # The prediction filters (ERRATA 13).
     for ch in range(sub.min_chan, sub.max_chan + 1):
         channel = sub.channels[ch]
@@ -362,12 +369,22 @@ def decode_block(sub, bits, rows, first):
             channel.fir_history = [output, *channel.fir_history[:7]]
             channel.iir_history = [s32(output - prediction), *channel.iir_history[:7]]
             rows[first + i][ch] = output
+    # Generator 0 (TH spec 17.2, ERRATA 23): two noise channels, one step of the LFSR a sample.
+    seed = sub.noise_seed
+    for i in range(size):
+        shr7 = seed >> 7
+        rows[first + i][16] = int8(seed >> 15) * (1 << sub.noise_shift)
+        rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
+        seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
+    sub.noise_seed = seed
     # The primitive matrices (ERRATA 8).
     for index, (out, coeffs, _lsb_bypass) in enumerate(sub.matrices):
         keep = s32((-1 << sub.quant[out]) & 0xFFFFFFFF) if out <= sub.max_chan else -1
         for i in range(size):
             row = rows[first + i]
             total = sum(row[c] * coeffs[c] for c in range(sub.max_matrix_chan + 1))
+            for noise in range(NOISE_CHANNELS):  # the noise channels follow the matrix channels
+                total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
             row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
     # The output: ch_assign picks the matrix channel, the output shift is applied (ERRATA 12).
     output_rows = []
@@ -412,7 +429,9 @@ def decode_segment(sub, entry, segment, rows):
         if bits.read(1):
             break
     padding = 0
-    if bits.left() >= 32 and bits.bits(len(payload) * 8 - 32, 20) == END_MARKER:
+    if sub.index == 3 and bits.left() >= 16 and bits.bits(bits.pos, 16) == 0x1234:
+        bits.pos += 16  # terminatorB (TH spec 16.5): no stream of FFmpeg's has it
+    elif bits.left() >= 32 and bits.bits(len(payload) * 8 - 32, 20) == END_MARKER:
         padding = bits.bits(len(payload) * 8 - 12, 12)
     return out, padding
 
@@ -435,7 +454,7 @@ def nibble_fold(data):
     return ((folded >> 4) ^ folded) & 0xF
 
 
-def decode_stream(data):
+def decode_stream(data, presentation="best"):
     """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
     substreams = [Substream(i) for i in range(4)]
     count = 0
@@ -466,7 +485,8 @@ def decode_stream(data):
         rows = []
         previous = 0
         out = padding = None
-        for index, entry in enumerate(entries):
+        wanted = {"best": min(count, 3), "2ch": 1, "6ch": 2, "8ch": 3, "all": count}[presentation]
+        for index, entry in enumerate(entries[:wanted]):
             segment = unit[offset + previous * 2 : offset + entry["end"] * 2]
             previous = entry["end"]
             out, padding = decode_segment(substreams[index], entry, segment, rows)

@@ -331,6 +331,10 @@ if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFO
         "ICLFORGE_BUILD_GUI and ICLFORGE_BUILD_TESTS to all be OFF too - they all link iclforge::ac4 "
         "unconditionally.")
 endif()
+if(NOT ICLFORGE_BUILD_TRUEHD AND ICLFORGE_BUILD_CLI)
+    message(FATAL_ERROR "ICLFORGE_BUILD_TRUEHD=OFF requires ICLFORGE_BUILD_CLI to be OFF too - forge "
+        "decodes and probes TrueHD and MLP through iclforge::truehd unconditionally.")
+endif()
 # Hearth's applications (apps/hearth), as distinct from the libraries under them. ON, with
 # ICLFORGE_BUILD_HEARTH, is every build that is not a board's or an Android app's. OFF leaves
 # libs/sendspin and libs/sink to a program that links them through a wrapper of its own: Hearth for

@@ -6,6 +6,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     io/test_elementary.cpp
     decoder/test_decoder.cpp
     decoder/test_ffmpeg_fixtures.cpp
+    decoder/test_handbuilt.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
     encoder/test_signals.cpp)

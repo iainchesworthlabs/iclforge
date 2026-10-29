@@ -953,6 +953,16 @@ promise what the other format cannot give stop the run: `bap-census=`, `verify-o
 warning: stream.ac4 is AC-4: heavy is AC-3's and E-AC-3's, and ignored
 ```
 
+### TrueHD and MLP
+
+`decode` and `probe` read a TrueHD or MLP elementary stream (`.thd`, `.mlp`) by the major sync that follows its first
+access unit's header. `decode` writes a 24-bit PCM WAV with the channels in the order the stream carries them, and a channel
+mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status line names the channels). A failed check
+(check nibble, CRC, parity, lossless check) or a byte the reader skipped stops the decode with exit status 2;
+`truehd-check=lenient` counts them (the status lines say how many) and goes on. `truehd-presentation=` picks the substreams read:
+`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`. `probe` describes the stream (`json=1` adds a `truehd`
+member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
+
 ### Damaged frames: `conceal=`
 
 `decode`, `monitor` and `spatial` stop on a frame that will not decode. `conceal=` substitutes

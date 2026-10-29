@@ -37,6 +37,7 @@
 #include "iclforge/ac4/io/carriage.hpp"
 #include "container_input.hpp"
 #include "probe_json.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -712,6 +713,12 @@ int run_probe(std::string_view in_path, const Options& meta) {
         file.seekg(0, std::ios::beg);
         const auto kind =
             iclforge::apps::sniff_container(std::as_bytes(std::span{head}).first(got));
+        // A TrueHD or MLP stream starts with an access unit whose major sync follows its four header
+        // bytes; run_probe_truehd reads the file itself.
+        if (kind == iclforge::apps::ContainerKind::kUnknown &&
+            is_truehd_stream(std::as_bytes(std::span{head}).first(got))) {
+            return run_probe_truehd(in_path, meta);
+        }
         if (kind != iclforge::apps::ContainerKind::kUnknown) {
             const auto bytes = read_all(in_path);
             auto result = iclforge::apps::elementary_stream_from_bytes(bytes);

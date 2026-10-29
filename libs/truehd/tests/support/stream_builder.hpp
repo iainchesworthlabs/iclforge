@@ -49,12 +49,14 @@ inline MajorSync stereo_major_sync() {
 
 // The bytes of one substream segment of the built stereo stream, with its parity and CRC bytes.
 // With `restart` the first block carries a restart header; without, a block with no header at all.
-inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = true) {
+inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = true,
+                                             std::uint16_t sync = kRestartSyncStandard) {
     BitWriter writer;
     if (restart) {
         writer.put(1, 1);  // block_header_exists
         writer.put(1, 1);  // restart_header_exists
         RestartHeader header;
+        header.sync = sync;
         header.min_chan = 0;
         header.max_chan = 1;
         header.max_matrix_chan = 1;
@@ -99,8 +101,9 @@ inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = tr
 }
 
 // One access unit of the built stereo stream.
-inline std::vector<std::byte> stereo_unit(bool with_major_sync, std::uint16_t input_timing = 0) {
-    const std::vector<std::byte> segment = stereo_segment(with_major_sync);
+inline std::vector<std::byte> stereo_unit(bool with_major_sync, std::uint16_t input_timing = 0,
+                                          std::uint16_t sync = kRestartSyncStandard) {
+    const std::vector<std::byte> segment = stereo_segment(with_major_sync, true, sync);
     SubstreamEntry entry;
     entry.restart_nonexistent = !with_major_sync;
     entry.crc_present = true;

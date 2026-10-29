@@ -24,7 +24,8 @@ iclforge_add_test_binary(iclforge-forge-cli-tests PROJECT forge-cli SOURCES
     test_cli_options.cpp test_cli_synth.cpp test_cli_analysis.cpp
     test_cli_encode_paths.cpp test_cli_stream_edges.cpp
     test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp test_cli_karaoke_example.cpp
-    test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp)
+    test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp
+    test_cli_truehd.cpp)
 # The same device-facing commands with a device to find: software ALSA
 # devices (tests/support/alsa_null_device.hpp), so only in the ALSA configuration.
 if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
@@ -83,4 +84,10 @@ target_link_libraries(iclforge-forge-cli-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::truehd
+        iclforge::json)
+# test_cli_truehd.cpp decodes and probes the FFmpeg fixtures of testdata/truehd, and holds the WAV to the
+# manifest's digests.
+target_compile_definitions(iclforge-forge-cli-tests PRIVATE
+    "ICLFORGE_TRUEHD_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/truehd\"")

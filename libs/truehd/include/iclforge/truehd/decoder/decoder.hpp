@@ -15,7 +15,7 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 
 // A TrueHD / MLP decoder, written from the owner's Dolby TrueHD (MLP) Reference Specification
-// (v3.3, "TH spec") and checked, sample for sample, against the streams FFmpeg's encoder writes and
+// (v3.5, "TH spec") and checked, sample for sample, against the streams FFmpeg's encoder writes and
 // FFmpeg's decoder. The codec is lossless: what comes out is the PCM that went in, 24 bits wide,
 // bit for bit.
 //
@@ -28,9 +28,10 @@
 // interval against the next restart header (§7.3). A presentation with several substreams reads
 // them in order, each seeing the channels the ones before it decoded (§2.3).
 //
-// What it refuses, with ErrorKind::kUnsupported and a reason: a matrix that draws on the noise
-// channels, and a restart header with noise_type set, because the specification does not define the
-// generator (§17; ERRATA.md); a stream whose major sync extension the CRC does not locate. The
+// What it refuses, with ErrorKind::kUnsupported and a reason: a restart header with noise_type 1
+// (sync 0x31EB), whose 256-entry noise table the specification does not give yet (§17.4;
+// ERRATA.md); a stream whose major sync extension the CRC does not locate. Noise generator 0 (§17.2)
+// is decoded. The
 // extra data (§16) and the object audio metadata in it are not interpreted: the bytes come back
 // with the unit.
 //
