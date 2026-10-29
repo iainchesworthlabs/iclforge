@@ -735,16 +735,21 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     std::span<const std::byte> access_unit) {
     Impl& impl = *impl_;
     ++impl.counters.units;
+    // A unit that does not read is lost to every substream, and the state a substream carries from
+    // one unit to the next (block parameters, filter histories, the noise seed) no longer follows
+    // the stream: every substream waits for its next restart header, whatever the strictness.
     auto unit = impl.parse_unit(access_unit);
     if (!unit) {
         if (unit.error().kind == ErrorKind::kNeedsRestart) {
             ++impl.counters.units_waiting;
             return std::optional<DecodedAccessUnit>{};
         }
+        lost_data();
         return std::unexpected(unit.error());
     }
     if (unit->major_sync) {
         if (unit->major_sync->sample_rate() == 0) {
+            lost_data();
             return std::unexpected(
                 make_error(ErrorKind::kBadParameter, "undefined sample rate code (TH spec §5.3)"));
         }
@@ -783,6 +788,7 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     DecodedAccessUnit decoded;
     decoded.sample_rate = impl.major_sync->sample_rate();
     if (last.padding_samples > last.samples) {
+        lost_data();
         return std::unexpected(
             make_error(ErrorKind::kBadParameter, "more padding samples than the unit holds"));
     }
@@ -805,6 +811,12 @@ const std::optional<MajorSync>& Decoder::major_sync() const noexcept {
 
 const DecoderCounters& Decoder::counters() const noexcept {
     return impl_->counters;
+}
+
+void Decoder::lost_data() noexcept {
+    for (auto& substream : impl_->substreams) {
+        substream.running = false;
+    }
 }
 
 void Decoder::reset() {

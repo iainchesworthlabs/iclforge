@@ -269,6 +269,8 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
                 failed = true;
                 break;
             }
+            // The reader dropped a unit the decoder cannot miss: it waits for the next restart.
+            decoder.lost_data();
         }
         if (!unit) {
             break;

@@ -2518,6 +2518,13 @@ ICLFORGE_C_EXPORT iclforge_lyrics_word_state_t iclforge_lyrics_word_state(
  * sixteen-channel substream 3 decode; a restart header that selects noise generator 1 is
  * refused with ICLFORGE_ERROR_TRUEHD_UNSUPPORTED, and the extra data after the last
  * substream (the object audio metadata is in it) is handed back as bytes and not read.
+ *
+ * Threads: a decoder, an encoder, a list of units and the handles a call returns (a decoded
+ * unit, an encode's access units) are each used by one thread at a time; the library takes no
+ * lock. Different handles can be used from different threads at once. A decoded unit and an
+ * encode's access units own their data and do not change when the decoder or encoder that made
+ * them is used again or destroyed. The sentence iclforge_truehd_decoder_last_error_detail
+ * (or the encoder's) returns is good until the next call on that decoder or encoder.
  * --------------------------------------------------------------------- */
 
 typedef struct iclforge_truehd_decoder iclforge_truehd_decoder_t;
@@ -2587,11 +2594,21 @@ ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_decoder_create(
 ICLFORGE_C_EXPORT void iclforge_truehd_decoder_destroy(iclforge_truehd_decoder_t* decoder);
 /* Forgets the stream: the next unit has to carry a major sync. */
 ICLFORGE_C_EXPORT void iclforge_truehd_decoder_reset(iclforge_truehd_decoder_t* decoder);
+/* For a caller that dropped input between the unit it decoded last and the next one it will
+ * decode (a packet lost, bytes iclforge_truehd_scan() skipped): the decoder cannot see a missing
+ * unit, so this makes every substream wait for its next restart header, as after an error.
+ * The stream's major sync and the counters are kept. */
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_lost_data(iclforge_truehd_decoder_t* decoder);
 
 /* Decodes one whole access unit. On success `*out_decoded` is a new handle, or NULL when the
  * unit gave no samples yet (it came before a major sync, or before its substreams' restart
  * headers: a stream joined part way). On an error `*out_decoded` is left untouched, the
- * decoder stays usable, and the substream that failed waits for its next restart header.
+ * decoder stays usable, and the substream that failed waits for its next restart header (every
+ * substream does, for a unit that does not read at all): the samples of the units in between
+ * are lost, and the decode is exact again from that restart header. In lenient mode a failed
+ * check is counted instead and the unit's samples can be wrong; the lossless check at the next
+ * restart header says so (lossless_check_failures), and none is made for the last restart
+ * interval of a stream, which no restart header follows.
  * The status is one of the ICLFORGE_ERROR_TRUEHD_* codes; iclforge_truehd_decoder_last_error_detail
  * gives the sentence that goes with it. */
 ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_decoder_decode(

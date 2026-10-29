@@ -56,6 +56,7 @@ iclforge_status_t iclforge_truehd_decoder_create(const iclforge_truehd_decoder_c
 
 void iclforge_truehd_decoder_destroy(iclforge_truehd_decoder_t*) {}
 void iclforge_truehd_decoder_reset(iclforge_truehd_decoder_t*) {}
+void iclforge_truehd_decoder_lost_data(iclforge_truehd_decoder_t*) {}
 
 iclforge_status_t iclforge_truehd_decoder_decode(iclforge_truehd_decoder_t*, const uint8_t*, size_t,
                                                  iclforge_truehd_decoded_t**) {
