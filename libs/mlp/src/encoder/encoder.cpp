@@ -94,7 +94,7 @@ bool run(const ChannelFilter& start, const FilterDesign& d, bool keep, int quant
         }
         // The residual is a multiple of the quantiser step: x and the rounded prediction are.
         residuals[i] = static_cast<std::int32_t>(r >> quant);
-        f.push(x[i], static_cast<std::int32_t>(r));
+        f.push(x[i]);
     }
     if (end != nullptr) {
         *end = f;

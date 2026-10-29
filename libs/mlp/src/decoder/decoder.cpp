@@ -284,8 +284,7 @@ std::expected<int, Error> Decoder::State::segment(int index, const detail::Segme
                 if (x >= limit || x < -limit) {
                     return std::unexpected(Error::kSampleRange);
                 }
-                st.filters[c].push(static_cast<std::int32_t>(x),
-                                   static_cast<std::int32_t>(x - prediction));
+                st.filters[c].push(static_cast<std::int32_t>(x));
                 decoded[c][static_cast<std::size_t>(n)] = static_cast<std::int32_t>(x);
             }
             std::array<std::int32_t, kMaxMatrixInputs> row{};

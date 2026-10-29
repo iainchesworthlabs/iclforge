@@ -26,6 +26,7 @@ struct ChannelFilter {
     std::array<std::int32_t, kMaxIirOrder> iir_coeffs{};
     std::array<std::int32_t, kMaxFirOrder> fir_history{};
     std::array<std::int32_t, kMaxIirOrder> iir_history{};
+    std::int64_t unrounded_ = 0;
 
     void clear_history() noexcept {
         fir_history.fill(0);
@@ -33,9 +34,11 @@ struct ChannelFilter {
     }
 
     // The prediction for the next sample, rounded down to a multiple of 1 << quant (P23's
-    // reconstruction adds it to a residual that is itself such a multiple).
-    [[nodiscard]] std::int64_t predict(int quant) const noexcept {
+    // reconstruction adds it to a residual that is itself such a multiple). The unrounded value is
+    // kept for push().
+    [[nodiscard]] std::int64_t predict(int quant) noexcept {
         if (fir_order == 0 && iir_order == 0) {
+            unrounded_ = 0;
             return 0;
         }
         std::int64_t acc = 0;
@@ -47,12 +50,14 @@ struct ChannelFilter {
             acc += std::int64_t{iir_coeffs[static_cast<std::size_t>(k)]} *
                    iir_history[static_cast<std::size_t>(k)];
         }
-        const std::int64_t prediction = acc >> coeff_q;
-        return (prediction >> quant) << quant;
+        unrounded_ = acc >> coeff_q;
+        return (unrounded_ >> quant) << quant;
     }
 
-    // Records a sample and the residual it was coded with.
-    void push(std::int32_t sample, std::int32_t residual) noexcept {
+    // Records the sample the last prediction was for. Filter B's history takes the sample less
+    // the prediction before its rounding to the quantiser step, which is what FFmpeg's decoder
+    // holds (P15): with a quantiser step of 0 the two are the same.
+    void push(std::int32_t sample) noexcept {
         for (std::size_t k = kMaxFirOrder - 1; k > 0; --k) {
             fir_history[k] = fir_history[k - 1];
         }
@@ -60,7 +65,7 @@ struct ChannelFilter {
         for (std::size_t k = kMaxIirOrder - 1; k > 0; --k) {
             iir_history[k] = iir_history[k - 1];
         }
-        iir_history[0] = residual;
+        iir_history[0] = static_cast<std::int32_t>(std::int64_t{sample} - unrounded_);
     }
 
     // Installs a filter's coded parameters (9.2): its effective coefficients, and filter B's
