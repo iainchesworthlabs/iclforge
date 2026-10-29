@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "iclforge/truehd/io/access_unit.hpp"
+#include "truehd_evolution_detail.hpp"
 
 namespace iclforge::apps {
 class JsonSink;
@@ -16,8 +17,8 @@ class JsonSink;
 // units: how many units carry one, whether the extra data's check nibble, framing and parity pass,
 // which payload ids the frames hold, what the object audio metadata (payload id 11) says through
 // iclforge::objects' reader (the object count, the bed and the dynamic objects), and how often a
-// frame comes. Metadata only: no payload byte is printed except the first four of the first frame,
-// which tell a bit-level container from a Thrift one.
+// frame comes. Metadata only: no payload byte is printed except the first four of the first frame
+// (the container's version, key id and the start of its first payload id).
 //
 // PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20). The
 // frames are read as TH spec v3.6 §15.4 under both readings the library has (the EMDF container's
@@ -30,6 +31,9 @@ namespace forge_cli::commands {
 
 class EvolutionSurvey {
    public:
+    // With `detail` the report also carries EvolutionDetail's (probe detail=evolution).
+    explicit EvolutionSurvey(bool detail = false) : detail_enabled_(detail) {}
+
     // One parsed access unit, `unit_index` counting the units that parsed, from 0.
     void add(std::uint64_t unit_index, const iclforge::truehd::AccessUnit& unit);
 
@@ -61,6 +65,8 @@ class EvolutionSurvey {
         std::uint64_t frames = 0;
     };
 
+    bool detail_enabled_ = false;
+    EvolutionDetail detail_{};
     std::uint64_t regions_ = 0;
     std::uint64_t check_ok_ = 0;
     std::uint64_t framing_ok_ = 0;

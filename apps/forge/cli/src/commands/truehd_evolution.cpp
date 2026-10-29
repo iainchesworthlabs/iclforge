@@ -86,14 +86,16 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
     // whichever read at all (a stream of random bytes reads as a frame now and then; one with a
     // payload and nothing but zero bits after it does not).
     const th::EvolutionFrame* frame = nullptr;
-    if (clean(emdf)) {
+    const char* reading = "none";
+    if (clean(emdf) || (!clean(letter) && emdf.container.has_value())) {
         frame = &*emdf.container;
-    } else if (clean(letter)) {
-        frame = &*letter.container;
-    } else if (emdf.container.has_value()) {
-        frame = &*emdf.container;
+        reading = "emdf";
     } else if (letter.container.has_value()) {
         frame = &*letter.container;
+        reading = "spec36";
+    }
+    if (detail_enabled_) {
+        detail_.add(unit_index, extra, emdf, letter, frame, reading);
     }
     if (frame == nullptr) {
         return;
@@ -165,6 +167,10 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     json.member("question", "libs/truehd/ERRATA.md, Atmos spec v3.6, question 20");
     json.member("regions", regions_);
     if (regions_ == 0) {
+        if (detail_enabled_) {
+            json.key("detail");
+            detail_.write_json(json);
+        }
         json.end_object();
         return;
     }
@@ -261,6 +267,10 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     json.member("max_gap_units", gap_max_);
     json.end_object();
     json.member("lead_hex", lead_hex_);
+    if (detail_enabled_) {
+        json.key("detail");
+        detail_.write_json(json);
+    }
     json.end_object();
 }
 
@@ -330,6 +340,9 @@ void EvolutionSurvey::print_text() const {
         }
     }
     continuation("not verified: the protection bytes and any signature");
+    if (detail_enabled_) {
+        detail_.print_text();
+    }
 }
 
 }  // namespace forge_cli::commands

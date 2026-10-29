@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -90,6 +91,20 @@ struct DecodedAccessUnit {
     int padding_samples = 0;
 };
 
+// What follows the last block of a substream's segments, counted over the segments decoded
+// (TH spec §16.5; ERRATA.md question 3). `bits` is the distance from the end of the last block to
+// the end of the segment's payload (its parity and CRC bytes excluded).
+struct SegmentTailCounters {
+    std::uint64_t segments = 0;
+    std::uint64_t zero = 0;          // only zero bits follow the last block
+    std::uint64_t terminator_a = 0;  // terminatorA (0xD234E or 0x348D3) follows it at once
+    std::uint64_t terminator_b = 0;  // 0x1234 follows it at once (substream 3)
+    std::uint64_t end_marker = 0;    // the segment ends with terminatorA and a 12-bit count
+    std::uint64_t other = 0;         // anything else
+    std::uint64_t bits_min = 0;
+    std::uint64_t bits_max = 0;
+};
+
 struct DecoderCounters {
     std::uint64_t units = 0;          // units decode() was given
     std::uint64_t units_decoded = 0;  // ... that gave samples
@@ -99,6 +114,12 @@ struct DecoderCounters {
     std::uint64_t lossless_check_failures = 0;
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
+    // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec
+    // §10.2; ERRATA.md question 11).
+    std::uint64_t matrix_headers = 0;
+    std::uint64_t lsb_bypass_matrices = 0;
+    // Per substream: what follows the last block of its segments.
+    std::array<SegmentTailCounters, kMaxSubstreams> tails{};
 };
 
 class ICLFORGE_TRUEHD_EXPORT Decoder {

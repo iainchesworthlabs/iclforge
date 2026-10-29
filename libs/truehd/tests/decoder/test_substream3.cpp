@@ -52,7 +52,8 @@ std::vector<std::byte> read_file(const std::string& path) {
 // The decoder gives back raw - 2^(lsbs - 1) (TH spec §11.3), as the low 24 bits, sign extended.
 std::vector<std::byte> unit_with(std::uint16_t sync, int lsbs,
                                  const std::array<std::array<std::uint32_t, 8>, 2>& raw,
-                                 int max_matrix_chan = 1) {
+                                 int max_matrix_chan = 1, std::uint32_t trailer = 0,
+                                 int trailer_bits = 0) {
     BitWriter writer;
     writer.put(1, 1);  // block_header_exists
     writer.put(1, 1);  // restart_header_exists
@@ -84,6 +85,9 @@ std::vector<std::byte> unit_with(std::uint16_t sync, int lsbs,
         }
     }
     writer.put(1, 1);  // last_block_in_segment
+    if (trailer_bits > 0) {
+        writer.put(trailer, trailer_bits);  // what follows the last block
+    }
     std::vector<std::byte> segment = writer.take();
     if (segment.size() % 2 != 0) {
         segment.push_back(std::byte{0});
@@ -244,4 +248,130 @@ TEST_CASE("a matrix channel above 7 is refused outside the object substream",
     const auto accepted = decoder.decode(unit_with(kRestartSyncStandard, 4, zero, 7));
     REQUIRE(accepted.has_value());
     CHECK(accepted->has_value());
+}
+
+namespace {
+
+// Decodes a whole stream (all substreams, lenient) and returns the decoder's counters and the
+// number of units.
+DecoderCounters count_stream(const std::string& path, std::uint64_t* units) {
+    const std::vector<std::byte> stream = read_file(path);
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    config.strictness = Strictness::kLenient;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    *units = 0;
+    while (const auto unit = reader.next()) {
+        const auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        ++*units;
+    }
+    return decoder.counters();
+}
+
+std::string handbuilt(const char* name) {
+    return std::string(ICLFORGE_GOLDEN_TRUEHD_DIR) + "/handbuilt/" + name;
+}
+
+}  // namespace
+
+TEST_CASE("the decoder counts what follows the last block of each segment",
+          "[truehd][decoder][terminators][no-external-oracle]") {
+    // ERRATA question 3: whether a stream carries terminatorA after the segments of substreams 0 to
+    // 2 and terminatorB after substream 3. `forge probe detail=structure` prints these counters.
+    std::uint64_t units = 0;
+    SECTION("an FFmpeg stream: zero bits, and the end marker in the last unit") {
+        const DecoderCounters counters =
+            count_stream(std::string(ICLFORGE_GOLDEN_TRUEHD_DIR) + "/truehd_m51_s24.thd", &units);
+        REQUIRE(units == 300);
+        for (std::size_t index = 0; index < 2; ++index) {
+            const SegmentTailCounters& tail = counters.tails[index];
+            CHECK(tail.segments == units);
+            CHECK(tail.zero + tail.end_marker == units);
+            CHECK(tail.end_marker <= 1);
+            CHECK(tail.terminator_a == 0);
+            CHECK(tail.terminator_b == 0);
+            CHECK(tail.other == 0);
+        }
+        CHECK(counters.tails[2].segments == 0);
+    }
+    SECTION("the marker in the last unit, and in every unit") {
+        const DecoderCounters last = count_stream(handbuilt("hb_marker_last.thd"), &units);
+        CHECK(last.tails[0].segments == units);
+        CHECK(last.tails[0].end_marker == 1);
+        CHECK(last.tails[0].zero == units - 1);
+        const DecoderCounters every = count_stream(handbuilt("hb_marker_every.thd"), &units);
+        CHECK(every.tails[0].end_marker == units);
+        CHECK(every.tails[0].zero == 0);
+        CHECK(every.tails[0].bits_min >= 32);
+    }
+    SECTION("terminatorB after substream 3") {
+        const DecoderCounters counters = count_stream(handbuilt("hb_sixteen_channels.thd"), &units);
+        CHECK(counters.tails[3].segments == units);
+        CHECK(counters.tails[3].terminator_b == units);
+        for (std::size_t index = 0; index < 3; ++index) {
+            CHECK(counters.tails[index].segments == units);
+            CHECK(counters.tails[index].terminator_b == 0);
+            CHECK(counters.tails[index].zero + counters.tails[index].end_marker == units);
+        }
+    }
+}
+
+TEST_CASE("the decoder counts the matrices that bypass LSBs",
+          "[truehd][decoder][no-external-oracle]") {
+    std::uint64_t units = 0;
+    const DecoderCounters bypass = count_stream(handbuilt("hb_lsb_bypass.thd"), &units);
+    CHECK(bypass.matrix_headers >= 1);
+    CHECK(bypass.lsb_bypass_matrices >= 1);
+    const DecoderCounters plain = count_stream(handbuilt("hb_matrices.thd"), &units);
+    CHECK(plain.matrix_headers >= 1);
+    CHECK(plain.lsb_bypass_matrices == 0);
+    const DecoderCounters none = count_stream(handbuilt("hb_filters.thd"), &units);
+    CHECK(none.matrix_headers == 0);
+}
+
+TEST_CASE("terminatorA right after the last block, and anything else there, are counted",
+          "[truehd][decoder][terminators][no-external-oracle]") {
+    // TH spec §16.5.1 puts terminatorA (0xD234E, or 0x348D3 read two bits late) at the end of the
+    // segments of substreams 0 to 2. The strict decode refuses data after the last block (ERRATA
+    // question 3: the decoder accepts a stream with or without terminators only when they are the
+    // end-of-stream marker); the lenient decode counts it.
+    std::array<std::array<std::uint32_t, 8>, 2> raw{};
+    for (std::size_t i = 0; i < 8; ++i) {
+        raw[0][i] = 8 + static_cast<std::uint32_t>(i);
+        raw[1][i] = 8;
+    }
+    DecoderConfig lenient;
+    lenient.strictness = Strictness::kLenient;
+    SECTION("terminatorA") {
+        for (const std::uint32_t pattern : {0xD234EU, 0x348D3U}) {
+            Decoder decoder(lenient);
+            const auto decoded =
+                decoder.decode(unit_with(kRestartSyncStandard, 4, raw, 1, pattern, 20));
+            REQUIRE(decoded.has_value());
+            REQUIRE(decoded->has_value());
+            const SegmentTailCounters& tail = decoder.counters().tails[0];
+            CHECK(tail.segments == 1);
+            CHECK(tail.terminator_a == 1);
+            CHECK(tail.zero == 0);
+            CHECK(tail.other == 0);
+        }
+        Decoder strict;
+        const auto refused = strict.decode(unit_with(kRestartSyncStandard, 4, raw, 1, 0xD234E, 20));
+        // 20 bits of terminator and the padding after them: more than the 16 bits the strict decode
+        // allows.
+        CHECK_FALSE(refused.has_value());
+    }
+    SECTION("anything else") {
+        Decoder decoder(lenient);
+        const auto decoded =
+            decoder.decode(unit_with(kRestartSyncStandard, 4, raw, 1, 0x5A5A5U, 20));
+        REQUIRE(decoded.has_value());
+        const SegmentTailCounters& tail = decoder.counters().tails[0];
+        CHECK(tail.other == 1);
+        CHECK(tail.terminator_a == 0);
+        CHECK(tail.zero == 0);
+        CHECK(tail.bits_max >= 20);
+    }
 }

@@ -830,6 +830,12 @@ int run_probe(std::string_view in_path, const Options& meta) {
             source = &demuxed;
         }
     }
+    if (meta.detail.has_value() &&
+        (*meta.detail == "evolution" || *meta.detail == "structure" || *meta.detail == "format")) {
+        fmt::println(stderr, "error: detail={} describes TrueHD and MLP streams, and {} is not one",
+                     *meta.detail, in_path);
+        return 1;
+    }
     std::istream& in = *source;
 
     // json=1's document is byte-exact text a consumer (or, here, a test's own

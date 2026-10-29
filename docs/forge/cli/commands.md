@@ -972,10 +972,22 @@ many units carry it; how many pass the check nibble, the framing and the parity;
 the two readings of TH spec v3.6 section 15.4 (the EMDF container of E-AC-3, and the section to the letter) and how many of those
 are clean (a payload, and only zero bits after the protection field); which payload ids the frames hold; for payload id 11, the
 object audio metadata read by `iclforge::objects`: the object count, the bed channels, the number of dynamic objects and of update
-blocks; how many units apart the frames come; and the first four bytes of the first frame, which tell a bit-level container from a
-Thrift one. It prints metadata only. The protection bytes and any signature are not verified, and the report says so. The reading is
+blocks; how many units apart the frames come; and the first four bytes of the first frame (the container's version, key id and
+the start of its first payload id). It prints metadata only. The protection bytes and any signature are not verified, and the report says so. The reading is
 provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 20), and
 this report is the check to run on a real Atmos track.
+
+`detail=evolution`, `detail=structure` and `detail=format` (both) are for the owner's check of a disc's stream and describe TrueHD and MLP
+streams only (any other stream is refused, exit status 1). `detail=evolution` lists the first frames one by one (the extra data's check
+nibble, framing and parity; the container's version, key id, each payload's id, size and configuration flags, the protection length
+codes), groups all the frames by shape (the payload ids, the protection codes and the reading) with how many frames and how large, and for a
+payload that is not the object audio metadata walks it as a Thrift Binary struct, printing field ids, types and lengths and never a value.
+`detail=structure` prints the distinct major syncs (with the size of the channel meaning's extension), each substream's restart headers (the
+sync, the 16 bits that end the fixed part as a histogram, the field ranges), and the result of decoding the whole stream, lenient, with
+the samples discarded: the lossless checks, the units that failed, the matrices that bypass LSBs, and what follows the last block of each
+substream's segments (terminators and the end marker). Nothing derived from the audio, no payload byte and no digest, certificate,
+signature or protection byte is printed. `libs/truehd/ERRATA.md` ("Atmos, spec v3.6", section H) says which field answers which open
+question.
 
 A TrueHD or MLP stream, bare or in a container, is also read by `probe` (the container's own description of the track beside
 the stream's), `levels` (peak and RMS per channel of the 24-bit samples), `loudness` (integrated loudness and true peak, with

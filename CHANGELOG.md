@@ -66,7 +66,7 @@ See [README.md](README.md) for the project overview and
   enforced, the evolution payload is read as the bit-level container of section 15.4 under two readings (the EMDF container E-AC-3 uses, and
   the letter of section 15.4), and payload id 11, the object audio metadata, is handed out as bytes for `iclforge::objects` to parse. Nothing
   decodes from it and nothing is verified (protection bytes, signatures). `forge probe` of a TrueHD stream whose units carry extra data now
-  prints an `evolution` report (and a `truehd.evolution` object with `json=1`): the frames, the payload ids, the object count and bed through
+  prints an `evolution` report (and a `truehd.evolution` object with `json=1`; `detail=evolution`, `detail=structure` and `detail=format` add the frames one by one, their shapes, a walk of any Thrift payload by field id and type, the major sync, restart header, decode-check and terminator facts that a disc settles): the frames, the payload ids, the object count and bed through
   `iclforge::objects`, the checks that pass, and which reading read them. No stream the project holds carries an evolution frame, so the
   reading is provisional; the probe is the check to run on a real Atmos track. A new hand-built stream, `hb_substream3_limits`, holds the
   decoder to substream 3's limits in v3.6 (restart sync 0x31EC, 15 matrices, `huff_lsbs` 29 to 31, values past 24 bits before the matrices):

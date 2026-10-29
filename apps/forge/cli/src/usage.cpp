@@ -186,7 +186,7 @@ constexpr std::array<OptionToken, 133> kOptionTokens{{
                "transcoding to AC-3 or falling back to decoded PCM"},
     {"preset=", "qc: gate the measurement against a named delivery spec"},
     {"json=", "probe: emit the JSON document instead of the human table"},
-    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail"},
+    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure or format"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
     {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
                "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
@@ -1081,6 +1081,12 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("                    substream headers and each frame's object layer");
         fmt::println("  detail=blocks     the same, plus every block's coding tools and");
         fmt::println("                    exponent strategies - what a codec bug report needs");
+        fmt::println("  detail=evolution  TrueHD and MLP: the structure of the evolution frames in the");
+        fmt::println("                    extra data (container fields, payload ids and sizes, shapes,");
+        fmt::println("                    a walk of any Thrift payload by field id and type)");
+        fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
+        fmt::println("                    headers, a decode check, what follows each last block");
+        fmt::println("  detail=format     both; metadata only, no content");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");

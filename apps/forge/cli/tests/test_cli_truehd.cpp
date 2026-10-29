@@ -15,11 +15,13 @@
 #include <iterator>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/base/crypto/thrift_binary.hpp"
 #include "iclforge/base/loudness.hpp"
 #include "iclforge/base/speaker.hpp"
 #include "iclforge/objects/emdf.hpp"
@@ -274,7 +276,7 @@ fs::path write_stream_with(const fs::path& dir, const std::string& name, Payload
     iclforge::truehd::EncoderConfig config;
     config.restart_interval_units = 8;
     config.extra_data = [&payload](std::uint64_t index) {
-        return carries_extra_data(index) ? payload() : std::vector<std::byte>{};
+        return carries_extra_data(index) ? payload(index) : std::vector<std::byte>{};
     };
     auto encoder = iclforge::truehd::Encoder::create(config);
     REQUIRE(encoder.has_value());
@@ -313,8 +315,9 @@ fs::path write_atmos_like_stream(const fs::path& dir) {
     const std::vector<std::byte> container = emdf::build_container(payloads, 0);
     const std::vector<std::byte> body(container.begin() + 4, container.end());
 
-    return write_stream_with(dir, "atmos_like.thd",
-                             [&body] { return std::vector<std::byte>(body.begin(), body.end()); });
+    return write_stream_with(dir, "atmos_like.thd", [&body](std::uint64_t) {
+        return std::vector<std::byte>(body.begin(), body.end());
+    });
 }
 
 }  // namespace
@@ -442,7 +445,7 @@ TEST_CASE("forge probe tells the two readings of the container apart",
     }
     REQUIRE_FALSE(payload.empty());
     const fs::path stream =
-        write_stream_with(dir, "letter_of_15_4.thd", [&payload] { return payload; });
+        write_stream_with(dir, "letter_of_15_4.thd", [&payload](std::uint64_t) { return payload; });
     const fs::path log = dir / "probe_letter.log";
     REQUIRE(run_cli("probe \"" + stream.string() + "\" json=1", log) == 0);
     const auto document = nlohmann::json::parse(read_text(log));
@@ -481,6 +484,241 @@ TEST_CASE("forge probe says so when there is no extra data and when it is not a 
     CHECK(evolution["readings"]["emdf"]["clean_frames"] == 0);
     CHECK(evolution["oamd"]["payloads"] == 0);
     CHECK(evolution["signature_verified"] == false);
+}
+
+// --- detail=evolution, detail=structure, detail=format -----------------------------------------
+// The owner's check on a disc's stream (libs/truehd/ERRATA.md, "Atmos, spec v3.6"): what the
+// evolution frames are made of, shape by shape, with any Thrift payload walked by field id, type
+// and length.
+
+namespace {
+
+// A Thrift Binary struct shaped like a signature envelope, with values that must never be printed:
+// field 1 a struct { 1: list<byte> (32), 2: string, 3: i32, 4: list<struct> (2) }, field 2 a struct
+// { 1: map<string, list<byte>> (1) }.
+constexpr std::string_view kSecretString = "do-not-print-this-string";
+
+std::vector<std::byte> secret_thrift() {
+    namespace thrift = iclforge::base::crypto::thrift;
+    thrift::Writer w;
+    w.field_struct(1);
+    const std::vector<std::byte> digest(32, std::byte{0xC3});
+    w.field_byte_list(1, digest);
+    w.field_string(2, kSecretString);
+    w.field_i32(3, 0x5EC12E7);
+    w.field(thrift::Type::kList, 4);
+    w.list_header(thrift::Type::kStruct, 2);
+    for (int i = 0; i < 2; ++i) {
+        w.field_i32(1, i);
+        w.stop();
+    }
+    w.stop();
+    w.field_struct(2);
+    w.field(thrift::Type::kMap, 1);
+    w.map_header(thrift::Type::kString, thrift::Type::kList, 1);
+    w.string("r");
+    w.byte_list(digest);
+    w.stop();
+    w.stop();
+    return w.take();
+}
+
+// Six access units: the first carries an OAMD payload (id 11) and a second payload (id 15) that is
+// the Thrift struct above; the others carry the OAMD payload alone.
+fs::path write_signed_like_stream(const fs::path& dir) {
+    namespace oba = iclforge::objects::oba;
+    namespace emdf = iclforge::objects::emdf;
+    oba::Program program;
+    program.dynamic_only = true;
+    program.lfe = true;
+    program.dynamic_objects = 3;
+    const std::vector<oba::DynamicObject> objects(3);
+    const std::vector<std::byte> oamd = oba::build_payload(program, objects);
+    const std::vector<std::byte> thrift = secret_thrift();
+    const std::array<emdf::Payload, 2> both{
+        {{.id = emdf::kPayloadIdOamd, .bytes = oamd}, {.id = 15, .bytes = thrift}}};
+    const std::array<emdf::Payload, 1> alone{{{.id = emdf::kPayloadIdOamd, .bytes = oamd}}};
+    const std::vector<std::byte> first = emdf::build_container(both, 0);
+    const std::vector<std::byte> rest = emdf::build_container(alone, 0);
+    // Every other frame after the first carries one object more, so a shape's payloads differ in
+    // size.
+    oba::Program bigger = program;
+    bigger.dynamic_objects = 4;
+    const std::vector<oba::DynamicObject> more_objects(4);
+    const std::vector<std::byte> larger_oamd = oba::build_payload(bigger, more_objects);
+    const std::array<emdf::Payload, 1> alone_larger{
+        {{.id = emdf::kPayloadIdOamd, .bytes = larger_oamd}}};
+    const std::vector<std::byte> rest_larger = emdf::build_container(alone_larger, 0);
+    return write_stream_with(dir, "signed_like.thd", [&](std::uint64_t index) {
+        const auto& container = index == 0 ? first : (index % 3 == 0 ? rest_larger : rest);
+        return std::vector<std::byte>(container.begin() + 4, container.end());
+    });
+}
+
+}  // namespace
+
+TEST_CASE("forge probe detail=evolution walks the evolution frames and the Thrift payload",
+          "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = write_signed_like_stream(dir);
+    const fs::path log = dir / "probe_detail_evolution.log";
+
+    SECTION("json") {
+        REQUIRE(run_cli("probe \"" + stream.string() + "\" detail=evolution json=1", log) == 0);
+        const std::string text = read_text(log);
+        // Structure only: not one value of the Thrift struct, the digest or the string is printed.
+        CHECK(text.find("do-not-print") == std::string::npos);
+        CHECK(text.find("c3c3c3") == std::string::npos);
+        CHECK(text.find("5ec12e7") == std::string::npos);
+        const auto document = nlohmann::json::parse(text);
+        const auto& detail = document["truehd"]["evolution"]["detail"];
+        CHECK(detail["frames_total"] == 6);
+        REQUIRE(detail["frames"].size() == 6);
+        const auto& first = detail["frames"][0];
+        CHECK(first["unit"] == 0);
+        CHECK(first["check_nibble_ok"] == true);
+        CHECK(first["parity_ok"] == true);
+        CHECK(first["reading"] == "emdf");
+        CHECK(first["version"] == 0);
+        CHECK(first["key_id"] == 0);
+        REQUIRE(first["payloads"].size() == 2);
+        CHECK(first["payloads"][0]["id"] == 11);
+        CHECK(first["payloads"][1]["id"] == 15);
+        CHECK(first["payloads"][1]["config"]["frame_aligned"] == true);
+        CHECK(first["payloads"][1]["config"]["group_id"] == 0);
+        CHECK(first["primary_protection_code"] == 2);
+        CHECK(first["secondary_protection_code"] == 1);
+        CHECK(detail["frames"][1]["payloads"].size() == 1);
+
+        // Two shapes: the first frame (a signature once), and the other five (OAMD alone).
+        REQUIRE(detail["shapes"].size() == 2);
+        const auto& once = detail["shapes"][0];
+        CHECK(once["frames"] == 1);
+        CHECK(once["payload_ids"] == nlohmann::json::array({11, 15}));
+        const auto& alone = detail["shapes"][1];
+        CHECK(alone["frames"] == 5);
+        CHECK(alone["payload_ids"] == nlohmann::json::array({11}));
+        CHECK(alone["thrift_walks"].empty());
+        CHECK(alone["payload_bytes"][0]["min"].get<int>() <
+              alone["payload_bytes"][0]["max"].get<int>());
+
+        REQUIRE(once["thrift_walks"].size() == 1);
+        const auto& walk = once["thrift_walks"][0];
+        CHECK(walk["payload_id"] == 15);
+        CHECK(walk["walk"]["found"] == true);
+        CHECK(walk["walk"]["offset"] == 0);
+        CHECK(walk["walk"]["consumed"] == walk["walk"]["payload_bytes"]);
+        const auto& fields = walk["walk"]["fields"];
+        REQUIRE(fields.size() == 2);
+        CHECK(fields[0]["id"] == 1);
+        CHECK(fields[0]["type"] == "struct");
+        const auto& inner = fields[0]["fields"];
+        REQUIRE(inner.size() == 4);
+        CHECK(inner[0]["type"] == "list");
+        CHECK(inner[0]["element"] == "byte");
+        CHECK(inner[0]["count"] == 32);
+        CHECK(inner[1]["type"] == "string");
+        CHECK(inner[1]["count"] == kSecretString.size());
+        CHECK(inner[2]["type"] == "i32");
+        CHECK(inner[2].contains("count") == false);
+        CHECK(inner[3]["element"] == "struct");
+        CHECK(inner[3]["count"] == 2);
+        CHECK(fields[1]["fields"][0]["type"] == "map");
+        CHECK(fields[1]["fields"][0]["key"] == "string");
+        CHECK(fields[1]["fields"][0]["count"] == 1);
+        // detail=evolution adds no structure section.
+        CHECK_FALSE(document["truehd"].contains("structure"));
+    }
+    SECTION("text") {
+        REQUIRE(run_cli("probe \"" + stream.string() + "\" detail=evolution", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("frames in detail (the first 6 of 6)") != std::string::npos);
+        CHECK(text.find("shape 1: 1 frame(s), units 0 to 0, emdf, payload ids [11,15]") !=
+              std::string::npos);
+        CHECK(text.find("shape 2: 5 frame(s)") != std::string::npos);
+        CHECK(text.find("a Thrift struct reads at offset 0") != std::string::npos);
+        CHECK(text.find("field 4 list of struct x2") != std::string::npos);
+        CHECK(text.find("do-not-print") == std::string::npos);
+        CHECK(text.find("shape 1") != std::string::npos);
+        CHECK(text.find("stream syntax") == std::string::npos);
+    }
+}
+
+TEST_CASE("forge probe detail=structure reports the headers, the decode check and the tails",
+          "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "probe_detail_structure.log";
+    REQUIRE(
+        run_cli("probe \"" + fixture("truehd_m51_s24.thd").string() + "\" detail=structure json=1",
+                log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    const auto& structure = document["truehd"]["structure"];
+    REQUIRE(structure["major_syncs"].size() >= 1);
+    CHECK(structure["major_syncs"][0]["size_bytes"] == 28);
+    CHECK(structure["major_syncs"][0]["substreams"] == 2);
+    CHECK(structure["major_syncs"][0]["extra_channel_meaning"] == false);
+    REQUIRE(structure["restart_headers"].size() == 2);
+    CHECK(structure["restart_headers"][0]["substream"] == 0);
+    CHECK(structure["restart_headers"][0]["syncs"][0]["sync"] == "0x31EA");
+    CHECK(structure["restart_headers"][0]["tail_16_bits"][0]["value"] == "0x0000");
+    CHECK(structure["restart_headers"][0]["failures"].empty());
+    const auto& decode = structure["decode"];
+    CHECK(decode["units"] == 300);
+    CHECK(decode["lossless_check_failures"] == 0);
+    CHECK(decode["lossless_checks_ok"].get<int>() >= 1);
+    CHECK(decode["errors"].empty());
+    CHECK(decode["matrices"]["matrices_with_lsb_bypass"] == 0);
+    REQUIRE(decode["segment_tails"].size() == 2);
+    CHECK(decode["segment_tails"][0]["segments"] == 300);
+    CHECK(decode["segment_tails"][0]["terminator_b_at_once"] == 0);
+    CHECK_FALSE(document["truehd"]["evolution"].contains("detail"));
+
+    // The hand-built 16-channel stream: terminatorB after substream 3, restart sync 0x31EC.
+    const fs::path sixteen =
+        fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_sixteen_channels.thd";
+    REQUIRE(run_cli("probe \"" + sixteen.string() + "\" detail=structure json=1", log) == 0);
+    const auto wide = nlohmann::json::parse(read_text(log))["truehd"]["structure"];
+    REQUIRE(wide["restart_headers"].size() == 4);
+    CHECK(wide["restart_headers"][3]["syncs"][0]["sync"] == "0x31EC");
+    const auto& tails = wide["decode"]["segment_tails"];
+    REQUIRE(tails.size() == 4);
+    CHECK(tails[3]["terminator_b_at_once"] == tails[3]["segments"]);
+    CHECK(tails[0]["terminator_b_at_once"] == 0);
+
+    // The hand-built stream with LSB bypass, and the text form.
+    const fs::path bypass =
+        fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_lsb_bypass.thd";
+    REQUIRE(run_cli("probe \"" + bypass.string() + "\" detail=structure", log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("stream syntax") != std::string::npos);
+    CHECK(text.find("matrices with lsb_bypass: ") != std::string::npos);
+    CHECK(text.find("matrices with lsb_bypass: 0") == std::string::npos);
+    CHECK(text.find("lossless check ") != std::string::npos);
+    CHECK(text.find("terminatorB at once 0") != std::string::npos);
+}
+
+TEST_CASE("forge probe detail=format is both, and the TrueHD details are refused for other streams",
+          "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = write_signed_like_stream(dir);
+    const fs::path log = dir / "probe_detail_format.log";
+    REQUIRE(run_cli("probe \"" + stream.string() + "\" detail=format json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    CHECK(document["truehd"]["evolution"].contains("detail"));
+    CHECK(document["truehd"].contains("structure"));
+    REQUIRE(run_cli("probe \"" + stream.string() + "\" detail=format", log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("frames in detail") != std::string::npos);
+    CHECK(text.find("stream syntax") != std::string::npos);
+
+    // Not a TrueHD stream: refused by name, exit 1. And a value probe does not know.
+    const fs::path ec3 =
+        fs::path{ICLFORGE_GOLDEN_AUDIO_DIR} / "reference_51_eac3_448k_cplbndstrce0.ec3";
+    CHECK(run_cli("probe \"" + ec3.string() + "\" detail=evolution", log) == 1);
+    CHECK(read_text(log).find("describes TrueHD and MLP streams") != std::string::npos);
+    CHECK(run_cli("probe \"" + stream.string() + "\" detail=everything", log) == 1);
+    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure or format") !=
+          std::string::npos);
 }
 
 TEST_CASE("forge probe exits 1 on a damaged TrueHD stream", "[forge-cli][truehd]") {

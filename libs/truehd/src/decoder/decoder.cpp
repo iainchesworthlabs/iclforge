@@ -35,6 +35,8 @@ constexpr int kObjectSubstream = 3;
 // of the unit that are padding (ERRATA.md). 0x348D3, the spec's second value, is the same bits seen
 // two bits late.
 constexpr std::uint32_t kTerminatorA = 0xD234E;
+constexpr std::uint32_t kTerminatorAShifted =
+    0x348D3;  // the same read two bits late (ERRATA.md entry 14)
 constexpr int kEndMarkerBits = 32;
 constexpr int kEndMarkerCountBits = 12;
 constexpr std::uint32_t kTerminatorB = 0x1234;  // TH spec §16.5, substream 3: no stream shows it
@@ -131,6 +133,8 @@ struct Decoder::Impl {
     [[nodiscard]] std::expected<void, Error> begin_restart(int index, SubstreamState& state,
                                                            BitReader& reader,
                                                            std::span<const std::byte> payload);
+    // Counts what follows the last block of a segment (SegmentTailCounters).
+    void record_tail(int index, BitReader reader, std::size_t left);
     [[nodiscard]] std::expected<void, Error> apply_block_header(
         SubstreamState& state, const BlockHeaderSpec& header) const;
     [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state,
@@ -268,6 +272,36 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
     return {};
+}
+
+void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
+    SegmentTailCounters& tail = counters.tails[static_cast<std::size_t>(index)];
+    tail.bits_min = tail.segments == 0 ? left : std::min<std::uint64_t>(tail.bits_min, left);
+    tail.bits_max = std::max<std::uint64_t>(tail.bits_max, left);
+    ++tail.segments;
+    if (index == kObjectSubstream && left >= 16 && reader.peek(16) == kTerminatorB) {
+        ++tail.terminator_b;
+        return;
+    }
+    if (left >= 20 && (reader.peek(20) == kTerminatorA || reader.peek(20) == kTerminatorAShifted)) {
+        ++tail.terminator_a;
+        return;
+    }
+    if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
+        BitReader marker = reader;
+        marker.skip(left - static_cast<std::size_t>(kEndMarkerBits));
+        if (marker.read(20) == kTerminatorA) {
+            ++tail.end_marker;
+            return;
+        }
+    }
+    bool zero = true;
+    for (std::size_t remaining = left; remaining > 0 && zero;) {
+        const auto chunk = static_cast<int>(std::min<std::size_t>(32, remaining));
+        zero = reader.read(chunk) == 0;
+        remaining -= static_cast<std::size_t>(chunk);
+    }
+    ++(zero ? tail.zero : tail.other);
 }
 
 std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& state,
@@ -581,6 +615,13 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 state.running = false;
                 return std::unexpected(applied.error());
             }
+            if (header->matrices) {
+                ++counters.matrix_headers;
+                for (int m = 0; m < header->matrices->count; ++m) {
+                    counters.lsb_bypass_matrices +=
+                        header->matrices->items[static_cast<std::size_t>(m)].lsb_bypass ? 1U : 0U;
+                }
+            }
         } else if (!state.running) {
             result.waiting = true;
             return result;
@@ -630,6 +671,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     // samples in the unit.
     const std::size_t end_bits = payload.size() * 8U;
     const std::size_t left = end_bits - reader.bit_position();
+    record_tail(index, reader, left);
     if (index == kObjectSubstream && left >= 16 && reader.peek(16) == kTerminatorB) {
         reader.skip(16);
     } else if (left >= static_cast<std::size_t>(kEndMarkerBits)) {

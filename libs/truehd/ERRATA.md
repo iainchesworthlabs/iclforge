@@ -41,12 +41,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
    ... bytes) and reads the fields as written, with "extended_substream" taken to mean `extended_substream_info != 0`.
    No stream has it (**no oracle**). Is the length in bits, bytes or words, and is the CRC placed after padding to
-   a 16-bit word?
+   a 16-bit word? A disc's stream settles it: `forge probe DISC detail=structure` prints the length field and the size the CRC confirmed (section H).
 3. **Terminators (§3.5, §16.5).** FFmpeg's encoder writes none between segments; its last access unit carries an
    end-of-stream marker that the specification does not describe (entry 14). Do DEE's streams carry `terminatorA`
    at the end of every segment of substreams 0 to 2, and `terminatorB` (0x1234) at the end of substream 3, as the
    specification says? Is the 12-bit count after `terminatorA` part of the terminator? The decoder accepts a
-   stream with or without them.
+   stream with or without them. A disc's stream settles it: `forge probe DISC detail=structure` counts what follows the last block of every
+   substream's segments (section H).
 4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
    default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
 5. **Noise generator 1 (§17.3, §17.4).** Generator 0 (`noise_type` 0, sync 0x31EA) is decoded from §17.2 (entry 23). For
@@ -81,7 +82,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     `lossless_check` replace reserved bits the streams have), so where they sit cannot be told, and a header that
     sets the bit may be longer than any stream here. The library reads the 16 bits as `tail` and writes nothing for
     heavy DRC; the directory's standard DRC word (§12.1) is read and carried (entry 18). Please give the layout, or
-    a DEE stream that sets `heavy_drc_present`.
+    a DEE stream that sets `heavy_drc_present`. A disc's stream shows whether the 16 bits that end the fixed part are ever non-zero:
+    `forge probe DISC detail=structure` (section H).
 11. **Where a bypassed LSB comes from (§10.2, §17.1, §17.5).** v3.5 says that with `lsb_bypass` set "the matrix output
     LSB comes from noise" ("rather than the coefficient computation"). The twelve FFmpeg streams whose matrix sets the flag
     (every 24 bit stereo stream; `python3 tools/checks/check_truehd_coverage.py --list`) carry one bit a sample for it and
@@ -89,7 +91,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     word "noise". The block data
     syntax (§8.1) has no field for it. The library reads one bit a sample, for each matrix with the flag, from the
     sample data (before the channels' residuals) and adds it to the matrix output; that reading is not in the
-    specification (**provisional, owner to confirm**). Which noise channel, which bit, and does the stream carry it?
+    specification (**provisional, owner to confirm**). Which noise channel, which bit, and does the stream carry it? On a disc's stream with such matrices, `forge probe DISC
+    detail=structure` counts them and the restart intervals whose lossless check passes or fails (section H).
 12. **The scale of `peak_data_rate` (§4.4, ERRATA 30).** The specification says raw x 200 x a rate multiplier; FFmpeg's
     streams hold raw values that make raw x rate / 16 equal 9.6 Mbps at every rate. The encoder writes raw =
     peak_data_rate_bps x 16 / rate (18 Mbps by default, Blu-ray's) and keeps the stream within it. Which scale does a
@@ -165,7 +168,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
 
 20. to 37. The questions v3.6's Atmos section raises (the container, the coding of variable-length numbers, the program assignment, the
     element framing, timing, channel accounting and the rest) are numbered in "Atmos, spec v3.6" below, with what the public standard says
-    and a recommendation for each.
+    and a recommendation for each. Section H there says which fields of `forge probe DISC detail=format` answer questions 2, 3, 10 and 11
+    above and the Atmos ones, for the owner to run on a disc's stream.
 
 ## Entries
 
@@ -437,6 +441,16 @@ container (§15.4) and constraints (§15.16, §15.17). The owner said the object
 is the one that standard defines. This section sets §15.4 to §15.15 (and the constants of §15.16 and §15.17) against the public text of
 ETSI TS 103 420 V1.2.1, statement by statement, and collects what is left for the owner as questions 20 to 37.
 
+**The owner's answer of 2026-10-29 (third round).** Real streams carry both layouts, nested: the bit-level EMDF-style `evo_frame()` of §15.4 is
+the outer container, and the Thrift `ContentSignature` of §16.3 sits inside one of its payloads. The answer cites two third-party projects as its
+basis (not fetched or read here) and says an HMAC-SHA-256 signs the OAMD and JOC structures, which does not agree with §16.6 (ECDSA P-256) unless
+the HMAC is the bits of `evo_protection()` and the ECDSA signature is the nested `ContentSignature`. Only the nesting is taken as the owner's
+reading; which payload id carries the Thrift blob, where in the payload it starts, what its digest covers, what the protection bytes cover and
+whether a signature comes with every frame or once per stream are **unconfirmed** and are questions 20 and 35. The library follows the nesting
+(it reads the §15.4 container, carries any payload that is not id 11 as bytes with its id and size, and does not parse Thrift: `libs/truehd` has
+no Thrift reader). `forge probe detail=evolution` walks a Thrift payload with the repository's reader in `libs/base` and prints field ids, types
+and lengths only (section H).
+
 **What the comparison rests on.** The standard is E-AC-3's: its scope is E-AC-3 only, and it never mentions TrueHD or MLP. What it can confirm
 is therefore the syntax and semantics of the OAMD payload itself (its §5 and Annex A) and the constraints it puts on the EMDF container
 the payload travels in (§8.2, Tables 55 and 56). It cannot confirm anything about TrueHD: that the payload is carried in the extra data, which
@@ -482,7 +496,7 @@ The repository reads the EMDF container for E-AC-3 (`libs/objects/src/emdf.cpp`;
 | A16 | the protection is an "HMAC" | the content is "implementation dependent and not defined" (Annex H); TS 103 420 says nothing | standard silent. **Q35** |
 | A17 | what follows the protection up to `evo_frame_byte_length` | EMDF: zero bits to the byte boundary implied by the container length | v3.6 silent. The library reports whether the bits after the protection are all zero |
 | A18 | the container sits in the extra data region and is `evolution_payload` of §16.1 | TS 103 420 §8.2: the container is carried in the last dependent substream of an E-AC-3 stream; nothing about TrueHD | standard silent: rests on the owner's word |
-| A19 | §16.3 says the same bytes are a Thrift Binary Protocol container holding the typed entries and a nested ContentSignature | -- | **internal contradiction** with §15.4: one region, two layouts, and v3.6 does not relate them. **Q20** |
+| A19 | §16.3 says the same bytes are a Thrift Binary Protocol container holding the typed entries and a nested ContentSignature | -- | **internal contradiction** with §15.4 in v3.6; the owner's answer (above) reads them as nested, §15.4 outside and the Thrift blob inside one payload. Which payload, where, and what it covers: **Q20** |
 
 **Field for field.** §15.4's `evo_frame()` is the EMDF container body with `evo_` for `emdf_`: every field of v3.6 has a counterpart in Annex H,
 in the same order, and the repository's reader holds it.
@@ -572,7 +586,7 @@ TrueHD carries it, in what bit layout around it, or that its configuration follo
 
 | # | Where | What |
 |---|---|---|
-| C1 | §15.4 against §16.3 | the same bytes (`evolution_payload`) are a bit-level container in §15.4 and a Thrift container in §16.3; §16.3.1 calls the payload "a single Thrift blob". Not related anywhere in v3.6. **Q20** |
+| C1 | §15.4 against §16.3 | the same bytes (`evolution_payload`) are a bit-level container in §15.4 and a Thrift container in §16.3; §16.3.1 calls the payload "a single Thrift blob". Not related anywhere in v3.6; the owner's answer nests them (above). **Q20** |
 | C2 | Appendix E and §15.16 against §15.6 | Appendix E still uses the v3.5 names: `multiple_bed_instances_present` (now `b_multiple_bed_instance`), `bed_object_chan_distr` (no such field now; the nearest is `b_chan_distribute`), and "`interm_spatial_format` SHALL be NULL", which forbids what §15.6 describes in detail (ISF objects through `isf_config`, 4 to 30 of them). Whether a TrueHD Atmos program may carry ISF objects is therefore open. **Q34** |
 | C3 | §15.2 against §2.3, §7.2, §15.3, §17.5 | §15.2: Atmos is 48 kHz only. §7.2 and §17.5: restart sync 0x31EC marks substreams 2 and 3; §15.3: substream 3; §2.3: all substreams share one 13-bit sync (0x18F5). No rate condition appears in §7.2, §15.3, §8.3 or §9.3. The library follows the sync and does not test the rate. **Q33** |
 | C4 | §8.3, §9.3 against §15.3 | `huff_lsbs` up to 31 and a Filter B range of 2^31 are for "substreams 2/3 in Atmos"; §15.3 lists them for substream 3. The library keys on the 0x31EC sync (any substream carrying it): 31 and a 32-bit filter there, 24 and 24 bits elsewhere. **Q33** |
@@ -587,14 +601,15 @@ Numbering continues the list at the top of this file. In each, "the standard" is
 until told otherwise. The library's evolution frame reader is **provisional, owner to confirm** (question 20): it is written and tested, but
 no TrueHD stream here has an evolution frame, so nothing decides it.
 
-20. **Which container do real TrueHD streams carry (A19, C1)?** §15.4 says the evolution frame is a bit-level EMDF-style container;
-    §16.3 says it is a Thrift container with a nested ContentSignature; §16.3.3 lists the Thrift layout as unconfirmed. The library reads
-    `evolution_payload` as §15.4's `evo_frame()` (`parse_evolution_frame`, `libs/truehd/include/iclforge/truehd/io/evolution.hpp`) and
-    keeps the bytes unchanged either way. If the bytes are a Thrift blob the read fails at once and says so; the two layouts can also nest
-    (the Thrift blob as one payload of the bit-level container, or the reverse), and `forge probe` lists the payload ids and sizes it finds,
-    which shows it. Which is it, and where does the ContentSignature sit? **Recommendation:** run `forge probe --json` on two or three of your
-    Atmos tracks and send back the "evolution" table; that answers it from the stream and needs no further analysis. This question supersedes
-    question 1 for the container's outer layout (question 1's digest scope and signing granularity stay open).
+20. **How the two layouts nest (A19, C1).** The owner's answer: the §15.4 container is the outer one and the Thrift `ContentSignature` is inside one
+    of its payloads. Still open, and not to be guessed: which payload id carries the Thrift blob (one of the ids other than 11, presumably);
+    whether the blob starts at the first byte of that payload or after a header; what the signature's digest covers (§16.3.3, §16.6.1: the
+    other payloads, the whole frame, or something else); what `evo_protection()` covers (the owner's text says an HMAC over the OAMD and JOC
+    structures, §16.6 says ECDSA); and whether each frame carries a signature or one frame in many does (§16.3.3 point 3). The library reads
+    the outer container (`parse_evolution_frame`, `libs/truehd/include/iclforge/truehd/io/evolution.hpp`), carries every payload as bytes with
+    its id and size, and does not look inside a payload that is not OAMD. **Recommendation:** `forge probe DISC detail=evolution` on a disc's
+    TrueHD stream settles the first three structural points and the last from the stream (section H lists the fields); the digest scope and what
+    the protection covers need the signing material or the owner's source and are not visible in a probe, which prints no value.
 21. **How `variable_bits(n, max_ext)` is coded (A12).** v3.6 §15.4 describes an escape value (all ones, add, read n more). The standard
     (§5.5.1), ETSI TS 102 366 Annex H and TS 103 190-1 all use a read-more flag after every group. The two disagree from the first
     `variable_bits` of the frame on. `max_ext` matches `max_num_groups` of §5.5.1, which suggests the source code uses the standard's coding and
@@ -654,9 +669,11 @@ no TrueHD stream here has an evolution frame, so nothing decides it.
 34. **Appendix E and §15.16 (B42, C2).** Appendix E uses the v3.5 field names and says ISF SHALL be NULL, which §15.6 contradicts.
     Can an Atmos program carry ISF objects? **Recommendation:** treat ISF as allowed (the standard defines it), and the rest of §15.16 as
     rules for an encoder that this library's encoder will keep (nothing is enforced on the read side).
-35. **Integrity (A3, A16, C7).** What is `key_id`, what does `evo_protection()` hold ("HMAC" in §15.4, undefined in Annex H) and does a
-    TrueHD frame carry both it and a ContentSignature? Out of scope for now; the library reports the protection lengths and bytes and verifies
-    nothing, and the probe says so.
+35. **Integrity (A3, A16, C7).** What is `key_id`, what does `evo_protection()` hold, and does a frame carry both it and a `ContentSignature`? The
+    owner's answer says an HMAC-SHA-256 with a secret key signs the OAMD and JOC structures; §16.6 says ECDSA P-256 over the Thrift
+    `SignedInfoWire`. The two agree if the HMAC is the protection bits (a 4 or 16 byte field is shorter than an HMAC-SHA-256, so it would be a
+    truncation, which is a further question) and the ECDSA is the nested signature. A secret key cannot be checked here in any case. Out of
+    scope for now: the library reports the protection lengths and bytes and verifies nothing, and the probe says so and prints no byte of either.
 36. **`evolution_frame_present` (C8).** §16.1 conditions the frame on a flag no field defines. **Recommendation:** any extra data region is
     a candidate; the nibble, the framing and the parity are reported, not enforced.
 37. **Speaker positions (B41).** §15.11.3's positions differ from the standard's informative Annex B for 14 of 17 labels. They are not
@@ -685,7 +702,8 @@ B12, B16, B18, B21 to B26, B28, B29 (the z sign), B31, B32, B34, B36, B38 and B4
 
 `libs/truehd/include/iclforge/truehd/io/evolution.hpp` reads what questions 20 to 22 leave open, in the form the owner's text and the
 standard agree on, so that a real stream can say which is right. **Provisional, owner to confirm**: no stream here has an evolution
-frame, and the owner has not said that §15.4 and not §16.3 is what real streams carry.
+frame. The owner's reading (2026-10-29, above) is that §15.4's container is the outer one with the Thrift ContentSignature nested in one of its
+payloads, which this reader follows: it reads the outer container and carries every payload as bytes with its id and size.
 
 - `read_extra_data(bytes)` is `parse_access_unit`'s own extra data reading, for bytes held apart from their unit. `read_evolution(extra)`
   reports the check nibble (§16.2), the framing, the parity (§16.4), `evo_reserved` zero (§16.8) and the capacity rule (§16.8, with
@@ -720,7 +738,7 @@ frame, and the owner has not said that §15.4 and not §16.3 is what real stream
   read as a frame under each reading and how many of those are clean (a payload, and only zero bits after the protection field), the
   payload ids, the protection length codes, and for payload id 11 what `iclforge::objects` reads from it: the object count, the bed
   channels, the dynamic objects and the update blocks. It says that the protection bytes and any signature are not verified, and prints
-  the first four bytes of the first frame (a bit-level container and a Thrift one start differently). No audio and no payload byte
+  the first four bytes of the first frame. No audio and no payload byte
   beyond those four. The tests (`apps/forge/cli/tests/test_cli_truehd.cpp`) run it on a stream the encoder makes with an OAMD payload in
   every other unit, on one with a wrong check nibble and a wrong parity byte, on a frame written in the letter of §15.4 (only that reading
   reads it cleanly), on the hand-built stream whose extra data is opaque, and on a stream with no extra data; 13 mutations of the survey
@@ -753,3 +771,33 @@ residual reaches 2^28, `huff_lsbs` 29 to 31, terminatorB. `python3 tools/checks/
 holds `forge decode` and the Python reference to its signal (15 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
 Only PCM of 24 bits is given back: a value of an object channel that needs more would lose its top bits in the output (and in the lossless check,
 which folds the low three bytes), and v3.6 says nothing about the width (question 33).
+
+### H. What the probe prints, and which question each field answers
+
+For the owner, on a disc's TrueHD stream, on the owner's machine. Metadata only: nothing derived from the audio, no payload byte, no digest,
+certificate, signature or protection byte, and no value of any Thrift field is printed. The file's path is (the `file` member). The command, for
+a bare `.thd` or a `.mkv`, `.mp4` or `.ts` / `.m2ts` that holds the track:
+
+    forge probe DISC_STREAM detail=format json=1 > probe.json
+    forge probe DISC_STREAM detail=format > probe.txt
+
+(`detail=evolution` is the first part alone and does not decode; `detail=structure` is the second part and decodes the whole stream, lenient, and
+discards the samples.) Paste back `probe.txt`, or `probe.json` if the text is not enough. If the track is in a Blu-ray `.m2ts` that forge
+does not read, extract the TrueHD stream with any tool first and probe that.
+
+| Question | Fields (JSON path under `truehd`) | What they show |
+|---|---|---|
+| 2: the extension of the channel meaning (§14.2) | `structure.major_syncs[]`: `size_bytes`, `extra_channel_meaning`, `extra_channel_meaning_length`, `sixteench_channel_count`, `dyn_object_only`, `content_description`, `channel_assignment`, `isf`, `dynamic_object_count`, `substream_info`, `extended_substream_info` | the size the major sync's CRC confirmed for the extension (28 bytes without one) against the length field: bits, bytes or words |
+| 3: terminators (§3.5, §16.5) | `structure.decode.segment_tails[]` per substream: `zero_bits_only`, `terminator_a_at_once` (0xD234E or 0x348D3 right after the last block), `terminator_b_at_once` (0x1234, substream 3), `end_marker_at_the_end` (terminatorA and the 12-bit count ending the segment), `other`, `bits_after_last_block_min/max` | whether every segment of substreams 0 to 2 ends with terminatorA, whether substream 3 ends with terminatorB, and whether the count follows. A stream with terminators in every segment fails a strict decode; this pass is lenient and counts them |
+| 10: heavy DRC (§7.1, §12.2) | `structure.restart_headers[]`: `tail_16_bits` (value and count), `tail_distinct_values`, `failures` (a restart header whose CRC-8 fails), `max_shift`, `max_lsbs`, `max_bits`, `max_bits_repeat`, `data_check_present` | a non-zero tail is where heavy DRC's gain and time would be; a header whose CRC fails would mean the header is longer than the library reads. `structure.decode.lossless_check_failures` and `check_failures` say whether the stream still decodes |
+| 11: where a bypassed LSB comes from (§10.2) | `structure.decode.matrices.matrices_with_lsb_bypass`, `block_headers_with_matrices`, with `structure.decode.lossless_checks_ok` and `lossless_check_failures` | if matrices bypass LSBs and every restart interval's lossless check passes, the library's reading (one bit a sample, from the sample data) is right for that stream; failures say it is not |
+| 5, 6, 18, 19 (marked correct by the owner; provisional until scored) | `structure.decode.lossless_checks_ok` / `lossless_check_failures` over a whole disc stream; `evolution.detail.frames[].extra_data_length`, `evo_frame_byte_length`, `length_fits` | a stream that decodes with no lossless failure supports the readings of noise, the channel shift and the filter history; the extra data lengths against the frame length show whether `extra_data_length` is the words less one |
+| 20, 35: how the layouts nest, signing | `evolution.detail.shapes[]`: `payload_ids`, `frames`, `first_unit`, `last_unit`, `payload_bytes` (min and max per payload), `primary_protection_code`, `secondary_protection_code`, `thrift_walks[]` (`payload_id`, `walk.offset`, `walk.consumed`, `walk.fields[]` with `id`, `type`, `element`, `count`) | which payload id holds a Thrift struct and at what offset; its fields by id, type and length; whether a shape with that payload is on every frame or on one frame in many (a signature per frame or per stream); the protection field's size |
+| 21, 22, 23: the coding of the container | `evolution.readings.emdf` and `.spec36` (`frames`, `clean_frames`, `errors`), `evolution.detail.frames[]`: `reading`, `emdf_error`, `spec36_error`, `version`, `key_id`, `payloads[].config`, `bits_used`, `trailing_zero` | which reading reads every frame cleanly (a payload, and only zero bits after the protection), the configuration flags the payloads carry, the version and key id |
+| 24 to 30, 32: the object metadata | `evolution.oamd.programs[]`: `object_count`, `dynamic_only`, `lfe`, `bed_assignment`, `bed_channels`, `isf_index`, `dynamic_objects`, `update_blocks`; `evolution.oamd.unread` | whether `iclforge::objects` reads the payload (and so whether it follows TS 103 420's syntax), the bed and the object count against the channels of substream 3 (`structure.restart_headers[3]`, `max_chan`) |
+| 31: the time base | `evolution.cadence` (`first_unit`, `last_unit`, `min_gap_units`, `max_gap_units`), `evolution.detail.shapes[]` | how often a frame comes, in access units of 40 samples |
+| 33: rate, sync, limits | `structure.major_syncs[].sample_rate`, `structure.restart_headers[]` (`syncs` per substream, `max_matrix_chan`, `max_lsbs`), `structure.decode.matrices` | the rate, the sync of each substream, the largest `huff_lsbs` and matrix channel the stream uses |
+
+The tests of these fields are in `apps/forge/cli/tests/test_cli_truehd.cpp` (a stream with a Thrift payload in one frame and OAMD alone in the others, whose output is
+checked for not containing any of its values; the FFmpeg fixtures; the hand-built 16-channel and LSB bypass streams) and in
+`libs/truehd/tests/decoder/test_substream3.cpp` (the decoder's counters).

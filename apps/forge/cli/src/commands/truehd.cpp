@@ -33,6 +33,7 @@
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "truehd_evolution.hpp"
+#include "truehd_structure.hpp"
 
 namespace forge_cli::commands {
 
@@ -548,13 +549,24 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     std::uint64_t segment_failures = 0;
     int substreams = 0;
     std::uint64_t extra_data_units = 0;
-    EvolutionSurvey evolution;
+    // detail=evolution, structure or format: the structure of the evolution frames, the
+    // stream-level syntax facts the specification leaves open, or both (the owner's check on a
+    // disc's stream).
+    const bool want_evolution =
+        meta.detail.has_value() && (*meta.detail == "evolution" || *meta.detail == "format");
+    const bool want_structure =
+        meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
+    EvolutionSurvey evolution(want_evolution);
+    StructureSurvey structure;
     while (const auto unit = reader.next()) {
         const auto parsed = th::parse_access_unit(*unit, substreams, true);
         if (!parsed) {
             continue;
         }
         evolution.add(units, *parsed);
+        if (want_structure) {
+            structure.add(units, *parsed);
+        }
         ++units;
         if (parsed->extra_data) {
             ++extra_data_units;
@@ -578,6 +590,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                 ++segment_failures;
             }
         }
+    }
+    if (want_structure) {
+        structure.decode(stream);
     }
     const std::uint64_t unreadable = info->access_units > units ? info->access_units - units : 0;
     const bool damaged = segment_failures != 0 || unreadable != 0 || reader.skipped_bytes() != 0;
@@ -628,6 +643,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("skipped_bytes", static_cast<std::uint64_t>(reader.skipped_bytes()));
         json.key("evolution");
         evolution.write_json(json);
+        if (want_structure) {
+            json.key("structure");
+            structure.write_json(json);
+        }
         json.end_object();
         json.end_object();
         json.finish();
@@ -661,6 +680,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             "skipped byte(s)",
             "checks", segments - segment_failures, segments, unreadable, reader.skipped_bytes());
         evolution.print_text();
+        if (want_structure) {
+            structure.print_text();
+        }
     }
     return damaged ? 1 : 0;
 }
