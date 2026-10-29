@@ -62,6 +62,8 @@ constexpr std::uint32_t kAc4Entry = fourcc("ac-4");  // TS 103 190-2 Annex E.4
 constexpr std::uint32_t kDac3 = fourcc("dac3");
 constexpr std::uint32_t kDec3 = fourcc("dec3");
 constexpr std::uint32_t kDac4 = fourcc("dac4");
+constexpr std::uint32_t kMlpaEntry = fourcc("mlpa");  // Dolby TrueHD; ERRATA C1
+constexpr std::uint32_t kDmlp = fourcc("dmlp");
 
 // Boxes that are pure containers: the walk descends into them rather than
 // buffering them whole, which is what keeps a moov of any size from being
@@ -80,6 +82,26 @@ constexpr std::uint32_t kDac4 = fourcc("dac4");
            type == kTrex || type == kTfhd || type == kTrun;
 }
 
+// The sampling frequency a TrueHD ratebits code names (TH spec §1.4), 0 for a code it does not.
+[[nodiscard]] std::uint32_t mlp_rate_hz(std::uint32_t ratebits) {
+    switch (ratebits) {
+        case 0x0:
+            return 48000;
+        case 0x1:
+            return 96000;
+        case 0x2:
+            return 192000;
+        case 0x8:
+            return 44100;
+        case 0x9:
+            return 88200;
+        case 0xA:
+            return 176400;
+        default:
+            return 0;
+    }
+}
+
 // --- the dac3/dec3 configuration box ---------------------------------------
 //
 // The read twin of iclforge::ac3::io::build_codec_config_box (ac3/io/dec3.hpp), field
@@ -94,6 +116,17 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
     CodecConfig out;
     out.eac3 = box_type == kDec3;
     out.payload.assign(payload.begin(), payload.end());
+    if (box_type == kDmlp) {
+        // 'dmlp' (ERRATA C3): format_info(32) peak_data_rate(15) reserved(1) reserved(32). The
+        // fields are read when the box is long enough and left at zero when it is not; the bytes
+        // are kept either way.
+        out.mlp = true;
+        if (payload.size() >= 6) {
+            out.mlp_format_info = get_u32(payload, 0);
+            out.mlp_peak_data_rate = static_cast<int>(get_u16(payload, 4) >> 1U);
+        }
+        return out;
+    }
     if (box_type == kDac4) {
         // ac4_dsi_v1 (TS 103 190-2 Annex E.5) shares no field with the
         // dac3/dec3 layout below, and this module has no business
@@ -317,7 +350,7 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kMalformed:
             return "malformed box, sample table or fragment layout";
         case DemuxError::kNoAudioTrack:
-            return "no 'ac-3'/'ec-3'/'ac-4' track (or the requested track id is absent)";
+            return "no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (or the requested track id is absent)";
         case DemuxError::kLimitExceeded:
             return "box size, sample count or nesting depth beyond the reader's limits";
         case DemuxError::kMoovAfterMdat:
@@ -409,18 +442,18 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
         if (top.type == kTrak) {
             bool selected_now = false;
             if (s.in_trak && !s.track_found && s.pending.has_entry) {
-                const bool wanted = options.track_id != 0
-                                        ? s.pending.track_id == options.track_id
-                                        : (s.pending.entry_type == kAc3Entry ||
-                                           s.pending.entry_type == kEc3Entry ||
-                                           s.pending.entry_type == kAc4Entry);
+                const bool wanted =
+                    options.track_id != 0
+                        ? s.pending.track_id == options.track_id
+                        : (s.pending.entry_type == kAc3Entry || s.pending.entry_type == kEc3Entry ||
+                           s.pending.entry_type == kAc4Entry || s.pending.entry_type == kMlpaEntry);
                 if (wanted) {
                     s.track = ReadTrack{
                         .track_id = s.pending.track_id,
-                        .codec_id =
-                            std::string{s.pending.entry_type == kAc3Entry    ? kCodecAc3
-                                        : s.pending.entry_type == kAc4Entry ? kCodecAc4
-                                                                            : kCodecEac3},
+                        .codec_id = std::string{s.pending.entry_type == kAc3Entry    ? kCodecAc3
+                                                : s.pending.entry_type == kAc4Entry  ? kCodecAc4
+                                                : s.pending.entry_type == kMlpaEntry ? kCodecTruehd
+                                                                                     : kCodecEac3},
                         .sample_rate = s.pending.sample_rate,
                         .channels = s.pending.channels,
                         .timescale = s.pending.timescale,
@@ -570,7 +603,8 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
         if (track.first_entry == 0) {
             track.first_entry = entry.type;
         }
-        if (entry.type == kAc3Entry || entry.type == kEc3Entry || entry.type == kAc4Entry) {
+        if (entry.type == kAc3Entry || entry.type == kEc3Entry || entry.type == kAc4Entry ||
+            entry.type == kMlpaEntry) {
             // §12.2.3's AudioSampleEntry, on top of §8.5.2's SampleEntry:
             // reserved(6) data_reference_index(2) reserved(8)
             // channelcount(2) samplesize(2) pre_defined(2) reserved(2)
@@ -582,7 +616,14 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
             }
             track.entry_type = entry.type;
             track.channels = static_cast<int>(get_u16(body, fields + 16));
-            track.sample_rate = get_u32(body, fields + 24) >> 16U;
+            const std::uint32_t rate_field = get_u32(body, fields + 24);
+            // 16.16 fixed point, except in 'mlpa', where the field holds the rate as a plain
+            // integer (ERRATA C2). A plain rate always has a non-zero low half (no rate is a
+            // multiple of 65,536), a 16.16 one of the same rate never does, which tells a file
+            // written either way apart.
+            track.sample_rate = (entry.type == kMlpaEntry && (rate_field & 0xFFFFU) != 0)
+                                    ? rate_field
+                                    : rate_field >> 16U;
             track.has_entry = true;
 
             // The one child that matters: dac3 or dec3.
@@ -596,11 +637,21 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
                 if (config.size > entry_end - child) {
                     return false;
                 }
-                if (config.type == kDac3 || config.type == kDec3 || config.type == kDac4) {
+                if (config.type == kDac3 || config.type == kDec3 || config.type == kDac4 ||
+                    config.type == kDmlp) {
                     track.codec_config = parse_codec_config(
                         config.type, body.subspan(child + config.header_bytes,
                                                   static_cast<std::size_t>(config.size) -
                                                       config.header_bytes));
+                    if (config.type == kDmlp) {
+                        // dmlp's ratebits are the rate the decoder uses; they win over the sample
+                        // entry's field when they name one (ERRATA C2).
+                        const std::uint32_t hz =
+                            mlp_rate_hz(track.codec_config.mlp_format_info >> 28U);
+                        if (hz != 0) {
+                            track.sample_rate = hz;
+                        }
+                    }
                     break;
                 }
                 child += static_cast<std::size_t>(config.size);

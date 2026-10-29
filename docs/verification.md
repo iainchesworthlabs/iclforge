@@ -670,6 +670,13 @@ only the in-repo decoder can read is checked against itself, not against anythin
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
 
+TrueHD's containers are not in this table either. FFmpeg's muxers write MP4, Matroska, MPEG-TS and MAT for it, and
+`tools/checks/verify_truehd_containers.py` has FFmpeg read what this project writes and this project read what FFmpeg
+writes, bit for bit (decoded PCM for the first three, the elementary stream for the second direction; MAT is compared
+as bytes). Each layout therefore has one oracle and no document: FFmpeg's `spdif` demuxer reads no stream from its own
+TrueHD MAT, so reading MAT has no oracle at all, and no receiver or disc player has read any of it
+([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
+
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
 it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's
 `strmtyp == 0x0` gates, sends neither the programme-mixing group nor the converter exponent and SNR
