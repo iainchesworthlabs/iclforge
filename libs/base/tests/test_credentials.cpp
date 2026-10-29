@@ -194,7 +194,7 @@ TEST_CASE("a bare 32-byte scalar loads whatever bytes it begins and ends with",
         CHECK(std::equal(bytes.begin(), bytes.end(), key->scalar().begin()));
     }
     // Padding around a scalar is still trimmed, as a file with a trailing newline needs.
-    std::vector<std::byte> padded(scalar.begin(), scalar.end());
+    std::vector<std::byte> padded(32, std::byte{0x11});
     padded.front() = std::byte{0x42};
     padded.back() = std::byte{0x43};
     padded.insert(padded.begin(), std::byte{'\n'});

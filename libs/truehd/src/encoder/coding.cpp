@@ -319,10 +319,9 @@ std::vector<double> autocorrelation(std::span<const std::int32_t> samples, int m
         for (std::size_t t = static_cast<std::size_t>(lag); t < n; ++t) {
             acc += windowed[t] * windowed[t - static_cast<std::size_t>(lag)];
         }
-        r[static_cast<std::size_t>(lag)] = acc;
+        // White noise correction at lag 0: keeps the recursion well conditioned on a pure tone.
+        r[static_cast<std::size_t>(lag)] = lag == 0 ? acc * (1.0 + 1e-9) + 1e-3 : acc;
     }
-    // White noise correction: keeps the recursion well conditioned on a pure tone.
-    r[0] = r[0] * (1.0 + 1e-9) + 1e-3;
     return r;
 }
 

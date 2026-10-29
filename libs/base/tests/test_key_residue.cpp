@@ -102,6 +102,9 @@ class Watch {
 }  // namespace
 
 void* operator new(std::size_t size) {
+    if (size > static_cast<std::size_t>(PTRDIFF_MAX) - kHeaderBytes) {
+        throw std::bad_alloc();
+    }
     void* raw = std::malloc(size + kHeaderBytes);
     if (raw == nullptr) {
         throw std::bad_alloc();

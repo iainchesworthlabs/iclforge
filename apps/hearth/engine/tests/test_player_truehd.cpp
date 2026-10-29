@@ -524,7 +524,7 @@ TEST_CASE("truehd player: what the decoder counted for an item is on its record,
 
     // The diagnostics file says it, beside the frames the item delivered.
     EngineStatus status;
-    status.history = player.history();
+    status.history = std::vector<PlayedItem>(player.history());
     const std::string report =
         render_report(ReportFacts{}, status, DiagnosticLog{}, Secrets{});
     CHECK(report.find("TrueHD: 75 restarts, 0 units waited for a restart, 0 lossless checks failed") !=
