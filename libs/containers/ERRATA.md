@@ -10,6 +10,10 @@ ours, and `tools/checks/verify_truehd_containers.py` compares both, bit for bit,
 (`testdata/truehd/`, FFmpeg-made). FFmpeg's source is not read. **Every layout here therefore has one oracle.** No
 document was found for the MP4 and MAT layouts, and no receiver or Blu-ray player was available to read either.
 
+The scripts quoted as evidence (`boxdump.py`, `cmp_mp4_samples.py`, `ts_pmt_patch.py`, `matdump.py`, `matlayout.py`) were
+exploration scripts of this work and are not in the tree. What stays is `tools/checks/verify_truehd_containers.py`, which
+repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]` cases of `iclforge-containers-tests`.
+
 ## Open questions for the owner
 
 1. **The MP4 binding (C1 to C6).** TH spec §21 does not mention MP4. The `mlpa` sample entry and `dmlp` box are
