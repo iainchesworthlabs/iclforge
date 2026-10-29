@@ -172,6 +172,21 @@ if(ICLFORGE_BUILD_AC4)
     endif()
 endif()
 
+# ac4_content_signature reads, signs and checks an AC-4 stream's content signature (libs/ac4's
+# io/content_signature.hpp over iclforge::base's crypto). Like decode_ac4 it works on the stream
+# it is given, so it keeps out of the list above; ctest hands it a committed stream, which
+# carries no signature, so what runs is the report path. Signing needs the operator's own key and
+# chain, and none is committed.
+if(ICLFORGE_BUILD_AC4)
+    add_executable(ac4_content_signature ac4_content_signature.cpp)
+    target_link_libraries(ac4_content_signature PRIVATE iclforge::ac4 iclforge::warnings iclforge::fmt)
+    set_target_properties(ac4_content_signature PROPERTIES FOLDER examples)
+    if(ICLFORGE_BUILD_TESTS)
+        add_test(NAME "example.ac4_content_signature" COMMAND ac4_content_signature
+            "${PROJECT_SOURCE_DIR}/testdata/external-baseline/ac4-51-film-96/dee.ac4")
+    endif()
+endif()
+
 # Run them under ctest when tests are on, so "the examples still work" is
 # checked by the same command as everything else.
 if(ICLFORGE_BUILD_TESTS)

@@ -182,6 +182,30 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**AC-4 content signing**
+
+- **A content signature for AC-4 streams: one ECDSA P-256 signature over the whole stream, made with the operator's own key and certificate
+  chain.** The `pace-ccjf1` scheme of the owner-supplied CS spec v2.3: SHA-256 of every byte before the signature, the signer information,
+  signed information and chain serialised with Thrift binary, appended after the last sync frame of a raw `.ac4` file (the frames are not
+  touched, so a signed file decodes as the unsigned one). The core under `iclforge::base::crypto` (SHA-1, SHA-256, ECDSA with RFC 6979
+  nonces and a constant-time ladder, DER, X.509, PEM, chain validation, the Thrift reader and writer, the signature) knows no codec;
+  `iclforge::ac4` adds the trailer. Opt-in at every call, **bring your own key**: the private key and chain are the operator's, read at run
+  time, zeroized and never stored, and no key, certificate or fingerprint of any issuer ships. A verdict of valid needs the chain to
+  lead to a trust anchor or pin the caller names; one that checks out against nothing it trusts is `chain unanchored`, never valid.
+  `forge ac4-sign` and `ac4-verify`; `sign-content` on `ac4-encode`, `atmos-encode`, `atmos-adm` and `atmos-iab` (with `codec=ac4`);
+  `verify-content` (refuse unless valid and anchored) and `check-content` (report and carry on) on `decode`; `content-key=`,
+  `content-chain=`, `trust-anchor=`, `pin=`, `leaf-title=`, `signed-date=`, `verify-time=` and `unanchored-ok`. `forge probe` shows
+  the signature without a key (`stream.content_signature`, `verified` always false), and a signed file no longer reads as a lost sync.
+  Checked with OpenSSL (`tools/checks/check_content_signature_openssl.py`, which also reads the owner's sample blob with no forge code)
+  and in `tools/ci/run_codec_matrix.sh`; two libFuzzer harnesses (`fuzz_ac4_content_signature`, `fuzz_content_signature`), not yet
+  run under libFuzzer. **Measured on the owner's sample, against the specification:** the signature is over the bytes of the signed
+  information and not the content digest; the signer-information digest is over the bytes as received; the certificates carry a
+  `40 82 LL LL` wrapper; a CA in the chain had expired before the signature was made (so "valid now" rejects a genuine signature, and
+  `verify-time=` exists); the signer's certificate is `CA:TRUE`; byte lists are lists of BYTE; `r` and `s` are raw. Eleven open
+  questions for the owner, among them the validity-time default and MP4 carriage, are at the top of `libs/ac4/ERRATA.md`. Not
+  implemented: carriage in an MP4, a second signature entry, revocation, digests other than SHA-256. See
+  [Signing](docs/library/signing.md#ac-4-content-signing).
+
 **What the P4X's panel shows while a song has no lyrics**
 
 - **The speakers of the layout in force, each glowing with its own level**, in place of the sentence "No lyrics for this

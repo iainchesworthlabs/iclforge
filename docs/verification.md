@@ -75,9 +75,12 @@ In rough order of strength:
    are not redistributable and are not used here.
 5. **Fuzzing, in both directions.** Into the decoder: the libFuzzer harnesses under `fuzz/` drive
    the codecs' untrusted-input entry points looking for crashes and undefined behaviour
-   (ASan+UBSan). There are 24, listed in [Threat model](threat-model.md#memory-safety-posture);
+   (ASan+UBSan). There are 26, listed in [Threat model](threat-model.md#memory-safety-posture);
    AC-4's are `fuzz_ac4_parse` (the inspector and the sync-frame splitter), `fuzz_ac4_decode`
-   (the syntax layer and the reconstruction to PCM) and `fuzz_ac4_encode`. Two differential
+   (the syntax layer and the reconstruction to PCM), `fuzz_ac4_encode`, and for the content
+   signature `fuzz_ac4_content_signature` (where the sync frames stop and what the digest covers)
+   and `fuzz_content_signature` (the Thrift, DER, X.509, PEM and verification readers it hands
+   the trailer to). Two differential
    harnesses decode each mutated stream with both this project's decoder and FFmpeg's and diff
    the PCM; they cover AC-3 and E-AC-3, since FFmpeg does not decode AC-4. CI runs them:
    `Fuzz Regress` replays the checked-in seed and regression corpora on every push and on pull
@@ -667,6 +670,19 @@ only the in-repo decoder can read is checked against itself, not against anythin
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
+
+**The AC-4 content signature** has an oracle for its cryptography and none for its meaning.
+OpenSSL checks what it can check without forge: that the certificates the blob carries parse and
+chain, that the ECDSA signature verifies over the bytes of the signed information, that it does not
+verify over the content digest (the reading the specification gives), and that one changed bit is
+refused (`tools/checks/check_content_signature_openssl.py`, on a signature forge wrote and on the
+owner's sample blob, kept out of the repository and read through
+`ICLFORGE_CONTENT_SIGNATURE_SAMPLE`). What no oracle reaches is whether a Dolby verifier accepts
+what forge writes: the structure is that of one sample and one specification
+([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
+and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
+demuxer takes the trailer for five more packets, so ffprobe does not agree with forge's frame count on
+a signed file; forge's own decode of the signed and unsigned stream is what is compared.
 
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
 it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's

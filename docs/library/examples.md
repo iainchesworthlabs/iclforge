@@ -4,7 +4,7 @@ Every program in [`examples/`](https://github.com/iainchesworthlabs/iclforge/tre
 builds by default (`ICLFORGE_BUILD_EXAMPLES=ON`) and registers as a `ctest` entry named
 `example.<name>`, so "the examples still work" is checked by the same command as everything else
 (`read_adm`, `encode_adm`, and `encode_iab` additionally need
-`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` needs `ICLFORGE_BUILD_AC4` and the two C programs
+`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` and `ac4_content_signature` need `ICLFORGE_BUILD_AC4` and the two C programs
 `ICLFORGE_BUILD_CAPI`, both on by default). These programs are
 also the source the library pages excerpt from — each page's "Full program" link lands on one of
 them.
@@ -40,6 +40,7 @@ them.
 | [`osc_object_control`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/osc_object_control.cpp) | A hand-built OSC 1.0 datagram, parsed and merged onto a `SceneCursor` object — no socket. | [Spatial & Atmos objects](spatial-and-atmos.md) |
 | [`atmos_fallback`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/atmos_fallback.cpp) | The same programme with and without the EMDF container — the either/or 5.1-fallback tradeoff. | [Spatial & Atmos objects](spatial-and-atmos.md) |
 | [`object_signing`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/object_signing.cpp) | Sign an Atmos stream's EMDF container with an operator key. | [Object signing](signing.md) |
+| [`ac4_content_signature`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/ac4_content_signature.cpp) | Read an AC-4 stream's content signature, and with the operator's own key and chain sign it and check the result against a trust anchor. `ctest` hands it a committed stream, which carries none. | [AC-4 content signing](signing.md#ac-4-content-signing) |
 | [`station_broadcast`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/station_broadcast.cpp) | A fully worked 115-second diegetic Atmos scene with authored flight paths. | [A worked scene — station broadcast](station-broadcast.md) |
 
 ## Containers
