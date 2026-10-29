@@ -2332,8 +2332,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.bap_census_path = std::string{value};
             continue;
         }
-        // TrueHD and MLP, which 'decode' alone reads; run_decode says when the input is something else.
-        if (command == "decode" && key == "truehd-presentation") {
+        // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
+        // something else.
+        const bool reads_truehd = command == "decode" || command == "levels" || command == "loudness";
+        if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
                 return false;
@@ -2341,7 +2343,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_presentation = std::string{value};
             continue;
         }
-        if (command == "decode" && key == "truehd-check") {
+        if (reads_truehd && key == "truehd-check") {
             if (value != "strict" && value != "lenient") {
                 fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);
                 return false;

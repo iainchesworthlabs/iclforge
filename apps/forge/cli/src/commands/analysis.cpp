@@ -1384,8 +1384,14 @@ int run_levels(std::string_view in_path, const Options& meta) {
         return kExitInput;
     }
     if (is_truehd_stream(bytes)) {
+        if (const int refused =
+                check_options_applied(meta, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
         return run_levels_truehd(bytes, in_path, meta);
     }
+    warn_truehd_options_unused(meta, in_path);
     // AC-4: the presentation decode's options choose, as the stream codes it,
     // each channel under its own name in the order the level meter reports A/52
     // in (L C R Ls Rs, the LFE, then a 7.X element's last pair).
@@ -1530,8 +1536,14 @@ int run_loudness(std::string_view in_path, const Options& meta) {
         return kExitInput;
     }
     if (is_truehd_stream(bytes)) {
+        if (const int refused =
+                check_options_applied(meta, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
         return run_loudness_truehd(bytes, in_path, meta);
     }
+    warn_truehd_options_unused(meta, in_path);
     if (is_ac4_stream(bytes)) {
         iclforge::ac4::Decoder decoder(ac4_coded_config(meta));
         std::optional<Ac4Meter> meter;

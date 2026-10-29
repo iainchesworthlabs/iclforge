@@ -800,3 +800,85 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
         CHECK(run_cli("probe " + in + "json=1", log) == 0);
     }
 }
+
+TEST_CASE("levels and loudness take truehd-presentation= and truehd-check=",
+          "[forge-cli][truehd][levels][loudness]") {
+    // Both accepted truehd-presentation= for decode alone, and refused it as an unknown option.
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "presentation_options.log";
+    const std::string in = cli_arg(tone.thd);
+
+    SECTION("a 5.1 stream's 2ch presentation is a stereo measurement") {
+        // The tone is coded with the default downmix=none: substream 0 is its first two channels.
+        REQUIRE(run_cli("levels " + in + "truehd-presentation=2ch", log) == 0);
+        CHECK(read_text(log).find("TrueHD/MLP, 2 channel(s), 48000 Hz") != std::string::npos);
+        REQUIRE(run_cli("loudness " + in + "truehd-presentation=2ch", log) == 0);
+        CHECK(read_text(log).find("L R (48000 Hz)") != std::string::npos);
+        REQUIRE(run_cli("levels " + in + "truehd-presentation=best", log) == 0);
+        CHECK(read_text(log).find("6 channel(s)") != std::string::npos);
+    }
+    SECTION("truehd-check=lenient is taken, and a bad value is a usage error") {
+        CHECK(run_cli("levels " + in + "truehd-check=lenient", log) == 0);
+        CHECK(run_cli("loudness " + in + "truehd-check=lenient", log) == 0);
+        CHECK(run_cli("levels " + in + "truehd-presentation=7ch", log) == kExitUsage);
+        CHECK(run_cli("loudness " + in + "truehd-check=sometimes", log) == kExitUsage);
+    }
+    SECTION("a lenient levels counts a damaged stream where a strict one stops") {
+        const fs::path bad = damaged_copy("truehd_st48_s24.thd", tone.dir);
+        CHECK(run_cli("levels " + cli_arg(bad), log) == kExitInput);
+        CHECK(run_cli("levels " + cli_arg(bad) + "truehd-check=lenient", log) == 0);
+    }
+    SECTION("anything else is refused by name") {
+        for (const std::string command : {"levels", "loudness"}) {
+            CHECK(run_cli(command + " " + in + "programme=1", log) == kExitUsage);
+            CHECK(read_text(log).find(command + " does not apply programme=1") !=
+                  std::string::npos);
+        }
+    }
+    SECTION("on a stream that is not TrueHD they are warned about and change nothing") {
+        REQUIRE(run_cli("levels " + cli_arg(tone.wav) + "truehd-presentation=2ch", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("warning:") != std::string::npos);
+        CHECK(text.find("is not TrueHD or MLP") != std::string::npos);
+    }
+}
+
+TEST_CASE("cut, cat, metadata and normalize refuse a TrueHD stream by name, and say why",
+          "[forge-cli][truehd][refusals]") {
+    // They read it as AC-3 and stopped with an AC-3 frame-sync error, exit 2, that said nothing of
+    // the codec.
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "tools.log";
+    const fs::path out = tone.dir / "tools_out.thd";
+    const std::string in = cli_arg(tone.thd);
+    struct Refusal {
+        std::string command;
+        std::string args;
+        std::string why;
+    };
+    const std::vector<Refusal> refusals{
+        {"cut", in + cli_arg(out) + "0.05 0.1", "major sync"},
+        {"cat", cli_arg(out) + in + in, "major sync"},
+        {"metadata", in + cli_arg(out) + "dialnorm=27", "CRC"},
+        {"normalize", in + cli_arg(out), "dialogue norm"},
+    };
+    for (const Refusal& item : refusals) {
+        DYNAMIC_SECTION(item.command) {
+            fs::remove(out);
+            CHECK(run_cli(item.command + " " + item.args, log) == kExitUsage);
+            const std::string text = read_text(log);
+            CHECK(text.find("is TrueHD or MLP") != std::string::npos);
+            CHECK(text.find("'" + item.command + "' does not read") != std::string::npos);
+            CHECK(text.find(item.why) != std::string::npos);
+            CHECK(text.find("lost sync") == std::string::npos);
+            CHECK_FALSE(fs::exists(out));
+        }
+    }
+    SECTION("a TrueHD stream anywhere in cat's inputs") {
+        const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
+        REQUIRE(fs::exists(ec3));
+        CHECK(run_cli("cat " + cli_arg(out) + cli_arg(ec3) + in, log) == kExitUsage);
+        CHECK(read_text(log).find("is TrueHD or MLP") != std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
+}

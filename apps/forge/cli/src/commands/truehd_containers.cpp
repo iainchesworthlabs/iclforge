@@ -572,11 +572,11 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
     return kExitOk;
 }
 
-int refuse_truehd(std::string_view command, std::string_view in_path) {
+int refuse_truehd(std::string_view command, std::string_view in_path, std::string_view reason) {
     fmt::println(stderr,
-                 "error: {} is TrueHD or MLP, which '{}' does not read. decode, probe, levels, "
-                 "loudness, mkv, mp4, ts, spdif, unspdif and demux do",
-                 in_path, command);
+                 "error: {} is TrueHD or MLP, which '{}' does not read{}{}. decode, probe, levels, "
+                 "loudness, mkv, mp4, ts, spdif, unspdif, demux and remux do",
+                 in_path, command, reason.empty() ? "" : ": ", reason);
     return kExitUsage;
 }
 

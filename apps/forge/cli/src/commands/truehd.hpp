@@ -101,8 +101,10 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
 // (L R C LFE Ls Rs Lrs Rrs). "-" as the output is a bare stream on stdout.
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta);
 
-// Says that `command` does not read TrueHD or MLP and returns kExitUsage.
-int refuse_truehd(std::string_view command, std::string_view in_path);
+// Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
+// kExitUsage.
+int refuse_truehd(std::string_view command, std::string_view in_path,
+                  std::string_view reason = {});
 
 // --- options a TrueHD run does not apply -----------------------------------------------------------
 // PROVISIONAL, until the owner answers question 7 of planning/truehd-parity-forge.md (and the entry

@@ -77,13 +77,42 @@ std::optional<LoadedStream> scan_loaded(std::vector<std::byte> bytes, std::strin
 
 }  // namespace
 
-std::optional<LoadedStream> load_stream(std::string_view path) {
+namespace {
+
+// Why `command` does not do to a TrueHD or MLP stream what it does to an AC-3 or E-AC-3 one.
+std::string_view truehd_reason(std::string_view command) {
+    if (command == "cut") {
+        return "a cut can start only at an access unit that carries a major sync, and this build "
+               "does not cut at those yet";
+    }
+    if (command == "cat") {
+        return "a join needs the second stream to open with a major sync and to match the "
+               "first's shape, and this build does not join them yet";
+    }
+    if (command == "metadata") {
+        return "its dialogue norm, mix level and DRC start-up gain are in the major sync under a "
+               "CRC, and this build does not rewrite them yet";
+    }
+    return "it writes the dialogue norm, which this build does not write for TrueHD or MLP yet";
+}
+
+}  // namespace
+
+std::expected<LoadedStream, int> load_stream(std::string_view path, std::string_view command) {
     auto bytes = read_all(path);
     if (bytes.empty()) {
         fmt::println(stderr, "error: cannot read {}", path);
-        return std::nullopt;
+        return std::unexpected(kExitInput);
     }
-    return scan_loaded(std::move(bytes), path);
+    // AC-3's scan would fail on it with a frame-sync error that says nothing of the codec.
+    if (is_truehd_stream(bytes)) {
+        return std::unexpected(refuse_truehd(command, path, truehd_reason(command)));
+    }
+    auto loaded = scan_loaded(std::move(bytes), path);
+    if (!loaded.has_value()) {
+        return std::unexpected(kExitInput);
+    }
+    return std::move(*loaded);
 }
 
 namespace {
@@ -1557,9 +1586,9 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
 }
 
 int run_metadata(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path);
+    auto loaded = load_stream(in_path, "metadata");
     if (!loaded.has_value()) {
-        return kExitInput;
+        return loaded.error();
     }
     const auto before = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     if (!before.has_value()) {
@@ -1678,9 +1707,9 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
 }
 
 int run_normalize(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path);
+    auto loaded = load_stream(in_path, "normalize");
     if (!loaded.has_value()) {
-        return kExitInput;
+        return loaded.error();
     }
     const auto before = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     if (!before.has_value()) {
@@ -1747,9 +1776,9 @@ int run_normalize(std::string_view in_path, std::string_view out_path, const Opt
 
 int run_cut(std::string_view in_path, std::string_view out_path, std::string_view start_seconds,
             std::string_view duration_seconds) {
-    const auto loaded = load_stream(in_path);
+    const auto loaded = load_stream(in_path, "cut");
     if (!loaded.has_value()) {
-        return kExitInput;
+        return loaded.error();
     }
     const auto& scan = loaded->scan;
     const auto total_units = scan.access_units.size();
@@ -1891,10 +1920,10 @@ int run_cat(std::string_view out_path, std::span<const std::string_view> in_path
     std::size_t units = 0;
     std::uint64_t samples = 0;
     for (const auto path : in_paths) {
-        const auto loaded = load_stream(path);
+        const auto loaded = load_stream(path, "cat");
         if (!loaded.has_value()) {
             sink.abort();
-            return kExitInput;
+            return loaded.error();
         }
         const auto& scan = loaded->scan;
         if (!reference.has_value()) {

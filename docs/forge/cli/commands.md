@@ -959,12 +959,12 @@ warning: stream.ac4 is AC-4: heavy is AC-3's and E-AC-3's, and ignored
 
 ### TrueHD and MLP
 
-`decode` and `probe` read a TrueHD or MLP elementary stream (`.thd`, `.mlp`) by the major sync that follows its first
-access unit's header. `decode` writes a 24-bit PCM WAV with the channels in the order the stream carries them, and a channel
+`decode`, `probe`, `levels` and `loudness` read a TrueHD or MLP elementary stream (`.thd`, `.mlp`), from a file or from `-`, by
+the major sync that follows its first access unit's header. `decode` writes a 24-bit PCM WAV with the channels in the order the stream carries them, and a channel
 mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status line names the channels). A failed check
 (check nibble, CRC, parity, lossless check) or a byte the reader skipped stops the decode with exit status 2;
 `truehd-check=lenient` counts them (the status lines say how many) and goes on. `truehd-presentation=` picks the substreams read:
-`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`. `probe` describes the stream (`json=1` adds a `truehd`
+`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `probe` describes the stream (`json=1` adds a `truehd`
 member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
 
 A TrueHD or MLP stream, bare or in a container, is also read by `probe` (the container's own description of the track beside
@@ -975,9 +975,12 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 `bluray` or nothing, and `dvb` or `atsc` is a usage error, as `bluray` is for every other codec. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `transcode`, `qc`, `fmp4`, `monitor` and `play` do not read TrueHD and say so (exit status 1). In a file
-with several audio tracks the commands that read TrueHD take the first, and these five take the first of another codec, so a
-Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD alone is refused. The layouts
+reads either back. `cut`, `cat`, `metadata`, `normalize`, `transcode`, `qc`, `fmp4`, `monitor` and `play` do not read TrueHD
+and say so by name (exit status 1); `cut` and `cat` would start and join only at an access unit that carries a major sync, and
+`metadata` and `normalize` would write fields that sit in the major sync under a CRC, none of which is built. In a file with
+several audio tracks the commands that read TrueHD take the first, and `transcode`, `qc`, `fmp4`, `monitor` and `play` take the
+first of another codec, so a Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD
+alone is refused. The layouts
 are FFmpeg's, a single oracle in each direction, and nothing has been played into a receiver or a disc player
 ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
 
