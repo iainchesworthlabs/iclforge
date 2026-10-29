@@ -217,10 +217,24 @@ struct CodecSet {
 [[nodiscard]] std::string_view codec_name(TrackCodec codec);
 
 // Whether `head` opens a bare TrueHD or MLP elementary stream: an access unit's four header bytes
-// and then a major sync (TH spec section 4.2). Such a stream is not a container, and
-// sniff_container calls it ContainerKind::kUnknown; a caller that cannot play it uses this to say
-// so.
-[[nodiscard]] bool looks_like_truehd(std::span<const std::byte> head);
+// (check nibble, length, timing) and then a major sync 0xF8726FBA or 0xF8726FBB (TH spec section
+// 4.2). A stream cut at an access-unit boundary opens that way, and so does every file `forge`
+// writes. Such a stream is not a container, and sniff_container calls it ContainerKind::kUnknown
+// (it recognises the major sync before the packet grid, as it does AC-3's sync word: a steady
+// signal repeats bytes at a fixed period, and the grid test only counts recurrence); a caller
+// that cannot play it uses this to say so. Defined here, not in container_input.cpp, because
+// Hearth's engine calls it (session.cpp, media_info.cpp) and the engine compiles none of this
+// file's container readers: the application supplies those (apps/hearth/engine/CMakeLists.txt).
+[[nodiscard]] inline bool looks_like_truehd(std::span<const std::byte> head) {
+    if (head.size() < 8) {
+        return false;
+    }
+    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
+           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
+           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
+           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
+            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
+}
 
 // `file`'s elementary stream: `file` itself, unchanged, if it does not sniff
 // as one of the three containers this build reads, or the first track of a

@@ -319,23 +319,6 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
 
 }  // namespace
 
-// A TrueHD or MLP elementary stream opens with an access unit: four header bytes (check nibble,
-// length, timing) and then, when the unit carries one, a major sync 0xF8726FBA or 0xF8726FBB (TH
-// spec §4.2). A stream cut at an access-unit boundary opens that way, and so does every file
-// `forge` writes. sniff_container recognises it by that major sync before the packet grid for the
-// reason AC-3 is: a steady signal repeats bytes at a fixed period, and the grid test only counts
-// recurrence.
-bool looks_like_truehd(std::span<const std::byte> head) {
-    if (head.size() < 8) {
-        return false;
-    }
-    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
-           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
-           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
-           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
-            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
-}
-
 std::string_view codec_name(TrackCodec codec) {
     switch (codec) {
         case TrackCodec::kAc3: return "AC-3";
