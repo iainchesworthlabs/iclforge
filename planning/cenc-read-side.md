@@ -258,6 +258,14 @@ samples through untouched, decrypts the protected ones and picks the key by the 
 oracles split here: GPAC decrypts `leader_entry`, `leader_entry_rev`, `leader_seig` and `rotate`;
 FFmpeg decrypts `leader_entry_rev` only (M7, M12), so GPAC is the oracle for this phase.
 
+Dolby's temporal-switching reference content (Spott OTT00261 to OTT00288, DASH `cbcs` and `cenc`) shows
+the same need at presentation level: each MPD is three Periods, AC-4 or E-AC-3, then clear AAC, then
+AC-4 or E-AC-3 again. The two coded periods are protected and share one `default_KID` with the video
+track; the AAC period carries no `ContentProtection` at all. Protection is therefore a property of the
+track (the file), never of the presentation, and the reader's per-track decision above is the right
+unit. Nothing in the manifests needs a licence server to read; the HLS variants (OTT00205 to OTT00208)
+are clear and signal each switch with `#EXT-X-DISCONTINUITY` and a new `#EXT-X-MAP`.
+
 ### 5.5 Command line
 
 ```
