@@ -299,8 +299,7 @@ library only (`iclforge::ac3`, plus `iclforge::containers::matroska`/`iclforge::
 `iclforge::containers::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
 `capi` (see the note below), the AC-4 library behind `ac4`, the TrueHD library behind `truehd`, `iclforge::iab` behind `iab` and
 `iclforge::containers::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
-`ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers. `iclforge::truehd` has no vcpkg feature
-or Conan option.
+`ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
 `iclforge::adm` (the ADM/BW64 reader and its bridge) has no vcpkg feature
 either - it does install/export via `find_package(iclforge)` now (shared-only), but embeds
 third-party libbw64/libadm and so deliberately carries no vcpkg/Conan feature of its own for

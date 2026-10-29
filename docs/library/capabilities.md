@@ -164,7 +164,7 @@ from the owner's TrueHD (MLP) Reference Specification v3.5; `libs/truehd/ERRATA.
 | Capability | Status | Checked against |
 |---|---|---|
 | Access units, major sync (CRC-16), substream directory, restart header (CRC-8), segment parity and CRC-8 | read and written | FFmpeg's strict decode of its encoders' streams |
-| Substreams 0 to 2 (up to 8 channels), 44.1 to 192 kHz, 16 and 24 bits, MLP and TrueHD | decoded | FFmpeg: 12 fixtures, sample for sample |
+| Substreams 0 to 2 (up to 8 channels), 44.1 to 192 kHz, 16 and 24 bits, MLP and TrueHD | decoded | FFmpeg: 25 fixtures, sample for sample |
 | FIR prediction, Huffman and raw residuals, one matrix set, quantiser step, output shift, lossless check | decoded | FFmpeg |
 | IIR filter, LSB bypass, several matrices, a permuted `ch_assign` and an output shift, block data length | decoded | FFmpeg's strict decode of hand-built streams, sample for sample (`verify_truehd_interop.py --handbuilt`) |
 | Extra data, the directory's DRC word | decoded; the extra data is carried as bytes | FFmpeg decodes the streams that carry them and returns neither: the layouts have **no oracle** |

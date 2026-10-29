@@ -5,7 +5,7 @@ FFmpeg's encoders do not write an IIR filter, LSB bypass, several matrices with 
 assignment, noise generator 0, the block data check, the end-of-stream marker in every unit, extra
 data, the DRC word of the directory, or the 16-channel substream. The decoders have to read them
 all. The streams carry a major sync FFmpeg accepts, and FFmpeg's strict decode is held to each of
-them (tools/checks/verify_truehd_interop.py --handbuilt): for nine of the twelve it returns the
+them (tools/checks/verify_truehd_interop.py --handbuilt): for eleven of the fourteen it returns the
 signal the stream was made from, which is the outside check; the manifest's `ffmpeg` field says
 what it does with the others. What FFmpeg does not read has no outside reader: the extra data, the
 values of the DRC word, the block data CRC, the 16-channel substream.
