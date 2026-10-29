@@ -7,7 +7,7 @@ newest figures were measured on and says how old it is;
 [Where each number comes from](#where-each-number-comes-from) says which job
 measures each series and when.
 
-Each card has one line per codec (AC-3, E-AC-3, and AC-4). A figure is the worst case among that
+Each card has one line per codec (AC-3, E-AC-3, and AC-4), and the speed and allocation cards add a TrueHD line once the series holds a TrueHD workload. A figure is the worst case among that
 codec's own workloads, except on the listening-quality card, which gives the range, and the
 workload it comes from is named beside it. The figures of two codecs come from different workloads
 and do not compare with each other. Each series is written by its own job, so a line recorded on
