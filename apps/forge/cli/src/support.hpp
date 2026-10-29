@@ -136,6 +136,20 @@ struct Options {
     // best), and whether a failed check is counted instead of stopping the decode.
     std::string truehd_presentation;
     bool truehd_lenient = false;
+    // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's
+    // own default.
+    struct TruehdEncode {
+        std::string downmix;                          // truehd-downmix=: "" or none, standard
+        std::optional<int> restart_units;             // truehd-restart=
+        std::optional<std::uint32_t> peak_rate_kbps;  // truehd-peak-rate=
+        bool rate_lenient = false;                    // truehd-rate-check=lenient
+        std::optional<int> fir_order;                 // truehd-fir-order=
+        bool matrix = true;                           // truehd-matrix=
+        unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone
+        // truehd-downmix-gains=: the linear gains of C, Ls/Rs, LFE and Lrs/Rrs, "off" being 0.
+        std::optional<std::array<double, 4>> downmix_gains;
+    };
+    TruehdEncode thdenc{};
     // 'ac4-encode' and 'decode' of AC-4 only: when non-empty, write the
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value

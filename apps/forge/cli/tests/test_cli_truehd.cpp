@@ -241,3 +241,241 @@ TEST_CASE("forge probe exits 1 on a damaged TrueHD stream", "[forge-cli][truehd]
     const auto document = nlohmann::json::parse(read_text(log));
     CHECK(document["truehd"]["segment_failures"].get<int>() >= 1);
 }
+
+// --- truehd-encode -----------------------------------------------------------------------------
+// The encoder is held to FFmpeg's strict decode in libs/truehd/tests and
+// tools/ci/run_codec_matrix.sh; what is held here is the command: the WAV it reads (its channel
+// mask above all), its options, its containers and its refusals, through the real binary.
+
+namespace {
+
+void put_le(std::vector<std::byte>& out, std::uint32_t value, int width) {
+    for (int i = 0; i < width; ++i) {
+        out.push_back(static_cast<std::byte>((value >> (8U * static_cast<unsigned>(i))) & 0xFFU));
+    }
+}
+
+// A 24-bit WAVE_FORMAT_EXTENSIBLE file with `mask` as its dwChannelMask, as `forge decode` writes.
+void write_wav(const fs::path& path, std::uint32_t rate, std::uint32_t channels, std::uint32_t mask,
+               const std::vector<std::int32_t>& samples) {
+    std::vector<std::byte> out;
+    const auto text = [&out](const char* s) {
+        for (; *s != '\0'; ++s) {
+            out.push_back(static_cast<std::byte>(*s));
+        }
+    };
+    const auto data_bytes = static_cast<std::uint32_t>(samples.size() * 3);
+    text("RIFF");
+    put_le(out, 60 + data_bytes, 4);
+    text("WAVEfmt ");
+    put_le(out, 40, 4);
+    put_le(out, 0xFFFE, 2);
+    put_le(out, channels, 2);
+    put_le(out, rate, 4);
+    put_le(out, rate * channels * 3, 4);
+    put_le(out, channels * 3, 2);
+    put_le(out, 24, 2);
+    put_le(out, 22, 2);
+    put_le(out, 24, 2);
+    put_le(out, mask, 4);
+    constexpr std::array<std::uint8_t, 16> kPcmSubformat{0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                         0x10, 0x00, 0x80, 0x00, 0x00, 0xAA,
+                                                         0x00, 0x38, 0x9B, 0x71};
+    for (const std::uint8_t b : kPcmSubformat) {
+        out.push_back(static_cast<std::byte>(b));
+    }
+    text("data");
+    put_le(out, data_bytes, 4);
+    for (const std::int32_t sample : samples) {
+        put_le(out, static_cast<std::uint32_t>(sample) & 0xFFFFFFU, 3);
+    }
+    std::ofstream file{path, std::ios::binary};
+    file.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
+}
+
+// The WAV at `path` with its channel mask replaced.
+void patch_mask(const fs::path& path, std::uint32_t mask) {
+    std::vector<std::byte> bytes = read_bytes(path);
+    for (std::size_t i = 0; i < 4; ++i) {
+        bytes[40 + i] = static_cast<std::byte>((mask >> (8U * i)) & 0xFFU);
+    }
+    std::ofstream out{path, std::ios::binary};
+    out.write(reinterpret_cast<const char*>(bytes.data()),
+              static_cast<std::streamsize>(bytes.size()));
+}
+
+std::string digest_of(const Wav& wav) {
+    return hex(iclforge::base::crypto::sha256(wav.s32le));
+}
+
+}  // namespace
+
+TEST_CASE("a TrueHD stream decoded, encoded and decoded again gives the same PCM",
+          "[forge-cli][truehd][truehd-encode]") {
+    const fs::path dir = scratch_dir();
+    for (const auto& item : manifest()["fixtures"]) {
+        if (item["codec"] != "truehd") {
+            continue;  // the encoder writes TrueHD, not MLP
+        }
+        const std::string name = item["name"];
+        DYNAMIC_SECTION(name) {
+            const fs::path first = dir / (name + "_first.wav");
+            const fs::path stream = dir / (name + "_loop.thd");
+            const fs::path second = dir / (name + "_second.wav");
+            const fs::path log = dir / (name + "_loop.log");
+            REQUIRE(run_cli("decode \"" + fixture(item["file"]).string() + "\" \"" +
+                                first.string() + "\"",
+                            log) == 0);
+            REQUIRE(run_cli("truehd-encode \"" + first.string() + "\" \"" + stream.string() +
+                                "\" verify",
+                            log) == 0);
+            CHECK(read_text(log).find("verified: ") != std::string::npos);
+            REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" + second.string() + "\"",
+                            log) == 0);
+            const Wav wav = read_wav(second);
+            CHECK(wav.channels == item["channels"].get<std::uint32_t>());
+            CHECK(wav.rate == item["sample_rate"].get<std::uint32_t>());
+            CHECK(wav.mask == read_wav(first).mask);
+            CHECK(digest_of(wav) == item["pcm_sha256"].get<std::string>());
+        }
+    }
+}
+
+TEST_CASE("truehd-encode reads the speakers of the WAV's channel mask",
+          "[forge-cli][truehd][truehd-encode]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "mask.log";
+    const fs::path source = dir / "mask_51.wav";
+    REQUIRE(run_cli("decode \"" + fixture("truehd_m51_s24.thd").string() + "\" \"" +
+                        source.string() + "\"",
+                    log) == 0);
+    const std::string expected = digest_of(read_wav(source));
+
+    SECTION("a 5.1 file whose surrounds are the back pair is coded as L R C LFE Ls Rs") {
+        patch_mask(source, 0x3F);  // FL FR FC LFE BL BR
+        const fs::path stream = dir / "mask_51_back.thd";
+        const fs::path out = dir / "mask_51_back.wav";
+        REQUIRE(run_cli("truehd-encode \"" + source.string() + "\" \"" + stream.string() + "\"",
+                        log) == 0);
+        REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" + out.string() + "\"", log) == 0);
+        CHECK(read_text(log).find("(L R C LFE Ls Rs)") != std::string::npos);
+        CHECK(digest_of(read_wav(out)) == expected);
+    }
+
+    SECTION("a mask that names a different number of speakers than the file has is a warning") {
+        patch_mask(source, 0x7);
+        const fs::path stream = dir / "mask_51_warn.thd";
+        REQUIRE(run_cli("truehd-encode \"" + source.string() + "\" \"" + stream.string() + "\"",
+                        log) == 0);
+        CHECK(read_text(log).find(
+                  "warning: the WAV's channel mask names 3 speakers for 6 channels") !=
+              std::string::npos);
+    }
+
+    SECTION("a speaker TrueHD has no channel for is refused") {
+        patch_mask(source, 0x1F | (1U << 15));  // top back left in place of the right surround
+        const fs::path stream = dir / "mask_51_top.thd";
+        CHECK(run_cli("truehd-encode \"" + source.string() + "\" \"" + stream.string() + "\"",
+                      log) == kExitInput);
+        CHECK(read_text(log).find("has no channel for") != std::string::npos);
+    }
+
+    SECTION(
+        "a 7.1 file in WAV order (back pair, then side pair) is coded with the sides as Ls Rs") {
+        constexpr std::size_t kFrames = 4800;
+        std::vector<std::int32_t> samples;
+        std::uint32_t state = 12345;
+        for (std::size_t n = 0; n < kFrames; ++n) {
+            for (std::int32_t c = 0; c < 8; ++c) {
+                state = state * 1664525U + 1013904223U;
+                samples.push_back(static_cast<std::int32_t>(state >> 9U) - (1 << 22) + c * 1000);
+            }
+        }
+        const fs::path wav = dir / "mask_71.wav";
+        write_wav(wav, 48000, 8, 0x63F, samples);  // FL FR FC LFE BL BR SL SR
+        const fs::path stream = dir / "mask_71.thd";
+        const fs::path out = dir / "mask_71_out.wav";
+        REQUIRE(run_cli("truehd-encode \"" + wav.string() + "\" \"" + stream.string() + "\" verify",
+                        log) == 0);
+        REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" + out.string() + "\"", log) == 0);
+        CHECK(read_text(log).find("(L R C LFE Ls Rs Lrs Rrs)") != std::string::npos);
+        // decode writes the stream's order, L R C LFE Ls Rs Lrs Rrs: the WAV's with its back pair
+        // (columns 4 and 5) and its side pair (6 and 7) swapped.
+        const Wav decoded = read_wav(out);
+        REQUIRE(decoded.channels == 8);
+        REQUIRE(decoded.s32le.size() == samples.size() * 4);
+        constexpr std::array<std::size_t, 8> kWavOfStream{0, 1, 2, 3, 6, 7, 4, 5};
+        bool equal = true;
+        for (std::size_t n = 0; n < kFrames && equal; ++n) {
+            for (std::size_t c = 0; c < 8 && equal; ++c) {
+                const auto got =
+                    static_cast<std::int32_t>(le(decoded.s32le, (n * 8 + c) * 4, 4)) >> 8;
+                equal = got == samples[n * 8 + kWavOfStream[c]];
+            }
+        }
+        CHECK(equal);
+    }
+}
+
+TEST_CASE("truehd-encode options, containers and refusals", "[forge-cli][truehd][truehd-encode]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "options.log";
+    const fs::path source = dir / "options_51.wav";
+    REQUIRE(run_cli("decode \"" + fixture("truehd_m51_s24.thd").string() + "\" \"" +
+                        source.string() + "\"",
+                    log) == 0);
+    const std::string expected = digest_of(read_wav(source));
+    const std::string in = "\"" + source.string() + "\" ";
+
+    SECTION("every option still gives the samples back") {
+        const fs::path stream = dir / "options.thd";
+        const fs::path out = dir / "options_out.wav";
+        REQUIRE(run_cli("truehd-encode " + in + "\"" + stream.string() +
+                            "\" truehd-downmix=standard truehd-downmix-gains=-6,-6,off,-6 "
+                            "truehd-restart=8 truehd-fir-order=2 truehd-matrix=off "
+                            "truehd-stereo-mode=ltrt truehd-peak-rate=18000 "
+                            "truehd-rate-check=lenient verify",
+                        log) == 0);
+        REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" + out.string() + "\"", log) == 0);
+        CHECK(digest_of(read_wav(out)) == expected);
+        REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" + out.string() +
+                            "\" truehd-presentation=2ch",
+                        log) == 0);
+        CHECK(read_wav(out).channels == 2);
+    }
+
+    SECTION("Matroska, MP4 and a Blu-ray transport stream carry the stream") {
+        for (const std::string container : {"mkv", "mp4", "ts"}) {
+            const fs::path file = dir / ("options." + container);
+            const fs::path out = dir / ("options_" + container + ".wav");
+            REQUIRE(run_cli("truehd-encode " + in + "\"" + file.string() + "\"", log) == 0);
+            REQUIRE(run_cli("decode \"" + file.string() + "\" \"" + out.string() + "\"", log) == 0);
+            CHECK(digest_of(read_wav(out)) == expected);
+        }
+    }
+
+    SECTION("the bare stream on stdout is the file") {
+        const fs::path stream = dir / "options_file.thd";
+        const fs::path piped = dir / "options_stdout.thd";
+        REQUIRE(run_cli("truehd-encode " + in + "\"" + stream.string() + "\"", log) == 0);
+        const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" truehd-encode " +
+                                    in + "- quiet > \"" + piped.string() + "\"";
+        REQUIRE(iclforge::test::platform::run_shell(command) == 0);
+        CHECK(read_bytes(piped) == read_bytes(stream));
+    }
+
+    SECTION("a name, an option or a rate the encoder cannot write is a usage error") {
+        CHECK(run_cli("truehd-encode " + in + "\"" + (dir / "refused.mlp").string() + "\"", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("TrueHD, not MLP") != std::string::npos);
+        CHECK(run_cli("truehd-encode " + in + "\"" + (dir / "refused.wav").string() + "\"", log) ==
+              kExitUsage);
+        const std::string out = "\"" + (dir / "refused.thd").string() + "\" ";
+        CHECK(run_cli("truehd-encode " + in + out + "truehd-restart=7", log) == kExitUsage);
+        CHECK(run_cli("truehd-encode " + in + out + "truehd-downmix=full", log) == kExitUsage);
+        CHECK(run_cli("truehd-encode " + in + out + "truehd-downmix-gains=-3,-3,off", log) ==
+              kExitUsage);
+        CHECK(run_cli("truehd-encode " + in + out + "truehd-fir-order=9", log) == kExitUsage);
+        CHECK(run_cli("decode " + in + out + "truehd-restart=8", log) == kExitUsage);
+    }
+}

@@ -27,6 +27,7 @@
 #include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
 #include "commands/synth.hpp"
+#include "commands/truehd.hpp"
 #include "exit_codes.hpp"
 #include "platform/console_encoding.hpp"
 #include "support.hpp"
@@ -218,7 +219,7 @@ int run_words(const std::vector<std::string>& words) {
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 46> kCommands{{
+constexpr std::array<Command, 47> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -387,6 +388,24 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kStdio | topic::kAc4Encode,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
+    {"truehd-encode", 3, "<in.wav> <out.thd|out.mkv|out.mp4|out.ts>",
+     "1 to 8 channels of 16 or 24 bit PCM at 44.1, 48, 88.2, 96, 176.4 or 192 kHz, with the speakers "
+     "the WAV's channel mask names, or in the order decode writes them (L R C LFE Ls Rs Lrs Rrs) when "
+     "it has none, to a lossless TrueHD stream: bare, or in Matroska, MP4 "
+     "or a Blu-ray transport stream when the output is .mkv, .mp4 or .ts. Decoding it gives the "
+     "samples back, bit for bit, and so does FFmpeg's strict decode. Each restart interval "
+     "(truehd-restart=, 128 access units by default) is coded whole, with FIR prediction "
+     "(truehd-fir-order=), a pair matrix where it helps (truehd-matrix=) and the shortest of three "
+     "codebooks or raw residuals; the 2, 6 and 8 channel presentations are a stereo and 5.1 downmix "
+     "of the source with truehd-downmix=standard (truehd-downmix-gains=), and the first two "
+     "channels and so on as they are with none. The stream is kept within truehd-peak-rate= "
+     "(18000 kbit/s, Blu-ray's) and TH spec section 18's 75 ms, or truehd-rate-check=lenient writes "
+     "it anyway and counts the violations; verify decodes every access unit as it is coded and "
+     "compares it with the input. 24 bit input is coded as 24 bit and 16 bit input as the same "
+     "samples with their clear low bits sent as an output shift",
+     topic::kStdio,
+     Needs::kNothing,
+     [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
     {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "

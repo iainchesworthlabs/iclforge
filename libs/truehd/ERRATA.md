@@ -75,6 +75,21 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
 15. **`substream_info` and `extended_substream_info` for three substreams (§4.5, §6.4, ERRATA 17).** The encoder writes 0x3C
     and 0 for a stream of three substreams because that is what FFmpeg's streams have for two. FFmpeg's decoder
     accepts them; nothing shows what a Blu-ray player expects.
+16. **A WAV's channel mask as TrueHD channels (§13.1; `forge truehd-encode`).** The specification names the channels (L, R,
+    C, LFE, Ls, Rs, Lvh, Rvh, Lc, Rc, Lrs, Rrs, Cs, Ts, ...) and gives no positions, and a WAV names speakers by position.
+    The command reads the mask this way: FL FR FC LFE are L R C LFE, SIDE_LEFT and SIDE_RIGHT are Ls Rs, BACK_LEFT and
+    BACK_RIGHT are Lrs Rrs when the file also has side speakers (the usual 7.1 mask) and Ls Rs when it has none (the usual 5.1
+    mask is front, LFE and back), FRONT_LEFT_OF_CENTER and its right are Lc Rc, BACK_CENTER is Cs, TOP_CENTER is Ts, and
+    TOP_FRONT_LEFT, TOP_FRONT_CENTER and TOP_FRONT_RIGHT are Lvh, Cvh and Rvh. The top back speakers have no TrueHD channel
+    and are refused. A file with no mask is taken in the order `decode` writes (the default layout for its count). Is that
+    the reading a disc authoring flow expects, in particular Ls Rs for a 5.1 whose WAV says back, and Lvh Rvh for the front
+    heights? **Provisional, owner to confirm.**
+17. **The speakers of the loudness measurement (§13.1; `forge loudness`).** The BS.1770-5 Annex 3 weights are keyed on
+    speakers, so each TrueHD channel is given one: L, R, C, LFE, Ls, Rs, Lrs, Rrs, Cs, Lw, Rw and LFE2 the speakers of the same
+    name, Lvh and Rvh the top front pair, Cvh the top front centre, Ts the top centre, Lc and Rc the screen pair, Lsd and Rsd
+    the side surrounds. The last six are the nearest speaker and nothing in the specification supports them (**provisional,
+    owner to confirm**). A stream whose major sync does not name the channels for its count (the assignment has fewer
+    speakers than the channels) is refused by `loudness` and measured by `levels`, which needs no weights.
 
 ## Entries
 
