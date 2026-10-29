@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <span>
 #include <string>
@@ -26,7 +27,6 @@
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
-#include "iclforge/truehd/io/evolution.hpp"
 #include "multi_track_files.hpp"
 #include "platform/process.hpp"
 
@@ -256,7 +256,8 @@ TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][trueh
 // --- the evolution frame in probe --------------------------------------------------------------
 // PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20): no real
 // stream carries an evolution frame, so the stream here is the encoder's, with the extra data
-// framing it writes around the E-AC-3 container's body holding an OAMD payload from iclforge::objects.
+// framing it writes around the E-AC-3 container's body holding an OAMD payload from
+// iclforge::objects.
 
 namespace {
 
@@ -312,7 +313,8 @@ fs::path write_atmos_like_stream(const fs::path& dir) {
     const std::vector<std::byte> container = emdf::build_container(payloads, 0);
     const std::vector<std::byte> body(container.begin() + 4, container.end());
 
-    return write_stream_with(dir, "atmos_like.thd", [&body] { return body; });
+    return write_stream_with(dir, "atmos_like.thd",
+                             [&body] { return std::vector<std::byte>(body.begin(), body.end()); });
 }
 
 }  // namespace
@@ -326,15 +328,17 @@ TEST_CASE("forge probe reports the evolution frames and the object metadata in t
     SECTION("text") {
         REQUIRE(run_cli("probe \"" + stream.string() + "\"", log) == 0);
         const std::string text = read_text(log);
-        CHECK(text.find("evolution       6 unit(s) carry extra data, 6 read as an evolution frame") !=
-              std::string::npos);
+        CHECK(
+            text.find("evolution       6 unit(s) carry extra data, 6 read as an evolution frame") !=
+            std::string::npos);
         CHECK(text.find("frames at units 0 to 10, 1 to 3 unit(s) apart") != std::string::npos);
         CHECK(text.find("check nibble 6/6, framing 6/6, parity 6/6") != std::string::npos);
         CHECK(text.find("read as the EMDF container: 6/6 (6 clean)") != std::string::npos);
         CHECK(text.find("payload ids: 11 (x6)") != std::string::npos);
         CHECK(text.find("4 object(s), dynamic-only program with LFE") != std::string::npos);
         CHECK(text.find("3 dynamic") != std::string::npos);
-        CHECK(text.find("not verified: the protection bytes and any signature") != std::string::npos);
+        CHECK(text.find("not verified: the protection bytes and any signature") !=
+              std::string::npos);
     }
     SECTION("json") {
         REQUIRE(run_cli("probe \"" + stream.string() + "\" json=1", log) == 0);
@@ -369,11 +373,13 @@ TEST_CASE("forge probe reports the evolution frames and the object metadata in t
     }
 }
 
-TEST_CASE("forge probe counts a wrong check nibble and a wrong parity byte", "[forge-cli][truehd][evolution]") {
+TEST_CASE("forge probe counts a wrong check nibble and a wrong parity byte",
+          "[forge-cli][truehd][evolution]") {
     const fs::path dir = scratch_dir();
     const fs::path stream = write_atmos_like_stream(dir);
     std::vector<std::byte> bytes = read_bytes(stream);
-    // Unit 0's extra data starts with the check nibble; unit 3's ends the unit with the parity byte.
+    // Unit 0's extra data starts with the check nibble; unit 3's ends the unit with the parity
+    // byte.
     iclforge::truehd::ElementaryReader reader(bytes);
     int index = 0;
     while (const auto unit = reader.next()) {
@@ -394,7 +400,8 @@ TEST_CASE("forge probe counts a wrong check nibble and a wrong parity byte", "[f
     const fs::path damaged = dir / "atmos_like_damaged.thd";
     {
         std::ofstream out{damaged, std::ios::binary};
-        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
     }
     const fs::path log = dir / "probe_damaged_evolution.log";
     REQUIRE(run_cli("probe \"" + damaged.string() + "\" json=1", log) == 0);
@@ -408,11 +415,14 @@ TEST_CASE("forge probe counts a wrong check nibble and a wrong parity byte", "[f
     CHECK(evolution["frames_read"] == 6);
 }
 
-TEST_CASE("forge probe tells the two readings of the container apart", "[forge-cli][truehd][evolution]") {
+TEST_CASE("forge probe tells the two readings of the container apart",
+          "[forge-cli][truehd][evolution]") {
     // A frame written in the coding of the letter of TH spec v3.6 section 15.4
-    // (tools/references/truehd_evolution.py): the EMDF coding does not read it cleanly, the other does.
+    // (tools/references/truehd_evolution.py): the EMDF coding does not read it cleanly, the other
+    // does.
     const fs::path dir = scratch_dir();
-    std::ifstream vectors_file{fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "evolution" / "vectors.json"};
+    std::ifstream vectors_file{fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "evolution" /
+                               "vectors.json"};
     REQUIRE(vectors_file.good());
     const auto vectors = nlohmann::json::parse(vectors_file);
     std::vector<std::byte> payload;
@@ -421,7 +431,8 @@ TEST_CASE("forge probe tells the two readings of the container apart", "[forge-c
             const std::string text = vector["extra_data"];
             std::vector<std::byte> region;
             for (std::size_t i = 0; i + 1 < text.size(); i += 2) {
-                region.push_back(static_cast<std::byte>(std::stoul(text.substr(i, 2), nullptr, 16)));
+                region.push_back(
+                    static_cast<std::byte>(std::stoul(text.substr(i, 2), nullptr, 16)));
             }
             const auto extra = iclforge::truehd::read_extra_data(region);
             REQUIRE(extra.has_value());
@@ -430,7 +441,8 @@ TEST_CASE("forge probe tells the two readings of the container apart", "[forge-c
         }
     }
     REQUIRE_FALSE(payload.empty());
-    const fs::path stream = write_stream_with(dir, "letter_of_15_4.thd", [&payload] { return payload; });
+    const fs::path stream =
+        write_stream_with(dir, "letter_of_15_4.thd", [&payload] { return payload; });
     const fs::path log = dir / "probe_letter.log";
     REQUIRE(run_cli("probe \"" + stream.string() + "\" json=1", log) == 0);
     const auto document = nlohmann::json::parse(read_text(log));
@@ -458,7 +470,8 @@ TEST_CASE("forge probe says so when there is no extra data and when it is not a 
     CHECK(read_text(log).find("evolution") == std::string::npos);
 
     // Opaque bytes in the extra data (the hand-built hb_extra_data): framed and checked, no frame.
-    const fs::path opaque = fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_extra_data.thd";
+    const fs::path opaque =
+        fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_extra_data.thd";
     REQUIRE(run_cli("probe \"" + opaque.string() + "\" json=1", log) == 0);
     const auto document = nlohmann::json::parse(read_text(log));
     const auto& evolution = document["truehd"]["evolution"];

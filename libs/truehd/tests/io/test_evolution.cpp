@@ -1,3 +1,4 @@
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
@@ -7,8 +8,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <ios>
+#include <optional>
 #include <set>
-#include <sstream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,6 +21,7 @@
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
 
@@ -25,7 +29,8 @@
 // libs/truehd/src/io/evolution.cpp. PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md question
 // 20): no stream carries one, so the checks here are
 //
-//   - the vectors tools/references/truehd_evolution.py writes (testdata/truehd/evolution): hand-built
+//   - the vectors tools/references/truehd_evolution.py writes (testdata/truehd/evolution):
+//   hand-built
 //     extra data regions that exercise every branch of the syntax, with what an independent Python
 //     transcription reads from each under both readings (EMDF and the letter of §15.4);
 //   - frames assembled here from a bit string, so that a few values are checked against numbers
@@ -208,7 +213,8 @@ void compare_with_emdf_reader(std::span<const std::byte> body, Counts& counts) {
 
 }  // namespace
 
-TEST_CASE("the reference's vectors read the same in both readings", "[truehd][io][evolution][no-external-oracle]") {
+TEST_CASE("the reference's vectors read the same in both readings",
+          "[truehd][io][evolution][no-external-oracle]") {
     const json vectors = load_vectors();
     REQUIRE(vectors["vectors"].size() >= 120);
     std::set<std::string> kinds_seen;
@@ -227,7 +233,8 @@ TEST_CASE("the reference's vectors read the same in both readings", "[truehd][io
         const std::string name = vector["name"].get<std::string>();
         const std::vector<std::byte> region = from_hex(vector["extra_data"].get<std::string>());
         const auto extra = read_extra_data(region);
-        for (const EvolutionReading reading : {EvolutionReading::kEmdf, EvolutionReading::kSpec36}) {
+        for (const EvolutionReading reading :
+             {EvolutionReading::kEmdf, EvolutionReading::kSpec36}) {
             INFO(name << " read as " << to_string(reading));
             const json& want = vector["expect"][std::string(to_string(reading))];
             if (want.is_null()) {
@@ -249,10 +256,11 @@ TEST_CASE("the reference's vectors read the same in both readings", "[truehd][io
     CHECK(kinds_seen == kinds_wanted);
 }
 
-TEST_CASE("a frame written out bit by bit reads as its fields", "[truehd][io][evolution][no-external-oracle]") {
-    // version 0, key 0, payload id 11 with the configuration TS 103 420 Table 56 asks for of an OAMD
-    // payload (group id 2, frame aligned, nothing else), three bytes, the end of the list, a 4 byte
-    // primary and a 1 byte secondary protection field.
+TEST_CASE("a frame written out bit by bit reads as its fields",
+          "[truehd][io][evolution][no-external-oracle]") {
+    // version 0, key 0, payload id 11 with the configuration TS 103 420 Table 56 asks for of an
+    // OAMD payload (group id 2, frame aligned, nothing else), three bytes, the end of the list, a 4
+    // byte primary and a 1 byte secondary protection field.
     const auto frame = from_bits(
         "00 000 01011"
         "0 0 1 10 0  0 0 1 0 0 00000 00"
@@ -291,8 +299,8 @@ TEST_CASE("a frame written out bit by bit reads as its fields", "[truehd][io][ev
         CHECK(counts.both_ok == 1);
     }
     SECTION("a frame of the letter of §15.4 has no flag bits in its variable-length numbers") {
-        // The same fields in the v3.6 coding: group id 2 and the size 3 are plain groups, and a primary
-        // protection length code of 0 is allowed (it means no bytes).
+        // The same fields in the v3.6 coding: group id 2 and the size 3 are plain groups, and a
+        // primary protection length code of 0 is allowed (it means no bytes).
         const auto letter = from_bits(
             "00 000 01011"
             "0 0 1 10  0 0 1 0 0 00000 00"
@@ -309,17 +317,19 @@ TEST_CASE("a frame written out bit by bit reads as its fields", "[truehd][io][ev
         CHECK(parsed->protection.primary.empty());
         CHECK(to_hex(parsed->protection.secondary) == "f0f1f2f3");
         CHECK(parsed->bits_used == 100);
-        // Under the EMDF reading the same bytes are not the same frame: the first variable_bits takes
-        // the next bit as a flag and every field after it moves.
+        // Under the EMDF reading the same bytes are not the same frame: the first variable_bits
+        // takes the next bit as a flag and every field after it moves.
         const auto as_emdf = parse_evolution_frame(letter, EvolutionReading::kEmdf);
         CHECK((!as_emdf.has_value() || as_emdf->payloads != parsed->payloads));
     }
 }
 
-TEST_CASE("the two readings differ where §15.4 and the EMDF container do", "[truehd][io][evolution]") {
+TEST_CASE("the two readings differ where §15.4 and the EMDF container do",
+          "[truehd][io][evolution]") {
     // Payload id 31: the EMDF container escapes it to a longer id, the letter of §15.4 reads 31.
     const auto id31 = from_bits(
-        "00 000 11111  00000 0  0 0 0 0 0 1 0 0 00000 00  00000001 0  11111111  00000  01 00 10100000");
+        "00 000 11111  00000 0  0 0 0 0 0 1 0 0 00000 00  00000001 0  11111111  00000  01 00 "
+        "10100000");
     const auto emdf_reading = parse_evolution_frame(id31, EvolutionReading::kEmdf);
     REQUIRE(emdf_reading.has_value());
     REQUIRE(emdf_reading->payloads.size() == 1);
@@ -331,13 +341,13 @@ TEST_CASE("the two readings differ where §15.4 and the EMDF container do", "[tr
     REQUIRE(read_emdf.has_value());
     CHECK(read_emdf->payloads[0].config.sample_offset == 100);
     CHECK(read_emdf->payloads[0].config.priority == 0);
-    const auto offset_letter = from_bits(
-        "00 000 01011  1 00001100100  0 0 0 0 00000 00  00000000  00000  01 00 11111111");
+    const auto offset_letter =
+        from_bits("00 000 01011  1 00001100100  0 0 0 0 00000 00  00000000  00000  01 00 11111111");
     const auto read_letter = parse_evolution_frame(offset_letter, EvolutionReading::kSpec36);
     REQUIRE(read_letter.has_value());
     CHECK(read_letter->payloads[0].config.sample_offset == 100);
-    // A variable_bits that is all ones continues: 255 is 255 and a further group in the escape coding,
-    // 255 plus the next group; the EMDF coding has its flag bit after every group.
+    // A variable_bits that is all ones continues: 255 is 255 and a further group in the escape
+    // coding, 255 plus the next group; the EMDF coding has its flag bit after every group.
     const auto size255 = from_bits("00 000 01011  0 0 0 0 0 1 0 0 00000 00  11111111 00000000");
     const auto escape = parse_evolution_frame(size255, EvolutionReading::kSpec36);
     REQUIRE_FALSE(escape.has_value());  // 255 bytes are claimed and the frame ends
@@ -359,7 +369,8 @@ TEST_CASE("the payload with id 11 is handed out and the others are found by id",
     CHECK(frame.find(12) == nullptr);
 }
 
-TEST_CASE("extra data read from its own bytes is what a whole unit reads", "[truehd][io][evolution]") {
+TEST_CASE("extra data read from its own bytes is what a whole unit reads",
+          "[truehd][io][evolution]") {
     CHECK_FALSE(read_extra_data({}).has_value());
     const std::vector<std::byte> one{std::byte{0x20}};
     CHECK_FALSE(read_extra_data(one).has_value());
@@ -377,7 +388,7 @@ TEST_CASE("the E-AC-3 container's body is the evolution frame", "[truehd][io][ev
     // iclforge::objects writes the E-AC-3 container; with its sync word and length taken off the
     // rest is §15.4's evo_frame() read as the EMDF container.
     const std::array<std::byte, 5> small{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4},
-                                          std::byte{5}};
+                                         std::byte{5}};
     std::vector<std::byte> large(300);
     for (std::size_t i = 0; i < large.size(); ++i) {
         large[i] = static_cast<std::byte>((i * 13 + 1) & 0xFF);
@@ -457,7 +468,8 @@ TEST_CASE("random bytes read the same in the E-AC-3 reader as in this one",
             b = static_cast<std::byte>(next() & 0xFFU);
         }
         if (next() % 4 != 0) {
-            body[0] &= std::byte{0x3F};  // version 0 most of the time: it is where the readers agree
+            body[0] &=
+                std::byte{0x3F};  // version 0 most of the time: it is where the readers agree
         }
         INFO("round " << round << " bytes " << to_hex(body));
         compare_with_emdf_reader(body, counts);
@@ -488,7 +500,8 @@ std::vector<std::byte> random_frame(Next&& next) {
     }
     const auto count = next() % 5;
     for (std::uint64_t n = 0; n < count; ++n) {
-        const auto id = static_cast<std::uint32_t>(next() % 3 == 0 ? 31 + next() % 70 : 1 + next() % 30);
+        const auto id =
+            static_cast<std::uint32_t>(next() % 3 == 0 ? 31 + next() % 70 : 1 + next() % 30);
         w.put(std::min<std::uint32_t>(id, 31U), 5);
         if (id >= 31) {
             w.write_variable_bits(5, id - 31);

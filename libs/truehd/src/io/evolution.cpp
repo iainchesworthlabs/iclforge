@@ -3,9 +3,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "iclforge/base/bitreader.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
 
 // Provisional, owner to confirm: see the header and libs/truehd/ERRATA.md, "Atmos, spec v3.6".
 
@@ -16,8 +20,8 @@ namespace {
 constexpr int kEmdfEscapeId = 0x1F;
 constexpr std::size_t kPayloadIdBits = 5;
 
-// The protection field sizes in bytes for the length codes 0 to 3 (TH spec v3.6 §15.4 SIZE_TABLE; Annex H
-// Tables H.2.5 and H.2.6 in bits).
+// The protection field sizes in bytes for the length codes 0 to 3 (TH spec v3.6 §15.4 SIZE_TABLE;
+// Annex H Tables H.2.5 and H.2.6 in bits).
 constexpr std::array<std::size_t, 4> kProtectionBytes = {0, 1, 4, 16};
 
 // TH spec v3.6 §15.4's maximum number of extension reads for each variable_bits(n, max_ext).
@@ -39,9 +43,9 @@ class Cursor {
     [[nodiscard]] std::size_t position() const noexcept { return reader_.bit_position(); }
 
     // variable_bits(n, max_ext) in the active reading. kEmdf: groups of n bits, each followed by a
-    // read-more flag, a further group adding 2^n to the shifted value (the coding BitReader implements,
-    // which iclforge::objects reads the E-AC-3 container with). kSpec36: an escape value, n bits and,
-    // when all are ones, n more, at most max_ext times.
+    // read-more flag, a further group adding 2^n to the shifted value (the coding BitReader
+    // implements, which iclforge::objects reads the E-AC-3 container with). kSpec36: an escape
+    // value, n bits and, when all are ones, n more, at most max_ext times.
     std::uint64_t variable(int n, int max_ext) noexcept {
         if (emdf()) {
             return reader_.variable_bits(n);
@@ -127,21 +131,32 @@ const EvolutionPayload* EvolutionFrame::find(std::uint64_t id) const noexcept {
 
 std::span<const std::byte> EvolutionFrame::oamd() const noexcept {
     const EvolutionPayload* payload = find(kEvolutionPayloadOamd);
-    return payload == nullptr ? std::span<const std::byte>{} : std::span<const std::byte>{payload->bytes};
+    return payload == nullptr ? std::span<const std::byte>{}
+                              : std::span<const std::byte>{payload->bytes};
 }
 
 std::string_view to_string(EvolutionErrorKind kind) noexcept {
     switch (kind) {
-        case EvolutionErrorKind::kNoEvolutionPayload: return "no_evolution_payload";
-        case EvolutionErrorKind::kEmpty: return "empty";
-        case EvolutionErrorKind::kTruncatedHeader: return "truncated_header";
-        case EvolutionErrorKind::kMissingTerminator: return "missing_terminator";
-        case EvolutionErrorKind::kTruncatedPayloadId: return "truncated_payload_id";
-        case EvolutionErrorKind::kTruncatedConfig: return "truncated_config";
-        case EvolutionErrorKind::kTruncatedSize: return "truncated_size";
-        case EvolutionErrorKind::kTruncatedPayload: return "truncated_payload";
-        case EvolutionErrorKind::kReservedProtectionLength: return "reserved_protection_length";
-        case EvolutionErrorKind::kTruncatedProtection: return "truncated_protection";
+        case EvolutionErrorKind::kNoEvolutionPayload:
+            return "no_evolution_payload";
+        case EvolutionErrorKind::kEmpty:
+            return "empty";
+        case EvolutionErrorKind::kTruncatedHeader:
+            return "truncated_header";
+        case EvolutionErrorKind::kMissingTerminator:
+            return "missing_terminator";
+        case EvolutionErrorKind::kTruncatedPayloadId:
+            return "truncated_payload_id";
+        case EvolutionErrorKind::kTruncatedConfig:
+            return "truncated_config";
+        case EvolutionErrorKind::kTruncatedSize:
+            return "truncated_size";
+        case EvolutionErrorKind::kTruncatedPayload:
+            return "truncated_payload";
+        case EvolutionErrorKind::kReservedProtectionLength:
+            return "reserved_protection_length";
+        case EvolutionErrorKind::kTruncatedProtection:
+            return "truncated_protection";
     }
     return "unknown";
 }
@@ -243,9 +258,8 @@ EvolutionRead read_evolution(const ExtraData& extra, EvolutionReading reading) {
     out.reserved_zero = extra.framing_ok && extra.evo_reserved == 0;
     out.extra_data_length = extra.length;
     out.evo_frame_byte_length = extra.evo_frame_byte_length;
-    out.length_fits = extra.framing_ok &&
-                      (std::size_t{extra.length} + 1U) * 16U >=
-                          std::size_t{extra.evo_frame_byte_length} * 8U + 40U;
+    out.length_fits = extra.framing_ok && (std::size_t{extra.length} + 1U) * 16U >=
+                                              std::size_t{extra.evo_frame_byte_length} * 8U + 40U;
     if (extra.framing_ok) {
         out.container = parse_evolution_frame(extra.evolution_payload, reading);
     }

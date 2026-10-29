@@ -5,14 +5,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
@@ -22,8 +26,8 @@
 // What TH spec v3.6 §7.2, §8.3, §9.3, §10.3 and §15.3 ask of the substream that carries the object
 // audio (restart sync 0x31EC; up to 15 primitive matrices; max_matrix_chan 15; huff_lsbs up to 31;
 // a Filter B range of 32 bits) against what the decoder does (libs/truehd/ERRATA.md, "Atmos, spec
-// v3.6", question 33). The streams are the hand-built hb_substream3_limits (decoded to its signal by
-// test_handbuilt.cpp, and by tools/references/truehd_syntax.py) and units built here from the
+// v3.6", question 33). The streams are the hand-built hb_substream3_limits (decoded to its signal
+// by test_handbuilt.cpp, and by tools/references/truehd_syntax.py) and units built here from the
 // library's writers. No decoder outside this repository reads 0x31EC: [no-external-oracle].
 
 namespace {
@@ -96,7 +100,8 @@ std::vector<std::byte> unit_with(std::uint16_t sync, int lsbs,
     entry.end_ptr = static_cast<std::uint16_t>(segment.size() / 2);
     const std::array<SubstreamEntry, 1> entries{entry};
     const std::size_t prefix_bytes = 4 + kMajorSyncBaseBytes + 2U;
-    auto prefix = write_access_unit_prefix(stereo_major_sync(), entries, 0, prefix_bytes + segment.size());
+    auto prefix =
+        write_access_unit_prefix(stereo_major_sync(), entries, 0, prefix_bytes + segment.size());
     std::vector<std::byte> unit = *prefix;
     unit.insert(unit.end(), segment.begin(), segment.end());
     return unit;
@@ -113,7 +118,8 @@ TEST_CASE("the sixteen-channel stream sits at substream 3's limits",
           "[truehd][decoder][substream3][no-external-oracle]") {
     // hb_substream3_limits: four substreams, the last of 16 channels with restart sync 0x31EC,
     // max_matrix_chan 15, 15 primitive matrices, and prediction that leaves residuals which
-    // huff_lsbs 29 to 31 carry. Its signal is 24 bit; the coded channels before the matrices are not.
+    // huff_lsbs 29 to 31 carry. Its signal is 24 bit; the coded channels before the matrices are
+    // not.
     const std::vector<std::byte> stream =
         read_file(std::string(ICLFORGE_GOLDEN_TRUEHD_DIR) + "/handbuilt/hb_substream3_limits.thd");
     ElementaryReader reader(stream);
@@ -165,7 +171,8 @@ TEST_CASE("the sixteen-channel stream sits at substream 3's limits",
     CHECK(decoder.counters().lossless_checks_ok > 0);
 }
 
-TEST_CASE("huff_lsbs above 24 needs restart sync 0x31EC", "[truehd][decoder][substream3][no-external-oracle]") {
+TEST_CASE("huff_lsbs above 24 needs restart sync 0x31EC",
+          "[truehd][decoder][substream3][no-external-oracle]") {
     // Eight samples of two channels. Channel 0 sends 2^30 + v, so that it decodes to v; channel 1
     // sends values 2^26 and more above that, so that it decodes to numbers past 24 bits, of which
     // the output keeps the low 24 bits (the PCM is 24 bit; TH spec §7.3 folds three bytes).
@@ -185,7 +192,8 @@ TEST_CASE("huff_lsbs above 24 needs restart sync 0x31EC", "[truehd][decoder][sub
         REQUIRE(pcm.size() == 16);
         for (std::size_t i = 0; i < 8; ++i) {
             CHECK(pcm[2 * i] == small[i]);
-            CHECK(pcm[2 * i + 1] == low24((std::int64_t{1} << 26) + static_cast<std::int64_t>(i) * 3));
+            CHECK(pcm[2 * i + 1] ==
+                  low24((std::int64_t{1} << 26) + static_cast<std::int64_t>(i) * 3));
         }
     }
     SECTION("25 bits are refused under 0x31EA and 0x31EB") {
@@ -207,7 +215,8 @@ TEST_CASE("huff_lsbs above 24 needs restart sync 0x31EC", "[truehd][decoder][sub
             plain[0][i] = static_cast<std::uint32_t>((1 << 23) + small[i] / 2);
             plain[1][i] = static_cast<std::uint32_t>((1 << 23) - static_cast<std::int32_t>(i));
         }
-        for (const std::uint16_t sync : {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncAtmos}) {
+        for (const std::uint16_t sync :
+             {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncAtmos}) {
             Decoder decoder;
             const auto decoded = decoder.decode(unit_with(sync, 24, plain));
             REQUIRE(decoded.has_value());

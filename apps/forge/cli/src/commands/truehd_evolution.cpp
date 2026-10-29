@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <span>
 #include <string>
@@ -12,9 +13,10 @@
 #include <utility>
 #include <vector>
 
-#include "json_sink.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
+#include "json_sink.hpp"
 
 namespace forge_cli::commands {
 
@@ -107,7 +109,8 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
         return;
     }
     const auto bytes = frame->oamd();
-    oamd_min_bytes_ = oamd_payloads_ == 0 ? bytes.size() : std::min<std::uint64_t>(oamd_min_bytes_, bytes.size());
+    oamd_min_bytes_ =
+        oamd_payloads_ == 0 ? bytes.size() : std::min<std::uint64_t>(oamd_min_bytes_, bytes.size());
     oamd_max_bytes_ = std::max<std::uint64_t>(oamd_max_bytes_, bytes.size());
     ++oamd_payloads_;
     const auto decoded = oba::parse_payload(bytes);
@@ -136,11 +139,13 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
         }
     }
     const auto same = [&tally](const ProgramTally& other) {
-        return other.object_count == tally.object_count && other.dynamic_only == tally.dynamic_only &&
-               other.lfe == tally.lfe && other.bed_assignment == tally.bed_assignment &&
+        return other.object_count == tally.object_count &&
+               other.dynamic_only == tally.dynamic_only && other.lfe == tally.lfe &&
+               other.bed_assignment == tally.bed_assignment &&
                other.bed_nonstandard == tally.bed_nonstandard &&
                other.extra_bed_instances == tally.extra_bed_instances &&
-               other.isf_index == tally.isf_index && other.dynamic_objects == tally.dynamic_objects &&
+               other.isf_index == tally.isf_index &&
+               other.dynamic_objects == tally.dynamic_objects &&
                other.update_blocks == tally.update_blocks;
     };
     const auto found = std::ranges::find_if(programs_, same);
@@ -200,7 +205,8 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     json.end_array();
     json.key("protection");
     json.begin_object();
-    const auto codes = [&json](std::string_view name, const std::map<std::uint64_t, std::uint64_t>& tally) {
+    const auto codes = [&json](std::string_view name,
+                               const std::map<std::uint64_t, std::uint64_t>& tally) {
         json.key(name);
         json.begin_array();
         for (const auto& [code, count] : tally) {
@@ -262,20 +268,23 @@ void EvolutionSurvey::print_text() const {
     if (regions_ == 0) {
         return;
     }
-    fmt::println("{:<16}{} unit(s) carry extra data, {} read as an evolution frame (provisional, "
-                 "ERRATA question 20)",
-                 "evolution", regions_, frames_read_);
-    continuation(fmt::format("check nibble {}/{}, framing {}/{}, parity {}/{}, evo_reserved 0 in "
-                             "{}/{}, length fits {}/{}",
-                             check_ok_, regions_, framing_ok_, regions_, parity_ok_, regions_,
-                             reserved_zero_, regions_, length_fits_, regions_));
+    fmt::println(
+        "{:<16}{} unit(s) carry extra data, {} read as an evolution frame (provisional, "
+        "ERRATA question 20)",
+        "evolution", regions_, frames_read_);
+    continuation(
+        fmt::format("check nibble {}/{}, framing {}/{}, parity {}/{}, evo_reserved 0 in "
+                    "{}/{}, length fits {}/{}",
+                    check_ok_, regions_, framing_ok_, regions_, parity_ok_, regions_,
+                    reserved_zero_, regions_, length_fits_, regions_));
     continuation(fmt::format(
         "read as the EMDF container: {}/{} ({} clean); as the letter of §15.4: {}/{} ({} clean)",
         readings_[0].frames, regions_, readings_[0].clean, readings_[1].frames, regions_,
         readings_[1].clean));
     for (std::size_t i = 0; i < 2; ++i) {
         for (const auto& [kind, count] : readings_[i].errors) {
-            continuation(fmt::format("  {} reading failed {} time(s): {}", i == 0 ? "EMDF" : "§15.4", count, kind));
+            continuation(fmt::format("  {} reading failed {} time(s): {}",
+                                     i == 0 ? "EMDF" : "§15.4", count, kind));
         }
     }
     std::string ids;
@@ -287,8 +296,9 @@ void EvolutionSurvey::print_text() const {
                              first_unit_, last_unit_, gap_min_, gap_max_,
                              lead_hex_.empty() ? "n/a" : lead_hex_));
     if (oamd_payloads_ != 0) {
-        continuation(fmt::format("object audio metadata: {} payload(s) of {} to {} byte(s), {} not read",
-                                 oamd_payloads_, oamd_min_bytes_, oamd_max_bytes_, oamd_unread_));
+        continuation(
+            fmt::format("object audio metadata: {} payload(s) of {} to {} byte(s), {} not read",
+                        oamd_payloads_, oamd_min_bytes_, oamd_max_bytes_, oamd_unread_));
         for (const ProgramTally& program : programs_) {
             std::string beds;
             for (const std::string& channel : program.bed_channels) {
@@ -298,7 +308,8 @@ void EvolutionSurvey::print_text() const {
             if (program.dynamic_only) {
                 layout = program.lfe ? "dynamic-only program with LFE" : "dynamic-only program";
             } else if (program.bed_nonstandard) {
-                layout = fmt::format("bed of a non-standard assignment (0x{:05X})", program.bed_assignment);
+                layout = fmt::format("bed of a non-standard assignment (0x{:05X})",
+                                     program.bed_assignment);
             } else {
                 layout = fmt::format("bed {} (assignment 0x{:03X})", beds.empty() ? "empty" : beds,
                                      program.bed_assignment);
@@ -306,14 +317,16 @@ void EvolutionSurvey::print_text() const {
             if (program.extra_bed_instances != 0) {
                 layout += fmt::format(" and {} more bed instance(s)", program.extra_bed_instances);
             }
-            continuation(fmt::format("  x{}: {} object(s), {}, ISF {}, {} dynamic, {} update block(s)",
-                                     program.frames, program.object_count, layout,
-                                     program.isf_index < 0 ? std::string("none")
-                                                           : fmt::format("index {}", program.isf_index),
-                                     program.dynamic_objects, program.update_blocks));
+            continuation(
+                fmt::format("  x{}: {} object(s), {}, ISF {}, {} dynamic, {} update block(s)",
+                            program.frames, program.object_count, layout,
+                            program.isf_index < 0 ? std::string("none")
+                                                  : fmt::format("index {}", program.isf_index),
+                            program.dynamic_objects, program.update_blocks));
         }
         if (oamd_other_programs_ != 0) {
-            continuation(fmt::format("  and {} frame(s) of further programs", oamd_other_programs_));
+            continuation(
+                fmt::format("  and {} frame(s) of further programs", oamd_other_programs_));
         }
     }
     continuation("not verified: the protection bytes and any signature");

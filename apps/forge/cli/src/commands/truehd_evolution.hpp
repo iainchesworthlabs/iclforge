@@ -19,12 +19,12 @@ class JsonSink;
 // frame comes. Metadata only: no payload byte is printed except the first four of the first frame,
 // which tell a bit-level container from a Thrift one.
 //
-// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20). The frames
-// are read as TH spec v3.6 §15.4 under both readings the library has (the EMDF container's and the
-// letter of §15.4), and the report says which one read each. Nothing is verified: the protection
-// bytes (§15.4) and any signature (§16.3, §16.6) are returned by the library and not checked, and
-// the report says so. This is the check to run on a real Atmos track, and its output is what the
-// owner is asked to send back.
+// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20). The
+// frames are read as TH spec v3.6 §15.4 under both readings the library has (the EMDF container's
+// and the letter of §15.4), and the report says which one read each. Nothing is verified: the
+// protection bytes (§15.4) and any signature (§16.3, §16.6) are returned by the library and not
+// checked, and the report says so. This is the check to run on a real Atmos track, and its output
+// is what the owner is asked to send back.
 
 namespace forge_cli::commands {
 
@@ -43,9 +43,9 @@ class EvolutionSurvey {
 
    private:
     struct ReadingTally {
-        std::uint64_t frames = 0;                        // regions that read as evo_frame()
+        std::uint64_t frames = 0;  // regions that read as evo_frame()
         std::uint64_t clean = 0;  // of them, with a payload and only zero bits after the protection
-        std::map<std::string, std::uint64_t> errors{};   // the failures, by kind
+        std::map<std::string, std::uint64_t> errors{};  // the failures, by kind
     };
     struct ProgramTally {
         std::uint64_t object_count = 0;
