@@ -202,6 +202,16 @@ if(ICLFORGE_BUILD_AC4)
         REQUIRES iclforge-base)
 endif()
 
+# The TrueHD (MLP) codec (libs/mlp, iclforge::mlp: the bitstream layer, the decoder and the
+# encoder, one library) is an optional component, ICLFORGE_BUILD_MLP (see the root
+# CMakeLists.txt), installed as the AC-4 library is. Its public headers name base's bit reader
+# (the syntax trace) and the object model (the Atmos payload), so its .pc requires both.
+if(ICLFORGE_BUILD_MLP)
+    iclforge_install_library(mlp
+        DESCRIPTION "TrueHD (MLP) bitstream layer, lossless decoder and encoder, with Atmos carriage"
+        REQUIRES iclforge-base iclforge-objects)
+endif()
+
 # iclforge::c is an optional component (ICLFORGE_BUILD_CAPI, see the root CMakeLists.txt). Roadmap
 # item F1's whole point is a stable C-callable surface for OTHER toolchains, so its header
 # (iclforge_c/iclforge.h) installs to its own include/iclforge_c/ subdirectory - a C or non-C++

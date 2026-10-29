@@ -180,6 +180,10 @@ option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (lib
 # defaults ON" treatment as the three above - apps/forge/cli/src's `probe` command links
 # it unconditionally.
 option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the decoder and the encoder (libs/ac4)" ON)
+# The TrueHD (MLP) codec (libs/mlp, planning/truehd.md): the bitstream layer, the decoder and the
+# lossless encoder, with Atmos carriage, one library. Same "own option, defaults ON" treatment as
+# the AC-4 codec above; with it off, forge has no `codec=truehd` (apps/forge/cli/CMakeLists.txt).
+option(ICLFORGE_BUILD_MLP "Build the TrueHD (MLP) codec: the bitstream layer, the decoder and the encoder (libs/mlp)" ON)
 
 # iclforge::iab (libs/iab) - IAB reader, phase 1: a standalone reader for SMPTE
 # ST 2098-2's Immersive Audio Bitstream. Like the three container writers above, it needs no
@@ -560,6 +564,14 @@ if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)
     add_subdirectory(libs/ac4)
 endif()
 
+# The TrueHD (MLP) codec, a peer of the AC-3 and AC-4 codecs that links neither: the bitstream
+# layer, the decoder and the encoder, one library (libs/mlp). Gated by ICLFORGE_BUILD_MLP (default
+# ON, see the option() above). No minimum-footprint archive: no board in firmware/ takes TrueHD,
+# and an IEC 61937 data type 22 passthrough needs the framing in libs/containers, not the codec.
+if(ICLFORGE_BUILD_MLP AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(libs/mlp)
+endif()
+
 # A standalone reader - roadmap item IM1
 # phase 1 ("IAB (SMPTE ST 2098-2) reader"). Gated by ICLFORGE_BUILD_IAB
 # (default ON, see the option() above).
@@ -700,7 +712,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 iab adm capi sendspin sink)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 mlp iab adm capi sendspin sink)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")
@@ -723,7 +735,7 @@ endif()
 # instruments; each file guards its harnesses on the option that builds their library.
 if(ICLFORGE_BUILD_FUZZERS)
     include(IclforgeFuzz)
-    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 adm sendspin)
+    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 mlp adm sendspin)
         add_subdirectory(libs/${_iclforge_lib}/fuzz)
     endforeach()
     unset(_iclforge_lib)

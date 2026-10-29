@@ -10,6 +10,7 @@
     "dsp": ["dsp", "internal"],
     "iab": ["iab"],
     "lyrics": ["lyrics"],
+    "mlp": ["mlp"],
     "objects": ["objects"],
     "pitch": ["pitch"],
     "render": ["render", "spatial"],
