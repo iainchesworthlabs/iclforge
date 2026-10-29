@@ -342,12 +342,12 @@ def summarise(results: list[Result]) -> dict[str, int]:
     return counts
 
 
-def print_report(title: str, results: list[Result]) -> int:
-    """Print every non-passing result and a count line. Returns the process exit status: 1 when
-    anything disagreed or failed, 0 otherwise."""
+def print_report(title: str, results: list[Result], verbose: bool = False) -> int:
+    """Print every non-passing result (every result when verbose) and a count line. Returns the
+    process exit status: 1 when anything disagreed or failed, 0 otherwise."""
     print(f"== {title}")
     for result in results:
-        if result.status != PASS:
+        if verbose or result.status != PASS:
             print(f"  {result.status.upper():8} {result.subject}: {result.detail}")
     counts = summarise(results)
     print(
