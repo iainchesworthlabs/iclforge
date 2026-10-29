@@ -580,7 +580,7 @@ std::optional<EcdsaSignature> ecdsa_p256_sign(const P256PrivateKey& key,
     wipe_bytes(h1);
 
     U256 d = from_big_endian(key.scalar());
-    const U256 dm = to_mont(c.n, d);
+    U256 dm = to_mont(c.n, d);  // the private key again, in the Montgomery domain: wiped below
     const U256 em = to_mont(c.n, e);
     std::optional<EcdsaSignature> result;
     while (!result.has_value()) {
@@ -614,6 +614,7 @@ std::optional<EcdsaSignature> ecdsa_p256_sign(const P256PrivateKey& key,
         result = sig;
     }
     wipe(d);
+    wipe(dm);
     wipe_bytes(x_octets);
     return result;
 }

@@ -158,9 +158,18 @@ path.
 **Keys and chains are the operator's.** `load_content_key` and `load_content_chain` read PEM
 (PKCS#8, SEC 1, certificates), DER or base64 of either, from a path or from
 `ICLFORGE_CONTENT_KEY_FILE` / `ICLFORGE_CONTENT_KEY` and `ICLFORGE_CONTENT_CHAIN_FILE`. The key
-zeroizes on destruction and is never written into an error or a log. The library carries no key,
-certificate or fingerprint of any issuer, so a verdict of valid needs the caller to name what it
-trusts.
+is never written into an error or a log. The library carries no key, certificate or fingerprint of
+any issuer, so a verdict of valid needs the caller to name what it trusts.
+
+*What is wiped, and what is not.* `P256PrivateKey` zeroizes on destruction. Loading reads a key file
+straight into the buffer that is wiped afterwards (no stack copy; reserved at the file's size so
+it is not regrown), decodes base64 into a buffer reserved at its full size, and wipes the decoded
+bytes, the library's copy of `ICLFORGE_CONTENT_KEY`, and the intermediate values of each signature
+(the nonce and its inverse, and the key in the form the arithmetic uses). Signing does not branch
+on, or index by, the key. Not wiped, because the library does not own it: the process's
+environment block that `getenv` points into (what `ps` and `/proc` show; prefer a key *file*), the
+page cache and storage the file came from, swap and core dumps, any copy the caller makes, and a
+key read from a source of unknown size such as a pipe, which can be copied as it grows.
 
 **Three verdicts, and one is not "valid".** `verify_stream` always returns a report: every check, in
 order (structure, versions and methods, curve, chain parsed, chain valid, signed date, signer
@@ -180,8 +189,14 @@ says which. A path is validated from its anchor down, so an expired certificate 
 not matter. The sample the owner supplied has a CA certificate that expired before its signature was
 dated, which `kNow` correctly refuses; see `libs/ac4/ERRATA.md`.
 
+**High-s signatures are accepted.** ECDSA allows both `s` and `n - s` for the same message, and the
+specification asks for neither; so one valid signature can be rewritten as another valid one. The
+content digest, not the signature's bytes, is what identifies what was signed, and nothing here uses
+the signature bytes as an identifier. A caller that does should normalise `s` itself.
+
 **What it does not do.** Raw `.ac4` only: carriage in an MP4 is not implemented (the specification
-gives it a sentence). Only the first signature entry is read. No revocation. SHA-256 and P-256 only. The
+gives it a sentence). A blob with more than one signature entry is refused, as is a chain of more
+than eight certificates. No revocation. SHA-256 and P-256 only. The
 open questions on each are the first thing in `libs/ac4/ERRATA.md`.
 
 ### In the CLI

@@ -40,6 +40,9 @@ int sextet(char c) {
 
 std::optional<std::vector<std::byte>> base64_decode(std::string_view text) {
     std::vector<std::byte> out;
+    // Reserved for the most the text can decode to, so that a key being decoded is never copied
+    // to a bigger buffer, which would leave the smaller one freed with the key in it.
+    out.reserve(text.size() / 4 * 3 + 3);
     std::uint32_t buffer = 0;
     int bits = 0;
     int padding = 0;

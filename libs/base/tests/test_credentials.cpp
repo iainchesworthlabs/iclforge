@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <ios>
 #include <optional>
 #include <span>
 #include <string>
@@ -13,6 +16,7 @@
 #include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/pem.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "platform/process.hpp"
 #include "test_pki.hpp"
 
 namespace {
@@ -220,6 +224,48 @@ TEST_CASE("a chain or a certificate file past its cap is refused", "[crypto][cre
     const auto too_many = crypto::parse_certificates(text_bytes(bundle));
     REQUIRE_FALSE(too_many.has_value());
     CHECK(too_many.error().message.find("at most 1024") != std::string::npos);
+}
+
+TEST_CASE("key and certificate files load whole, at any size", "[crypto][credentials]") {
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::path{ICLFORGE_TEST_SCRATCH_DIR} /
+                         ("credentials_files_" + iclforge::test::platform::process_id());
+    fs::create_directories(dir);
+    const auto write = [&dir](const std::string& name, std::span<const std::byte> bytes) {
+        const fs::path path = dir / name;
+        std::ofstream out{path, std::ios::binary | std::ios::trunc};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        return path.string();
+    };
+
+    // A bare scalar in a file, 32 bytes exactly, ending in a byte that counts as white space.
+    std::vector<std::byte> scalar(32, std::byte{0x23});
+    scalar.front() = std::byte{0x20};
+    scalar.back() = std::byte{0x0A};
+    const auto key = crypto::load_content_key(write("scalar.key", scalar));
+    REQUIRE(key.has_value());
+    CHECK(std::equal(scalar.begin(), scalar.end(), key->scalar().begin()));
+
+    // A bundle of 20 certificates is several times the 4096 bytes a read takes at once.
+    const pki::TestChain chain = pki::make_chain();
+    std::string bundle;
+    for (std::size_t i = 0; i < 20; ++i) {
+        bundle += crypto::pem_encode("CERTIFICATE", chain.certificates[i % 4]);
+    }
+    REQUIRE(bundle.size() > 3 * 4096);
+    const std::vector<std::string> paths = {write("bundle.pem", text_bytes(bundle))};
+    const auto certificates = crypto::load_certificate_files(paths);
+    REQUIRE(certificates.has_value());
+    CHECK(certificates->size() == 20);
+
+    // An empty file is an empty source, and a missing one is unreadable; neither is a key.
+    const auto empty = crypto::load_content_key(write("empty.key", {}));
+    REQUIRE_FALSE(empty.has_value());
+    CHECK(empty.error().kind == crypto::CredentialErrorKind::kEmpty);
+    const auto missing = crypto::load_content_key((dir / "absent.key").string());
+    REQUIRE_FALSE(missing.has_value());
+    CHECK(missing.error().kind == crypto::CredentialErrorKind::kUnreadable);
 }
 
 TEST_CASE("credentials need the key to belong to the leaf", "[crypto][credentials]") {

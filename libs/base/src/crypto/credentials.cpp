@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <expected>
+#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <iterator>
@@ -12,6 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -238,11 +240,24 @@ std::expected<std::vector<std::byte>, CredentialError> read_file(const std::stri
         return error(CredentialErrorKind::kUnreadable, "cannot open '" + path + "'");
     }
     std::vector<std::byte> bytes;
-    char buffer[4096];
-    while (in.read(buffer, sizeof buffer) || in.gcount() > 0) {
+    // A key file is read straight into the vector that is wiped later: no stack buffer holds a copy
+    // of it, and a vector reserved at the file's size is never regrown, which would leave the
+    // smaller block freed with the key in it. (A source of unknown size, a pipe, can still regrow.)
+    std::error_code size_error;
+    const auto file_size = std::filesystem::file_size(path, size_error);
+    if (!size_error && file_size <= kMaxCredentialFileBytes) {
+        bytes.reserve(static_cast<std::size_t>(file_size) + 1);
+    }
+    constexpr std::size_t kChunk = 4096;
+    for (;;) {
+        const std::size_t before = bytes.size();
+        const std::size_t room = bytes.capacity() > before ? bytes.capacity() - before : kChunk;
+        bytes.resize(before + room);
+        in.read(reinterpret_cast<char*>(bytes.data() + before), static_cast<std::streamsize>(room));
         const auto got = static_cast<std::size_t>(in.gcount());
-        for (std::size_t i = 0; i < got; ++i) {
-            bytes.push_back(static_cast<std::byte>(buffer[i]));
+        bytes.resize(before + got);
+        if (got == 0) {
+            break;
         }
         if (bytes.size() > kMaxCredentialFileBytes) {
             wipe(bytes);
@@ -431,7 +446,7 @@ std::expected<P256PrivateKey, CredentialError> load_content_key(std::string_view
         }
         bytes = std::move(*file);
     } else {
-        const std::string inline_key = env_value("ICLFORGE_CONTENT_KEY");
+        std::string inline_key = env_value("ICLFORGE_CONTENT_KEY");
         if (inline_key.empty()) {
             return error(
                 CredentialErrorKind::kAbsent,
@@ -439,8 +454,15 @@ std::expected<P256PrivateKey, CredentialError> load_content_key(std::string_view
                 "names a private key");
         }
         source = "$ICLFORGE_CONTENT_KEY";
+        bytes.reserve(inline_key.size());
         for (const char c : inline_key) {
             bytes.push_back(static_cast<std::byte>(c));
+        }
+        // This copy of the environment variable is wiped; the process's own environment block,
+        // which getenv() points into and which `ps` and /proc can show, is not ours to wipe.
+        volatile char* text = inline_key.data();
+        for (std::size_t i = 0; i < inline_key.size(); ++i) {
+            text[i] = '\0';
         }
     }
     auto key = parse_p256_private_key(bytes);
