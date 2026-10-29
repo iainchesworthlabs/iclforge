@@ -1,6 +1,6 @@
 # TrueHD and DD+ parity: performance and platforms
 
-!!! note "Status as of 2026-10-29: an audit; nothing in it is built yet"
+!!! note "Status as of 2026-10-29: the matrix, the host measurements, the arithmetic analysis and one AVX2 kernel are built; the small parts are not"
     The owner wants Dolby TrueHD to have what Dolby Digital Plus (DD+, E-AC-3; AC-3 and the JOC layer ride with it) has
     for performance and for platform-specific code: timing, instruction counts, memory and size measurements, the
     arithmetic tiers, SIMD, the minimum-footprint profile and the ESP32 parts. This page lists every such artifact DD+
@@ -78,12 +78,12 @@ Size is the ROADMAP's scale: S an afternoon, M a day or two, L a focused week, X
 
 | # | Capability | DD+ | TrueHD | Gap | Size | Blocked by | Evidence |
 |---|---|---|---|---|---|---|---|
-| P27 | The SIMD seam: one `simd.hpp` per architecture directory, chosen by CMake, no conditional in a kernel | `libs/base/variants/arch-{generic,x86_64,aarch64}` (`f64x2`, `f32x4`, a small `i32x4`), `ICLFORGE_SIMD` | Not used. The seam has no integer multiply or 64-bit lane, so an integer kernel in the seam's SSE2 and NEON tiers would need new operations | missing | M | Q2 | `grep -n 'struct\|operator' libs/base/variants/arch-x86_64/iclforge/base/detail/simd.hpp` |
-| P28 | AVX2 tier selected at run time, kernel bodies in their own translation unit, plain signatures, a stub for builds without it | `libs/ac3/src/internal/avx2/`, `has_avx2()` in `libs/base`, option `ICLFORGE_AVX2`, `iclforge_ac3_simd_avx2` | None | missing | L | Q2 | `grep -rli avx2 libs/truehd`: no file |
-| P29 | NEON | The `arch-aarch64` seam; exercised by the arm64 leg | Not written (needs the seam change of P27) | missing | M | Q2 | read only |
+| P27 | The SIMD seam: one `simd.hpp` per architecture directory, chosen by CMake, no conditional in a kernel | `libs/base/variants/arch-{generic,x86_64,aarch64}` (`f64x2`, `f32x4`, a small `i32x4`), `ICLFORGE_SIMD` | Not used, and not needed by the AVX2 kernel, which has a tier of its own as ac3's MDCT kernels do. The seam has no integer multiply or 64-bit lane, so an integer kernel in the seam's SSE2 and NEON tiers would need new operations | missing | M | Q2 | `grep -n 'struct\|operator' libs/base/variants/arch-x86_64/iclforge/base/detail/simd.hpp` |
+| P28 | AVX2 tier selected at run time, kernel bodies in their own translation unit, plain signatures, a stub for builds without it | `libs/ac3/src/internal/avx2/`, `has_avx2()` in `libs/base`, option `ICLFORGE_AVX2`, `iclforge_ac3_simd_avx2` | `libs/truehd/src/internal/avx2/` (the encoder's bit count) and `none/`, `iclforge_truehd_simd_avx2`; the same option and probe | partial | L | Q2, Q6 | Section 6: one kernel of the three that qualify |
+| P29 | NEON | The `arch-aarch64` seam; exercised by the arm64 leg | Not written. The scalar kernels build on arm64 as they are; a NEON body needs the seam change of P27 and could be compiled here but not run | missing | M | Q2 | read only |
 | P30 | WASM SIMD | None: Emscripten lands on `arch-generic`; `docs/platforms/wasm.md` says "no WASM SIMD" | None | none | - | - | `grep -n 'no WASM SIMD' docs/platforms/wasm.md` |
 | P31 | AVX-512 | None: `arch-x86_64/simd.hpp` says wider than SSE2 needs run-time dispatch; the AVX2 tier is the only one | None | none | - | - | read only |
-| P32 | Scalar-against-vector tests: bit-exact on real data and on random inputs, a mutation-proof | `libs/ac3/tests/core/test_simd_kernels.cpp`, `libs/ac3/tests/core/avx2/{present,absent}` | None | missing | M | - | `ls libs/truehd/tests`: no SIMD test |
+| P32 | Scalar-against-vector tests: bit-exact on real data and on random inputs, a mutation-proof | `libs/ac3/tests/core/test_simd_kernels.cpp`, `libs/ac3/tests/core/avx2/{present,absent}` | `libs/truehd/tests/encoder/test_coded_bits_simd.cpp`: 7.1 million comparisons on all eight fixtures and 40,000 random blocks; five mutations each fail it. The tests compile the tier's translation unit or its stub into their binary and skip on a CPU without AVX2, in place of ac3's present/absent header pair | built, one kernel | - | - | Section 6 |
 | P33 | The ESP32-S3's PIE and other part-specific kernels | None in the tree for DD+ either: the S3 runs the `float` tier on the generic seam | None | none | - | - | `grep -rn 'PIE\b' libs firmware`: three comments (`libs/ac3/minimal.cmake:226`, `libs/render/include/iclforge/render/float_biquad.hpp:14`, `firmware/esp-idf/iclforge/idf_component.yml:52`), no code |
 
 ### 2.5 Platforms
@@ -288,7 +288,63 @@ IEEE machine. What is left platform-dependent is the C library's `cos` and `log2
 
 ## 6. SIMD and platform-specific kernels
 
-(To be written with the kernels; see the commits after this one.)
+**The threshold.** A kernel is built for a vector unit when it is an exact integer computation (so a vector body can be bit-identical to
+the scalar, which is the only kind the repository's seam accepts) and takes at least 20 % of the instructions of a workload of section 4.
+Twenty per cent because a kernel sped up four-fold removes 15 % of the whole at that share, which is the least that repays a second body, a
+stub, a test and a CMake target to keep. Four kernels clear it:
+
+| Kernel | Share | Exact? | State |
+|---|---:|---|---|
+| Encoder: `coded_bits` | 41.7 % of a 5.1 encode | integer | **built** (AVX2) |
+| Encoder: the filter search's residual (`fir_prediction`, `compute_residual`) | 23.2 % | integer, no recurrence | not built |
+| Decoder: the prediction filters (`inverse_filter`) | 28 to 31 % of a decode | integer, a recurrence | not built |
+| Decoder: bit reader and Huffman (`read_residuals`) | 28 to 33 % | integer, sequential | not built: not a SIMD kernel |
+
+`autocorrelation` (12.1 %) is under the line and is `double`, so a vector body would change the encoded bytes; it is the kernel Q3 is about.
+
+**Built: the encoder's bit count, AVX2.** `libs/truehd/src/internal/avx2/coded_bits_avx2.cpp` is the only translation unit built with
+`-mavx2`, with plain signatures, a `none/` stub, a call site in `encoder/coding.cpp` behind `has_avx2()`, and the scalar body kept as
+`coded_bits_reference`: the layout of `libs/ac3/src/internal/avx2`. It needs no change to the seam. Eight residuals a step in 32-bit
+lanes, a gather for the code lengths, and the scalar's own 64-bit arithmetic for a tail of fewer than eight and for a block with a
+residual outside +-2^30 (which the encoder's own residuals never are). It is held to the scalar by `test_coded_bits_simd.cpp`: the
+residuals the encoder's analysis finds in all eight TrueHD fixtures at four block sizes and three filter orders, with every codebook and
+the widths and offsets around the chosen ones, and 40,000 random blocks of 1 to 200 residuals at every magnitude to 2^30, every codebook,
+width and offset, with the edges of the lanes planted; 7.1 million comparisons, feasible and infeasible both. Five mutations of the vector
+body (the shift, the table index, the sum, the length limit, the raw bound) each fail it. What it bought, x86-64, the fastest of three runs,
+against `ICLFORGE_SIMD_TIER=sse2`, which takes the tier away:
+
+| | Scalar | AVX2 | |
+|---|---:|---:|---|
+| `choose_coding`, a block of 40 | 6.4 us | 2.8 us | 2.3 times |
+| `truehd_51_encode`, an access unit | 71.4 us | 54.3 us | 1.31 times |
+| `truehd_stereo_encode`, an access unit | 25.7 us | 21.4 us | 1.20 times |
+| `truehd_coded_bits`, one feasible 40-residual candidate | 84 ns | 87 ns | none |
+
+The last row is the kernel alone on one candidate that fits: the vector body pays for its set-up and the scalar one for nothing, and they tie.
+The gain is in the candidates that do not fit and in the raw codings, which the scalar counts to the end or leaves late. The streams are
+byte for byte the same under both tiers (`reference_51.wav` 497,026 bytes and `reference_stereo.wav` 189,940, and the 18 inputs of
+section 5 through the scalar tier).
+
+**Not built, and why.**
+
+- *The encoder's filter search (23 %).* It has no recurrence and an 8-tap 64-bit dot product vectorises across samples with
+  `vpmuldq`; the work is a second body and its tests on the pattern above. Left for the next round; nothing blocks it.
+- *The decoder's prediction filters (28 to 31 %).* Each output is in the next sample's sum, so the filter is latency-bound along a
+  channel: a vector across the eight taps would wait on the same chain, and the scalar loop already issues the eight multiplies together.
+  What can be vectorised is *across channels*, each with its own chain, which wants the block's samples channel-major where
+  `decode_block` keeps a row of 10 columns per sample time (and clears and copies it every block, the `memset` and `memcpy` of 8 to 16 %
+  in section 4). That is a change to the decoder's data layout, pinned by 24 streams and 88 test cases, and it is a question before it is
+  code (Q6). A scalar version that interleaves the channels would let an out-of-order core overlap their chains with no vector unit at all,
+  and is the first thing to try.
+- *NEON, WASM SIMD and the ESP32 parts.* Nothing is written. The repository's seam has no integer multiply or 64-bit lane for the first
+  (Q2); WASM has no SIMD tier for DD+ either; the S3's PIE multiply-accumulate is 8 and 16 bits wide as far as I could tell, narrower than the
+  24-bit samples, and I had no manual to check. The scalar kernels build for aarch64, thumbv7m and riscv32 (section 5 compiled the
+  sums); no vector body for them was compiled, so there is nothing to label "compiled, not run".
+- *AVX-512.* This machine has it, the repository's pattern has no AVX-512 tier for DD+, and the AVX2 body is the repository's pattern.
+
+**Found and left alone.** The decoder clears and copies `kRowStride` (10) columns of every sample time for every channel count and every
+block, which is 8 to 16 % of a decode's instructions on x86-64 and more on a part with a slow `memset`; and its state is 156 KB for any
+stream. Both are data-layout changes to the decoder and belong with Q6.
 
 ## 7. Questions for the owner
 
@@ -315,3 +371,10 @@ Each has a recommendation; none is settled here. Sections that follow the matrix
 5. **Is a core-only or reduced-rate decode acceptable on small parts?** TH spec §2.2 lets a decoder read substream 0 (stereo)
    or substreams 0 and 1 (5.1) of a stream that carries more. `Presentation::k2ch` and `k6ch` already do this.
    *Recommendation:* yes; it is the only way the ESP32-C3 and C6 decode a 7.1 stream at all.
+6. **May the decoder's block buffer change shape?** It keeps a row of 10 columns per sample time whatever the channel count, clears it
+   and copies it every block (8 to 16 % of a decode's instructions), and any vector filter across channels wants the samples
+   channel-major. *Recommendation:* yes, as one change to `decode_block` before any decode-side SIMD, pinned by the 24 streams and the
+   test cases that exist; the scalar channel-interleaved version first, because it may need no vector unit.
+7. **Should CI run `tools/checks/truehd_instructions.py`?** It is the only deterministic cost figure TrueHD has without QEMU, and it
+   needs valgrind, which the CI images do not carry. *Recommendation:* in the nightly run only, with the ceilings in
+   `testdata/truehd-instruction-ceilings.json`, on the image that already runs the benches; or not at all until the Cortex-M3 leg exists.
