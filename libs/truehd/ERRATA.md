@@ -484,6 +484,42 @@ The repository reads the EMDF container for E-AC-3 (`libs/objects/src/emdf.cpp`;
 | A18 | the container sits in the extra data region and is `evolution_payload` of §16.1 | TS 103 420 §8.2: the container is carried in the last dependent substream of an E-AC-3 stream; nothing about TrueHD | standard silent: rests on the owner's word |
 | A19 | §16.3 says the same bytes are a Thrift Binary Protocol container holding the typed entries and a nested ContentSignature | -- | **internal contradiction** with §15.4: one region, two layouts, and v3.6 does not relate them. **Q20** |
 
+**Field for field.** §15.4's `evo_frame()` is the EMDF container body with `evo_` for `emdf_`: every field of v3.6 has a counterpart in Annex H,
+in the same order, and the repository's reader holds it.
+
+| TH spec v3.6 | Annex H (EMDF) | `iclforge::objects::emdf::parse_container` | Differs from v3.6 |
+|---|---|---|---|
+| (none: §16.1 frames it) | `emdf_sync` 0x5838, `emdf_container_length` | found by scanning for the sync word; the length bounds the container | v3.6 has neither (A1) |
+| `evo_version` (+ `variable_bits(2)`) | `emdf_version` | read; any value but 0 is refused (`kUnsupportedConfig`) | refuses 1 to 3 (A2) |
+| `key_id` (+ `variable_bits(3)`) | `key_id` | read, the value discarded | -- |
+| `evo_payload_id` | `emdf_payload_id` (0x1F escapes) | `DecodedPayload::id`; the escape is read | no escape in v3.6 (A5) |
+| `b_smploffst_present`, `smploffst` | `smploffste`, `smploffst` (11 bits) + 1 reserved bit | `PayloadConfig::sample_offset`, -1 when absent | `variable_bits` in v3.6 (A7) |
+| `b_duration_present`, `duration` | `duratione`, `duration` | `duration`, -1 when absent | -- |
+| `b_groupid_present`, `groupid` | `groupide`, `groupid` | `group_id`, -1 when absent | -- |
+| `b_codedcdata_present`, `codedcdata` (8) | `codecdatae`, 8 reserved bits | `codec_data`; the 8 bits skipped | v3.6 calls them data (A9) |
+| `discard_unknown_payload` | `discard_unknown_payload` | `discard_unknown` | -- |
+| `payload_frame_aligned`, `create_duplicate`, `remove_duplicate` | the same | `frame_aligned`, `create_duplicate`, `remove_duplicate` | -- |
+| `priority`, `proc_allowed` | the same | `priority`, `proc_allowed` (0 when absent) | -- |
+| `evo_payload_size`, `evo_payload_byte[]` | `emdf_payload_size`, `emdf_payload_byte[]` | `DecodedPayload::bytes`, copied (not byte-aligned in the frame) | -- |
+| payload id 0 | `emdf_payload_id` 0 | ends the list | -- |
+| `protection_length_primary`, `protection_length_secondary` | the same | read; a primary code of 0 is refused (`kUnsupportedConfig`) | v3.6 allows it (A15) |
+| `protection_bits_primary`, `protection_bits_secondary` | the same, implementation defined | skipped, not verified, not returned | -- |
+| (none) | zero bits to the container's byte boundary | ignored | -- |
+
+Three further differences between the repository's readers. `parse_container` reads the whole configuration clause and reports it;
+`libs/ac3/src/emdf/frame_layout.cpp`, which only needs to know where a container ends, reads the clause in the one shape Table 56 allows
+(it reads `smploffste` and `duratione` as flags and does not read the values they gate, so a configuration with either set desyncs it),
+and so it is narrower than v3.6's syntax. Neither returns the protection bytes. And the repository's writer (`build_container`) follows
+Table 56 except `codecdatae`, which it writes as 0 (question 23).
+
+**What TS 103 420 §8.2 constrains.** The payloads "shall be carried in the EMDF container" (so the container of ETSI TS 102 366
+Annex H, which §5.1 names as the one that carries the OAMD bitstream); OAMD is payload id 11 and JOC 14, each once per frame (Table 55);
+and the configuration data of Table 56 (`duratione` 0, `groupide` 1 with the same `groupid` for the OAMD and JOC payloads, `codecdatae` 1,
+`discard_unknown_payload`, `create_duplicate`, `remove_duplicate`, `priority` and `proc_allowed` 0), "as specified in ETSI TS 102 366
+clause H.2.2.3". The names v3.6 gives `evo_payload_config()` are Annex H's with `evo_` for `emdf_` and the flag fields renamed
+`b_..._present`. So the standard confirms the claim that §15.4's container is the EMDF container, for E-AC-3. It does not confirm that
+TrueHD carries it, in what bit layout around it, or that its configuration follows Table 56 (v3.6's syntax allows every configuration).
+
 ### B. The OAMD payload (§15.5 to §15.15) against TS 103 420 §5
 
 | # | TH spec v3.6 | TS 103 420 | Verdict |
