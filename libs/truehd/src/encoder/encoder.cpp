@@ -1057,7 +1057,12 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     const detail::CodingChoice choice =
                         detail::choose_coding(block, quant, previous[k], fir_bits);
                     if (choice.data_bits >= detail::kInfeasible) {
-                        // The filter's residual does not fit any coding: drop the filter.
+                        // The filter's residual does not fit any coding: drop the filter. A row
+                        // that does not fit without one has nothing left to drop.
+                        if (stage.fir[k].order == 0) {
+                            return std::unexpected(make_error(EncodeErrorKind::kInternal,
+                                                              "a channel row fits no coding"));
+                        }
                         stage.fir[k] = FilterSpec{};
                         if (!compute_residual(stage.coded[k], stage.fir[k], quant,
                                               stage.residual[k])) {

@@ -184,6 +184,17 @@ CodingChoice choose_coding(std::span<const std::int32_t> residuals, int quant,
             consider(type, before.lsbs - quant, clamp_offset(mean));
         }
     }
+    if (best.data_bits >= kInfeasible) {
+        // A block that sits far from zero in a narrow band (a DC offset in a row, a steady
+        // full-scale level) is out of reach of every width its spread suggests, because the
+        // offset is 15 bits: try every width.
+        for (int type = 0; type <= 3; ++type) {
+            for (int lb = 0; lb <= lb_limit; ++lb) {
+                consider(type, lb, 0);
+                consider(type, lb, clamp_offset(mean));
+            }
+        }
+    }
     return best;
 }
 
