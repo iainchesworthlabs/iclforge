@@ -32,6 +32,7 @@
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "truehd_evolution.hpp"
 
 namespace forge_cli::commands {
 
@@ -547,11 +548,13 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     std::uint64_t segment_failures = 0;
     int substreams = 0;
     std::uint64_t extra_data_units = 0;
+    EvolutionSurvey evolution;
     while (const auto unit = reader.next()) {
         const auto parsed = th::parse_access_unit(*unit, substreams, true);
         if (!parsed) {
             continue;
         }
+        evolution.add(units, *parsed);
         ++units;
         if (parsed->extra_data) {
             ++extra_data_units;
@@ -623,6 +626,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("segment_failures", segment_failures);
         json.member("unreadable_units", unreadable);
         json.member("skipped_bytes", static_cast<std::uint64_t>(reader.skipped_bytes()));
+        json.key("evolution");
+        evolution.write_json(json);
         json.end_object();
         json.end_object();
         json.finish();
@@ -655,6 +660,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             "{:<16}{} of {} segment(s) pass their parity and CRC; {} unreadable unit(s); {} "
             "skipped byte(s)",
             "checks", segments - segment_failures, segments, unreadable, reader.skipped_bytes());
+        evolution.print_text();
     }
     return damaged ? 1 : 0;
 }

@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # forge - the command-line front end over iclforge::ac3.
 # ---------------------------------------------------------------------------
-add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp src/commands/project.cpp ../../shared/project/src/karaoke_parts.cpp ../../shared/project/src/project_document.cpp ../../shared/project/src/project_command.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/associated_mix.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/truehd.cpp src/commands/truehd_containers.cpp
+add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp src/commands/project.cpp ../../shared/project/src/karaoke_parts.cpp ../../shared/project/src/project_document.cpp ../../shared/project/src/project_command.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/associated_mix.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/truehd.cpp src/commands/truehd_evolution.cpp src/commands/truehd_containers.cpp
     src/commands/truehd_encode.cpp src/commands/lyrics.cpp src/commands/content_signature.cpp src/commands/stream_tools.cpp)
 
 # ../../shared/media/src/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
@@ -106,6 +106,7 @@ target_link_libraries(forge
         iclforge::containers
         iclforge::ac4
         iclforge::truehd
+        iclforge::objects
         iclforge::lyrics
         iclforge::app_text_encoding
         iclforge::warnings

@@ -967,6 +967,16 @@ mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status 
 `best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `probe` describes the stream (`json=1` adds a `truehd`
 member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
 
+When access units carry extra data, `probe` adds an `evolution` line (and an `evolution` object under `truehd` with `json=1`): how
+many units carry it; how many pass the check nibble, the framing and the parity; how many read as an evolution frame under each of
+the two readings of TH spec v3.6 section 15.4 (the EMDF container of E-AC-3, and the section to the letter) and how many of those
+are clean (a payload, and only zero bits after the protection field); which payload ids the frames hold; for payload id 11, the
+object audio metadata read by `iclforge::objects`: the object count, the bed channels, the number of dynamic objects and of update
+blocks; how many units apart the frames come; and the first four bytes of the first frame, which tell a bit-level container from a
+Thrift one. It prints metadata only. The protection bytes and any signature are not verified, and the report says so. The reading is
+provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 20), and
+this report is the check to run on a real Atmos track.
+
 A TrueHD or MLP stream, bare or in a container, is also read by `probe` (the container's own description of the track beside
 the stream's), `levels` (peak and RMS per channel of the 24-bit samples), `loudness` (integrated loudness and true peak, with
 BS.1770-5 Annex 3's weights taken from the speakers the stream names), `mkv`, `mp4`, `ts`, `spdif`, `unspdif`, `demux` and

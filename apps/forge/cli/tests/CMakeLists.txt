@@ -92,6 +92,7 @@ target_link_libraries(iclforge-forge-cli-tests
         iclforge::containers
         iclforge::ac4
         iclforge::truehd
+        iclforge::objects
         iclforge::json)
 # test_cli_truehd.cpp decodes and probes the FFmpeg fixtures of testdata/truehd, and holds the WAV to the
 # manifest's digests.

@@ -21,6 +21,12 @@
 #include "iclforge/base/crypto/sha256.hpp"
 #include "iclforge/base/loudness.hpp"
 #include "iclforge/base/speaker.hpp"
+#include "iclforge/objects/emdf.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/evolution.hpp"
 #include "multi_track_files.hpp"
 #include "platform/process.hpp"
 
@@ -245,6 +251,223 @@ TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][trueh
     CHECK(stream["samples_per_access_unit"] == 80);
     CHECK(stream["segment_failures"] == 0);
     CHECK(stream["skipped_bytes"] == 0);
+}
+
+// --- the evolution frame in probe --------------------------------------------------------------
+// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20): no real
+// stream carries an evolution frame, so the stream here is the encoder's, with the extra data
+// framing it writes around the E-AC-3 container's body holding an OAMD payload from iclforge::objects.
+
+namespace {
+
+// The access units that carry extra data in the streams below: six of twelve, at gaps of 2, 1, 3, 2
+// and 2 units.
+bool carries_extra_data(std::uint64_t index) {
+    return index == 0 || index == 2 || index == 3 || index == 6 || index == 8 || index == 10;
+}
+
+// Writes the stream a payload source makes: twelve access units of stereo whose extra data is
+// `payload(index)` in the units that `carries_extra_data` names.
+template <typename Payload>
+fs::path write_stream_with(const fs::path& dir, const std::string& name, Payload&& payload) {
+    iclforge::truehd::EncoderConfig config;
+    config.restart_interval_units = 8;
+    config.extra_data = [&payload](std::uint64_t index) {
+        return carries_extra_data(index) ? payload() : std::vector<std::byte>{};
+    };
+    auto encoder = iclforge::truehd::Encoder::create(config);
+    REQUIRE(encoder.has_value());
+    std::vector<std::int32_t> pcm(40 * 12 * 2);
+    for (std::size_t i = 0; i < pcm.size(); ++i) {
+        pcm[i] = static_cast<std::int32_t>((i * 7919U) % 20000U) - 10000;
+    }
+    std::vector<std::byte> stream;
+    auto units = encoder->encode(pcm);
+    REQUIRE(units.has_value());
+    auto tail = encoder->flush();
+    REQUIRE(tail.has_value());
+    for (const auto* batch : {&*units, &*tail}) {
+        for (const auto& unit : *batch) {
+            stream.insert(stream.end(), unit.bytes.begin(), unit.bytes.end());
+        }
+    }
+    const fs::path path = dir / name;
+    std::ofstream out{path, std::ios::binary};
+    out.write(reinterpret_cast<const char*>(stream.data()),
+              static_cast<std::streamsize>(stream.size()));
+    return path;
+}
+
+// Six access units carrying an OAMD payload of three dynamic objects in the EMDF container's body.
+fs::path write_atmos_like_stream(const fs::path& dir) {
+    namespace oba = iclforge::objects::oba;
+    namespace emdf = iclforge::objects::emdf;
+    oba::Program program;
+    program.dynamic_only = true;
+    program.lfe = true;
+    program.dynamic_objects = 3;
+    const std::vector<oba::DynamicObject> objects(3);
+    const std::vector<std::byte> oamd = oba::build_payload(program, objects);
+    const std::array<emdf::Payload, 1> payloads{{{.id = emdf::kPayloadIdOamd, .bytes = oamd}}};
+    const std::vector<std::byte> container = emdf::build_container(payloads, 0);
+    const std::vector<std::byte> body(container.begin() + 4, container.end());
+
+    return write_stream_with(dir, "atmos_like.thd", [&body] { return body; });
+}
+
+}  // namespace
+
+TEST_CASE("forge probe reports the evolution frames and the object metadata in them",
+          "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = write_atmos_like_stream(dir);
+    const fs::path log = dir / "probe_evolution.log";
+
+    SECTION("text") {
+        REQUIRE(run_cli("probe \"" + stream.string() + "\"", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("evolution       6 unit(s) carry extra data, 6 read as an evolution frame") !=
+              std::string::npos);
+        CHECK(text.find("frames at units 0 to 10, 1 to 3 unit(s) apart") != std::string::npos);
+        CHECK(text.find("check nibble 6/6, framing 6/6, parity 6/6") != std::string::npos);
+        CHECK(text.find("read as the EMDF container: 6/6 (6 clean)") != std::string::npos);
+        CHECK(text.find("payload ids: 11 (x6)") != std::string::npos);
+        CHECK(text.find("4 object(s), dynamic-only program with LFE") != std::string::npos);
+        CHECK(text.find("3 dynamic") != std::string::npos);
+        CHECK(text.find("not verified: the protection bytes and any signature") != std::string::npos);
+    }
+    SECTION("json") {
+        REQUIRE(run_cli("probe \"" + stream.string() + "\" json=1", log) == 0);
+        const auto document = nlohmann::json::parse(read_text(log));
+        const auto& evolution = document["truehd"]["evolution"];
+        CHECK(evolution["provisional"] == true);
+        CHECK(evolution["regions"] == 6);
+        CHECK(evolution["check_nibble_ok"] == 6);
+        CHECK(evolution["framing_ok"] == 6);
+        CHECK(evolution["parity_ok"] == 6);
+        CHECK(evolution["frames_read"] == 6);
+        CHECK(evolution["readings"]["emdf"]["frames"] == 6);
+        CHECK(evolution["readings"]["emdf"]["clean_frames"] == 6);
+        CHECK(evolution["payload_ids"].size() == 1);
+        CHECK(evolution["payload_ids"][0]["id"] == 11);
+        CHECK(evolution["payload_ids"][0]["frames"] == 6);
+        CHECK(evolution["protection"]["verified"] == false);
+        CHECK(evolution["signature_verified"] == false);
+        CHECK(evolution["oamd"]["payloads"] == 6);
+        CHECK(evolution["oamd"]["unread"] == 0);
+        REQUIRE(evolution["oamd"]["programs"].size() == 1);
+        const auto& program = evolution["oamd"]["programs"][0];
+        CHECK(program["frames"] == 6);
+        CHECK(program["object_count"] == 4);
+        CHECK(program["dynamic_only"] == true);
+        CHECK(program["dynamic_objects"] == 3);
+        CHECK(program["bed_channels"][0] == "LFE");
+        CHECK(evolution["cadence"]["first_unit"] == 0);
+        CHECK(evolution["cadence"]["last_unit"] == 10);
+        CHECK(evolution["cadence"]["min_gap_units"] == 1);
+        CHECK(evolution["cadence"]["max_gap_units"] == 3);
+    }
+}
+
+TEST_CASE("forge probe counts a wrong check nibble and a wrong parity byte", "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = write_atmos_like_stream(dir);
+    std::vector<std::byte> bytes = read_bytes(stream);
+    // Unit 0's extra data starts with the check nibble; unit 3's ends the unit with the parity byte.
+    iclforge::truehd::ElementaryReader reader(bytes);
+    int index = 0;
+    while (const auto unit = reader.next()) {
+        const auto parsed = iclforge::truehd::parse_access_unit(*unit, 1, true);
+        REQUIRE(parsed.has_value());
+        if (index == 0) {
+            REQUIRE(parsed->extra_data.has_value());
+            bytes[static_cast<std::size_t>(parsed->extra_data->bytes.data() - bytes.data())] ^=
+                std::byte{0x10};
+        }
+        if (index == 3) {
+            REQUIRE(parsed->extra_data.has_value());
+            bytes[static_cast<std::size_t>(parsed->extra_data->bytes.data() - bytes.data()) +
+                  parsed->extra_data->bytes.size() - 1] ^= std::byte{0x5A};
+        }
+        ++index;
+    }
+    const fs::path damaged = dir / "atmos_like_damaged.thd";
+    {
+        std::ofstream out{damaged, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    }
+    const fs::path log = dir / "probe_damaged_evolution.log";
+    REQUIRE(run_cli("probe \"" + damaged.string() + "\" json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    const auto& evolution = document["truehd"]["evolution"];
+    CHECK(evolution["regions"] == 6);
+    CHECK(evolution["check_nibble_ok"] == 5);
+    CHECK(evolution["parity_ok"] == 5);
+    CHECK(evolution["framing_ok"] == 6);
+    // The checks are reported, not enforced: every frame still reads and the exit status is 0.
+    CHECK(evolution["frames_read"] == 6);
+}
+
+TEST_CASE("forge probe tells the two readings of the container apart", "[forge-cli][truehd][evolution]") {
+    // A frame written in the coding of the letter of TH spec v3.6 section 15.4
+    // (tools/references/truehd_evolution.py): the EMDF coding does not read it cleanly, the other does.
+    const fs::path dir = scratch_dir();
+    std::ifstream vectors_file{fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "evolution" / "vectors.json"};
+    REQUIRE(vectors_file.good());
+    const auto vectors = nlohmann::json::parse(vectors_file);
+    std::vector<std::byte> payload;
+    for (const auto& vector : vectors["vectors"]) {
+        if (vector["name"] == "spec36_one_oamd_payload") {
+            const std::string text = vector["extra_data"];
+            std::vector<std::byte> region;
+            for (std::size_t i = 0; i + 1 < text.size(); i += 2) {
+                region.push_back(static_cast<std::byte>(std::stoul(text.substr(i, 2), nullptr, 16)));
+            }
+            const auto extra = iclforge::truehd::read_extra_data(region);
+            REQUIRE(extra.has_value());
+            REQUIRE(extra->framing_ok);
+            payload.assign(extra->evolution_payload.begin(), extra->evolution_payload.end());
+        }
+    }
+    REQUIRE_FALSE(payload.empty());
+    const fs::path stream = write_stream_with(dir, "letter_of_15_4.thd", [&payload] { return payload; });
+    const fs::path log = dir / "probe_letter.log";
+    REQUIRE(run_cli("probe \"" + stream.string() + "\" json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    const auto& evolution = document["truehd"]["evolution"];
+    CHECK(evolution["regions"] == 6);
+    CHECK(evolution["readings"]["spec36"]["clean_frames"] == 6);
+    CHECK(evolution["readings"]["emdf"]["clean_frames"] == 0);
+    REQUIRE(evolution["payload_ids"].size() == 1);
+    CHECK(evolution["payload_ids"][0]["id"] == 11);
+    CHECK(evolution["payload_ids"][0]["frames"] == 6);
+    // 23 bytes that are not object audio metadata: counted, not read.
+    CHECK(evolution["oamd"]["payloads"] == 6);
+    CHECK(evolution["oamd"]["unread"] == 6);
+}
+
+TEST_CASE("forge probe says so when there is no extra data and when it is not a frame",
+          "[forge-cli][truehd][evolution]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "probe_no_evolution.log";
+    REQUIRE(run_cli("probe \"" + fixture("truehd_m51_s24.thd").string() + "\" json=1", log) == 0);
+    const auto none = nlohmann::json::parse(read_text(log));
+    CHECK(none["truehd"]["evolution"]["regions"] == 0);
+    CHECK(none["truehd"]["evolution"]["provisional"] == true);
+    REQUIRE(run_cli("probe \"" + fixture("truehd_m51_s24.thd").string() + "\"", log) == 0);
+    CHECK(read_text(log).find("evolution") == std::string::npos);
+
+    // Opaque bytes in the extra data (the hand-built hb_extra_data): framed and checked, no frame.
+    const fs::path opaque = fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_extra_data.thd";
+    REQUIRE(run_cli("probe \"" + opaque.string() + "\" json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    const auto& evolution = document["truehd"]["evolution"];
+    CHECK(evolution["regions"] == 20);
+    CHECK(evolution["check_nibble_ok"] == 20);
+    CHECK(evolution["parity_ok"] == 20);
+    CHECK(evolution["readings"]["emdf"]["clean_frames"] == 0);
+    CHECK(evolution["oamd"]["payloads"] == 0);
+    CHECK(evolution["signature_verified"] == false);
 }
 
 TEST_CASE("forge probe exits 1 on a damaged TrueHD stream", "[forge-cli][truehd]") {

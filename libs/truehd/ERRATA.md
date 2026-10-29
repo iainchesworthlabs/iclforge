@@ -714,6 +714,20 @@ frame, and the owner has not said that §15.4 and not §16.3 is what real stream
   reports, the escape cap of `kSpec36`, the protection order, the discard flag, the version and key id escapes, the first-payload rule,
   the widths of `proc_allowed`, the group id and the codec data, the error kind of a missing terminator and the two-byte minimum of
   `read_extra_data`) and `ctest -L truehd` failed each time.
+- `forge probe` (`apps/forge/cli/src/commands/truehd_evolution.cpp`) is the check to run on a real Atmos track. For a stream whose units
+  carry extra data it prints, and writes under `truehd.evolution` with `json=1`: the units that carry it and the cadence (first and last unit,
+  the smallest and largest gap), how many pass the check nibble, the framing, the parity, `evo_reserved` and the capacity rule, how many
+  read as a frame under each reading and how many of those are clean (a payload, and only zero bits after the protection field), the
+  payload ids, the protection length codes, and for payload id 11 what `iclforge::objects` reads from it: the object count, the bed
+  channels, the dynamic objects and the update blocks. It says that the protection bytes and any signature are not verified, and prints
+  the first four bytes of the first frame (a bit-level container and a Thrift one start differently). No audio and no payload byte
+  beyond those four. The tests (`apps/forge/cli/tests/test_cli_truehd.cpp`) run it on a stream the encoder makes with an OAMD payload in
+  every other unit, on one with a wrong check nibble and a wrong parity byte, on a frame written in the letter of §15.4 (only that reading
+  reads it cleanly), on the hand-built stream whose extra data is opaque, and on a stream with no extra data; 17 mutations of the survey
+  were tried and 15 fail the tests (the two that do not change what is chosen only when both readings read the same bytes cleanly). The
+  JSON of a stream inside Matroska, MP4 or a transport stream is still invalid for the reason `planning/truehd-parity-forge.md` R3 gives
+  (the `container` key is written twice, before and after this change; not touched here): with that key repaired the `evolution` object is
+  valid in all three.
 - What this does not show: that any TrueHD stream looks like this. The vectors, the Python transcription and the C++ reader share one
   author's reading of §15.4; the E-AC-3 reader does not, and is why `kEmdf` is the default.
 

@@ -61,6 +61,17 @@ See [README.md](README.md) for the project overview and
   answers (`libs/truehd/ERRATA.md`, question 21). `forge help truehd-encode`, `decode`, `levels` and `loudness` print their TrueHD options, and
   the help, the man page and the banner name TrueHD. New cases cover the containers, MAT, levels, loudness and refusals over streams
   `truehd-encode` makes, and the codec matrix lists every refusal with its exit status.
+- **Added: TrueHD Atmos groundwork from TH spec v3.6 (reading side only, provisional).** `libs/truehd` reads a unit's extra data into plain
+  structures (`read_extra_data`, `read_evolution`, `parse_evolution_frame`): the check nibble, framing and parity are reported and not
+  enforced, the evolution payload is read as the bit-level container of section 15.4 under two readings (the EMDF container E-AC-3 uses, and
+  the letter of section 15.4), and payload id 11, the object audio metadata, is handed out as bytes for `iclforge::objects` to parse. Nothing
+  decodes from it and nothing is verified (protection bytes, signatures). `forge probe` of a TrueHD stream whose units carry extra data now
+  prints an `evolution` report (and a `truehd.evolution` object with `json=1`): the frames, the payload ids, the object count and bed through
+  `iclforge::objects`, the checks that pass, and which reading read them. No stream the project holds carries an evolution frame, so the
+  reading is provisional; the probe is the check to run on a real Atmos track. A new hand-built stream, `hb_substream3_limits`, holds the
+  decoder to substream 3's limits in v3.6 (restart sync 0x31EC, 15 matrices, `huff_lsbs` 29 to 31, values past 24 bits before the matrices):
+  the decoder already accepts all of it, and the refusal of `huff_lsbs` above the limit now names both limits. `libs/truehd/ERRATA.md`
+  sets sections 15.4 to 15.15 of v3.6 against ETSI TS 103 420 statement by statement, with 18 new questions for the owner (20 to 37).
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,
