@@ -22,17 +22,19 @@ Every library has its own header directory, `src/<name>/include/iclforge/<name>/
 `iclforge/<name>/...` in an `#include`; the [header map](header-map.md) lists what is where. The
 main codec headers are under `libs/ac3/include/iclforge/ac3/`, and the AC-4 headers under
 `libs/ac4/include/iclforge/ac4/`, by area as AC-3's are: `core/` (the table of contents), `io/`
-(the elementary stream and the carriage), `decoder/` and `encoder/`.
+(the elementary stream and the carriage), `decoder/` and `encoder/`. The TrueHD headers are under
+`libs/truehd/include/iclforge/truehd/`, split the same way (`core/`, `io/`, `decoder/`, `encoder/`).
 
 | CMake target | Purpose |
 |---|---|
 | `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the four libraries below it |
 | `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256; the FFT, the QMF bank and the sample-rate converter |
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
-| `iclforge::containers` | The codec-blind carriage, in parts: IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4 (`iclforge::containers::iec61937`, always built); the Matroska, MP4 and MPEG-TS writers and readers (`::matroska`, `::mp4`, `::mpegts`); IAMF reading and writing, as OBUs, ISO-BMFF and fragments (`::iamf`, see [IAMF](iamf.md)) |
+| `iclforge::containers` | The codec-blind carriage, in parts: IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4, and TrueHD's MAT (`iclforge::containers::iec61937`, always built); the Matroska, MP4 and MPEG-TS writers and readers (`::matroska`, `::mp4`, `::mpegts`), which carry TrueHD too; IAMF reading and writing, as OBUs, ISO-BMFF and fragments (`::iamf`, see [IAMF](iamf.md)) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder or decoder; opt-in with `ICLFORGE_BUILD_ADM=ON` |
-| `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
+| `iclforge::ac4` | AC-4 decoding and encoding, the sync frames, table of contents and presentations both work through, and the AC-4 content signature; see [AC-4](ac4.md) and [Signing](signing.md#ac-4-content-signing) |
+| `iclforge::truehd` | TrueHD and MLP: the bitstream layer, a lossless decoder and a TrueHD encoder; links `iclforge::base` only; see [TrueHD and MLP](truehd.md) |
 
 `iclforge::adm` needs the root dependency manifest's `adm` feature
 (`-DVCPKG_MANIFEST_FEATURES=adm`) when building this repository with vcpkg, and is installed as a
