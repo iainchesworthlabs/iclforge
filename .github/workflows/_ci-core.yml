@@ -1094,17 +1094,27 @@ jobs:
       - name: Configure
         run: cmake --preset config-linux-llvm
 
-      - name: Build forge and the TrueHD container tool
-        run: cmake --build --preset build-linux-llvm --target forge iclforge-truehd-container-tool -- -k 0
+      - name: Build forge, the TrueHD container tool and the TrueHD encode tool
+        run: cmake --build --preset build-linux-llvm --target forge iclforge-truehd-container-tool iclforge-truehd-encode-tool -- -k 0
 
       - name: Codec matrix against the FFmpeg oracle
         run: bash tools/ci/run_codec_matrix.sh build/config-linux-llvm/bin/forge
 
       # TrueHD and MLP are lossless, so FFmpeg's strict decode is held to bit for bit: the decoder on
-      # testdata/truehd (with the independent Python reference beside it), and the containers in both
-      # directions (planning/truehd.md, libs/containers/ERRATA.md).
+      # testdata/truehd (with the independent Python reference beside it), the encoder's streams
+      # (forge truehd-encode over the quick matrix of rates, layouts, widths and signals), and the
+      # containers in both directions (planning/truehd.md, libs/containers/ERRATA.md).
       - name: TrueHD and MLP decode against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_interop.py --forge build/config-linux-llvm/bin/forge --reference --require-ffmpeg
+
+      - name: TrueHD encoder against FFmpeg's strict decode (bit-exact)
+        run: python3 tools/checks/verify_truehd_encode_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
+
+      # The seeds that ever made the encoder write a stream a decoder disagreed with, replayed exactly
+      # (REGRESSION_SEEDS in the script): deterministic and quick, so it gates. The unseeded search is
+      # fuzz.yml's nightly job.
+      - name: TrueHD encoder input-space regressions (recorded past failures)
+        run: python3 tools/ci/fuzz_truehd_encoder_space.py --tool build/config-linux-llvm/bin/iclforge-truehd-encode-tool --regressions
 
       - name: TrueHD in MP4, Matroska, MPEG-TS and MAT against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_containers.py --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool

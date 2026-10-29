@@ -63,6 +63,9 @@
 #                      dependent substream, enhanced coupling, transient
 #                      pre-noise or fscod2 audio, and holds those cells
 #                      against ffprobe's syncframe walk instead.
+#                      The TrueHD encoder has a third, tools/ci/fuzz_truehd_encoder_space.py:
+#                      the codec is lossless, so FFmpeg's strict decode of every stream
+#                      is held to the source sample for sample.
 #                      Not a libFuzzer target and not part of tools/fuzz/run.sh - it
 #                      drives the real forge, so it builds the CLI the way
 #                      _ci-core.yml's ffmpeg-validate job (called from
@@ -159,6 +162,10 @@ on:
         default: 900
       ac4_encoder_space_seconds:
         description: "AC-4 encoder input-space budget, in seconds"
+        type: number
+        default: 900
+      truehd_encoder_space_seconds:
+        description: "TrueHD encoder input-space budget, in seconds"
         type: number
         default: 900
 
@@ -522,6 +529,7 @@ jobs:
       ENCODER_SPACE_SECONDS: ${{ github.event.inputs.encoder_space_seconds || 900 }}
       EAC3_ENCODER_SPACE_SECONDS: ${{ github.event.inputs.eac3_encoder_space_seconds || 900 }}
       AC4_ENCODER_SPACE_SECONDS: ${{ github.event.inputs.ac4_encoder_space_seconds || 900 }}
+      TRUEHD_ENCODER_SPACE_SECONDS: ${{ github.event.inputs.truehd_encoder_space_seconds || 900 }}
     steps:
       - name: Bootstrap container
         run: |
@@ -530,7 +538,7 @@ jobs:
           attempt=1
           until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
             build-essential ca-certificates cmake curl git gnupg lsb-release \
-            ninja-build pkg-config python3 software-properties-common \
+            ninja-build pkg-config python3 python3-numpy software-properties-common \
             tar unzip wget zip \
             ffmpeg=7:8.0.1-3ubuntu2
           do
@@ -557,8 +565,8 @@ jobs:
       - name: Configure
         run: cmake --preset config-linux-llvm
 
-      - name: Build forge
-        run: cmake --build --preset build-linux-llvm --target forge -- -k 0
+      - name: Build forge and the TrueHD encode tool
+        run: cmake --build --preset build-linux-llvm --target forge iclforge-truehd-encode-tool -- -k 0
 
       # First, because a run that draws configurations the encoder was never
       # going to accept would come back green having encoded almost nothing.
@@ -593,6 +601,18 @@ jobs:
         run: >
           python3 tools/ci/fuzz_ac4_encoder_space.py
           --seconds "$AC4_ENCODER_SPACE_SECONDS"
+
+      # The TrueHD half: lossless, so FFmpeg's strict decode of every stream is held to the source
+      # sample for sample. The case seeds that ever failed replay first (deterministic), then the
+      # unseeded search; every failure prints the seed that --replay reruns.
+      - name: TrueHD encoder input-space regressions (recorded past failures)
+        run: python3 tools/ci/fuzz_truehd_encoder_space.py --tool build/config-linux-llvm/bin/iclforge-truehd-encode-tool --regressions
+
+      - name: TrueHD encoder input-space fuzz (deeper budget, FFmpeg's strict decode)
+        run: >
+          python3 tools/ci/fuzz_truehd_encoder_space.py
+          --tool build/config-linux-llvm/bin/iclforge-truehd-encode-tool
+          --seconds "$TRUEHD_ENCODER_SPACE_SECONDS"
 
       - name: Upload failing inputs
         if: failure()
