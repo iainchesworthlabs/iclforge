@@ -405,7 +405,7 @@ constexpr std::array<Command, 49> kCommands{{
      "it anyway and counts the violations; verify decodes every access unit as it is coded and "
      "compares it with the input. 24 bit input is coded as 24 bit and 16 bit input as the same "
      "samples with their clear low bits sent as an output shift",
-     topic::kStdio,
+     topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
     {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path>",
@@ -434,13 +434,15 @@ constexpr std::array<Command, 49> kCommands{{
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
      "pinned to their speaker, dynamic objects positioned by their own timeline",
-     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects | topic::kContentSignature,
+     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kTruehd | topic::kObjects |
+         topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_decode(x.str(1), x.str(2), x.meta, x.str(3), x.str(4)); }},
-    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
+    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
      "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 "
-     "TOC/presentations/substream groups, bare or inside a container, and what the container "
-     "says of its track; table or documented JSON",
+     "TOC/presentations/substream groups, or a TrueHD/MLP stream's substreams, rate and parity "
+     "and CRC checks (detail= is not read for it), bare or inside a container, and what the "
+     "container says of its track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
     {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
@@ -481,16 +483,18 @@ constexpr std::array<Command, 49> kCommands{{
          const auto inputs = x.tail(2);
          return run_cat(x.str(1), inputs);
      }},
-    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
-     "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded",
-     topic::kProgramme | topic::kAc4Decode,
+    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
+     "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded "
+     "(truehd-presentation=, truehd-check=)",
+     topic::kProgramme | topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_levels(x.str(1), x.meta); }},
-    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mkv|in.mp4|in.ts>",
+    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
      "BS.1770-4 loudness -> dialnorm, beside a stream's own: an AC-3 or E-AC-3 stream's first "
      "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB; a TrueHD or MLP "
-     "stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights)",
-     topic::kAc4Decode,
+     "stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights; truehd-presentation=, "
+     "truehd-check=)",
+     topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_loudness(x.str(1), x.meta); }},
     {"qc", 2,

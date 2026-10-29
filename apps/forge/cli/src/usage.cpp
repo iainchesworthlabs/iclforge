@@ -100,8 +100,8 @@ constexpr std::array<OptionToken, 133> kOptionTokens{{
     {"dialogue-enhancement=", "decode of AC-4: raise the dialogue by 0 to 12 dB, capped by the stream"},
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
-    {"truehd-presentation=", "decode of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all"},
-    {"truehd-check=", "decode of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all"},
+    {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
     {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
@@ -516,6 +516,29 @@ void print_decode_topic() {
     fmt::println("       E-AC-3 stream's objects, has no karaoke bed, and says so.");
 }
 
+void print_truehd_topic() {
+    fmt::println("");
+    fmt::println("TrueHD and MLP: the stream decides, bare or in Matroska, MP4 or a transport");
+    fmt::println("       stream. decode, levels and loudness read the best presentation the");
+    fmt::println("       stream has, or the one truehd-presentation=best|2ch|6ch|8ch|all names,");
+    fmt::println("       and stop at the first failed check unless truehd-check=lenient counts");
+    fmt::println("       them. truehd-encode codes a WAV losslessly, as set by");
+    fmt::println("       truehd-downmix=none|standard,");
+    fmt::println("       truehd-downmix-gains=<C,Ls/Rs,LFE,Lrs/Rrs in dB>,");
+    fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
+    fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
+    fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
+    fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
+    fmt::println("       the input.");
+    fmt::println("       A TrueHD or MLP run does not apply the other options (the output stage,");
+    fmt::println("       DRC, programmes, objects, metadata, sources, signatures) and refuses them");
+    fmt::println("       by name with a usage error instead of accepting and dropping them; a");
+    fmt::println("       verification flag such as verify-content never succeeds without verifying.");
+    fmt::println("       fast-mdct, fast-imdct and mode= choose a transform, which TrueHD has not,");
+    fmt::println("       and are warned about. cut, cat, metadata, normalize, qc, transcode, fmp4,");
+    fmt::println("       play and monitor do not read TrueHD or MLP and say so.");
+}
+
 void print_ac4_decode_topic() {
     fmt::println("");
     fmt::println("AC-4 (decode, monitor, play, qc, levels, loudness, transcode): a stream of");
@@ -710,6 +733,9 @@ void print_probe_topic() {
     fmt::println("       each presentation (id, name, language, level, channels, substreams)");
     fmt::println("       and the selected one's dialnorm, loudness, DRC modes, dialogue");
     fmt::println("       enhancement and stereo downmix values.");
+    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
+    fmt::println("       the substreams and their channels, and how many segments pass their");
+    fmt::println("       parity and CRC; detail= is refused for it, since it has no such dump.");
 }
 
 void print_mkv_topic() {
@@ -799,7 +825,7 @@ struct TopicSection {
     void (*print)();
 };
 
-constexpr std::array<TopicSection, 18> kTopicSections{{
+constexpr std::array<TopicSection, 19> kTopicSections{{
     {topic::kStdio, print_stdio_topic},
     {topic::kLive, print_live_topic},
     {topic::kPlay, print_play_topic},
@@ -814,6 +840,7 @@ constexpr std::array<TopicSection, 18> kTopicSections{{
     {topic::kTs, print_ts_topic},
     {topic::kDecode, print_decode_topic},
     {topic::kAc4Decode, print_ac4_decode_topic},
+    {topic::kTruehd, print_truehd_topic},
     {topic::kAc4Encode, print_ac4_encode_topic},
     {topic::kQc, print_qc_topic},
     {topic::kProbe, print_probe_topic},
@@ -1156,7 +1183,7 @@ void print_exit_codes() {
     fmt::println("     configuration the encoder cannot express (an illegal bitrate for a");
     fmt::println("     layout, more objects than a stream can carry). Retrying the same command");
     fmt::println("     line cannot help.");
-    fmt::println("  {}  input: the input could not be read, or is not a valid AC-3/E-AC-3/AC-4/WAV/",
+    fmt::println("  {}  input: the input could not be read, or is not a valid AC-3/E-AC-3/AC-4/TrueHD/WAV/",
                  kExitInput);
     fmt::println("     ADM file, or stopped decoding part-way.");
     fmt::println("  {}  output: the destination could not be created, written or finalized.",
@@ -1195,7 +1222,8 @@ void print_command_index(std::span<const CommandInfo> commands) {
 
 void print_usage(std::span<const CommandInfo> commands) {
     fmt::println("Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and "
-                 "AC-4 (ETSI TS 103 190) encoder/decoder");
+                 "AC-4 (ETSI TS 103 190) encoder/decoder, and a TrueHD / MLP lossless "
+                 "encoder/decoder");
     fmt::println("");
     print_command_index(commands);
     print_unavailable_reasons(commands);
@@ -1232,7 +1260,8 @@ void print_man_page(std::span<const CommandInfo> commands) {
                  roff_escape(iclforge::ac3::version_full));
     fmt::println(".SH NAME");
     fmt::println("forge \\- clean\\-room AC\\-3 / E\\-AC\\-3 (ATSC A/52) and AC\\-4 (ETSI TS 103 190) "
-                 "encoder, decoder and Atmos object tool");
+                 "encoder, decoder and Atmos object tool, and a TrueHD / MLP lossless encoder and "
+                 "decoder");
     fmt::println(".SH SYNOPSIS");
     fmt::println(".B forge");
     fmt::println(".I command");
@@ -1240,7 +1269,8 @@ void print_man_page(std::span<const CommandInfo> commands) {
     fmt::println(".SH DESCRIPTION");
     fmt::println("forge encodes, decodes, wraps, measures and plays AC\\-3, E\\-AC\\-3 and AC\\-4");
     fmt::println("(Dolby Digital, Dolby Digital Plus and AC\\-4, including E\\-AC\\-3's Atmos object");
-    fmt::println("layer and AC\\-4's object audio).");
+    fmt::println("layer and AC\\-4's object audio), and decodes, encodes and wraps the lossless");
+    fmt::println("TrueHD and MLP.");
     fmt::println("Positional arguments come first and options follow in any order; an option");
     fmt::println("is either a bare word or a");
     fmt::println(".IR key = value");

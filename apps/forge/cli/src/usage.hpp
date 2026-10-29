@@ -80,8 +80,11 @@ inline constexpr std::uint32_t kAc4Decode = 1U << 21;
 inline constexpr std::uint32_t kLyricsConvert = 1U << 22;
 // AC-4 content signing: ac4-sign, ac4-verify and the options that sign or check a stream.
 inline constexpr std::uint32_t kContentSignature = 1U << 23;
+// What reads or writes a TrueHD or MLP stream: decode/levels/loudness's truehd-presentation= and
+// truehd-check=, truehd-encode's truehd-* options, and what the other commands refuse of them.
+inline constexpr std::uint32_t kTruehd = 1U << 24;
 
-inline constexpr std::uint32_t kAll = 0xFFFFFFU;
+inline constexpr std::uint32_t kAll = 0x1FFFFFFU;
 
 }  // namespace topic
 

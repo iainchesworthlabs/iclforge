@@ -959,3 +959,47 @@ TEST_CASE("an MLP stream in MP4 reports its own rate, not 192 kHz", "[forge-cli]
         }
     }
 }
+
+TEST_CASE("forge help names TrueHD and prints the options of the commands that take it",
+          "[forge-cli][truehd][help]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "help.log";
+    SECTION("truehd-encode prints its options") {
+        REQUIRE(run_cli("help truehd-encode", log) == 0);
+        const std::string text = read_text(log);
+        for (const std::string option :
+             {"truehd-downmix=", "truehd-downmix-gains=", "truehd-restart=", "truehd-peak-rate=",
+              "truehd-rate-check=", "truehd-fir-order=", "truehd-matrix=", "truehd-stereo-mode=",
+              "verify"}) {
+            CHECK(text.find(option) != std::string::npos);
+        }
+    }
+    SECTION("decode, levels and loudness print truehd-presentation= and truehd-check=") {
+        for (const std::string command : {"decode", "levels", "loudness"}) {
+            DYNAMIC_SECTION(command) {
+                REQUIRE(run_cli("help " + command, log) == 0);
+                const std::string text = read_text(log);
+                CHECK(text.find("truehd-presentation=") != std::string::npos);
+                CHECK(text.find("truehd-check=") != std::string::npos);
+            }
+        }
+    }
+    SECTION("probe's row takes .thd and .mlp") {
+        REQUIRE(run_cli("help probe", log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("in.thd|in.mlp") != std::string::npos);
+    }
+    SECTION("the banner, the man page and the exit codes name TrueHD") {
+        REQUIRE(run_cli("help", log) == 0);
+        const std::string banner = read_text(log);
+        CHECK(banner.substr(0, banner.find('\n')).find("TrueHD") != std::string::npos);
+        REQUIRE(run_cli("man", log) == 0);
+        CHECK(read_text(log).find("TrueHD") != std::string::npos);
+        REQUIRE(run_cli("help exit-codes", log) == 0);
+        CHECK(read_text(log).find("TrueHD") != std::string::npos);
+    }
+    SECTION("remux lists bluray") {
+        REQUIRE(run_cli("help remux", log) == 0);
+        CHECK(read_text(log).find("[dvb|atsc|bluray]") != std::string::npos);
+    }
+}
