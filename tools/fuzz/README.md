@@ -587,6 +587,48 @@ siblings' seed corpora, so they inherit the deeper inputs this finds, but
 adding the mutator there would multiply the number of inputs both decoders
 accept - and every one of those spawns a real FFmpeg process.
 
+## The TrueHD mutator
+
+A TrueHD or MLP stream puts five checks between a mutated byte and the parser it was aimed at: the
+access unit's check nibble (TH spec section 3.2), the major sync's CRC-16 (4.1), the restart
+header's CRC-8 (7.1), a segment's parity byte and CRC-8 (6.2), and the extra data's check nibble
+and parity byte (16). A unit that does not pass the first two is not read at all, one that does
+not pass the third is refused before its channel layout and filters are read, and one that does
+not pass the fourth is refused before its first block. So a mutation that changes any byte of a
+unit but its checks is thrown away at one of them, and nothing it did to the fields behind them is
+read, which is the loss the AC-3 mutator above exists for, in a format with more doors.
+
+`fuzz_truehd_parse` and `fuzz_truehd_decode` define a custom
+mutator (`libs/truehd/fuzz/truehd_mutator.hpp`): libFuzzer's own mutation first, then a walk over
+the result as access units, from the first major sync, each unit's length being the 12-bit word
+count that opens it, and a rewrite of the five checks with the library's own routines
+(`major_sync_crc`, `restart_header_crc`, `substream_parity`, `substream_crc`,
+`extra_data_check_nibble`), which `libs/truehd/tests` hold to FFmpeg's streams. They are written in
+the order they nest: the restart header's CRC, then the segment's parity and CRC that cover it,
+then the nibble that covers the directory. After a unit that does not fit the walk resumes at the
+next major sync, as `ElementaryReader` does, so a damaged unit costs only itself.
+
+Deliberate limits, as with the AC-3 mutator:
+
+- **Nothing but the checks is repaired.** Lengths, end pointers, counts and every field the syntax
+  gives meaning to stay as the mutation left them.
+- **The lossless check is not repaired.** It is the check of the decoded samples of the interval
+  before a restart header, so putting it right takes a decode. A mutation in the audio of an
+  interval that a restart header follows is refused by strict decode at that header; lenient decode
+  counts it and goes on, and the last interval of a stream, which no restart header follows, is
+  never checked. `fuzz_truehd_decode` runs both.
+- **A restart header that is not at the head of a segment's first block is not found**, because
+  where a later block begins is known only by decoding the one before.
+- **Some mutations are left unrepaired.** One in four is not repaired at all, and in the rest each
+  of the five checks is left alone one time in sixteen, so that the paths that refuse a bad check
+  stay reachable. Both draws come from libFuzzer's seed argument, so a mutation reproduces.
+
+`libs/truehd/tests/fuzz/test_truehd_mutator.cpp` holds the repair to the streams (an unmodified
+committed stream comes back byte for byte), to each door (the decoder stops at a corrupted field
+for the check that covers it, the repair opens it, and the same repair with that check left out of
+the mask does not), and to the draw (a quarter of seeds repair nothing, each check is left out in
+about one in sixteen of the rest).
+
 ## Differential mode (differential decoder fuzzing)
 
 `fuzz_differential_ac3_decode` and `fuzz_differential_eac3_decode` drive the

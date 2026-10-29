@@ -6,6 +6,7 @@
 
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "truehd_mutator.hpp"
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     using namespace iclforge::truehd;
@@ -31,4 +32,12 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     Decoder decoder;
     (void)decoder.decode(bytes);
     return 0;
+}
+
+// Put the checks of each unit right after mutating, so that a mutation in a restart header, a
+// block or the extra data reaches the code that reads it and is not refused at a CRC, a parity
+// byte or the check nibble first. See truehd_mutator.hpp.
+extern "C" std::size_t LLVMFuzzerCustomMutator(std::uint8_t* data, std::size_t size,
+                                               std::size_t max_size, unsigned int seed) {
+    return iclforge_fuzz::truehd_repairing_mutate(data, size, max_size, seed);
 }

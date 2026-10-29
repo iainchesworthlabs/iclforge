@@ -17,12 +17,20 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_coding.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
-    encoder/test_signals.cpp)
+    encoder/test_signals.cpp
+    fuzz/test_truehd_mutator.cpp)
 
 # iclforge::objects only for test_evolution.cpp, which holds this library's reading of the evolution
 # frame to the EMDF container reader E-AC-3 streams go through (libs/truehd itself links base alone).
 target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json
     iclforge::objects)
+# fuzz/test_truehd_mutator.cpp includes libs/truehd/fuzz/truehd_mutator.hpp, the repair half of the
+# libFuzzer custom mutator. The mutator itself builds only under Clang with -fsanitize=fuzzer, but
+# the header's restamp_truehd_checks is portable C++ over the library's own check routines, and
+# whether it writes what a decoder accepts is checked on every platform, not inferred from a
+# coverage number on one. Same shape as libs/ac3/tests: a directory outside the public include
+# tree, on this target's path only.
+target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/.
 target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)
