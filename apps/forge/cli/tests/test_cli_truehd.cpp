@@ -1003,3 +1003,181 @@ TEST_CASE("forge help names TrueHD and prints the options of the commands that t
         CHECK(read_text(log).find("[dvb|atsc|bluray]") != std::string::npos);
     }
 }
+
+// --- the containers, MAT, levels and loudness of a TrueHD stream ---------------------------------
+// One case a command (or a group of them), over a stream that truehd-encode makes here from a tone,
+// so that none of it needs FFmpeg. The containers and MAT are held to FFmpeg's reading in
+// tools/ci/run_codec_matrix.sh; what is held here is the command: that it runs, gives the stream
+// back, and reports what is in it.
+
+TEST_CASE("mkv, mp4 and ts wrap a TrueHD stream, and demux and remux give it back",
+          "[forge-cli][truehd][containers]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "wrap.log";
+    const std::vector<std::byte> stream = read_bytes(tone.thd);
+    const std::array<std::string, 3> kinds{"mkv", "mp4", "ts"};
+    for (const std::string& kind : kinds) {
+        DYNAMIC_SECTION(kind) {
+            const fs::path file = tone.dir / ("wrap." + kind);
+            REQUIRE(run_cli(kind + " " + cli_arg(tone.thd) + cli_arg(file), log) == 0);
+            CHECK(read_text(log).find("TrueHD access units") != std::string::npos);
+
+            // truehd-encode writes the same container in one step.
+            const fs::path direct = tone.dir / ("direct." + kind);
+            REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(direct), log) == 0);
+            CHECK(read_bytes(direct) == read_bytes(file));
+
+            const fs::path back = tone.dir / ("back_" + kind + ".thd");
+            REQUIRE(run_cli("demux " + cli_arg(file) + cli_arg(back), log) == 0);
+            CHECK(read_bytes(back) == stream);
+
+            // ... and every other container, one remux away.
+            for (const std::string& other : kinds) {
+                if (other == kind) {
+                    continue;
+                }
+                const fs::path moved = tone.dir / ("moved_" + kind + "_to." + other);
+                const fs::path unwrapped = tone.dir / ("moved_" + kind + "_to_" + other + ".thd");
+                REQUIRE(run_cli("remux " + cli_arg(file) + cli_arg(moved), log) == 0);
+                REQUIRE(run_cli("demux " + cli_arg(moved) + cli_arg(unwrapped), log) == 0);
+                CHECK(read_bytes(unwrapped) == stream);
+            }
+
+            // A decode of the container is the decode of the bare stream.
+            const fs::path bare_wav = tone.dir / "bare_decode.wav";
+            const fs::path wrapped_wav = tone.dir / ("decode_" + kind + ".wav");
+            REQUIRE(run_cli("decode " + cli_arg(tone.thd) + cli_arg(bare_wav), log) == 0);
+            REQUIRE(run_cli("decode " + cli_arg(file) + cli_arg(wrapped_wav), log) == 0);
+            CHECK(read_bytes(wrapped_wav) == read_bytes(bare_wav));
+        }
+    }
+}
+
+TEST_CASE("spdif wraps a TrueHD stream in MAT bursts and unspdif gives it back",
+          "[forge-cli][truehd][containers]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "mat.log";
+    const std::vector<std::byte> stream = read_bytes(tone.thd);
+
+    SECTION("an eight-channel PCM16 WAV") {
+        const fs::path wav = tone.dir / "mat.wav";
+        const fs::path back = tone.dir / "mat_wav.thd";
+        REQUIRE(run_cli("spdif " + cli_arg(tone.thd) + cli_arg(wav), log) == 0);
+        CHECK(read_text(log).find("MAT burst(s)") != std::string::npos);
+        const std::vector<std::byte> bytes = read_bytes(wav);
+        REQUIRE(bytes.size() > 44);
+        CHECK(le(bytes, 22, 2) == 8);        // channels
+        CHECK(le(bytes, 24, 4) == 192000);   // four times the 48 kHz family
+        CHECK(le(bytes, 34, 2) == 16);       // bits
+        REQUIRE(run_cli("unspdif " + cli_arg(wav) + cli_arg(back), log) == 0);
+        CHECK(read_bytes(back) == stream);
+    }
+    SECTION("raw bursts when the output is not a WAV") {
+        const fs::path raw = tone.dir / "mat.raw";
+        const fs::path back = tone.dir / "mat_raw.thd";
+        REQUIRE(run_cli("spdif " + cli_arg(tone.thd) + cli_arg(raw), log) == 0);
+        const std::vector<std::byte> bursts = read_bytes(raw);
+        CHECK(!bursts.empty());
+        CHECK(bursts.size() % 61440 == 0);  // a MAT burst is 61,440 bytes
+        REQUIRE(run_cli("unspdif " + cli_arg(raw) + cli_arg(back), log) == 0);
+        CHECK(read_bytes(back) == stream);
+    }
+}
+
+TEST_CASE("levels reports each channel of a TrueHD stream, bare or in a container",
+          "[forge-cli][truehd][levels]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "levels.log";
+    REQUIRE(run_cli("levels " + cli_arg(tone.thd), log) == 0);
+    const std::string report = read_text(log);
+    CHECK(report.find("TrueHD/MLP, 6 channel(s), 48000 Hz, 1.00 s") != std::string::npos);
+    // The tone's channels are at 1/2, 1/4, ... of full scale: -6.02, -12.04, ... dBFS peak and
+    // 3.01 dB less RMS, under the names the stream gives them.
+    const std::array<std::string, 6> names{"L", "R", "C", "LFE", "Ls", "Rs"};
+    for (std::size_t c = 0; c < names.size(); ++c) {
+        const double peak = 20.0 * std::log10(kToneShare[c]);
+        const std::string line = fmt::format("  {:<6} {:>10.2f} {:>10.2f}", names[c], peak,
+                                             peak - 3.0103);
+        CHECK(report.find(line) != std::string::npos);
+    }
+    for (const std::string kind : {"mkv", "mp4", "ts"}) {
+        DYNAMIC_SECTION(kind) {
+            const fs::path file = tone.dir / ("levels." + kind);
+            REQUIRE(run_cli(kind + " " + cli_arg(tone.thd) + cli_arg(file), log) == 0);
+            REQUIRE(run_cli("levels " + cli_arg(file), log) == 0);
+            CHECK(after_first_line(read_text(log)) == after_first_line(report));
+        }
+    }
+}
+
+TEST_CASE("loudness measures a TrueHD stream as the meter measures its samples",
+          "[forge-cli][truehd][loudness]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "loudness.log";
+
+    // What the library's meter says of the tone itself, with the speakers the stream names.
+    using iclforge::base::Speaker;
+    const std::array<Speaker, 6> speakers{Speaker::kLeft,         Speaker::kRight,
+                                          Speaker::kCentre,       Speaker::kLfe,
+                                          Speaker::kLeftSurround, Speaker::kRightSurround};
+    iclforge::base::LoudnessMeter meter(48000, speakers);
+    const std::vector<std::int32_t> samples = tone_samples();
+    constexpr std::size_t kBlock = 480;
+    for (std::size_t at = 0; at < kToneFrames; at += kBlock) {
+        std::vector<std::vector<float>> planes(6, std::vector<float>(kBlock));
+        for (std::size_t n = 0; n < kBlock; ++n) {
+            for (std::size_t c = 0; c < 6; ++c) {
+                planes[c][n] = static_cast<float>(samples[((at + n) * 6) + c]) / 8388608.0F;
+            }
+        }
+        const std::array<std::span<const float>, 6> views{planes[0], planes[1], planes[2],
+                                                          planes[3], planes[4], planes[5]};
+        meter.push(views);
+    }
+    const auto expected_lkfs = meter.integrated_lkfs();
+    const auto expected_peak = meter.true_peak_dbtp();
+    REQUIRE(expected_lkfs.has_value());
+    REQUIRE(expected_peak.has_value());
+
+    REQUIRE(run_cli("loudness " + cli_arg(tone.thd), log) == 0);
+    const std::string report = read_text(log);
+    CHECK(report.find("L R C LFE Ls Rs (48000 Hz)") != std::string::npos);
+    CHECK(report.find(fmt::format("integrated loudness {:.1f} LKFS", *expected_lkfs)) !=
+          std::string::npos);
+    CHECK(report.find(fmt::format("true peak {:.1f} dBTP", *expected_peak)) != std::string::npos);
+
+    for (const std::string kind : {"mkv", "mp4", "ts"}) {
+        DYNAMIC_SECTION(kind) {
+            const fs::path file = tone.dir / ("loudness." + kind);
+            REQUIRE(run_cli(kind + " " + cli_arg(tone.thd) + cli_arg(file), log) == 0);
+            REQUIRE(run_cli("loudness " + cli_arg(file), log) == 0);
+            CHECK(after_first_line(read_text(log)) == after_first_line(report));
+        }
+    }
+}
+
+TEST_CASE("qc, transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][truehd][refusals]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "refusals.log";
+    const fs::path out = tone.dir / "refused_out";
+    struct Refusal {
+        std::string command;
+        std::string args;
+    };
+    const std::vector<Refusal> refusals{
+        {"qc", cli_arg(tone.thd)},
+        {"transcode", cli_arg(tone.thd) + cli_arg(out.string() + ".ac3")},
+        {"fmp4", cli_arg(tone.thd) + cli_arg(out)},
+    };
+    for (const Refusal& item : refusals) {
+        DYNAMIC_SECTION(item.command) {
+            CHECK(run_cli(item.command + " " + item.args, log) == kExitUsage);
+            const std::string text = read_text(log);
+            CHECK(text.find("is TrueHD or MLP") != std::string::npos);
+            CHECK(text.find(item.command == "fmp4" ? "CMAF, HLS or DASH"
+                                                   : "'" + item.command + "' does not read") !=
+                  std::string::npos);
+            CHECK(text.find("lost sync") == std::string::npos);
+        }
+    }
+}
