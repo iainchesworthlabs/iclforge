@@ -6,7 +6,7 @@ The library's example programs, in C++ and Python.
 
 A example.
 
-- **Uses:** `ac3`, `ac4`, `adm`, `base`, `capi`, `containers`, `iab`, `objects`, `render`
+- **Uses:** `ac3`, `ac4`, `adm`, `mlp`, `base`, `capi`, `containers`, `iab`, `objects`, `render`
 - **Used by:** nothing
 - **CI lanes:** core
 

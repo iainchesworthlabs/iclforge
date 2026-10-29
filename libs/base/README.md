@@ -7,7 +7,7 @@ What every codec and service builds on and none owns: the bit reader and writer,
 A library.
 
 - **Uses:** nothing
-- **Used by:** `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render`
+- **Used by:** `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `mlp`, `objects`, `python`, `render`
 - **CI lanes:** core
 - **CMake target:** `iclforge::base`
 
