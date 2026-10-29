@@ -205,7 +205,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 ## TrueHD / MLP
 
 Written from the owner's TrueHD (MLP) Reference Specification, which has no published counterpart; the reading taken wherever it and the
-streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (20 open questions for the owner). Every row below is the peer of a row in the
+streams disagree is in [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (21 open questions for the owner). Every row below is the peer of a row in the
 E-AC-3 and AC-4 sections above; where TrueHD is not built the row says so. The Priority and Criticality of a row that is not built are
 provisional until the parity audits of [the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) land.
 
@@ -438,7 +438,7 @@ this register is the checklist that those bounds appear here too.
 
 | Source | Open item | Status |
 |---|---|---|
-| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 20 questions for the specification's owner, the first being the evolution payload | 🟡 |
+| `libs/truehd` ([ERRATA](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)) | Decoder and encoder landed (T1, T2a); 21 questions for the specification's owner, the first being the evolution payload | 🟡 |
 | Evolution frame | Content signing (the container of the specification v3.4 and later, or the older truncated HMAC note): field IDs and digest scope unconfirmed | 🔴 |
 | MLP reference material | Shipping interop (IM6): no Dolby decoder, player or receiver has read output | 🔴 |
 

@@ -178,5 +178,6 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
 - Protected files: a protected (Common Encryption) `mlpa` track is refused by the MP4 reader's code for protected audio, which
   names the scheme; no fixture or test covers an `mlpa` one.
 - Nothing outside the library uses it but `forge` (and the C API's callers): the Forge GUI, Hearth and Crucible do not link it,
-  `forge transcode`, `qc`, `fmp4`, `monitor` and `play` refuse it, and no device output sends a MAT burst.
+  `forge cut`, `cat`, `metadata`, `normalize`, `transcode`, `qc`, `fmp4`, `monitor` and `play` refuse it by name (the last five
+  read the AC-3 or E-AC-3 track after a TrueHD one in a file that has both), and no device output sends a MAT burst.
   [Development status](development-status.md#truehd-mlp) has each as a row.

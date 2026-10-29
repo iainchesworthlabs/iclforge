@@ -117,7 +117,7 @@ lands and takes its sizes (the scale above) from it. No implementation below is 
 
 | Area | Today | Wanted | Plan |
 |---|---|---|---|
-| Forge CLI | The commands in the row above; the usage line of `probe` does not name `.thd` or `.mlp` | The four refused commands, MLP encoding, the project file, the usage text | [Not done in T2c](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md#not-done-in-t2c); parity audit |
+| Forge CLI | The commands in the row above; the help and the usage text name TrueHD and MLP, and `cut`, `cat`, `metadata`, `normalize`, `transcode`, `qc`, `fmp4`, `monitor` and `play` refuse a TrueHD stream by name | The refused commands, MLP encoding, the project file | [Not done in T2c](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md#not-done-in-t2c); parity audit |
 | Forge GUI | Nothing: no page opens, plays, inspects, checks or encodes TrueHD | An Open stream, QC, player and encode route for TrueHD | Parity audit |
 | Crucible | Not linked; Crucible uses the AC-3, E-AC-3 and Atmos codec only | A decision on what a lossless stream means for a capture product | Parity audit |
 | Hearth desktop player | Not linked; `.thd` and `.mlp` are not among the kinds it lists | Playback to local outputs, MAT to a receiver, the Media and Decoder pages | Parity audit |
