@@ -7,6 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -306,8 +307,10 @@ TEST_CASE("the library agrees with OpenSSL", "[crypto][interop]") {
         TrustStore trust;
         trust.anchors.push_back(TrustAnchor{cert, "v1"});
         ChainPolicy policy;
-        policy.now_unix =
-            std::min(cert.not_after, kNow < cert.not_after ? kNow : cert.not_after - 1);
+        // `openssl x509 -req` starts the certificate's validity when it runs, which is after kNow
+        // (the script's fixed NOW) on every day from the one the script was written. A time inside
+        // the certificate's own dates is what this section means to test.
+        policy.now_unix = std::clamp(kNow, cert.not_before + 1, cert.not_after - 1);
         const std::vector<Certificate> chain = {cert};
         CHECK(validate_chain(chain, trust, policy).has_value());
     }
