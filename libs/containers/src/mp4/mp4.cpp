@@ -124,6 +124,15 @@ std::string_view describe(MuxError error) {
     return "unknown error";
 }
 
+std::vector<std::byte> build_dmlp_payload(const TruehdConfig& config) {
+    std::vector<std::byte> out;
+    put_u32(out, config.format_info);
+    // peak_data_rate(15) then one reserved bit, then 32 reserved bits.
+    put_u16(out, static_cast<std::uint16_t>((config.peak_data_rate & 0x7FFFU) << 1U));
+    put_u32(out, 0);
+    return out;
+}
+
 std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::span<const std::byte>> frames,
     const MuxOptions& options) {
@@ -131,10 +140,11 @@ std::expected<std::vector<std::byte>, MuxError> mux(
         return std::unexpected(MuxError::kNoFrames);
     }
     if (track.channels <= 0 || track.sample_rate == 0 ||
-        track.sample_rate > std::numeric_limits<std::uint16_t>::max() ||
+        (track.sample_rate > std::numeric_limits<std::uint16_t>::max() &&
+         track.codec_id != kCodecTruehd) ||
         track.samples_per_frame == 0 || track.codec_config.empty() ||
-        (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 &&
-         track.codec_id != kCodecAc4)) {
+        (track.codec_id != kCodecAc3 && track.codec_id != kCodecEac3 && track.codec_id != kCodecAc4 &&
+         track.codec_id != kCodecTruehd)) {
         return std::unexpected(MuxError::kInvalidTrack);
     }
 

@@ -84,6 +84,10 @@ enum class AudioCodec : std::uint8_t {
     // ServiceOptions fields (bsid, mainid, components...) describe elements
     // the AC-4 descriptor does not carry and are ignored for this codec.
     kAc4,
+    // Dolby TrueHD (TH spec §21.2): stream_type 0x83 under the program-level 'HDMV' registration descriptor, which
+    // is how FFmpeg's demuxer names the stream. Blu-ray profile only; the other two refuse it with
+    // kInvalidOptions. One access unit, header included, to a PES packet.
+    kTruehd,
 };
 
 // Which registry's stream_type and descriptor to write. See the header
@@ -91,6 +95,7 @@ enum class AudioCodec : std::uint8_t {
 enum class BroadcastProfile : std::uint8_t {
     kDvb,   // ETSI EN 300 468 Annex D.3/D.5, stream_type 0x06
     kAtsc,  // A/52:2018 Annex A / Annex G, stream_type 0x81 / 0x87
+    kBluray,  // TrueHD only: stream_type 0x83 and a program-level registration descriptor 'HDMV'
 };
 
 // One independent substream other than substream 0, as the descriptors'

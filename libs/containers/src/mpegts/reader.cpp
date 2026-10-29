@@ -236,6 +236,21 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
     const std::size_t program_info_length =
         ((static_cast<std::size_t>(byte_at(section, 10)) & 0x0FU) << 8U) | byte_at(section, 11);
     std::size_t at = 12 + program_info_length;
+    // The program-level descriptors: only the registration descriptor 'HDMV' matters, and only to say which
+    // form of TrueHD signalling follows.
+    bool hdmv = false;
+    for (std::size_t d = 12; d + 2 <= std::min(at, section.size() - 4);) {
+        const std::size_t length = byte_at(section, d + 1);
+        if (d + 2 + length > at) {
+            break;
+        }
+        if (byte_at(section, d) == kTagRegistrationDescriptor && length >= 4 &&
+            byte_at(section, d + 2) == 'H' && byte_at(section, d + 3) == 'D' &&
+            byte_at(section, d + 4) == 'M' && byte_at(section, d + 5) == 'V') {
+            hdmv = true;
+        }
+        d += 2 + length;
+    }
     // The CRC_32 is the last four bytes and is not part of the ES loop.
     const std::size_t loop_end = section.size() - 4;
     if (at > loop_end) {
@@ -257,11 +272,19 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
 
         bool eac3 = false;
         bool ac4 = false;
+        bool truehd = false;
         bool matched = false;
         CodecSignalling signalling = CodecSignalling::kAtscStreamType;
 
+        // TrueHD names the codec in stream_type 0x83 (TH spec §21.2).
+        if (stream_type == kStreamTypeTruehd) {
+            truehd = true;
+            matched = true;
+            signalling = hdmv ? CodecSignalling::kHdmvStreamType : CodecSignalling::kBareTruehdStreamType;
+        }
+
         // ATSC names the codec in stream_type itself.
-        if (stream_type == kStreamTypeAtscAc3 || stream_type == kStreamTypeAtscEac3) {
+        if (!matched && (stream_type == kStreamTypeAtscAc3 || stream_type == kStreamTypeAtscEac3)) {
             eac3 = stream_type == kStreamTypeAtscEac3;
             matched = true;
             signalling = CodecSignalling::kAtscStreamType;
@@ -321,7 +344,7 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
             // changes matched/eac3/ac4/signalling, only what (if anything)
             // ends up in ReadStream::service.
             std::optional<ServiceInfo> service;
-            if (!ac4) {
+            if (!ac4 && !truehd) {
                 const std::uint8_t dvb_tag =
                     eac3 ? kTagEnhancedAc3Descriptor : kTagAc3Descriptor;
                 const std::uint8_t atsc_tag =
@@ -347,6 +370,7 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
                                   .stream_type = stream_type,
                                   .eac3 = eac3,
                                   .ac4 = ac4,
+                                  .truehd = truehd,
                                   .signalling = signalling,
                                   .packet_size = s.grid.stride,
                                   .service = service};

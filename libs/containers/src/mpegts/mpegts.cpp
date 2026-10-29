@@ -124,6 +124,8 @@ constexpr std::uint8_t kStreamTypeAtscAc3 = 0x81;
 // with a stream_type value of 0x87 when transmitted as PES streams
 // conforming to ATSC-published standards."
 constexpr std::uint8_t kStreamTypeAtscEac3 = 0x87;
+// TH spec §21.2: the stream_type of TrueHD in a Blu-ray transport stream.
+constexpr std::uint8_t kStreamTypeTruehd = 0x83;
 
 // ISO/IEC 13818-1 Table 2-22's audio stream_id range ('110x xxxx') does not
 // apply to either profile: both put the audio in PES private data, which
@@ -803,7 +805,24 @@ Bytes build_atsc_eac3_descriptor(const ServiceInfo& s) {
     return d;
 }
 
+// The program-level registration_descriptor (ISO/IEC 13818-1 §2.6.8) with format_identifier 'HDMV'. FFmpeg's
+// demuxer names stream_type 0x83 as TrueHD only under it: without it ffprobe reports an unknown codec (the
+// libs/containers/ERRATA.md entry C8 has the experiment).
+[[nodiscard]] Bytes build_hdmv_registration_descriptor() {
+    Bytes d;
+    put_descriptor_header(d, 0x05, 4);
+    d.push_back(std::byte{'H'});
+    d.push_back(std::byte{'D'});
+    d.push_back(std::byte{'M'});
+    d.push_back(std::byte{'V'});
+    return d;
+}
+
 [[nodiscard]] Bytes build_descriptor(const AudioTrack& track, BroadcastProfile profile) {
+    if (track.codec == AudioCodec::kTruehd) {
+        // No elementary-stream descriptor: FFmpeg's own TrueHD output has none (ERRATA C8).
+        return {};
+    }
     if (track.codec == AudioCodec::kAc4) {
         // mux() has already refused kAtsc for this codec.
         return build_dvb_ac4_descriptor();
@@ -818,6 +837,9 @@ Bytes build_atsc_eac3_descriptor(const ServiceInfo& s) {
 }
 
 [[nodiscard]] std::uint8_t stream_type_for(const AudioTrack& track, BroadcastProfile profile) {
+    if (track.codec == AudioCodec::kTruehd) {
+        return kStreamTypeTruehd;
+    }
     if (profile != BroadcastProfile::kAtsc) {
         // DVB: 0x06 for all three codecs - the descriptor is the
         // identification (AC-4's included, EN 300 468 Annex D.7.1).
@@ -827,7 +849,8 @@ Bytes build_atsc_eac3_descriptor(const ServiceInfo& s) {
 }
 
 Bytes build_pmt_section(std::uint16_t program_number, std::uint16_t audio_pid,
-                        std::uint8_t stream_type, const Bytes& descriptor) {
+                        std::uint8_t stream_type, const Bytes& descriptor,
+                        const Bytes& program_info = {}) {
     Bytes es_loop;
     put_byte(es_loop, stream_type);
     // reserved(3)='111', elementary_PID(13).
@@ -845,7 +868,9 @@ Bytes build_pmt_section(std::uint16_t program_number, std::uint16_t audio_pid,
     // PID this program has and mux() always stamps a PCR on it (see
     // mpegts.hpp's header comment on why once per access unit is enough).
     put_be16(body, static_cast<std::uint16_t>(0xE000u | (audio_pid & 0x1FFFu)));
-    put_be16(body, 0xF000u);  // reserved(4)='1111', program_info_length(12)=0: no top-level descriptors
+    // reserved(4)='1111', program_info_length(12): none but the Blu-ray profile's registration descriptor.
+    put_be16(body, static_cast<std::uint16_t>(0xF000u | (program_info.size() & 0x0FFFu)));
+    body.insert(body.end(), program_info.begin(), program_info.end());
     body.insert(body.end(), es_loop.begin(), es_loop.end());
 
     Bytes section;
@@ -1109,13 +1134,20 @@ std::expected<std::vector<std::byte>, MuxError> mux(
         // ROUTE/MMT, not 13818-1) - refusing beats inventing a stream_type.
         return std::unexpected(MuxError::kInvalidOptions);
     }
+    // TrueHD is Blu-ray's alone (TH spec §21.2), and the Blu-ray profile writes nothing else.
+    if ((track.codec == AudioCodec::kTruehd) != (options.profile == BroadcastProfile::kBluray)) {
+        return std::unexpected(MuxError::kInvalidOptions);
+    }
 
     const Bytes descriptor = build_descriptor(track, options.profile);
     const Bytes pat_section =
         build_pat_section(options.transport_stream_id, options.program_number, options.pmt_pid);
     const Bytes pmt_section =
         build_pmt_section(options.program_number, options.audio_pid,
-                          stream_type_for(track, options.profile), descriptor);
+                          stream_type_for(track, options.profile), descriptor,
+                          options.profile == BroadcastProfile::kBluray
+                              ? build_hdmv_registration_descriptor()
+                              : Bytes{});
 
     // PTS and PCR share one 90 kHz clock derived from the cumulative sample
     // count, the same way iclforge::containers::matroska::mux derives its millisecond timestamps -
@@ -1174,12 +1206,19 @@ std::expected<Writer, MuxError> Writer::create(const AudioTrack& track,
         // ROUTE/MMT, not 13818-1) - refusing beats inventing a stream_type.
         return std::unexpected(MuxError::kInvalidOptions);
     }
+    // TrueHD is Blu-ray's alone (TH spec §21.2), and the Blu-ray profile writes nothing else.
+    if ((track.codec == AudioCodec::kTruehd) != (options.profile == BroadcastProfile::kBluray)) {
+        return std::unexpected(MuxError::kInvalidOptions);
+    }
     const Bytes descriptor = build_descriptor(track, options.profile);
     return Writer(
         track, options,
         build_pat_section(options.transport_stream_id, options.program_number, options.pmt_pid),
         build_pmt_section(options.program_number, options.audio_pid,
-                          stream_type_for(track, options.profile), descriptor));
+                          stream_type_for(track, options.profile), descriptor,
+                          options.profile == BroadcastProfile::kBluray
+                              ? build_hdmv_registration_descriptor()
+                              : Bytes{}));
 }
 
 Writer::Writer(AudioTrack track, MuxOptions options, std::vector<std::byte> pat_section,

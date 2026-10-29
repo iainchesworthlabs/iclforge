@@ -63,7 +63,7 @@ enum class DemuxError : std::uint8_t {
     kNotIsobmff,       // no box structure worth calling ISOBMFF
     kTruncated,        // the input ends before the track or its samples
     kMalformed,        // a box, sample table or fragment layout that cannot be parsed
-    kNoAudioTrack,     // no 'ac-3'/'ec-3'/'ac-4' track (see ReadOptions::track_id)
+    kNoAudioTrack,     // no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (see ReadOptions::track_id)
     kLimitExceeded,    // a box size, sample count or nesting depth beyond ReadOptions
     kMoovAfterMdat,    // Reader only: the sample table follows the data it indexes
 };
@@ -86,6 +86,10 @@ struct CodecConfig {
     // so when this is set only `payload` below is meaningful - the AC-3-shaped
     // fields stay at their defaults and iclforge::ac4::'s own parser is the authority.
     bool ac4 = false;
+    // 'dmlp' (a TrueHD 'mlpa' track): the fields the box holds. Zero in the other layouts.
+    bool mlp = false;
+    std::uint32_t mlp_format_info = 0;
+    int mlp_peak_data_rate = 0;  // 15 bits
     int fscod = 0;
     int bsid = 0;
     int bsmod = 0;
@@ -130,7 +134,7 @@ struct EditListEntry {
 // AudioTrack.
 struct ReadTrack {
     std::uint32_t track_id = 0;
-    std::string codec_id;  // kCodecAc3, kCodecEac3 or kCodecAc4
+    std::string codec_id;  // kCodecAc3, kCodecEac3, kCodecAc4 or kCodecTruehd
     // The sample entry's own 16.16 samplerate field, integer part.
     std::uint32_t sample_rate = 0;
     int channels = 0;

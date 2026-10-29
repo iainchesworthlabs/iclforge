@@ -60,6 +60,22 @@ inline constexpr std::string_view kCodecEac3 = "ec-3";
 // so an AC-4 AudioTrack that feeds HLS/DASH should also set
 // AudioTrack::rfc6381 (iclforge::ac4::rfc6381_codec_string produces it).
 inline constexpr std::string_view kCodecAc4 = "ac-4";
+// Dolby TrueHD: the 'mlpa' sample entry and its 'dmlp' configuration box. Neither is in the TH spec, and
+// no document for them was found: the layout is what FFmpeg's MP4 muxer writes (libs/containers/ERRATA.md,
+// entries C1 to C6; a single oracle). Like 'ac-4', the bare fourcc is the whole RFC 6381 codec string. One
+// access unit is one sample, whole and unmodified, its 4-byte header included.
+inline constexpr std::string_view kCodecTruehd = "mlpa";
+
+// What an 'mlpa' track's 'dmlp' box carries. The caller reads both from the stream's major sync: format_info
+// is its 32-bit field (TH spec §5.1) and peak_data_rate its 15-bit one (TH spec §4.1). ERRATA C3.
+struct TruehdConfig {
+    std::uint32_t format_info = 0;
+    std::uint16_t peak_data_rate = 0;  // 15 bits
+};
+
+// The 10-byte payload of 'dmlp': format_info (32), peak_data_rate (15), a reserved bit and 32 reserved bits,
+// all reserved bits zero. Hand it to AudioTrack::codec_config.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::vector<std::byte> build_dmlp_payload(const TruehdConfig& config);
 
 enum class MuxError : std::uint8_t {
     kNoFrames,

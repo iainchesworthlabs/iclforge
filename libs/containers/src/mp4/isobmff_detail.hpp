@@ -197,8 +197,8 @@ inline Bytes build_dinf() {
 // The audio sample entry (ISO/IEC 14496-12 §12.2.3's AudioSampleEntry,
 // itself extending §8.5.2's SampleEntry) plus its one child configuration
 // box - 'dac3' for an "ac-3" track, 'dec3' for "ec-3" (ETSI TS 102 366
-// Annex F). track.codec_id has already been validated to be one of exactly
-// those two strings by the time mux()/fragment() calls this.
+// Annex F), 'dac4' for "ac-4" and 'dmlp' for "mlpa". track.codec_id has
+// already been validated to be one of those by the time mux()/fragment() calls this.
 inline Bytes build_sample_entry(const AudioTrack& track) {
     Bytes body;
     put_u32(body, 0);
@@ -212,12 +212,16 @@ inline Bytes build_sample_entry(const AudioTrack& track) {
     put_u16(body, 0);   // reserved
     // samplerate: 16.16 fixed point, integer part only - mux()'s/fragment()'s
     // own kInvalidTrack check keeps sample_rate under 2^16 so this never
-    // overflows the field.
-    put_u32(body, track.sample_rate << 16);
+    // overflows the field. 'mlpa' is the exception: its rates reach 192 kHz, and
+    // the field there holds the rate as a plain 32-bit integer, which is what
+    // FFmpeg's muxer writes (libs/containers/ERRATA.md, entry C2).
+    const bool truehd = track.codec_id == kCodecTruehd;
+    put_u32(body, truehd ? track.sample_rate : track.sample_rate << 16);
 
-    const std::string_view config_fourcc = track.codec_id == kCodecAc3    ? "dac3"
-                                           : track.codec_id == kCodecAc4 ? "dac4"
-                                                                         : "dec3";
+    const std::string_view config_fourcc = track.codec_id == kCodecAc3     ? "dac3"
+                                           : track.codec_id == kCodecAc4   ? "dac4"
+                                           : track.codec_id == kCodecTruehd ? "dmlp"
+                                                                            : "dec3";
     put_box(body, config_fourcc, track.codec_config);
 
     Bytes out;
