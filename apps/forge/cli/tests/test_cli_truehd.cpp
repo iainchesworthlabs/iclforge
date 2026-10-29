@@ -2,7 +2,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include <fmt/format.h>
+
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -11,10 +14,13 @@
 #include <iterator>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/base/loudness.hpp"
+#include "iclforge/base/speaker.hpp"
 #include "multi_track_files.hpp"
 #include "platform/process.hpp"
 
@@ -119,6 +125,12 @@ nlohmann::json manifest() {
     return nlohmann::json::parse(in);
 }
 
+// The manifest's fixtures, by value: a range-for over `manifest()["fixtures"]` iterates a reference
+// into a temporary that is already gone when the first pass starts.
+nlohmann::json fixture_list() {
+    return manifest()["fixtures"];
+}
+
 // The fixture with one byte of its eleventh access unit's payload flipped.
 fs::path damaged_copy(const std::string& file, const fs::path& dir) {
     std::vector<std::byte> bytes = read_bytes(fixture(file));
@@ -141,7 +153,7 @@ fs::path damaged_copy(const std::string& file, const fs::path& dir) {
 
 TEST_CASE("forge decode gives every fixture's PCM as a 24-bit WAV", "[forge-cli][truehd]") {
     const fs::path dir = scratch_dir();
-    for (const auto& item : manifest()["fixtures"]) {
+    for (const auto& item : fixture_list()) {
         const std::string name = item["name"];
         DYNAMIC_SECTION(name) {
             const fs::path wav_path = dir / (name + ".wav");
@@ -244,6 +256,39 @@ TEST_CASE("forge probe exits 1 on a damaged TrueHD stream", "[forge-cli][truehd]
     CHECK(document["truehd"]["segment_failures"].get<int>() >= 1);
 }
 
+TEST_CASE("forge probe json=1 of a TrueHD or MLP stream is valid JSON in every container",
+          "[forge-cli][truehd]") {
+    // The TrueHD report wrote the key "container" itself and then called the writer that writes it
+    // again, so a stream in Matroska, MP4 or a transport stream gave a document no parser reads.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "container_json.log";
+    for (const auto& item : fixture_list()) {
+        const std::string name = item["name"];
+        const std::string input = fixture(item["file"]).string();
+        DYNAMIC_SECTION(name + " bare") {
+            REQUIRE(run_cli("probe \"" + input + "\" json=1", log) == 0);
+            const auto document = nlohmann::json::parse(read_text(log));
+            CHECK(document["container"].is_null());
+            CHECK(document["truehd"]["codec"] == item["codec"]);
+        }
+        for (const std::string container : {"mkv", "mp4", "ts"}) {
+            DYNAMIC_SECTION(name + " in " + container) {
+                const fs::path file = dir / (name + "_json." + container);
+                REQUIRE(run_cli(container + " \"" + input + "\" \"" + file.string() + "\"", log) ==
+                        0);
+                REQUIRE(run_cli("probe \"" + file.string() + "\" json=1", log) == 0);
+                const auto document = nlohmann::json::parse(read_text(log));
+                CHECK(document["schema"] == "iclforge.probe/1");
+                REQUIRE(document["container"].is_object());
+                CHECK(document["container"]["format"].is_string());
+                CHECK(document["truehd"]["codec"] == item["codec"]);
+                CHECK(document["truehd"]["access_units"] == item["access_units"]);
+                CHECK(document["truehd"]["sample_rate"] == item["sample_rate"]);
+            }
+        }
+    }
+}
+
 // --- truehd-encode -----------------------------------------------------------------------------
 // The encoder is held to FFmpeg's strict decode in libs/truehd/tests and
 // tools/ci/run_codec_matrix.sh; what is held here is the command: the WAV it reads (its channel
@@ -315,7 +360,7 @@ std::string digest_of(const Wav& wav) {
 TEST_CASE("a TrueHD stream decoded, encoded and decoded again gives the same PCM",
           "[forge-cli][truehd][truehd-encode]") {
     const fs::path dir = scratch_dir();
-    for (const auto& item : manifest()["fixtures"]) {
+    for (const auto& item : fixture_list()) {
         if (item["codec"] != "truehd") {
             continue;  // the encoder writes TrueHD, not MLP
         }

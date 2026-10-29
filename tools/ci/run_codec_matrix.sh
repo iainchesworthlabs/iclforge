@@ -1465,6 +1465,14 @@ run_truehd_container_check() {
     }
 }
 
+# probe json=1 of $1 must parse: a TrueHD stream in a container once wrote the key "container" twice,
+# and a run that only checked the exit status did not see it.
+run_truehd_probe_json_check() {
+    count=$((count + 1))
+    echo "[$count] truehd probe json=1 of $1 is valid JSON"
+    "$CLI" probe "$1" json=1 | python3 -c 'import json, sys; json.load(sys.stdin)'
+}
+
 # Every stream of the fixtures' manifest, so that a fixture added to testdata/truehd has these legs the
 # day it lands. The manifest's `spliced` streams are not among them: the library's strict decode
 # stops at the join by design (libs/truehd/ERRATA.md, question 20), and the interop script holds those.
@@ -1485,6 +1493,7 @@ for fixture in "${truehd_streams[@]}"; do
     cp "$TRUEHD_FIXTURES/$fixture" "th_$fixture"
     run probe "th_$fixture"
     run probe "th_$fixture" json=1
+    run_truehd_probe_json_check "th_$fixture"
     run decode "th_$fixture" "th_$name.wav"
     run_truehd_bitexact_check "th_$name.wav" "th_$fixture" "$codec"
     run levels "th_$fixture"
@@ -1524,6 +1533,7 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     }
     run_truehd_container_check "th_$name.mkv" "$src" truehd
     run probe "th_$name.mkv"
+    run_truehd_probe_json_check "th_$name.mkv"
     run mp4 "$src" "th_$name.mp4"
     run demux "th_$name.mp4" "th_$name.mp4.thd"
     cmp -s "$src" "th_$name.mp4.thd" || {
@@ -1532,6 +1542,7 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     }
     run_truehd_container_check "th_$name.mp4" "$src" truehd
     run probe "th_$name.mp4" json=1
+    run_truehd_probe_json_check "th_$name.mp4"
     run ts "$src" "th_$name.ts"
     run ts "$src" "th_${name}_bluray.ts" bluray
     cmp -s "th_$name.ts" "th_${name}_bluray.ts" || {
@@ -1545,6 +1556,7 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     }
     run_truehd_container_check "th_$name.ts" "$src" truehd
     run probe "th_$name.ts"
+    run_truehd_probe_json_check "th_$name.ts"
     # Remuxing one container into another goes through the same readers and writers.
     run mkv "th_$name.mp4" "th_${name}_remux.mkv"
     run mp4 "th_$name.mkv" "th_${name}_remux.mp4"
