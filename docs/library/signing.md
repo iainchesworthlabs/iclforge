@@ -229,11 +229,13 @@ for E-AC-3 output.
 
 ### The seam for other codecs
 
-The core in `iclforge::base::crypto` is codec-neutral on purpose. The TrueHD specification
-supplied for this project describes its Evolution frame payload as the same `ContentSignature`
-container under the same scheme; if real streams agree, a TrueHD front end needs only its own
-carriage (where the blob sits, which bytes the digest covers), the way `iclforge::ac4` has. See
-[Object signing](../concepts/object-signing.md#sibling-truehd-evolution).
+The core in `iclforge::base::crypto` is codec-neutral on purpose. The TrueHD specification supplied for this project describes its
+Evolution frame payload as the same `ContentSignature` container under the same scheme, and lists the container's field IDs and the
+digest scope as unconfirmed. If real streams agree, a TrueHD front end needs only its own carriage (where the blob sits, which bytes
+the digest covers), the way `iclforge::ac4` has. **Nothing for TrueHD is built:** `forge` has no TrueHD signing or verifying command,
+and the TrueHD decoder reads none of the evolution frame. See
+[Object signing](../concepts/object-signing.md#sibling-truehd-evolution) and, for the open question,
+[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
 
 ## Provenance
 

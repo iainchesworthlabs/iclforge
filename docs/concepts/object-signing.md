@@ -238,24 +238,22 @@ the app streams the unsigned `bed51`-equivalent, always safe on any receiver.
 
 ## Sibling: TrueHD Evolution
 
-This page is **E-AC-3 / EMDF** object signing only. TrueHD uses a different keyed check —
-**Evolution frame protection** (truncated HMAC-SHA-256 over the access unit and the Evolution
-frame). That seam belongs on the TrueHD/MLP branch (`feature/truehd-atmos-support`, roadmap IM5),
-not in `iclforge::ac3::signing`. Open tools such as truehdd expose it as an optional `--evo-key`; decode
-without a key stays unchecked. Any future multi-key verify / licensed soft-gate for MLP should
-target Evolution HMAC, parallel to but separate from the EMDF policy on this page.
+This page is **E-AC-3 / EMDF** object signing. TrueHD has a check of its own on the **evolution frame**, the payload that carries
+Atmos object metadata, and nothing for it is built here: the TrueHD decoder carries the frame's bytes and reads none of them.
 
-The TrueHD specification supplied for this project (TH spec §16.3, §16.6 and §22) describes the
-Evolution frame payload differently: as the same `ContentSignature` container, serialised with
-Thrift and signed under the same `pace-ccjf1` scheme, as [AC-4's](#sibling-ac-4). The paragraph above
-predates it, and which of the two describes real TrueHD streams is for the TrueHD work to settle
-against them. If it is the container, the seam is already cut: everything in
-`iclforge::base::crypto` (SHA-1 and SHA-256, ECDSA P-256 with RFC 6979 nonces, DER, X.509, PEM,
-chain validation, the Thrift reader and writer, `sign_content_digest` and
-`verify_content_signature`) knows no codec, and a TrueHD front end supplies only what
-`iclforge/ac4/io/content_signature.hpp` supplies for AC-4: where the blob sits in the stream and
-which bytes the digest covers. The same BYOK, opt-in and anchoring rules apply; nothing for TrueHD
-is built here.
+Two accounts of that check exist, and neither has been tested against a stream. An earlier note in this project described a
+truncated HMAC-SHA-256 over the access unit and the evolution frame, verified optionally with an operator-supplied key. The owner's
+TrueHD specification (TH spec §16.3, §16.6 and §22, version 3.4 and later) describes the payload as the same `ContentSignature`
+container, serialised with Thrift and signed under the same `pace-ccjf1` scheme, as [AC-4's](#sibling-ac-4), and lists the container's
+field IDs, the digest scope and whether each frame carries its own signature as unconfirmed. The code follows the specification, the
+later of the two; which one real streams use is open question 1 of
+[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
+
+If it is the container, the seam is already cut: everything in `iclforge::base::crypto` (SHA-1 and SHA-256, ECDSA P-256 with RFC 6979
+nonces, DER, X.509, PEM, chain validation, the Thrift reader and writer, `sign_content_digest` and `verify_content_signature`) knows no
+codec, and a TrueHD front end supplies only what `iclforge/ac4/io/content_signature.hpp` supplies for AC-4: where the blob sits in the
+stream and which bytes the digest covers. The same BYOK, opt-in and anchoring rules would apply. Either way it belongs to the TrueHD
+library and `iclforge::base::crypto`, not to `iclforge::ac3::signing`'s EMDF path, and decode without a key would stay unchecked.
 
 ## Sibling: AC-4
 

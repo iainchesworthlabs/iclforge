@@ -62,32 +62,6 @@ The syntax is also written: `write_restart_header`, `write_block_header`, `write
 
 ## Encoding
 
-```cpp
-#include "iclforge/truehd/encoder/encoder.hpp"
-
-iclforge::truehd::EncoderConfig config;          // 48 kHz, 2 channels, 24 bit
-config.sample_rate = 48000;
-config.channels = 6;                             // the layout of TH spec 13.1 for the count: 5.1
-auto encoder = iclforge::truehd::Encoder::create(config);   // std::expected<Encoder, EncodeError>
-auto units = encoder->encode(interleaved_pcm);   // std::vector<EncodedAccessUnit>; mostly empty
-auto rest = encoder->flush();                    // the last units, padded to a whole unit
-```
-
-It writes 1 to 8 channels of 16, 20 or 24 bit PCM at 44.1 to 192 kHz as TrueHD. A restart interval (128 access units by
-default) is coded whole: the low bits every sample leaves clear become the output shift, a primitive matrix decorrelates a
-channel pair where that is smaller, each channel is predicted with a FIR filter (windowed autocorrelation and the
-Levinson-Durbin recursion, quantised to the widths of TH spec 9.3), and the residual of each block is coded with the shortest
-of the three codebooks or raw. Channels are spread over substreams as FFmpeg's encoder spreads them (2, then 4, then 2), or,
-with `DownmixMode::kStandard`, as the 2, 6 and 8 channel presentations whose lower members are downmixes. The stream is kept
-within a declared peak rate and TH spec 18's 75 ms, and `EncoderConfig::verify` decodes every unit as it is written.
-FFmpeg's strict decode of what it writes is the input, sample for sample (`tools/checks/verify_truehd_encode_interop.py`); it
-is about 6% smaller than FFmpeg's encoder's output over the cases FFmpeg writes. It writes no noise, no IIR filter and no LSB
-bypass (nothing outside this library reads them), no MLP, and no block data CRC; the Atmos substream and the evolution payload
-it only frames, from bytes it is given. [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)
-(entries 30 to 38, questions 12 to 15) records each place the specification and the streams left it a choice.
-
-## Encoding
-
 `iclforge/truehd/encoder/encoder.hpp`: `Encoder`, `EncoderConfig`, `EncodedAccessUnit`, `EncoderStats`. The encoder
 streams: `create()` checks the configuration (`refusal_reason()` gives the same sentence without building one),
 `encode()` takes interleaved PCM and returns the access units that are complete, and `flush()` codes what is left,
@@ -131,8 +105,15 @@ specification's FIFO model: a stream that cannot be sent in time is `EncodeError
 `allow_rate_violations` is written and counted. `verify` decodes every unit with this library's decoder as it is
 produced and compares it with the input. `extra_data` frames a payload into a unit's extra data and never looks
 inside it. The restart interval is 1 or at least 8 access units; a longer interval makes a smaller stream and a shorter
-one a quicker random access. `forge` has no encode command yet; `iclforge-truehd-encode-tool` (WAV in, `.thd` out) is
-the test tool the interoperability checks use.
+one a quicker random access.
+
+FFmpeg's strict decode of what it writes is the check, sample for sample
+(`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.95 times the size of
+FFmpeg's encoder's over the layouts it writes. It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
+them), no MLP, and no block data CRC; the Atmos substream and the evolution payload it only frames, from bytes it is given.
+[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
+records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;
+`iclforge-truehd-encode-tool` (WAV in, `.thd` out) is the test tool the interoperability checks use.
 
 ## Forge
 
@@ -191,3 +172,11 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
   FFmpeg's 7), on full-scale square waves, with a restart interval of 1 and with the downmix presentations.
 - The object renderer and the Atmos substream are phase T2b. Python, JavaScript and Rust bindings over the C API
   (`iclforge_truehd_*` in [the C API](c-api.md#truehd-and-mlp)) are not written.
+- Content signing: nothing signs or checks a TrueHD stream, and an evolution payload is carried, not read. The owner's
+  specification describes it as the container [AC-4's content signature](signing.md#ac-4-content-signing) uses; see
+  [the seam for other codecs](signing.md#the-seam-for-other-codecs).
+- Protected files: a protected (Common Encryption) `mlpa` track is refused by the MP4 reader's code for protected audio, which
+  names the scheme; no fixture or test covers an `mlpa` one.
+- Nothing outside the library uses it but `forge` (and the C API's callers): the Forge GUI, Hearth and Crucible do not link it,
+  `forge transcode`, `qc`, `fmp4`, `monitor` and `play` refuse it, and no device output sends a MAT burst.
+  [Development status](development-status.md#truehd-mlp) has each as a row.
