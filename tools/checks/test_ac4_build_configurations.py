@@ -142,6 +142,20 @@ class Ac4BuildConfigurations(unittest.TestCase):
         self.assertNotIn("_ac4_encoder_sources", minimal)
         self.assertNotIn("src/encoder", minimal)
 
+    def test_the_decode_profile_leaves_out_content_signing(self):
+        # src/io/content_signature.cpp calls iclforge::base's crypto, and the profile builds no
+        # iclforge::base (it links the headers): a source in the inspector's list reaches the
+        # profile's archive and the compile stops at base's export header. The full library
+        # lists the file by itself.
+        library = AC4_CMAKE.read_text(encoding="utf-8")
+        inspector = re.search(r"set\(_ac4_inspector_sources(.*?)\)", library, re.S)
+        self.assertIsNotNone(inspector)
+        self.assertNotIn("content_signature", inspector.group(1))
+        self.assertRegex(library, r"set\(_ac4_signature_sources\s+src/io/content_signature\.cpp\)")
+        self.assertIn("${_ac4_signature_sources}", library)
+        minimal = AC4_MINIMAL.read_text(encoding="utf-8")
+        self.assertNotIn("signature", minimal)
+
     def test_baremetal_ac4_probe_links_the_decoder_and_nothing_of_the_encoder(self):
         text = BAREMETAL_CMAKE.read_text(encoding="utf-8")
         self.assertIn("ac4_probe.cpp", text)

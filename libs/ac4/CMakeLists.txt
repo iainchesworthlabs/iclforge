@@ -106,8 +106,13 @@ set(_ac4_meta_sources
 set(_ac4_inspector_sources
     src/core/toc.cpp
     src/io/carriage.cpp
-    src/io/content_signature.cpp
     src/io/elementary.cpp)
+
+# Content signing and verification (src/io/content_signature.cpp) calls iclforge::base's crypto, which
+# the minimum-footprint profile does not build (it links base's headers only), and a firmware that
+# decodes has no use for it. The full library takes it; minimal.cmake does not.
+set(_ac4_signature_sources
+    src/io/content_signature.cpp)
 
 # What the decoder and the encoder compute alike: the tables generated from the
 # ETSI attachments, in namespace iclforge::ac4::detail, and the transforms, the
@@ -196,6 +201,7 @@ else()
             ${_ac4_encoder_sources}
             ${_ac4_meta_sources}
             ${_ac4_inspector_sources}
+            ${_ac4_signature_sources}
             ${_ac4_kernel_sources}
         PRIVATE_INCLUDES ${_ac4_private_includes}
         LINK_PRIVATE ${_ac4_link_private})
