@@ -1,7 +1,7 @@
 # iclforge::truehd: where the specification and the streams disagree
 
-"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5 (planning/truehd.md says what it is and
-how it is used; section numbers are v3.3's, except §16.3.3 (v3.4) and §17 (v3.5)). Every entry below is a place where the specification is silent, contradicts itself or disagrees
+"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5, except §15, which is v3.6's (planning/truehd.md says what it is and
+how it is used; section numbers are v3.3's, except §16.3.3 (v3.4), §17 (v3.5) and §15 (v3.6)). Every entry below is a place where the specification is silent, contradicts itself or disagrees
 with the streams FFmpeg 6.1.1's `truehd` and `mlp` encoders write (and its decoder reads). The streams decide:
 FFmpeg's decoder decodes them, and the codec is lossless, so a reading that decodes all of them sample for sample
 is the reading in use. Where a reading is forced by the streams and the specification is silent, it is marked
@@ -33,6 +33,10 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    said on 2026-10-29 that the object data follows TS 103 420. That settles the syntax of the entry, if it was meant that
    way; it does not settle what this question asks (the outer container's field IDs, the digest scope, one signature per
    frame or per stream), and TS 103 420 does not either. Nothing is written until the owner confirms the reading.
+
+   v3.6 (2026-10-29) adds a second description of the same bytes: §15.4 gives the evolution frame as a bit-level container (the EMDF
+   container of ETSI TS 102 366 with renamed fields), and §16.3 still says Thrift. v3.6 does not relate the two. The comparison is in
+   "Atmos, spec v3.6" below; the container question is now question 20, and this question's digest scope and signing granularity stay open.
 2. **The 16-channel extension of the channel meaning (§14.2).** `extra_channel_meaning_length` has no unit and the
    section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
    ... bytes) and reads the fields as written, with "extended_substream" taken to mean `extended_substream_info != 0`.
@@ -158,6 +162,10 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     arguments a command does not read, which `forge` ignores for every codec. Refuse, warn, or refuse only some? Recommendation:
     refuse, and warn only where the option cannot change the output or any verdict, so that a verification flag or a second
     source is never dropped. **Provisional, owner to confirm.**
+
+20. to 37. The questions v3.6's Atmos section raises (the container, the coding of variable-length numbers, the program assignment, the
+    element framing, timing, channel accounting and the rest) are numbered in "Atmos, spec v3.6" below, with what the public standard says
+    and a recommendation for each.
 
 ## Entries
 
@@ -420,3 +428,218 @@ which §7.5's non-splice rule forbids (a gap under 8 must be followed by one of 
 such a stream exactly (the quick matrix of `verify_truehd_encode_interop.py` has the case); and neither the encoder nor the
 decoder models §18.1's 30,000-byte FIFO, the encoder keeping the peak rate unit by unit (entry 37), a weaker rule than the
 buffer.
+
+## Atmos, spec v3.6
+
+TH spec v3.6 (released 2026-10-29) rewrites §15 and leaves every other section as v3.5 has it. It now gives the bit-level syntax of the
+object audio metadata (OAMD, §15.5 to §15.15), the program assignment (§15.6), constants (§15.8 to §15.14), a bit-level `evo_frame()`
+container (§15.4) and constraints (§15.16, §15.17). The owner said the object data follows ETSI TS 103 420 and §15.1 says the OAMD bitstream
+is the one that standard defines. This section sets §15.4 to §15.15 (and the constants of §15.16 and §15.17) against the public text of
+ETSI TS 103 420 V1.2.1, statement by statement, and collects what is left for the owner as questions 20 to 37.
+
+**What the comparison rests on.** The standard is E-AC-3's: its scope is E-AC-3 only, and it never mentions TrueHD or MLP. What it can confirm
+is therefore the syntax and semantics of the OAMD payload itself (its §5 and Annex A) and the constraints it puts on the EMDF container
+the payload travels in (§8.2, Tables 55 and 56). It cannot confirm anything about TrueHD: that the payload is carried in the extra data, which
+access unit carries it, how often, what substream 3 holds. Those statements rest on the owner's word alone. Two limits of the method: the
+EMDF container's own syntax is ETSI TS 102 366 Annex H, which was not available as text here, so the container rows compare §15.4 with
+`libs/objects/src/emdf.cpp` (which cites Annex H's clauses and reads real E-AC-3 streams) and with what TS 103 420 itself says; and the
+extracted text of TS 103 420 lost some formula glyphs, so a formula is taken from the text where it survived and from
+`libs/objects/src/oamd.cpp` (written from the full document and checked on E-AC-3 streams) where it did not.
+
+**Verdicts.** *agree*: the two say the same. *disagree*: they differ; the standard's reading is stated. *v3.6 silent*: the standard specifies
+something v3.6 leaves out. *standard silent*: the public text says nothing (a TrueHD matter, or an identifier the standard reserves). Rows
+marked **Q** are in the numbered questions below.
+
+**Headline.** §15.5 to §15.15 do not describe the syntax of TS 103 420 §5.5. Their field widths for the version, object count and element
+count extensions, the tables of sample offsets, ramp durations, divergence, extended position precision and trim levels, the ISF object counts
+and the bed channel groups agree with the standard. Their structure does not: the program assignment, the element framing, the timing block,
+the object info block (status indices), the basic and render info, the trim element, the extended object element and the way variable-length
+numbers are coded all differ, and a parser written from §15.5 to §15.15 as printed could not read a payload that `iclforge::objects`' parser
+reads. The questions recommend taking the standard's syntax and treating §15.5 to §15.15 as a summary of it.
+
+### A. `evo_frame()` (§15.4) against the EMDF container
+
+The repository reads the EMDF container for E-AC-3 (`libs/objects/src/emdf.cpp`; `libs/ac3/src/emdf/frame_layout.cpp` walks the same shape).
+"EMDF" below means that reader and the Annex H clauses it cites.
+
+| # | TH spec v3.6 | The standard / the EMDF reader | Verdict |
+|---|---|---|---|
+| A1 | `evo_frame()` has no sync word and no length field; the length is `evo_frame_byte_length` in §16.1 | EMDF: `emdf_sync` 0x5838 and a 16-bit `emdf_container_length` in bytes precede the body; TS 103 420 §8.2 requires the payloads "in the EMDF container" | v3.6 differs by design: §16.1's framing stands in for sync and length. Not a conflict if §15.4 is the container body |
+| A2 | `evo_version` 2 bits, `+= variable_bits(2, max_ext=16)` when 3 | `emdf_version` 2 bits, `variable_bits(2)` when 3. Annex H defines the container's fields for version 0 only (the reader refuses any other) | agree on width; v3.6 silent on what versions 1 and up change. **Q22** |
+| A3 | `key_id` 3 bits, `+= variable_bits(3, max_ext=10)` when 7 | `key_id` 3 bits, `variable_bits(3)` when 7; 0 is "no authentication key" | agree on width; v3.6 silent on what a key id selects. **Q35** |
+| A4 | the payload list ends at `evo_payload_id == 0` | the same | agree |
+| A5 | `evo_payload_id` is 5 bits, no escape | 0x1F is an escape: the id is 0x1F plus `variable_bits(5)` (the reader implements it) | disagree (v3.6 silent on the escape). **Q22** |
+| A6 | OAMD is `evo_payload_id` 11 | TS 103 420 Table 55: OAMD is payload id 11 (JOC 14), "frequency: 1 frame" | agree on the id; v3.6 silent on "once per frame". **Q31** |
+| A7 | `smploffst` is `variable_bits(11, max_ext=2)` | `smploffst` is 11 bits followed by one reserved bit | disagree. **Q22** |
+| A8 | `duration` `variable_bits(11, max_ext=2)`, `groupid` `variable_bits(2, max_ext=16)` | `duration` `variable_bits(11)`, `groupid` `variable_bits(2)`; Table 56: `duratione` 0, `groupide` 1, `groupid` equal for the OAMD and JOC payloads | agree on the fields; v3.6 silent on Table 56's values and on what `groupid` ties together when there is no JOC payload. **Q22** |
+| A9 | `b_codedcdata_present`, then `codedcdata` 8 bits | `codecdatae`, then 8 reserved bits. Table 56 says `codecdatae` 1; Annex H (as the reader quotes it) says 0 for a conforming configuration, and Dolby's E-AC-3 streams send 0 | agree on width; v3.6 calls the byte data (and misspells the name); the standard calls it reserved and contradicts itself on the flag. **Q22** |
+| A10 | `discard_unknown_payload`; when 0: `payload_frame_aligned` only without a sample offset, `create_duplicate` and `remove_duplicate` when aligned, `priority` (5) and `proc_allowed` (2) when a sample offset or alignment | the same, bit for bit; Table 56: `discard_unknown_payload`, `create_duplicate`, `remove_duplicate`, `priority`, `proc_allowed` all 0 | agree |
+| A11 | `evo_payload_size` is `variable_bits(8, max_ext=4)`, in bytes | `emdf_payload_size` `variable_bits(8)`, in bytes | agree on width and unit |
+| A12 | "`variable_bits(n, max_ext)`: read n bits; if the value is 2^n - 1, add it and read n more; repeat up to max_ext times" | TS 103 420 §5.5.1 (`variable_bits_max`), TS 102 366 Annex H and TS 103 190-1 clause 4.2.2: n bits, then a 1-bit read-more flag after every group; each further group adds 2^n to the shifted value. `max_num_groups` in §5.5.1 plays the part of `max_ext` | **disagree**. Under the standard's coding even a small size costs one flag bit, so every field after the first `variable_bits` sits one bit later than under v3.6's text. **Q21** |
+| A13 | `evo_payload_byte[size]`: size x 8 bits, not aligned to a byte boundary of the frame | the same: the payload's bits are not byte-aligned in the container | agree |
+| A14 | `evo_protection()`: two 2-bit length codes, then the primary and the secondary bytes; `SIZE_TABLE` 0, 1, 4, 16 bytes | `protection_length_primary`, `protection_length_secondary`, then the two protection fields: 0, 8, 32, 128 bits for the codes 0 to 3 (Tables H.2.5 and H.2.6) | agree on the structure and the sizes |
+| A15 | primary code 0 means no primary bytes | the primary code 0b00 is reserved (the reader refuses it); only the secondary code 0b00 means none | disagree. **Q22** |
+| A16 | the protection is an "HMAC" | the content is "implementation dependent and not defined" (Annex H); TS 103 420 says nothing | standard silent. **Q35** |
+| A17 | what follows the protection up to `evo_frame_byte_length` | EMDF: zero bits to the byte boundary implied by the container length | v3.6 silent. The library reports whether the bits after the protection are all zero |
+| A18 | the container sits in the extra data region and is `evolution_payload` of §16.1 | TS 103 420 §8.2: the container is carried in the last dependent substream of an E-AC-3 stream; nothing about TrueHD | standard silent: rests on the owner's word |
+| A19 | §16.3 says the same bytes are a Thrift Binary Protocol container holding the typed entries and a nested ContentSignature | -- | **internal contradiction** with §15.4: one region, two layouts, and v3.6 does not relate them. **Q20** |
+
+### B. The OAMD payload (§15.5 to §15.15) against TS 103 420 §5
+
+| # | TH spec v3.6 | TS 103 420 | Verdict |
+|---|---|---|---|
+| B1 | `oamd_version` 2 bits, `+3` bits when 3 (0 to 10) | `oa_md_version_bits` 2, `+3` when 0x3 (§5.5.2); the semantics say only "the syntax version" | agree on the coding. The standard defines syntax for no version but 0 (the reader refuses others) |
+| B2 | `object_count_code` 5 bits, `+7` bits when 31; count = code + 1 (1 to 159) | `object_count_bits` 5, `+7` when 0x1F; `object_count = bits + 1` (§5.5.2, §5.6.0.2) | agree. The standard caps nothing at 159; 159 is the most the coding can say. Its own cap is 16 objects for E-AC-3 (§8.3.2.2; §6.1: up to 16 essences). **Q32** |
+| B3 | `b_dyn_object_only_program` 1 bit | the same (§5.5.3) | agree |
+| B4 | the dynamic-only branch reads `content_description` (4 bits) and nothing else | the dynamic-only branch reads `b_lfe_present` (1 bit) and no `content_description` | disagree. **Q24** |
+| B5 | the other branch reads `content_description` (4 bits, never used) and then every bed, ISF and dynamic field | `content_description[]` is four flags (3 bed, 2 ISF, 1 dynamic objects, 0 reserved), and each group of fields is present only if its flag is set (§5.5.3, Table 11a) | disagree: v3.6 reads the ISF index and the dynamic count even for a program without them. **Q24** |
+| B6 | order: `b_multiple_bed_instance`; per instance `b_standard_bed`, the assignment, `b_lfe_only`, `b_chan_distribute` | order: `b_bed_chan_distribute` once, `b_multiple_bed_instances_present`, `num_bed_instances_bits` (3 bits, count = bits + 2) when set; then per instance `b_lfe_only`, and when it is clear `b_standard_chan_assign` and the assignment (absent when `b_lfe_only` is set) | disagree in order, in where the two flags sit and in the missing instance count. **Q24** |
+| B7 | `b_multiple_bed_instance` SHALL be 0 | the standard allows 2 to 9 instances | standard silent on the constraint (a TrueHD matter); the syntax disagrees (B6). **Q24** |
+| B8 | `bed_assign`, 10 bits; bit k of the mask selects a group: stereo, centre, LFE, side surround, rear surround, front height, top surround, rear height, wide, LFE2 | Table 12: ten flags L/R, C, LFE, Ls/Rs, Lb/Rb, Tfl/Tfr, Tsl/Tsr, Tbl/Tbr, Lw/Rw, LFE2, numbered 9 down to 0 and sent index 0 first, so v3.6's bit k is the standard's index 9 - k | agree on the groups, their order and counts, given that reading (the standard's text, taken literally, orders the labels from index 0 up; `libs/objects/src/oamd.cpp` records why the other reading is right) |
+| B9 | the examples: 7.1.4 is `0x07F`, 7.1.2 `0x05F`, "9.1.6" `0x0FF` | -- | v3.6 inconsistent with itself: groups 0 to 7 are 14 channels (7.1.6); 9.1.6 needs the wide group too (`0x1FF`, 16 channels). The 7.1.4 example takes the top-side pair where E-AC-3's reference streams take the top-back pair. **Q32** |
+| B10 | not standard: `custom_speaker_count` and one `speaker_label_idx` per channel, "variable" | `nonstd_bed_channel_assignment[]`: 17 flags, Table 13 (L, R, C, LFE, Ls, Rs, Lb, Rb, Tfl, Tfr, Tsl, Tsr, Tbl, Tbr, Lw, Rw, LFE2), no count, no indices | disagree; the 17 labels and their order (§15.11.3) agree. **Q25** |
+| B11 | `isf_config` 3 bits, always present; 0 none, 1 to 6 give 4, 8, 10, 14, 15, 30 | `intermediate_spatial_format_idx` 3 bits, present only if `content_description[2]`; 0 to 5 give 4, 8, 10, 14, 15, 30 (Table 11b); 6 and 7 reserved | counts agree; the coding differs by one and by the condition. **Q24** |
+| B12 | `num_dynamic_objects` 5 bits, `+7` when 31 | `num_dynamic_objects_bits` 5, `+7` when 0x1F, present only if `content_description[1]`; count = bits + 1 (§5.6.0.12) | extension agrees; v3.6 silent on "+ 1" and the condition. **Q24** |
+| B13 | -- | `content_description[0]` set: `reserved_data_size_bits` (4), `reserved_data`, padding | v3.6 silent. **Q24** |
+| B14 | `b_alternate_object_data_present` 1 bit | the same; when set, each element carries `alternate_object_data_id_idx` (§5.6.0.3) | agree on the bit; v3.6 silent on its effect. **Q26** |
+| B15 | `oa_element_count` 4 bits, `+5` when 15 (0 to 46) | the same (§5.5.2) | agree |
+| B16 | an element is a 4-bit id followed by its body | `oa_element_md()`: `oa_element_id_idx` (4), `oa_element_size_bits` = `variable_bits_max(4,4)` (size in bytes = bits + 1), `alternate_object_data_id_idx` (4, if flagged), `b_discard_unknown_element` (1), the element, padding to the size (§5.5.4, §5.6.4.3) | disagree: v3.6 omits the size, which is what lets a reader skip an element it does not know. **Q26** |
+| B17 | ids: 1 object, 2 trim, 3 headphone, 4 object description (reserved, "not parsed"), 5 extended object, 6 bed object | Table 26: 1 object, 2 trim, 5 extended object; 0, 3, 4 and 6 to 15 are reserved | agree for 1, 2, 5; 3 and 6 are reserved in the standard, so it is silent on them. **Q26** |
+| B18 | the object element loops block by block, then object by object | `object_element()`: `md_update_info()`, `b_reserved_data_not_present` (1) and, if clear, 5 reserved bits, then for each object `object_data()` = all its blocks (object-major) | disagree in order; v3.6 omits the reserved-data flag. **Q27** |
+| B19 | `sample_offset_code` 2 bits: 0 is 0, 1 is a 2-bit table index, 2 is 5 bits, 3 reserved | Table 22: the same; Table 23 offsets 8, 16, 18, 24; `sample_offset_bits` 0 to 31 | agree |
+| B20 | `num_obj_info_blocks_code` 3 bits, count = code + 1 (1 to 8) | the same (§5.6.2.4) | agree |
+| B21 | `block_offset_factor` (6) and `ramp_duration_code` (2) for blocks 1 and up only | `block_update_info()` for every block including block 0 | disagree. **Q27** |
+| B22 | `ramp_duration_code` 0 to 2 are the first table entries; 3 adds 2 more bits (code 0 to 6) | codes 0, 1, 2 are 0, 512, 1536 samples (Table 24); code 3 reads `b_use_ramp_duration_idx`, then a 4-bit index into Table 25 or an 11-bit `ramp_duration_bits` (0 to 2047) | disagree. The 16 table entries agree (32, 64, 128, 256, 320, 480, 1000, 1001, 1024, 1600, 1601, 1602, 1920, 2000, 2002, 2048). **Q27** |
+| B23 | `object_info_block`: `b_object_not_active`; block 0 has `b_default_basic_info` and `b_default_render_info`; later blocks have `basic_info_status_idx` and `render_info_status_idx` ("variable") | `b_object_not_active`; `object_basic_info_status_idx` (2 bits; forced 0 when inactive, forced 1 in block 0, so no bit); basic info present for status 1 and 3; `object_render_info_status_idx` (2 bits; forced 0 when inactive or when the object is in a bed or is an ISF object; forced 1 in block 0); render info present for 1 and 3; `b_additional_table_data_exists` and its data (§5.5.9, Tables 28 and 29) | disagree: the default flags do not exist, the status indices are 2 bits, bed and ISF objects carry no render info, and the additional data is missing. **Q27** |
+| B24 | `b_default_basic_info` set: gain 0 dB, no priority | status 0 ("default", an inactive object): gain -inf dB, priority 0 (Table 28) | disagree |
+| B25 | `gain_code` 2 bits: 0 is 0 dB, 1 a 6-bit value giving -0.5 x (v + 1) dB (-0.5 to -32), 2 is -inf, 3 reserved | `object_gain_idx` 2 bits: 0 is 0 dB, 1 is -inf, 2 is followed by `object_gain_bits` (6) giving 15 - bits dB for 0 to 14 and 14 - bits dB for 15 to 63 (+15 to -49 dB in 1 dB steps), 3 is "the previous object's gain in this block" (Tables 18 and 19) | disagree: codes 1 and 2 swapped, a different gain law and range, code 3 not reserved. **Q28** |
+| B26 | `b_priority_present`, then a 5-bit priority (0 to 31) | `b_default_object_priority` (set means 1.0), else `object_priority_bits` (5), priority = bits / 32 | disagree: the flag has the opposite sense and the scale is not given. **Q28** |
+| B27 | `render_info_mask` 4 bits, bit 3 position, 2 zone, 1 size, 0 screen reference | `obj_render_info[]` 4 flags (all four implied by status 1): Table 31 numbers position 3, zone 2, size 1, screen 0; the §5.5.11 pseudocode numbers them 0 to 3 in the same syntax order. Sent index 0 first, Table 31 puts the screen flag first, the pseudocode the position flag first | standard inconsistent with itself, v3.6 follows the pseudocode; no stream decides (the E-AC-3 reference streams the repository reads send status 1, which implies all four). **Q28** |
+| B28 | `b_absolute_position`: set means x, y, z follow, clear means three 3-bit signed differences; read in every block | `b_differential_position_specified`, read only in blocks after the first (block 0 is absolute): set means differences. Differences are signed, in 1/62, 1/62, 1/15 steps added to the previous standard-precision value | disagree: the flag has the opposite sense and block 0 has none. **Q28** |
+| B29 | `x` 6 bits (/ 62), `y` 6 bits (/ 62), `z` 1 sign bit + 4 bits (/ 15); sign bit 0 is positive | the same widths and divisors, with `min(1, ...)`; `pos3D_Z_sign_bits` 0 means -1 (§5.6.1.1.10) | agree on widths and scale; **disagree on the sign**: v3.6 has it inverted. **Q28** |
+| B30 | `b_distance_specified`, `b_at_infinity`, `distance_factor_idx` 4 bits | the same widths (§5.5.11); Table 15 gives the 16 factors (1.1 to 50.1) | agree; v3.6 silent on the table |
+| B31 | `zone_constraints_idx` (3) and `b_enable_elevation` (1) follow the position group, and are read again under mask bit 2 | the pair belongs to the zone flag only (Table 31), with Tables 20 and 21 for the meaning | disagree: v3.6 puts them in two places. **Q28** |
+| B32 | `size_code` 0: one 5-bit size; 1: width, depth, height 5 bits each; 2 and 3 reserved | `object_size_idx` 0: zero size, nothing follows; 1: one 5-bit size; 2: width, depth, height (5 bits each); 3 reserved; each value is bits / 31 (Table 17) | disagree (shifted by one). **Q28** |
+| B33 | `b_use_screen_ref`, `screen_factor` 3 bits, `depth_factor` 2 bits; `b_object_snap` 1 bit | the same widths; `screen_factor = (bits + 1) / 8`, Table 16 depth factors 0.25, 0.5, 1, 2; `b_object_snap` ends every render info | agree on widths; v3.6 silent on the scale and the table |
+| B34 | the trim element: `warp_mode` 2, 2 reserved, `global_trim_mode` 2, then 9 x `trim_value_idx` (4 bits) into a 16-entry level table | `warp_mode` 2, 2 reserved, `global_trim_mode` 2; only for mode 0b10 (custom) a loop over `NUM_TRIM_CONFIGS` of `b_default_trim`, `b_disable_trim`, a 5-flag `trim_balance_presence`, then centre, surround and height levels (4 bits each) and two balance values (sign + 4 bits); then `b_disable_trim_per_obj` and one flag per object (§5.5.12). `NUM_TRIM_CONFIGS` has no value in the standard | disagree. The 16 levels agree with Table 35 (`trim_centre`: +6, +3, +1.5, +0.75, -0.75, -1.5, -3, -4.5, -6, -7.5, -9, -10.5, -12, -13.5, -16, -36 dB) but surround and height use Tables 36 and 37, whose first four codes are reserved. **Q29** |
+| B35 | the headphone element (id 3): "exact field layout to be confirmed from ETSI TS 103 420" | id 3 is reserved in Table 26: there is nothing to confirm it from | standard silent. **Q26** |
+| B36 | the extended object element: per object `b_divergence_present` and a 2-bit index; then per block and object `b_ext_position` and three 2-bit codes | `b_obj_div_block` (1), then per object and block, for dynamic objects only: `b_object_divergence`, `object_div_mode` (2 bits: table, reuse the previous, 6-bit code), `object_div_table` (2) or `object_div_code` (6, Table 42); `b_ext_prec_pos_block` (1), then per object and block, dynamic objects only: `b_ext_prec_pos`, a 3-flag presence mask, and a 2-bit code per flag set (§5.5.13 to §5.5.15) | disagree: no block-level flags, no divergence mode or code, no presence mask, a different loop order and object scope. **Q30** |
+| B37 | `OBJECT_DIV_TABLE`: 0.500755, 0.608529, 0.704833, 1.0; `EXT_PREC_POS3D_LUT`: +1, +2, -1, -2 | Table 41 and Tables 44 to 46: the same values | agree |
+| B38 | the position becomes "base + ext_offset / (resolution of base field)" | `pos3D_X = min(1, bits/62 + ext/(62 x 5))`, likewise Y with 62 x 5 and Z with 15 x 5 | disagree: v3.6 leaves out the factor 5, so read literally it makes the refinement five times too large. **Q30** |
+| B39 | the bed object element (id 6): "the same ObjectInfoBlock applied to each bed channel, position fixed to the speaker" | id 6 is reserved in Table 26; for a bed object the render info is not coded at all (status forced 0) | standard silent; v3.6 gives no bit syntax. **Q26** |
+| B40 | §15.11.1: x/62, y/62, z/15 as normalised coordinates; §15.11.2: the room mapping X = 2(x - 0.5), Y = 2(0.5 - y), Z = z | §4.2.1: x from the left wall (0) to the right (1), y from the front wall (0) to the back (1), z from the floor (-1) to the ceiling (1); the front-wall centre is (0.5, 0, 0) | agree on the axes and their direction; the mapping to a signed cube is v3.6's own |
+| B41 | §15.11.3: 17 speaker positions, e.g. L (0.134, 0.134, 0), LFE (0.134, 0.134, 0), Ls (0, 0.366, 0), Lb (0, 0.866, 0), Lw (0.067, 0.25, 0) | §4.2.3 gives speaker-anchored objects no numbers. The informative Annex B (Table B.10) has L (0, 0, 0), LFE (0, 0, -1), Ls (0, 0.5, 0), Lb (0, 1, 0), Lw (0, 0.161, 0), in the same normalised axes | disagree with Annex B for 14 of 17 labels (C, Lts and Rts agree). Not wire format. **Q37** |
+| B42 | §15.16: SHALL: `object_count` within 159; `b_chan_distribute` and `b_lfe_only` not both set; `bed_assign` consistent across frames; sample offsets under the access unit's samples; timestamps increasing; active objects not muted (`gain_code != 2`); payload within the frame's capacity | none of these is in the standard. The standard's gain code for -inf is 1, not 2, and `b_bed_chan_distribute` is one flag for the whole program | standard silent; the `gain_code` and the two flag names do not match the standard's syntax (B6, B25). **Q34** |
+| B43 | §15.6.3 / §15.16: `object_count` = beds + ISF + dynamic, and equals the channel count of substream 3 | §5.6.4.8: objects are ordered beds, ISF, dynamic; §8.3.2.2: for E-AC-3 the same total is `complexity_index_type_a`, at most 16 | agree on the order and the total; the link to substream 3 is TrueHD's (standard silent). **Q32** |
+
+### C. Contradictions inside v3.6
+
+| # | Where | What |
+|---|---|---|
+| C1 | §15.4 against §16.3 | the same bytes (`evolution_payload`) are a bit-level container in §15.4 and a Thrift container in §16.3; §16.3.1 calls the payload "a single Thrift blob". Not related anywhere in v3.6. **Q20** |
+| C2 | Appendix E and §15.16 against §15.6 | Appendix E still uses the v3.5 names: `multiple_bed_instances_present` (now `b_multiple_bed_instance`), `bed_object_chan_distr` (no such field now; the nearest is `b_chan_distribute`), and "`interm_spatial_format` SHALL be NULL", which forbids what §15.6 describes in detail (ISF objects through `isf_config`, 4 to 30 of them). Whether a TrueHD Atmos program may carry ISF objects is therefore open. **Q34** |
+| C3 | §15.2 against §2.3, §7.2, §15.3, §17.5 | §15.2: Atmos is 48 kHz only. §7.2 and §17.5: restart sync 0x31EC marks substreams 2 and 3; §15.3: substream 3; §2.3: all substreams share one 13-bit sync (0x18F5). No rate condition appears in §7.2, §15.3, §8.3 or §9.3. The library follows the sync and does not test the rate. **Q33** |
+| C4 | §8.3, §9.3 against §15.3 | `huff_lsbs` up to 31 and a Filter B range of 2^31 are for "substreams 2/3 in Atmos"; §15.3 lists them for substream 3. The library keys on the 0x31EC sync (any substream carrying it): 31 and a 32-bit filter there, 24 and 24 bits elsewhere. **Q33** |
+| C5 | §15.17 against §14.2 | "Max Channel Count" 12, 14, 16 per Atmos presentation; §14.2's `sixteench_channel_count` is 5 bits and its use is not stated. Is it 12, 14 or 16, the substream 3 channel count, or `object_count`? §15.17 does not say whether a program with fewer objects is padded to 12, 14 or 16 channels. **Q32** |
+| C6 | §15.6.1 | the example "9.1.6" is a 14 channel mask (B9). §15.6.2 lists a 30 object ISF layout, which cannot fit a 16 channel substream. **Q32** |
+| C7 | §15.4 against §16.6 | `evo_protection()` is called an HMAC; §16.6 authenticates the frame with a Thrift ContentSignature (ECDSA). Whether a frame carries both is not said. **Q35** |
+| C8 | §16.1 | `if (evolution_frame_present)` is a condition no field defines. The library treats any extra data region that passes its framing checks as a candidate evolution frame and reports the checks. **Q36** |
+
+### D. Questions for the owner
+
+Numbering continues the list at the top of this file. In each, "the standard" is TS 103 420 §5 and "recommendation" is what the library does
+until told otherwise. The library's evolution frame reader is **provisional, owner to confirm** (question 20): it is written and tested, but
+no TrueHD stream here has an evolution frame, so nothing decides it.
+
+20. **Which container do real TrueHD streams carry (A19, C1)?** §15.4 says the evolution frame is a bit-level EMDF-style container;
+    §16.3 says it is a Thrift container with a nested ContentSignature; §16.3.3 lists the Thrift layout as unconfirmed. The library reads
+    `evolution_payload` as §15.4's `evo_frame()` (`parse_evolution_frame`, `libs/truehd/include/iclforge/truehd/io/evolution.hpp`) and
+    keeps the bytes unchanged either way. If the bytes are a Thrift blob the read fails at once and says so; the two layouts can also nest
+    (the Thrift blob as one payload of the bit-level container, or the reverse), and `forge probe` lists the payload ids and sizes it finds,
+    which shows it. Which is it, and where does the ContentSignature sit? **Recommendation:** run `forge probe --json` on two or three of your
+    Atmos tracks and send back the "evolution" table; that answers it from the stream and needs no further analysis. This question supersedes
+    question 1 for the container's outer layout (question 1's digest scope and signing granularity stay open).
+21. **How `variable_bits(n, max_ext)` is coded (A12).** v3.6 §15.4 describes an escape value (all ones, add, read n more). The standard
+    (§5.5.1), ETSI TS 102 366 Annex H and TS 103 190-1 all use a read-more flag after every group. The two disagree from the first
+    `variable_bits` of the frame on. `max_ext` matches `max_num_groups` of §5.5.1, which suggests the source code uses the standard's coding and
+    the prose is a paraphrase. **Recommendation:** the standard's coding (`EvolutionReading::kEmdf`). The reader also has the literal v3.6
+    reading (`kSpec36`), and `forge probe` reports which of the two parses a stream, so a real stream can settle it.
+22. **The EMDF details §15.4 omits or changes (A2, A5, A7, A8, A9, A15).** Version other than 0; the payload id escape at 31; `smploffst` as 11
+    bits plus a reserved bit against `variable_bits(11, 2)`; the 8 bits after the codec data flag, which the standard calls reserved; and a
+    primary protection length code of 0, which Annex H reserves and v3.6 allows. **Recommendation:** the standard's reading for each, as
+    `kEmdf`; `kSpec36` differs in exactly these and in question 21's coding.
+23. **The payload configuration a TrueHD writer sends (A6, A8, A9).** Table 56 fixes it for E-AC-3: one OAMD payload per frame, frame
+    aligned, no sample offset or duration, `groupid` shared with JOC (there is none in TrueHD), priority 0. Table 56 also says
+    `codecdatae` 1 where Annex H says 0. **Recommendation:** write what `libs/objects` writes for E-AC-3 (Table 56 with `codecdatae` 0,
+    `groupid` 0) and read anything; nothing is written yet (planning/truehd-atmos.md).
+24. **The program assignment (B4 to B7, B11 to B13).** The standard's syntax (§5.5.3): `b_lfe_present` in the dynamic-only branch;
+    `content_description` as four flags that gate the bed, ISF, dynamic-object and reserved-data groups; `b_bed_chan_distribute` first,
+    then the instance count (bits + 2), then `b_lfe_only` before the assignment; the ISF index and the dynamic object count only when
+    flagged, the count being bits + 1. §15.6 differs in all of these. The "SHALL be 0" on multiple bed instances is a TrueHD rule the
+    standard cannot confirm. **Recommendation:** the standard's syntax (it is what `iclforge::objects` parses); §15.6 read as a summary.
+    Is it?
+25. **Non-standard beds (B10).** `custom_speaker_count` and `speaker_label_idx` are "variable" in §15.6; the standard has 17 flags (Table 13)
+    and no count. **Recommendation:** Table 13.
+26. **Element framing and the reserved ids (B14, B16, B17, B35, B39).** The standard frames each element with its size in bytes, the
+    alternate-data id, a discard flag and padding, so that an unknown element can be skipped. §15.7 has none of that. Ids 3 (headphone) and 6
+    (bed object) are reserved in Table 26; §15.13 asks for the headphone layout to be confirmed from a document that reserves the id, and §15.15
+    gives no bit syntax. **Recommendation:** the standard's framing; ids 3, 4, 6 and above skipped by size. If real streams carry a headphone
+    or bed object element, the owner supplies the layout.
+27. **Timing and object info blocks (B18, B21 to B24).** Block 0 has a `block_update_info` too; ramp codes 0, 1, 2 mean 0, 512, 1536 samples;
+    code 3 reads a flag and then a 4-bit table index or an 11-bit value; the info status indices are 2 bits (§15.8.2's "variable" is 2 bits)
+    and forced to 0 for inactive objects and for bed and ISF objects' render info, to 1 in block 0; objects are coded object by object, not
+    block by block; `b_reserved_data_not_present` and the additional table data exist. **Recommendation:** the standard.
+28. **Basic and render info (B25 to B29, B31, B32).** Gain: code 1 is -inf, code 2 carries the 6 bits (1 dB steps, +15 to -49 dB), code 3
+    repeats the previous object's. Priority: `b_default_object_priority`, scale bits / 32. Position: the differential flag is read only
+    after block 0 and means differences when set; the z sign bit 0 is negative. Zone and elevation belong to the zone flag only. Size code 0 is
+    zero size. The presence-flag order of `obj_render_info[]` is ambiguous inside the standard (B27) and only matters for status 3.
+    **Recommendation:** the standard; for the flag order, Table 31's numbering as `iclforge::objects` reads it, until a stream with status 3 shows
+    otherwise.
+29. **The trim element (B34).** The standard's loop is conditional on the global mode and its length `NUM_TRIM_CONFIGS` is not given
+    (`iclforge::objects` finds 6 or 9 from the element's own size). §15.12's nine fixed 4-bit levels do not exist in it. What is the count in
+    TrueHD, and are the surround and height levels Tables 36 and 37? **Recommendation:** the standard's syntax, the size-driven count.
+30. **The extended object element (B36, B38).** Block-level flags, a divergence mode and code (Table 42), a 3-flag presence mask for the
+    position refinement, dynamic objects only, and a refinement of 1/5 of the base step. **Recommendation:** the standard.
+31. **The time base (A6, B42).** The standard's OAMD payload covers one E-AC-3 frame (1536 samples): up to 8 updates, each at
+    `sample_offset + 32 x block_offset_factor` samples, ramps to 2048. A TrueHD access unit is 40 samples (§3.3). §15.16 says sample offsets
+    must be below the access unit's duration, which fits `sample_offset` (at most 31) but not a block offset factor up to 63. How many access
+    units does one evolution frame cover, how often is one sent, and what do `sample_offset`, `block_offset_factor` and the ramp refer to?
+    **Recommendation:** the owner states it; the probe reports the access unit index of every frame so the cadence can be read off.
+32. **Channel accounting (B2, B9, B43, C5, C6).** `object_count` up to 159 against a substream of at most 16 channels; a 30-object ISF layout
+    cannot fit; 12, 14 and 16 (§15.17) against `sixteench_channel_count` (§14.2) and `object_count`; the LFE and the bed channel order in the
+    substream; the "9.1.6" mask that is 14 channels. **Recommendation:** treat 16 as the limit of `object_count` for TrueHD, state the channel
+    order as the standard's (beds in Table 12's order with L/R first, then ISF, then dynamic), and say whether a 7.1.4 program with fewer
+    objects is padded to 12 channels.
+33. **Sample rate, sync and limits (C3, C4).** Is Atmos 48 kHz only, and is the rule for the encoder or for the decoder? Does 0x31EC mark
+    substream 3 only (§15.3) or 2 and 3 (§7.2, §17.5)? Do the 31-bit `huff_lsbs` and the 2^31 filter range apply to every substream with
+    sync 0x31EC or by index? **Recommendation:** the decoder keys on the sync, accepts any rate and refuses nothing the sync does not
+    allow; the encoder writes 48 kHz only. (The decoder's behaviour is tested in `libs/truehd/tests/decoder/test_handbuilt.cpp`.)
+34. **Appendix E and §15.16 (B42, C2).** Appendix E uses the v3.5 field names and says ISF SHALL be NULL, which §15.6 contradicts.
+    Can an Atmos program carry ISF objects? **Recommendation:** treat ISF as allowed (the standard defines it), and the rest of §15.16 as
+    rules for an encoder that this library's encoder will keep (nothing is enforced on the read side).
+35. **Integrity (A3, A16, C7).** What is `key_id`, what does `evo_protection()` hold ("HMAC" in §15.4, undefined in Annex H) and does a
+    TrueHD frame carry both it and a ContentSignature? Out of scope for now; the library reports the protection lengths and bytes and verifies
+    nothing, and the probe says so.
+36. **`evolution_frame_present` (C8).** §16.1 conditions the frame on a flag no field defines. **Recommendation:** any extra data region is
+    a candidate; the nibble, the framing and the parity are reported, not enforced.
+37. **Speaker positions (B41).** §15.11.3's positions differ from the standard's informative Annex B for 14 of 17 labels. They are not
+    wire format; they matter to a renderer. **Recommendation:** do not use §15.11.3 until the owner says where its numbers come from; the
+    renderer uses `libs/render`'s own.
+
+### E. What the public standard confirms, and what rests on the owner's word
+
+Confirmed by TS 103 420: the widths and extension rules of the version, object count and element count (B1, B2, B15); `b_dyn_object_only_program`
+and `b_alternate_object_data_present` (B3, B14); the sample offset, ramp duration, divergence, extended position and trim level tables
+(B19, B22's 16 entries, B37, B34's centre levels); the ISF object counts (B11); the bed groups and the 17 channel labels (B8, B10);
+the widths of the distance, screen and snap fields and of the position and the z magnitude (B29, B30, B33); the room axes (B40); OAMD as
+payload id 11 (A6); the shape of the EMDF payload configuration, size and protection (A4, A10, A11, A13, A14, in the container reader's
+terms).
+
+Rests on the owner's word alone, because the standard is silent on TrueHD: that the payload travels in the extra data and as
+`evo_frame()` (A18, A19); its protection being an HMAC (A16); everything about substream 3 (restart sync 0x31EC, 15 matrices, 32-bit Filter B,
+`huff_lsbs` 31, terminator B, the 12, 14 and 16 channel presentations); the program rules that tie `object_count` to the substream's
+channels; the constraints of §15.16; the extra data framing, its check nibble and parity (§16.1, §16.2, §16.4).
+
+Where the owner's text and the public text differ, nothing but a stream or the owner decides: A5, A7, A12, A15 (the container) and B4 to B6, B10 to
+B12, B16, B18, B21 to B26, B28, B29 (the z sign), B31, B32, B34, B36, B38 and B41 (the payload). The library follows the standard in all of them
+(`iclforge::objects` already does) and says so in the question.
