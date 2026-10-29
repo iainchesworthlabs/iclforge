@@ -6,6 +6,15 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     io/test_elementary.cpp
     decoder/test_decoder.cpp
     decoder/test_ffmpeg_fixtures.cpp
-    decoder/test_handbuilt.cpp)
+    decoder/test_handbuilt.cpp
+    encoder/test_downmix.cpp
+    encoder/test_encoder.cpp
+    encoder/test_signals.cpp)
 
 target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json)
+
+# iclforge-truehd-encode-tool - WAV in, TrueHD out, for tools/checks/verify_truehd_encode_interop.py
+# and tools/ci/fuzz_truehd_encoder_space.py until the forge encode command replaces it.
+add_executable(iclforge-truehd-encode-tool tools/encode_tool.cpp)
+target_link_libraries(iclforge-truehd-encode-tool PRIVATE iclforge::truehd iclforge::warnings)
+add_dependencies(iclforge-tests iclforge-truehd-encode-tool)

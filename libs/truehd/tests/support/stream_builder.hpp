@@ -50,7 +50,8 @@ inline MajorSync stereo_major_sync() {
 // The bytes of one substream segment of the built stereo stream, with its parity and CRC bytes.
 // With `restart` the first block carries a restart header; without, a block with no header at all.
 inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = true,
-                                             std::uint16_t sync = kRestartSyncStandard) {
+                                             std::uint16_t sync = kRestartSyncStandard,
+                                             bool bypass_matrix = false) {
     BitWriter writer;
     if (restart) {
         writer.put(1, 1);  // block_header_exists
@@ -69,6 +70,16 @@ inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = tr
         context.max_matrix_chan = 1;
         BlockHeaderSpec block;
         block.block_size = kBuiltBlockSize;
+        if (bypass_matrix) {
+            MatrixSet set;
+            set.count = 1;
+            set.items[0].out_ch = 0;
+            set.items[0].frac_bits = 0;
+            set.items[0].lsb_bypass = true;
+            set.items[0].present[0] = true;
+            set.items[0].coeff[0] = 1;
+            block.matrices = set;
+        }
         for (int ch = 0; ch < 2; ++ch) {
             block.channels[static_cast<std::size_t>(ch)].present = true;
             block.channels[static_cast<std::size_t>(ch)].huff_type = 0;
@@ -102,8 +113,10 @@ inline std::vector<std::byte> stereo_segment(bool restart, bool with_checks = tr
 
 // One access unit of the built stereo stream.
 inline std::vector<std::byte> stereo_unit(bool with_major_sync, std::uint16_t input_timing = 0,
-                                          std::uint16_t sync = kRestartSyncStandard) {
-    const std::vector<std::byte> segment = stereo_segment(with_major_sync, true, sync);
+                                          std::uint16_t sync = kRestartSyncStandard,
+                                          bool bypass_matrix = false) {
+    const std::vector<std::byte> segment =
+        stereo_segment(with_major_sync, true, sync, bypass_matrix);
     SubstreamEntry entry;
     entry.restart_nonexistent = !with_major_sync;
     entry.crc_present = true;

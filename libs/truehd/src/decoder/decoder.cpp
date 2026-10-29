@@ -110,6 +110,7 @@ struct Decoder::Impl {
     explicit Impl(const DecoderConfig& configuration)
         : config(configuration),
           rows(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kRowStride),
+          matrixed(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kRowStride),
           pcm(static_cast<std::size_t>(kMaxSamplesPerAccessUnit) * kMaxChannels) {
         extra_data.reserve(256);
     }
@@ -119,6 +120,8 @@ struct Decoder::Impl {
     std::optional<MajorSync> major_sync;
     std::array<SubstreamState, kMaxSubstreams> substreams;
     std::vector<std::int32_t> rows;
+    std::vector<std::int32_t>
+        matrixed;  // a substream's rows after its matrices (ERRATA.md entry 34)
     std::vector<std::int32_t> pcm;
     std::vector<std::byte> extra_data;
     std::vector<Channel> layout_eight;  // the channels of the major sync's eight-channel assignment
@@ -221,11 +224,6 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     if (!header) {
         return std::unexpected(header.error());
     }
-    if (header->noise_type()) {
-        return std::unexpected(make_error(ErrorKind::kUnsupported,
-                                          "restart sync 0x31EB (noise_type 1): the 256-entry noise "
-                                          "table of generator 1 is not available (TH spec §17.4)"));
-    }
     const bool is_mlp = major_sync && major_sync->kind == StreamKind::kMlp;
     const int limit = index >= kObjectSubstream
                           ? kMaxChannels - 1
@@ -256,7 +254,11 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.min_chan = header->min_chan;
     state.context.max_chan = header->max_chan;
     state.context.max_matrix_chan = header->max_matrix_chan;
-    state.context.noise_type = false;
+    // TH spec §10.2: a restart with noise_type set adds a noise shift to every matrix, and its
+    // matrices have no coefficients for the noise channels (ERRATA.md entry 32), so no matrix
+    // draws on them: FFmpeg's streams of more than 6 channels set the flag and decode here without
+    // the noise table of generator 1 (§17.4).
+    state.context.noise_type = header->noise_type();
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
@@ -284,6 +286,13 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
+            if (spec.lsb_bypass && state.context.noise_type) {
+                return std::unexpected(make_error(
+                    ErrorKind::kUnsupported,
+                    "LSB bypass under restart sync 0x31EB (noise_type 1): the bypassed bits come "
+                    "from "
+                    "generator 1, whose 256-entry table is not available (TH spec §17.4)"));
+            }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
@@ -512,7 +521,12 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         state.noise_seed = seed;
     }
 
-    // The primitive matrices (TH spec §10), in the order the block header listed them.
+    // The primitive matrices (TH spec §10), in the order the block header listed them. They work
+    // on a copy of the block's rows: the next substream starts from the rows this one decoded
+    // before its matrices, as FFmpeg's decoder gives them (ERRATA.md entry 34).
+    std::int32_t* const matrix_base =
+        matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
+    std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     for (int m = 0; m < state.matrix_count; ++m) {
         const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
         const std::uint32_t keep =
@@ -520,7 +534,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) - 1U)
                 : 0xFFFFFFFFU;
         for (int i = 0; i < block; ++i) {
-            std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
             std::int64_t sum = 0;
             for (int k = 0; k < plan.count; ++k) {
                 sum += std::int64_t{row[plan.channel[static_cast<std::size_t>(k)]]} *
@@ -539,7 +553,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     std::int32_t* const pcm_base =
         pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
     for (int i = 0; i < block; ++i) {
-        const std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+        const std::int32_t* const row = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[restart.ch_assign[static_cast<std::size_t>(ch)]];
             const int shift = state.output_shift[static_cast<std::size_t>(ch)];

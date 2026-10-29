@@ -83,6 +83,14 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 
 // --- TH spec §10.2, matrix_parameters() ---
 
+// The coefficients a matrix sends: one for each matrix channel and, in a stream without noise_type,
+// the two noise channels after them (ERRATA.md entry 8). With noise_type set the matrix sends the
+// matrix channels' coefficients alone and a 4 bit noise shift after them, which is what TH spec
+// §10.2 lists (ERRATA.md entry 32; provisional, owner to confirm).
+[[nodiscard]] int matrix_coefficients(const BlockContext& context) noexcept {
+    return context.max_matrix_chan + 1 + (context.noise_type ? 0 : kNoiseChannels);
+}
+
 [[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,
                                                             const BlockContext& context) {
     const unsigned count = reader.read(4);
@@ -93,7 +101,7 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     set.count = static_cast<std::uint8_t>(count);
     // The streams carry a coefficient for each of the matrix channels and the two noise channels,
     // where TH spec §10.2 lists max_chan + 1 (ERRATA.md).
-    const int coefficients = context.max_matrix_chan + 1 + kNoiseChannels;
+    const int coefficients = matrix_coefficients(context);
     for (unsigned m = 0; m < count; ++m) {
         MatrixSpec& matrix = set.items[m];
         matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
@@ -122,7 +130,7 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 
 void write_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
     put_field(writer, set.count, 4);
-    const int coefficients = context.max_matrix_chan + 1 + kNoiseChannels;
+    const int coefficients = matrix_coefficients(context);
     for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
         const MatrixSpec& matrix = set.items[m];
         put_field(writer, matrix.out_ch, 4);
