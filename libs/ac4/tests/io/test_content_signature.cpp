@@ -519,7 +519,7 @@ TEST_CASE("an unsigned or foreign stream is reported, not mistaken", "[ac4][sign
     CHECK(refused.error().fault->code == crypto::SignatureError::kCertifierNoPrivateKey);
 }
 
-// CS spec v2.5 §8.3.2: signing an MP4 is out of scope and a signer shall refuse it. The refusal
+// CS spec v2.6 §8.3.2: signing an MP4 is out of scope and a signer shall refuse it. The refusal
 // names the reason (the kind is its own, not "not AC-4": the samples inside may well be AC-4) and
 // the stream that can be signed.
 TEST_CASE("an MP4 is refused by name, not signed and not taken for a damaged AC-4 stream",

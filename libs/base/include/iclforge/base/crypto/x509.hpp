@@ -48,10 +48,6 @@ struct DistinguishedName {
     std::string text;            // "CN=Example, title=Code/Content Signer, ..." for people to read
     std::optional<std::string> common_name;
     std::optional<std::string> title;  // the `title` attribute, 2.5.4.12 (CS spec §6.1 step 4)
-    // The value of every attribute, in the order written, escaped as `text` is. CS spec v2.5
-    // §5.3 asks that the publisher UUID match the one bound to the signing certificate and does
-    // not say which attribute holds it, so a caller looks through all of them.
-    std::vector<std::string> values;
 };
 
 struct Certificate {

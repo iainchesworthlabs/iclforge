@@ -88,7 +88,7 @@ std::expected<TrailerLocation, StreamSignatureError> locate_signature_trailer(
         return failure(
             StreamSignatureErrorKind::kContainerNotSupported,
             "this is an MP4 (ISO base media) file. A content signature is carried only as a "
-            "trailer after the last sync frame of a raw .ac4 stream. CS spec v2.5 section 8.3.2 "
+            "trailer after the last sync frame of a raw .ac4 stream. CS spec v2.6 section 8.3.2 "
             "puts signing an MP4 out of scope: it names no box that carries one, so no verifier "
             "would know where to look");
     }

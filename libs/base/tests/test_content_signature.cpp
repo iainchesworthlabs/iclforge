@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -587,14 +588,14 @@ TEST_CASE("a chain or a digest list past its cap is refused",
     CHECK(refused.error().message.find("at most 8") != std::string::npos);
 }
 
-// ---- CS spec v2.5: the order of the checks, and the operator metadata of §5.3 ------------------
+// ---- CS spec v2.6: the order of the checks, and the operator metadata of §5.3 ------------------
 
 namespace {
 
-// A signature written here, by hand, from the field list of CS spec v2.5 §7.6 and the steps of
+// A signature written here, by hand, from the field list of CS spec v2.6 §7.6 and the steps of
 // §5.2, and not by the library's writer: so that what the verifier is shown is not only what its
 // own signer makes, and so that the fields §5.3 speaks of can be given values the signer refuses to
-// write (a publisher UUID the certificate contradicts, a nonce of the wrong length).
+// write (a malformed publisher UUID, a nonce of the wrong length).
 struct HandBuilt {
     std::vector<std::byte> nonce = std::vector<std::byte>(128, std::byte{0x33});
     std::string publisher_uuid;
@@ -720,7 +721,9 @@ std::vector<std::byte> hand_built(const std::array<pki::Bytes, 4>& certificates,
 
 // The test chain with its signer certificate issued again, to the same key, with a serialNumber
 // attribute in its subject (the test chain has the ones the library's own tests give it) set to
-// `subject_attribute`: a UUID, to stand for a certificate that carries one.
+// `subject_attribute`: a UUID, to stand for a certificate that carries one. CS spec v2.6 §5.3: the
+// publisher UUID is not in a signing certificate and is not compared with one, so a test that
+// gives the certificate another UUID shows that it is not.
 struct UuidChain {
     std::array<pki::Bytes, 4> certificates;
     std::vector<crypto::Certificate> parsed;
@@ -773,7 +776,7 @@ TEST_CASE("a signature written by hand reads and verifies as the library's own d
     CHECK(parsed->signer_nonce.size() == crypto::kSignerNonceBytes);
 }
 
-TEST_CASE("the signature is checked before the digests it authenticates (CS spec v2.5 6.1)",
+TEST_CASE("the signature is checked before the digests it authenticates (CS spec v2.6 6.1)",
           "[crypto][content-signature][v25]") {
     const Fixture f;
     auto content = content_of(900);
@@ -835,7 +838,7 @@ TEST_CASE("the signature is checked before the digests it authenticates (CS spec
 
 TEST_CASE("every wire version field the signer writes is 1, and scheme version 3 is not one",
           "[crypto][content-signature][v25]") {
-    // CS spec v2.5 §3.16: "an implementation SHALL write wire version = 1". Read back from the
+    // CS spec v2.6 §3.16: "an implementation SHALL write wire version = 1". Read back from the
     // bytes with the Thrift reader, field by field, and not through the library's parser.
     const Fixture f;
     const auto blob = crypto::sign_content(content_of(10), f.credentials, f.options());
@@ -927,27 +930,30 @@ TEST_CASE("signing refuses a nonce that is not 128 bytes and a publisher UUID th
             CHECK(refused.error().message.find("is not a UUID") != std::string::npos);
         }
     }
-    SECTION("a publisher UUID the signer certificate's subject contradicts") {
+    SECTION("a UUID in the signer certificate's subject is not held against the publisher UUID") {
+        // CS spec v2.6 §5.3 withdrew v2.5's rule that the publisher UUID match the certificate's:
+        // the UUID is the PACE account's, carried out of band. Signing with a certificate that
+        // carries another UUID is signing, and the verifier takes the result.
         const UuidChain chain = chain_with_subject_attribute(f.chain, kPublisherUuid);
         const crypto::SigningCredentials credentials =
             *crypto::make_credentials(f.chain.leaf_key, chain.parsed);
         crypto::SignOptions options = f.options();
         options.metadata.publisher_uuid = kOtherUuid;
-        const auto refused = crypto::sign_content(content, credentials, options);
-        REQUIRE_FALSE(refused.has_value());
-        CHECK(refused.error().code == crypto::SignatureError::kBadCredentialsForSigningContent);
-        CHECK(refused.error().message.find(kPublisherUuid) != std::string::npos);
-        // The certificate's own UUID is accepted, in either case.
-        options.metadata.publisher_uuid = kPublisherUuid;
-        CHECK(crypto::sign_content(content, credentials, options).has_value());
-        options.metadata.publisher_uuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";
-        CHECK(crypto::sign_content(content, credentials, options).has_value());
+        const auto blob = crypto::sign_content(content, credentials, options);
+        REQUIRE(blob.has_value());
+        crypto::VerifyPolicy policy = f.policy();
+        policy.operator_metadata = crypto::OperatorMetadata::kRequire;
+        const auto report =
+            crypto::verify_content_signature(*blob, crypto::sha256(content), policy);
+        CHECK_FALSE(report.fault.has_value());
+        CHECK(report.verdict == crypto::Verdict::kChecksChainUnanchored);
+        CHECK(report.publisher.find(kOtherUuid) != std::string::npos);
     }
     SECTION("no UUID at all is written as it is: the signer's choice, the verifier's finding") {
         crypto::SignOptions options = f.options();
         options.metadata.publisher_uuid.clear();
         CHECK(crypto::sign_content(content, f.credentials, options).has_value());
-        // A UUID with a certificate that carries none to compare it with is written too.
+        // A UUID is written as it is given, in either case.
         options.metadata.publisher_uuid = kPublisherUuid;
         CHECK(crypto::sign_content(content, f.credentials, options).has_value());
     }
@@ -978,34 +984,44 @@ TEST_CASE("each signature gets a nonce of its own, 128 bytes, not a constant",
 TEST_CASE("operator metadata is reported, and decides the verdict only when the policy says so",
           "[crypto][content-signature][v25]") {
     const Fixture f;
-    const UuidChain bound = chain_with_subject_attribute(f.chain, kPublisherUuid);
-    const UuidChain unbound = chain_with_subject_attribute(f.chain, "T0004");
     std::array<std::byte, 32> digest{};
     digest.fill(std::byte{0x44});
+    const std::vector<std::string> expected_one = {kPublisherUuid};
+    const std::vector<std::string> expected_two = {kOtherUuid, kPublisherUuid};
+    const std::vector<std::string> expected_other = {kOtherUuid};
 
     struct Case {
         const char* name;
-        const UuidChain* chain;
         std::string uuid;
         std::size_t nonce_size;
-        bool finding_ok;  // the finding that case is about
+        const std::vector<std::string>* expected;  // the accounts the verifier expects, or none
+        bool finding_ok;                           // the finding that case is about
         const char* finding;
         crypto::SignatureError strict_fault;
     };
+    const std::vector<std::string> nobody;
     const Case cases[] = {
-        {"the certificate's own UUID", &bound, kPublisherUuid, 128, true, "publisher UUID",
+        // Without expected accounts the UUID is reported and compared with nothing.
+        {"a UUID, nothing to compare it with", kPublisherUuid, 128, &nobody, true, "publisher UUID",
          crypto::SignatureError::kBadOrMissingSignature},
-        {"the same, in capitals", &bound, "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84", 128, true,
+        {"no UUID", "", 128, &nobody, false, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a text that is not a UUID", "not-a-uuid", 128, &nobody, false, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a nonce of 16 bytes", kPublisherUuid, 16, &nobody, false, "signer nonce",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a nonce of 129 bytes", kPublisherUuid, 129, &nobody, false, "signer nonce",
+         crypto::SignatureError::kBadOrMissingSignature},
+        // With them it has to be one of them, in either case.
+        {"the expected account", kPublisherUuid, 128, &expected_one, true, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"the expected account, in capitals", "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84", 128,
+         &expected_one, true, "publisher UUID", crypto::SignatureError::kBadOrMissingSignature},
+        {"the second of two expected accounts", kPublisherUuid, 128, &expected_two, true,
          "publisher UUID", crypto::SignatureError::kBadOrMissingSignature},
-        {"another UUID than the certificate's", &bound, kOtherUuid, 128, false, "publisher UUID",
-         crypto::SignatureError::kBadCredentialsForSigningContent},
-        {"no UUID", &bound, "", 128, false, "publisher UUID",
-         crypto::SignatureError::kBadOrMissingSignature},
-        {"a text that is not a UUID", &bound, "not-a-uuid", 128, false, "publisher UUID",
-         crypto::SignatureError::kBadOrMissingSignature},
-        {"a nonce of 16 bytes", &bound, kPublisherUuid, 16, false, "signer nonce",
-         crypto::SignatureError::kBadOrMissingSignature},
-        {"a nonce of 129 bytes", &bound, kPublisherUuid, 129, false, "signer nonce",
+        {"another account than the expected one", kPublisherUuid, 128, &expected_other, false,
+         "publisher UUID", crypto::SignatureError::kBadCredentialsForSigningContent},
+        {"no UUID, with an expected account", "", 128, &expected_one, false, "publisher UUID",
          crypto::SignatureError::kBadOrMissingSignature},
     };
     for (const Case& c : cases) {
@@ -1013,11 +1029,12 @@ TEST_CASE("operator metadata is reported, and decides the verdict only when the 
         HandBuilt in;
         in.publisher_uuid = c.uuid;
         in.nonce.assign(c.nonce_size, std::byte{0x5C});
-        const std::vector<std::byte> blob = hand_built(c.chain->certificates, f.chain.leaf_key, in);
+        const std::vector<std::byte> blob = hand_built(f.chain.certificates, f.chain.leaf_key, in);
 
         // Reporting: a good signature stays one, and the finding is there to read.
         crypto::VerifyPolicy report_only = f.policy();
         report_only.operator_metadata = crypto::OperatorMetadata::kReport;
+        report_only.expected_publisher_uuids = *c.expected;
         const crypto::VerifyReport reported =
             crypto::verify_content_signature(blob, digest, report_only);
         CHECK(reported.verdict == crypto::Verdict::kChecksChainUnanchored);
@@ -1032,6 +1049,7 @@ TEST_CASE("operator metadata is reported, and decides the verdict only when the 
         // and the check that says why, and passes when it is a good one.
         crypto::VerifyPolicy strict = f.policy();
         strict.operator_metadata = crypto::OperatorMetadata::kRequire;
+        strict.expected_publisher_uuids = *c.expected;
         const crypto::VerifyReport required =
             crypto::verify_content_signature(blob, digest, strict);
         if (c.finding_ok) {
@@ -1048,25 +1066,27 @@ TEST_CASE("operator metadata is reported, and decides the verdict only when the 
         }
     }
 
-    // A certificate whose subject carries no UUID cannot contradict one: reported as not compared
-    // in either mode, and never a reason to refuse (the owner's sample is such a case).
-    HandBuilt in;
-    in.publisher_uuid = kPublisherUuid;
-    const std::vector<std::byte> blob = hand_built(unbound.certificates, f.chain.leaf_key, in);
-    for (const auto mode :
-         {crypto::OperatorMetadata::kReport, crypto::OperatorMetadata::kRequire}) {
-        crypto::VerifyPolicy policy = f.policy();
-        policy.operator_metadata = mode;
-        const crypto::VerifyReport report = crypto::verify_content_signature(blob, digest, policy);
-        CHECK(report.verdict == crypto::Verdict::kChecksChainUnanchored);
-        const auto note =
-            std::find_if(report.notes.begin(), report.notes.end(),
-                         [](const crypto::CheckResult& n) { return n.name == "publisher UUID"; });
-        REQUIRE(note != report.notes.end());
-        CHECK_FALSE(note->ok);
-        CHECK(note->detail.find("was not compared") != std::string::npos);
-        CHECK(has_check(report, "publisher UUID", false) == false);
-        CHECK(has_check(report, "publisher UUID", true) == false);
+    // The signing certificate is not asked for the UUID (CS spec v2.6 §5.3): a certificate that
+    // carries another UUID in its subject, and one that carries none, make no difference to the
+    // verdict, in either mode, with or without the expected accounts.
+    const UuidChain other_uuid = chain_with_subject_attribute(f.chain, kOtherUuid);
+    const UuidChain no_uuid = chain_with_subject_attribute(f.chain, "T0004");
+    for (const UuidChain* chain : {&other_uuid, &no_uuid}) {
+        HandBuilt in;
+        in.publisher_uuid = kPublisherUuid;
+        const std::vector<std::byte> blob = hand_built(chain->certificates, f.chain.leaf_key, in);
+        for (const auto mode :
+             {crypto::OperatorMetadata::kReport, crypto::OperatorMetadata::kRequire}) {
+            for (const auto* expected : {&nobody, &expected_one}) {
+                crypto::VerifyPolicy policy = f.policy();
+                policy.operator_metadata = mode;
+                policy.expected_publisher_uuids = *expected;
+                const crypto::VerifyReport report =
+                    crypto::verify_content_signature(blob, digest, policy);
+                CHECK(report.verdict == crypto::Verdict::kChecksChainUnanchored);
+                CHECK_FALSE(report.fault.has_value());
+            }
+        }
     }
 }
 
@@ -1208,7 +1228,7 @@ TEST_CASE("the owner's sample parses and verifies the way the measurements say",
     CHECK(has_check(crypto::verify_content_signature(blob, stored_content_digest, policy), "chain",
                     false));
 
-    // CS spec v2.5 §3.16 states the sample's wire version fields are all 1, §2.3 and §3.13 that r
+    // CS spec v2.6 §3.16 states the sample's wire version fields are all 1, §2.3 and §3.13 that r
     // and s are 32 raw bytes each, §3.2 that the nonce is 128 bytes and §5.3 what the publisher
     // UUID is. Held against the sample itself, with nothing of it written down here.
     CHECK(parsed->version == 1);
@@ -1224,19 +1244,40 @@ TEST_CASE("the owner's sample parses and verifies the way the measurements say",
     CHECK(parsed->content_digests.front().version == 1);
     CHECK(parsed->signer_nonce.size() == crypto::kSignerNonceBytes);
     CHECK(crypto::is_uuid(parsed->signer.publisher_uuid));
-    // §5.3 says the UUID is bound to the signing certificate and does not say where. In the sample
-    // it is in none of the four certificates' subjects, so nothing can be compared: the reading
-    // that cannot refuse a genuine signature reports it as not compared, and a verifier that
-    // required the UUID to appear in the certificate would refuse this one.
-    for (const crypto::Certificate& certificate : parsed->chain) {
-        for (const std::string& value : certificate.subject.values) {
-            CHECK(!crypto::is_uuid(value));
+    // CS spec v2.6 §5.3: the publisher UUID is the PACE account's, carried out of band, and not in
+    // the signing certificate. In the sample it is in none of the four certificates, in any
+    // encoding the library can be asked about (the text in either case, or its 16 bytes, in any
+    // part of the certificate), so a verifier that required it there would refuse this one.
+    const std::string& uuid = parsed->signer.publisher_uuid;
+    const auto contains = [](std::span<const std::byte> haystack,
+                             std::span<const std::byte> needle) {
+        return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end()) !=
+               haystack.end();
+    };
+    std::string lower = uuid;
+    std::string upper = uuid;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(upper.begin(), upper.end(), upper.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    std::string hex;  // the 16 bytes the hexadecimal digits spell
+    for (const char c : uuid) {
+        if (c != '-') {
+            hex += c;
         }
     }
-    const auto binding =
-        crypto::check_publisher_binding(parsed->signer.publisher_uuid, parsed->chain.back());
-    CHECK(binding.binding == crypto::PublisherBinding::kUnbound);
-    // Required metadata does not turn the genuine signature into an invalid one.
+    std::vector<std::byte> uuid_bytes;
+    for (std::size_t i = 0; i + 1 < hex.size(); i += 2) {
+        uuid_bytes.push_back(static_cast<std::byte>(std::stoi(hex.substr(i, 2), nullptr, 16)));
+    }
+    REQUIRE(uuid_bytes.size() == 16);
+    for (const crypto::Certificate& certificate : parsed->chain) {
+        CHECK_FALSE(contains(certificate.der, text_bytes(lower)));
+        CHECK_FALSE(contains(certificate.der, text_bytes(upper)));
+        CHECK_FALSE(contains(certificate.der, uuid_bytes));
+    }
+    // Required signer information does not turn the genuine signature into an invalid one when
+    // there is nothing to compare the UUID with.
     crypto::VerifyPolicy required;
     required.time_basis = crypto::TimeBasis::kIgnore;
     required.operator_metadata = crypto::OperatorMetadata::kRequire;
@@ -1245,6 +1286,35 @@ TEST_CASE("the owner's sample parses and verifies the way the measurements say",
     CHECK(strict.verdict == crypto::Verdict::kChecksChainUnanchored);
     CHECK(!strict.publisher.empty());
     CHECK(!strict.application.empty());
+    // With the sample's own account as the expected one, in either case, it passes; with another it
+    // is a finding when reporting and a refusal when required. (The UUID is read from the sample,
+    // not written here.)
+    for (const std::string& account : {uuid, lower, upper}) {
+        const std::vector<std::string> expected = {"0f0e0d0c-0b0a-4908-8706-050403020100", account};
+        required.expected_publisher_uuids = expected;
+        const auto listed = crypto::verify_content_signature(blob, stored_content_digest, required);
+        CHECK_FALSE(listed.fault.has_value());
+        CHECK(listed.verdict == crypto::Verdict::kChecksChainUnanchored);
+        CHECK(has_check(listed, "publisher UUID", true));
+    }
+    const std::vector<std::string> elsewhere = {"0f0e0d0c-0b0a-4908-8706-050403020100"};
+    required.expected_publisher_uuids = elsewhere;
+    const auto refused = crypto::verify_content_signature(blob, stored_content_digest, required);
+    CHECK(refused.verdict == crypto::Verdict::kInvalid);
+    REQUIRE(refused.fault.has_value());
+    CHECK(refused.fault->code == crypto::SignatureError::kBadCredentialsForSigningContent);
+    CHECK(has_check(refused, "publisher UUID", false));
+    CHECK(has_check(refused, "signature", true));  // the rest of the signature is as it was
+    crypto::VerifyPolicy reporting = required;
+    reporting.operator_metadata = crypto::OperatorMetadata::kReport;
+    const auto reported = crypto::verify_content_signature(blob, stored_content_digest, reporting);
+    CHECK_FALSE(reported.fault.has_value());
+    CHECK(reported.verdict == crypto::Verdict::kChecksChainUnanchored);
+    const auto note =
+        std::find_if(reported.notes.begin(), reported.notes.end(),
+                     [](const crypto::CheckResult& n) { return n.name == "publisher UUID"; });
+    REQUIRE(note != reported.notes.end());
+    CHECK_FALSE(note->ok);
     // The signature is checked before the digests it holds, in the sample's report as in any.
     const auto order_of = [&](std::string_view name) {
         for (std::size_t i = 0; i < strict.checks.size(); ++i) {

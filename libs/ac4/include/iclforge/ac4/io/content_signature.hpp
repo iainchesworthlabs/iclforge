@@ -9,7 +9,7 @@
 // byte).
 //
 // Signing here is opt-in at every call; nothing in the encoder or the decoder reaches this. Only
-// the raw elementary stream is handled. CS spec v2.5 §8.3.2 puts signing an MP4 out of scope (it
+// the raw elementary stream is handled. CS spec v2.6 §8.3.2 puts signing an MP4 out of scope (it
 // names no box that carries a signature, and the reference encoder writes none) and says a signer
 // shall refuse it: an MP4 is refused with kContainerNotSupported, and the raw `.ac4` stream is
 // signed instead.
@@ -30,7 +30,7 @@ namespace iclforge::ac4 {
 
 enum class StreamSignatureErrorKind : std::uint8_t {
     kNotAnAc4Stream,         // does not begin with an AC-4 sync frame
-    kContainerNotSupported,  // an MP4 (ISO base media) file: CS spec v2.5 §8.3.2, out of scope
+    kContainerNotSupported,  // an MP4 (ISO base media) file: CS spec v2.6 §8.3.2, out of scope
     kTruncated,      // the last sync frame is cut off, or bytes too few to be a trailer follow
     kAlreadySigned,  // there is a trailer already; strip it or sign the unsigned stream
     kTrailingData,   // bytes follow the last sync frame and are not a content signature

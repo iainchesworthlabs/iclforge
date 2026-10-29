@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
         options.signed_date = crypto::format_iso8601_utc(now);
         options.chain_policy.valid_at = now;
         options.chain_policy.required_leaf_title = std::string(crypto::kDefaultLeafTitle);
-        // Who is signing (CS spec v2.5 section 5.3). The publisher's UUID is the one of your
+        // Who is signing (CS spec v2.6 section 5.3). The publisher's UUID is the one of your
         // publisher account; left empty it is written empty, and a strict verifier refuses that.
         options.metadata.publisher_name = "Example Publisher";
 

@@ -9,8 +9,8 @@ the encoder's.
 Everything under this heading is about the content signature appended to a raw `.ac4` stream
 (`libs/base/src/crypto`, `libs/ac4/src/io/content_signature.cpp`, `forge ac4-sign` and
 `ac4-verify`), not about ETSI TS 103 190. It follows the owner-supplied "AC-4 content signing"
-specification, version 2.5 of 2026-10-29 (version 2.4 was not seen), cited here as "CS spec" with
-section numbers. That specification and the sample blob below were supplied by the owner; parts
+specification, version 2.6 of 2026-10-29 (versions 2.5 and 2.6 came the same day; 2.4 was not seen),
+cited here as "CS spec" with section numbers. That specification and the sample blob below were supplied by the owner; parts
 derive from analysis of DEE and FFmpeg, per the owner. Only wire-format facts are used. The sample is
 kept outside the repository, with its certificates, and the tests that read it take its path from
 `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` and skip when it is unset.
@@ -18,7 +18,7 @@ kept outside the repository, with its certificates, and the tests that read it t
 The questions are numbered in the order they were met, and other documents cite them as `AC4-n`; a
 question that has been answered keeps its number.
 
-### What CS spec v2.5 settled
+### What CS spec v2.5 and v2.6 settled
 
 Version 2.5 differs from 2.3 in 62 places. Each was checked against the code on 2026-10-29. Answered:
 
@@ -54,9 +54,19 @@ Version 2.5 differs from 2.3 in 62 places. Each was checked against the code on 
   and the first fault differ.
 - **Signer information (AC4-3, in part).** §5.3 is new. It says what an operator writes in
   `SignerInfoWire`; what it settles, and what the code does, is under question 3. What it leaves to
-  the implementation is questions 16 and 17.
+  the implementation is questions 17 to 19.
+- **Where the publisher UUID is bound (AC4-16), v2.6.** v2.5's §5.3 had `publisherUUID` match the
+  UUID bound to the signing certificate. v2.6 withdraws that: the UUID is the PACE publisher account's
+  GUID, carried out of band in the PACE licence data and copied into `signerInfo`; it is not in the
+  X.509 certificate, which the sample bears out (it is in none of the four). A verifier must not
+  require it there and may compare it with an expected publisher account; the chain authenticates the
+  signer on its own, and report-only is the safe behaviour. Changed: the comparison with the signer
+  certificate's subject is gone, from signing (which no longer refuses a UUID the certificate
+  "contradicts") and from verifying; `expect-publisher-uuid=` names the accounts to accept, a finding
+  in `ac4-verify` and a refusal with `verify-content`, and without it the UUID is reported and
+  compared with nothing. Still checked: that it is a UUID, and that it is there (question 17).
 
-Not changed by v2.5, and read again for it: the time the certificates are judged at (question 1),
+Not changed by v2.5 or v2.6, and read again for them: the time the certificates are judged at (question 1),
 exactly one signature entry (6), revocation and the leaf's other properties (7), trust anchors (8),
 `ContentSignatureInfo` (5) and the ID3 and damaged-frame trailers (14, 15). §8.5 still walks the sync
 frames and takes what follows as the blob; it says nothing of tags or of a damaged frame. Questions
@@ -84,16 +94,15 @@ owner decides; none of them blocks the rest.
    is not built.
 3. **What goes in the signer information of a signature made with an operator's own key?** *Answered
    in part by v2.5 §5.3.* `signerNonce` is 128 bytes from a CSPRNG, fresh for every signature;
-   `publisher.publisherUUID` is the UUID of the operator's PACE publisher account and shall match the
-   one bound to the signing certificate; `signedDate` is the time of signing, in UTC; the platform
-   and application are informational. `ac4-sign` and `sign-content` take `publisher-uuid=`,
+   `publisher.publisherUUID` is the UUID of the operator's PACE publisher account (v2.6: not in the
+   signing certificate); `signedDate` is the time of signing, in UTC; the platform and application
+   are informational. `ac4-sign` and `sign-content` take `publisher-uuid=`,
    `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
    `os-description=`; the application is this program, its version and its commit; the nonce and the
    date are drawn and read from the clock for each signature. A nonce of another length and a
-   malformed publisher UUID are refused when signing, and so is a UUID that the signing certificate's
-   subject contradicts. A signature without `publisher-uuid=` is made, with a warning, because
-   nothing says an operator without a PACE account may not sign. What the verifier does with all this
-   is question 17; where a certificate binds the UUID is question 16; the clock is question 10.
+   publisher UUID that is not a UUID are refused when signing. A signature without
+   `publisher-uuid=` is made, with a warning, because nothing says an operator without a PACE account
+   may not sign. What the verifier does with all this is question 17; the clock is question 10.
 4. **Are digests or curves other than SHA-256 and secp256r1 ever written?** The spec fixes both
    (§1.1) but the wire carries them as strings (`sha256`, `ecdsa`, `secp256r1`). We refuse anything
    else with `BadContentSignaturePKStandard`. Say if SHA-384, SHA-512 or P-384 appear in practice.
@@ -151,24 +160,21 @@ owner decides; none of them blocks the rest.
     signature` with the byte where the frames stop, and a flipped payload byte (the framing holds)
     is reported as a digest mismatch. A signature found by its own structure at the end of the file
     would give the better message (digest mismatch) at the cost of a search; say if that is wanted.
-16. **Where does a certificate bind the publisher UUID?** §5.3 says `publisherUUID` "shall match the
-    UUID bound to the operator's signing certificate" and that a mismatch "between the claimed
-    publisher and the certificate's subject allows a verifier to reject". It does not say which
-    attribute or extension holds the UUID. Measured on the sample: the publisher UUID it names is in
-    none of its four certificates, not in any subject attribute, not in the private extensions, and
-    not as 16 raw bytes either. The reading taken is the narrowest that cannot refuse a genuine
-    signature: the claim is compared with every attribute of the signer certificate's subject; one
-    that is that UUID (in either case) matches; a subject that carries a UUID and not this one is a
-    mismatch; a subject that carries none is "not compared", reported and never a failure. The
-    sample is the last case. Say where the binding is, and the comparison can be made for real.
+16. **Where does a certificate bind the publisher UUID?** *Answered by v2.6 §5.3: nowhere. The UUID is
+    the PACE publisher account's, carried out of band and copied into `signerInfo`; it is not in the
+    certificate (see above).* Measured on the sample before the answer: the publisher UUID it names
+    is in none of its four certificates, not in any subject attribute, not in the private
+    extensions, and not as 16 raw bytes either (measured correction 11).
 17. **What does a verifier do with a nonce that is not 128 bytes, a publisher UUID that is empty or
-    not a UUID, or one the certificate contradicts?** §5.3 says "may reject" for the last and is
-    silent on the others. The reading taken: always reported (the lines `signer nonce` and
-    `publisher UUID` in `ac4-verify`'s output, which do not change the verdict); with
-    `verify-content`, the strict reading, a bad nonce, a missing or malformed UUID and a
-    contradicted UUID make the signature INVALID (`BadOrMissingSignature`, and
-    `BadCredentialsForSigningContent` for the contradiction); "not compared" never does. Should a
-    signature without a publisher UUID be refused by the strict check, as it is now?
+    not a UUID, or one that is not an expected account?** §5.3 says a verifier "may" compare the
+    UUID with an expected publisher account (v2.6) and is silent on the other two. The reading
+    taken: always reported (the lines `signer nonce` and `publisher UUID` in `ac4-verify`'s output,
+    which do not change the verdict); with `verify-content`, the strict reading, a bad nonce, a
+    missing or malformed UUID, and a UUID that is none of the `expect-publisher-uuid=` accounts (if
+    any are given) make the signature INVALID (`BadOrMissingSignature`, and
+    `BadCredentialsForSigningContent` for the account). Without `expect-publisher-uuid=` a well
+    formed UUID is reported and compared with nothing. Should a signature without a publisher UUID
+    be refused by the strict check, as it is now, or only the allow-list be strict?
 18. **Is `std::random_device` the CSPRNG §5.3 asks for?** It is the platform's entropy source on the
     toolchains this builds with (hardware or the operating system's generator under libstdc++,
     libc++ and MSVC), and it is what draws the nonce. The language does not promise that, and
@@ -284,22 +290,25 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
     ones (up to 70 000 bytes), a damaged frame followed by a valid signature, an ID3v2 tag between
     frames.
 
-11. **The publisher UUID the sample names is in none of its certificates.** §5.3 (v2.5) says it shall match
-    the UUID bound to the signing certificate. The sample's `publisherUUID` appears in no subject
-    attribute of any of the four certificates, and not in their extensions, as text or as 16 raw
-    bytes (the extensions under the 1.3.6.1.4.1.11620 arc are opaque to the library and were searched
-    as bytes). The subjects carry `serialNumber`, `dnQualifier`, `commonName`, `generationQualifier`,
+11. **The publisher UUID the sample names is in none of its certificates.** v2.5's §5.3 said it shall
+    match the UUID bound to the signing certificate; v2.6 withdraws that and says the UUID is not in the
+    certificate. The sample's `publisherUUID` appears in no subject attribute of any of the four
+    certificates, and not in their extensions, as text in either case or as 16 raw bytes (the
+    extensions under the 1.3.6.1.4.1.11620 arc are opaque to the library and were searched as bytes).
+    The subjects carry `serialNumber`, `dnQualifier`, `commonName`, `generationQualifier`,
     `organizationName` and `organizationalUnitName`, and the signer's also `businessCategory` and
-    `title`; none is a UUID. So a verifier that required the UUID to be found in the certificate would
-    refuse this signature (question 16). Asserted by the sample test, not printed.
+    `title`; none is a UUID. So a verifier that required the UUID to be found in the certificate
+    would refuse this signature. Asserted by the sample test, which reads the UUID from the sample
+    and searches each certificate's bytes for it; not printed.
 12. **Every wire version field in the sample is 1, the nonce is 128 bytes, `r` and `s` are 32 bytes.**
     §3.16, §3.2 and §2.3 of v2.5 say so; asserted field by field by the sample test, which also
     checks that the strict reading of the signer information (nonce and publisher UUID required)
-    does not refuse it. Not printed.
+    does not refuse it, with no expected account and with its own UUID as the expected account in
+    either case, and refuses it when the expected account is another. Not printed.
 
 ### Where the code differs from the specification without a measurement behind it
 
-These are choices, not findings. Each differs from the text of CS spec v2.5 and is listed so that
+These are choices, not findings. Each differs from the text of CS spec v2.6 and is listed so that
 the owner can overrule it. (The choice about version numbers that stood first is gone: v2.5 §3.16
 says the scheme release is 3, the wire version is 1, and an implementation shall write 1, which is
 what the code does and what the sample's markers are. Numbering of the rest is kept.)

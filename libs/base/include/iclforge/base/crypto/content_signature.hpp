@@ -1,11 +1,11 @@
 #pragma once
 
-// The content signature (CS spec v2.5, scheme "pace-ccjf1"): an ECDSA P-256 signature, with the
+// The content signature (CS spec v2.6, scheme "pace-ccjf1"): an ECDSA P-256 signature, with the
 // certificate chain that vouches for its key and the digests it covers, serialised with Thrift's
 // binary protocol into one blob. This file is codec-blind: the content is any bytes (the AC-4 file
 // before the blob, an evolution frame payload, ...) and the carriage of the blob is the caller's.
 //
-// What the signature covers (CS spec v2.5 §2.2, §5.2 step 6, §6.1 step 6; v2.3's text said
+// What the signature covers (CS spec v2.6 §2.2, §5.2 step 6, §6.1 step 6; v2.3's text said
 // otherwise and a real signed blob showed the layout, which libs/ac4/ERRATA.md records):
 //   - SignedInfoWire (SignatureEntryWire field 1) holds two digests: the SHA-256 of the
 //   SignerInfoWire
@@ -49,7 +49,7 @@ inline constexpr std::string_view kContentReference = "digest_data_ref_win_signa
 inline constexpr std::string_view kCanonicalThriftBinary = "canonical_method_thrift_binary";
 inline constexpr std::string_view kCanonicalRaw = "canonical_method_raw";
 inline constexpr std::string_view kDefaultLeafTitle = "Code/Content Signer";
-// CS spec v2.5 §3.2 and §5.3: signerNonce is 128 bytes.
+// CS spec v2.6 §3.2 and §5.3: signerNonce is 128 bytes.
 inline constexpr std::size_t kSignerNonceBytes = 128;
 
 // CS spec §6.2's error conditions, with the two the spec's table leaves implicit (a digest that
@@ -73,11 +73,11 @@ struct SignatureFault {
     std::string message;  // a sentence naming the specific thing
 };
 
-// The description of who signed and with what (CS spec v2.5 §5.3). The library writes what it is
-// given. The publisher's UUID is checked against the signing certificate when a signature is made
-// (see check_publisher_binding); the rest is free text, bound by the signature and checked by no
-// one. `platform` and `application` are informational. The defaults name this library and no
-// issuer.
+// The description of who signed and with what (CS spec v2.6 §5.3). The library writes what it is
+// given. The publisher's UUID, when one is given, has to be a UUID; it is not compared with the
+// signing certificate (see check_publisher_uuid). The rest is free text, bound by the signature and
+// checked by no one. `platform` and `application` are informational. The defaults name this
+// library and no issuer.
 struct SignerMetadata {
     std::int32_t publisher_type = 1;  // 1: an authorised publisher, as the sample has it
     std::string publisher_uuid;       // the UUID of the operator's PACE publisher account
@@ -104,31 +104,32 @@ struct SignerMetadata {
 // True for the 8-4-4-4-12 form of a UUID in hexadecimal digits, either case.
 [[nodiscard]] ICLFORGE_BASE_EXPORT bool is_uuid(std::string_view text) noexcept;
 
-// CS spec v2.5 §5.3 says `publisher.publisherUUID` shall match the UUID bound to the signing
-// certificate and that a verifier may reject a mismatch. It does not say where a certificate binds
-// a UUID. The sample the owner supplied names a publisher UUID that none of its four certificates
-// carries in any attribute or extension. So the reading taken is the narrowest one that cannot
-// reject a genuine signature: the claim is compared with the attributes of the signer certificate's
-// subject, and only a subject that carries a UUID of its own, and not this one, is a mismatch.
-enum class PublisherBinding : std::uint8_t {
-    kMatches,   // an attribute of the subject is this UUID
-    kMismatch,  // the subject carries a UUID, and none of its UUIDs is this one
-    kUnbound,   // the subject carries no UUID: there is nothing to compare with
-    kNotAUuid,  // the claimed publisherUUID is empty or is not a UUID
+// CS spec v2.6 §5.3: `publisher.publisherUUID` identifies the operator's PACE publisher account. It
+// is carried out of band in the licence data and copied into signerInfo; it is not stored in the
+// X.509 signing certificate (the owner's sample names one that none of its four certificates
+// carries, in any encoding), so a verifier must not require it to appear there, and the certificate
+// chain authenticates the signer on its own. A verifier may compare it with the publisher accounts
+// it expects, which is all this does. v2.5 had it match the certificate; v2.6 withdraws that.
+enum class PublisherCheck : std::uint8_t {
+    kListed,     // it is one of the expected accounts
+    kNotListed,  // expected accounts were given, and it is none of them
+    kUnchecked,  // no expected account was given: there is nothing to compare it with
+    kNotAUuid,   // the claimed publisherUUID is empty or is not a UUID
 };
 
-struct PublisherBindingResult {
-    PublisherBinding binding = PublisherBinding::kNotAUuid;
-    std::string detail;  // a sentence, with what the signature and the certificate say (escaped)
+struct PublisherCheckResult {
+    PublisherCheck result = PublisherCheck::kNotAUuid;
+    std::string detail;  // a sentence, with what the signature says (escaped)
 };
 
-[[nodiscard]] ICLFORGE_BASE_EXPORT PublisherBindingResult
-check_publisher_binding(std::string_view publisher_uuid, const Certificate& signer);
+// `expected` are UUIDs, compared without regard to case.
+[[nodiscard]] ICLFORGE_BASE_EXPORT PublisherCheckResult
+check_publisher_uuid(std::string_view publisher_uuid, std::span<const std::string> expected);
 
 struct SignOptions {
     SignerMetadata metadata;
     // "YYYY-MM-DDTHH:MM:SS" (UTC) as the sample writes it. The caller supplies the clock. CS spec
-    // v2.5 §5.3: it shall be the time of signing; a caller that gives another is not following it.
+    // v2.6 §5.3: it shall be the time of signing; a caller that gives another is not following it.
     std::string signed_date;
     // The signerNonce: kSignerNonceBytes (128) bytes, fresh for each signature (§5.3: reusing one
     // is a signing fault). Empty: the library draws one from std::random_device, which is the
@@ -210,7 +211,7 @@ struct ParsedContentSignature {
     }
 };
 
-// Reads the structure of CS spec v2.5 §3 and §7.6. Unknown fields are skipped and field order is
+// Reads the structure of CS spec v2.6 §3 and §7.6. Unknown fields are skipped and field order is
 // free, as Thrift allows. Does not judge the certificates or check any digest or signature.
 [[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<ParsedContentSignature, SignatureFault>
 parse_content_signature(std::span<const std::byte> blob);
@@ -218,18 +219,19 @@ parse_content_signature(std::span<const std::byte> blob);
 // ---- Verifying ----------------------------------------------------------------------------
 
 enum class TimeBasis : std::uint8_t {
-    kNow,         // every certificate valid at `now` (CS spec v2.5 §6.1 steps 3 and 4)
+    kNow,         // every certificate valid at `now` (CS spec v2.6 §6.1 steps 3 and 4)
     kSignedDate,  // ... at the blob's own signedDate; only as trustworthy as the signer
     kInstant,     // ... at `instant`
     kIgnore,      // validity periods are not checked
 };
 
-// What a finding about the operator metadata of CS spec v2.5 §5.3 does to the verdict. The
+// What a finding about the operator metadata of CS spec v2.6 §5.3 does to the verdict. The
 // specification says a verifier "may" reject on these, so the policy is the caller's.
 enum class OperatorMetadata : std::uint8_t {
     kReport,   // reported in VerifyReport::notes; the verdict is not affected
-    kRequire,  // a nonce that is not 128 bytes, a publisherUUID that is not a UUID, or one the
-               // signer certificate's subject contradicts, makes the report invalid
+    kRequire,  // a nonce that is not 128 bytes, a publisherUUID that is not a UUID, or (when
+               // expected_publisher_uuids is given) one that is not among them, makes the report
+               // invalid
 };
 
 struct VerifyPolicy {
@@ -244,6 +246,11 @@ struct VerifyPolicy {
     // A signedDate later than `now` by more than this is refused (kNow only).
     std::int64_t max_future_skew_seconds = 86400;
     OperatorMetadata operator_metadata = OperatorMetadata::kReport;
+    // The publisher accounts (UUIDs) the caller expects. When there are some, a signature naming
+    // another is a finding (kReport) or makes the report invalid (kRequire). Empty: the UUID is
+    // reported and compared with nothing, and is never refused for being absent from the signing
+    // certificate, which does not carry it (CS spec v2.6 §5.3).
+    std::span<const std::string> expected_publisher_uuids;
 };
 
 struct CheckResult {
@@ -262,7 +269,7 @@ struct VerifyReport {
     Verdict verdict = Verdict::kInvalid;
     std::optional<SignatureFault> fault;  // the first thing wrong, when verdict == kInvalid
     std::vector<CheckResult> checks;      // in order, each with its outcome
-    // What the operator metadata of CS spec v2.5 §5.3 shows, one finding each (the signer nonce and
+    // What the operator metadata of CS spec v2.6 §5.3 shows, one finding each (the signer nonce and
     // the publisher UUID). With OperatorMetadata::kReport these never change the verdict; with
     // kRequire the ones that fail are in `checks` as well.
     std::vector<CheckResult> notes;
@@ -280,7 +287,7 @@ struct VerifyReport {
 };
 
 // Verifies `blob` against `content_digest`, the SHA-256 of the content as it is now. The checks run
-// in the order of CS spec v2.5 §6.1, all of them reported: structure, versions and methods, curve,
+// in the order of CS spec v2.6 §6.1, all of them reported: structure, versions and methods, curve,
 // chain parsed, chain valid, signedDate, then the signature over SignedInfoWire, then the
 // signer-info digest and the content digest it holds. The signature comes first because the digests
 // carry weight only once it has verified (§6.1, "Verification order matters"): when it has not,

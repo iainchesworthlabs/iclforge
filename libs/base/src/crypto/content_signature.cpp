@@ -28,7 +28,7 @@ namespace {
 namespace tb = thrift;
 using Bytes = std::vector<std::byte>;
 
-// Every wire version field is 1 (CS spec v2.5 §3.16: "an implementation SHALL write wire version =
+// Every wire version field is 1 (CS spec v2.6 §3.16: "an implementation SHALL write wire version =
 // 1"); "scheme version 3" (kSignatureValuesVersion3) names the scheme's release and is not a wire
 // field. A different marker is a structure this reader has not been given.
 constexpr std::int32_t kSupportedVersion = 1;
@@ -101,7 +101,7 @@ Bytes make_nonce(const SignOptions& options) {
     if (!options.nonce.empty()) {
         return options.nonce;
     }
-    // CS spec v2.5 §5.3: fresh randomness from a CSPRNG for every signature. std::random_device is
+    // CS spec v2.6 §5.3: fresh randomness from a CSPRNG for every signature. std::random_device is
     // the platform's entropy source on the toolchains this builds with (hardware or the operating
     // system's generator under libstdc++, libc++ and MSVC), never a fixed seed.
     std::random_device device;
@@ -117,7 +117,7 @@ Bytes make_nonce(const SignOptions& options) {
     return nonce;
 }
 
-// SignerInfoWire (CS spec v2.5 §3.2 to §3.7), fields in ascending id order.
+// SignerInfoWire (CS spec v2.6 §3.2 to §3.7), fields in ascending id order.
 Bytes write_signer_info(std::span<const std::byte> nonce, const SignerMetadata& m,
                         std::string_view signed_date, std::span<const Certificate> chain) {
     tb::Writer w;
@@ -249,43 +249,36 @@ bool equal_ignoring_case(std::string_view a, std::string_view b) {
 
 }  // namespace
 
-PublisherBindingResult check_publisher_binding(std::string_view publisher_uuid,
-                                               const Certificate& signer) {
-    PublisherBindingResult result;
+PublisherCheckResult check_publisher_uuid(std::string_view publisher_uuid,
+                                          std::span<const std::string> expected) {
+    PublisherCheckResult result;
     if (!is_uuid(publisher_uuid)) {
-        result.binding = PublisherBinding::kNotAUuid;
+        result.result = PublisherCheck::kNotAUuid;
         result.detail =
             publisher_uuid.empty()
-                ? "publisherUUID is empty; CS spec v2.5 section 5.3 asks for the UUID of the "
+                ? "publisherUUID is empty; CS spec v2.6 section 5.3 asks for the UUID of the "
                   "operator's publisher account"
                 : "publisherUUID \"" + escape_text(publisher_uuid) + "\" is not a UUID";
         return result;
     }
-    std::string other;
-    for (const std::string& value : signer.subject.values) {
-        if (!is_uuid(value)) {
-            continue;
-        }
-        if (equal_ignoring_case(value, publisher_uuid)) {
-            result.binding = PublisherBinding::kMatches;
-            result.detail = "publisher UUID " + escape_text(publisher_uuid) +
-                            " is the one the signer certificate's subject carries";
-            return result;
-        }
-        if (other.empty()) {
-            other = value;
-        }
-    }
-    if (!other.empty()) {
-        result.binding = PublisherBinding::kMismatch;
-        result.detail = "the signature names publisher UUID " + escape_text(publisher_uuid) +
-                        " and the signer certificate's subject carries UUID " + other;
+    if (expected.empty()) {
+        result.result = PublisherCheck::kUnchecked;
+        result.detail = "publisher UUID " + escape_text(publisher_uuid) +
+                        "; no expected publisher was given to compare it with, and the signing "
+                        "certificate does not carry it (section 5.3)";
         return result;
     }
-    result.binding = PublisherBinding::kUnbound;
-    result.detail = "publisher UUID " + escape_text(publisher_uuid) +
-                    " was not compared: the signer certificate's subject carries no UUID, and CS "
-                    "spec v2.5 section 5.3 does not say where a certificate binds one";
+    for (const std::string& account : expected) {
+        if (equal_ignoring_case(account, publisher_uuid)) {
+            result.result = PublisherCheck::kListed;
+            result.detail = "publisher UUID " + escape_text(publisher_uuid) + " is one of the " +
+                            std::to_string(expected.size()) + " expected publisher account(s)";
+            return result;
+        }
+    }
+    result.result = PublisherCheck::kNotListed;
+    result.detail = "publisher UUID " + escape_text(publisher_uuid) + " is none of the " +
+                    std::to_string(expected.size()) + " expected publisher account(s)";
     return result;
 }
 
@@ -309,21 +302,17 @@ std::expected<Bytes, SignatureFault> sign_content_digest(
     if (!options.nonce.empty() && options.nonce.size() != kSignerNonceBytes) {
         return fault(SignatureError::kBadOrMissingSignature,
                      "the signer nonce is " + std::to_string(options.nonce.size()) +
-                         " bytes; CS spec v2.5 section 5.3 asks for " +
+                         " bytes; CS spec v2.6 section 5.3 asks for " +
                          std::to_string(kSignerNonceBytes));
     }
-    // The UUID of the publisher the signature names, when one is named, must be a UUID and must not
-    // contradict the signing certificate (CS spec v2.5 section 5.3). An empty one is written as it
-    // is: whether that is acceptable is the operator's, and the verifier's, to say.
-    if (!options.metadata.publisher_uuid.empty()) {
-        const PublisherBindingResult binding =
-            check_publisher_binding(options.metadata.publisher_uuid, credentials.chain.back());
-        if (binding.binding == PublisherBinding::kNotAUuid) {
-            return fault(SignatureError::kBadOrMissingSignature, binding.detail);
-        }
-        if (binding.binding == PublisherBinding::kMismatch) {
-            return fault(SignatureError::kBadCredentialsForSigningContent, binding.detail);
-        }
+    // The UUID of the publisher the signature names, when one is named, has to be a UUID. It is the
+    // operator's PACE account and is not in the signing certificate (CS spec v2.6 section 5.3), so
+    // there is nothing to hold it against. An empty one is written as it is: whether that is
+    // acceptable is the operator's, and the verifier's, to say.
+    if (!options.metadata.publisher_uuid.empty() && !is_uuid(options.metadata.publisher_uuid)) {
+        return fault(
+            SignatureError::kBadOrMissingSignature,
+            "publisherUUID \"" + escape_text(options.metadata.publisher_uuid) + "\" is not a UUID");
     }
     const ChainReport chain = validate_chain(credentials.chain, options.chain_policy);
     if (!chain.ok()) {
@@ -738,7 +727,7 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
         return report;
     }
     const ParsedContentSignature& p = *parsed;
-    record("structure", true, "the Thrift structure of CS spec v2.5 §3 reads",
+    record("structure", true, "the Thrift structure of CS spec v2.6 §3 reads",
            SignatureError::kBadOrMissingSignature);
     report.signed_date = escape_text(p.signed_date);
     fill_claims(report, p.signer);
@@ -846,7 +835,7 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
     }
 
     // The signature itself, under the leaf's key, over the SignedInfoWire bytes as received. CS
-    // spec v2.5 §6.1: it comes before the digests it holds, which carry weight only once it
+    // spec v2.6 §6.1: it comes before the digests it holds, which carry weight only once it
     // verifies.
     bool signature_ok = false;
     if (chain_read) {
@@ -904,8 +893,9 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
         record("content digest", ok, detail + unauthenticated, code);
     }
 
-    // The operator metadata of CS spec v2.5 §5.3. The nonce is 128 bytes; the publisher UUID is a
-    // UUID that the signer certificate does not contradict. The specification lets a verifier
+    // The operator metadata of CS spec v2.6 §5.3. The nonce is 128 bytes; the publisher UUID is a
+    // UUID, and, when the policy names the accounts it expects, one of them. It is not compared
+    // with the signing certificate, which does not carry it. The specification lets a verifier
     // reject on these and does not require it, so they are findings first (`notes`) and part of the
     // verdict only when the policy says so. That the nonce is fresh, and that the platform and
     // application fields are accurate, a verifier cannot know.
@@ -923,18 +913,18 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
         finding("signer nonce", nonce_ok, true,
                 nonce_ok ? std::to_string(kSignerNonceBytes) + " bytes"
                          : std::to_string(p.signer_nonce.size()) +
-                               " bytes; CS spec v2.5 section 5.3 asks for " +
+                               " bytes; CS spec v2.6 section 5.3 asks for " +
                                std::to_string(kSignerNonceBytes),
                 SignatureError::kBadOrMissingSignature);
-        if (chain_read) {
-            const PublisherBindingResult binding =
-                check_publisher_binding(p.signer.publisher_uuid, p.chain.back());
-            finding("publisher UUID", binding.binding == PublisherBinding::kMatches,
-                    binding.binding != PublisherBinding::kUnbound, binding.detail,
-                    binding.binding == PublisherBinding::kMismatch
-                        ? SignatureError::kBadCredentialsForSigningContent
-                        : SignatureError::kBadOrMissingSignature);
-        }
+        const PublisherCheckResult publisher =
+            check_publisher_uuid(p.signer.publisher_uuid, policy.expected_publisher_uuids);
+        finding("publisher UUID",
+                publisher.result == PublisherCheck::kListed ||
+                    publisher.result == PublisherCheck::kUnchecked,
+                true, publisher.detail,
+                publisher.result == PublisherCheck::kNotListed
+                    ? SignatureError::kBadCredentialsForSigningContent
+                    : SignatureError::kBadOrMissingSignature);
     }
 
     if (report.fault.has_value()) {
