@@ -10,6 +10,7 @@
 #include "internal.hpp"
 #include "internal_truehd.hpp"
 
+using iclforge_c::c_string;
 using iclforge_c::from_cpp;
 using iclforge_c::guard;
 
@@ -18,10 +19,6 @@ namespace {
 std::span<const std::byte> bytes_of(const std::uint8_t* data, std::size_t size) {
     return std::as_bytes(std::span<const std::uint8_t>(data, size));
 }
-
-// A string_view of a string literal (iclforge::truehd::Error::detail, channel_name()) as a C string;
-// the empty view's data() may be NULL, so it is normalised to "".
-const char* c_string(std::string_view literal) { return literal.empty() ? "" : literal.data(); }
 
 }  // namespace
 
@@ -88,7 +85,9 @@ iclforge_status_t iclforge_truehd_scan(const uint8_t* data, size_t size,
     });
 }
 
-void iclforge_truehd_units_destroy(iclforge_truehd_units_t* units) { delete units; }
+void iclforge_truehd_units_destroy(iclforge_truehd_units_t* units) {
+    delete units;
+}
 
 size_t iclforge_truehd_units_count(const iclforge_truehd_units_t* units) {
     return units == nullptr ? 0 : units->units.size();
@@ -125,7 +124,9 @@ iclforge_status_t iclforge_truehd_decoder_create(const iclforge_truehd_decoder_c
     });
 }
 
-void iclforge_truehd_decoder_destroy(iclforge_truehd_decoder_t* decoder) { delete decoder; }
+void iclforge_truehd_decoder_destroy(iclforge_truehd_decoder_t* decoder) {
+    delete decoder;
+}
 
 void iclforge_truehd_decoder_reset(iclforge_truehd_decoder_t* decoder) {
     if (decoder == nullptr) {
@@ -190,7 +191,9 @@ void iclforge_truehd_decoder_counters(const iclforge_truehd_decoder_t* decoder,
                                       .check_failures = counters.check_failures};
 }
 
-void iclforge_truehd_decoded_destroy(iclforge_truehd_decoded_t* decoded) { delete decoded; }
+void iclforge_truehd_decoded_destroy(iclforge_truehd_decoded_t* decoded) {
+    delete decoded;
+}
 
 uint32_t iclforge_truehd_decoded_sample_rate(const iclforge_truehd_decoded_t* decoded) {
     return decoded == nullptr ? 0 : decoded->sample_rate;
@@ -225,8 +228,7 @@ const uint8_t* iclforge_truehd_decoded_extra_data(const iclforge_truehd_decoded_
     if (out_size != nullptr) {
         *out_size = decoded == nullptr ? 0 : decoded->extra_data.size();
     }
-    return decoded == nullptr || decoded->extra_data.empty() ? nullptr
-                                                              : decoded->extra_data.data();
+    return decoded == nullptr || decoded->extra_data.empty() ? nullptr : decoded->extra_data.data();
 }
 
 const char* iclforge_truehd_decoded_channel_name(const iclforge_truehd_decoded_t* decoded,

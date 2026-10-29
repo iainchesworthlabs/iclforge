@@ -1,5 +1,6 @@
-// The TrueHD C entry points of a library built with ICLFORGE_BUILD_TRUEHD off (src/truehd_absent.cpp):
-// the same symbols, every fallible one answering ICLFORGE_ERROR_UNSUPPORTED and the rest a NULL, 0 or
+// The TrueHD C entry points of a library built with ICLFORGE_BUILD_TRUEHD off
+// (src/truehd_absent.cpp): the same symbols, every fallible one answering
+// ICLFORGE_ERROR_UNSUPPORTED and the rest a NULL, 0 or
 // "". test_capi_truehd.cpp is the other build's.
 
 #include <catch2/catch_test_macros.hpp>
@@ -48,4 +49,35 @@ TEST_CASE("without ICLFORGE_BUILD_TRUEHD every TrueHD call is unsupported", "[ca
     iclforge_truehd_decoder_destroy(decoder);
     iclforge_truehd_decoded_destroy(decoded);
     iclforge_truehd_units_destroy(units);
+}
+
+TEST_CASE("without ICLFORGE_BUILD_TRUEHD the TrueHD encoder is unsupported too", "[capi][truehd]") {
+    iclforge_truehd_encoder_config_t config;
+    iclforge_truehd_encoder_config_init(&config);
+    CHECK(config.sample_rate == 48000);
+    CHECK(config.channels == 2);
+    CHECK(config.bits == 24);
+    CHECK(config.restart_interval_units == 128);
+    CHECK(config.peak_data_rate_bps == 18'000'000);
+    CHECK(config.downmix == ICLFORGE_TRUEHD_DOWNMIX_NONE);
+    CHECK(config.downmix_lfe == 0.0);
+    CHECK(config.max_fir_order == 8);
+    CHECK(config.matrix_search == 1);
+
+    iclforge_truehd_encoder_t* encoder = nullptr;
+    CHECK(iclforge_truehd_encoder_create(&config, &encoder) == ICLFORGE_ERROR_UNSUPPORTED);
+    CHECK(encoder == nullptr);
+    CHECK(iclforge_truehd_default_channel_assignment(2) == 0);
+    CHECK(std::string_view(iclforge_truehd_encoder_refusal_reason(&config)).empty());
+    const std::array<std::int32_t, 4> pcm{};
+    iclforge_truehd_encoded_t* encoded = nullptr;
+    CHECK(iclforge_truehd_encoder_encode(encoder, pcm.data(), 2, &encoded) ==
+          ICLFORGE_ERROR_UNSUPPORTED);
+    CHECK(iclforge_truehd_encoder_flush(encoder, &encoded) == ICLFORGE_ERROR_UNSUPPORTED);
+    CHECK(encoded == nullptr);
+    CHECK(iclforge_truehd_encoder_substreams(encoder) == 0);
+    CHECK(iclforge_truehd_encoded_count(encoded) == 0);
+    CHECK(iclforge_truehd_encoded_data(encoded, 0) == nullptr);
+    iclforge_truehd_encoder_destroy(encoder);
+    iclforge_truehd_encoded_destroy(encoded);
 }

@@ -1,13 +1,15 @@
-// The TrueHD and MLP C entry points (iclforge_truehd_*): the committed FFmpeg fixtures decoded through
-// them, held to the SHA-256 of what FFmpeg's strict decode of the same file gives (the codec is
-// lossless, so the digests are equal or the decode is wrong), and what a NULL argument, an index past
-// the end, a stream that is not TrueHD and a unit that does not decode leave each call to answer. The
-// build here has ICLFORGE_BUILD_TRUEHD on; test_capi_truehd_absent.cpp is the other build's.
+// The TrueHD and MLP C entry points (iclforge_truehd_*): the committed FFmpeg fixtures decoded
+// through them, held to the SHA-256 of what FFmpeg's strict decode of the same file gives (the
+// codec is lossless, so the digests are equal or the decode is wrong), and what a NULL argument, an
+// index past the end, a stream that is not TrueHD and a unit that does not decode leave each call
+// to answer. The build here has ICLFORGE_BUILD_TRUEHD on; test_capi_truehd_absent.cpp is the other
+// build's.
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -278,10 +280,10 @@ TEST_CASE("a presentation reads the substreams it names", "[capi][truehd]") {
         DYNAMIC_SECTION("presentation " << static_cast<int>(presentation)) {
             Decoder decoder(config_for(presentation));
             Decoded decoded;
-            REQUIRE(iclforge_truehd_decoder_decode(
-                        decoder.handle, stream.data() + iclforge_truehd_units_offset(units.handle, 0),
-                        iclforge_truehd_units_size(units.handle, 0), &decoded.handle) ==
-                    ICLFORGE_OK);
+            REQUIRE(
+                iclforge_truehd_decoder_decode(
+                    decoder.handle, stream.data() + iclforge_truehd_units_offset(units.handle, 0),
+                    iclforge_truehd_units_size(units.handle, 0), &decoded.handle) == ICLFORGE_OK);
             REQUIRE(decoded.handle != nullptr);
             CHECK(iclforge_truehd_decoded_channels(decoded.handle) == channels);
         }
@@ -296,10 +298,10 @@ TEST_CASE("a unit before any major sync gives no samples, and a corrupt one is r
     REQUIRE(iclforge_truehd_units_count(units.handle) > 2);
     const auto unit = [&](std::size_t i) {
         const std::size_t offset = iclforge_truehd_units_offset(units.handle, i);
-        return std::vector<std::uint8_t>(stream.begin() + static_cast<std::ptrdiff_t>(offset),
-                                         stream.begin() + static_cast<std::ptrdiff_t>(
-                                                              offset + iclforge_truehd_units_size(
-                                                                           units.handle, i)));
+        return std::vector<std::uint8_t>(
+            stream.begin() + static_cast<std::ptrdiff_t>(offset),
+            stream.begin() +
+                static_cast<std::ptrdiff_t>(offset + iclforge_truehd_units_size(units.handle, i)));
     };
 
     SECTION("joined part way") {
@@ -388,9 +390,10 @@ TEST_CASE("data that is not TrueHD is refused", "[capi][truehd]") {
     CHECK(iclforge_truehd_probe(ac3.data(), ac3.size(), &info) == ICLFORGE_ERROR_TRUEHD_BAD_SYNC);
 }
 
-TEST_CASE("the TrueHD entry points answer a NULL, an index past the end and an enumerator that is "
-          "not one",
-          "[capi][truehd]") {
+TEST_CASE(
+    "the TrueHD entry points answer a NULL, an index past the end and an enumerator that is "
+    "not one",
+    "[capi][truehd]") {
     iclforge_truehd_stream_info_t info;
     iclforge_truehd_units_t* units = nullptr;
     iclforge_truehd_decoder_t* decoder = nullptr;
@@ -487,6 +490,350 @@ TEST_CASE("every TrueHD status has its own message", "[capi][truehd]") {
         for (const std::string& earlier : seen) {
             CHECK(message != earlier);
         }
+        seen.push_back(message);
+    }
+}
+
+// --- The encoder (iclforge_truehd_encoder_*) -----------------------------------------------------
+
+namespace {
+
+struct Encoder {
+    iclforge_truehd_encoder_t* handle = nullptr;
+    explicit Encoder(const iclforge_truehd_encoder_config_t& config) {
+        REQUIRE(iclforge_truehd_encoder_create(&config, &handle) == ICLFORGE_OK);
+        REQUIRE(handle != nullptr);
+    }
+    Encoder(const Encoder&) = delete;
+    Encoder& operator=(const Encoder&) = delete;
+    ~Encoder() { iclforge_truehd_encoder_destroy(handle); }
+};
+
+struct Encoded {
+    iclforge_truehd_encoded_t* handle = nullptr;
+    Encoded() = default;
+    Encoded(const Encoded&) = delete;
+    Encoded& operator=(const Encoded&) = delete;
+    ~Encoded() { iclforge_truehd_encoded_destroy(handle); }
+};
+
+// Appends the units of one encode() or flush() to the stream; the number of units it held.
+std::size_t take(const Encoded& encoded, std::vector<std::uint8_t>& stream) {
+    const std::size_t count = iclforge_truehd_encoded_count(encoded.handle);
+    for (std::size_t i = 0; i < count; ++i) {
+        const std::uint8_t* data = iclforge_truehd_encoded_data(encoded.handle, i);
+        stream.insert(stream.end(), data, data + iclforge_truehd_encoded_size(encoded.handle, i));
+    }
+    return count;
+}
+
+struct DecodedStream {
+    std::vector<std::int32_t> pcm;  // interleaved
+    std::vector<std::byte> s32le;   // as FFmpeg's -f s32le gives it
+    std::size_t units = 0;
+    int channels = 0;
+    std::size_t frames = 0;
+};
+
+// Every unit of `stream` through the C API's decoder, strict.
+DecodedStream decode_all(const std::vector<std::uint8_t>& stream) {
+    DecodedStream out;
+    Units units;
+    REQUIRE(iclforge_truehd_scan(stream.data(), stream.size(), &units.handle) == ICLFORGE_OK);
+    out.units = iclforge_truehd_units_count(units.handle);
+    Decoder decoder;
+    for (std::size_t i = 0; i < out.units; ++i) {
+        Decoded decoded;
+        REQUIRE(iclforge_truehd_decoder_decode(
+                    decoder.handle, stream.data() + iclforge_truehd_units_offset(units.handle, i),
+                    iclforge_truehd_units_size(units.handle, i), &decoded.handle) == ICLFORGE_OK);
+        REQUIRE(decoded.handle != nullptr);
+        out.channels = iclforge_truehd_decoded_channels(decoded.handle);
+        const auto samples =
+            static_cast<std::size_t>(iclforge_truehd_decoded_samples(decoded.handle));
+        out.frames += samples;
+        const std::int32_t* pcm = iclforge_truehd_decoded_pcm(decoded.handle);
+        const std::size_t values = samples * static_cast<std::size_t>(out.channels);
+        out.pcm.insert(out.pcm.end(), pcm, pcm + values);
+        append_s32le(out.s32le, pcm, values);
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("iclforge_truehd_encoder_config_init gives the C++ defaults", "[capi][truehd]") {
+    iclforge_truehd_encoder_config_t config;
+    std::memset(&config, 0xAB, sizeof config);
+    iclforge_truehd_encoder_config_init(&config);
+    CHECK(config.sample_rate == 48000);
+    CHECK(config.channels == 2);
+    CHECK(config.bits == 24);
+    CHECK(config.channel_assignment == 0);
+    CHECK(config.restart_interval_units == 128);
+    CHECK(config.peak_data_rate_bps == 18'000'000);
+    CHECK(config.allow_rate_violations == 0);
+    CHECK(config.downmix == ICLFORGE_TRUEHD_DOWNMIX_NONE);
+    CHECK(config.downmix_centre == 0.7071067811865476);
+    CHECK(config.downmix_surround == 0.7071067811865476);
+    CHECK(config.downmix_lfe == 0.0);
+    CHECK(config.downmix_rear_to_surround == 0.7071067811865476);
+    CHECK(config.stereo_mode == 0);
+    CHECK(config.max_fir_order == 8);
+    CHECK(config.matrix_search == 1);
+    CHECK(config.verify == 0);
+    CHECK(std::string_view(iclforge_truehd_encoder_refusal_reason(&config)).empty());
+
+    iclforge_truehd_encoder_config_init(nullptr);  // documented no-op
+    CHECK(iclforge_truehd_default_channel_assignment(2) != 0);
+    CHECK(iclforge_truehd_default_channel_assignment(8) != 0);
+    CHECK(iclforge_truehd_default_channel_assignment(9) == 0);
+}
+
+TEST_CASE("every TrueHD fixture decoded, encoded and decoded again through the C API gives its PCM",
+          "[capi][truehd]") {
+    const nlohmann::json fixtures = manifest()["fixtures"];
+    for (const nlohmann::json& fixture : fixtures) {
+        if (fixture["codec"] != "truehd") {
+            continue;  // the encoder writes TrueHD, not MLP
+        }
+        const std::string name = fixture["name"];
+        DYNAMIC_SECTION(name) {
+            const DecodedStream source = decode_all(fixture_bytes(fixture["file"]));
+            REQUIRE(source.channels == fixture["channels"].get<int>());
+
+            iclforge_truehd_encoder_config_t config;
+            iclforge_truehd_encoder_config_init(&config);
+            config.sample_rate = fixture["sample_rate"].get<std::uint32_t>();
+            config.channels = source.channels;
+            config.verify = 1;
+            Encoder encoder(config);
+            const unsigned family = config.sample_rate % 44100U == 0 ? 44100U : 48000U;
+            CHECK(iclforge_truehd_encoder_samples_per_access_unit(encoder.handle) ==
+                  40 * static_cast<int>(config.sample_rate / family));
+
+            std::vector<std::uint8_t> stream;
+            std::size_t units = 0;
+            const std::size_t chunk = 1000;
+            for (std::size_t at = 0; at < source.frames; at += chunk) {
+                const std::size_t frames = std::min(chunk, source.frames - at);
+                Encoded encoded;
+                REQUIRE(iclforge_truehd_encoder_encode(
+                            encoder.handle,
+                            source.pcm.data() + at * static_cast<std::size_t>(source.channels),
+                            frames, &encoded.handle) == ICLFORGE_OK);
+                units += take(encoded, stream);
+            }
+            Encoded last;
+            REQUIRE(iclforge_truehd_encoder_flush(encoder.handle, &last.handle) == ICLFORGE_OK);
+            REQUIRE(last.handle != nullptr);
+            const std::size_t last_count = iclforge_truehd_encoded_count(last.handle);
+            units += take(last, stream);
+            // The end-of-stream marker counts the zero samples the last unit was filled up with:
+            // whole units less the padding are the frames that went in.
+            const int per_unit = iclforge_truehd_encoded_samples(last.handle, last_count - 1);
+            CHECK(source.frames + static_cast<std::size_t>(iclforge_truehd_encoded_padding_samples(
+                                      last.handle, last_count - 1)) ==
+                  units * static_cast<std::size_t>(per_unit));
+
+            iclforge_truehd_encoder_stats_t stats;
+            iclforge_truehd_encoder_stats(encoder.handle, &stats);
+            CHECK(stats.access_units == units);
+            CHECK(stats.bytes == stream.size());
+            CHECK(stats.input_samples == source.frames);
+            CHECK(stats.verified_units == stats.access_units);
+            CHECK(stats.rate_violations == 0);
+
+            // Decoded again, the stream is the PCM that went in, and the PCM FFmpeg's strict decode
+            // gives the fixture.
+            const DecodedStream again = decode_all(stream);
+            CHECK(again.units == units);
+            CHECK(again.channels == source.channels);
+            CHECK(again.frames == source.frames);
+            CHECK(again.pcm == source.pcm);
+            CHECK(hex(iclforge::base::crypto::sha256(again.s32le)) ==
+                  fixture["pcm_sha256"].get<std::string>());
+        }
+    }
+}
+
+TEST_CASE("the encoder says which substreams and access unit length a configuration has",
+          "[capi][truehd]") {
+    const std::array<std::array<int, 4>, 4> cases{{
+        // channels, rate, substreams, samples per access unit
+        {{2, 48000, 1, 40}},
+        {{6, 96000, 2, 80}},
+        {{8, 48000, 3, 40}},
+        {{2, 192000, 1, 160}},
+    }};
+    for (const auto& item : cases) {
+        iclforge_truehd_encoder_config_t config;
+        iclforge_truehd_encoder_config_init(&config);
+        config.channels = item[0];
+        config.sample_rate = static_cast<std::uint32_t>(item[1]);
+        Encoder encoder(config);
+        CHECK(iclforge_truehd_encoder_substreams(encoder.handle) == item[2]);
+        CHECK(iclforge_truehd_encoder_samples_per_access_unit(encoder.handle) == item[3]);
+    }
+}
+
+TEST_CASE("the encoder refuses what it does not write, and a stream it cannot send in time",
+          "[capi][truehd]") {
+    iclforge_truehd_encoder_config_t config;
+    iclforge_truehd_encoder_config_init(&config);
+
+    SECTION("a configuration is refused with a reason, and nothing is made") {
+        config.channels = 9;
+        iclforge_truehd_encoder_t* encoder = nullptr;
+        CHECK_FALSE(std::string_view(iclforge_truehd_encoder_refusal_reason(&config)).empty());
+        CHECK(iclforge_truehd_encoder_create(&config, &encoder) ==
+              ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG);
+        CHECK(encoder == nullptr);
+        config.channels = 2;
+        config.sample_rate = 32000;
+        CHECK(iclforge_truehd_encoder_create(&config, &encoder) ==
+              ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG);
+        config.sample_rate = 48000;
+        config.restart_interval_units = 5;  // 1, or at least 8
+        CHECK(iclforge_truehd_encoder_create(&config, &encoder) ==
+              ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG);
+    }
+
+    SECTION("a downmix that is not one of the two is an invalid argument, read as the int stored") {
+        const int odd = 7;
+        std::memcpy(&config.downmix, &odd, sizeof odd);
+        iclforge_truehd_encoder_t* encoder = nullptr;
+        CHECK(iclforge_truehd_encoder_create(&config, &encoder) == ICLFORGE_ERROR_INVALID_ARGUMENT);
+        CHECK(std::string_view(iclforge_truehd_encoder_refusal_reason(&config)).find("downmix") !=
+              std::string_view::npos);
+    }
+
+    SECTION("PCM outside the declared width is bad input, with a sentence") {
+        config.bits = 16;
+        Encoder encoder(config);
+        const std::array<std::int32_t, 4> pcm{40000, -40000, 0, 0};
+        Encoded encoded;
+        iclforge_truehd_encoded_t* sentinel = reinterpret_cast<iclforge_truehd_encoded_t*>(&config);
+        encoded.handle = sentinel;
+        const iclforge_status_t status =
+            iclforge_truehd_encoder_encode(encoder.handle, pcm.data(), 2, &encoded.handle);
+        CHECK(status == ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT);
+        CHECK(encoded.handle == sentinel);  // untouched on an error
+        encoded.handle = nullptr;
+        CHECK_FALSE(
+            std::string_view(iclforge_truehd_encoder_last_error_detail(encoder.handle)).empty());
+        CHECK(std::string_view(iclforge_status_message(status)) == "invalid TrueHD encoder input");
+    }
+
+    SECTION(
+        "noise cannot be sent at 1 Mbit/s, the least a peak rate can be: an error, or counted") {
+        config.peak_data_rate_bps = 1'000'000;
+        config.restart_interval_units = 8;
+        std::vector<std::int32_t> noise;
+        std::uint32_t state = 99;
+        for (std::size_t i = 0; i < 48000 * 2; ++i) {
+            state = state * 1664525U + 1013904223U;
+            noise.push_back(static_cast<std::int32_t>(state >> 9U) - (1 << 22));
+        }
+        {
+            Encoder encoder(config);
+            iclforge_status_t status = ICLFORGE_OK;
+            Encoded encoded;
+            status = iclforge_truehd_encoder_encode(encoder.handle, noise.data(), 48000,
+                                                    &encoded.handle);
+            if (status == ICLFORGE_OK) {
+                Encoded last;
+                status = iclforge_truehd_encoder_flush(encoder.handle, &last.handle);
+            }
+            CHECK(status == ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED);
+        }
+        config.allow_rate_violations = 1;
+        Encoder lenient(config);
+        Encoded encoded;
+        REQUIRE(iclforge_truehd_encoder_encode(lenient.handle, noise.data(), 48000,
+                                               &encoded.handle) == ICLFORGE_OK);
+        Encoded last;
+        REQUIRE(iclforge_truehd_encoder_flush(lenient.handle, &last.handle) == ICLFORGE_OK);
+        iclforge_truehd_encoder_stats_t stats;
+        iclforge_truehd_encoder_stats(lenient.handle, &stats);
+        CHECK(stats.rate_violations > 0);
+    }
+}
+
+TEST_CASE("the TrueHD encoder entry points answer a NULL and an index past the end",
+          "[capi][truehd]") {
+    iclforge_truehd_encoder_config_t config;
+    iclforge_truehd_encoder_config_init(&config);
+    iclforge_truehd_encoder_t* encoder = nullptr;
+    iclforge_truehd_encoded_t* encoded = nullptr;
+    const std::array<std::int32_t, 2> pcm{};
+
+    CHECK(iclforge_truehd_encoder_create(nullptr, &encoder) == ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_truehd_encoder_create(&config, nullptr) == ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(std::string_view(iclforge_truehd_encoder_refusal_reason(nullptr)).empty());
+    CHECK(iclforge_truehd_encoder_encode(nullptr, pcm.data(), 1, &encoded) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_truehd_encoder_flush(nullptr, &encoded) == ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(std::string_view(iclforge_truehd_encoder_last_error_detail(nullptr)).empty());
+    CHECK(iclforge_truehd_encoder_samples_per_access_unit(nullptr) == 0);
+    CHECK(iclforge_truehd_encoder_substreams(nullptr) == 0);
+    iclforge_truehd_encoder_stats_t stats;
+    iclforge_truehd_encoder_stats(nullptr, &stats);  // documented no-ops
+    iclforge_truehd_encoder_destroy(nullptr);
+
+    {
+        Encoder live(config);
+        CHECK(iclforge_truehd_encoder_encode(live.handle, nullptr, 1, &encoded) ==
+              ICLFORGE_ERROR_INVALID_ARGUMENT);
+        CHECK(iclforge_truehd_encoder_encode(live.handle, pcm.data(), 1, nullptr) ==
+              ICLFORGE_ERROR_INVALID_ARGUMENT);
+        CHECK(iclforge_truehd_encoder_flush(live.handle, nullptr) ==
+              ICLFORGE_ERROR_INVALID_ARGUMENT);
+        // No frames is a call that completes nothing, and takes no PCM pointer.
+        CHECK(iclforge_truehd_encoder_encode(live.handle, nullptr, 0, &encoded) == ICLFORGE_OK);
+        CHECK(encoded == nullptr);
+        // A flush with nothing held gives no unit either.
+        CHECK(iclforge_truehd_encoder_flush(live.handle, &encoded) == ICLFORGE_OK);
+        CHECK(encoded == nullptr);
+    }
+
+    CHECK(iclforge_truehd_encoded_count(nullptr) == 0);
+    CHECK(iclforge_truehd_encoded_data(nullptr, 0) == nullptr);
+    CHECK(iclforge_truehd_encoded_size(nullptr, 0) == 0);
+    CHECK(iclforge_truehd_encoded_samples(nullptr, 0) == 0);
+    CHECK(iclforge_truehd_encoded_padding_samples(nullptr, 0) == 0);
+    CHECK(iclforge_truehd_encoded_has_major_sync(nullptr, 0) == 0);
+    iclforge_truehd_encoded_destroy(nullptr);
+}
+
+TEST_CASE("an index past the last encoded unit is 0 or NULL", "[capi][truehd]") {
+    iclforge_truehd_encoder_config_t config;
+    iclforge_truehd_encoder_config_init(&config);
+    config.restart_interval_units = 8;
+    Encoder encoder(config);
+    const std::vector<std::int32_t> silence(2 * 4000, 0);
+    Encoded encoded;
+    REQUIRE(iclforge_truehd_encoder_encode(encoder.handle, silence.data(), 4000, &encoded.handle) ==
+            ICLFORGE_OK);
+    Encoded last;
+    REQUIRE(iclforge_truehd_encoder_flush(encoder.handle, &last.handle) == ICLFORGE_OK);
+    REQUIRE(last.handle != nullptr);
+    const std::size_t count = iclforge_truehd_encoded_count(last.handle);
+    CHECK(iclforge_truehd_encoded_data(last.handle, count) == nullptr);
+    CHECK(iclforge_truehd_encoded_size(last.handle, count) == 0);
+    CHECK(iclforge_truehd_encoded_size(last.handle, count - 1) > 0);
+    CHECK(iclforge_truehd_encoded_samples(last.handle, 0) == 40);
+}
+
+TEST_CASE("every TrueHD encoder status has its own message", "[capi][truehd]") {
+    std::vector<std::string> seen;
+    for (int status = ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG;
+         status <= ICLFORGE_ERROR_TRUEHD_ENCODE_INTERNAL; ++status) {
+        const std::string message = iclforge_status_message(static_cast<iclforge_status_t>(status));
+        INFO(status);
+        CHECK_FALSE(message.empty());
+        CHECK(message != "unknown status");
+        CHECK(std::find(seen.begin(), seen.end(), message) == seen.end());
         seen.push_back(message);
     }
 }

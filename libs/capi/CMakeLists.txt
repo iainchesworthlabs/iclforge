@@ -69,8 +69,8 @@
 #
 # TrueHD and MLP (libs/truehd, the iclforge_truehd_* functions of iclforge.h) follow the same
 # rule: truehd.cpp with ICLFORGE_BUILD_TRUEHD on, with iclforge::truehd_static embedded,
-# truehd_absent.cpp (which names no iclforge::truehd:: type) with it off. The decoder is the whole of
-# it for now; the encoder follows when libs/truehd has one.
+# truehd_absent.cpp (which names no iclforge::truehd:: type) with it off. truehd.cpp is the decoder and
+# truehd_encoder.cpp the encoder; the one absent file answers both.
 #
 # The lyrics reader (libs/lyrics, the iclforge_lyrics_* functions of iclforge.h) is COMPILED INTO
 # this library, not linked: iclforge::lyrics is an internal library that is never installed, so an
@@ -117,7 +117,7 @@ else()
     list(APPEND _capi_sources src/ac4_absent.cpp)
 endif()
 if(ICLFORGE_BUILD_TRUEHD)
-    list(APPEND _capi_sources src/truehd.cpp)
+    list(APPEND _capi_sources src/truehd.cpp src/truehd_encoder.cpp)
     list(APPEND _capi_embeds iclforge::truehd_static)
 else()
     list(APPEND _capi_sources src/truehd_absent.cpp)

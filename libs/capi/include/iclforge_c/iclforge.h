@@ -121,7 +121,15 @@ typedef enum iclforge_status {
     ICLFORGE_ERROR_TRUEHD_BAD_BLOCK_DATA = 111,
     ICLFORGE_ERROR_TRUEHD_BAD_LOSSLESS_CHECK = 112,
     ICLFORGE_ERROR_TRUEHD_NEEDS_RESTART = 113,
-    ICLFORGE_ERROR_TRUEHD_UNSUPPORTED = 114
+    ICLFORGE_ERROR_TRUEHD_UNSUPPORTED = 114,
+
+    /* iclforge::truehd::EncodeErrorKind - iclforge_truehd_encoder_create(), _encode() and _flush() */
+    ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG = 120,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT = 121,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_UNSUPPORTED = 122,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED = 123,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_VERIFY_FAILED = 124,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_INTERNAL = 125
 } iclforge_status_t;
 
 /* A short, static, human-readable description of `status` — e.g. for a log
@@ -2634,6 +2642,154 @@ ICLFORGE_C_EXPORT const uint8_t* iclforge_truehd_decoded_extra_data(
  * channel count or the index is out of range. A static string. */
 ICLFORGE_C_EXPORT const char* iclforge_truehd_decoded_channel_name(
     const iclforge_truehd_decoded_t* decoded, size_t index);
+
+
+/* --- TrueHD encoder (iclforge::truehd::Encoder) --- */
+
+/* A lossless TrueHD (0xF8726FBA) encoder: 1 to 8 channels of 16, 20 or 24 bit PCM at 44.1, 48, 88.2,
+ * 96, 176.4 or 192 kHz. What goes in comes out of any TrueHD decoder bit for bit. Declared either
+ * way, like the decoder above: a library built with ICLFORGE_BUILD_TRUEHD off answers every function
+ * with ICLFORGE_ERROR_UNSUPPORTED (a NULL, 0 or "" where the type allows).
+ *
+ * The encoder codes a restart interval at a time (128 access units, 107 ms at 48 kHz, by default), so
+ * most calls to iclforge_truehd_encoder_encode() give no access unit; the ones that complete an
+ * interval give all of it. iclforge_truehd_encoder_flush() codes what is held, padding the last unit
+ * with zero samples that the unit's end-of-stream marker counts, and the stream is then complete.
+ *
+ * The access units come back whole, one `data` run each, in stream order: a bare .thd file is the
+ * runs one after another, and a container takes each as one sample. What the encoder writes, and
+ * every place the specification and the streams disagree, is libs/truehd/ERRATA.md. */
+
+typedef struct iclforge_truehd_encoder iclforge_truehd_encoder_t;
+typedef struct iclforge_truehd_encoded iclforge_truehd_encoded_t;
+
+/* How the lower presentations of a multichannel stream are made: iclforge::truehd::DownmixMode. */
+typedef enum iclforge_truehd_downmix {
+    /* Substream 0 carries the first two channels as they are, substream 1 the next four and
+     * substream 2 the last two: how FFmpeg's encoder writes a stream. */
+    ICLFORGE_TRUEHD_DOWNMIX_NONE = 0,
+    /* Substream 0 carries a stereo downmix and substream 1 a 5.1 one, which the later substreams'
+     * matrices undo exactly. The gains below fold the channels in. */
+    ICLFORGE_TRUEHD_DOWNMIX_STANDARD = 1
+} iclforge_truehd_downmix_t;
+
+typedef struct iclforge_truehd_encoder_config {
+    uint32_t sample_rate; /* 44100, 48000, 88200, 96000, 176400 or 192000 */
+    int channels;         /* 1 to 8 */
+    /* The width of the PCM given to encode(): 16, 20 or 24. A sample is a signed integer of this
+     * many bits, not left-justified. */
+    int bits;
+    /* The 13-bit channel assignment (TH spec section 13.1) naming the speakers in the order of the
+     * PCM's channels; 0 picks iclforge_truehd_default_channel_assignment(channels). */
+    uint32_t channel_assignment;
+    /* Access units between restart headers: 1, or at least 8. */
+    int restart_interval_units;
+    /* The rate the stream is declared not to exceed, bits per second (18 000 000 is Blu-ray's). */
+    uint32_t peak_data_rate_bps;
+    /* 0: a stream that cannot be sent within the peak rate and the 75 ms of TH spec section 18 is
+     * ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED. Nonzero: it is written, and counted in the
+     * stats' rate_violations. */
+    int allow_rate_violations;
+    iclforge_truehd_downmix_t downmix;
+    /* The gains the standard downmix folds in, linear (0.7071 is -3 dB): C into L and R, Ls into L
+     * and Rs into R, LFE into L and R, and Lrs into Ls and Rrs into Rs. */
+    double downmix_centre;
+    double downmix_surround;
+    double downmix_lfe;
+    double downmix_rear_to_surround;
+    /* The 2 channel mode the stream declares: 0 stereo, 1 Lt/Rt matrix encoded, 2 headphone. */
+    unsigned stereo_mode;
+    /* The largest FIR prediction order tried, 0 (prediction off) to 8. */
+    int max_fir_order;
+    /* Nonzero: decorrelate channel pairs with a primitive matrix where that makes the stream smaller. */
+    int matrix_search;
+    /* Nonzero: decode every access unit with the library's decoder as it is written and compare it
+     * with the input; ICLFORGE_ERROR_TRUEHD_ENCODE_VERIFY_FAILED if it differs. Costs about as much
+     * again as the encode. */
+    int verify;
+} iclforge_truehd_encoder_config_t;
+
+/* The defaults of iclforge::truehd::EncoderConfig{}: 48 kHz stereo, 24 bit, the default assignment,
+ * 128-unit restart intervals, 18 Mbit/s, no downmix, -3 dB gains (LFE off), FIR order 8, the matrix
+ * search on, no verification. */
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_config_init(iclforge_truehd_encoder_config_t* config);
+
+/* The default channel assignment for a channel count (mono C, stereo L R, 3.0, 4.0, 5.0, 5.1, 6.0
+ * and 7.1 without LFE as 6 channels, 7.1 as 8), or 0 for a count with none. */
+ICLFORGE_C_EXPORT uint32_t iclforge_truehd_default_channel_assignment(int channels);
+
+/* The sentence iclforge_truehd_encoder_create() would fail with for this configuration, or "" if it
+ * would not. A static string. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_encoder_refusal_reason(
+    const iclforge_truehd_encoder_config_t* config);
+
+/* ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG for a configuration the encoder does not write;
+ * `*out_encoder` is left untouched on an error. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_create(
+    const iclforge_truehd_encoder_config_t* config, iclforge_truehd_encoder_t** out_encoder);
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_destroy(iclforge_truehd_encoder_t* encoder);
+
+/* Takes interleaved PCM, `frames` x config.channels values, and writes the access units that are
+ * complete to `*out_encoded`: a new handle, or NULL when none is yet (the usual answer). On an error
+ * `*out_encoded` is left untouched; after one the encoder should be destroyed. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_encode(
+    iclforge_truehd_encoder_t* encoder, const int32_t* pcm, size_t frames,
+    iclforge_truehd_encoded_t** out_encoded);
+
+/* Codes what is held and ends the stream; as encode() otherwise. The encoder starts a new stream if
+ * it is given more input afterwards. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_flush(
+    iclforge_truehd_encoder_t* encoder, iclforge_truehd_encoded_t** out_encoded);
+
+/* The sentence that goes with the status of the most recent encode() or flush(): a static string, ""
+ * when that call succeeded or none has been made. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_encoder_last_error_detail(
+    const iclforge_truehd_encoder_t* encoder);
+
+/* The samples per channel in a full access unit (40 at 44.1 and 48 kHz, 80 at 88.2 and 96, 160 at
+ * 176.4 and 192), and the substreams the configuration writes. 0 for a NULL encoder. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoder_samples_per_access_unit(
+    const iclforge_truehd_encoder_t* encoder);
+ICLFORGE_C_EXPORT int iclforge_truehd_encoder_substreams(const iclforge_truehd_encoder_t* encoder);
+
+/* Tagged iclforge_truehd_encoder_stats_info rather than iclforge_truehd_encoder_stats, for the reason
+ * iclforge_version_info's comment gives: the function below has that name. */
+typedef struct iclforge_truehd_encoder_stats_info {
+    uint64_t access_units;
+    uint64_t restart_intervals;
+    uint64_t input_samples; /* per channel */
+    uint64_t bytes;
+    uint64_t rate_violations;
+    uint32_t max_unit_bytes;
+    uint64_t max_unit_rate_bps; /* the largest rate any unit would need to arrive at over its own duration */
+    uint64_t matrices_used;
+    uint64_t downmix_reduced_intervals; /* intervals whose downmix gains were lowered to fit 24 bits */
+    uint64_t verified_units;
+} iclforge_truehd_encoder_stats_t;
+
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_stats(const iclforge_truehd_encoder_t* encoder,
+                                                     iclforge_truehd_encoder_stats_t* out);
+
+/* The access units one encode() or flush() completed. The handle owns their bytes, so they stay
+ * valid until it is destroyed; an index out of range gives 0 or NULL. */
+ICLFORGE_C_EXPORT void iclforge_truehd_encoded_destroy(iclforge_truehd_encoded_t* encoded);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_encoded_count(const iclforge_truehd_encoded_t* encoded);
+/* One access unit, whole, from its 4-byte header. */
+ICLFORGE_C_EXPORT const uint8_t* iclforge_truehd_encoded_data(const iclforge_truehd_encoded_t* encoded,
+                                                              size_t index);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_encoded_size(const iclforge_truehd_encoded_t* encoded,
+                                                      size_t index);
+/* The samples per channel the unit holds, padding included. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_samples(const iclforge_truehd_encoded_t* encoded,
+                                                      size_t index);
+/* The zero samples the last unit was filled up with (its end-of-stream marker counts them); 0 for
+ * every other. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_padding_samples(
+    const iclforge_truehd_encoded_t* encoded, size_t index);
+/* Nonzero when the unit opens with a major sync (the first of a restart interval): the units a
+ * container marks as sync samples. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_has_major_sync(
+    const iclforge_truehd_encoded_t* encoded, size_t index);
 
 
 #ifdef __cplusplus

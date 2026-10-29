@@ -59,6 +59,15 @@ const char* iclforge_status_message(iclforge_status_t status) {
         case ICLFORGE_ERROR_TRUEHD_NEEDS_RESTART:
             return "TrueHD substream needs a restart header not yet seen";
         case ICLFORGE_ERROR_TRUEHD_UNSUPPORTED: return "legal but unsupported TrueHD syntax";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG:
+            return "invalid TrueHD encoder configuration";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT: return "invalid TrueHD encoder input";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_UNSUPPORTED: return "TrueHD form the encoder does not write";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED:
+            return "TrueHD stream cannot be sent within the peak rate";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_VERIFY_FAILED:
+            return "TrueHD stream does not decode to the input";
+        case ICLFORGE_ERROR_TRUEHD_ENCODE_INTERNAL: return "internal TrueHD encoder error";
     }
     return "unknown status";
 }

@@ -138,12 +138,17 @@ if(ICLFORGE_BUILD_CAPI)
     add_executable(capi_decode_truehd capi_decode_truehd.c)
     target_link_libraries(capi_decode_truehd PRIVATE iclforge::c iclforge::warnings)
 
+    # Encodes a tone, decodes the stream and compares, so it takes no argument: it runs under ctest
+    # like capi_encode_decode, where the library has the TrueHD codec.
+    add_executable(capi_encode_truehd capi_encode_truehd.c)
+    target_link_libraries(capi_encode_truehd PRIVATE iclforge::c iclforge::warnings)
+
     # Pin the dialect rather than riding whatever the compiler defaults to
     # (gnu17 on GCC/Clang, an unspecified MSVC default) - this is the project's
     # one standing proof that iclforge_c/iclforge.h is valid strict C11 (with
     # -Wpedantic from iclforge::warnings above) on every desktop leg, not merely
     # valid under whichever superset dialect happened to be the default.
-    foreach(capi_example IN ITEMS capi_encode_decode capi_encode_eac3 capi_decode_truehd)
+    foreach(capi_example IN ITEMS capi_encode_decode capi_encode_eac3 capi_decode_truehd capi_encode_truehd)
         set_target_properties(${capi_example} PROPERTIES
             FOLDER examples
             C_STANDARD 11
@@ -162,6 +167,7 @@ if(ICLFORGE_BUILD_CAPI)
         add_test(NAME "example.capi_encode_decode" COMMAND capi_encode_decode)
         add_test(NAME "example.capi_encode_eac3" COMMAND capi_encode_eac3)
         if(ICLFORGE_BUILD_TRUEHD)
+            add_test(NAME "example.capi_encode_truehd" COMMAND capi_encode_truehd)
             add_test(NAME "example.capi_decode_truehd" COMMAND capi_decode_truehd
                 "${PROJECT_SOURCE_DIR}/testdata/truehd/truehd_m51_s24.thd"
                 "${CMAKE_CURRENT_BINARY_DIR}/capi_decode_truehd.pcm")
