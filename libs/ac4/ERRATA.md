@@ -56,10 +56,26 @@ depends on the same reading.
   gives to 7.0 (3/4/0). Read as 7.0, `metadata()` fails its `tools_metadata_size` check in I-frames, the
   presentation substream reads one bit past its end, and the audio fails in its section data. Read as
   stereo, every frame of every stream ends exactly.
-- **Reading:** in a presentation_version 2 presentation, a channel-coded substream with that code is
+- **Second code, 0b1111001 (7.1: 3/4/0.1).** Dolby's *AC-4 in MPEG-DASH* specification, in the Online
+  Delivery Kit 1.5 (topic "Signaling immersive stereo content", with the HLS volume's "Signaling
+  immersive stereo with Dolby Atmos"), says a presentation_version 2 presentation signals immersive
+  stereo with `channel_mode` 0b1111000 for any content or 0b1111001 for immersive stereo made from Dolby
+  Atmos content, with `ch_mode` 1 in both cases. Dolby's own test streams
+  `Audio_ID_ims_112kbps_25fps_ac4.ac4` and `..._2997fps_...` (800 and 960 frames) are the 0b1111001 kind.
+  Read as the 7.1 Table 56 names, frame 0's presentation substream reads one bit past its end
+  (`Refused`: "read of 1 bits at bit 208 runs past the end") and the audio fails in its section data
+  (`sect_cb 14 is not a Huffman codebook`; the C++ decoder: "sect_cb 12 to 15 name no codebook"), in both
+  transcriptions. Read as stereo, every substream of every frame ends exactly (Python: 800 frames,
+  0 failures, 0 refusals), the C++ and Python traces agree record for record over all frames of all 12
+  elementary streams of the kit, and the C++ decoder returns two channels, 32.0 s and 32.03 s.
+- **Reading:** in a presentation_version 2 presentation, a channel-coded substream with either code is
   stereo wherever its channel mode is used: its channel element, its `metadata()` and the
-  presentation's `pres_ch_mode`.
-- **Evidence:** Observation.
+  presentation's `pres_ch_mode`. The Atmos indication (0b1111001) changes nothing in the audio syntax;
+  it is a label for the DSI's `dolby_atmos_indicator`, which this library does not write.
+- **Evidence:** Observation for 0b1111000 (DEE); text of a supplementary specification, confirmed by
+  observation of Dolby's streams, for 0b1111001. Part 2 itself still says nothing.
+  `libs/ac4/tests/decoder/test_decoder.cpp` builds the second kind from DEE's stream by setting one bit
+  per frame.
 
 #### The frame rate factor of a substream group
 

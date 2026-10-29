@@ -197,13 +197,21 @@ using detail::role_from_classifier;
 using detail::role_v1;
 using detail::SubstreamContext;
 
-// DEE's immersive stereo: presentation_version 2, which Part 2 V1.3.1 names
-// without defining, over a channel-coded substream carrying the channel_mode
-// code Table 56 gives to 7.0 (3/4/0). Every such stream parses to the exact
-// end of every substream only when that substream is read as stereo wherever
-// its channel mode is used: its channel element, its metadata() and the
-// presentation's pres_ch_mode. The Python transcription found the same. It is
-// an observation of one encoder, not the text; the errata register records it.
+// Immersive stereo: presentation_version 2, which Part 2 V1.3.1 names without
+// defining, over a channel-coded substream carrying a channel_mode code that
+// Table 56 gives to a 7.X mode: 0b1111000 (7.0: 3/4/0), which every DEE
+// immersive-stereo encode uses, or 0b1111001 (7.1: 3/4/0.1), which Dolby's
+// AC-4 in MPEG-DASH specification ("Signaling immersive stereo content") gives
+// to immersive stereo made from Dolby Atmos content, both with ch_mode 1. Every
+// such stream parses to the exact end of every substream only when that
+// substream is read as stereo wherever its channel mode is used: its channel
+// element, its metadata() and the presentation's pres_ch_mode. The Python
+// transcription found the same. The first code is an observation of one
+// encoder, the second a statement of a supplementary specification, neither the
+// text of Part 2; the errata register records both.
+constexpr int kImsAnyContentChannelMode = 0b1111000;
+constexpr int kImsAtmosChannelMode = 0b1111001;
+
 void apply_observed_stereo_rule(Toc& toc) {
     // Each group is patched once however many presentations name it, and
     // however many times one names it: a presentation may repeat a group
@@ -224,7 +232,9 @@ void apply_observed_stereo_rule(Toc& toc) {
             continue;
         }
         for (GroupSubstream& sub : toc.substream_groups[group_index].substreams) {
-            if (sub.kind == GroupSubstream::Kind::kChan && sub.chan && sub.chan->channel_mode == 0b1111000) {
+            if (sub.kind == GroupSubstream::Kind::kChan && sub.chan &&
+                (sub.chan->channel_mode == kImsAnyContentChannelMode ||
+                 sub.chan->channel_mode == kImsAtmosChannelMode)) {
                 sub.chan->ch_mode = detail::ch_mode::kStereo;
             }
         }
