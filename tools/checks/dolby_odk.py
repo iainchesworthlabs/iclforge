@@ -19,8 +19,9 @@ What this module does and does not do.
   directory, a time limit and a cap on the output it keeps.
 - `python3 tools/checks/dolby_odk.py fetch <cache-dir>` is the one opt-in step that touches the
   network. It reads the two tool archives out of the AC-4 kit's zip on ott.dolby.com with HTTP range
-  requests (the kit is 1.1 GB; the two archives are 1.3 MB), checks each against the SHA-256 recorded
-  here, and extracts the member for this platform only. Nothing is fetched by a test or by CI.
+  requests (the kit is 1.1 GB; the two archives are 1.3 MB), checks each against the SHA-256
+  recorded here, and extracts the member for this platform only. Nothing is fetched by a test or by
+  CI.
 - Nothing from the kit is committed: not the programs, not the archives, not Dolby's streams, not
   XML dumps of Dolby's files. The kit is Dolby's and this project does not redistribute it. The
   project has not read the kit's licence terms in full; whether CI may fetch it is the owner's
@@ -135,7 +136,10 @@ def _unshare_works() -> bool:
     if unshare is None:
         return False
     try:
-        return subprocess.run([unshare, "-n", "true"], capture_output=True, timeout=10).returncode == 0
+        probe = subprocess.run(
+            [unshare, "-n", "true"], capture_output=True, timeout=10, check=False
+        )
+        return probe.returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -179,8 +183,14 @@ def run_tool(
         with out_path.open("wb") as out, err_path.open("wb") as err:
             try:
                 proc = subprocess.run(
-                    argv, stdin=subprocess.DEVNULL, stdout=out, stderr=err, cwd=cwd, env=env,
-                    timeout=timeout, check=False,
+                    argv,
+                    stdin=subprocess.DEVNULL,
+                    stdout=out,
+                    stderr=err,
+                    cwd=cwd,
+                    env=env,
+                    timeout=timeout,
+                    check=False,
                 )
                 code = proc.returncode
             except subprocess.TimeoutExpired:
@@ -204,15 +214,15 @@ class Box:
     kind: str
     size: int
     fields: dict[str, list[str]] = field(default_factory=dict)
-    children: list["Box"] = field(default_factory=list)
+    children: list[Box] = field(default_factory=list)
 
-    def find(self, kind: str) -> "Box | None":
+    def find(self, kind: str) -> Box | None:
         for child in self.children:
             if child.kind == kind:
                 return child
         return None
 
-    def find_all(self, kind: str) -> list["Box"]:
+    def find_all(self, kind: str) -> list[Box]:
         return [c for c in self.children if c.kind == kind]
 
     def walk(self, path: str = ""):
@@ -265,8 +275,12 @@ def parse_mp4drop_xml(text: str) -> list[Box]:
     return [_box_from_element(child) for child in root if "size" in child.attrib]
 
 
-def mp4drop_boxes(path: str | os.PathLike[str], *, root: str | os.PathLike[str] | None = None,
-                  timeout: float = DEFAULT_TIMEOUT_S) -> list[Box]:
+def mp4drop_boxes(
+    path: str | os.PathLike[str],
+    *,
+    root: str | os.PathLike[str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+) -> list[Box]:
     result = run_tool("mp4drop", [Path(path).resolve(), "-m", "1"], root=root, timeout=timeout)
     if result.timed_out or result.truncated:
         raise RuntimeError("mp4drop timed out or produced more output than the limit")
@@ -367,7 +381,7 @@ class _HttpRangeFile(io.RawIOBase):
     def __init__(self, url: str, context: ssl.SSLContext):
         self._url, self._context, self._pos = url, context, 0
         head = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(head, context=context, timeout=60) as response:  # noqa: S310
+        with urllib.request.urlopen(head, context=context, timeout=60) as response:
             self._size = int(response.headers["Content-Length"])
 
     def seekable(self) -> bool:
@@ -396,7 +410,7 @@ class _HttpRangeFile(io.RawIOBase):
         request = urllib.request.Request(
             self._url, headers={"Range": f"bytes={self._pos}-{self._pos + size - 1}"}
         )
-        with urllib.request.urlopen(request, context=self._context, timeout=120) as response:  # noqa: S310
+        with urllib.request.urlopen(request, context=self._context, timeout=120) as response:
             data = response.read()
         self._pos += len(data)
         return data
@@ -460,7 +474,9 @@ NOTICE = (
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    fetch_parser = sub.add_parser("fetch", help="download streamdemuxer and mp4drop into a directory")
+    fetch_parser = sub.add_parser(
+        "fetch", help="download streamdemuxer and mp4drop into a directory"
+    )
     fetch_parser.add_argument("cache_dir")
     sub.add_parser("where", help="print where the tools are, or why they are not found")
     args = parser.parse_args(argv)

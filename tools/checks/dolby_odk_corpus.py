@@ -72,7 +72,9 @@ def make_streams(cli: str, work: Path) -> tuple[list[Stream], list[str]]:
         if done.returncode == 0 and path.exists():
             streams.append(Stream(name, path))
         else:
-            notes.append(f"{name}: forge {argv[0]} failed ({done.returncode}): {done.stderr.strip()[-120:]}")
+            notes.append(
+                f"{name}: forge {argv[0]} failed ({done.returncode}): {done.stderr.strip()[-120:]}"
+            )
 
     add("ac3", ["sine", work / "ac3.ac3", 3, 192], work / "ac3.ac3")
     add("eac3", ["eac3-sine", work / "eac3.ec3", 3, 192], work / "eac3.ec3")

@@ -5,8 +5,8 @@
 track: `dac3` for AC-3, `dec3` for E-AC-3 (with the JOC extension flag and complexity index) and
 `dac4` for AC-4. Two checks:
 
-1. forge writes MP4 and the init segment of its fragmented MP4 for AC-3, E-AC-3, E-AC-3 JOC and AC-4;
-   mp4drop's reading of the configuration box must equal what forge's probe says about the
+1. forge writes MP4 and the init segment of its fragmented MP4 for AC-3, E-AC-3, E-AC-3 JOC and
+   AC-4; mp4drop's reading of the configuration box must equal what forge's probe says about the
    elementary stream the box was made from. That catches a bit-layout error in a box that forge's
    own reader, written by the same hand, would read back without complaint.
 2. Dolby's own sample files (--samples): forge's reading of the configuration box (`forge probe`)
@@ -34,7 +34,27 @@ import dolby_odk_corpus as corpus
 
 # The nominal AC-3 data rates of the frame size code table (ETSI TS 102 366); the AC3SpecificBox's
 # bit_rate_code (Annex F) indexes them, which the agreement with mp4drop below confirms.
-AC3_RATES_KBPS = (32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640)
+AC3_RATES_KBPS = (
+    32,
+    40,
+    48,
+    56,
+    64,
+    80,
+    96,
+    112,
+    128,
+    160,
+    192,
+    224,
+    256,
+    320,
+    384,
+    448,
+    512,
+    576,
+    640,
+)
 FSCOD_OF_RATE = {48000: 0, 44100: 1, 32000: 2}
 # fs_index of the AC-4 specific box (ETSI TS 103 190-2 Annex E): 0 is 44.1 kHz and 1 is 48 kHz.
 AC4_FS_INDEX_OF_RATE = {44100: 0, 48000: 1}
@@ -51,7 +71,7 @@ def forge_probe(cli: str, path: Path) -> dict | None:
 
 
 def expected_config(kind: str, probe: dict) -> dict[str, int]:
-    """The configuration-box fields a stream implies, from forge's probe of the elementary stream."""
+    """The configuration-box fields a stream implies, from forge's probe of the stream."""
     stream = probe["stream"]
     if kind == "ac4":
         info = stream["ac4"]
@@ -107,7 +127,9 @@ def check_forge_written(cli: str, work: Path) -> tuple[list[odk.Result], dict[st
     for stream in streams:
         probe = forge_probe(cli, stream.path)
         if probe is None:
-            results.append(odk.Result(stream.name, odk.ERROR, "forge probe did not read its own stream"))
+            results.append(
+                odk.Result(stream.name, odk.ERROR, "forge probe did not read its own stream")
+            )
             continue
         files = corpus.make_containers(cli, stream, work / stream.name)
         for leg in ("mp4", "fmp4_init"):
@@ -123,12 +145,18 @@ def check_forge_written(cli: str, work: Path) -> tuple[list[odk.Result], dict[st
             entries = odk.audio_sample_entries(boxes)
             if len(entries) != 1 or entries[0][1].kind != stream.entry:
                 found = [e.kind for _, e in entries]
-                results.append(odk.Result(subject, odk.DISAGREE, f"expected one {stream.entry} entry, found {found}"))
+                results.append(
+                    odk.Result(
+                        subject, odk.DISAGREE, f"expected one {stream.entry} entry, found {found}"
+                    )
+                )
                 continue
             entry = entries[0][1]
             box = config_box(entry)
             if box is None:
-                results.append(odk.Result(subject, odk.DISAGREE, "no dac3/dec3/dac4 box in the sample entry"))
+                results.append(
+                    odk.Result(subject, odk.DISAGREE, "no dac3/dec3/dac4 box in the sample entry")
+                )
                 continue
             results += compare_config(subject, expected_config(stream.name, probe), box)
             if leg == "mp4":
@@ -158,27 +186,35 @@ def check_dolby_written(cli: str, samples: Path, forge_counts: dict[str, int]) -
             # ETSI TS 102 366 Annex F (EC3SpecificBox): num_ind_sub is the number of independent
             # substreams minus one, and forge's probe reports the count.
             mapping = {
-                "fscod": "fscod", "bsid": "bsid", "bsmod": "bsmod", "acmod": "acmod",
-                "data_rate": "data_rate_kbps", "num_dep_sub": "num_dep_sub",
+                "fscod": "fscod",
+                "bsid": "bsid",
+                "bsmod": "bsmod",
+                "acmod": "acmod",
+                "data_rate": "data_rate_kbps",
+                "num_dep_sub": "num_dep_sub",
             }
             wrong = []
             for dolby_name, forge_name in mapping.items():
                 if box.int_value(dolby_name) != theirs.get(forge_name):
-                    wrong.append(f"{dolby_name}: mp4drop {box.int_value(dolby_name)}, forge {theirs.get(forge_name)}")
+                    got, want = box.int_value(dolby_name), theirs.get(forge_name)
+                    wrong.append(f"{dolby_name}: mp4drop {got}, forge {want}")
             if (box.int_value("num_ind_sub") or 0) + 1 != theirs.get("independent_substreams"):
                 wrong.append(
                     f"num_ind_sub: mp4drop {box.int_value('num_ind_sub')} (+1), "
                     f"forge {theirs.get('independent_substreams')} independent substreams"
                 )
             if box.int_value("lfeon") != int(bool(theirs.get("lfeon"))):
-                wrong.append(f"lfeon: mp4drop {box.int_value('lfeon')}, forge {theirs.get('lfeon')}")
+                wrong.append(
+                    f"lfeon: mp4drop {box.int_value('lfeon')}, forge {theirs.get('lfeon')}"
+                )
             joc = bool(box.int_value("flag_ec3_extension_type_a"))
             if joc != (theirs.get("complexity_index") is not None):
-                wrong.append(f"JOC flag: mp4drop {joc}, forge complexity {theirs.get('complexity_index')}")
-            elif joc and box.int_value("complexity_index_type_a") != theirs.get("complexity_index"):
                 wrong.append(
-                    f"complexity: mp4drop {box.int_value('complexity_index_type_a')}, forge {theirs.get('complexity_index')}"
+                    f"JOC flag: mp4drop {joc}, forge complexity {theirs.get('complexity_index')}"
                 )
+            elif joc and box.int_value("complexity_index_type_a") != theirs.get("complexity_index"):
+                got, want = box.int_value("complexity_index_type_a"), theirs.get("complexity_index")
+                wrong.append(f"complexity: mp4drop {got}, forge {want}")
             if wrong:
                 results.append(odk.Result(sample.name, odk.DISAGREE, "; ".join(wrong)))
             else:
@@ -199,7 +235,9 @@ def check_dolby_written(cli: str, samples: Path, forge_counts: dict[str, int]) -
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)")
+    parser.add_argument(
+        "--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)"
+    )
     parser.add_argument("--samples", default=os.environ.get("ICLFORGE_DOLBY_ODK_SAMPLES"))
     parser.add_argument("--work", help="working directory (default: a temporary one)")
     args = parser.parse_args(argv)

@@ -11,13 +11,12 @@ naming the scheme, `tenc` with the default key id, IV size, constant IV and patt
 wrote, and `senc` with one entry per sample where the scheme sends IVs. This says Dolby's parser
 reads the layout the generator writes. It says nothing about whether the cipher output is right.
 
-Leg 2, decryption (streamdemuxer --decryption-keys): the elementary stream the tool writes, given the
-test key, must equal the clear stream. Only this leg is evidence about the cipher. It is gated: the
-tool is first given the same key for a file it should read, and when it answers "Need a key for
-decryption" for every protected file even then, the leg is reported as a skip with that reason
-(the 1.0.0.5519896 tool of September 2020 does this for every file tried), because a result that
-cannot be told from "the tool ignores the key" proves nothing. --require-decrypt turns that skip
-into an error.
+Leg 2, decryption (streamdemuxer --decryption-keys): the elementary stream the tool writes, given
+the test key, must equal the clear stream. Only this leg is evidence about the cipher. It is gated:
+when the tool answers "Need a key for decryption" for every protected file although the matching key
+was supplied (the 1.0.0.5519896 tool of September 2020 does this for every file tried, FFmpeg's
+included), the legs are summarised as one skip, because a result that cannot be told from "the tool
+ignores the key" proves nothing. --require-decrypt turns that skip into an error.
 
     python3 tools/checks/check_dolby_cenc.py --cli build/bin/forge [--quick] [--require-decrypt]
 
@@ -95,14 +94,14 @@ def find_protection(boxes: list[odk.Box]) -> dict[str, odk.Box]:
     """The first `enca` entry's frma, schm, tenc and the moov-level list, from an mp4drop dump."""
     found: dict[str, odk.Box] = {}
     for top in boxes:
-        for path, box in top.walk():
+        for _, box in top.walk():
             if box.kind in ("enca", "frma", "schm", "tenc") and box.kind not in found:
                 found[box.kind] = box
     return found
 
 
 def trafs_with_senc(boxes: list[odk.Box]) -> tuple[int, int, list[str]]:
-    """(fragments, fragments with senc, mismatches between senc sample_count and trun sample_count)."""
+    """(fragments, fragments with senc, senc sample counts that differ from the trun's)."""
     total = with_senc = 0
     problems: list[str] = []
     for top in boxes:
@@ -114,8 +113,9 @@ def trafs_with_senc(boxes: list[odk.Box]) -> tuple[int, int, list[str]]:
             if senc is None:
                 continue
             with_senc += 1
-            if trun is not None and senc.int_value("sample_count") != trun.int_value("sample_count"):
-                problems.append(f"senc {senc.int_value('sample_count')} vs trun {trun.int_value('sample_count')}")
+            in_senc = senc.int_value("sample_count")
+            if trun is not None and in_senc != trun.int_value("sample_count"):
+                problems.append(f"senc {in_senc} vs trun {trun.int_value('sample_count')}")
     return total, with_senc, problems
 
 
@@ -145,7 +145,16 @@ def check_boxes(subject: str, case: Case, entry_name: str, boxes: list[odk.Box])
 
 
 def make_protected(clear_mp4: Path, case: Case, out: Path) -> str | None:
-    argv = [sys.executable, str(GENERATOR), str(clear_mp4), str(out), case.scheme, "--variant", case.variant, *case.extra]
+    argv = [
+        sys.executable,
+        str(GENERATOR),
+        str(clear_mp4),
+        str(out),
+        case.scheme,
+        "--variant",
+        case.variant,
+        *case.extra,
+    ]
     done = subprocess.run(argv, capture_output=True, text=True, check=False)
     return None if done.returncode == 0 and out.exists() else done.stderr.strip()[-160:]
 
@@ -153,8 +162,10 @@ def make_protected(clear_mp4: Path, case: Case, out: Path) -> str | None:
 def gpac_protected(clear_mp4: Path, scheme: str, work: Path) -> Path | None:
     if shutil.which("MP4Box") is None:
         return None
-    iv8 = '<CrypTrack trackID="1" IsEncrypted="1" IV_size="8" first_IV="0x0001020304050607" saiSavedBox="senc">'
-    iv16 = '<CrypTrack trackID="1" IsEncrypted="1" IV_size="16" first_IV="0x000102030405060708090a0b0c0d0e0f" saiSavedBox="senc">'
+    head = '<CrypTrack trackID="1" IsEncrypted="1" '
+    tail = ' saiSavedBox="senc">'
+    iv8 = head + 'IV_size="8" first_IV="0x0001020304050607"' + tail
+    iv16 = head + 'IV_size="16" first_IV="0x000102030405060708090a0b0c0d0e0f"' + tail
     cbcs = (
         '<CrypTrack trackID="1" IsEncrypted="1" constant_IV="0x000102030405060708090a0b0c0d0e0f" '
         'crypt_byte_block="1" skip_byte_block="0" saiSavedBox="senc">'
@@ -165,15 +176,20 @@ def gpac_protected(clear_mp4: Path, scheme: str, work: Path) -> Path | None:
     )
     track = {"cenc": iv8, "cbc1": iv16, "cens": cens, "cbcs": cbcs}[scheme]
     xml = work / f"gpac_{scheme}.xml"
-    xml.write_text(
-        f'<GPACDRM type="{scheme}">{track}<key KID="0x{KID1}" value="0x{KEY1}"/></CrypTrack></GPACDRM>'
-    )
+    key = f'<key KID="0x{KID1}" value="0x{KEY1}"/>'
+    xml.write_text(f'<GPACDRM type="{scheme}">{track}{key}</CrypTrack></GPACDRM>')
     out = work / f"{clear_mp4.stem}_gpac_{scheme}.mp4"
-    done = subprocess.run(["MP4Box", "-crypt", str(xml), str(clear_mp4), "-out", str(out)], capture_output=True, check=False)
+    done = subprocess.run(
+        ["MP4Box", "-crypt", str(xml), str(clear_mp4), "-out", str(out)],
+        capture_output=True,
+        check=False,
+    )
     return out if done.returncode == 0 and out.exists() else None
 
 
-def decrypt_leg(subject: str, kind: str, protected: Path, clear: bytes, work: Path, root: str | None) -> odk.Result:
+def decrypt_leg(
+    subject: str, kind: str, protected: Path, clear: bytes, work: Path, root: str | None
+) -> odk.Result:
     out = work / "dolby" / subject
     done = odk.streamdemuxer(protected, out, keys={KID1: KEY1}, root=root)
     files = [p for p in done.files if p.suffix in corpus.ES_SUFFIXES]
@@ -181,16 +197,27 @@ def decrypt_leg(subject: str, kind: str, protected: Path, clear: bytes, work: Pa
     if files:
         if corpus.same_stream(kind, files[0].read_bytes(), clear):
             return odk.Result(subject, odk.PASS)
-        return odk.Result(subject, odk.DISAGREE, "the tool wrote a stream that is not the clear one")
+        return odk.Result(
+            subject, odk.DISAGREE, "the tool wrote a stream that is not the clear one"
+        )
     if NEEDS_KEY in text:
-        return odk.Result(subject, odk.SKIP, "tool answered '" + NEEDS_KEY + "' although the matching key was given")
+        return odk.Result(
+            subject,
+            odk.SKIP,
+            "tool answered '" + NEEDS_KEY + "' although the matching key was given",
+        )
     if done.returncode < 0:
         return odk.Result(subject, odk.SKIP, f"the tool crashed (signal {-done.returncode})")
     return odk.Result(subject, odk.SKIP, f"no stream written (exit {done.returncode})")
 
 
 def run_checks(
-    cli: str, work: Path, quick: bool, require_decrypt: bool, root: str | None, keep_legs: bool = False
+    cli: str,
+    work: Path,
+    quick: bool,
+    require_decrypt: bool,
+    root: str | None,
+    keep_legs: bool = False,
 ) -> list[odk.Result]:
     results: list[odk.Result] = []
     streams, notes = corpus.make_streams(cli, work / "streams")
@@ -200,7 +227,10 @@ def run_checks(
         mp4 = work / "clear" / f"{stream.name}.mp4"
         mp4.parent.mkdir(parents=True, exist_ok=True)
         demuxed = work / "clear" / f"{stream.name}.demux{corpus.SUFFIX_OF[stream.name]}"
-        if corpus.run([cli, "mp4", stream.path, mp4]).returncode == 0 and corpus.run([cli, "demux", mp4, demuxed]).returncode == 0:
+        if (
+            corpus.run([cli, "mp4", stream.path, mp4]).returncode == 0
+            and corpus.run([cli, "demux", mp4, demuxed]).returncode == 0
+        ):
             clear[stream.name] = (mp4, demuxed.read_bytes())
     protected: list[tuple[str, str, Path, Case | None]] = []
     for case in cases(quick):
@@ -228,8 +258,16 @@ def run_checks(
             results.append(check_boxes(subject + " boxes", case, corpus.ENTRY_OF[codec], boxes))
         elif case is not None:
             found = find_protection(boxes)
-            ok = {"enca", "frma", "schm", "tenc"} <= set(found) and found["schm"].value("scheme_type") == case.scheme
-            results.append(odk.Result(subject + " boxes", odk.PASS if ok else odk.DISAGREE, "" if ok else "protection boxes not as GPAC was told"))
+            ok = {"enca", "frma", "schm", "tenc"} <= set(found) and found["schm"].value(
+                "scheme_type"
+            ) == case.scheme
+            results.append(
+                odk.Result(
+                    subject + " boxes",
+                    odk.PASS if ok else odk.DISAGREE,
+                    "" if ok else "protection boxes not as GPAC was told",
+                )
+            )
         results.append(decrypt_leg(subject + " decrypt", codec, path, clear[codec][1], work, root))
     legs = [r for r in results if r.subject.endswith(" decrypt")]
     if legs and all(r.status == odk.SKIP for r in legs):
@@ -237,17 +275,25 @@ def run_checks(
         summary = f"every decrypt leg was skipped ({len(legs)}); reasons: {sorted(reasons)}"
         if not keep_legs:
             results = [r for r in results if r not in legs]
-        results.append(odk.Result("decrypt legs", odk.ERROR if require_decrypt else odk.SKIP, summary))
+        results.append(
+            odk.Result("decrypt legs", odk.ERROR if require_decrypt else odk.SKIP, summary)
+        )
     return results
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)")
+    parser.add_argument(
+        "--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)"
+    )
     parser.add_argument("--quick", action="store_true", help="the core layout of each scheme only")
-    parser.add_argument("--require-decrypt", action="store_true", help="a tool that cannot decrypt is an error")
+    parser.add_argument(
+        "--require-decrypt", action="store_true", help="a tool that cannot decrypt is an error"
+    )
     parser.add_argument("--work", help="working directory (default: a temporary one)")
-    parser.add_argument("--verbose", action="store_true", help="list every leg, not only the failures and skips")
+    parser.add_argument(
+        "--verbose", action="store_true", help="list every leg, not only the failures and skips"
+    )
     args = parser.parse_args(argv)
     reason = odk.skip_reason("mp4drop", "streamdemuxer")
     if reason:

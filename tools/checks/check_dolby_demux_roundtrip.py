@@ -63,22 +63,34 @@ def check_forge_written(cli: str, work: Path, root: str | None) -> list[odk.Resu
             subject = f"{stream.name} in {leg}"
             if leg not in containers:
                 if not (stream.name == "ac4" and leg == "ts_atsc"):
-                    results.append(odk.Result(subject, odk.ERROR, "forge did not write this container"))
+                    results.append(
+                        odk.Result(subject, odk.ERROR, "forge did not write this container")
+                    )
                 continue
-            done = odk.streamdemuxer(containers[leg], work / "dolby" / f"{stream.name}_{leg}", root=root)
+            done = odk.streamdemuxer(
+                containers[leg], work / "dolby" / f"{stream.name}_{leg}", root=root
+            )
             files = dolby_elementary(done)
             if not files:
                 if stream.name == "ac3" and leg.startswith("ts_") and done.returncode == 0:
-                    results.append(odk.Result(subject, odk.SKIP, "streamdemuxer does not list AC-3"))
+                    results.append(
+                        odk.Result(subject, odk.SKIP, "streamdemuxer does not list AC-3")
+                    )
                 else:
-                    results.append(odk.Result(subject, odk.ERROR, tool_failure(done) + "; no stream written"))
+                    results.append(
+                        odk.Result(subject, odk.ERROR, tool_failure(done) + "; no stream written")
+                    )
                 continue
             got = files[0].read_bytes()
             if corpus.same_stream(stream.name, got, expected):
                 results.append(odk.Result(subject, odk.PASS))
             else:
                 results.append(
-                    odk.Result(subject, odk.DISAGREE, f"{len(got)} bytes from the tool, {len(expected)} from forge")
+                    odk.Result(
+                        subject,
+                        odk.DISAGREE,
+                        f"{len(got)} bytes from the tool, {len(expected)} from forge",
+                    )
                 )
     return results
 
@@ -89,23 +101,37 @@ def check_dolby_written(cli: str, samples: Path, work: Path, root: str | None) -
         done = odk.streamdemuxer(sample, work / "dolby_samples" / sample.stem, root=root)
         files = dolby_elementary(done)
         if not files:
-            results.append(odk.Result(sample.name, odk.SKIP, "the tool wrote no audio stream: " + tool_failure(done)))
+            results.append(
+                odk.Result(
+                    sample.name, odk.SKIP, "the tool wrote no audio stream: " + tool_failure(done)
+                )
+            )
             continue
         suffix = files[0].suffix
         mine = forge_demux(cli, sample, work / f"forge_{sample.stem}{suffix}")
         kind = "ac4" if suffix == ".ac4" else ("ac3" if suffix == ".ac3" else "eac3")
         if mine is None:
-            results.append(odk.Result(sample.name, odk.DISAGREE, "forge could not demux a file Dolby's tool demuxes"))
+            results.append(
+                odk.Result(
+                    sample.name, odk.DISAGREE, "forge could not demux a file Dolby's tool demuxes"
+                )
+            )
         elif corpus.same_stream(kind, mine, files[0].read_bytes()):
             results.append(odk.Result(sample.name, odk.PASS))
         else:
-            results.append(odk.Result(sample.name, odk.DISAGREE, "the two demultiplexers wrote different audio"))
+            results.append(
+                odk.Result(
+                    sample.name, odk.DISAGREE, "the two demultiplexers wrote different audio"
+                )
+            )
     return results
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)")
+    parser.add_argument(
+        "--cli", default=corpus.default_cli(), help="forge binary (default $ICLFORGE_CLI)"
+    )
     parser.add_argument("--samples", default=os.environ.get("ICLFORGE_DOLBY_ODK_SAMPLES"))
     parser.add_argument("--work", help="working directory (default: a temporary one)")
     args = parser.parse_args(argv)
