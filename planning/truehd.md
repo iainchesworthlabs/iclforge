@@ -181,7 +181,7 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 | Phase | What | State |
 |---|---|---|
 | 0 | this design | drafted 2026-10-29 |
-| 1 | bitstream layer | in progress: the whole syntax is settled from FFmpeg streams (register P1 to P27). A scratch Python model that decodes all four FFmpeg test streams exactly is at `/tmp/claude-0/-home-claude/4316ae20-e191-53b7-a454-66eafc52d7e3/scratchpad/exp/model.py` (outside the repository; reference only). C++ port of the bitstream layer next |
+| 1 | bitstream layer | core done 2026-10-29: structures, one syntax description (`src/core/syntax.hpp`), access unit framing, CRCs, Huffman; `iclforge-mlp-tests` passes. Extra data container and public `io/elementary.hpp` next. A scratch Python model that decodes all four FFmpeg test streams exactly is at `/tmp/claude-0/-home-claude/4316ae20-e191-53b7-a454-66eafc52d7e3/scratchpad/exp/model.py` (outside the repository, may be lost) |
 | 2 | decoder | not started |
 | 3 | encoder | not started |
 | 4 | Atmos | not started |
