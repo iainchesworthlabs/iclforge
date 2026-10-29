@@ -73,7 +73,7 @@ the bad place. Verifying a prefix would pass a stream whose tail nobody authenti
 |---|---|
 | Elementary stream (`.ac4`) | A file beside it, `<stream>.sig`, holding the serialised `ContentSignature`. `content-signature=<path>` names another file |
 | MP4 | A `uuid` box, a child of the AC-4 track's `trak`, whose user type is `b715f9db-6b41-403d-8bbe-429f3209ca2e` and whose payload is the serialised `ContentSignature` |
-| Fragmented MP4 | The same box, in the initialization segment. Reading back a folder of segments is not built; joining `init.mp4` and the segments end to end gives one file that verifies |
+| Fragmented MP4 | The same box, in the initialisation segment. Reading back a folder of segments is not built; joining `init.mp4` and the segments end to end gives one file that verifies |
 | Matroska, MPEG-TS | Nowhere. Matroska registers no AC-4 `CodecID`, so this project writes no AC-4 Matroska file, and MPEG-TS has no per-track box |
 
 The sidecar has a plain consequence. The signature stays with an elementary stream only while the two
