@@ -8,6 +8,7 @@
 #include <fstream>
 #include <ios>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -579,6 +580,233 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
         fmt::println("  true peak {:.1f} dBTP", *peak);
     }
     return kExitOk;
+}
+
+namespace {
+
+// TH spec §18's model of the transmission of a stream (RateReport): the encoder's own, so that a
+// stream it wrote within the rate is within it here.
+class RateModel {
+   public:
+    void add(std::size_t unit_bytes, const std::optional<th::MajorSync>& first_sync) {
+        if (!started_) {
+            if (!first_sync) {
+                return;
+            }
+            started_ = true;
+            rate_ = first_sync->sample_rate();
+            nominal_ = th::nominal_samples_per_access_unit(first_sync->ratebits());
+            // ERRATA.md entry 30: raw x rate / 16, the reading FFmpeg's streams fit.
+            report_.declared_bps = std::uint64_t{first_sync->peak_data_rate} * rate_ / 16U;
+            limit_ = static_cast<std::int64_t>(rate_) * 75 / 1000;
+        }
+        if (report_.declared_bps == 0 || nominal_ <= 0) {
+            return;
+        }
+        const std::int64_t slot = position_ - nominal_;
+        std::int64_t start = slot;
+        if (units_ > 0) {
+            start = std::max({slot, last_arrival_end_, last_start_ + nominal_});
+        }
+        const auto bits_at_rate = static_cast<std::uint64_t>(unit_bytes) * 8U * rate_;
+        const auto arrival = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
+                                                       report_.declared_bps);
+        const std::int64_t latency = start + arrival - slot;
+        if (latency > limit_) {
+            ++report_.violations;
+        }
+        report_.worst_latency_ms =
+            std::max(report_.worst_latency_ms,
+                     1000.0 * static_cast<double>(latency) / static_cast<double>(rate_));
+        report_.max_unit_rate_bps = std::max<std::uint64_t>(
+            report_.max_unit_rate_bps, bits_at_rate / static_cast<std::uint64_t>(nominal_));
+        last_start_ = start;
+        last_arrival_end_ = start + arrival;
+        position_ += nominal_;
+        ++units_;
+    }
+
+    [[nodiscard]] const RateReport& report() const noexcept { return report_; }
+
+   private:
+    RateReport report_{};
+    bool started_ = false;
+    std::uint32_t rate_ = 0;
+    int nominal_ = 0;
+    std::int64_t limit_ = 0;
+    std::int64_t position_ = 0;
+    std::int64_t last_start_ = 0;
+    std::int64_t last_arrival_end_ = 0;
+    std::uint64_t units_ = 0;
+};
+
+th::Presentation decoder_presentation(MeaningPresentation presentation) {
+    switch (presentation) {
+        case MeaningPresentation::k2ch:
+            return th::Presentation::k2ch;
+        case MeaningPresentation::k6ch:
+            return th::Presentation::k6ch;
+        case MeaningPresentation::k8ch:
+            break;
+    }
+    return th::Presentation::k8ch;
+}
+
+// One presentation's decoder and meter.
+struct Track {
+    explicit Track(MeaningPresentation which, th::Strictness strictness)
+        : decoder(th::DecoderConfig{.presentation = decoder_presentation(which),
+                                    .strictness = strictness}) {
+        result.presentation = which;
+    }
+    th::Decoder decoder;
+    std::optional<iclforge::base::LoudnessMeter> meter;
+    PresentationLoudness result;
+    std::vector<std::span<const float>> views;
+};
+
+}  // namespace
+
+std::optional<TruehdMeasurement> measure_truehd(std::span<const std::byte> stream,
+                                                std::string_view in_path,
+                                                std::span<const MeaningPresentation> presentations,
+                                                bool integrity, bool lenient) {
+    const th::Strictness strictness = lenient ? th::Strictness::kLenient : th::Strictness::kStrict;
+    std::vector<std::unique_ptr<Track>> tracks;
+    for (const MeaningPresentation presentation : presentations) {
+        tracks.push_back(std::make_unique<Track>(presentation, strictness));
+    }
+    std::optional<th::Decoder> every_substream;
+    if (integrity) {
+        every_substream.emplace(
+            th::DecoderConfig{.presentation = th::Presentation::kAll, .strictness = strictness});
+    }
+    TruehdMeasurement out;
+    RateModel rate;
+    th::ElementaryReader reader(stream);
+    std::vector<std::vector<float>> planes;
+    while (true) {
+        const std::size_t skipped_before = reader.skipped_bytes();
+        const auto unit = reader.next();
+        if (reader.skipped_bytes() != skipped_before) {
+            fmt::println(stderr, "{}: {} bytes before access unit {} do not read as one", in_path,
+                         reader.skipped_bytes() - skipped_before, out.units);
+            if (!lenient) {
+                return std::nullopt;
+            }
+            // The reader dropped a unit the decoder cannot miss: it waits for the next restart.
+            for (const auto& track : tracks) {
+                track->decoder.lost_data();
+            }
+            if (every_substream) {
+                every_substream->lost_data();
+            }
+        }
+        if (!unit) {
+            break;
+        }
+        std::optional<th::MajorSync> sync;
+        if (unit->size() >= 8 && th::starts_with_major_sync(unit->subspan(4))) {
+            if (const auto parsed = th::parse_major_sync(unit->subspan(4), false)) {
+                sync = *parsed;
+                if (!out.major_sync) {
+                    out.major_sync = *parsed;
+                }
+                out.substreams = parsed->num_substreams;
+            }
+        }
+        rate.add(unit->size(), sync);
+        bool errored = false;
+        for (const auto& track : tracks) {
+            const auto result = track->decoder.decode(*unit);
+            if (!result) {
+                errored = true;
+                fmt::println(stderr, "error: {}: access unit {}: {}", in_path, out.units,
+                             error_text(result.error()));
+                if (!lenient) {
+                    return std::nullopt;
+                }
+                continue;
+            }
+            if (!*result) {
+                continue;
+            }
+            const th::DecodedAccessUnit& decoded = **result;
+            const auto channels = static_cast<std::size_t>(decoded.channels);
+            const auto samples = static_cast<std::size_t>(decoded.samples);
+            PresentationLoudness& loudness = track->result;
+            if (!track->meter && !loudness.unnamed) {
+                std::vector<iclforge::base::Speaker> speakers;
+                for (const th::Channel channel : decoded.layout) {
+                    if (const auto speaker = speaker_of(channel)) {
+                        speakers.push_back(*speaker);
+                    }
+                    loudness.layout += loudness.layout.empty() ? "" : " ";
+                    loudness.layout += th::channel_name(channel);
+                }
+                loudness.channels = decoded.channels;
+                loudness.sample_rate = decoded.sample_rate;
+                if (speakers.size() != channels || decoded.layout.empty()) {
+                    loudness.unnamed = true;
+                } else {
+                    track->meter.emplace(decoded.sample_rate,
+                                         std::span<const iclforge::base::Speaker>{speakers});
+                }
+            }
+            loudness.samples += samples;
+            if (track->meter) {
+                planes.resize(channels);
+                for (std::size_t c = 0; c < channels; ++c) {
+                    planes[c].resize(samples);
+                    for (std::size_t s = 0; s < samples; ++s) {
+                        planes[c][s] = static_cast<float>(
+                            static_cast<double>(decoded.pcm[(s * channels) + c]) / kFullScale);
+                    }
+                }
+                track->views.clear();
+                for (const auto& plane : planes) {
+                    track->views.emplace_back(plane);
+                }
+                track->meter->push(track->views);
+            }
+        }
+        if (every_substream) {
+            const auto result = every_substream->decode(*unit);
+            if (!result) {
+                errored = true;
+                fmt::println(stderr, "error: {}: access unit {}: {}", in_path, out.units,
+                             error_text(result.error()));
+                if (!lenient) {
+                    return std::nullopt;
+                }
+            }
+        }
+        if (errored) {
+            ++out.decode_errors;
+        }
+        ++out.units;
+    }
+    if (out.units == 0) {
+        fmt::println(stderr, "error: {}: no access unit reads", in_path);
+        return std::nullopt;
+    }
+    out.skipped_bytes = reader.skipped_bytes();
+    out.rate = rate.report();
+    for (const auto& track : tracks) {
+        PresentationLoudness result = track->result;
+        if (track->meter) {
+            result.integrated_lkfs = track->meter->integrated_lkfs();
+            result.loudness_range_lu = track->meter->loudness_range();
+            result.true_peak_dbtp = track->meter->true_peak_dbtp();
+        }
+        out.presentations.push_back(std::move(result));
+    }
+    if (every_substream) {
+        out.counters = every_substream->counters();
+    } else if (!tracks.empty()) {
+        out.counters = tracks.back()->decoder.counters();
+    }
+    return out;
 }
 
 int refuse_truehd(std::string_view command, std::string_view in_path, std::string_view reason) {

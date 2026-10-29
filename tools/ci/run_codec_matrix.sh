@@ -1642,18 +1642,18 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
 done
 
 # Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
-# cut, cat and normalize once stopped with AC-3's sync error (exit 2); the other
+# cut and cat once stopped with AC-3's sync error (exit 2); the other
 # transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
 # dropped (a verification flag above all, which must never exit 0 without verifying). play and
 # monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
 # this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by cut, cat, normalize, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata refuses E-AC-3's options)"
+echo "[$count] truehd is refused by cut, cat, transcode, qc and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata and normalize refuse E-AC-3's options)"
 th_in=th_truehd_st48_s24.thd
 for refused in "cut $th_in th_refused.thd 0.05 0.1" \
     "cat th_refused.thd $th_in $th_in" \
     "metadata $th_in th_refused.thd dialnorm=27" \
-    "normalize $th_in th_refused.thd" \
+    "normalize $th_in th_refused.thd dialnorm=27" \
     "transcode $th_in th_refused.ac3 192" \
     "qc $th_in" "fmp4 $th_in th_refused_fmp4 24" \
     "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
@@ -1814,6 +1814,27 @@ sys.exit(0 if meaning["distinct_in_stream"] == 1 and meaning["drc_start_up_gain"
         echo "a second metadata pass with the same values changed meta_$stream" >&2
         exit 1
     }
+done
+
+# `normalize` measures each presentation of a finished stream and writes its dialogue norm, changing
+# nothing else: FFmpeg's strict decode of the result must equal its decode of the original, and the
+# probe must show a dialogue norm of 1 to 31 where the stream had 0. forge's own streams, which are
+# long enough for the 400 ms blocks of a loudness measurement (the fixtures are 0.25 s).
+for stream in te_st48_s24.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    run normalize "$stream" "norm_$stream"
+    count=$((count + 1))
+    echo "[$count] truehd normalize $stream: ffmpeg's strict decode of the result equals the original's"
+    truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig2.s32"
+    truehd_ffmpeg_pcm "norm_$stream" -f truehd >"norm_$stream.s32"
+    cmp -s "$stream.orig2.s32" "norm_$stream.s32" || {
+        echo "ffmpeg's strict decode of norm_$stream differs from its decode of $stream" >&2
+        exit 1
+    }
+    "$CLI" probe "norm_$stream" json=1 | python3 -c '
+import json, sys
+presentations = json.load(sys.stdin)["truehd"]["channel_meaning"]["presentations"]
+present = [p for p in ("2ch", "6ch", "8ch") if presentations[p]["in_stream"]]
+sys.exit(0 if present and all(1 <= presentations[p]["dialogue_norm"] <= 31 for p in present) else 1)'
 done
 
 # The streams forge wrote, in the containers forge writes: encode straight into each, read it back

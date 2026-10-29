@@ -4,6 +4,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -30,6 +31,7 @@
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "multi_track_files.hpp"
 #include "platform/process.hpp"
 
@@ -1449,7 +1451,7 @@ TEST_CASE("levels and loudness take truehd-presentation= and truehd-check=",
     }
 }
 
-TEST_CASE("cut, cat and normalize refuse a TrueHD stream by name, and say why",
+TEST_CASE("cut and cat refuse a TrueHD stream by name, and say why",
           "[forge-cli][truehd][refusals]") {
     // They read it as AC-3 and stopped with an AC-3 frame-sync error, exit 2, that said nothing of
     // the codec.
@@ -1465,7 +1467,6 @@ TEST_CASE("cut, cat and normalize refuse a TrueHD stream by name, and say why",
     const std::vector<Refusal> refusals{
         {"cut", in + cli_arg(out) + "0.05 0.1", "major sync"},
         {"cat", cli_arg(out) + in + in, "major sync"},
-        {"normalize", in + cli_arg(out), "dialogue norm"},
     };
     for (const Refusal& item : refusals) {
         DYNAMIC_SECTION(item.command) {
@@ -1758,6 +1759,231 @@ TEST_CASE("loudness measures a TrueHD stream as the meter measures its samples",
             REQUIRE(run_cli("loudness " + cli_arg(file), log) == 0);
             CHECK(after_first_line(read_text(log)) == after_first_line(report));
         }
+    }
+}
+
+namespace {
+
+// The BS.1770 integrated loudness of `samples` (interleaved, `channels` of them, 48 kHz, 24 bit)
+// with the given speakers, through the library's meter.
+double meter_lkfs(const std::vector<std::int32_t>& samples,
+                  std::span<const iclforge::base::Speaker> speakers, std::size_t channels) {
+    iclforge::base::LoudnessMeter meter(48000, speakers);
+    constexpr std::size_t kBlock = 480;
+    const std::size_t frames = samples.size() / channels;
+    for (std::size_t at = 0; at + kBlock <= frames; at += kBlock) {
+        std::vector<std::vector<float>> planes(channels, std::vector<float>(kBlock));
+        std::vector<std::span<const float>> views;
+        for (std::size_t c = 0; c < channels; ++c) {
+            for (std::size_t n = 0; n < kBlock; ++n) {
+                planes[c][n] = static_cast<float>(samples[((at + n) * channels) + c]) / 8388608.0F;
+            }
+            views.emplace_back(planes[c]);
+        }
+        meter.push(views);
+    }
+    const auto lkfs = meter.integrated_lkfs();
+    REQUIRE(lkfs.has_value());
+    return *lkfs;
+}
+
+// The major syncs' channel meanings of a stream, each read with its CRC checked.
+std::vector<iclforge::truehd::ChannelMeaning> channel_meanings(const fs::path& stream) {
+    const std::vector<std::byte> bytes = read_bytes(stream);
+    std::vector<iclforge::truehd::ChannelMeaning> out;
+    iclforge::truehd::ElementaryReader reader(bytes);
+    while (const auto unit = reader.next()) {
+        if (unit->size() >= 8 && iclforge::truehd::starts_with_major_sync(unit->subspan(4))) {
+            const auto sync = iclforge::truehd::parse_major_sync(unit->subspan(4), true);
+            REQUIRE(sync.has_value());
+            out.push_back(sync->channel_meaning);
+        }
+    }
+    return out;
+}
+
+// What ATSC A/85 section 8 makes of a loudness, as E-AC-3's normalize writes it: -LKFS rounded, 1
+// to 31.
+int dialnorm_of(double lkfs) {
+    return std::clamp(static_cast<int>(std::lround(-lkfs)), 1, 31);
+}
+
+}  // namespace
+
+TEST_CASE("normalize measures each presentation of a TrueHD stream and writes its dialogue norm",
+          "[forge-cli][truehd][normalize]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "normalize.log";
+    const fs::path out = tone.dir / "normalized.thd";
+    using iclforge::base::Speaker;
+    // The first tone channel (a 1 kHz sine at 0.5 of full scale) halved and repeated in all six
+    // channels: the 2 channel presentation (the first two, the stream is coded with the default
+    // downmix=none) and the 6 channel one (all of them, the surrounds weighted +1.5 dB) measure
+    // differently, so the two fields are told apart.
+    const std::vector<std::int32_t> tone_all = tone_samples();
+    std::vector<std::int32_t> samples;
+    std::vector<std::int32_t> stereo;
+    for (std::size_t n = 0; n < kToneFrames; ++n) {
+        const std::int32_t value = tone_all[n * 6] / 2;
+        for (std::size_t c = 0; c < 6; ++c) {
+            samples.push_back(value);
+        }
+        stereo.push_back(value);
+        stereo.push_back(value);
+    }
+    const fs::path wav = tone.dir / "normalize_levels.wav";
+    const fs::path thd = tone.dir / "normalize_levels.thd";
+    write_wav(wav, 48000, 6, 0x60F, samples);
+    REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(thd), log) == 0);
+    const std::array<Speaker, 6> bed{Speaker::kLeft,         Speaker::kRight,
+                                     Speaker::kCentre,       Speaker::kLfe,
+                                     Speaker::kLeftSurround, Speaker::kRightSurround};
+    const std::array<Speaker, 2> pair{Speaker::kLeft, Speaker::kRight};
+    const double lkfs_2ch = meter_lkfs(stereo, pair, 2);
+    const double lkfs_6ch = meter_lkfs(samples, bed, 6);
+    REQUIRE(dialnorm_of(lkfs_2ch) != dialnorm_of(lkfs_6ch));  // the two fields are told apart
+
+    fs::remove(out);
+    REQUIRE(run_cli("normalize " + cli_arg(thd) + cli_arg(out), log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("normalised ") != std::string::npos);
+    CHECK(text.find("audio untouched") != std::string::npos);
+    CHECK(text.find(fmt::format("2ch  measured {:+.2f} LKFS", lkfs_2ch)) != std::string::npos);
+    CHECK(text.find(fmt::format("6ch  measured {:+.2f} LKFS", lkfs_6ch)) != std::string::npos);
+    CHECK(text.find(fmt::format("2ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
+                                dialnorm_of(lkfs_2ch))) != std::string::npos);
+    CHECK(text.find(fmt::format("6ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
+                                dialnorm_of(lkfs_6ch))) != std::string::npos);
+    CHECK(text.find("no gain is applied") != std::string::npos);
+    CHECK(text.find("control-enabled bit is off") != std::string::npos);
+    CHECK(text.find("provisional, no oracle until the DEE set") != std::string::npos);
+
+    // Every major sync carries the two dialogue norms, with a good CRC, and nothing else is set.
+    const auto meanings = channel_meanings(out);
+    REQUIRE_FALSE(meanings.empty());
+    iclforge::truehd::ChannelMeaning expected;
+    expected.twoch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_2ch));
+    expected.sixch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_6ch));
+    for (const auto& meaning : meanings) {
+        CHECK(meaning == expected);  // no 8 channel presentation: its field is left alone
+    }
+    // The audio is the same, sample for sample.
+    const fs::path a = tone.dir / "normalize_a.wav";
+    const fs::path b = tone.dir / "normalize_b.wav";
+    REQUIRE(run_cli("decode " + cli_arg(thd) + cli_arg(a), log) == 0);
+    REQUIRE(run_cli("decode " + cli_arg(out) + cli_arg(b), log) == 0);
+    CHECK(read_bytes(a) == read_bytes(b));
+    // The probe gives them back, and the stream normalised again does not change.
+    REQUIRE(run_cli("probe " + cli_arg(out) + "json=1", log) == 0);
+    const auto presentations =
+        nlohmann::json::parse(read_text(log))["truehd"]["channel_meaning"]["presentations"];
+    CHECK(presentations["2ch"]["dialogue_norm"] == dialnorm_of(lkfs_2ch));
+    CHECK(presentations["6ch"]["dialogue_norm"] == dialnorm_of(lkfs_6ch));
+    const fs::path again = tone.dir / "normalized_again.thd";
+    REQUIRE(run_cli("normalize " + cli_arg(out) + cli_arg(again), log) == 0);
+    CHECK(read_bytes(again) == read_bytes(out));
+    CHECK(read_text(log).find("6ch  dialogue norm " + std::to_string(dialnorm_of(lkfs_6ch)) +
+                              " -> " + std::to_string(dialnorm_of(lkfs_6ch))) != std::string::npos);
+}
+
+TEST_CASE(
+    "normalize keeps the mix level and the rest, clamps to 1..31 and refuses what it cannot do",
+    "[forge-cli][truehd][normalize]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "normalize_more.log";
+
+    SECTION(
+        "only the dialogue norms change: the mix level, source format, controls and gains stay") {
+        const fs::path set = tone.dir / "normalize_set.thd";
+        const fs::path out = tone.dir / "normalize_set_out.thd";
+        REQUIRE(
+            run_cli("metadata " + cli_arg(tone.thd) + cli_arg(set) +
+                        "truehd-mix-level-6ch=17 truehd-source-format-6ch=5 truehd-control-6ch=on "
+                        "truehd-control-2ch=on truehd-drc-start-up-gain=21 "
+                        "truehd-heavy-drc-start-up-gain=-9 truehd-dialnorm-6ch=31",
+                    log) == 0);
+        REQUIRE(run_cli("normalize " + cli_arg(set) + cli_arg(out), log) == 0);
+        CHECK(read_text(log).find("control-enabled bit is off") == std::string::npos);
+        const auto before = channel_meanings(set);
+        const auto after = channel_meanings(out);
+        REQUIRE(after.size() == before.size());
+        for (std::size_t i = 0; i < after.size(); ++i) {
+            iclforge::truehd::ChannelMeaning expected = before[i];
+            expected.twoch_dialogue_norm = after[i].twoch_dialogue_norm;
+            expected.sixch_dialogue_norm = after[i].sixch_dialogue_norm;
+            CHECK(after[i] == expected);
+            CHECK(after[i].sixch_dialogue_norm != 31);
+            CHECK(after[i].sixch_mix_level == 17);
+            CHECK(after[i].sixch_control_enabled);
+        }
+    }
+    SECTION("a quiet stream is clamped to 31, and a silent one has nothing to normalise against") {
+        std::vector<std::int32_t> quiet;
+        for (const std::int32_t sample : tone_samples()) {
+            quiet.push_back(sample / 1024);  // 60 dB down
+        }
+        const fs::path wav = tone.dir / "normalize_quiet.wav";
+        const fs::path thd = tone.dir / "normalize_quiet.thd";
+        const fs::path out = tone.dir / "normalize_quiet_out.thd";
+        write_wav(wav, 48000, 6, 0x60F, quiet);
+        REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(thd), log) == 0);
+        REQUIRE(run_cli("normalize " + cli_arg(thd) + cli_arg(out), log) == 0);
+        for (const auto& meaning : channel_meanings(out)) {
+            CHECK(meaning.sixch_dialogue_norm == 31);
+            CHECK(meaning.twoch_dialogue_norm == 31);
+        }
+
+        const fs::path silent_wav = tone.dir / "normalize_silent.wav";
+        const fs::path silent = tone.dir / "normalize_silent.thd";
+        const fs::path silent_out = tone.dir / "normalize_silent_out.thd";
+        write_wav(silent_wav, 48000, 6, 0x60F, std::vector<std::int32_t>(6 * kToneFrames, 0));
+        REQUIRE(run_cli("truehd-encode " + cli_arg(silent_wav) + cli_arg(silent), log) == 0);
+        fs::remove(silent_out);
+        CHECK(run_cli("normalize " + cli_arg(silent) + cli_arg(silent_out), log) == 5);
+        CHECK(read_text(log).find("nothing to normalise against") != std::string::npos);
+        CHECK_FALSE(fs::exists(silent_out));
+    }
+    SECTION("a mono stream has only a 2 channel presentation, an MLP stream is refused") {
+        const fs::path out = tone.dir / "normalize_mono_out.thd";
+        const fs::path mono_wav = tone.dir / "normalize_mono.wav";
+        const fs::path mono = tone.dir / "normalize_mono.thd";
+        const std::vector<std::int32_t> all_channels = tone_samples();
+        std::vector<std::int32_t> first_channel;
+        for (std::size_t n = 0; n < kToneFrames; ++n) {
+            first_channel.push_back(all_channels[n * 6]);
+        }
+        write_wav(mono_wav, 48000, 1, 0x4, first_channel);
+        REQUIRE(run_cli("truehd-encode " + cli_arg(mono_wav) + cli_arg(mono), log) == 0);
+        REQUIRE(run_cli("normalize " + cli_arg(mono) + cli_arg(out), log) == 0);
+        CHECK(read_text(log).find("2ch  measured") != std::string::npos);
+        CHECK(read_text(log).find("6ch") == std::string::npos);
+        CHECK(channel_meanings(out).front().sixch_dialogue_norm == 0);
+        fs::remove(out);
+        CHECK(run_cli("normalize " + cli_arg(fixture("mlp_st48_s24.mlp")) + cli_arg(out), log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("MLP") != std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
+    SECTION("options it does not apply are refused by name; E-AC-3 still normalises") {
+        const fs::path out = tone.dir / "normalize_refused.thd";
+        CHECK(run_cli("normalize " + cli_arg(tone.thd) + cli_arg(out) + "dialnorm=27", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("normalize does not apply dialnorm=27") != std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+        CHECK(run_cli("normalize " + cli_arg(tone.thd) + cli_arg(out) + "truehd-dialnorm-6ch=3",
+                      log) == kExitUsage);
+        CHECK_FALSE(fs::exists(out));
+        const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
+        REQUIRE(run_cli("normalize " + cli_arg(ec3) + cli_arg(tone.dir / "normalized.ec3"), log) ==
+                0);
+        CHECK(read_text(log).find("normalised ") != std::string::npos);
+    }
+    SECTION("a damaged stream fails the measurement, strict, and writes nothing") {
+        const fs::path bad = damaged_copy("truehd_st48_s24.thd", tone.dir);
+        const fs::path out = tone.dir / "normalize_damaged_out.thd";
+        fs::remove(out);
+        CHECK(run_cli("normalize " + cli_arg(bad) + cli_arg(out), log) == kExitInput);
+        CHECK_FALSE(fs::exists(out));
     }
 }
 

@@ -45,7 +45,7 @@ struct LoadedStream {
 // Reads the whole file at `path` and scans it, reporting either failure
 // (unreadable, or not a scannable AC-3/E-AC-3 elementary stream) to stderr
 // itself. The error is the exit code the command returns: kExitInput for those two, and kExitUsage
-// for a TrueHD or MLP stream, which `command` (cut, cat, metadata or normalize) refuses by name
+// for a TrueHD or MLP stream, which `command` (cut or cat) refuses by name
 // instead of reading as AC-3 and failing with its sync error.
 [[nodiscard]] std::expected<LoadedStream, int> load_stream(std::string_view path,
                                                            std::string_view command);

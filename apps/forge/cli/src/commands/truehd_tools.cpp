@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -21,7 +22,9 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
@@ -159,6 +162,153 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
                        "  the major syncs carried {} different channel meanings; the changes are "
                        "those of the first",
                        summary->distinct_before);
+    }
+    status_println(status,
+                   "  provisional, no oracle until the DEE set (libs/truehd/ERRATA.md, questions "
+                   "51 to 55)");
+    return kExitOk;
+}
+
+namespace {
+
+constexpr std::array<MeaningPresentation, 3> kAllPresentations{
+    MeaningPresentation::k2ch, MeaningPresentation::k6ch, MeaningPresentation::k8ch};
+
+// The presentations a stream with `substreams` substreams has, in the order 2, 6, 8 channels.
+std::vector<MeaningPresentation> presentations_of(int substreams) {
+    std::vector<MeaningPresentation> present;
+    for (const MeaningPresentation presentation : kAllPresentations) {
+        if (stream_has_presentation(presentation, substreams)) {
+            present.push_back(presentation);
+        }
+    }
+    return present;
+}
+
+// The field of a ChannelMeaningEdit that holds a presentation's dialogue norm.
+std::optional<int>& dialogue_norm_of(th::ChannelMeaningEdit& edit,
+                                     MeaningPresentation presentation) {
+    switch (presentation) {
+        case MeaningPresentation::k2ch:
+            return edit.twoch_dialogue_norm;
+        case MeaningPresentation::k6ch:
+            return edit.sixch_dialogue_norm;
+        case MeaningPresentation::k8ch:
+            break;
+    }
+    return edit.eightch_dialogue_norm;
+}
+
+bool control_of(const th::ChannelMeaning& meaning, MeaningPresentation presentation) {
+    switch (presentation) {
+        case MeaningPresentation::k2ch:
+            return meaning.twoch_control_enabled;
+        case MeaningPresentation::k6ch:
+            return meaning.sixch_control_enabled;
+        case MeaningPresentation::k8ch:
+            break;
+    }
+    return meaning.eightch_control_enabled;
+}
+
+int dialogue_norm_field(const th::ChannelMeaning& meaning, MeaningPresentation presentation) {
+    switch (presentation) {
+        case MeaningPresentation::k2ch:
+            return meaning.twoch_dialogue_norm;
+        case MeaningPresentation::k6ch:
+            return meaning.sixch_dialogue_norm;
+        case MeaningPresentation::k8ch:
+            break;
+    }
+    return meaning.eightch_dialogue_norm;
+}
+
+}  // namespace
+
+int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
+                         std::string_view out_path, const Options& meta) {
+    // E-AC-3's normalize takes no option, and neither does this one.
+    if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+        return refused;
+    }
+    const auto info = th::probe_stream(bytes);
+    if (!info) {
+        fmt::println(stderr, "error: {}: {}{}{}", in_path, th::to_string(info.error().kind),
+                     info.error().detail.empty() ? "" : ": ", info.error().detail);
+        return kExitInput;
+    }
+    if (info->major_sync.kind != th::StreamKind::kTrueHd) {
+        fmt::println(stderr,
+                     "error: {} is MLP: the bytes after substream_info that would hold the "
+                     "dialogue norm are not described (TH spec §5.2)",
+                     in_path);
+        return kExitUsage;
+    }
+    // One measurement of each presentation the stream has: the decode of its substreams, metered
+    // as `loudness` meters it. The audio is not changed, so the decodes are thrown away.
+    const std::vector<MeaningPresentation> present = presentations_of(info->num_substreams);
+    const auto measured = measure_truehd(bytes, in_path, present, /*integrity=*/false,
+                                         /*lenient=*/false);
+    if (!measured) {
+        return kExitInput;
+    }
+    th::ChannelMeaningEdit edit;
+    for (const PresentationLoudness& loudness : measured->presentations) {
+        const char* name = presentation_name(loudness.presentation);
+        if (loudness.unnamed) {
+            fmt::println(stderr,
+                         "error: {}: the stream does not name the speakers of its {} presentation, "
+                         "so no BS.1770 weights can be chosen",
+                         in_path, name);
+            return kExitInput;
+        }
+        if (!loudness.integrated_lkfs) {
+            fmt::println(stderr,
+                         "error: no audio above the -70 LKFS absolute gate in the {} presentation; "
+                         "nothing to normalise against",
+                         name);
+            return kExitRuntime;
+        }
+        // ATSC A/85 section 8, as E-AC-3's normalize takes it: dialnorm states where dialogue
+        // sits relative to full scale, and the anchor for a programme with no separate dialogue
+        // measurement is its own integrated loudness. The same mapping, clamped to 1..31, which
+        // the 5 bit fields hold and the 6 bit one never needs (ERRATA.md question 51).
+        dialogue_norm_of(edit, loudness.presentation) =
+            iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs);
+    }
+    const auto summary = th::edit_channel_meaning(bytes, edit);
+    if (!summary) {
+        return report_edit_error(summary.error(), in_path);
+    }
+    if (!write_stream(out_path, bytes, meta.keep_partial)) {
+        return kExitOutput;
+    }
+    const auto status = status_stream(out_path);
+    status_println(status, "normalised {} ({} access units, {} major syncs, audio untouched) -> {}",
+                   in_path, summary->units, summary->major_syncs, out_path);
+    for (const PresentationLoudness& loudness : measured->presentations) {
+        const char* name = presentation_name(loudness.presentation);
+        status_println(status, "  {}  measured {:+.2f} LKFS (BS.1770-5 Annex 3 weights, {})", name,
+                       *loudness.integrated_lkfs, loudness.layout);
+        status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8)", name,
+                       dialogue_norm_field(summary->before, loudness.presentation),
+                       dialogue_norm_field(summary->after, loudness.presentation));
+    }
+    // What the changes in the major sync are, field by field, is above; what is left alone is said
+    // once.
+    status_println(status,
+                   "  no gain is applied (the stream is lossless): only the dialogue norm fields "
+                   "change; the mix level, source format, control bits and DRC start-up gains are "
+                   "as they were");
+    for (const PresentationLoudness& loudness : measured->presentations) {
+        if (!control_of(summary->after, loudness.presentation)) {
+            status_println(
+                status,
+                "  note: the {} control-enabled bit is off, so a decoder may not apply "
+                "its dialogue norm (set it with metadata truehd-control-{}=on; ERRATA.md "
+                "question 54)",
+                presentation_name(loudness.presentation), presentation_name(loudness.presentation));
+        }
     }
     status_println(status,
                    "  provisional, no oracle until the DEE set (libs/truehd/ERRATA.md, questions "

@@ -89,7 +89,7 @@ std::string_view truehd_reason(std::string_view command) {
         return "a join needs the second stream to open with a major sync and to match the "
                "first's shape, and this build does not join them yet";
     }
-    return "it writes the dialogue norm, which this build does not write for TrueHD or MLP yet";
+    return {};
 }
 
 }  // namespace
@@ -1720,9 +1720,19 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
 }
 
 int run_normalize(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path, "normalize");
+    // A TrueHD or MLP stream is measured presentation by presentation and its dialogue norms
+    // written into the major sync (truehd_tools.cpp).
+    auto bytes = read_all(in_path);
+    if (bytes.empty()) {
+        fmt::println(stderr, "error: cannot read {}", in_path);
+        return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_normalize_truehd(std::move(bytes), in_path, out_path, meta);
+    }
+    auto loaded = scan_loaded(std::move(bytes), in_path);
     if (!loaded.has_value()) {
-        return loaded.error();
+        return kExitInput;
     }
     const auto before = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     if (!before.has_value()) {

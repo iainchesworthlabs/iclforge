@@ -37,7 +37,7 @@ Usage:
   forge probe         <in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks] (inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 TOC/presentations/substream groups, or a TrueHD/MLP stream's substreams, rate and parity and CRC checks (detail= is not read for it), bare or inside a container, and what the container says of its track; table or documented JSON)
   forge transcode     <in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout] (decode and re-encode, carrying dialnorm, compr and the mix metadata across - the DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the programme, decoded without DRC and re-encoded with its drc_eac3_profile, dialnorm and downmix values; an AC-3 or E-AC-3 source's dialnorm and downmix values go to AC-4, and drc= names its DRC profile. The output codec comes from the output name's suffix, or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4)
   forge metadata      <in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>       (rewrite dialnorm/compr/bsmod/dsurmod on an existing stream and re-stamp its CRCs; the audio is copied through untouched, not re-encoded. A TrueHD stream's channel meaning (TH spec section 14: dialogue norm, mix level, source format and control bit per presentation, and the two DRC start-up gains) is set in every major sync, with its CRC, from truehd-dialnorm-6ch= and the options like it; provisional, no oracle until the DEE set)
-  forge normalize     <in.ac3|in.ec3> <out.ac3|out.ec3>       (measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio untouched)
+  forge normalize     <in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>       (measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio untouched. A TrueHD stream: each presentation's loudness (BS.1770-5 Annex 3) sets that presentation's dialogue norm in every major sync; no gain is applied, since the stream is lossless; provisional, no oracle until the DEE set)
   forge cut           <in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds] (extract on access-unit boundaries; nothing is re-encoded)
   forge cat           <out.ac3|out.ec3> <in1> <in2> [in3...]  (join streams end to end (output FIRST, since the input list is variadic); refuses inputs whose codec, rate, layout or substream shape differ)
   forge levels        <in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> (per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded (truehd-presentation=, truehd-check=))
@@ -1008,9 +1008,9 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 profile writes that Blu-ray one for TrueHD and MLP, as it writes DVB's for AC-3, E-AC-3 and AC-4. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `metadata` sets the channel meaning of a TrueHD stream (below). `cut`, `cat`, `normalize`, `transcode`, `qc`, `fmp4`,
+reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream (below). `cut`, `cat`, `transcode`, `qc`, `fmp4`,
 `monitor` and `play` do not read TrueHD and say so by name (exit status 1); `cut` and `cat` would start and join only at an access unit
-that carries a major sync, and `normalize` would write a field that sits in the major sync under a CRC, which is not built. In a file with
+that carries a major sync. In a file with
 several audio tracks the commands that read TrueHD take the first, and `transcode`, `qc`, `fmp4`, `monitor` and `play` take the
 first of another codec, so a Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD
 alone is refused. The layouts
@@ -1061,6 +1061,18 @@ output may be the input or `-`. The status lines say how many major syncs were r
 after. It refuses by name, with exit status 1 and no output, an option of E-AC-3's `metadata` (`dialnorm=`, `compr=`, `bsmod=`, `insert`
 and the rest), a call that names no field, a value outside its field's width, an MLP stream (its bytes at that place are not described),
 and, for an AC-3 or E-AC-3 stream, any `truehd-` option. The same provisional marks apply as for `truehd-encode`.
+
+`normalize <in.thd> <out.thd>` is the measurement-driven case: it decodes each presentation the stream has (2 channels for one substream, 6
+for two, 8 for three), measures its integrated loudness with the BS.1770-5 Annex 3 weights `loudness` uses (from the speakers the major sync
+names), maps it to a dialogue norm as E-AC-3's `normalize` maps it (ATSC A/85 section 8: the loudness negated and rounded, from 1 to 31, the
+range the 5 bit fields hold, so a quiet programme is 31 and no field is written as 0), and writes it into that presentation's field of every
+major sync, as `metadata` does. **No gain is applied to the audio: the stream is lossless, so only the field changes**, and the mix level,
+source format, control-enabled bits and DRC start-up gains are left as they were (E-AC-3's `normalize` leaves its mixing metadata alone
+too). The status lines give each presentation's loudness and its dialogue norm before and after, and say for each whose control-enabled bit
+is off that a decoder may not apply the field (`metadata ... truehd-control-6ch=on` sets it; whether any decoder reads the bit that way is
+open). A stream with nothing above the -70 LKFS gate in some presentation is exit status 5 and writes nothing, a damaged stream is exit
+status 2 (the measurement is strict), and `normalize` takes no option but `quiet` and `verbose`, refusing any other by name. Provisional,
+with no oracle until the DEE set (`libs/truehd/ERRATA.md`, question 51).
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
 `truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the
@@ -1529,7 +1541,7 @@ Everything above takes PCM. These five take an already-encoded AC-3/E-AC-3 eleme
 |---|---|
 | `transcode` | Decode and re-encode. The only one here that re-encodes, because DD+ and DD are different codecs and nothing else bridges them — the route to an optical link or an AC-3-only HDMI sink, which had no route at all before. It also goes between AC-4 and AC-3 or E-AC-3, either way — see [below](#transcode-and-ac-4) |
 | `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs (a TrueHD stream takes the `truehd-` options of its [channel meaning](#truehd-and-mlp) instead). The audio bytes are copied through untouched. A field the stream does not transmit is refused, naming `insert`; with `insert` an E-AC-3 stream gets the field added to every independent substream, and each syncframe that gains one grows by a word or two (the rate rises by about 16 bits a frame at most). An AC-3 stream cannot take it, nor can a frame with block start information or auxiliary data |
-| `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else |
+| `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else (for a TrueHD stream, [see below](#truehd-and-mlp)) |
 | `cut` | Extract on access-unit boundaries |
 | `cat` | Join streams end to end |
 

@@ -479,10 +479,12 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_metadata(x.str(1), x.str(2), x.meta); }},
-    {"normalize", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3>",
+    {"normalize", 3, "<in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>",
      "measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio "
-     "untouched",
-     topic::kStreamTools,
+     "untouched. A TrueHD stream: each presentation's integrated loudness (BS.1770-5 Annex 3) "
+     "sets that presentation's dialogue norm in every major sync; no gain is applied, since the "
+     "stream is lossless, only the field changes; provisional, no oracle until the DEE set",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_normalize(x.str(1), x.str(2), x.meta); }},
     {"cut", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds]",

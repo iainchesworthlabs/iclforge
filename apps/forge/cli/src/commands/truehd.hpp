@@ -1,14 +1,19 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
-#include <optional>
 #include <initializer_list>
+#include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "../support.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
+#include "truehd_meaning.hpp"
 
 namespace iclforge::apps {
 class JsonSink;
@@ -95,12 +100,68 @@ int run_levels_truehd(std::span<const std::byte> stream, std::string_view in_pat
 int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_path,
                         const Options& meta);
 
+// --- measuring a stream (truehd_containers.cpp) ---
+// What `normalize` and `qc` read of a TrueHD stream in one pass: the loudness of each presentation
+// they ask for (BS.1770-5 Annex 3 weights from the speakers the major sync names, as `loudness`
+// weights them), the checks of every substream, and the data rate against TH spec §18's model.
+
+struct PresentationLoudness {
+    MeaningPresentation presentation = MeaningPresentation::k2ch;
+    int channels = 0;
+    std::uint32_t sample_rate = 0;
+    std::string layout;    // the channel names in decode order
+    bool unnamed = false;  // the major sync does not name the speakers for this count: no weights
+    std::uint64_t samples = 0;  // per channel
+    std::optional<double> integrated_lkfs = std::nullopt;
+    std::optional<double> loudness_range_lu = std::nullopt;
+    std::optional<double> true_peak_dbtp = std::nullopt;
+};
+
+// TH spec §18: the stream must be sendable within the declared peak data rate and 75 ms. The
+// declared rate is the field read as raw x sample rate / 16 (ERRATA.md entry 30, provisional), and
+// the model is the encoder's: a unit starts to arrive when its slot opens, when the previous unit
+// has arrived and one unit duration after the previous started, and takes bytes x 8 / rate to
+// arrive.
+struct RateReport {
+    std::uint64_t declared_bps = 0;
+    std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
+    double worst_latency_ms = 0.0;        // from a unit's slot opening to its last byte
+    double latency_limit_ms = 75.0;
+    std::uint64_t violations = 0;  // units whose latency is over the limit
+};
+
+struct TruehdMeasurement {
+    std::vector<PresentationLoudness> presentations;        // as asked, in the order asked
+    std::optional<iclforge::truehd::MajorSync> major_sync;  // the first
+    int substreams = 0;
+    std::uint64_t units = 0;          // access units the reader handed out
+    std::size_t skipped_bytes = 0;    // bytes that did not read as an access unit
+    std::uint64_t decode_errors = 0;  // units a decoder could not read (lenient runs only)
+    iclforge::truehd::DecoderCounters counters{};  // of the decoder that read every substream
+    RateReport rate{};
+};
+
+// Decodes `stream` once for each presentation in `presentations`, metering it, and (with
+// `integrity`) once more through every substream for the counters of the checks. With `lenient`
+// a failed check is counted and the run goes on; otherwise the first failure is reported on
+// stderr and nothing is returned. Also nothing when no access unit reads.
+[[nodiscard]] std::optional<TruehdMeasurement> measure_truehd(
+    std::span<const std::byte> stream, std::string_view in_path,
+    std::span<const MeaningPresentation> presentations, bool integrity, bool lenient);
+
 // `metadata` of a TrueHD stream (truehd_tools.cpp): the channel meaning of TH spec section 14.1 set in
 // every major sync of the file's content `bytes`, re-stamping each one's CRC, and written to `out_path`.
 // E-AC-3's own options are refused by name. Provisional, no oracle until the DEE set (libs/truehd/
 // ERRATA.md, questions 51 to 55).
 int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
                         std::string_view out_path, const Options& meta);
+
+// `normalize` of a TrueHD stream (truehd_tools.cpp): the integrated loudness of each presentation
+// the stream has (BS.1770-5 Annex 3 weights, as `loudness` weights them) mapped to a dialogue norm
+// the way E-AC-3's normalize maps it (ATSC A/85 section 8: round(-LKFS), 1 to 31), and written into
+// that presentation's field in every major sync. No gain is applied, since the stream is lossless.
+int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
+                         std::string_view out_path, const Options& meta);
 
 // `truehd-encode`: the PCM in a WAV, coded losslessly as TrueHD (iclforge::truehd::Encoder) into a
 // bare .thd, or wrapped as .mkv, .mp4 or a Blu-ray .ts. The WAV's channel mask names its speakers

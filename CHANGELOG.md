@@ -10,6 +10,14 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge normalize` sets a TrueHD stream's dialogue norms from the loudness of each presentation, without changing the audio.** It
+  decodes each presentation the stream has (2, 6 and 8 channels for one, two and three substreams), measures its integrated loudness with the
+  BS.1770-5 Annex 3 weights `forge loudness` uses, maps it to a dialogue norm the way E-AC-3's `normalize` does (ATSC A/85 §8: the loudness
+  negated and rounded, clamped to 1 to 31, which is the range the 5 bit fields hold) and writes it into that presentation's field of every
+  major sync. **No gain is applied: the stream is lossless, so only the field changes**; the mix level, source format, control-enabled bits
+  and DRC start-up gains are left as they were, and a presentation whose control-enabled bit is off is said to be one a decoder may not apply.
+  Nothing above the gate is exit 5, a damaged stream exit 2. The audit's T4. **Provisional, with no oracle until the DEE set**
+  (`libs/truehd/ERRATA.md`, questions 51 and 54).
 - **Added: `forge metadata` sets a TrueHD stream's channel meaning (TH spec §14.1) in a finished stream, without re-encoding it.** The
   `truehd-dialnorm-6ch=` family of options `truehd-encode` takes sets the named fields in every major sync, which repeat at each restart, and
   re-stamps each one's CRC-16 (polynomial 0x002D); no other check covers the major sync, so every other byte is copied and the audio is the

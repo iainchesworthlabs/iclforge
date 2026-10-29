@@ -560,7 +560,10 @@ void print_truehd_topic() {
     fmt::println("       width. Left out, a field is 0 (and a control bit off), as in FFmpeg's");
     fmt::println("       streams. metadata takes the same options and sets them in a finished");
     fmt::println("       stream: it rewrites every major sync and its CRC and copies everything");
-    fmt::println("       else, so the audio is the same sample for sample. PROVISIONAL, no oracle");
+    fmt::println("       else, so the audio is the same sample for sample. normalize measures");
+    fmt::println("       each presentation's loudness (BS.1770-5) and writes its dialogue norm,");
+    fmt::println("       round(-LKFS) from 1 to 31 as E-AC-3's does; no gain is applied, since");
+    fmt::println("       the stream is lossless, only the field changes. PROVISIONAL, no oracle");
     fmt::println("       until the DEE set: the units, which presentation applies when and what a");
     fmt::println("       control bit gates are open (libs/truehd/ERRATA.md, questions 51 to 55).");
     fmt::println("       A TrueHD or MLP run does not apply the other options (the output stage,");
@@ -568,7 +571,7 @@ void print_truehd_topic() {
     fmt::println("       by name with a usage error instead of accepting and dropping them; a");
     fmt::println("       verification flag such as verify-content never succeeds without verifying.");
     fmt::println("       fast-mdct, fast-imdct and mode= choose a transform, which TrueHD has not,");
-    fmt::println("       and are warned about. cut, cat, normalize, qc, transcode, fmp4,");
+    fmt::println("       and are warned about. cut, cat, qc, transcode, fmp4,");
     fmt::println("       play and monitor do not read TrueHD or MLP and say so.");
 }
 
