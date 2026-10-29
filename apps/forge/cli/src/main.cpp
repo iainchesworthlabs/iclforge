@@ -213,13 +213,13 @@ int run_words(const std::vector<std::string>& words) {
     return run_main(static_cast<int>(pointers.size()), pointers.data());
 }
 
-// 47 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// 49 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 47> kCommands{{
+constexpr std::array<Command, 49> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -400,6 +400,26 @@ constexpr std::array<Command, 47> kCommands{{
      topic::kStdio,
      Needs::kNothing,
      [](const Args& x) { return forge_cli::run_truehd_encode(x.str(1), x.str(2), x.meta); }},
+    {"truehd-atmos-encode", 4, "<bed.wav> <objects.wav> <out.thd>",
+     "a 7.1 bed and 1 to 8 objects (one a channel), 16 or 24-bit at 48 kHz, to a TrueHD Atmos "
+     "stream: the bed and objects in a 16-channel substream with their object audio metadata, "
+     "and 2, 6 and 8-channel presentations with the objects rendered into the bed. The objects "
+     "circle the room on fixed paths (a new position every fourth access unit); the library "
+     "takes any metadata. truehd-restart=, truehd-peak=, truehd-verify= as for truehd-encode",
+     topic::kStdio,
+     Needs::kNothing,
+     [](const Args& x) {
+         return forge_cli::run_truehd_atmos_encode(x.str(1), x.str(2), x.str(3), x.meta);
+     }},
+    {"truehd-atmos-decode", 5, "<in.thd> <bed.wav> <objects.wav> <metadata.json>",
+     "a TrueHD Atmos stream's 16-channel presentation: the 7.1 bed, the objects (one a channel) "
+     "and each object audio metadata frame (the sample it starts at, each object's position and "
+     "gain) as JSON",
+     topic::kStdio,
+     Needs::kNothing,
+     [](const Args& x) {
+         return forge_cli::run_truehd_atmos_decode(x.str(1), x.str(2), x.str(3), x.str(4), x.meta);
+     }},
     {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "

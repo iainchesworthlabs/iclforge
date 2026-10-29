@@ -251,8 +251,11 @@ def leg_4(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:
     bed = work / "atmos-bed.wav"
     objects = work / "atmos-objects.wav"
     stream = work / "atmos.thd"
-    write_wav(bed, synthesise(8, rate, 24, frames, 77), rate, 24)
-    write_wav(objects, synthesise(8, rate, 24, frames, 78), rate, 24)
+    # 16-bit sources: sixteen channels of the 24-bit synthetic material, noise in a third of
+    # them, would need more than the 18 Mbit/s Blu-ray ceiling, which the encoder rightly
+    # refuses (kRateExceeded); programme material does not come near it.
+    write_wav(bed, synthesise(8, rate, 16, frames, 77), rate, 16)
+    write_wav(objects, synthesise(8, rate, 16, frames, 78), rate, 16)
     r = run([cli, "truehd-atmos-encode", str(bed), str(objects), str(stream)])
     if r.returncode != 0:
         gate.check(False, f"atmos: forge encode ({r.stderr.decode().strip()})")
@@ -279,15 +282,19 @@ def leg_4(gate: Gate, cli: str, ffmpeg: str, work: Path) -> None:
     gate.check(status == 0, f"atmos: FFmpeg decodes the stream without error"
                             f"{' (' + messages + ')' if messages else ''}")
     probe = run(["ffprobe", "-v", "error", "-f", "truehd", "-show_entries",
-                 "stream=channels,channel_layout", "-of", "compact", str(stream)])
+                 "stream=channels,channel_layout", "-of", "compact=p=0", str(stream)])
     exposed = probe.stdout.decode().strip()
-    gate.finding(f"atmos: FFmpeg exposes {exposed or 'nothing it can describe'}, "
-                 f"{len(got) // 4 // max(1, frames)} samples a frame decoded")
-    bed_frames = wav_s32(ffmpeg, bed)
-    if status == 0 and len(got) == len(bed_frames):
-        same = got == bed_frames
-        gate.finding("atmos: FFmpeg's decode is the bed's 7.1 fold of the scene"
-                     if not same else "atmos: FFmpeg's decode equals the bed exactly")
+    gate.finding(f"atmos: FFmpeg exposes {exposed or 'nothing it can describe'}: the 8-channel "
+                 "presentation, not the 16-channel one (its decoder supports at most 8 channels)")
+    # What FFmpeg plays must be the 8-channel presentation forge's decoder gives: the bed with the
+    # objects rendered in. That is exact, since the presentation is lossless too.
+    ours = work / "atmos-p8.forge.wav"
+    r = run([cli, "decode", str(stream), str(ours), "truehd-presentation=8"])
+    gate.check(status == 0 and r.returncode == 0 and got == wav_s32(ffmpeg, ours),
+               "atmos: FFmpeg's decode equals forge's 8-channel presentation "
+               f"({first_difference(got, wav_s32(ffmpeg, ours))})")
+    gate.check(got != wav_s32(ffmpeg, bed),
+               "atmos: the 8-channel presentation carries the objects (it is not the bare bed)")
 
 
 def main() -> int:

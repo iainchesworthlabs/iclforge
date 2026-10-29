@@ -25,6 +25,17 @@ int run_truehd_decode(std::span<const std::byte> stream, std::string_view out_wa
                       const Options& meta);
 int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path,
                      const Options& meta);
+// Atmos (iclforge/mlp/encoder/atmos.hpp): a 7.1 bed WAV and an objects WAV (1 to 8 channels, one
+// object each) to a 16-channel TrueHD stream with object audio metadata. The objects move on
+// fixed paths, object o circling the room at (1 + o / 2) turns a second, every fourth access unit
+// a new position; the library takes any metadata, this command is for exercising it.
+int run_truehd_atmos_encode(std::string_view bed_wav, std::string_view objects_wav,
+                            std::string_view out_path, const Options& meta);
+// The bed, the objects and the metadata (as JSON) of an Atmos TrueHD stream.
+int run_truehd_atmos_decode(std::string_view in_path, std::string_view bed_wav,
+                            std::string_view objects_wav, std::string_view metadata_json,
+                            const Options& meta);
+
 // A transcode with TrueHD on either side: through integer PCM when both sides are TrueHD, and
 // through a WAV the other codec's own command reads or writes otherwise.
 int run_truehd_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,

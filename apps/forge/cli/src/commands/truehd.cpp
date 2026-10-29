@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@
 #include "decode.hpp"
 #include "encode.hpp"
 #include "iclforge/mlp/decoder/decoder.hpp"
+#include "iclforge/mlp/encoder/atmos.hpp"
 #include "iclforge/mlp/encoder/encoder.hpp"
 #include "iclforge/mlp/io/elementary.hpp"
 
@@ -447,6 +449,153 @@ int run_truehd_probe(std::span<const std::byte> stream, std::string_view in_path
     if (summary->stopped_at) {
         fmt::println("  framing error      {}", mlp::describe(*summary->stopped_at));
     }
+    return kExitOk;
+}
+
+int run_truehd_atmos_encode(std::string_view bed_wav, std::string_view objects_wav,
+                            std::string_view out_path, const Options& meta) {
+    std::string error;
+    auto bed = read_pcm(bed_wav, error);
+    if (!bed) {
+        fmt::println(stderr, "error: {}: {}", bed_wav, error);
+        return kExitInput;
+    }
+    auto objects = read_pcm(objects_wav, error);
+    if (!objects) {
+        fmt::println(stderr, "error: {}: {}", objects_wav, error);
+        return kExitInput;
+    }
+    if (bed->channels != 8 || objects->channels < 1 || objects->channels > 8 ||
+        bed->sample_rate != 48000U || objects->sample_rate != 48000U ||
+        bed->samples.size() / 8 !=
+            objects->samples.size() / static_cast<std::size_t>(objects->channels)) {
+        fmt::println(stderr,
+                     "error: an Atmos encode takes a 7.1 bed and 1 to 8 objects, both at 48 kHz "
+                     "(truehd-spec.md 15.5) and of the same length");
+        return kExitUsage;
+    }
+    reorder(bed->samples, 8, true);
+    mlp::AtmosConfig config;
+    config.objects = objects->channels;
+    if (meta.truehd.restart_interval) {
+        config.restart_interval = *meta.truehd.restart_interval;
+    }
+    if (meta.truehd.peak_kbps) {
+        config.peak_data_rate = std::uint64_t{*meta.truehd.peak_kbps} * 1000U;
+    }
+    if (meta.truehd.verify) {
+        config.verify = *meta.truehd.verify;
+    }
+    auto encoder = mlp::AtmosEncoder::create(config);
+    if (!encoder) {
+        fmt::println(stderr, "error: {}", mlp::describe(encoder.error()));
+        return kExitUsage;
+    }
+    const std::size_t frames = bed->samples.size() / 8;
+    const auto n = static_cast<std::size_t>(objects->channels);
+    constexpr std::size_t kStep = 160;  // four access units
+    std::vector<std::byte> stream;
+    for (std::size_t at = 0; at < frames; at += kStep) {
+        const std::size_t take = std::min(kStep, frames - at);
+        std::vector<iclforge::objects::oba::DynamicObject> state(n);
+        const double t = static_cast<double>(at) / 48000.0;
+        for (std::size_t o = 0; o < n; ++o) {
+            const double angle =
+                2.0 * 3.14159265358979323846 * t * (1.0 + 0.5 * static_cast<double>(o));
+            state[o].position.x = 0.5 + 0.4 * std::cos(angle);
+            state[o].position.y = 0.5 + 0.4 * std::sin(angle);
+            state[o].position.z = o % 2 == 0 ? 0.0 : 0.5;
+            state[o].gain_db = -3.0;
+        }
+        auto bytes = encoder->encode(std::span(bed->samples).subspan(at * 8, take * 8),
+                                     std::span(objects->samples).subspan(at * n, take * n), state);
+        if (!bytes) {
+            fmt::println(stderr, "error: Atmos encode failed: {}", mlp::describe(bytes.error()));
+            return kExitRuntime;
+        }
+        stream.insert(stream.end(), bytes->begin(), bytes->end());
+    }
+    auto tail = encoder->flush();
+    if (!tail) {
+        fmt::println(stderr, "error: Atmos encode failed: {}", mlp::describe(tail.error()));
+        return kExitRuntime;
+    }
+    stream.insert(stream.end(), tail->begin(), tail->end());
+    if (!write_bytes(out_path, stream)) {
+        fmt::println(stderr, "error: cannot write {}", out_path);
+        return kExitOutput;
+    }
+    const auto& stats = encoder->stats();
+    fmt::println(stderr,
+                 "{}: TrueHD Atmos, 7.1 bed and {} objects, {} access units, {} bytes, "
+                 "mean {} kbit/s",
+                 out_path, n, stats.access_units, stats.bytes, stats.mean_bits_per_second / 1000U);
+    return kExitOk;
+}
+
+int run_truehd_atmos_decode(std::string_view in_path, std::string_view bed_wav,
+                            std::string_view objects_wav, std::string_view metadata_json,
+                            const Options& meta) {
+    (void)meta;
+    const auto bytes = read_bytes(in_path);
+    if (!bytes) {
+        fmt::println(stderr, "error: cannot read {}", in_path);
+        return kExitInput;
+    }
+    auto atmos = mlp::decode_atmos(*bytes);
+    if (!atmos) {
+        fmt::println(stderr, "error: {}: {}", in_path, mlp::describe(atmos.error()));
+        return kExitInput;
+    }
+    Pcm bed;
+    bed.channels = 8;
+    bed.sample_rate = atmos->sample_rate;
+    bed.channel_mask = wav_mask(8);
+    bed.samples = std::move(atmos->bed);
+    reorder(bed.samples, 8, false);
+    Pcm objects;
+    objects.channels = atmos->objects;
+    objects.sample_rate = atmos->sample_rate;
+    objects.samples = std::move(atmos->object_pcm);
+    const auto bits_of = [](const Pcm& p) {
+        for (const std::int32_t s : p.samples) {
+            if ((s & 0xFF) != 0) {
+                return 24;
+            }
+        }
+        return 16;
+    };
+    if (!write_pcm(bed_wav, bed, bits_of(bed)) ||
+        !write_pcm(objects_wav, objects, bits_of(objects))) {
+        fmt::println(stderr, "error: cannot write {} or {}", bed_wav, objects_wav);
+        return kExitOutput;
+    }
+    std::string json =
+        fmt::format("{{\"sample_rate\":{},\"bed\":\"7.1\",\"objects\":{},\"frames\":[",
+                    atmos->sample_rate, atmos->objects);
+    for (std::size_t f = 0; f < atmos->metadata.size(); ++f) {
+        const auto& frame = atmos->metadata[f];
+        json +=
+            fmt::format("{}{{\"sample\":{},\"objects\":[", f > 0 ? "," : "", frame.first_sample);
+        for (std::size_t o = 0; o < frame.metadata.objects.size(); ++o) {
+            const auto& d = frame.metadata.objects[o];
+            json +=
+                fmt::format("{}{{\"x\":{:.4f},\"y\":{:.4f},\"z\":{:.4f},\"gain_db\":{:.2f}}}",
+                            o > 0 ? "," : "", d.position.x, d.position.y, d.position.z, d.gain_db);
+        }
+        json += "]}";
+    }
+    json += "]}\n";
+    std::vector<std::byte> text(json.size());
+    for (std::size_t i = 0; i < json.size(); ++i) {
+        text[i] = static_cast<std::byte>(json[i]);
+    }
+    if (!write_bytes(metadata_json, text)) {
+        fmt::println(stderr, "error: cannot write {}", metadata_json);
+        return kExitOutput;
+    }
+    fmt::println(stderr, "{}: 7.1 bed, {} objects, {} metadata frames", in_path, objects.channels,
+                 atmos->metadata.size());
     return kExitOk;
 }
 
