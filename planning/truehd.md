@@ -147,6 +147,8 @@ Each entry: what the specification says, the reading taken, and the evidence. En
 | P15 | 9.4, 9.5 | IIR state update `(residual - predicted) << state_shift` and the order of A and B in inverse prediction | open | |
 | P16 | 16.1 | Extra data length field: "12 bits" with "4 bits part of AU header parity" | open | |
 | P18 | brief | FFmpeg 6.1.1's `truehd` encoder takes at most 5.1 (mono to 5.1(side)); asked for 7.1 it silently writes 5.0 | FFmpeg golden masters are 2 and 6 channel only; 8 channel interoperability rests on our encoder and FFmpeg's decoder | `ffmpeg -h encoder=truehd`; a 7.1 WAV came back as 5.0 |
+| P19 | 9.2 | `new_states` is shown for filter B only, yet 9.2 also says filter A "SHALL NOT have new_states set" | The bit is read after the coefficients of both filters; it must be 0 for filter A | FFmpeg silent stream: the bit after an order-1 FIR's coefficient is 0, and only that reading lines up the next channel's parameters |
+| P20 | 8.2 | Block 1 of an FFmpeg access unit has `block_size` 8 and block 2 has 32 | Access units may hold blocks of different sizes summing to the access unit's samples | FFmpeg silent stream |
 | P17 | 22, ROADMAP | Signing: pace-ccjf1 ECDSA in the specification, truncated HMAC-SHA-256 in ROADMAP.md and `docs/concepts/object-signing.md` | carriage only, no scheme | [decision 1](#decisions-needing-owner-review) |
 
 ## Decisions needing owner review
