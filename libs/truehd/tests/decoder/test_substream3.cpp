@@ -306,6 +306,23 @@ TEST_CASE("the decoder counts what follows the last block of each segment",
         CHECK(every.tails[0].zero == 0);
         CHECK(every.tails[0].bits_min >= 32);
     }
+    SECTION("terminatorA as 0x348D3, ending every segment") {
+        // TH spec §16.5.1 gives two values and a decoder accepts either (§3.5).
+        const DecoderCounters counters = count_stream(handbuilt("hb_marker_shifted.thd"), &units);
+        CHECK(counters.tails[0].segments == units);
+        CHECK(counters.tails[0].end_marker == units);
+        CHECK(counters.tails[0].other == 0);
+    }
+    SECTION("terminatorB ending the segment of substream 3") {
+        const DecoderCounters counters =
+            count_stream(handbuilt("hb_sixteen_channels_b_end.thd"), &units);
+        CHECK(counters.tails[3].segments == units);
+        // A segment whose last block ends on a 16-bit boundary has no padding to tell the two
+        // places apart, and counts as "at once".
+        CHECK(counters.tails[3].terminator_b_at_end > units / 2);
+        CHECK(counters.tails[3].terminator_b_at_end + counters.tails[3].terminator_b == units);
+        CHECK(counters.tails[3].other == 0);
+    }
     SECTION("terminatorB after substream 3") {
         const DecoderCounters counters = count_stream(handbuilt("hb_sixteen_channels.thd"), &units);
         CHECK(counters.tails[3].segments == units);

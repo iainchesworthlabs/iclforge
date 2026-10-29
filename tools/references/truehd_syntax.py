@@ -24,6 +24,7 @@ FIXTURES = REPO / "testdata" / "truehd"
 SYNC_WORD = b"\xf8\x72\x6f"
 RESTART_SYNCS = (0x31EA, 0x31EB, 0x31EC)
 END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
+TERMINATOR_A = (0xD234E, 0x348D3)  # TH spec 16.5.1: both are accepted
 NOISE_CHANNELS = 2
 MATRIX_SHIFT = 14
 
@@ -495,11 +496,17 @@ def decode_segment(sub, entry, segment, rows):
         first += sub.block_size
         if bits.read(1):
             break
+    # What may follow the last block (TH spec 3.5, 16.5): terminatorB after substream 3, right
+    # after the block or ending the segment; terminatorA and the 12 bit count of padding samples
+    # ending the segment (ERRATA 45).
     padding = 0
+    end = len(payload) * 8
     if sub.index == 3 and bits.left() >= 16 and bits.bits(bits.pos, 16) == 0x1234:
-        bits.pos += 16  # terminatorB (TH spec 16.5): no stream of FFmpeg's has it
-    elif bits.left() >= 32 and bits.bits(len(payload) * 8 - 32, 20) == END_MARKER:
-        padding = bits.bits(len(payload) * 8 - 12, 12)
+        bits.pos += 16
+    elif sub.index == 3 and bits.left() >= 16 and bits.bits(end - 16, 16) == 0x1234:
+        bits.pos = end
+    elif bits.left() >= 32 and bits.bits(end - 32, 20) in TERMINATOR_A:
+        padding = bits.bits(end - 12, 12)
     return out, padding
 
 

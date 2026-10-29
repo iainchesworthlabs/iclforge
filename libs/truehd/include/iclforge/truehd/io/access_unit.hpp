@@ -41,9 +41,12 @@ struct SubstreamEntry {
 // are reported, and the bytes are carried as they are.
 struct ExtraData {
     std::uint8_t header_check_nibble = 0;
-    std::uint16_t length = 0;  // extra_data_length, 12 bits, "in 16-bit words" (the specification
-                               // does not say of what)
-    bool check_ok = false;     // header_check_nibble against the length (TH spec §16.2)
+    std::uint16_t length = 0;  // extra_data_length, 12 bits: the 16-bit words after the header
+                               // word, so the region is length + 1 words (TH spec §16.2)
+    bool check_ok = false;     // the four nibbles of the header word XOR to 0xF (TH spec §16.2), or
+                               // the word is the padding-only form
+    bool padding_only = false;  // header_check_nibble and length both zero: the rest of the access
+                                // unit is zero words and no check applies (TH spec §16.2)
     std::uint8_t evo_reserved = 0;
     std::uint16_t evo_frame_byte_length = 0;
     bool framing_ok = false;  // the payload and the parity byte fit in `bytes`

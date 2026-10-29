@@ -113,7 +113,7 @@ std::uint8_t substream_crc(std::span<const std::byte> payload) noexcept {
 
 std::uint8_t extra_data_check_nibble(std::uint32_t extra_data_length) noexcept {
     return static_cast<std::uint8_t>(
-        ((extra_data_length >> 8U) ^ (extra_data_length >> 4U) ^ extra_data_length) & 0xFU);
+        ((extra_data_length >> 8U) ^ (extra_data_length >> 4U) ^ extra_data_length ^ 0xFU) & 0xFU);
 }
 
 }  // namespace iclforge::truehd

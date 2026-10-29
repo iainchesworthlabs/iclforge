@@ -1,9 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <initializer_list>
+#include <string>
 #include <cstddef>
 #include <vector>
 
+#include "iclforge/base/bitwriter.hpp"
+#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "support/stream_builder.hpp"
@@ -35,6 +39,63 @@ TEST_CASE("a TrueHD major sync written reads back with a good CRC", "[truehd][io
     (*bytes)[10] ^= std::byte{0x01};
     CHECK(parse_major_sync(*bytes).error().kind == ErrorKind::kBadMajorSyncCrc);
     CHECK(parse_major_sync(*bytes, false).has_value());
+}
+
+TEST_CASE("the extension of the channel meaning has a body of length + 1 words (TH spec 14.2)",
+          "[truehd][io][no-external-oracle]") {
+    // The 16-channel fields: dialogue norm, mix level, channel count, dyn_object_only 0, content
+    // description 6 (ISF and dynamic objects), the ISF index and the object count: 29 bits after
+    // the 4-bit length. TH spec §14.2 (v3.9) says the body is length + 1 words and not where the
+    // nibble sits against the first, so a major sync is built both ways and read both ways; the
+    // CRC confirms the size.
+    MajorSync base = stereo_major_sync();
+    base.extended_substream_info = 2;
+    base.channel_meaning.extra_present = true;
+    base.num_substreams = 4;
+    auto head = write_major_sync(base);  // written without the extension; its last two bytes are the CRC
+    REQUIRE(head.has_value());
+    // extra_present is the last bit of the channel meaning, the last bit before the CRC.
+    for (const bool nibble_in_body : {true, false}) {
+        for (const unsigned length : {2U, 5U, 15U}) {
+            std::vector<std::byte> bytes(head->begin(), head->end() - 2);
+            iclforge::BitWriter extension;
+            extension.put(length, 4);
+            extension.put(21, 5);   // sixteench_dialogue_norm
+            extension.put(33, 6);   // sixteench_mix_level
+            extension.put(16, 5);   // sixteench_channel_count
+            extension.put(0, 1);    // dyn_object_only
+            extension.put(6, 4);    // content_description: ISF and dynamic objects
+            extension.put(3, 3);    // sixteench_isf
+            extension.put(9, 5);    // sixteench_dynamic_object_count
+            // length + 1 words of body; with the nibble in front of them one more word holds it.
+            const std::size_t words = length + 1U + (nibble_in_body ? 0U : 1U);
+            extension.put(0, static_cast<int>(words * 16U - extension.bit_count()));
+            const std::vector<std::byte> body = extension.take();
+            bytes.insert(bytes.end(), body.begin(), body.end());
+            const std::uint16_t crc = major_sync_crc(bytes);
+            bytes.push_back(static_cast<std::byte>(crc >> 8U));
+            bytes.push_back(static_cast<std::byte>(crc & 0xFFU));
+            CAPTURE(nibble_in_body, length, bytes.size());
+
+            auto read = parse_major_sync(bytes);
+            if (!read) {
+                UNSCOPED_INFO(std::string(read.error().detail));
+            }
+            REQUIRE(read.has_value());
+            CHECK(read->size_bytes == bytes.size());
+            REQUIRE(read->extra.has_value());
+            CHECK(read->extra->length == length);
+            CHECK(read->extra->body_words() == static_cast<int>(length) + 1);
+            CHECK(read->extra->size_from_length);
+            CHECK(read->extra->nibble_in_body == nibble_in_body);
+            CHECK(read->extra->sixteench_dialogue_norm == 21);
+            CHECK(read->extra->sixteench_mix_level == 33);
+            CHECK(read->extra->sixteench_channel_count == 16);
+            CHECK(read->extra->content_description == 6);
+            CHECK(read->extra->isf == 3);
+            CHECK(read->extra->dynamic_object_count == 9);
+        }
+    }
 }
 
 TEST_CASE("an MLP major sync keeps the bytes the specification does not describe", "[truehd][io]") {
@@ -143,9 +204,10 @@ TEST_CASE("bytes after the last segment are extra data, carried and checked", "[
     const std::vector<std::byte> extra{std::byte{0x00 | 0x00}, std::byte{0x02}, std::byte{0x00},
                                        std::byte{0x02},        std::byte{0xAB}, std::byte{0xCD},
                                        std::byte{0x00},        std::byte{0x00}};
-    // length 2 -> nibble = 0 ^ 0 ^ 2 = 2
+    // length 2 -> nibble = 0 ^ 0 ^ 2 ^ 0xF = 0xD: the header word's four nibbles XOR to 0xF
+    // (TH spec §16.2)
     std::vector<std::byte> framed = extra;
-    framed[0] = std::byte{0x20};
+    framed[0] = std::byte{0xD0};
     unsigned accumulator = 0 ^ 2 ^ 0xA9;
     for (std::size_t i = 4; i + 1 < framed.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(framed[i]);
@@ -175,4 +237,64 @@ TEST_CASE("bytes after the last segment are extra data, carried and checked", "[
     CHECK(data.evolution_payload.size() == 2);
     CHECK(data.parity_ok);
     CHECK(data.bytes.size() == framed.size());
+    CHECK_FALSE(data.padding_only);
+}
+
+TEST_CASE("an extra data header word is checked to XOR to 0xF and a zero word is padding",
+          "[truehd][io]") {
+    const auto unit_with = [](std::initializer_list<unsigned> bytes) {
+        std::vector<std::byte> unit = stereo_unit(false);
+        for (const unsigned b : bytes) {
+            unit.push_back(static_cast<std::byte>(b));
+        }
+        const unsigned words = static_cast<unsigned>(unit.size() / 2);
+        unit[0] = static_cast<std::byte>((words >> 8) & 0xF);
+        unit[1] = static_cast<std::byte>(words & 0xFF);
+        unsigned fold = 0;
+        for (std::size_t i = 0; i < 6; ++i) {
+            fold ^= std::to_integer<unsigned>(unit[i]);
+        }
+        unit[0] |= static_cast<std::byte>((0xF ^ (((fold >> 4) ^ fold) & 0xF)) << 4);
+        return unit;
+    };
+    // The nibble of the old formula, the XOR of the length's nibbles alone, is wrong now.
+    {
+        const std::vector<std::byte> unit = unit_with({0x20, 0x02, 0x00, 0x00, 0x00, 0x00});
+        auto parsed = parse_access_unit(unit, 1);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->extra_data.has_value());
+        CHECK_FALSE(parsed->extra_data->check_ok);
+        CHECK_FALSE(parsed->extra_data->padding_only);
+    }
+    {
+        const std::vector<std::byte> unit = unit_with({0xD0, 0x02, 0x00, 0x00, 0x00, 0x00});
+        auto parsed = parse_access_unit(unit, 1);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->extra_data.has_value());
+        CHECK(parsed->extra_data->check_ok);
+        CHECK_FALSE(parsed->extra_data->padding_only);
+    }
+    // A zero header word is the padding-only form: exempt, and said so.
+    {
+        const std::vector<std::byte> unit = unit_with({0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+        auto parsed = parse_access_unit(unit, 1);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->extra_data.has_value());
+        CHECK(parsed->extra_data->padding_only);
+        CHECK(parsed->extra_data->check_ok);
+        CHECK(parsed->extra_data->length == 0);
+    }
+    // A zero nibble with a length, and a zero length with the nibble 0xF, are not padding.
+    {
+        const std::vector<std::byte> unit = unit_with({0x00, 0x02, 0x00, 0x00, 0x00, 0x00});
+        auto parsed = parse_access_unit(unit, 1);
+        REQUIRE(parsed->extra_data.has_value());
+        CHECK_FALSE(parsed->extra_data->padding_only);
+        CHECK_FALSE(parsed->extra_data->check_ok);
+        const std::vector<std::byte> full = unit_with({0xF0, 0x00, 0x00, 0x00, 0x00, 0x00});
+        auto other = parse_access_unit(full, 1);
+        REQUIRE(other->extra_data.has_value());
+        CHECK_FALSE(other->extra_data->padding_only);
+        CHECK(other->extra_data->check_ok);
+    }
 }

@@ -271,6 +271,7 @@ void StructureSurvey::write_json(iclforge::apps::JsonSink& json) const {
             json.member("zero_bits_only", tail.zero);
             json.member("terminator_a_at_once", tail.terminator_a);
             json.member("terminator_b_at_once", tail.terminator_b);
+            json.member("terminator_b_at_the_end", tail.terminator_b_at_end);
             json.member("end_marker_at_the_end", tail.end_marker);
             json.member("other", tail.other);
             json.member("bits_after_last_block_min", tail.bits_min);
@@ -347,10 +348,10 @@ void StructureSurvey::print_text() const {
         }
         fmt::println(
             "{:<16}substream {} after the last block, {} segment(s): zero bits only {}, "
-            "terminatorA at once {}, terminatorB at once {}, end marker at the end {}, "
-            "other {}; {} to {} bit(s) left",
-            "", i, tail.segments, tail.zero, tail.terminator_a, tail.terminator_b, tail.end_marker,
-            tail.other, tail.bits_min, tail.bits_max);
+            "terminatorA at once {}, terminatorB at once {} and at the end {}, end marker at "
+            "the end {}, other {}; {} to {} bit(s) left",
+            "", i, tail.segments, tail.zero, tail.terminator_a, tail.terminator_b,
+            tail.terminator_b_at_end, tail.end_marker, tail.other, tail.bits_min, tail.bits_max);
     }
 }
 

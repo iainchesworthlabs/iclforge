@@ -40,7 +40,9 @@ namespace iclforge::truehd {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::uint8_t substream_crc(
     std::span<const std::byte> payload) noexcept;
 
-// TH spec §16.4: the check an extra-data field ends with.
+// TH spec §16.2: the header_check_nibble of the extra data's header word, which makes the four
+// nibbles of that word (this one and the three of `extra_data_length`) XOR to 0xF. A word of zero
+// (nibble and length both zero) is the padding-only form and is exempt: see ExtraData::padding_only.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::uint8_t extra_data_check_nibble(
     std::uint32_t extra_data_length) noexcept;
 

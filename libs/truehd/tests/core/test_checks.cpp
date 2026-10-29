@@ -40,10 +40,16 @@ TEST_CASE("the substream CRC folds in the last payload byte", "[truehd][checks]"
     CHECK(a != c);
 }
 
-TEST_CASE("the extra data check nibble is the XOR of the length's nibbles", "[truehd][checks]") {
-    CHECK(extra_data_check_nibble(0x000) == 0x0);
-    CHECK(extra_data_check_nibble(0x123) == (0x1 ^ 0x2 ^ 0x3));
-    CHECK(extra_data_check_nibble(0xFFF) == 0xF);
+TEST_CASE("the four nibbles of the extra data's header word XOR to 0xF", "[truehd][checks]") {
+    // TH spec §16.2: check_nibble = nibble_2 ^ nibble_1 ^ nibble_0 ^ 0xF.
+    CHECK(extra_data_check_nibble(0x000) == 0xF);
+    CHECK(extra_data_check_nibble(0x123) == 0xF);  // 1 ^ 2 ^ 3 is 0
+    CHECK(extra_data_check_nibble(0x002) == 0xD);
+    CHECK(extra_data_check_nibble(0xFFF) == 0x0);
+    for (std::uint32_t length = 0; length < 0x1000; ++length) {
+        const std::uint32_t word = (std::uint32_t{extra_data_check_nibble(length)} << 12U) | length;
+        CHECK(((word >> 12U) ^ (word >> 8U) ^ (word >> 4U) ^ word) % 16U == 0xFU);
+    }
 }
 
 TEST_CASE("the major sync CRC XORs its last two bytes into the register", "[truehd][checks]") {

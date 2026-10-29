@@ -35,7 +35,7 @@ def units_of(data):
 
 
 def check_nibble(length):
-    return ((length >> 8) ^ (length >> 4) ^ length) & 0xF
+    return ((length >> 8) ^ (length >> 4) ^ length ^ 0xF) & 0xF
 
 
 def rewrite(data, delta, wrong_nibble=False):

@@ -394,6 +394,28 @@
       "pcm_sha256": "bb84cb950e2b48e7e883fbb196e07f84f56a3395b7d1ff65c6db4cbcd5d2c497"
     },
     {
+      "name": "hb_marker_shifted",
+      "file": "hb_marker_shifted.thd",
+      "description": "terminatorA as 0x348D3 and its count ending the segment of every unit, 11 padding samples",
+      "features": [
+        "end_marker",
+        "terminator_a_0x348d3"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "FFmpeg recognises the end-of-stream marker as 0xD234E only; with 0x348D3 it reads the end of each segment as data and fails"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 20,
+      "pcm_samples": 789,
+      "stream_sha256": "5140ea38bfcc91776e26dcbe2c52fac3122b7380370a755d6102b4f7411defcd",
+      "pcm_sha256": "69ef96d51c6318cf2f93ea55d4e386814c7fada41c99f66a235af9e42fd6052e"
+    },
+    {
       "name": "hb_extra_data",
       "file": "hb_extra_data.thd",
       "description": "extra data with an opaque payload in every unit",
@@ -410,7 +432,7 @@
       "channels": 2,
       "access_units": 20,
       "pcm_samples": 800,
-      "stream_sha256": "4c9d9d305fff41a2704ca912166279733a53f48397cbe1ce83c7faf94db1b9d2",
+      "stream_sha256": "820c6586947296c0ec2eb92b8cff0486da05a7e64c000cc7ac50a445f0c3de64",
       "pcm_sha256": "ee66d6c23db2b05d3f267baa5c454c09c60d89e27c1e0423f52487bea5df8838",
       "extra_data_first_hex": "0001020304"
     },
@@ -476,6 +498,50 @@
       "access_units": 32,
       "pcm_samples": 1280,
       "stream_sha256": "c88716c5a282af63896af978b4038efd7aac7604d5dd5d681a8d7a863f59c0f6",
+      "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
+    },
+    {
+      "name": "hb_sixteen_channels_b_end_all",
+      "file": "hb_sixteen_channels_b_end.thd",
+      "description": "four substreams, terminatorB ending the segment of substream 3 instead of following its last block",
+      "features": [
+        "substream_3",
+        "terminator_b_at_end"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "codec": "truehd",
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 16,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "7f28bc320d9abd91318f3375d014b9a206c78b17309a48ca51f88a8271c8ab7f",
+      "pcm_sha256": "a4332898a5fa61ce7df96d0f2e0b9ddabb33ad91dea19b4cba410203dd159a16"
+    },
+    {
+      "name": "hb_sixteen_channels_b_end_best",
+      "file": "hb_sixteen_channels_b_end.thd",
+      "description": "four substreams, terminatorB ending the segment of substream 3 instead of following its last block",
+      "features": [
+        "substream_3",
+        "terminator_b_at_end"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "7f28bc320d9abd91318f3375d014b9a206c78b17309a48ca51f88a8271c8ab7f",
       "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
     },
     {

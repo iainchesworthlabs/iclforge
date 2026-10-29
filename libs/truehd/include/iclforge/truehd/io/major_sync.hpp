@@ -21,7 +21,15 @@ namespace iclforge::truehd {
 // TH spec §14.2: what a sixteen-channel (Atmos) stream adds to the channel meaning. Read as the
 // specification lays it out; no stream here carries one, so the layout has no oracle (ERRATA.md).
 struct ExtraChannelMeaning {
-    std::uint8_t length = 0;  // extra_channel_meaning_length, 4 bits; its unit is not defined
+    // extra_channel_meaning_length, 4 bits: the extension's body is length + 1 16-bit words
+    // (TH spec §14.2, v3.9). Where the nibble sits against the first word is not said.
+    std::uint8_t length = 0;
+    // The size of the major sync that the CRC confirmed is one the length gives: 26 bytes, the body
+    // (length + 1 words) and the CRC, with the nibble inside the first word (`nibble_in_body`) or
+    // in front of the body, padded to a word. False for a size found by the CRC search alone.
+    bool size_from_length = false;
+    bool nibble_in_body = false;
+    [[nodiscard]] constexpr int body_words() const noexcept { return length + 1; }
     std::uint8_t sixteench_dialogue_norm = 0;
     std::uint8_t sixteench_mix_level = 0;
     std::uint8_t sixteench_channel_count = 0;

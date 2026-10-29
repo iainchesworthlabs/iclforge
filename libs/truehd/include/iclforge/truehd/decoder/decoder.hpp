@@ -99,6 +99,7 @@ struct SegmentTailCounters {
     std::uint64_t zero = 0;          // only zero bits follow the last block
     std::uint64_t terminator_a = 0;  // terminatorA (0xD234E or 0x348D3) follows it at once
     std::uint64_t terminator_b = 0;  // 0x1234 follows it at once (substream 3)
+    std::uint64_t terminator_b_at_end = 0;  // the segment ends with 0x1234 (substream 3)
     std::uint64_t end_marker = 0;    // the segment ends with terminatorA and a 12-bit count
     std::uint64_t other = 0;         // anything else
     std::uint64_t bits_min = 0;

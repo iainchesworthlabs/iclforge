@@ -37,16 +37,24 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    v3.6 (2026-10-29) adds a second description of the same bytes: §15.4 gives the evolution frame as a bit-level container (the EMDF
    container of ETSI TS 102 366 with renamed fields), and §16.3 still says Thrift. v3.6 does not relate the two. The comparison is in
    "Atmos, spec v3.6" below; the container question is now question 22, and this question's digest scope and signing granularity stay open.
-2. **The 16-channel extension of the channel meaning (§14.2).** `extra_channel_meaning_length` has no unit and the
-   section gives no size for a major sync that carries it. The library finds the size by the CRC (it tries 30, 32,
-   ... bytes) and reads the fields as written, with "extended_substream" taken to mean `extended_substream_info != 0`.
-   No stream has it (**no oracle**). Is the length in bits, bytes or words, and is the CRC placed after padding to
-   a 16-bit word? A disc's stream settles it: `forge probe DISC detail=structure` prints the length field and the size the CRC confirmed (section H).
-3. **Terminators (§3.5, §16.5).** FFmpeg's encoder writes none between segments; its last access unit carries an
-   end-of-stream marker that the specification does not describe (entry 14). Do DEE's streams carry `terminatorA`
-   at the end of every segment of substreams 0 to 2, and `terminatorB` (0x1234) at the end of substream 3, as the
-   specification says? Is the 12-bit count after `terminatorA` part of the terminator? The decoder accepts a
-   stream with or without them. A disc's stream settles it: `forge probe DISC detail=structure` counts what follows the last block of every
+2. **The 16-channel extension of the channel meaning (§14.2).** TH spec v3.9 §14.2 answers the unit (TH-2): `extra_channel_meaning_length`
+   is 4 bits and the body is (value + 1) 16-bit words, 2 to 32 bytes, read from DEE's channel meaning reader. The library still finds
+   the size by the CRC, now trying the two sizes the length gives first (the nibble inside the first word of the body, or the
+   body after the nibble, which takes one more word) and then the old search, and reports `body_words()`, whether the confirmed size
+   is one of those two (`size_from_length`) and which (`nibble_in_body`). Not said, and no stream has one (**no oracle**): where the
+   4-bit length sits against the first word of the body, whether the CRC follows on a 16-bit boundary as the library assumes, and what
+   "extended_substream" is in the field list (the library takes `extended_substream_info != 0`). `forge probe DISC detail=structure`
+   prints the length and the size the CRC confirmed (section H); `test_access_unit.cpp` builds both placements. **Length confirmed by
+   TH spec v3.9 §14.2; the placement is question 44.**
+3. **Terminators (§3.5, §16.5).** TH spec v3.9 §3.5 and §16.5.4 answer it (TH-3): DEE writes terminatorA (`0xD234E` or `0x348D3`)
+   after the segments of substreams 0 to 2 and terminatorB (`0x1234`) after substream 3 in a pass that can be switched off, so a stream
+   has them or has none and a decoder accepts either; the 12-bit count after terminatorA is a real field, `zero_samples`, gated by
+   `zero_samples_indicated` in DEE (its width not isolated: the library keeps 12 bits, which FFmpeg's end-of-stream marker shows,
+   ERRATA 14); the end-of-stream marker `0xD234D234` is another thing. The decoder takes either pattern of terminatorA with its count
+   as the last 32 bits of a segment, and terminatorB at once after the last block or as the last 16 bits of the segment of substream 3
+   (entry 45). Open: where in the segment DEE puts terminatorA relative to the padding (the library takes the end of the segment and
+   FFmpeg-made streams agree; a terminator right after the last block is counted and refused in strict mode), and the width of
+   `zero_samples`. A disc's stream settles it: `forge probe DISC detail=structure` counts what follows the last block of every
    substream's segments (section H).
 4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
    default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
@@ -143,7 +151,12 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     less one (a frame of 3 words carries 2), and the encoder and the hand-built writer write that; the writer first wrote the
     whole count. FFmpeg ignores the field: its strict decode of `hb_extra_data` returns the same samples with the length changed
     by -1 and +5 and with a wrong check nibble (`python3 tools/checks/probe_truehd_extra_length.py`), so no oracle decides it.
-    Is it the words less one? **Provisional, owner to confirm.**
+    TH spec v3.9 §16.2 answers it (TH-19): the field counts the 16-bit words after the header word, so the region is `length + 1`
+    words, and the four nibbles of the header word (the check nibble and the three of the length) XOR to 0xF; the library's check
+    nibble used to be the XOR of the length's three nibbles without the 0xF, which only agreed with itself. It is now
+    `nibble_2 ^ nibble_1 ^ nibble_0 ^ 0xF`, in the library, the encoder, the fuzz mutator, the Python references and the 135 vectors of
+    `testdata/truehd/evolution`. A header word of zero (nibble and length both zero) is the padding-only form: exempt from the rule
+    and reported as `ExtraData::padding_only`. **Confirmed by TH spec v3.9 §16.2; awaiting the DEE score.**
 
 20. **The lossless check across a join (§7.3; entry 12).** Two streams of one format joined end to end
     (`testdata/truehd/truehd_cat_st48_s24.thd`, `planning/truehd-fixtures.md`): the second stream's first restart header
@@ -182,21 +195,23 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     library returns the 24-bit value a stream decodes to. A stream that is what it declares never shows the difference,
     since the samples of a 16-bit stream have eight zero bits below them, but a stream whose coded samples have a bit set
     below its declared width does: the differential fuzzer's first finding was `mlp_st44_s16.mlp` with two bytes of audio
-    changed (the checks put right), whose right channel decoded to 80256 in the library and 80128 in FFmpeg. Should the
-    decoder clear the bits below the declared word length, as FFmpeg does, or return what the stream codes?
-    Recommendation: return what the stream codes, and leave the width to the caller, since the declared width is
-    metadata about the stream and no valid stream differs; `libs/truehd/fuzz/differential_oracle.hpp` clears the bits
-    on the library's side before it compares. Evidence: `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/`
-    (replay it with `ICLFORGE_DIFF_MEASURE_ONLY=1` to see the outcome).
+    changed (the checks put right), whose right channel decoded to 80256 in the library and 80128 in FFmpeg. TH spec v3.9 §7.4
+    answers it (TH-21): the declared word width is informational, not a mask; a decoder SHALL NOT clear the bits below bit 8 of a
+    stream that declares 16-bit words, since the codec is lossless and the only mask in the codec is the quantiser's. That is what
+    the library does; `hb_mlp_word16` holds it (FFmpeg's decode of that stream differs, as the manifest says) and
+    `libs/truehd/fuzz/differential_oracle.hpp` still clears the bits on the library's side before it compares with FFmpeg, which it
+    could stop doing for a different reason: FFmpeg is then the one that differs. Evidence:
+    `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/` (replay it with `ICLFORGE_DIFF_MEASURE_ONLY=1` to see the
+    outcome). **Confirmed by TH spec v3.9 §7.4.**
 
-41. **A `ch_assign` that is not a permutation (§7.4, entry 42).** §7.4 says only that each value is at most
-    `max_matrix_chan`. A stream whose values repeat leaves an output channel with no matrix channel. The decoder refuses
-    it (`kBadParameter`). FFmpeg's decoder does not: an output channel nobody was assigned takes matrix channel 0, and of
-    two matrix channels with one output the later wins (the differential fuzzer's second finding, entry 42). No stream
-    sets such a `ch_assign`, so nothing says which is meant. Should the decoder refuse it, or follow FFmpeg?
-    Recommendation: refuse, since a decode that plays channel 0 twice is not what any encoder meant. Evidence:
-    `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/ch-assign-repeats-an-output-channel`, which FFmpeg
-    decodes and the library refuses.
+41. **A `ch_assign` that is not a permutation (§7.4, entry 42).** §7.4 said only that each value is at most `max_matrix_chan`. A
+    stream whose values repeat leaves an output channel with no matrix channel. The decoder refuses it (`kBadParameter`). FFmpeg's
+    decoder does not: an output channel nobody was assigned takes matrix channel 0, and of two matrix channels with one output the
+    later wins (the differential fuzzer's second finding, entry 42). TH spec v3.9 §7.4 answers it (TH-22): `ch_assign` SHALL be a
+    permutation of 0..`max_matrix_chan`, DEE validates exactly that, and a decoder SHOULD refuse a repeat rather than follow a lenient
+    reading. **Confirmed by TH spec v3.9 §7.4**; the decoder refuses, as it did. Evidence:
+    `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/ch-assign-repeats-an-output-channel`, which FFmpeg decodes and the
+    library refuses. Which way the permutation reads is a different matter: question 45.
 
 42. **A changed major sync and the filter histories (§7.1, §7.5; entry 13, question 18).** The library carries the filter
     histories across a restart (question 18). It used to forget all codec state when a major sync changed the stream's `kind`,
@@ -218,6 +233,22 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     unit of the substream (a unit with no noise draw too), and for matrix `k` of `N` the start index `N - k` with stride `2 (N - k) + 1`,
     which is what FFmpeg 6.1.1 does on hand-built streams. Does DEE do the same? **Recommendation:** keep it; every DEE leg with a
     non-zero matrix noise shift is the check. **Provisional, owner to confirm.**
+
+44. **Where the length nibble of the extension of the channel meaning sits (§14.2, question 2).** v3.9 says the body is
+    `extra_channel_meaning_length + 1` words and gives the field as 4 bits at the start of the extension. Is the nibble inside the first
+    word of the body (the extension is `length + 1` words in all) or in front of it (the extension is `length + 1` words after the
+    nibble, padded to a word)? The library confirms whichever size the CRC confirms and says which. **Recommendation:** nothing until
+    a stream with the extension shows the CRC position; `forge probe DISC detail=structure` prints `extra_channel_meaning_length` and
+    the confirmed size.
+45. **Which way `ch_assign` reads (§7.3, §7.4, entry 42).** v3.9 §7.4 reads "The 6-bit `ch_assign` field maps output positions to matrix
+    channels" and §7.3's pseudo-code takes `mat_ch = ch_assign[out_ch]`; v3.5 to v3.6 had "maps matrix channels to output channels". The
+    stream's `ch_assign[m]` as read from the bits is, in FFmpeg's decoder and in this library (entry 42, `hb_output_shift_permuted`
+    and the three-cycle stream of `test_channel_assignment.cpp`), the output position of matrix channel `m`; the array that maps an output
+    position to its matrix channel is its inverse, which FFmpeg holds in memory and the pseudo-code is written from. The two readings
+    decode a permutation that is not its own inverse differently, and the new wording, taken for the bits of the stream, is the other one.
+    **Recommendation:** keep the library's reading (FFmpeg's strict decode agrees with it) and word §7.4 as
+    "the field, read in order, gives the output position of each matrix channel; the inverse maps output positions to matrix channels".
+    Is that what DEE writes? A DEE stream whose `ch_assign` is a three-cycle would settle it.
 
 ## Entries
 
@@ -542,6 +573,15 @@ FFmpeg-made streams and `hb_matrices` (whose one shifted channel is a fixed poin
 showed it too: the 6 and 8 channel legs of `testdata/truehd-dee` stopped at access unit 128 with a failing lossless check in the second
 substream (`thd-fx-6ch-music-48k24`, `thd-fx-8ch-tones-48k24-dmx6-dmx2`) and decode to their sources, with every substream's check
 passing, since this was changed. Held by `hb_output_shift_permuted`, `hb_output_shift_negative` and `test_kernels.cpp`.
+
+**45. What follows the last block of a segment (§3.5, §16.5; TH spec v3.9).** Zero padding to the end of the segment, or a terminator:
+terminatorA, `0xD234E` or `0x348D3`, followed by the 12-bit `zero_samples` count, as the last 32 bits of the segment of substream 0
+to 2; terminatorB, `0x1234`, as the 16 bits after the last block or the last 16 bits of the segment of substream 3. The decoder accepts all
+of them and a segment with none. A terminatorA right after the last block, before the padding, is counted by the probe and refused by the
+strict decode (more than 15 bits after the last block), since no stream shows it and the spec's own placement is the end of the
+segment. FFmpeg reads the end-of-stream marker as `0xD234E` only: `hb_marker_shifted` (0x348D3 in every unit) and
+`hb_sixteen_channels_b_end` are refused by it (the manifest says so), and decode in the library and the Python reference. Held by
+`test_handbuilt.cpp` and `test_substream3.cpp`.
 
 ## Atmos, spec v3.6
 

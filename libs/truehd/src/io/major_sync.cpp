@@ -1,5 +1,7 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 
+#include <array>
+
 #include "core/bit_io.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
@@ -13,9 +15,10 @@ using detail::put_field;
 using detail::put_signed;
 using detail::read_signed;
 
-// TH spec §14.2 has no length for the extension, and its fields add up to at most 45 bits; the CRC
-// search goes this far past the base form.
-constexpr std::size_t kMaxExtensionBytes = 8;
+// TH spec §14.2 (v3.9): the extension's body is (extra_channel_meaning_length + 1) 16-bit words, at
+// most 32 bytes; the CRC search goes this far past the base form (the nibble in front of the body
+// takes one more word, and the CRC two bytes of their own).
+constexpr std::size_t kMaxExtensionBytes = 36;
 
 [[nodiscard]] bool has_extended_substream(const MajorSync& major_sync) noexcept {
     return major_sync.extended_substream_info != 0;
@@ -161,13 +164,26 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
         std::optional<ExtraChannelMeaning> chosen_extra;
         std::size_t fallback = 0;
         std::optional<ExtraChannelMeaning> fallback_extra;
+        // TH spec §14.2 (v3.9): the body is extra_channel_meaning_length + 1 words. The extension
+        // starts at byte 26 with the 4-bit length; the body is either those words with the length
+        // nibble inside the first, or the words after the nibble, which takes one more word.
+        const std::size_t length_words =
+            data.size() > 26 ? (std::to_integer<std::size_t>(data[26]) >> 4U) + 1U : 0;
         // The extra fields start at byte 26, where the base form has its CRC. The CRC follows them,
-        // on a 16-bit boundary: try each size from the base form's 28 bytes (an extension of
-        // nothing) upward.
-        for (std::size_t size = kMajorSyncBaseBytes;
-             size <= kMajorSyncBaseBytes + kMaxExtensionBytes; size += 2) {
-            if (data.size() < size) {
-                break;
+        // on a 16-bit boundary: try the two sizes the length gives, then each size from the base
+        // form's 28 bytes (an extension of nothing) upward.
+        std::array<std::size_t, 2 + (kMaxExtensionBytes / 2 + 1)> candidates{};
+        std::size_t candidate_count = 0;
+        candidates[candidate_count++] = 26 + 2 * length_words + 2;
+        candidates[candidate_count++] = 26 + 2 * (length_words + 1) + 2;
+        for (std::size_t size = kMajorSyncBaseBytes; size <= kMajorSyncBaseBytes + kMaxExtensionBytes;
+             size += 2) {
+            candidates[candidate_count++] = size;
+        }
+        for (std::size_t candidate = 0; candidate < candidate_count; ++candidate) {
+            const std::size_t size = candidates[candidate];
+            if (size < kMajorSyncBaseBytes || data.size() < size) {
+                continue;
             }
             BitReader extra_reader(data.subspan(26, size - 28 + 2));
             const ExtraChannelMeaning extra =
@@ -176,13 +192,18 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
             if (extra_bytes + 2U > size - 26U) {
                 continue;  // the fields do not fit before the CRC
             }
-            if (fallback == 0) {
+            if (fallback == 0 || size < fallback) {
                 fallback = size;
                 fallback_extra = extra;
             }
             if (major_sync_crc(data.first(size - 2)) == stored_crc(data, size)) {
                 chosen = size;
                 chosen_extra = extra;
+                if (chosen_extra) {
+                    chosen_extra->nibble_in_body = size == 26 + 2 * length_words + 2;
+                    chosen_extra->size_from_length =
+                        chosen_extra->nibble_in_body || size == 26 + 2 * (length_words + 1) + 2;
+                }
                 break;
             }
         }

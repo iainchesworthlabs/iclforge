@@ -31,16 +31,22 @@ constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
 constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-14 (ERRATA.md)
 constexpr int kObjectSubstream = 3;
-// TH spec §16.5: terminatorA. The streams show it as the first 20 bits of a 32-bit end-of-stream
-// marker that ends the segments of the last access unit, the 12 bits after it counting the samples
-// of the unit that are padding (ERRATA.md). 0x348D3, the spec's second value, is the same bits seen
-// two bits late.
+// TH spec §3.5, §16.5: terminatorA, 0xD234E or 0x348D3, is followed by the 12-bit zero_samples
+// count (§16.5.4: a field, its width not isolated). DEE writes it after the segments of substreams
+// 0 to 2 and FFmpeg's encoder only in the last access unit of a stream, as the last 32 bits of the
+// segment (ERRATA.md entry 14); a decoder accepts a segment with it, without it, right after the
+// last block or at the end of the segment (ERRATA.md entry 45).
 constexpr std::uint32_t kTerminatorA = 0xD234E;
-constexpr std::uint32_t kTerminatorAShifted =
-    0x348D3;  // the same read two bits late (ERRATA.md entry 14)
+constexpr std::uint32_t kTerminatorAShifted = 0x348D3;  // the spec's second value (§16.5.1)
+constexpr int kTerminatorABits = 20;
 constexpr int kEndMarkerBits = 32;
 constexpr int kEndMarkerCountBits = 12;
-constexpr std::uint32_t kTerminatorB = 0x1234;  // TH spec §16.5, substream 3: no stream shows it
+constexpr std::uint32_t kTerminatorB = 0x1234;  // TH spec §16.5.2, end of substream 3
+constexpr int kTerminatorBBits = 16;
+
+[[nodiscard]] constexpr bool is_terminator_a(std::uint32_t bits) noexcept {
+    return bits == kTerminatorA || bits == kTerminatorAShifted;
+}
 
 constexpr std::array<Channel, 2> kStereo{Channel::kL, Channel::kR};
 
@@ -103,6 +109,43 @@ struct SegmentResult {
 
 Error make_error(ErrorKind kind, std::string_view detail) {
     return Error{kind, detail};
+}
+
+// TH spec §3.5, §16.5: what may follow the last block of a segment besides zero padding.
+// terminatorA, either pattern, and the 12-bit count of padding samples (32 bits) ending the
+// segments of substreams 0 to 2; terminatorB (16 bits) after substream 3, either at once after the
+// last block or ending the segment. FFmpeg's streams carry terminatorA only at the end of the last
+// access unit's segments (ERRATA.md entry 14), and a segment without one is as good (ERRATA.md
+// entry 45). `reader` is left after what was taken.
+void take_terminator(int index, std::span<const std::byte> payload, BitReader& reader,
+                     SegmentResult& result) {
+    const std::size_t end_bits = payload.size() * 8U;
+    const std::size_t left = end_bits - reader.bit_position();
+    const auto at_end = [&](std::size_t bits) {
+        BitReader tail(payload);
+        tail.skip(end_bits - bits);
+        return tail;
+    };
+    if (index == kObjectSubstream) {
+        if (left >= kTerminatorBBits) {
+            if (reader.peek(kTerminatorBBits) == kTerminatorB) {
+                reader.skip(kTerminatorBBits);
+                return;
+            }
+            if (at_end(kTerminatorBBits).read(kTerminatorBBits) == kTerminatorB) {
+                reader.skip(left);
+                return;
+            }
+        }
+    }
+    if (left < static_cast<std::size_t>(kEndMarkerBits)) {
+        return;
+    }
+    BitReader marker = at_end(kEndMarkerBits);
+    if (is_terminator_a(marker.read(kTerminatorABits))) {
+        result.padding_samples = static_cast<int>(marker.read(kEndMarkerCountBits));
+        reader.skip(left);
+    }
 }
 
 }  // namespace
@@ -318,14 +361,22 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
         ++tail.terminator_b;
         return;
     }
-    if (left >= 20 && (reader.peek(20) == kTerminatorA || reader.peek(20) == kTerminatorAShifted)) {
+    if (index == kObjectSubstream && left >= 16) {
+        BitReader at_end = reader;
+        at_end.skip(left - 16);
+        if (at_end.peek(16) == kTerminatorB) {
+            ++tail.terminator_b_at_end;
+            return;
+        }
+    }
+    if (left >= 20 && is_terminator_a(reader.peek(20))) {
         ++tail.terminator_a;
         return;
     }
     if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
         BitReader marker = reader;
         marker.skip(left - static_cast<std::size_t>(kEndMarkerBits));
-        if (marker.read(20) == kTerminatorA) {
+        if (is_terminator_a(marker.read(kTerminatorABits))) {
             ++tail.end_marker;
             return;
         }
@@ -707,23 +758,11 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
         }
     }
 
-    // What follows the last block is zero padding to the end of the segment, or, in the last access
-    // unit of a stream that does not end on an access unit boundary, zero padding and then the
-    // 32-bit end-of-stream marker (TH spec §16.5, ERRATA.md): terminatorA and the count of padding
-    // samples in the unit.
+    // What follows the last block is zero padding to the end of the segment, or a terminator.
     const std::size_t end_bits = payload.size() * 8U;
     const std::size_t left = end_bits - reader.bit_position();
     record_tail(index, reader, left);
-    if (index == kObjectSubstream && left >= 16 && reader.peek(16) == kTerminatorB) {
-        reader.skip(16);
-    } else if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
-        BitReader marker(payload);
-        marker.skip(end_bits - kEndMarkerBits);
-        if (marker.read(20) == kTerminatorA) {
-            result.padding_samples = static_cast<int>(marker.read(kEndMarkerCountBits));
-            reader.skip(left);
-        }
-    }
+    take_terminator(index, payload, reader, result);
     if (strict() && end_bits - reader.bit_position() >= 16) {
         state.running = false;
         return std::unexpected(

@@ -67,11 +67,24 @@ class VariableBits(unittest.TestCase):
 
 
 class ExtraData(unittest.TestCase):
-    def test_check_nibble_is_the_xor_of_the_three_nibbles(self):
-        self.assertEqual(E.check_nibble(0x123), 0)
-        self.assertEqual(E.check_nibble(0x002), 2)
-        self.assertEqual(E.check_nibble(0xF00), 0xF)
-        self.assertEqual(E.check_nibble(0x0A5), 0xF)
+    def test_the_four_nibbles_of_the_header_word_xor_to_f(self):
+        # TH spec 16.2: check_nibble = nibble_2 ^ nibble_1 ^ nibble_0 ^ 0xF.
+        self.assertEqual(E.check_nibble(0x123), 0xF)
+        self.assertEqual(E.check_nibble(0x002), 0xD)
+        self.assertEqual(E.check_nibble(0xF00), 0)
+        self.assertEqual(E.check_nibble(0x0A5), 0)
+        for length in (0, 1, 0x123, 0x7FF, 0xFFF):
+            word = (E.check_nibble(length) << 12) | length
+            folded = (word >> 12) ^ (word >> 8) ^ (word >> 4) ^ word
+            self.assertEqual(folded & 0xF, 0xF)
+
+    def test_a_header_word_of_zero_is_the_padding_only_form(self):
+        read = E.parse_extra_data(bytes(8), "emdf")
+        self.assertTrue(read["padding_only"] and read["check_ok"])
+        # A zero nibble with a non-zero length is not exempt, and nor is a zero length with a
+        # nibble.
+        self.assertFalse(E.parse_extra_data(b"\x00\x01" + bytes(6), "emdf")["check_ok"])
+        self.assertFalse(E.parse_extra_data(b"\xf0\x00" + bytes(6), "emdf")["padding_only"])
 
     def test_parity_matches_the_worked_example(self):
         # seed 0xA9 ^ length 2 = 0xAB, then the two bytes; the fold of a byte-sized value is itself

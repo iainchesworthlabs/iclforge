@@ -120,6 +120,7 @@ EvolutionPayloadConfig config_of(const json& want) {
 // What the Python reference reads from `want`, against what the library reads.
 void check_against_reference(const EvolutionRead& got, const json& want) {
     CHECK(got.check_ok == want["check_ok"].get<bool>());
+    CHECK(got.padding_only == want["padding_only"].get<bool>());
     CHECK(got.framing_ok == want["framing_ok"].get<bool>());
     CHECK(got.parity_ok == want["parity_ok"].get<bool>());
     CHECK(got.reserved_zero == want["reserved_zero"].get<bool>());

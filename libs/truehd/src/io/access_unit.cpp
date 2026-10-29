@@ -36,7 +36,9 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     const unsigned word = be16(bytes, 0);
     extra.header_check_nibble = static_cast<std::uint8_t>(word >> 12U);
     extra.length = static_cast<std::uint16_t>(word & 0xFFFU);
-    extra.check_ok = extra.header_check_nibble == extra_data_check_nibble(extra.length);
+    extra.padding_only = extra.header_check_nibble == 0 && extra.length == 0;
+    extra.check_ok =
+        extra.padding_only || extra.header_check_nibble == extra_data_check_nibble(extra.length);
     extra.parity = std::to_integer<std::uint8_t>(bytes.back());
     // evo_reserved and evo_frame_byte_length share the next 16 bits; the payload starts on the byte
     // after.

@@ -139,6 +139,7 @@ class Stream:
         terminator_b=False,
         channel_assignment=None,
         word_code=2,
+        marker_pattern=MARKER,
     ):
         self.substreams = substreams
         self.samples = samples
@@ -146,9 +147,10 @@ class Stream:
         self.kind = kind
         self.restart_interval = restart_interval
         self.marker = marker  # "last": the last unit only, "every": each unit
+        self.marker_pattern = marker_pattern  # terminatorA: 0xD234E or 0x348D3 (TH spec 16.5.1)
         self.drc_words = drc_words
         self.extra_data = extra_data  # a function of the unit's index giving its payload
-        self.terminator_b = terminator_b
+        self.terminator_b = terminator_b  # True: right after the last block; "end": ends the segment
         self.word_code = word_code  # an MLP stream's group 1 word length code: 0 16, 1 20, 2 24 bit
         self.channel_assignment = channel_assignment or DEFAULT_ASSIGNMENT[self.channels]
 
@@ -425,9 +427,11 @@ def build_stream(stream):
             if stream.marker == "every" or (stream.marker == "last" and padding):
                 w.align(1)
                 w.put(0, -(w.count + 32) % 16)
-                w.put(MARKER, 20)
+                w.put(stream.marker_pattern, 20)
                 w.put(padding, 12)
             elif stream.terminator_b and index == 3:
+                if stream.terminator_b == "end":
+                    w.put(0, -w.count % 16)
                 w.put(0x1234, 16)
             payload = w.bytes()
             if len(payload) % 2:
@@ -459,7 +463,7 @@ def build_stream(stream):
             frame[-1] = parity_extra(frame)
             words = len(frame) // 2
             length = words - 1  # extra_data_length: the words less one (TH spec 16.8)
-            nibble = ((length >> 8) ^ (length >> 4) ^ length) & 0xF
+            nibble = ((length >> 8) ^ (length >> 4) ^ length ^ 0xF) & 0xF  # TH spec 16.2
             frame[0:2] = ((nibble << 12) | length).to_bytes(2, "big")
             extra = bytes(frame)
         major_sync = write_major_sync(stream) if is_restart else b""
@@ -673,6 +677,15 @@ def case_marker_every():
     )
 
 
+def case_marker_shifted():
+    stream = stereo_stream(39, 40 * 20 - 11, marker="every", marker_pattern=0x348D3)
+    return (
+        stream,
+        "terminatorA as 0x348D3 and its count ending the segment of every unit, 11 padding samples",
+        ["end_marker", "terminator_a_0x348d3"],
+    )
+
+
 def case_extra_data():
     stream = stereo_stream(
         34, 40 * 20, extra_data=lambda u: bytes((u * 7 + i) & 0xFF for i in range(5 + u % 17))
@@ -708,6 +721,17 @@ def case_sixteen():
         stream,
         "four substreams, the last of 16 channels with terminatorB",
         ["substream_3", "terminator_b"],
+    )
+
+
+def case_sixteen_terminator_end():
+    stream, _description, _features = case_sixteen()
+    stream.terminator_b = "end"
+    return (
+        stream,
+        "four substreams, terminatorB ending the segment of substream 3 instead of following "
+        "its last block",
+        ["substream_3", "terminator_b_at_end"],
     )
 
 
@@ -1114,9 +1138,11 @@ CASES = {
     "hb_data_check": case_data_check,
     "hb_marker_last": case_marker_last,
     "hb_marker_every": case_marker_every,
+    "hb_marker_shifted": case_marker_shifted,
     "hb_extra_data": case_extra_data,
     "hb_drc_word": case_drc_word,
     "hb_sixteen_channels": case_sixteen,
+    "hb_sixteen_channels_b_end": case_sixteen_terminator_end,
     "hb_eight_channels": case_eight_channels,
     "hb_substream3_limits": case_substream3_limits,
 }
@@ -1161,6 +1187,15 @@ FFMPEG = {
         "codec": "mlp",
         "note": "FFmpeg writes a 16 bit MLP stream as 16 bit samples and clears the bits below bit "
         "8; the decoder does not (TH spec 7.4)",
+    },
+    "hb_marker_shifted": {
+        "outcome": "refused",
+        "note": "FFmpeg recognises the end-of-stream marker as 0xD234E only; with 0x348D3 it reads "
+        "the end of each segment as data and fails",
+    },
+    "hb_sixteen_channels_b_end": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
     "hb_sixteen_channels": {
         "outcome": "refused",

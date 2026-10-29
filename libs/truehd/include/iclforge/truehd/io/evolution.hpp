@@ -141,7 +141,8 @@ parse_evolution_frame(std::span<const std::byte> evolution_payload,
 
 // What one unit's extra data comes to: the checks of §16.1 to §16.4 and the container.
 struct EvolutionRead {
-    bool check_ok = false;       // header_check_nibble against extra_data_length (§16.2)
+    bool check_ok = false;       // the header word's four nibbles XOR to 0xF, or it is padding (§16.2)
+    bool padding_only = false;   // the header word is zero: no evolution frame follows (§16.2)
     bool framing_ok = false;     // the evolution payload and the parity byte fit
     bool parity_ok = false;      // §16.4
     bool reserved_zero = false;  // evo_reserved is 0 (§16.8)

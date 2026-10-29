@@ -253,6 +253,7 @@ std::expected<EvolutionFrame, EvolutionError> parse_evolution_frame(
 EvolutionRead read_evolution(const ExtraData& extra, EvolutionReading reading) {
     EvolutionRead out;
     out.check_ok = extra.check_ok;
+    out.padding_only = extra.padding_only;
     out.framing_ok = extra.framing_ok;
     out.parity_ok = extra.framing_ok && extra.parity_ok;
     out.reserved_zero = extra.framing_ok && extra.evo_reserved == 0;

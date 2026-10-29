@@ -354,8 +354,8 @@ def parse_evo_frame(data, reading):
 
 
 def check_nibble(length):
-    """16.2: the three nibbles of the 12-bit extra_data_length XORed."""
-    return ((length >> 8) ^ (length >> 4) ^ length) & 0xF
+    """16.2: the nibble that makes the four nibbles of the header word XOR to 0xF."""
+    return ((length >> 8) ^ (length >> 4) ^ length ^ 0xF) & 0xF
 
 
 def parity(reserved, frame_length, tail):
@@ -387,8 +387,10 @@ def parse_extra_data(data, reading):
         return None
     word = int.from_bytes(data[0:2], "big")
     nibble, length = word >> 12, word & 0xFFF
+    padding_only = nibble == 0 and length == 0  # 16.2: the padding-only form is exempt
     out = {
-        "check_ok": nibble == check_nibble(length),
+        "padding_only": padding_only,
+        "check_ok": padding_only or nibble == check_nibble(length),
         "framing_ok": False,
         "parity_ok": False,
         "reserved_zero": False,
@@ -695,6 +697,26 @@ def make_vectors():
         )
     )
     out.append(vector("region_of_two_bytes", "only the header word", "emdf", region[:2]))
+
+    # --- the header word (16.2): the padding-only form, and a nibble that is the old formula ----
+    out.append(
+        vector(
+            "padding_only_region",
+            "header word zero, then zero words: no nibble rule, no evolution frame",
+            "emdf",
+            bytes(8),
+        )
+    )
+    old_nibble = bytearray(region)
+    old_nibble[0] = (old_nibble[0] & 0x0F) | (((check_nibble(len(region) // 2 - 1) ^ 0xF)) << 4)
+    out.append(
+        vector(
+            "nibble_without_the_xor_f",
+            "the nibble that is the XOR of the length's three nibbles alone: wrong under 16.2",
+            "emdf",
+            bytes(old_nibble),
+        )
+    )
 
     intended = {
         "truncated_in_version_extension": ("emdf", "truncated_header"),

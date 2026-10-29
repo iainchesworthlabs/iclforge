@@ -333,6 +333,23 @@ TEST_CASE("the end-of-stream marker removes its padding samples", "[truehd][hand
     }
     CHECK(units == 20);
     CHECK(padding == 17);
+
+    // The marker with the second value of TH spec §16.5.1, 0x348D3, in every unit: the count after
+    // it is read as well, and strictly (the default decoder) nothing is left over.
+    const std::vector<std::byte> shifted = read_file(dir() + "/hb_marker_shifted.thd");
+    Decoder strict;
+    ElementaryReader shifted_reader(shifted);
+    padding = 0;
+    units = 0;
+    while (const auto unit = shifted_reader.next()) {
+        auto decoded = strict.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        padding += (*decoded)->padding_samples;
+        ++units;
+    }
+    CHECK(units == 20);
+    CHECK(padding == 11);
 }
 
 TEST_CASE("extra data comes back with the unit it was in",
