@@ -630,7 +630,8 @@ def build_sources(root, names):
             print(f"source {name}: written", flush=True)
         entries[name] = {"layout": layout, "speakers": list(SPEAKERS[layout]),
                          "seconds": seconds, "sample_rate": rate, "bits": bits,
-                         "description": text, "sha256": hashlib.sha256(data).hexdigest()}
+                         "description": text, "size_bytes": len(data),
+                         "sha256": hashlib.sha256(data).hexdigest()}
     return entries
 
 
@@ -1063,8 +1064,15 @@ def forge_probe(cli, stream):
         text = (result.stderr + result.stdout).decode("utf-8", "replace").strip().splitlines()
         return {"error": f"exit {result.returncode}: {(text or [''])[0][:300]}"}
     try:
-        stream_info = json.loads(result.stdout)["stream"]
-    except (json.JSONDecodeError, KeyError) as exc:
+        info = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return {"error": f"unreadable JSON: {exc}"}
+    # A TrueHD or MLP stream's facts are under "truehd", not "stream".
+    if "truehd" in info:
+        return info["truehd"]
+    try:
+        stream_info = info["stream"]
+    except KeyError as exc:
         return {"error": f"unreadable JSON: {exc}"}
     keep = ("codec", "bsid", "bsmod", "acmod", "lfeon", "layout", "coded_channels",
             "rendered_channels", "substreams", "access_units", "syncframes", "bitrate_kbps",
@@ -1090,12 +1098,12 @@ def wav_shape(path):
     return None
 
 
-def forge_decode(cli, stream, scratch):
+def forge_decode(cli, stream, scratch, extra=(), tag=""):
     scratch.mkdir(parents=True, exist_ok=True)
-    wav = scratch / f"{stream.parent.name}-{stream.stem}.wav"
+    wav = scratch / f"{stream.parent.name}-{stream.stem}{tag}.wav"
     wav.unlink(missing_ok=True)
-    result = subprocess.run([str(cli), "decode", str(stream), str(wav)], capture_output=True,
-                            check=False, timeout=3600)
+    result = subprocess.run([str(cli), "decode", str(stream), str(wav), *extra],
+                            capture_output=True, check=False, timeout=3600)
     shape = wav_shape(wav) if wav.is_file() else None
     wav.unlink(missing_ok=True)
     if result.returncode == 0 and shape:
@@ -1133,6 +1141,14 @@ def ffmpeg_check(stream, scratch, source=None):
     demuxer = ["-f", "truehd"] if stream.suffix == ".mlp" else []
     if demuxer:
         out["demuxer"] = "truehd"
+    strict = subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-err_detect",
+                             "crccheck+bitstream+buffer+explode", "-f", "truehd", "-i",
+                             str(stream), "-f", "null", "-"], capture_output=True, check=False,
+                            timeout=3600)
+    strict_errors = (strict.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+    out["strict"] = ("ok" if strict.returncode == 0 and not strict_errors
+                     else f"exit {strict.returncode}: " + " | ".join(dict.fromkeys(
+                         strict_errors))[:400])
     result = subprocess.run(["ffmpeg", "-v", "error", *demuxer, "-i", str(stream), "-f", "null",
                              "-"], capture_output=True, check=False, timeout=3600)
     errors = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()
@@ -1196,6 +1212,13 @@ def ffmpeg_check(stream, scratch, source=None):
     out.update({"lossless": False, "channel_map": mapping, "error_db_per_channel": errors,
                 "max_abs_error_24bit": largest})
     return out
+
+
+def presentations_wanted(leg):
+    """Whether each presentation of the stream is decoded in turn: legs with more than one
+    presentation, and the Atmos and sixteen-channel ones."""
+    return (leg["options"].count("--presentation") > 1
+            or leg["name"].startswith(("obj-thd-atmos", "thd-16ch")))
 
 
 def run_leg(task):
@@ -1269,11 +1292,21 @@ def run_leg(task):
                 d["mp4"] = mux_mp4(stream, work, "ac3" if ext == "ac3" else "eac3", suffix)
             else:
                 d["mp4"] = previous["mp4"]
+        if ext == "mlp":
+            # DEE's own log and encode-request files, hashed and not read.
+            reports = {r.name: sha256(r) for r in sorted(work.glob(f"{stream.name}.*"))}
+            if reports:
+                d["reports"] = reports
         if cli:
             d["forge_probe"] = forge_probe(cli, stream)
             d["forge_decode"] = forge_decode(cli, stream, scratch / "decode")
+            if ext == "mlp" and presentations_wanted(leg):
+                d["forge_presentations"] = {
+                    p: forge_decode(cli, stream, scratch / "decode",
+                                    [f"truehd-presentation={p}"], f"-{p}")
+                    for p in ("2ch", "6ch", "8ch", "all")}
         else:
-            for key in ("forge_probe", "forge_decode"):
+            for key in ("forge_probe", "forge_decode", "forge_presentations"):
                 if key in previous:
                     d[key] = previous[key]
         d["ffmpeg"] = ffmpeg_check(stream, scratch / "decode", lossless_source)
