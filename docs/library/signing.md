@@ -6,7 +6,8 @@ optional step a front end applies to already-encoded frames: no encoder or decod
 signer, and the minimum-footprint archives leave it out. See [Object signing](../concepts/object-signing.md) for
 what this is *for* — a licensed decoder treats the EMDF container's `emdf_protection` field as a
 commitment to object decoding and refuses the whole stream if the tag does not check out; this
-computes the keyed tag that satisfies it.
+computes the keyed tag that satisfies it. The tag is an authenticity check, not content
+protection: it encrypts nothing and has no relation to Common Encryption or DRM.
 
 ```cpp
 const iclforge::base::crypto::SigningKey key{key_bytes};   // the operator's own, at runtime

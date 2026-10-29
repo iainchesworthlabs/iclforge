@@ -62,7 +62,8 @@ the `AC3FORGE_` variables. The family is ICL Forge now, and its programs are `fo
 | [iab-object-clustering.md](iab-object-clustering.md) | Fitting a master of more than 15 (E-AC-3) or 64 (AC-4) beds and objects into an encode: the cap following the codec, then clustering, with the decisions for the owner | Proposal, 2026-10-10: not started; [`kTooManyChannels`](../docs/library/development-status.md#iab-smpte-st-2098-2) in the IAB and ADM bridges |
 | [host-plugin.md](host-plugin.md) | DAW/NLE metering/QC plugin feasibility | [Proposed — DAW/NLE host plugin](../ROADMAP.md#proposed) |
 | [qc-report.md](qc-report.md) | Delivery-shaped QC report file | [Proposed — QC delivery report file](../ROADMAP.md#proposed) |
-| [cenc-conformance.md](cenc-conformance.md) | Common Encryption (ISO/IEC 23001-7) against the tree: what the standard requires of Dolby audio, what the readers and writers do with protected input, a gap register, measurements with FFmpeg and GPAC, and the decisions for the owner | Audit, 2026-10-29: nothing built; [Proposed — Common Encryption](../ROADMAP.md#proposed) |
+| [cenc-conformance.md](cenc-conformance.md) | Common Encryption (ISO/IEC 23001-7) against the tree: what the standard requires of Dolby audio, what the readers and writers do with protected input, a gap register, measurements with FFmpeg and GPAC, and the decisions for the owner | Audit, 2026-10-29; its G1 to G5 are fixed (a protected track is refused by name); [Proposed — Common Encryption](../ROADMAP.md#proposed) |
+| [cenc-read-side.md](cenc-read-side.md) | Reading protected Dolby audio with operator-supplied keys (BYOK): scope, where AES lives, the reader API, key supply, the test ladder, the risks of a decrypting reader in an open-source project, an effort estimate and the decisions for the owner | Plan, 2026-10-29: nothing built; [Proposed — Common Encryption](../ROADMAP.md#proposed) |
 
 ---
 

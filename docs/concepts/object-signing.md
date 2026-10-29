@@ -272,6 +272,11 @@ path, never a shipped one; it is a known and accepted gap, not an open task.
 
 ## What this is not
 
+- **Not content protection.** "Protection" in the EMDF `protection` field, and on this page, names an
+  authenticity tag that gates object decoding. It encrypts nothing. It has no relation to Common
+  Encryption (ISO/IEC 23001-7), to DRM, or to a Common Encryption key ID: the EMDF `key_id` selects
+  an authentication key and nothing more. An MP4 protected with Common Encryption is a separate
+  matter; the MP4 reader refuses such a track and says so.
 - **Not a key you get from us.** The library ships the machinery, never a key — see above. Whoever
   uses it, in this project or outside it, brings their own and is responsible for being entitled to
   use it.

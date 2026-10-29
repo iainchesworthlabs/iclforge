@@ -4615,7 +4615,8 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 - Writing immersive stereo (`presentation_version` 2): V1.3.1 names the version without defining it,
   so the encoder does not copy DEE's use of it, while the decoder reads it by the observed rule
   (decision 10).
-- Protected (encrypted) AC-4 tracks.
+- Protected (encrypted) AC-4 tracks. The MP4 reader refuses one, naming the Common Encryption scheme,
+  the original format and the default KID, and nothing decrypts it (planned: `cenc-read-side.md`).
 - MPEG-2 TS under ATSC A/342-2's profile, which `ac3cli ts` refuses; DVB's is carried.
 - AC-4 on the ESP32-C3 and the other ESP32 parts; D14 plans the P4, the S3 and the C6, and has built
   the P4. The encoder on any ESP32.
