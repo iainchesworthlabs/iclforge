@@ -848,6 +848,10 @@ int run_probe(std::string_view in_path, const Options& meta) {
         json.member("file", in_path);
         // null for a bare stream: the schema's members are never omitted.
         write_container(json, container);
+        // Content signing is AC-4's: an AC-3 or E-AC-3 stream has no such signature to report,
+        // and the member is null rather than missing, as the schema promises.
+        json.key("content_signature");
+        json.value_null();
         if (detail != Detail::kNone) {
             json.key("access_units");
             json.begin_array();

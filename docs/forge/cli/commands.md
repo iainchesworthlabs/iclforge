@@ -31,7 +31,7 @@ Usage:
   forge eac3-encode   <in.wav> <out.ec3> [bitrate_kbps] [tools] [layout] [vbr] [in2.wav] (in2.wav: layout 1+1's Ch2, when Ch1 is a separate mono file; or use src=/map= for more than one source. programme2= (up to programme8=) is a different thing entirely - another independent E-AC-3 substream (its own layout/bitrate/dialnorm and metadata via programmeN-layout=/-bitrate=/-<field>=), not another channel of this one)
   forge ac4-encode    <in.wav> <out.ac4|out.mp4> [bitrate_kbps] (mono, stereo, 5.0, 5.1, 5.0.4 or 5.1.4 at 48 or 44.1 kHz, in the WAV order decode writes, to AC-4: raw sync frames with CRC, or an MP4 with the 'ac-4' sample entry when the output is .mp4/.m4a/.mov. In 5.X, ASPX_ACPL_3 (a Lo/Ro downmix and A-CPL) below 22.4 kbps a channel and ASPX_ACPL_2 (downmixes of each side and C, and A-CPL) below 33.6; the ASPX codec mode (A-SPX above a crossover, with companding at the lower rates in mono and stereo) below 96 kbps a channel, 76.8 in 5.X, and SIMPLE from there. 5.1.4 takes the immersive element in ASPX_ACPL_2 below 480 kbps, ASPX_SCPL below 640 and SCPL from there, as DEE's 5.1.4 streams do. The options below set the codec mode, the frame rate, the rate mode, the I-frames, the CRC, and the loudness, DRC, downmix and dialogue enhancement metadata; substreamN= and presentationN= add substreams, each an input of its own, and the presentations that play them; syntax-trace=<file> writes what the encoder writes)
   forge decode        <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out] (AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and syntax-trace=<file> writes what the decoder reads. objects_dir: export each object's own PCM as its own object_NN.wav there - JOC-reconstructed for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels pinned to their speaker, dynamic objects positioned by their own timeline)
-  forge probe         <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks] (inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 TOC/presentations/substream groups, bare or inside a container, and what the container says of its track; table or documented JSON)
+  forge probe         <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks] (inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 TOC/presentations/substream groups, bare or inside a container, and what the container says of its track; table or documented JSON. An AC-4 content signature is reported too (the signer, the date and the chain's SHA-1 fingerprints), without a key or any trust)
   forge transcode     <in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout] (decode and re-encode, carrying dialnorm, compr and the mix metadata across - the DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the programme, decoded without DRC and re-encoded with its drc_eac3_profile, dialnorm and downmix values; an AC-3 or E-AC-3 source's dialnorm and downmix values go to AC-4, and drc= names its DRC profile. The output codec comes from the output name's suffix, or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4)
   forge metadata      <in.ac3|in.ec3> <out.ac3|out.ec3>      (rewrite dialnorm/compr/bsmod/dsurmod on an existing stream and re-stamp its CRCs; the audio is copied through untouched, not re-encoded)
   forge normalize     <in.ac3|in.ec3> <out.ac3|out.ec3>      (measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio untouched)
@@ -44,7 +44,7 @@ Usage:
   forge unspdif       <in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|-> (the inverse: recover the elementary stream from IEC 61937 bursts, as captured from an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end)
   forge project       <project.forgeproj> [out] [print]      (encode what a Forge project file says, by running the commands it stands for: the line the Forge GUI's command bar shows for the same settings; out is where the result goes (beside the project, named for it, by default); print shows the commands and runs none of them)
   forge mkv           <in.ac3|in.ec3> <out.mkv>              (wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it)
-  forge mp4           <in.ac3|in.ec3|in.ac4> <out.mp4>       (wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4)
+  forge mp4           <in.ac3|in.ec3|in.ac4> <out.mp4>       (wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4; sign-content signs an AC-4 input into a uuid box of the track)
   forge fmp4          <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment] (fragmented MP4/CMAF + HLS/DASH manifests, ready for a packager; fallback-51 also writes an object-stripped 5.1 companion rendition. AC-4 as TS 103 190-2 Annex H has it: each fragment starting at an I-frame, the timescale Table E.1 gives, the ca4m and ca4s brands and the DASH descriptors of Annex G)
   forge ts            <in.ac3|in.ec3|in.ac4> <out.ts> [dvb|atsc] (wrap as MPEG-2 TS; AC-4 supports DVB only)
   forge demux         <in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4> (the inverse of 'mkv': unwrap the elementary stream a container carries. The container is identified by its own magic bytes, not by the file name)
@@ -115,7 +115,7 @@ so a misrouted channel is identifiable by ear.)
 | `eac3-encode` | WAV → E-AC-3, with the Annex E `tools:` token and an optional `vbr:` token available (see [Options & grammars](metadata-options.md)). Without `[layout]`, follows the source: the speakers its `WAVE_FORMAT_EXTENSIBLE` header states, or, for a file that states none, its channel count (1→mono, 2→stereo, 3–6→5.1, 8→7.1, 10→5.1.4, 12→7.1.4). |
 | `atmos-encode` | WAV → E-AC-3 Atmos, every source channel becomes its own object; optional `[paths.txt]` drives per-object motion from an authored scene file the same way `atmos-path` does, keyed by WAV channel index — an object it doesn't mention keeps its default (fanned-out) placement. With `codec=ac4` it writes AC-4 objects instead: see [AC-4 objects from a WAV](#ac-4-objects-from-a-wav) below |
 | `atmos-cbi` | WAV already mixed into a fixed channel-based-immersive (CBI) bed layout → E-AC-3 Atmos with `program.bed != 0` and 0 dynamic objects — Dolby's `dee_ddpjoc_encoder --input-format cbi_wav` shape, not free-floating objects |
-| `ac4-encode` | WAV → AC-4: mono, stereo, 5.0, 5.1, 5.0.4 or 5.1.4 (7.0, 7.1, 7.0.4, 7.1.4 and 3.0 experimental), at 48 kHz at every frame rate of Part 1 Table 83 or at 44.1 kHz at the native one, as raw sync frames with their CRC (or without, `crc=off`) or, for `.mp4`, `.m4a` or `.mov`, an MP4 file with the `ac-4` sample entry and its `dac4`. The codec mode follows the rate: SIMPLE from 96 kbps a channel (76.8 in 5.X), the ASPX mode below, in 5.X the A-CPL modes lower still, and in the immersive layouts ASPX_ACPL_2, ASPX_SCPL and SCPL by the rate. The frame rate, the rate mode, the I-frames, the metadata, and further substreams and the presentations that play them are options: see [`ac4-encode`](#ac4-encode) below |
+| `ac4-encode` | WAV → AC-4: mono, stereo, 5.0, 5.1, 5.0.4 or 5.1.4 (7.0, 7.1, 7.0.4, 7.1.4 and 3.0 experimental), at 48 kHz at every frame rate of Part 1 Table 83 or at 44.1 kHz at the native one, as raw sync frames with their CRC (or without, `crc=off`) or, for `.mp4`, `.m4a` or `.mov`, an MP4 file with the `ac-4` sample entry and its `dac4`. The codec mode follows the rate: SIMPLE from 96 kbps a channel (76.8 in 5.X), the ASPX mode below, in 5.X the A-CPL modes lower still, and in the immersive layouts ASPX_ACPL_2, ASPX_SCPL and SCPL by the rate. The frame rate, the rate mode, the I-frames, the metadata, and further substreams and the presentations that play them are options: see [`ac4-encode`](#ac4-encode) below. `sign-content` signs the output with a key and certificate chain you bring: see [AC-4 content signing](#ac-4-content-signing) |
 
 ```bash
 forge encode in.wav out.ac3 448 couple
@@ -506,7 +506,9 @@ forge atmos-encode stems.wav out.mp4 256 0 scene.json src=vo.wav \
   source's last sample.
 - **Options.** `dialnorm=1..31` sets the stream's dialnorm; `dialnorm=auto` and `sign-objects`
   are refused (an object stream has no bed to measure and no EMDF container to sign), and
-  `coding=` and `crc=` without `codec=ac4` are refused rather than dropped.
+  `coding=` and `crc=` without `codec=ac4` are refused rather than dropped. `sign-content` signs
+  the stream whole, which an AC-4 stream allows where `sign-objects` does not: see
+  [AC-4 content signing](#ac-4-content-signing).
 
 `dialnorm=` works the same as every other encoding command (see
 [Options & grammars](metadata-options.md)); `dialnorm=auto` does not — an ADM document's bed/object
@@ -614,8 +616,8 @@ requirements ask for beside an Atmos one.
 
 | Command | What it does |
 |---|---|
-| `decode` | AC-3, E-AC-3 or AC-4 → WAV (an AC-3 or E-AC-3 stream of three channels or more is written with its speaker mask, so `encode` reads the file back as the coding mode it came from); the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
-| `probe` | What a stream *declares*, without rendering its audio: bsid, sample rate, layout, substream map, counts, duration, bit rate, metadata ranges, EMDF/OAMD/JOC, authenticity, per-frame CRC and coding-tool usage. Human table by default, or the `iclforge.probe/1` JSON document with `json=1`. An AC-4 stream gets its table of contents, frame rate, bit rate, I-frames and splices, and each presentation with the metadata the decoder reads of it. The input may be a Matroska, MP4 or MPEG-TS container, sniffed by content: the report then also says what the container declares of the track (codec ID, sample entry or descriptor, time scale, language), in the JSON document as `container`, which is `null` for a bare stream |
+| `decode` | AC-3, E-AC-3 or AC-4 → WAV (an AC-3 or E-AC-3 stream of three channels or more is written with its speaker mask, so `encode` reads the file back as the coding mode it came from); the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties `verify-content` refuses an AC-4 stream whose content signature does not verify under the trust you give, and `gate-content` decodes it without its object audio instead: see [AC-4 content signing](#ac-4-content-signing) |
+| `probe` | What a stream *declares*, without rendering its audio: bsid, sample rate, layout, substream map, counts, duration, bit rate, metadata ranges, EMDF/OAMD/JOC, authenticity, per-frame CRC and coding-tool usage. Human table by default, or the `iclforge.probe/1` JSON document with `json=1`. An AC-4 stream gets its table of contents, frame rate, bit rate, I-frames and splices, and each presentation with the metadata the decoder reads of it, and the content signature it carries, if any: who signed it and the chain's SHA-1 fingerprints, in the JSON document as `content_signature`, answered without a key or any trust. The input may be a Matroska, MP4 or MPEG-TS container, sniffed by content: the report then also says what the container declares of the track (codec ID, sample entry or descriptor, time scale, language), in the JSON document as `container`, which is `null` for a bare stream |
 | `levels` | Per-channel peak/RMS report — takes a WAV, a bare encoded stream, or a Matroska/MP4/MPEG-TS container carrying one; of an AC-4 stream, the presentation [`presentation=` and the rest](#ac-4-presentations-presentation-language-associated) choose, as coded |
 | `loudness` | BS.1770-4 gated loudness, reported as the `dialnorm` it implies: of a WAV; of an AC-3 or E-AC-3 stream's first programme, beside the `dialnorm` it carries; or of an AC-4 presentation as coded, in AC-4's steps of 0.25 dB, beside the stream's own. Bare or inside a container |
 | `qc` | Bitstream-aware loudness QC: decodes an already-encoded AC-3, E-AC-3 or AC-4 stream — bare, or inside a Matroska/MP4/MPEG-TS container — measures it with the real BS.1770-4/EBU Tech 3342 meter — the Table 5.8 bed by default, the whole rendered program with `layout=rendered`, or a dynamic-object-only programme's objects re-rendered onto a named layout with `objects=<layout>` (BS.1770-5 Annex 4) — and compares the result against the stream's own embedded `dialnorm`/`compr` and, optionally, a named delivery-spec gate. An AC-4 presentation is measured as coded (no output level, so no DRC) against its `dialnorm` and the loudness it states; `layout=` takes it too, and `objects=` does not (see below). One that decodes at 96 or 192 kHz is refused by name: the meter's K-weighting is made for 44.1 and 48 kHz |
@@ -947,11 +949,118 @@ E-AC-3 stream it does the same with AC-4's (`output-level=`, `dialogue-enhanceme
 both: an AC-4 stream's choose a presentation and its mix, an E-AC-3 stream's [mix a second
 programme into the first](metadata-options.md#programme-options-decode-qc-levels-programme). The options that
 promise what the other format cannot give stop the run: `bap-census=`, `verify-objects` and
-`gate-objects` for AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
+`gate-objects` for AC-4, and `channels=5.1`, `syntax-trace=`, `verify-content` and `gate-content`
+for AC-3 and E-AC-3.
 
 ```text
 warning: stream.ac4 is AC-4: heavy is AC-3's and E-AC-3's, and ignored
 ```
+
+### AC-4 content signing
+
+`sign-content` signs the AC-4 stream a command writes, and `verify-content` and `gate-content`
+check one a command reads. They are the AC-4 counterparts of `sign-objects`, `verify-objects`
+and `gate-objects` and are handled the same way: off unless given, a strict mode that refuses and
+a soft mode that carries on. They differ in what they cover. The E-AC-3 options tag each frame's
+object container with a keyed MAC. The AC-4 ones sign the stream as a whole: one SHA-256 over every
+frame, an ECDSA P-256 signature over that digest, and the signer's X.509 certificate chain, in
+the form [pace-ccjf1](../../concepts/content-signing.md) names. You bring the key and the chain;
+this project builds in no key, no certificate and no trust anchor. [Content
+signing](../../concepts/content-signing.md) says what the signature covers and how it is judged,
+and the [library page](../../library/signing.md#ac-4-content-signing) shows the same calls from C++.
+
+```bash
+# Sign while encoding: the signature goes into the MP4's AC-4 track.
+forge ac4-encode programme.wav programme.mp4 192 sign-content \
+    signing-key=signer.key signing-chain=chain.pem
+
+# Refuse anything that does not verify under this root.
+forge decode programme.mp4 out.wav verify-content trust-anchor=root.pem
+
+# The licensed policy: decode it either way, without its object audio if it does not verify.
+forge decode programme.mp4 out.wav gate-content trust-anchor=root.pem
+```
+
+```text
+encoded 29 AC-4 frames -> programme.mp4 (48000 Hz, stereo, 192 kbps, dialnorm -31 dB, MP4, codecs ac-4.02.01.00)
+  content signature: signed as serial 1798A2B5D62000000005 (CN=ILok, title=Code/Content Signer) at 2026-10-29T12:00:00Z, 3 certificates in the chain
+                     in a uuid box of the AC-4 track (1621 bytes)
+```
+
+```text
+content signature: verified (MP4 uuid box, 29 frames)
+                   signer: serial 1798A2B5D62000000005 (CN=ILok, title=Code/Content Signer)
+                   accepted under anchor 1 (root.pem); 3 certificates in the chain
+                   signed 2026-10-29T12:00:00Z (as the signer wrote it; the signature does not cover the date)
+```
+
+| Option | Read by | Meaning |
+|---|---|---|
+| `sign-content` | `ac4-encode`, `mp4` and `fmp4` with an AC-4 input, `atmos-encode`, `atmos-adm` and `atmos-iab` with `codec=ac4` | Sign the output. Refused anywhere else, `record` and `live` included, and on a command that would write E-AC-3 |
+| `signing-key=<path>` | `sign-content` | The private key: PEM (PKCS#8 or SEC1) or DER, P-256. Absent, `ICLFORGE_CONTENT_SIGNING_KEY_FILE` names the file, and failing that `ICLFORGE_CONTENT_SIGNING_KEY` holds the PEM itself. It is the option `sign-objects` uses for its HMAC key, read here as an EC key; give `sign-content` one key |
+| `signing-chain=<path>` | `sign-content` | The certificates, PEM or DER: the leaf and its issuers in any order, the root included or left out. The leaf must hold the key. Absent, `ICLFORGE_CONTENT_SIGNING_CHAIN_FILE` |
+| `sign-time=<ISO 8601 UTC>` | `sign-content` | The signed date to record, such as `2026-10-29T12:00:00Z`. The default is the system clock. The signature does not cover the date, so it is the signer's statement and nothing more |
+| `verify-content` | `decode`, `monitor` | Refuse the command unless the content signature verifies. An unsigned stream is refused |
+| `gate-content` | `decode` | Content that does not verify (unsigned, altered, signed by someone not trusted) decodes without its object audio, for the whole stream, and the run goes on. A presentation made of object audio alone then has nothing to play and is refused. Not combinable with `verify-content` |
+| `trust-anchor=<path>` | `verify-content`, `gate-content` | A certificate to trust (PEM or DER, one or several in the file); repeat for more. The chain must lead to one of them |
+| `trust-key=<path>` | `verify-content`, `gate-content` | A public key (PEM SPKI), or a certificate whose key is trusted directly, whatever the chain says; repeat for more |
+| `content-signature=<path>` | all three | The file holding an elementary stream's signature. The default is `<stream>.sig`. An MP4 carries its own, so naming a file for one is refused when signing, and when verifying the box in the MP4 is the one read |
+| `verify-time=<ISO 8601 UTC>` | `verify-content`, `gate-content` | The time the chain's validity is judged at. The default is the system clock |
+| `allow-expired-intermediates` | `verify-content`, `gate-content` | Accept an intermediate certificate past its `notAfter`, and say so. The anchor and the leaf must still be in date |
+| `signer-profile=spec\|any` | `verify-content`, `gate-content` | What the signer's certificate must look like. `spec`, the default, is the specification's: title `Code/Content Signer`, common name `ILok`, serial `1798A2B5D62000000005`. `any` checks none of the three |
+| `signer-title=`, `signer-cn=`, `signer-serial=` | `verify-content`, `gate-content` | Replace one part of that profile; the serial is hexadecimal |
+
+An option is refused on a command that would not read it, and so is one given without the mode that
+reads it (`trust-anchor=` without `verify-content` or `gate-content`, `signing-chain=` without
+`sign-content`). A flag that did nothing would read exactly like one that worked.
+
+**Trust has no default.** `verify-content` and `gate-content` need `trust-anchor=` or `trust-key=`,
+or failing both the file `ICLFORGE_CONTENT_TRUST_FILE` names. Naming a path on the command line means
+the environment is not read. With nothing to trust the command stops with exit code 2 before it reads
+the stream, because a signature checked against nothing says nothing. A test chain's root is a
+reasonable anchor for a test and a poor one for anything else; an operator who wants the specification's
+signer chain brings that chain's root, and one that has expired (the specification's Master CA did,
+on 2025-11-13) verifies only under `allow-expired-intermediates`.
+
+**Where the signature goes.**
+
+| Command | Output | Signature |
+|---|---|---|
+| `ac4-encode`, `atmos-encode`, `atmos-adm`, `atmos-iab` | `.ac4` | `<out>.sig` beside it, or the file `content-signature=` names. Writing to `-` needs `content-signature=` |
+| the same | `.mp4`, `.m4a`, `.mov` | A `uuid` box of the AC-4 track |
+| `mp4` with an AC-4 input | `.mp4` | A `uuid` box of the AC-4 track |
+| `fmp4` with an AC-4 input | a folder | The same box, in `init.mp4`. Joining `init.mp4` and the segments end to end gives one file that verifies |
+
+A signature does not follow its stream through a command that copies it. `mp4`, `fmp4`, `demux`,
+`remux` and `ts` write a new container, and the new file carries a signature only when `sign-content`
+signs it again, with a key and chain given to that command. Matroska and MPEG-TS carry none.
+
+**Failures.** Every refusal is exit code 2 (input) and writes no output file: no trust configured, no
+signature, a signature that does not parse, a chain that reaches nothing trusted, a signer that does
+not match the profile, a stream altered after it was signed. The message names the check that failed,
+using the names of the [check order](../../concepts/content-signing.md#how-a-signature-is-judged).
+A malformed option is exit code 1, an unreadable key or chain is exit code 2, and a sidecar that cannot
+be written is exit code 3.
+
+```text
+error: verify-content: programme.mp4 has a content signature that does not verify (SignatureInvalid: the content's SHA-256 is not the digest the signature was made over: the content changed after it was signed, or this is another stream's signature)
+error: verify-content: plain.ac4 carries no content signature (BadOrMissingSignature: the stream carries no content signature (no sidecar file or no signature box))
+error: verify-content needs something to trust: no trust anchor or trusted key provided (a trust path or ICLFORGE_CONTENT_TRUST_FILE); pass trust-anchor=<certificate> or trust-key=<public key>, or set ICLFORGE_CONTENT_TRUST_FILE. A signature is never checked against nothing
+```
+
+`gate-content` prints the reason as a warning and decodes without the object audio:
+
+```text
+warning: gate-content: plain.ac4 did not verify (BadOrMissingSignature: the stream carries no content signature (no sidecar file or no signature box)); decoding it without its objects
+decoded 26 AC-4 frames -> out.wav (L R, 48000 Hz)
+          gate-content: the content did not verify; object audio left out
+```
+
+The options belong to AC-4. `decode` given `verify-content` or `gate-content` with an AC-3 or E-AC-3
+stream stops with exit code 1 and names the E-AC-3 options (`verify-objects`, `gate-objects`) that
+check that format. `sign-content` on a command that writes E-AC-3 stops the same way and names
+`sign-objects`, and `ac4-encode` refuses `sign-objects`, since it writes no EMDF container to sign. `probe` reports a signature without
+any of these options, with no key and no trust, as [described below](#probe-what-the-stream-says-about-itself).
 
 ### Damaged frames: `conceal=`
 
@@ -1103,6 +1212,7 @@ Top level:
 | `container` | object or `null` | What a Matroska, MP4 or MPEG-TS input says of its audio track; `null` for a bare stream |
 | `access_units` | array | Present only with `detail=` — see below |
 | `stream` | object | The summary |
+| `content_signature` | object or `null` | The AC-4 content signature the input carries, as [described below](#content-signature-of-an-ac-4-stream); `null` for an unsigned stream and for AC-3 and E-AC-3 |
 
 `container`, for a container input: `format` (`"matroska"`, `"mp4"` or `"mpegts"`), `codec_id` (the
 Matroska CodecID or MP4 sample entry, such as `"A_EAC3"`, `"ec-3"` or `"ac-4"`; `null` for
@@ -1271,6 +1381,39 @@ number of syncframes that passed. `parse_failures` is 0 or 1, because the walk k
 first error; `first_parse_error` names that error (`truncated`, `lost_sync` or
 `unsupported_bitstream_version`) and is `null` when there was none. **Exit code** follows the same
 rule as AC-3/E-AC-3: 0 only when every sync frame's CRC passed and every frame parsed.
+
+##### Content signature of an AC-4 stream
+
+An AC-4 stream signed with `sign-content` is reported by `probe` whatever options are given, because
+reading the signature takes no key and no trust. The signature is looked for where the container puts
+it: the `uuid` box of an MP4's AC-4 track, or for an elementary stream the file beside it
+(`<stream>.sig`, or the one `content-signature=` names). The table gains a `content sig.` block after
+the presentations and metadata, and an unsigned stream gains nothing:
+
+```text
+content sig.    carrier: MP4 uuid box; 1621 bytes
+                signer serial: 1798A2B5D62000000005
+                signed: 2026-10-29T12:00:00Z (the signer's statement; not covered by the signature)
+                version: 3
+                certificate 1: CN=Test Root serial 7E097FF39FAD17C0A1122CBE7C30CF9F413FE41D, valid 2026-10-28T23:51:55Z to 2036-10-25T23:51:55Z
+                  SHA-1 DA:91:8B:32:38:C5:D8:92:B0:9C:83:4C:30:59:D9:10:38:74:64:2A
+                certificate 2: CN=Test Intermediate serial 02, valid 2026-10-28T23:51:55Z to 2035-01-14T23:51:55Z
+                  SHA-1 02:CF:E2:A6:69:DF:03:45:D0:A6:0E:F5:57:96:6D:55:66:BE:13:EC
+                certificate 3: CN=ILok, title=Code/Content Signer serial 1798A2B5D62000000005, valid 2026-10-28T23:51:55Z to 2032-04-19T23:51:55Z
+                  SHA-1 D9:4F:A9:12:9F:8B:21:7C:8B:D4:D3:5E:D6:5E:FC:08:09:B0:61:B7
+```
+
+In the JSON document `content_signature` is an object: `present`, `carrier`, `signer_serial`,
+`signed` (an ISO 8601 UTC time), `version` and `certificates[]`, each with `subject`, `serial`,
+`not_before`, `not_after` and `sha1` (the SHA-1 of its DER, as colon-separated hexadecimal pairs). A
+signature that cannot be read (it is there and does not parse, or the MP4 holds two of them) gives
+an object with `present` and `problem`, the reason, and the stream is still probed. The member is
+`null` where no signature is found, and for a Matroska or MPEG-TS file, which cannot carry one.
+
+This report says who the signature claims to be from and says nothing of whether it holds.
+The signer's serial and the date are the signature's own statements, and the date is not covered by
+the signature at all. `decode ... verify-content` is what checks the signature, against trust you
+give it.
 
 `qc` is `loudness`'s bitstream-aware counterpart: `loudness` measures a *source* WAV before encoding, `qc` measures what a stream actually *delivers* after encoding and decoding it back, and checks that against what the stream's own metadata claims:
 
@@ -1502,11 +1645,11 @@ reads, is refused with its reason and exit code 2; a project with nothing to enc
 | `spdif` | Wraps AC-3, E-AC-3 or AC-4 as IEC 61937 bursts inside a playable PCM16 WAV — the stream's `bsid`, or its AC-4 sync word, decides which, and the E-AC-3 carrier runs at four times the content sample rate. AC-4 goes in IEC 61937-14's bursts, the smallest of AC-4, AC-4 HBR4 and AC-4 HBR16 that holds the stream's largest frame, on the link its frame rate gives (HBR16's as eight channels at a quarter of the link rate). An E-AC-3 stream with a second independent substream (a second language, an audio description) goes in as **one** programme, as `play` sends it: `programme=<0..7>`, or the first the stream carries (said as `programme 0 of 2 (0, 1)`), cut out and renumbered as substream 0 when it is not 0 already — never both programmes' bursts one after the other, which a receiver would lock onto as the main at half speed. For feeding a receiver through an ordinary audio path |
 | `unspdif` | The inverse of `spdif`: reads IEC 61937 bursts back and writes the AC-3, E-AC-3 or AC-4 elementary stream inside them. Takes the WAV `spdif` writes, a capture of an S/PDIF or HDMI input, or a bare dump of carrier bytes with no RIFF header at all — the data type in `Pc` decides AC-3, E-AC-3 or AC-4, and both 16-bit word orders are read. Nothing is re-encoded: the output is what the source sent, byte for byte. `-` works on either end — a capture tool piped straight in, the stream piped straight out — with the report going to stderr, same convention as `encode`/`decode` |
 | `mkv` | Wraps AC-3 or E-AC-3 as Matroska, reading format/packet boundaries/sample rate/channel count from the bitstream itself so the container can't be told the wrong ones. The input may itself be a container — Matroska/MP4/MPEG-TS are sniffed by content, not by name — which is what makes `mkv`/`mp4`/`ts` container-to-container remuxers as well as encode targets. AC-4 is refused: Matroska's codec specification registers no codec ID for it, and a file under one of this project's invention would be one no other reader could name. So is an AC-3 core with E-AC-3 dependents (A/52 §E2.3.1.2): `A_AC3` covers `bsid` 10 and below and `A_EAC3` 11 to 16, and neither names a stream that is both. A stream with several programmes keeps its first, with a warning — the muxer writes one track — and `programme=<0..7>` picks another, renumbered as substream 0 |
-| `mp4` | Wraps AC-3, E-AC-3 **or AC-4** as a single-file MP4/ISOBMFF (an AC-4 input takes TS 103 190-2 Annex E's `ac-4`/`dac4` path, with the Annex E.13 codecs string reported), writing a spec-correct `dac3`/`dec3` sample-entry box (fscod/bsid/bsmod/acmod/lfeon, plus the Atmos complexity-index extension for JOC content) read straight off the bitstream — never off whatever a container INPUT declared, which is the dec3-repair case: a source with a broken or missing Atmos `dec3` flag gets a correct one on the way out. A stream with several programmes (§E2.3.1.2's independent substreams) keeps every one: an E-AC-3 sample is the syncframes of every substream present (TS 102 366 F.2), the `dec3` carries one block for each, and `data_rate` is their sum; `programme=<0..7>` writes that programme alone, renumbered as substream 0, for a player that takes only the first. An AC-3 core with E-AC-3 dependents is an `ec-3` entry whose `dec3` carries the core's `bsid`, and `chan_loc` is filled in from the dependents' `chanmap` (Table F.6.1) |
+| `mp4` | Wraps AC-3, E-AC-3 **or AC-4** as a single-file MP4/ISOBMFF (an AC-4 input takes TS 103 190-2 Annex E's `ac-4`/`dac4` path, with the Annex E.13 codecs string reported), writing a spec-correct `dac3`/`dec3` sample-entry box (fscod/bsid/bsmod/acmod/lfeon, plus the Atmos complexity-index extension for JOC content) read straight off the bitstream — never off whatever a container INPUT declared, which is the dec3-repair case: a source with a broken or missing Atmos `dec3` flag gets a correct one on the way out. A stream with several programmes (§E2.3.1.2's independent substreams) keeps every one: an E-AC-3 sample is the syncframes of every substream present (TS 102 366 F.2), the `dec3` carries one block for each, and `data_rate` is their sum; `programme=<0..7>` writes that programme alone, renumbered as substream 0, for a player that takes only the first. An AC-3 core with E-AC-3 dependents is an `ec-3` entry whose `dec3` carries the core's `bsid`, and `chan_loc` is filled in from the dependents' `chanmap` (Table F.6.1) With an AC-4 input, `sign-content` signs the stream into a `uuid` box of the track ([AC-4 content signing](#ac-4-content-signing)); a signature already in an MP4 input is not carried to the new file |
 | `ts` | Wraps AC-3, E-AC-3 **or AC-4** (DVB profile only — EN 300 468 Annex D.7; `atsc` is refused for AC-4) as an MPEG-2 Transport Stream (PAT + PMT + one PES-wrapped audio PID), identified per whichever broadcast profile the optional third argument names — `dvb` (the default) or `atsc`. Every programme of a multi-programme stream rides in each PES payload (A/52 Annex G §3.3), which is what the descriptor's `substream1`-`substream3` fields describe; `programme=<0..7>` writes one alone. See below |
 | `demux` | The inverse of `mkv`: reads a container and writes the bare AC-3/E-AC-3 elementary stream inside it (an AC-4 track as sync frames), which is what every other command here takes as input. The container is identified by its **own magic bytes**, never by the file name — a rip called `title00.mkv` that is really something else, or one with no extension at all, is the normal case. Unlike the wrapping commands it streams: the reader is fed in 64 KiB chunks and each access unit is written as it comes out, so peak memory is a chunk plus a frame whatever the file's duration. Matroska/WebM, MP4 (plain and fragmented) and MPEG-2 Transport Stream (188/192/204-byte packet grids; DVB, ATSC and registration-descriptor codec signalling all read). An MP4 whose `moov` follows its `mdat` is read from a file path by walking the boxes and jumping over `mdat`, then reading each sample where the sample table says, in the same bounded memory; from a pipe it is refused with an explanation rather than read wrong, since a pipe cannot go back for the table. For MPEG-TS the destination gets the concatenated PES payloads rather than a guaranteed one-access-unit-per-payload split, since PES makes no such promise — the status line omits sample rate/channels for it, since a transport stream's PMT names the codec but not those |
 | `remux` | Container-to-container in one step: `mkv`/`mp4`/`ts` under the hood, picked by `out_path`'s **extension** (`.mkv`/`.webm`, `.mp4`/`.m4a`/`.mov`, `.ts`/`.m2ts`) since a file that doesn't exist yet has no bytes to sniff. The input is still identified by its own magic bytes, exactly as `demux`'s. `[dvb\|atsc]` is passed through when the target is a Transport Stream and ignored otherwise |
-| `fmp4` | Writes fragmented MP4/CMAF — an init segment plus one media segment per fragment — alongside an HLS media+master playlist pair and a DASH MPD, all pointing at the same segments, ready for a real HLS/DASH origin or packager. `[frames_per_fragment]` defaults to 48 access units per fragment, about 1.5 s at 48 kHz. Atmos content signals itself automatically and completely: `CHANNELS="<N>/JOC"` in the HLS playlists, the two `EC3_ExtensionType`/`EC3_ExtensionComplexityIndex` supplemental descriptors ETSI TS 103 420 clause D.2 defines in the MPD, and the `ceao` compatibility brand its Annex E requires on the segments. Every representation also states its channel configuration, on the Dolby scheme TS 102 366 clause I.1.2.1 defines. `fallback-51` additionally writes the paired 5.1 rendition. AC-4, bare or in MP4, is fragmented as ETSI TS 103 190-2 Annex H has a CMAF track: each fragment starts at an I-frame, the first once it holds `frames_per_fragment` frames; each sample that is not an I-frame is listed with its flags; the track counts in Table E.1's time scale (240 000 at 29.97, 59.94 and 119.88 fps); its brands are `ca4m` and `ca4s`; and the manifests carry the codecs parameter, the channel configuration (Annex G's Table G.1, or the Dolby 2015 scheme) and the frame rate of the presentation with the widest compatibility. A stream Annex H.1.2 does not allow in a CMAF track is refused, naming the rule |
+| `fmp4` | Writes fragmented MP4/CMAF — an init segment plus one media segment per fragment — alongside an HLS media+master playlist pair and a DASH MPD, all pointing at the same segments, ready for a real HLS/DASH origin or packager. `[frames_per_fragment]` defaults to 48 access units per fragment, about 1.5 s at 48 kHz. Atmos content signals itself automatically and completely: `CHANNELS="<N>/JOC"` in the HLS playlists, the two `EC3_ExtensionType`/`EC3_ExtensionComplexityIndex` supplemental descriptors ETSI TS 103 420 clause D.2 defines in the MPD, and the `ceao` compatibility brand its Annex E requires on the segments. Every representation also states its channel configuration, on the Dolby scheme TS 102 366 clause I.1.2.1 defines. `fallback-51` additionally writes the paired 5.1 rendition. AC-4, bare or in MP4, is fragmented as ETSI TS 103 190-2 Annex H has a CMAF track: each fragment starts at an I-frame, the first once it holds `frames_per_fragment` frames; each sample that is not an I-frame is listed with its flags; the track counts in Table E.1's time scale (240 000 at 29.97, 59.94 and 119.88 fps); its brands are `ca4m` and `ca4s`; and the manifests carry the codecs parameter, the channel configuration (Annex G's Table G.1, or the Dolby 2015 scheme) and the frame rate of the presentation with the widest compatibility. A stream Annex H.1.2 does not allow in a CMAF track is refused, naming the rule With an AC-4 input, `sign-content` puts the signature in `init.mp4` ([AC-4 content signing](#ac-4-content-signing)) |
 
 #### `ts` broadcast profiles
 
@@ -1561,7 +1704,7 @@ each OS.
 | `identify` | Walks the identify tone across an output's speakers: pink noise on one rendered channel at a time, placed by the routing patch, so which speaker each channel reaches can be heard rather than assumed. The stream is opened at the device's own channel count and each rendered channel placed by the patch — see [`identify`](#identify-hearing-which-speaker-a-channel-reaches) below |
 | `record` | Captures from a device straight to a file, metering live. `layout=`/`codec=` choose the shape (any layout up to 7.1.4, AC-3 or E-AC-3; with `codec=ac4`, AC-4 in mono, stereo, 5.0 or 5.1), `container=` the wrapper (`raw`, `mkv`, `ts`, `spdif`, `fmp4`), `watchdog=` how long a silent device is tolerated. If the endpoint turns out to be bitstreaming IEC 61937 rather than delivering PCM (an HDMI/S/PDIF capture card, or a loopback of a player set to bitstream), `record` recognises that within about a quarter of a second and writes the **elementary stream** instead of encoding the bursts as if they were audio — see [passthrough capture](#passthrough-capture) below |
 | `play` | Exclusive-mode IEC 61937 passthrough of an existing file, bare or inside a container — `bsid` decides AC-3 vs. E-AC-3. When a `device_index` is named, `play` follows the sink: a source format it rejects gets transcoded to AC-3 or decoded to PCM automatically instead of refused — see [Following the sink](#following-the-sink) below. AC-4, which no receiver found takes over IEC 61937, is decoded and played as PCM, as `monitor` plays it (`follow=off`, which asks for passthrough alone, refuses it with exit `4`) |
-| `monitor` | Decodes an existing file, bare or inside a container, and plays it on an ordinary, non-bitstreamed output — the shared-mode preview path. For an Atmos-mode stream, this plays the 5.1 **bed** and reports the object count found: the decoder reads TS 103 420's object layer (OAMD/JOC) but this path does not render or export objects, so this is what a legacy decoder hears, not unmixed objects — use `decode` with `objects_dir` for the object audio itself. An AC-4 stream plays the presentation `presentation=` and the rest choose, with `decode`'s output level, DRC, dialogue enhancement and downmix options; on an endpoint with fewer channels than the presentation it folds by the stream's own downmix. It plays the channels a presentation decodes to: the layout renderer that puts a presentation's objects on speakers belongs to `decode` (and to Hearth), not to `monitor` or `play`. An E-AC-3 stream with a second independent substream (a second language, an audio description) plays one programme, as `decode` does: `programme=<0..7>`, or the first the stream carries, said as `programme 0 of 2 (0, 1)`. `play` sends a receiver that programme alone, cut out and renumbered as substream 0 when it is not already. |
+| `monitor` | Decodes an existing file, bare or inside a container, and plays it on an ordinary, non-bitstreamed output — the shared-mode preview path. For an Atmos-mode stream, this plays the 5.1 **bed** and reports the object count found: the decoder reads TS 103 420's object layer (OAMD/JOC) but this path does not render or export objects, so this is what a legacy decoder hears, not unmixed objects — use `decode` with `objects_dir` for the object audio itself. An AC-4 stream plays the presentation `presentation=` and the rest choose, with `decode`'s output level, DRC, dialogue enhancement and downmix options; on an endpoint with fewer channels than the presentation it folds by the stream's own downmix. It plays the channels a presentation decodes to: the layout renderer that puts a presentation's objects on speakers belongs to `decode` (and to Hearth), not to `monitor` or `play`. An E-AC-3 stream with a second independent substream (a second language, an audio description) plays one programme, as `decode` does: `programme=<0..7>`, or the first the stream carries, said as `programme 0 of 2 (0, 1)`. `play` sends a receiver that programme alone, cut out and renumbered as substream 0 when it is not already. Given an AC-4 stream, `verify-content` checks its content signature before anything plays, as `decode` does ([AC-4 content signing](#ac-4-content-signing)). |
 | `spatial` | Decodes an E-AC-3 stream's object layer and hands the objects to the platform's spatial renderer, each at its own OAMD position — the one playback path that renders objects as objects rather than as a bed. Windows only today; see [`spatial`](#spatial-objects-on-the-platform-renderer) below |
 | `live` | Capture → encode → optional live monitor and/or IEC 61937 passthrough, running continuously, still writing the file `record` always has. Everything `record` takes, plus a second clock-conformed capture device (`capture2=`), an object-slot budget and `map=` binding (`objects=`, `mode=atmos`), and a parallel 5.1 AC-3 leg for an AC-3-only receiver (`downmix=`) |
 

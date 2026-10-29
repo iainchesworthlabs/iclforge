@@ -747,6 +747,13 @@ TEST_CASE("probe reports a signature without a key or any trust", "[cli][content
         REQUIRE(json.exit_code == 0);
         REQUIRE(contains(json.log, "\"content_signature\": null"));
     }
+    SECTION("an AC-3 stream's JSON has the member too, null, as the schema promises") {
+        const fs::path ac3 = scratch_dir() / "probe-ac3.ac3";
+        REQUIRE(forge("encode " + quoted(tones_wav()) + " " + quoted(ac3) + " 192").exit_code == 0);
+        const Run json = forge("probe " + quoted(ac3) + " json=1");
+        REQUIRE(json.exit_code == 0);
+        REQUIRE(contains(json.log, "\"content_signature\": null"));
+    }
     SECTION("a sidecar that does not parse is reported, and the stream is still probed") {
         const fs::path stream = scratch_dir() / "probe-junk.ac4";
         REQUIRE(
