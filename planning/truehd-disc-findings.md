@@ -34,7 +34,7 @@ pass) and decodes its 2-channel presentation (568 of 568 lossless-check interval
 | 9 (block data CRC) | `data_check_present` is 0 in all four substreams' restart headers. | **No oracle** on this stream either. |
 | 10 (heavy DRC) | The major sync's heavy DRC start-up gain is 0 at all 569 major syncs. The 16 bits after the lossless check in each restart header are 0x0000 (314 restarts) or 0x8000 (255 restarts), identically in all four substreams. The standard DRC start-up gain (7 bits) changes at every major sync (-51 to -44 over the 60 s). The 2,351 directory entries with the extra-word bit set carry the standard DRC word. | **Partly.** The bit at 0x8000 is set with a zero gain and time. |
 | 12 (`peak_data_rate`) | Raw 2417, constant. raw x rate / 16 = 7.25 Mbps, which is the FFmpeg-fixture scale, not raw x 200 x a multiplier. The highest data rate over a 16-unit window is 7.19 Mbps (7.60 over 8 units, 6.65 over 128, 14.8 for a single unit). | **Consistent with raw x rate / 16** over a ~16-unit window. |
-| 18 (filter history across a restart) | The 2-channel substream uses FIR orders up to 8 and IIR orders 1 and 3 with the state flag set, and passes all 568 lossless-check intervals. The reference decode with the history kept and with it zeroed at each restart gives the same PCM (sha256 prefix equal) and the same 568 of 568. | **Not decided** by this stream: it does not use the history across a restart. |
+| 18 (filter history across a restart) | Substreams 0 to 2 use FIR orders up to 8 and IIR orders 1 and 3 with the state flag set. The reference decode of the whole excerpt with the history kept and with it zeroed at each restart gives the same samples (all 568 intervals ok in each substream, all 8 channels equal to FFmpeg's). | **Not decided** by this stream: it does not use the history across a restart. |
 
 Also seen, not asked: the directory word's reserved bit (bit 12) is set on substream 0's entry in about 47% of
 access units; the major sync repeats every 128 access units
@@ -62,5 +62,7 @@ with the DRC start-up gain counting up; the stream's average rate is 4.77 Mbps.
 - The 12-channel Atmos substream (restart sync 0x31EC): its matrices carry `frac_bits` from 0 to 15 (forge
   refuses above 14) and the block parse then breaks at a filter order, so it has more to it than the 8-channel
   bed; open.
-- Q 18 over the whole excerpt for substreams 1 and 2 (history kept against zeroed) was started and is not in
-  this note.
+- Q 18 is settled in neither direction: the reference decode of the whole excerpt with the filters' histories
+  kept across each restart and with them zeroed gives the same samples for substreams 0, 1 and 2 (all 568
+  intervals ok in each, all eight channels equal to FFmpeg's), so this encoder does not rely on the history
+  after a restart.
