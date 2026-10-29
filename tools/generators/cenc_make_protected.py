@@ -12,11 +12,11 @@ and FFmpeg 6.1.1 decrypt the `core` layout of all four schemes to the clear samp
 decrypts `leader_entry`, `leader_seig` and `rotate` too. A 1:9 pattern on audio is not agreed by
 either of them. Do not use this file as a reference for the standard.
 
-Input is an MP4 with one `ac-3`, `ec-3` or `ac-4` track, such as `forge mp4 in.ec3 out.mp4` or
-`forge ac4-encode in.wav out.mp4` writes. Output is a fragmented MP4 (default-base-is-moof, one
-`traf` per `moof`) whose `stsd` entry is `enca`, with the original configuration box kept and a
-`sinf` after it. Audio is protected whole-sample, with no subsample map. The keys are fixed test
-values; change them with --kid and --key.
+Input is an MP4 with one `ac-3`, `ec-3`, `ac-4` or `mlpa` (TrueHD or MLP) track, such as
+`forge mp4 in.ec3 out.mp4` or `forge ac4-encode in.wav out.mp4` writes. Output is a fragmented MP4
+(default-base-is-moof, one `traf` per `moof`) whose `stsd` entry is `enca`, with the original
+configuration box kept and a `sinf` after it. Audio is protected whole-sample, with no subsample
+map. The keys are fixed test values; change them with --kid and --key.
 
     python3 tools/generators/cenc_make_protected.py clear.mp4 out.mp4 cenc
     python3 tools/generators/cenc_make_protected.py clear.mp4 out.mp4 cbcs --variant leader_entry
@@ -431,7 +431,7 @@ def playready_object(plan: Plan) -> bytes:
 
 
 def original_format(clear: bytes) -> bytes:
-    """The first sample entry's type of the clear input ('ec-3', 'ac-3', 'ac-4'), or b''."""
+    """The first sample entry's type of the clear input ('ec-3', 'ac-3', 'ac-4', 'mlpa'), or b''."""
     found = find(clear, "moov/trak/mdia/minf/stbl/stsd")
     if not found:
         return b""
@@ -445,8 +445,8 @@ def init_segment(clear: bytes, plan: Plan) -> tuple[bytes, int]:
     pos, header, size = find(clear, "moov/trak/mdia/minf/stbl/stsd")
     kind, first, _h, entry_size = next(boxes(clear, pos + header + 8, pos + size))
     entry = clear[first : first + entry_size]
-    if kind not in (b"ec-3", b"ac-3", b"ac-4"):
-        sys.exit("the input needs one ac-3, ec-3 or ac-4 track")
+    if kind not in (b"ec-3", b"ac-3", b"ac-4", b"mlpa"):
+        sys.exit("the input needs one ac-3, ec-3, ac-4 or mlpa track")
     prefix = entry[8 : 8 + AUDIO_ENTRY_BYTES]
     children = entry[8 + AUDIO_ENTRY_BYTES :]
     protected = box(b"enca", prefix + children + sinf(plan, kind, plan.kid1))
@@ -636,7 +636,7 @@ def parse_pattern(text: str) -> tuple[int, int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])
-    parser.add_argument("input", help="clear MP4 with one ac-3, ec-3 or ac-4 track")
+    parser.add_argument("input", help="clear MP4 with one ac-3, ec-3, ac-4 or mlpa track")
     parser.add_argument("output", help="protected fragmented MP4 to write")
     parser.add_argument("scheme", choices=SCHEMES)
     parser.add_argument("--variant", choices=VARIANTS, default="core")

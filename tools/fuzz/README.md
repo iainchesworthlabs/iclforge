@@ -994,6 +994,31 @@ streams is what lets a fuzzer's mutations explore "almost valid" input
 instead of spending its budget on bytes that get rejected before line one of
 the parser.
 
+The content-signature corpora are grown by `tools/fuzz/signature-seeds.py` from files `forge` signs
+with keys made on the spot by openssl and thrown away: the chains a signature can carry (leaf, root
+and an intermediate in order; leaf and root; the leaf alone; the root first), a mono and a 5.1
+stream beside the stereo one, a leaf with another title and a signing date days later, the
+certificates as DER and as PEM (a root, an intermediate with a path length, leaves with and without
+a key usage, with names, on an ECDSA P-384 key and on an RSA key, which the verifier refuses by
+algorithm), the Thrift blob alone and as base64, and streams cut inside the certificate list or
+with the trailer twice. They are reduced by `run.sh merge` to the files that reach different
+branches: `fuzz_content_signature` has 31 seeds and `fuzz_ac4_content_signature` 11. No private key
+is written to a seed, so that a secret scanner has nothing to find; the key loader's PEM path is
+reached by mutation and by the dictionary (`dictionaries/fuzz_content_signature.dict`: the PEM
+markers and labels, the DER encodings of the object identifiers the X.509 reader compares against,
+the default leaf title and a date's shape). Nothing is made from, or derived from, anyone's signed
+file.
+
+`fuzz_mp4_demux` starts from protected files as well as clear ones: the three layouts
+`tools/generators/gen_cenc_reader_fixtures.py` makes for the reader's tests and Dolby's four, and the
+files `tools/fuzz/protected-seeds.py` adds with `tools/generators/cenc_make_protected.py` (TrueHD
+`mlpa`, E-AC-3 and AC-4 in `cenc`, `cens`, `cbc1` and `cbcs`, with a clear lead-in entry in either
+order, a clear first fragment marked by a `seig` group, and a second key rotated in by one). Their
+`sinf`, `frma`, `schm`, `schi` and `tenc` are what the reader parses; `senc`, `saiz`, `saio`,
+`pssh` and `seig` it walks over, so the seeds carry them for the day a reader decrypts and add
+nothing to coverage today, and `dictionaries/fuzz_mp4_demux.dict` lists every box type the reader
+matches and the protection boxes and scheme names.
+
 The TrueHD and MLP corpora are made by `tools/fuzz/truehd-seeds.py` from the streams of
 `testdata/truehd` and nothing else. `fuzz_truehd_parse`, whose seeds and dictionary
 `fuzz_truehd_decode` and `fuzz_differential_truehd_decode` share, holds a cut of every fixture and hand-built stream: the

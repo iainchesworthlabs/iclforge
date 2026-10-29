@@ -118,6 +118,26 @@ else
     echo "    openssl or python3 not found: the content signature seeds are left as committed"
 fi
 
+# More of the same, from tools/fuzz/signature-seeds.py: the chains a signature can carry (leaf, root
+# and an intermediate in order, leaf and root, the leaf alone, the root first), a mono and a 5.1
+# stream, a leaf with another title and a later signing date, the certificates as DER and PEM
+# (with and without a key usage, with names, on an ECDSA P-384 key and an RSA key), the blob alone
+# and as base64. Synthetic keys only: nothing here reads or derives from anyone's signed file.
+if command -v openssl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    echo "==> AC-4 content signature: chains, streams and certificates"
+    python3 "$SCRIPT_DIR/signature-seeds.py" "$OUT" --forge "$ICLFORGE_CLI"
+fi
+
+# Protected MP4s for the box walk and the sinf/frma/schm/tenc parse: TrueHD ('mlpa'), E-AC-3 and
+# AC-4 under the schemes and the clear-lead-in, clear-first-fragment and key-rotation layouts that
+# the committed seeds do not cover (the generator is tools/generators/cenc_make_protected.py).
+if python3 -c "import cryptography" >/dev/null 2>&1; then
+    echo "==> Protected MP4: mlpa, ec-3 and ac-4 in more layouts"
+    python3 "$SCRIPT_DIR/protected-seeds.py" "$OUT/fuzz_mp4_demux" --forge "$ICLFORGE_CLI"
+else
+    echo "    the 'cryptography' package is missing: the protected MP4 seeds are left as committed"
+fi
+
 # The IAB seed comes from examples/encode_iab.cpp's own --write-fixture mode,
 # the one tools/ci/run_codec_matrix.sh drives, so it needs that example built -
 # which this script's ICLFORGE_CLI_BIN contract does not cover. It is committed
