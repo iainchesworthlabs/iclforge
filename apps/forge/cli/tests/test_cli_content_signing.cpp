@@ -154,6 +154,25 @@ fs::path tones_wav() {
     return path;
 }
 
+// Half a second of four tones as a four-channel WAV, which atmos-encode makes four objects of.
+fs::path objects_wav() {
+    static const fs::path path = [] {
+        std::vector<std::vector<float>> channels(4, std::vector<float>(kRate / 2));
+        const double frequencies[4] = {220.0, 330.0, 440.0, 550.0};
+        for (std::size_t c = 0; c < channels.size(); ++c) {
+            for (std::size_t n = 0; n < channels[c].size(); ++n) {
+                const double t = static_cast<double>(n) / kRate;
+                channels[c][n] =
+                    static_cast<float>(0.1 * std::sin(2.0 * std::numbers::pi * frequencies[c] * t));
+            }
+        }
+        const fs::path wav = scratch_dir() / "objects.wav";
+        REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, kRate).has_value());
+        return wav;
+    }();
+    return path;
+}
+
 // The elementary stream and its signature, written by sign-content.
 struct SignedStream {
     fs::path stream;
@@ -521,6 +540,40 @@ TEST_CASE("an expired intermediate is refused unless allow-expired-intermediates
     REQUIRE_FALSE(fs::exists(root_out));
 }
 
+TEST_CASE("verify-time= is the time the chain is judged at, not the clock",
+          "[cli][content_signing]") {
+    const CleanEnvironment environment;
+    // Every certificate of the default authority is valid from 2024-01-01 to 2034-01-01, and the
+    // system clock sits inside that, so only an option that is read can make these two differ.
+    const Signer signer{"verify-time"};
+    const SignedStream signed_stream = sign_elementary(signer, "verify-time");
+    const std::string anchor = "trust-anchor=" + quoted(signer.root);
+
+    SECTION("inside the dates") {
+        const fs::path out = wav_out("verify-time-inside");
+        const Run run = forge("decode " + quoted(signed_stream.stream) + " " + quoted(out) +
+                              " verify-content " + anchor + " verify-time=2030-01-01T00:00:00Z");
+        REQUIRE(run.exit_code == 0);
+        REQUIRE(fs::exists(out));
+    }
+    SECTION("after every certificate has lapsed") {
+        const fs::path out = wav_out("verify-time-after");
+        const Run run = forge("decode " + quoted(signed_stream.stream) + " " + quoted(out) +
+                              " verify-content " + anchor + " verify-time=2040-01-01T00:00:00Z");
+        REQUIRE(run.exit_code == 2);
+        REQUIRE(contains(run.log, "BadCredentialsForSigningContent"));
+        REQUIRE_FALSE(fs::exists(out));
+    }
+    SECTION("before any certificate was valid") {
+        const fs::path out = wav_out("verify-time-before");
+        const Run run = forge("decode " + quoted(signed_stream.stream) + " " + quoted(out) +
+                              " verify-content " + anchor + " verify-time=2023-01-01T00:00:00Z");
+        REQUIRE(run.exit_code == 2);
+        REQUIRE(contains(run.log, "BadCredentialsForSigningContent"));
+        REQUIRE_FALSE(fs::exists(out));
+    }
+}
+
 TEST_CASE("the leaf profile is the specification's unless the operator changes it",
           "[cli][content_signing]") {
     const CleanEnvironment environment;
@@ -587,6 +640,8 @@ TEST_CASE("gate-content decodes what does not verify, without its objects, and c
         REQUIRE(contains(run.log, "warning: gate-content"));
         REQUIRE(contains(run.log, "did not verify"));
         REQUIRE(contains(run.log, "decoding it without its objects"));
+        // The decoder was told to leave objects out: the run says so, and a verified one did not.
+        REQUIRE(contains(run.log, "object audio left out"));
         REQUIRE(fs::exists(gated));
 
         // A stream with no object audio loses nothing: the same samples as an unchecked decode.
@@ -602,7 +657,35 @@ TEST_CASE("gate-content decodes what does not verify, without its objects, and c
                               std::string{kVerifyTime});
         REQUIRE(run.exit_code == 0);
         REQUIRE(contains(run.log, "BadCredentialsForSigningContent"));
+        REQUIRE(contains(run.log, "object audio left out"));
         REQUIRE(fs::exists(out));
+    }
+    SECTION("object audio plays when the signature verifies and is refused when it does not") {
+        const fs::path stream = scratch_dir() / "gate-objects.ac4";
+        const Run encoded = forge("atmos-encode " + quoted(objects_wav()) + " " + quoted(stream) +
+                                  " 256 codec=ac4 " + signer.sign_args());
+        REQUIRE(encoded.exit_code == 0);
+        REQUIRE(fs::exists(scratch_dir() / "gate-objects.ac4.sig"));
+
+        const fs::path verified = wav_out("gate-objects-verified");
+        const Run good = forge("decode " + quoted(stream) + " " + quoted(verified) +
+                               " gate-content " + signer.verify_args());
+        REQUIRE(good.exit_code == 0);
+        REQUIRE(contains(good.log, "content signature: verified"));
+        REQUIRE(contains(good.log, "4 objects"));
+        REQUIRE(fs::exists(verified));
+
+        // The same stream under another authority's anchor does not verify. It is a presentation of
+        // object audio alone, so with the objects left out there is nothing to play: the decode
+        // stops and writes nothing, and says why.
+        const Signer other{"gate-objects-other", {.seed = "objects other"}};
+        const fs::path refused = wav_out("gate-objects-refused");
+        const Run bad = forge("decode " + quoted(stream) + " " + quoted(refused) +
+                              " gate-content " + other.verify_args());
+        REQUIRE(bad.exit_code == 2);
+        REQUIRE(contains(bad.log, "BadCredentialsForSigningContent"));
+        REQUIRE(contains(bad.log, "object audio alone"));
+        REQUIRE_FALSE(fs::exists(refused));
     }
     SECTION("with nothing to trust it is still refused: it has no way to judge") {
         const fs::path out = wav_out("gate-no-trust");
