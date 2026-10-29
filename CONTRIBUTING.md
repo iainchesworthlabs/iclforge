@@ -77,7 +77,7 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 12
+**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 17
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`, under `include/`), its sources (`src/`), its tests (`tests/`, a binary
 of their own: `ctest -L <name>`), its libFuzzer harnesses (`fuzz/`, with their seeds and the inputs
@@ -89,8 +89,9 @@ library's public headers declare into the namespace named for it under the famil
 into another library's namespace, or into `iclforge` itself.
 `libs/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `libs/ac4` is the
 AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
-`encoder`), and links nothing from `libs/ac3`.
-The two codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
+`encoder`), and links nothing from `libs/ac3`. `libs/truehd` is the TrueHD and MLP codec, in namespace
+`iclforge::truehd`, laid out by the same areas, and links only `libs/base`.
+The codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
 the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
 `Fixed32`, the project's own float functions and the SIMD seam), `libs/dsp` (the transforms more
 than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
@@ -372,6 +373,15 @@ comparison, to MediaInfo's frame-by-frame reading and DEE's MP4 muxer
 (librempeg does not decode the one and refuses the other) or reads IEC 61937 bursts: for those,
 say so in the commit message and hold the change to the standard's own tables and formulas, as
 the tests there do.
+
+**TrueHD has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#truehd-and-mlp)
+and in `planning/truehd.md`. The codec is lossless, so FFmpeg's strict decode (flags as above) is held to the
+source sample for sample in both directions: its `truehd` and `mlp` encoders' streams through this decoder, and this
+encoder's streams through its decoder (`tools/checks/verify_truehd_interop.py`, `verify_truehd_encode_interop.py` and
+`verify_truehd_containers.py`). The syntax is transcribed a second time in `tools/references/truehd_syntax.py`, and
+`tools/references/truehd_writer.py` builds the streams no encoder writes. DEE's TrueHD streams of known sources are
+scored on the owner's machine only (`score_truehd_decode.py`). The specification the code follows is the owner's and is
+not in the tree: where it and a stream disagree, the reading taken goes in `libs/truehd/ERRATA.md`.
 
 **Object reconstruction has none of the four.** Dolby's tooling above verifies the object
 layer's *syntax*, not its audio: that decoder gates object decoding on a keyed authenticity tag
