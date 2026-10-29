@@ -19,8 +19,7 @@
 // object path: three encoders (AC-3, E-AC-3 with its tools on `auto`, and
 // Atmos/JOC) and the three decoders that read what they produce, and AC-4's
 // encoder and decoder at stereo and 5.1, each held to AC-4's own 2 048-sample
-// frame rather than A/52's 1 536 (ac4_bench.hpp), and the TrueHD decoder at 5.1, forty access units
-// (33.3 ms) to the frame (truehd_bench.hpp). Before PF1
+// frame rather than A/52's 1 536 (ac4_bench.hpp). Before PF1
 // the E-AC-3 encoder - the largest single source file in the codec - and
 // every decode path had no ms/frame series at all, so a regression in any of
 // them was invisible to this page. The decode series are timed off streams
@@ -105,9 +104,6 @@ public:
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
                 .count());
     }
-
-    // A frame whose time was taken elsewhere (truehd_bench.cpp times its own decode calls).
-    void add_frame(double ms) { per_frame_ms_.push_back(ms); }
 
     [[nodiscard]] Result result(std::string name) const {
         const auto frames = static_cast<int>(per_frame_ms_.size());
@@ -446,22 +442,80 @@ Result bench_ac4_decode(std::string name, const std::vector<std::vector<std::byt
     return r;
 }
 
-// A frame is 40 access units decoded back to back (33.3 ms of 5.1 at 48 kHz), timed together against
-// that duration. The stream is the encoder's own, from the same fixture: truehd_bench.hpp.
-Result bench_truehd_decode(std::string name, const perf::truehd_bench::DecodeRun& run) {
-    if (!run.built || !run.error.empty() || run.frame_ms.empty()) {
-        std::fprintf(stderr, "%s: %s\n", name.c_str(),
-                     run.built ? run.error.c_str()
-                               : "this build has no TrueHD library (ICLFORGE_BUILD_TRUEHD=OFF)");
-        std::exit(1);
+// --- TrueHD ----------------------------------------------------------------------------------
+// A frame is an access unit (truehd_bench.hpp). The encoder is given one access unit's PCM a call,
+// as a live caller would, and the call that completes a restart interval does the interval's whole
+// analysis: the mean is the codec's cost and the maximum is that burst.
+
+Result bench_truehd_encode(std::string name, const perf::truehd_bench::Source& source,
+                           const iclforge::truehd::EncoderConfig& config) {
+    const auto create = [&] {
+        auto encoder = iclforge::truehd::Encoder::create(config);
+        if (!encoder) {
+            fail(name.c_str(), "iclforge::truehd::Encoder::create");
+        }
+        return std::move(*encoder);
+    };
+    const int samples = create().samples_per_access_unit();
+    const auto units = static_cast<int>(source.frames()) / samples;
+    {
+        auto warm = create();
+        for (int unit = 0; unit < perf::truehd_bench::kIntervalUnits + kWarmupFrames; ++unit) {
+            (void)warm.encode(perf::truehd_bench::unit_pcm(source, samples,
+                                                           static_cast<std::size_t>(unit)));
+        }
     }
-    FrameTimer timer{static_cast<int>(run.frame_ms.size())};
-    for (const double ms : run.frame_ms) {
-        timer.add_frame(ms);
+
+    auto encoder = create();
+    FrameTimer timer{units};
+    for (int unit = 0; unit < units; ++unit) {
+        timer.time_frame([&] {
+            const auto result = encoder.encode(
+                perf::truehd_bench::unit_pcm(source, samples, static_cast<std::size_t>(unit)));
+            if (!result) {
+                fail(name.c_str(), "iclforge::truehd::Encoder::encode");
+            }
+        });
+    }
+    // The tail of the last interval leaves the encoder here and is attributed to the last frame.
+    timer.time_frame([&] { (void)encoder.flush(); });
+    Result r = timer.result(std::move(name));
+    r.budget_ms_per_frame = perf::truehd_bench::budget_ms(config.sample_rate, samples);
+    return r;
+}
+
+// `passes` runs over the same units, each from a fresh decoder, so a series is long enough to time:
+// an access unit takes microseconds.
+Result bench_truehd_decode(std::string name, std::span<const std::span<const std::byte>> units,
+                           std::uint32_t sample_rate, int samples_per_unit, int passes) {
+    if (units.empty()) {
+        fail(name.c_str(), "building its source stream");
+    }
+    {
+        iclforge::truehd::Decoder warm;
+        for (const auto unit : units) {
+            (void)warm.decode(unit);
+        }
+    }
+    FrameTimer timer{static_cast<int>(units.size()) * passes};
+    for (int pass = 0; pass < passes; ++pass) {
+        iclforge::truehd::Decoder decoder;
+        for (const auto unit : units) {
+            timer.time_frame([&] {
+                const auto result = decoder.decode(unit);
+                if (!result) {
+                    fail(name.c_str(), "iclforge::truehd::Decoder::decode");
+                }
+            });
+        }
     }
     Result r = timer.result(std::move(name));
-    r.budget_ms_per_frame = run.budget_ms;
+    r.budget_ms_per_frame = perf::truehd_bench::budget_ms(sample_rate, samples_per_unit);
     return r;
+}
+
+std::vector<std::span<const std::byte>> as_spans(const perf::truehd_bench::Stream& stream) {
+    return {stream.units.begin(), stream.units.end()};
 }
 
 void write_json(const std::vector<Result>& results, const std::string& path) {
@@ -491,9 +545,15 @@ int main(int argc, char** argv) {
     // other work, a short run that can be repeated many times is worth far
     // more than one long one.
     std::vector<std::string> only;
+    // --truehd-fixtures: also time the TrueHD and MLP streams committed under testdata/truehd, one
+    // decode row each and one encode row for each TrueHD stream's own material. CI never passes it:
+    // those rows are a table of configurations to read, not series to keep.
+    bool truehd_fixtures = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--json-out" && i + 1 < argc) {
+        if (arg == "--truehd-fixtures") {
+            truehd_fixtures = true;
+        } else if (arg == "--json-out" && i + 1 < argc) {
             json_out = argv[++i];
         } else if (arg == "--wav" && i + 1 < argc) {
             wav_path = argv[++i];
@@ -589,15 +649,49 @@ int main(int argc, char** argv) {
             "ac4_51_decode", perf::ac4_bench::encode_frames(
                                  ac4_five_one, perf::ac4_bench::five_one_config(), kFrames)));
     }
-    if (wanted("truehd_51_decode")) {
-        const auto run = perf::truehd_bench::time_decode(audio, perf::truehd_bench::kFrames,
-                                                         perf::truehd_bench::kWarmupUnits);
-        if (!run.built && only.empty()) {
-            // A build without the TrueHD library has no series for it, as one without Atmos would not;
-            // asking for it by name is the only way to make that an error.
-            fmt::printf("%-20s skipped: this build has no TrueHD library\n", "truehd_51_decode");
-        } else {
-            results.push_back(bench_truehd_decode("truehd_51_decode", run));
+
+    // TrueHD: stereo and 5.1 at 48 kHz and 24 bits, each direction. The decode rows read what the
+    // encode rows' encoder writes from the same source, as the other codecs' do.
+    const bool want_truehd_encode = wanted("truehd_stereo_encode") || wanted("truehd_51_encode");
+    const bool want_truehd_decode = wanted("truehd_stereo_decode") || wanted("truehd_51_decode");
+    if (want_truehd_encode || want_truehd_decode) {
+        namespace tb = perf::truehd_bench;
+        constexpr int kTrueHdDecodePasses = 20;
+        const struct {
+            const char* layout;
+            std::span<const std::size_t> channels;
+        } layouts[] = {{"stereo", tb::kStereoChannels}, {"51", tb::kFiveOneChannels}};
+        for (const auto& layout : layouts) {
+            const std::string base = std::string("truehd_") + layout.layout;
+            const tb::Source source = tb::make_source(audio, layout.channels, 24);
+            const auto config = tb::config_for(source);
+            if (wanted(base + "_encode")) {
+                results.push_back(bench_truehd_encode(base + "_encode", source, config));
+            }
+            if (wanted(base + "_decode")) {
+                const tb::Stream stream = tb::encode_stream(source, config);
+                const auto units = as_spans(stream);
+                results.push_back(bench_truehd_decode(base + "_decode", units, stream.sample_rate,
+                                                      stream.samples_per_unit,
+                                                      kTrueHdDecodePasses));
+            }
+        }
+    }
+    if (truehd_fixtures) {
+        namespace tb = perf::truehd_bench;
+        for (const auto& fixture : tb::load_fixtures(ICLFORGE_SOURCE_DIR "/testdata/truehd")) {
+            const auto units = tb::split_units(fixture.bytes);
+            if (wanted(fixture.name + "_decode")) {
+                results.push_back(bench_truehd_decode(
+                    fixture.name + "_decode", units, fixture.info.sample_rate,
+                    fixture.info.samples_per_access_unit, 20));
+            }
+            // The encoder writes TrueHD only, so an MLP fixture has a decode row and no encode row.
+            if (fixture.truehd && wanted(fixture.name + "_encode")) {
+                const tb::Source source = tb::decode_to_source(fixture);
+                results.push_back(bench_truehd_encode(fixture.name + "_encode", source,
+                                                      tb::config_for(source)));
+            }
         }
     }
     if (results.empty()) {
@@ -610,6 +704,22 @@ int main(int argc, char** argv) {
                     "(p95 %6.3f  max %6.3f)  (budget %.3f ms/frame)\n",
                     r.name.c_str(), r.frames, r.total_ms, r.ms_per_frame, r.p95_ms_per_frame,
                     r.max_ms_per_frame, r.budget_ms_per_frame);
+    }
+
+    // The TrueHD rows again, in the units the codec is quoted in: microseconds an access unit, and
+    // milliseconds of processing a second of audio (one over the real-time multiple).
+    bool heading = false;
+    for (const auto& r : results) {
+        if (!r.name.contains("truehd") && !r.name.starts_with("mlp_")) {
+            continue;
+        }
+        if (!heading) {
+            fmt::printf("\nTrueHD, per access unit and per second of audio\n");
+            heading = true;
+        }
+        fmt::printf("%-28s %9.2f us/unit  %9.2f ms/s of audio  %8.1fx real time\n", r.name.c_str(),
+                    1000.0 * r.ms_per_frame, 1000.0 * r.ms_per_frame / r.budget_ms_per_frame,
+                    r.budget_ms_per_frame / r.ms_per_frame);
     }
 
     if (!json_out.empty()) {

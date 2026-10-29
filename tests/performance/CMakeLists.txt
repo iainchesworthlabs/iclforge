@@ -1,14 +1,3 @@
-# The TrueHD decode measurement, shared by iclforge-perf and iclforge-bench (truehd_bench.hpp). The tests are
-# built whether or not iclforge::truehd is (ICLFORGE_BUILD_TRUEHD), and the sources carry no conditional, so
-# the library that answers is chosen here: the real one, or the one that says the codec was not built.
-if(TARGET iclforge::truehd)
-    add_library(iclforge-perf-truehd STATIC truehd_bench.cpp)
-    target_link_libraries(iclforge-perf-truehd PRIVATE iclforge::truehd)
-else()
-    add_library(iclforge-perf-truehd STATIC truehd_bench_absent.cpp)
-endif()
-target_link_libraries(iclforge-perf-truehd PUBLIC iclforge::ac3 PRIVATE iclforge::warnings)
-
 # ---------------------------------------------------------------------------
 # iclforge-perf - real-time throughput regression guards (hard pass/fail). See
 # test_performance.cpp for why this is a separate target from the test binaries, and
@@ -27,7 +16,7 @@ target_link_libraries(iclforge-perf
     PRIVATE
         iclforge::ac3
         iclforge::ac4
-        iclforge-perf-truehd
+        iclforge::truehd
         iclforge::warnings
         iclforge::fmt
         Catch2::Catch2WithMain)
@@ -61,7 +50,7 @@ catch_discover_tests(iclforge-perf
 # ---------------------------------------------------------------------------
 add_executable(iclforge-bench bench_encoder.cpp)
 
-target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4 iclforge-perf-truehd iclforge::warnings iclforge::fmt)
+target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4 iclforge::truehd iclforge::warnings iclforge::fmt)
 
 target_include_directories(iclforge-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -116,7 +105,8 @@ if((WIN32 OR LINUX) AND NOT ICLFORGE_SANITIZERS MATCHES "thread")
     # The AC-4 library's static build, for the same reason as
     # iclforge::ac3_static: a DLL's allocations would not reach the counters.
     target_link_libraries(iclforge-membench PRIVATE
-        iclforge::ac3_static iclforge::ac4_static iclforge::warnings iclforge::fmt)
+        iclforge::ac3_static iclforge::ac4_static iclforge::truehd_static iclforge::warnings
+        iclforge::fmt)
 
     # The AC-4 workloads read the real-audio fixture (real_audio.hpp).
     target_compile_definitions(iclforge-membench PRIVATE
@@ -141,11 +131,12 @@ add_executable(iclforge-kernelbench kernel_bench.cpp)
 # kernels it builds, libs/dsp/src/tiered), so it
 # links the static library in every build and takes the library's private and
 # scalar-tier directories, as libs/ac4/tests/CMakeLists.txt does for its core/ tests.
-target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
+target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::truehd_static iclforge::warnings iclforge::fmt)
 target_include_directories(iclforge-kernelbench PRIVATE
     "${CMAKE_SOURCE_DIR}/libs/ac4/src"
     "${CMAKE_SOURCE_DIR}/libs/dsp/include"
     "${CMAKE_SOURCE_DIR}/libs/dsp/src"
+    "${CMAKE_SOURCE_DIR}/libs/truehd/src"
     "${CMAKE_SOURCE_DIR}/libs/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

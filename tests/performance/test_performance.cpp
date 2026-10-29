@@ -30,10 +30,11 @@
 // caught a regression like that - this file exists specifically to fail
 // loudly if the codec ever stops being faster than real time again.
 //
-// It covers both directions of both generations plus the object path: the
+// It covers both directions of both generations plus the object path (and, since TrueHD joined,
+// both directions of TrueHD at stereo and 5.1, a frame there being an access unit): the
 // AC-3 and Atmos/JOC encoders it was written for, and - since encoder/decode benchmarks -
 // the E-AC-3 encoder and all three decoders, which had no real-time gate of
-// any kind - and AC-4's encoder and decoder, at stereo and 5.1, and the TrueHD decoder at 5.1. A decoder
+// any kind - and AC-4's encoder and decoder, at stereo and 5.1. A decoder
 // is the half of the codec that runs on the least capable hardware there is
 // (a set-top box, a phone, the WASM demo in a browser tab), so "faster than
 // real time" is a harder requirement there than it is on the encode side,
@@ -73,8 +74,6 @@ constexpr double kSlackFactor = 2.0;
 constexpr int kDecodeSourceFrames = 40;
 // The object count every Atmos case here uses, encode and decode alike.
 constexpr int kObjects = 4;
-// TrueHD frames to decode (40 access units, 33.3 ms of 5.1 at 48 kHz, each): a second.
-constexpr int kTrueHdFrames = 30;
 
 double real_time_budget_seconds(int frames) {
     return static_cast<double>(frames) * iclforge::ac3::kSamplesPerFrame / kSampleRate;
@@ -193,6 +192,55 @@ void check_ac4_decode(const std::string& what, const iclforge::ac4::EncoderConfi
     }
     const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start);
     check_ac4_faster_than_real_time(what, elapsed.count(), static_cast<int>(frames.size()));
+}
+
+
+// TrueHD's frame is an access unit, 40 samples at 48 kHz, so its budget is 0.83 ms against A/52's
+// 32. The whole 2.5 s fixture is run: 3 000 units.
+void check_truehd_faster_than_real_time(const std::string& what, double elapsed_seconds,
+                                        std::size_t units, int samples_per_unit) {
+    const double budget = static_cast<double>(units) *
+                          perf::truehd_bench::budget_ms(48000, samples_per_unit) / 1000.0;
+    INFO(what << ": " << units << " access units in " << elapsed_seconds << "s ("
+              << (1.0e6 * elapsed_seconds / static_cast<double>(units))
+              << "us/unit); real-time budget is " << budget << "s");
+    CHECK(elapsed_seconds < kSlackFactor * budget);
+}
+
+perf::truehd_bench::Source truehd_source(std::span<const std::size_t> channels) {
+    return perf::truehd_bench::make_source(fixture(), channels, 24);
+}
+
+void check_truehd_encode(const std::string& what, std::span<const std::size_t> channels) {
+    const auto source = truehd_source(channels);
+    auto encoder = iclforge::truehd::Encoder::create(perf::truehd_bench::config_for(source));
+    REQUIRE(encoder.has_value());
+    const int samples = encoder->samples_per_access_unit();
+    const auto units = source.frames() / static_cast<std::size_t>(samples);
+
+    const auto start = std::chrono::steady_clock::now();
+    for (std::size_t unit = 0; unit < units; ++unit) {
+        REQUIRE(encoder->encode(perf::truehd_bench::unit_pcm(source, samples, unit)).has_value());
+    }
+    REQUIRE(encoder->flush().has_value());
+    const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start);
+    check_truehd_faster_than_real_time(what, elapsed.count(), units, samples);
+}
+
+void check_truehd_decode(const std::string& what, std::span<const std::size_t> channels) {
+    const auto source = truehd_source(channels);
+    const auto stream =
+        perf::truehd_bench::encode_stream(source, perf::truehd_bench::config_for(source));
+    REQUIRE_FALSE(stream.units.empty());
+    iclforge::truehd::Decoder decoder;
+
+    const auto start = std::chrono::steady_clock::now();
+    for (const auto& unit : stream.units) {
+        REQUIRE(decoder.decode(unit).has_value());
+    }
+    const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start);
+    check_truehd_faster_than_real_time(what, elapsed.count(), stream.units.size(),
+                                       stream.samples_per_unit);
 }
 
 }  // namespace
@@ -322,25 +370,18 @@ TEST_CASE("the AC-4 5.1 decoder stays faster than real time") {
     check_ac4_decode("AC-4 5.1 decode", perf::ac4_bench::five_one_config(),
                      perf::ac4_bench::kFiveOneChannels);
 }
+TEST_CASE("the TrueHD stereo encoder stays faster than real time") {
+    check_truehd_encode("TrueHD stereo encode", perf::truehd_bench::kStereoChannels);
+}
 
-// A frame is 40 TrueHD access units (33.3 ms), decoded back to back from a stream the TrueHD encoder wrote
-// from the same fixture. The budget is the sum of the frames' durations, as for the other decoders.
+TEST_CASE("the TrueHD 5.1 encoder stays faster than real time") {
+    check_truehd_encode("TrueHD 5.1 encode", perf::truehd_bench::kFiveOneChannels);
+}
+
+TEST_CASE("the TrueHD stereo decoder stays faster than real time") {
+    check_truehd_decode("TrueHD stereo decode", perf::truehd_bench::kStereoChannels);
+}
+
 TEST_CASE("the TrueHD 5.1 decoder stays faster than real time") {
-    const auto run = perf::truehd_bench::time_decode(fixture(), kTrueHdFrames,
-                                                     perf::truehd_bench::kWarmupUnits);
-    if (!run.built) {
-        SKIP("this build has no TrueHD library (ICLFORGE_BUILD_TRUEHD=OFF)");
-    }
-    INFO(run.error);
-    REQUIRE(run.error.empty());
-    REQUIRE_FALSE(run.frame_ms.empty());
-    double elapsed_ms = 0.0;
-    for (const double ms : run.frame_ms) {
-        elapsed_ms += ms;
-    }
-    const double frames = static_cast<double>(run.frame_ms.size());
-    INFO("TrueHD 5.1 decode: " << run.frame_ms.size() << " frames in " << elapsed_ms << "ms ("
-                               << (elapsed_ms / frames) << "ms/frame); real-time budget is "
-                               << (run.budget_ms * frames) << "ms");
-    CHECK(elapsed_ms < kSlackFactor * run.budget_ms * frames);
+    check_truehd_decode("TrueHD 5.1 decode", perf::truehd_bench::kFiveOneChannels);
 }

@@ -6,7 +6,7 @@ What every test binary is built with (iclforge::test_support) and the performanc
 
 A tests.
 
-- **Uses:** `ac3`, `ac4`, `dsp`, `truehd`
+- **Uses:** `ac3`, `ac4`, `base`, `dsp`, `truehd`
 - **Used by:** nothing
 - **CI lanes:** core
 

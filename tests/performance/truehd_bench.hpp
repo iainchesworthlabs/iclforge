@@ -62,7 +62,8 @@ inline Source make_source(const iclforge::ac3::io::WavData& wav,
                           std::span<const std::size_t> channels, int bits) {
     Source source{.channels = static_cast<int>(channels.size()),
                   .bits = bits,
-                  .sample_rate = wav.sample_rate};
+                  .sample_rate = wav.sample_rate,
+                  .pcm = {}};
     const std::size_t frames = wav.frame_count();
     source.pcm.reserve(frames * channels.size());
     std::uint32_t lcg = 0x2545F491U;
@@ -118,7 +119,8 @@ struct Stream {
         std::fprintf(stderr, "truehd bench: the encoder refused its configuration\n");
         std::exit(1);
     }
-    Stream stream{.samples_per_unit = encoder->samples_per_access_unit(),
+    Stream stream{.units = {},
+                  .samples_per_unit = encoder->samples_per_access_unit(),
                   .sample_rate = config.sample_rate};
     const auto take = [&](auto&& result) {
         if (!result) {
@@ -158,7 +160,7 @@ struct Fixture {
     for (const auto& path : paths) {
         std::ifstream in(path, std::ios::binary);
         std::vector<char> raw((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        Fixture fixture{.name = path.stem().string()};
+        Fixture fixture{.name = path.stem().string(), .bytes = {}, .info = {}};
         fixture.bytes.resize(raw.size());
         std::ranges::transform(raw, fixture.bytes.begin(),
                                [](char c) { return static_cast<std::byte>(c); });
@@ -193,7 +195,10 @@ struct Fixture {
 // The PCM a fixture decodes to, interleaved, for the encode workload over the same material.
 [[nodiscard]] inline Source decode_to_source(const Fixture& fixture) {
     iclforge::truehd::Decoder decoder;
-    Source source{.channels = 0, .bits = fixture.bits, .sample_rate = fixture.info.sample_rate};
+    Source source{.channels = 0,
+                  .bits = fixture.bits,
+                  .sample_rate = fixture.info.sample_rate,
+                  .pcm = {}};
     for (const auto unit : split_units(fixture.bytes)) {
         auto result = decoder.decode(unit);
         if (!result) {
