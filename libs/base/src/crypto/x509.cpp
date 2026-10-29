@@ -217,6 +217,7 @@ std::optional<DistinguishedName> parse_name(const der::Tlv& name) {
             out.text += label;
             out.text += '=';
             out.text += text;
+            out.values.push_back(text);
             if (*oid_text == "2.5.4.3" && !out.common_name) {
                 out.common_name = text;
             } else if (*oid_text == "2.5.4.12" && !out.title) {

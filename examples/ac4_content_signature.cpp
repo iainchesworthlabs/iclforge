@@ -146,6 +146,9 @@ int main(int argc, char** argv) {
         options.signed_date = crypto::format_iso8601_utc(now);
         options.chain_policy.valid_at = now;
         options.chain_policy.required_leaf_title = std::string(crypto::kDefaultLeafTitle);
+        // Who is signing (CS spec v2.5 section 5.3). The publisher's UUID is the one of your
+        // publisher account; left empty it is written empty, and a strict verifier refuses that.
+        options.metadata.publisher_name = "Example Publisher";
 
         // A stream that already carries a signature is refused rather than signed over; strip it
         // first with iclforge::ac4::strip_signature() to re-sign.
@@ -164,6 +167,12 @@ int main(int argc, char** argv) {
     for (const crypto::CheckResult& result : report.checks) {
         fmt::printf("  %s  %s: %s\n", result.ok ? "ok  " : "FAIL", result.name.c_str(),
                     result.detail.c_str());
+    }
+    // Findings on the signer information that did not decide the verdict (set
+    // VerifyPolicy::operator_metadata to kRequire to make them decide it).
+    for (const crypto::CheckResult& note : report.notes) {
+        fmt::printf("  %s  %s: %s\n", note.ok ? "ok  " : "note", note.name.c_str(),
+                    note.detail.c_str());
     }
     fmt::printf("content signature: %s\n", verdict_name(report.verdict));
     // Exit 0 for a stream that checks out and for one that carries nothing to check; the verdict

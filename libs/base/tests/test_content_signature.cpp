@@ -587,6 +587,527 @@ TEST_CASE("a chain or a digest list past its cap is refused",
     CHECK(refused.error().message.find("at most 8") != std::string::npos);
 }
 
+// ---- CS spec v2.5: the order of the checks, and the operator metadata of §5.3 ------------------
+
+namespace {
+
+// A signature written here, by hand, from the field list of CS spec v2.5 §7.6 and the steps of
+// §5.2, and not by the library's writer: so that what the verifier is shown is not only what its
+// own signer makes, and so that the fields §5.3 speaks of can be given values the signer refuses to
+// write (a publisher UUID the certificate contradicts, a nonce of the wrong length).
+struct HandBuilt {
+    std::vector<std::byte> nonce = std::vector<std::byte>(128, std::byte{0x33});
+    std::string publisher_uuid;
+    std::string signed_date = kSignedDate;
+    std::vector<std::byte> content_digest = std::vector<std::byte>(32, std::byte{0x44});
+};
+
+void hand_digest(tb::Writer& w, std::string_view reference, std::string_view method,
+                 std::span<const std::byte> value) {
+    w.field_i32(1, 1);
+    w.field_i32(2, 1);
+    w.field_string(21, reference);
+    w.field_struct(31);
+    w.field_string(1, method);
+    w.field_string(2, "sha256");
+    w.stop();
+    w.field_byte_list(32, value);
+    w.stop();
+}
+
+std::vector<std::byte> hand_built(const std::array<pki::Bytes, 4>& certificates,
+                                  const crypto::P256PrivateKey& key, const HandBuilt& in) {
+    std::vector<std::byte> der;
+    for (const pki::Bytes& certificate : certificates) {
+        append(der, certificate);
+    }
+    // 40 82 LL LL around the four certificates, as the measured blob has it.
+    std::vector<std::byte> wrapped = {std::byte{0x40}, std::byte{0x82},
+                                      static_cast<std::byte>(der.size() >> 8),
+                                      static_cast<std::byte>(der.size() & 0xFF)};
+    append(wrapped, der);
+
+    tb::Writer signer;
+    signer.field_byte_list(1, in.nonce);
+    signer.field_i32(2, 1);
+    signer.field_i32(3, 1);
+    signer.field_struct(4);
+    signer.field_i32(1, 1);
+    signer.field_string(2, in.publisher_uuid);
+    signer.field_string(3, "Hand Built Publisher");
+    signer.field_string(4, "publisher");
+    signer.stop();
+    signer.field_struct(5);
+    signer.field_i32(1, 0);
+    signer.field_string(2, "");
+    signer.field_string(3, "");
+    signer.field_string(4, "product");
+    signer.stop();
+    signer.field_struct(6);
+    signer.field_string(1, "");
+    signer.field_string(2, "");
+    signer.field_string(3, "");
+    signer.field_string(4, "");
+    signer.stop();
+    signer.field_struct(7);
+    signer.field_struct(1);
+    signer.field_i32(1, 0);
+    signer.field_string(3, "hand built");
+    signer.field_string(4, "");
+    signer.stop();
+    signer.field_string(2, "");
+    signer.field_string(3, "");
+    signer.field_string(4, "");
+    signer.stop();
+    signer.field_string(8, in.signed_date);
+    signer.field_struct(10);
+    signer.field_i32(1, 1);
+    signer.field_string(2, "pace-ccjf1");
+    signer.field_string(3, "der");
+    signer.field_byte_list(4, wrapped);
+    signer.stop();
+    signer.stop();
+
+    tb::Writer info;
+    info.field_i32(1, 1);
+    info.field_i32(2, 1);
+    info.field_string(3, "b715f9db-6b41-403d-8bbe-429f3209ca2e");
+    info.field_struct(4);
+    info.field_string(1, "canonical_method_thrift_binary");
+    info.field_string(2, "sha256");
+    info.stop();
+    info.field_struct(5);
+    info.field_string(1, "ecdsa");
+    info.field_string(2, "secp256r1");
+    info.stop();
+    info.field_struct(6);
+    hand_digest(info, "digest_data_ref_signer_info", "canonical_method_thrift_binary",
+                crypto::sha256(signer.bytes()));
+    info.field(tb::Type::kList, 7);
+    info.list_header(tb::Type::kStruct, 1);
+    hand_digest(info, "digest_data_ref_win_signature_data", "canonical_method_raw",
+                in.content_digest);
+    info.stop();
+
+    const auto signature = *crypto::ecdsa_p256_sign(key, crypto::sha256(info.bytes()));
+    tb::Writer data;
+    data.field_i32(1, 1);
+    data.field_i32(2, 1);
+    data.field_string(3, "b715f9db-6b41-403d-8bbe-429f3209ca2e");
+    data.field(tb::Type::kMap, 4);
+    data.map_header(tb::Type::kString, tb::Type::kList, 2);
+    data.string("ecc_r_value");
+    data.byte_list(signature.r);
+    data.string("ecc_s_value");
+    data.byte_list(signature.s);
+    data.stop();
+
+    tb::Writer top;
+    top.field_i32(1, 1);
+    top.field_i32(2, 1);
+    top.field_struct(3);
+    top.raw(signer.bytes());
+    top.field(tb::Type::kList, 4);
+    top.list_header(tb::Type::kStruct, 1);
+    top.field_struct(1);
+    top.raw(info.bytes());
+    top.field_struct(2);
+    top.raw(data.bytes());
+    top.stop();
+    top.stop();
+    return top.take();
+}
+
+// The test chain with its signer certificate issued again, to the same key, with a serialNumber
+// attribute in its subject (the test chain has the ones the library's own tests give it) set to
+// `subject_attribute`: a UUID, to stand for a certificate that carries one.
+struct UuidChain {
+    std::array<pki::Bytes, 4> certificates;
+    std::vector<crypto::Certificate> parsed;
+};
+
+UuidChain chain_with_subject_attribute(const pki::TestChain& base,
+                                       const std::string& subject_attribute) {
+    UuidChain out;
+    out.certificates = base.certificates;
+    pki::CertSpec leaf;
+    leaf.subject =
+        pki::Name{"ICL Forge Test Content Signer", "Code/Content Signer", subject_attribute};
+    leaf.serial_hex = "0A0004B5D62000000005";
+    leaf.not_before = "2022-06-09T21:56:24";
+    leaf.not_after = "2042-06-09T21:56:24";
+    leaf.ca = true;
+    leaf.key_usage = 1U << 0;
+    out.certificates[3] =
+        pki::issue(leaf, base.leaf_key, base.names[2], pki::key_for("icl-forge-test-issuing"));
+    for (const pki::Bytes& der : out.certificates) {
+        out.parsed.push_back(*crypto::parse_certificate(der));
+    }
+    return out;
+}
+
+constexpr const char* kPublisherUuid = "3b9c1f52-7a4e-4d08-b6a1-2f0e9d7c5a84";
+constexpr const char* kOtherUuid = "0f0e0d0c-0b0a-4908-8706-050403020100";
+
+}  // namespace
+
+TEST_CASE("a signature written by hand reads and verifies as the library's own does",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    const std::vector<std::byte> blob =
+        hand_built(f.chain.certificates, f.chain.leaf_key, HandBuilt{});
+    std::array<std::byte, 32> digest{};
+    digest.fill(std::byte{0x44});
+    const auto report = crypto::verify_content_signature(blob, digest, f.policy());
+    for (const crypto::CheckResult& c : report.checks) {
+        INFO(c.name << ": " << c.detail);
+        CHECK(c.ok);
+    }
+    CHECK(report.verdict == crypto::Verdict::kChecksChainUnanchored);
+
+    // The library reads every field the hand-built blob carries as it was written.
+    const auto parsed = crypto::parse_content_signature(blob);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->version == 1);
+    CHECK(parsed->signature_type == 1);
+    CHECK(parsed->signer_nonce.size() == crypto::kSignerNonceBytes);
+}
+
+TEST_CASE("the signature is checked before the digests it authenticates (CS spec v2.5 6.1)",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    auto content = content_of(900);
+    const auto blob = crypto::sign_content(content, f.credentials, f.options());
+    REQUIRE(blob.has_value());
+    const auto digest = crypto::sha256(content);
+
+    const auto index_of = [](const crypto::VerifyReport& r, std::string_view name) {
+        for (std::size_t i = 0; i < r.checks.size(); ++i) {
+            if (r.checks[i].name == name) {
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
+    };
+
+    // In a good report: the signature, then the signer-information digest, then the content digest.
+    const crypto::VerifyReport good = crypto::verify_content_signature(*blob, digest, f.policy());
+    REQUIRE(good.verdict == crypto::Verdict::kChecksChainUnanchored);
+    REQUIRE(index_of(good, "signature") >= 0);
+    CHECK(index_of(good, "signature") < index_of(good, "signer-information digest"));
+    CHECK(index_of(good, "signer-information digest") < index_of(good, "content digest"));
+    CHECK(index_of(good, "chain") < index_of(good, "signature"));
+    // A digest the signature authenticates says nothing more than that it matches.
+    for (const crypto::CheckResult& c : good.checks) {
+        CHECK(c.detail.find("authenticates nothing") == std::string::npos);
+    }
+
+    // A damaged signature and wrong content together: the first fault is the signature, and the
+    // digest checks, which still run, say they rest on a signature that did not verify.
+    std::vector<std::byte> damaged = *blob;
+    damaged[damaged.size() - 10] ^= std::byte{0x01};  // inside s
+    content[100] ^= std::byte{0x01};
+    const crypto::VerifyReport bad =
+        crypto::verify_content_signature(damaged, crypto::sha256(content), f.policy());
+    CHECK(bad.verdict == crypto::Verdict::kInvalid);
+    REQUIRE(bad.fault.has_value());
+    CHECK(bad.fault->code == crypto::SignatureError::kSignatureInvalid);
+    CHECK(has_check(bad, "signature", false));
+    CHECK(has_check(bad, "content digest", false));
+    for (const crypto::CheckResult& c : bad.checks) {
+        if (c.name == "content digest" || c.name == "signer-information digest") {
+            INFO(c.name << ": " << c.detail);
+            CHECK(c.detail.find("did not verify, so it authenticates nothing") !=
+                  std::string::npos);
+        }
+    }
+
+    // A good signature over content that changed: the digest is the fault, and the report does not
+    // doubt the digest's authority.
+    content[100] ^= std::byte{0x01};
+    content[200] ^= std::byte{0x01};
+    const crypto::VerifyReport changed =
+        crypto::verify_content_signature(*blob, crypto::sha256(content), f.policy());
+    REQUIRE(changed.fault.has_value());
+    CHECK(changed.fault->code == crypto::SignatureError::kDigestMismatch);
+    CHECK(changed.fault->message.find("authenticates nothing") == std::string::npos);
+}
+
+TEST_CASE("every wire version field the signer writes is 1, and scheme version 3 is not one",
+          "[crypto][content-signature][v25]") {
+    // CS spec v2.5 §3.16: "an implementation SHALL write wire version = 1". Read back from the
+    // bytes with the Thrift reader, field by field, and not through the library's parser.
+    const Fixture f;
+    const auto blob = crypto::sign_content(content_of(10), f.credentials, f.options());
+    REQUIRE(blob.has_value());
+    const auto top = tb::read_struct(*blob);
+    REQUIRE(top.has_value());
+    const auto version_of = [](std::span<const tb::Field> fields, std::int16_t id) {
+        const tb::Field* field = tb::find(fields, id, tb::Type::kI32);
+        REQUIRE(field != nullptr);
+        return tb::as_i32(*field);
+    };
+    CHECK(version_of(*top, 1) == std::optional<std::int32_t>(1));  // ContentSignature.version
+    CHECK(version_of(*top, 2) == std::optional<std::int32_t>(1));  // .schemaVersion
+    const auto signer = tb::as_struct(*tb::find(*top, 3, tb::Type::kStruct));
+    REQUIRE(signer.has_value());
+    CHECK(version_of(*signer, 2) == std::optional<std::int32_t>(1));
+    CHECK(version_of(*signer, 3) == std::optional<std::int32_t>(1));
+    const auto chain_info = tb::as_struct(*tb::find(*signer, 10, tb::Type::kStruct));
+    REQUIRE(chain_info.has_value());
+    CHECK(version_of(*chain_info, 1) == std::optional<std::int32_t>(1));
+    const auto entries = tb::as_struct_list(*tb::find(*top, 4, tb::Type::kList));
+    REQUIRE(entries.has_value());
+    const auto entry = tb::read_struct(entries->front());
+    REQUIRE(entry.has_value());
+    const auto signed_info = tb::as_struct(*tb::find(*entry, 1, tb::Type::kStruct));
+    REQUIRE(signed_info.has_value());
+    CHECK(version_of(*signed_info, 1) == std::optional<std::int32_t>(1));  // canonicalVersion
+    CHECK(version_of(*signed_info, 2) == std::optional<std::int32_t>(1));  // version
+    const auto signer_digest = tb::as_struct(*tb::find(*signed_info, 6, tb::Type::kStruct));
+    REQUIRE(signer_digest.has_value());
+    CHECK(version_of(*signer_digest, 1) == std::optional<std::int32_t>(1));
+    CHECK(version_of(*signer_digest, 2) == std::optional<std::int32_t>(1));
+    const auto content_digests = tb::as_struct_list(*tb::find(*signed_info, 7, tb::Type::kList));
+    REQUIRE(content_digests.has_value());
+    const auto content_digest = tb::read_struct(content_digests->front());
+    REQUIRE(content_digest.has_value());
+    CHECK(version_of(*content_digest, 1) == std::optional<std::int32_t>(1));
+    CHECK(version_of(*content_digest, 2) == std::optional<std::int32_t>(1));
+    const auto data = tb::as_struct(*tb::find(*entry, 2, tb::Type::kStruct));
+    REQUIRE(data.has_value());
+    CHECK(version_of(*data, 1) == std::optional<std::int32_t>(1));
+    CHECK(version_of(*data, 2) == std::optional<std::int32_t>(1));
+
+    // A reader given the scheme release id (3) where a wire version belongs does not know the
+    // structure and says so, whichever struct carries it: the signature is refused as unsupported.
+    const tb::Field* version = tb::find(*top, 1, tb::Type::kI32);
+    REQUIRE(version != nullptr);
+    const std::vector<std::byte> three = {std::byte{0}, std::byte{0}, std::byte{0}, std::byte{3}};
+    const auto v3 = splice(*blob, version->value, three);
+    const auto report =
+        crypto::verify_content_signature(v3, crypto::sha256(content_of(10)), f.policy());
+    CHECK(report.verdict == crypto::Verdict::kInvalid);
+    CHECK(has_check(report, "version markers", false));
+    REQUIRE(report.fault.has_value());
+    CHECK(report.fault->code == crypto::SignatureError::kLibDoesntSupportContentSignature);
+}
+
+TEST_CASE("signing refuses a nonce that is not 128 bytes and a publisher UUID that is wrong",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    const auto content = content_of(32);
+
+    SECTION("a nonce of another length") {
+        for (const std::size_t size : {std::size_t{1}, std::size_t{16}, std::size_t{127},
+                                       std::size_t{129}, std::size_t{256}}) {
+            crypto::SignOptions options = f.options();
+            options.nonce.assign(size, std::byte{0x77});
+            const auto refused = crypto::sign_content(content, f.credentials, options);
+            INFO(size);
+            REQUIRE_FALSE(refused.has_value());
+            CHECK(refused.error().code == crypto::SignatureError::kBadOrMissingSignature);
+            CHECK(refused.error().message.find("asks for 128") != std::string::npos);
+        }
+        crypto::SignOptions exact = f.options();
+        exact.nonce.assign(128, std::byte{0x77});
+        CHECK(crypto::sign_content(content, f.credentials, exact).has_value());
+    }
+    SECTION("a publisher UUID that is not a UUID") {
+        for (const char* text :
+             {"not-a-uuid", "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A8",
+              "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A8G", "3B9C1F527A4E4D08B6A12F0E9D7C5A84",
+              "{3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84}"}) {
+            crypto::SignOptions options = f.options();
+            options.metadata.publisher_uuid = text;
+            const auto refused = crypto::sign_content(content, f.credentials, options);
+            INFO(text);
+            REQUIRE_FALSE(refused.has_value());
+            CHECK(refused.error().code == crypto::SignatureError::kBadOrMissingSignature);
+            CHECK(refused.error().message.find("is not a UUID") != std::string::npos);
+        }
+    }
+    SECTION("a publisher UUID the signer certificate's subject contradicts") {
+        const UuidChain chain = chain_with_subject_attribute(f.chain, kPublisherUuid);
+        const crypto::SigningCredentials credentials =
+            *crypto::make_credentials(f.chain.leaf_key, chain.parsed);
+        crypto::SignOptions options = f.options();
+        options.metadata.publisher_uuid = kOtherUuid;
+        const auto refused = crypto::sign_content(content, credentials, options);
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error().code == crypto::SignatureError::kBadCredentialsForSigningContent);
+        CHECK(refused.error().message.find(kPublisherUuid) != std::string::npos);
+        // The certificate's own UUID is accepted, in either case.
+        options.metadata.publisher_uuid = kPublisherUuid;
+        CHECK(crypto::sign_content(content, credentials, options).has_value());
+        options.metadata.publisher_uuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";
+        CHECK(crypto::sign_content(content, credentials, options).has_value());
+    }
+    SECTION("no UUID at all is written as it is: the signer's choice, the verifier's finding") {
+        crypto::SignOptions options = f.options();
+        options.metadata.publisher_uuid.clear();
+        CHECK(crypto::sign_content(content, f.credentials, options).has_value());
+        // A UUID with a certificate that carries none to compare it with is written too.
+        options.metadata.publisher_uuid = kPublisherUuid;
+        CHECK(crypto::sign_content(content, f.credentials, options).has_value());
+    }
+}
+
+TEST_CASE("each signature gets a nonce of its own, 128 bytes, not a constant",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    crypto::SignOptions options = f.options();
+    options.nonce.clear();
+    std::vector<std::vector<std::byte>> nonces;
+    for (int i = 0; i < 8; ++i) {
+        const auto blob = crypto::sign_content(content_of(16), f.credentials, options);
+        REQUIRE(blob.has_value());
+        const auto parsed = crypto::parse_content_signature(*blob);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->signer_nonce.size() == 128);
+        // Not all one byte, not the fixed nonce of the tests, and none of the others.
+        CHECK(std::any_of(parsed->signer_nonce.begin(), parsed->signer_nonce.end(),
+                          [&](std::byte b) { return b != parsed->signer_nonce.front(); }));
+        for (const auto& earlier : nonces) {
+            CHECK(earlier != parsed->signer_nonce);
+        }
+        nonces.push_back(parsed->signer_nonce);
+    }
+}
+
+TEST_CASE("operator metadata is reported, and decides the verdict only when the policy says so",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    const UuidChain bound = chain_with_subject_attribute(f.chain, kPublisherUuid);
+    const UuidChain unbound = chain_with_subject_attribute(f.chain, "T0004");
+    std::array<std::byte, 32> digest{};
+    digest.fill(std::byte{0x44});
+
+    struct Case {
+        const char* name;
+        const UuidChain* chain;
+        std::string uuid;
+        std::size_t nonce_size;
+        bool finding_ok;  // the finding that case is about
+        const char* finding;
+        crypto::SignatureError strict_fault;
+    };
+    const Case cases[] = {
+        {"the certificate's own UUID", &bound, kPublisherUuid, 128, true, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"the same, in capitals", &bound, "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84", 128, true,
+         "publisher UUID", crypto::SignatureError::kBadOrMissingSignature},
+        {"another UUID than the certificate's", &bound, kOtherUuid, 128, false, "publisher UUID",
+         crypto::SignatureError::kBadCredentialsForSigningContent},
+        {"no UUID", &bound, "", 128, false, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a text that is not a UUID", &bound, "not-a-uuid", 128, false, "publisher UUID",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a nonce of 16 bytes", &bound, kPublisherUuid, 16, false, "signer nonce",
+         crypto::SignatureError::kBadOrMissingSignature},
+        {"a nonce of 129 bytes", &bound, kPublisherUuid, 129, false, "signer nonce",
+         crypto::SignatureError::kBadOrMissingSignature},
+    };
+    for (const Case& c : cases) {
+        INFO(c.name);
+        HandBuilt in;
+        in.publisher_uuid = c.uuid;
+        in.nonce.assign(c.nonce_size, std::byte{0x5C});
+        const std::vector<std::byte> blob = hand_built(c.chain->certificates, f.chain.leaf_key, in);
+
+        // Reporting: a good signature stays one, and the finding is there to read.
+        crypto::VerifyPolicy report_only = f.policy();
+        report_only.operator_metadata = crypto::OperatorMetadata::kReport;
+        const crypto::VerifyReport reported =
+            crypto::verify_content_signature(blob, digest, report_only);
+        CHECK(reported.verdict == crypto::Verdict::kChecksChainUnanchored);
+        CHECK_FALSE(reported.fault.has_value());
+        const auto note =
+            std::find_if(reported.notes.begin(), reported.notes.end(),
+                         [&](const crypto::CheckResult& n) { return n.name == c.finding; });
+        REQUIRE(note != reported.notes.end());
+        CHECK(note->ok == c.finding_ok);
+
+        // Requiring: the same signature is refused when the finding is a bad one, with the code
+        // and the check that says why, and passes when it is a good one.
+        crypto::VerifyPolicy strict = f.policy();
+        strict.operator_metadata = crypto::OperatorMetadata::kRequire;
+        const crypto::VerifyReport required =
+            crypto::verify_content_signature(blob, digest, strict);
+        if (c.finding_ok) {
+            CHECK(required.verdict == crypto::Verdict::kChecksChainUnanchored);
+            CHECK(has_check(required, c.finding, true));
+        } else {
+            CHECK(required.verdict == crypto::Verdict::kInvalid);
+            REQUIRE(required.fault.has_value());
+            CHECK(required.fault->code == c.strict_fault);
+            CHECK(has_check(required, c.finding, false));
+            // Everything else about the signature still checked out.
+            CHECK(has_check(required, "signature", true));
+            CHECK(has_check(required, "content digest", true));
+        }
+    }
+
+    // A certificate whose subject carries no UUID cannot contradict one: reported as not compared
+    // in either mode, and never a reason to refuse (the owner's sample is such a case).
+    HandBuilt in;
+    in.publisher_uuid = kPublisherUuid;
+    const std::vector<std::byte> blob = hand_built(unbound.certificates, f.chain.leaf_key, in);
+    for (const auto mode :
+         {crypto::OperatorMetadata::kReport, crypto::OperatorMetadata::kRequire}) {
+        crypto::VerifyPolicy policy = f.policy();
+        policy.operator_metadata = mode;
+        const crypto::VerifyReport report = crypto::verify_content_signature(blob, digest, policy);
+        CHECK(report.verdict == crypto::Verdict::kChecksChainUnanchored);
+        const auto note =
+            std::find_if(report.notes.begin(), report.notes.end(),
+                         [](const crypto::CheckResult& n) { return n.name == "publisher UUID"; });
+        REQUIRE(note != report.notes.end());
+        CHECK_FALSE(note->ok);
+        CHECK(note->detail.find("was not compared") != std::string::npos);
+        CHECK(has_check(report, "publisher UUID", false) == false);
+        CHECK(has_check(report, "publisher UUID", true) == false);
+    }
+}
+
+TEST_CASE("the report carries what the signer says about itself, escaped",
+          "[crypto][content-signature][v25]") {
+    const Fixture f;
+    crypto::SignOptions options = f.options();
+    options.metadata.publisher_name = "Example Publisher";
+    options.metadata.publisher_uuid = kPublisherUuid;
+    options.metadata.product_name = "Example Product";
+    options.metadata.wrapper_name = "Example Wrapper";
+    options.metadata.os_name = "TestOS";
+    options.metadata.os_version = "1.2";
+    options.metadata.os_description = "TestOS 1.2 on a test";
+    options.metadata.application_name = "Signer\x1B[2J";
+    options.metadata.application_version = "9.9";
+    options.metadata.build_hash = "abc123";
+    const auto content = content_of(8);
+    const auto blob = crypto::sign_content(content, f.credentials, options);
+    REQUIRE(blob.has_value());
+    const auto report =
+        crypto::verify_content_signature(*blob, crypto::sha256(content), f.policy());
+    CHECK(report.publisher == "Example Publisher (UUID 3b9c1f52-7a4e-4d08-b6a1-2f0e9d7c5a84)");
+    CHECK(report.product == "Example Product (wrapper Example Wrapper)");
+    CHECK(report.platform == "TestOS 1.2 (TestOS 1.2 on a test)");
+    CHECK(report.application == "Signer\\x1B[2J 9.9 (build abc123)");
+
+    // Nothing given: nothing to show, and no empty brackets.
+    crypto::SignOptions bare = f.options();
+    bare.metadata.application_name.clear();
+    bare.metadata.application_version.clear();
+    const auto plain = crypto::sign_content(content, f.credentials, bare);
+    REQUIRE(plain.has_value());
+    const auto empty =
+        crypto::verify_content_signature(*plain, crypto::sha256(content), f.policy());
+    CHECK(empty.publisher.empty());
+    CHECK(empty.product.empty());
+    CHECK(empty.platform.empty());
+    CHECK(empty.application.empty());
+}
+
 // ---- The owner's sample ------------------------------------------------------------------
 // A ContentSignature blob the owner extracted from a signing tool (see libs/ac4/ERRATA.md for the
 // provenance). It is not in the repository and these checks need no key: set
@@ -686,6 +1207,55 @@ TEST_CASE("the owner's sample parses and verifies the way the measurements say",
                      .count();
     CHECK(has_check(crypto::verify_content_signature(blob, stored_content_digest, policy), "chain",
                     false));
+
+    // CS spec v2.5 §3.16 states the sample's wire version fields are all 1, §2.3 and §3.13 that r
+    // and s are 32 raw bytes each, §3.2 that the nonce is 128 bytes and §5.3 what the publisher
+    // UUID is. Held against the sample itself, with nothing of it written down here.
+    CHECK(parsed->version == 1);
+    CHECK(parsed->schema_version == 1);
+    CHECK(parsed->signer_version == 1);
+    CHECK(parsed->signer_schema_version == 1);
+    CHECK(parsed->chain_format_version == 1);
+    CHECK(parsed->canonical_version == 1);
+    CHECK(parsed->signed_info_version == 1);
+    CHECK(parsed->signature_data_version == 1);
+    CHECK(parsed->signature_type == 1);
+    CHECK(parsed->signer_info_digest.version == 1);
+    CHECK(parsed->content_digests.front().version == 1);
+    CHECK(parsed->signer_nonce.size() == crypto::kSignerNonceBytes);
+    CHECK(crypto::is_uuid(parsed->signer.publisher_uuid));
+    // §5.3 says the UUID is bound to the signing certificate and does not say where. In the sample
+    // it is in none of the four certificates' subjects, so nothing can be compared: the reading
+    // that cannot refuse a genuine signature reports it as not compared, and a verifier that
+    // required the UUID to appear in the certificate would refuse this one.
+    for (const crypto::Certificate& certificate : parsed->chain) {
+        for (const std::string& value : certificate.subject.values) {
+            CHECK(!crypto::is_uuid(value));
+        }
+    }
+    const auto binding =
+        crypto::check_publisher_binding(parsed->signer.publisher_uuid, parsed->chain.back());
+    CHECK(binding.binding == crypto::PublisherBinding::kUnbound);
+    // Required metadata does not turn the genuine signature into an invalid one.
+    crypto::VerifyPolicy required;
+    required.time_basis = crypto::TimeBasis::kIgnore;
+    required.operator_metadata = crypto::OperatorMetadata::kRequire;
+    const auto strict = crypto::verify_content_signature(blob, stored_content_digest, required);
+    CHECK_FALSE(strict.fault.has_value());
+    CHECK(strict.verdict == crypto::Verdict::kChecksChainUnanchored);
+    CHECK(!strict.publisher.empty());
+    CHECK(!strict.application.empty());
+    // The signature is checked before the digests it holds, in the sample's report as in any.
+    const auto order_of = [&](std::string_view name) {
+        for (std::size_t i = 0; i < strict.checks.size(); ++i) {
+            if (strict.checks[i].name == name) {
+                return i;
+            }
+        }
+        return strict.checks.size();
+    };
+    CHECK(order_of("signature") < order_of("signer-information digest"));
+    CHECK(order_of("signer-information digest") < order_of("content digest"));
 
     // Any other content is refused, with everything else still passing.
     const auto wrong =
