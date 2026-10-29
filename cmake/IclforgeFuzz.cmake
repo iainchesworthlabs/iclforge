@@ -109,6 +109,11 @@ endif()
 if(ICLFORGE_BUILD_IAB)
     iclforge_instrument_for_fuzzing(iclforge_iab_objects)
 endif()
+# The TrueHD codec (libs/mlp): its access unit framing, restart headers and block headers take
+# every count and length from the stream, which is what fuzz_mlp_decode mutates.
+if(ICLFORGE_BUILD_MLP)
+    iclforge_instrument_for_fuzzing(iclforge_mlp_objects)
+endif()
 if(ICLFORGE_BUILD_ADM)
     iclforge_instrument_for_fuzzing(iclforge_adm_objects)
 endif()
