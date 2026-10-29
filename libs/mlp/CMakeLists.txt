@@ -19,10 +19,18 @@ set(_mlp_core_sources
     src/core/access_unit.cpp
     src/core/stream_info.cpp)
 
+set(_mlp_decoder_sources
+    src/decoder/decoder.cpp)
+
+set(_mlp_io_sources
+    src/io/extra_data.cpp)
+
 iclforge_add_library(mlp
     DEPENDS base
     SOURCES
         ${_mlp_core_sources}
+        ${_mlp_decoder_sources}
+        ${_mlp_io_sources}
     PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
     # The bit reader and writer are header-only; base's public headers carry them.
     LINK_PRIVATE "$<BUILD_INTERFACE:iclforge::base_headers>")
