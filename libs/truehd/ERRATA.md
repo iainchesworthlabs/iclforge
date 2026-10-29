@@ -260,8 +260,14 @@ is refused by FFmpeg's decoder: `9 channels (more than the maximum supported by 
 absent. With them FFmpeg reports `Invalid channel 15 specified as output from matrix` and `substream 2 length
 mismatch`; without them the 29 intervals of a 3 s 7.1 stream decode bit-exactly. The encoder writes 0x31EB for a
 substream whose last row is above 5, with a zero seed, zero shifts and no matrix drawing on a noise channel. The decoder
-accepts a `noise_type` restart when no matrix uses a noise channel and refuses it otherwise (the generator is still not
-defined, Q5). **Provisional, owner to confirm.**
+accepts a `noise_type` restart and refuses only the matrices that need generator 1's table (below; the table is still
+not available, Q5). **Provisional, owner to confirm.**
+
+As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects
+noise from generator 1's table, which is not available. The decoder refuses it (`ErrorKind::kUnsupported`), as it
+refuses LSB bypass under that sync, and decodes the restart when every shift is zero. `hb_noise_type1` (decodes) and
+`hb_noise_type1_shift` (refused) hold both outcomes, in the decoder and in `tools/references/truehd_syntax.py`
+(**no oracle**).
 
 **33. FFmpeg's channel order and the six channel field.** For 7 and 8 channel streams FFmpeg's decode returns the channels
 in the order of its own layout bits: a stream in the order L R C LFE Ls Rs Lrs Rrs comes back as L R C LFE Lrs Rrs Ls Rs

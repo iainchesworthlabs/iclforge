@@ -1,6 +1,6 @@
 # iclforge::truehd
 
-The Dolby TrueHD and MLP bitstream and a lossless decoder, written from the owner's *Dolby TrueHD (MLP) Reference
+The Dolby TrueHD and MLP bitstream, a lossless decoder and an encoder, written from the owner's *Dolby TrueHD (MLP) Reference
 Specification* v3.5 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
 [planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
@@ -14,8 +14,9 @@ It links `iclforge::base` and nothing else. The option is `ICLFORGE_BUILD_TRUEHD
 | `include/iclforge/truehd/core/` | `format.hpp` (constants, sample rates, channel vocabulary), `error.hpp` (`ErrorKind`, `Error`), `crc.hpp` (the four check values), `syntax.hpp` (restart header, block header, filters, matrices, Huffman codes: a reader and a writer for each) |
 | `include/iclforge/truehd/io/` | `major_sync.hpp`, `access_unit.hpp` (parse a unit, write its header and directory), `elementary.hpp` (`probe_stream`, `ElementaryReader`) |
 | `include/iclforge/truehd/decoder/` | `decoder.hpp`: `Decoder`, `DecoderConfig`, `DecodedAccessUnit`, `DecoderCounters` |
+| `include/iclforge/truehd/encoder/` | `encoder.hpp`: `Encoder`, `EncoderConfig`, `EncodedAccessUnit`, `EncoderStats`, `DownmixMode` |
 | `src/` | the same split; `core/huffman.hpp` holds the codebooks |
-| `tests/`, `fuzz/` | Catch2 tests, and the libFuzzer harnesses `fuzz_truehd_parse` and `fuzz_truehd_decode` |
+| `tests/`, `fuzz/` | Catch2 tests, `iclforge-truehd-encode-tool`, and the libFuzzer harnesses `fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_truehd_encode` |
 
 ## Decoding
 
@@ -39,6 +40,21 @@ first restart header. A failed check (the check nibble, a CRC, a parity byte, th
 generic 16-channel substream 3 the same way; the FFmpeg encoders write neither 7.1 nor the sixteen-channel substream,
 so those have no external oracle (see the plan).
 
+## Encoding
+
+```cpp
+#include "iclforge/truehd/encoder/encoder.hpp"
+
+iclforge::truehd::EncoderConfig config;      // 48 kHz, 2 channels, 24 bits by default
+config.channels = 6;
+auto encoder = iclforge::truehd::Encoder::create(config);   // std::expected<Encoder, EncodeError>
+auto units = encoder->encode(interleaved_pcm);                // the access units that are complete
+auto tail = encoder->flush();                                  // pads and ends the stream
+```
+
+The encoder holds one restart interval of input before it emits it. `verify` has the decoder read every unit back; `Encoder::refusal_reason()`
+names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/library/truehd.md#encoding).
+
 ## Checks
 
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
@@ -47,3 +63,7 @@ The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd
 do not write: an IIR filter, LSB bypass, several matrices, the block data check, the end-of-stream marker, extra data,
 the directory's DRC word and the 16-channel substream. They have no external oracle: they are held to the signal each
 was made from, by this decoder and by `tools/references/truehd_syntax.py`.
+
+`tools/checks/verify_truehd_encode_interop.py --encoder <iclforge-truehd-encode-tool>` encodes 43 cases and requires FFmpeg's strict decode of each
+to equal the source; `tools/ci/fuzz_truehd_encoder_space.py` does the same for random legal configurations against adversarial PCM
+(`--replay <seed>` reruns a case).

@@ -286,6 +286,14 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
+            if (spec.noise_shift != 0 && state.context.noise_type) {
+                return std::unexpected(make_error(
+                    ErrorKind::kUnsupported,
+                    "a matrix with a non-zero noise shift under restart sync 0x31EB (noise_type "
+                    "1): "
+                    "its noise comes from generator 1, whose 256-entry table is not available "
+                    "(TH spec §17.3, §17.4)"));
+            }
             if (spec.lsb_bypass && state.context.noise_type) {
                 return std::unexpected(make_error(
                     ErrorKind::kUnsupported,

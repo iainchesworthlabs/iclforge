@@ -28,12 +28,12 @@
 // interval against the next restart header (§7.3). A presentation with several substreams reads
 // them in order, each seeing the channels the ones before it decoded (§2.3).
 //
-// What it refuses, with ErrorKind::kUnsupported and a reason: a restart header with noise_type 1
-// (sync 0x31EB), whose 256-entry noise table the specification does not give yet (§17.4;
-// ERRATA.md); a stream whose major sync extension the CRC does not locate. Noise generator 0 (§17.2)
-// is decoded. The
-// extra data (§16) and the object audio metadata in it are not interpreted: the bytes come back
-// with the unit.
+// What it refuses, with ErrorKind::kUnsupported and a reason: under a restart header with
+// noise_type 1 (sync 0x31EB), a matrix with LSB bypass or a non-zero noise shift, because the
+// 256-entry noise table of generator 1 is not in the specification yet (§17.3, §17.4; ERRATA.md
+// entry 32); a stream whose major sync extension the CRC does not locate. A noise_type 1 restart
+// without either decodes, and noise generator 0 (§17.2) is decoded. The extra data (§16) and the
+// object audio metadata in it are not interpreted: the bytes come back with the unit.
 //
 // ERRATA.md, beside this library, records every place the specification and the streams disagree,
 // the reading taken for each, and the questions only the owner can answer.

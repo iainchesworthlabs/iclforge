@@ -2065,7 +2065,7 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    of a stream whose length is not a multiple of the unit carries a 32-bit marker with the number of padding samples,
    which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's. The
    encoder is held to the same oracle the other way round: FFmpeg's strict decode of what `forge truehd-encode` writes
-   must equal the samples that went in (`tools/checks/verify_truehd_encode_interop.py --forge`, 32 cases of rates, 1 to 8
+   must equal the samples that went in (`tools/checks/verify_truehd_encode_interop.py --forge`, 32 cases of rates (43 with `--full`), 1 to 8
    channels, 16, 20 and 24 bits and signals, and the encode legs of `tools/ci/run_codec_matrix.sh`, which also read the
    same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
@@ -2077,9 +2077,25 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
 
+The encoder is held to the first tier from the other side. `tools/checks/verify_truehd_encode_interop.py` encodes 43 cases
+(real music, speech and 5.1 programme material and synthetic signals that are hard for a lossless coder: full-scale squares and
+alternating extremes, impulses, silence, DC, noise, a level that steps inside a restart interval; stereo to 7.1, 44.1 to 192 kHz,
+16, 20 and 24 bits, restart intervals of 1, 8 and 128 units, lengths that are not whole units, the downmix presentations) and
+requires FFmpeg's strict decode to return every sample, with the library's own decoder reading every unit back as it is written.
+That is a stronger test of a reading of the specification than decoding FFmpeg's streams, because the encoder writes things
+FFmpeg's never do and FFmpeg's decoder says whether they are right; it added nine entries to `libs/truehd/ERRATA.md` (30 to 38),
+among them the scale of `peak_data_rate`, how channels are spread over
+substreams, that a substream reads its predecessor's rows before that predecessor's matrices, and that FFmpeg's decoder takes a
+substream of more than 6 channels only under restart sync `0x31EB`. `tools/ci/fuzz_truehd_encoder_space.py` draws random legal
+configurations against adversarial PCM (about 800 cases in 100 s) and the same check; its first run found an encoder that never
+finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.95 times the size of FFmpeg's encoder's
+over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
+outside the library reads the 2 and 6 channel presentations.
+
 Not covered: noise generator 1 beyond a stream whose matrices do not bypass an LSB (its table is not available, so a
-bypassed LSB under restart sync 0x31EB is refused; `libs/truehd/ERRATA.md`, entry 32) and heavy DRC (not read), and the block data CRC (the length is checked, the
-algorithm is not known).
+bypassed LSB under restart sync 0x31EB is refused; `libs/truehd/ERRATA.md`, entry 32), heavy DRC (not read, and not written)
+and the block data CRC (the length is checked, the algorithm is not known); and, in the encoder, the IIR filter, LSB bypass
+and a negative output shift, which it does not write.
 
 ### Scoring DEE's TrueHD streams
 

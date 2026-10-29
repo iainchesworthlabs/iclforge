@@ -47,7 +47,7 @@ FFMPEG_ORDER = {7: [0, 1, 2, 5, 6, 3, 4], 8: [0, 1, 2, 3, 6, 7, 4, 5]}
 
 def write_wav(path, rate, samples, container_bits):
     """samples: int array (frames, channels) of values that fit container_bits."""
-    frames, channels = samples.shape
+    _frames, channels = samples.shape
     width = container_bits // 8
     flat = samples.astype("<i4").reshape(-1)
     if container_bits == 16:
@@ -56,8 +56,9 @@ def write_wav(path, rate, samples, container_bits):
         raw = flat.astype("<i4").tobytes()
         body = b"".join(raw[i : i + 3] for i in range(0, len(raw), 4))
     header = b"RIFF" + struct.pack("<I", 36 + len(body)) + b"WAVE"
-    header += b"fmt " + struct.pack("<IHHIIHH", 16, 1, channels, rate, rate * channels * width,
-                                    channels * width, container_bits)
+    header += b"fmt " + struct.pack(
+        "<IHHIIHH", 16, 1, channels, rate, rate * channels * width, channels * width, container_bits
+    )
     header += b"data" + struct.pack("<I", len(body))
     path.write_bytes(header + body)
 
@@ -65,8 +66,10 @@ def write_wav(path, rate, samples, container_bits):
 # The encoder tool's key=value arguments, as `forge truehd-encode` spells them. `bits=` has no
 # counterpart: forge reads the width from the WAV file (a 20 bit source is a 24 bit file whose low
 # bits are clear, which the encoder sends as an output shift).
-FORGE_ARGUMENTS = {"downmix=standard": ["truehd-downmix=standard"],
-                   "rate-violations=1": ["truehd-rate-check=lenient"]}
+FORGE_ARGUMENTS = {
+    "downmix=standard": ["truehd-downmix=standard"],
+    "rate-violations=1": ["truehd-rate-check=lenient"],
+}
 FORGE_PREFIXES = {"restart=": "truehd-restart=", "order=": "truehd-fir-order="}
 
 
@@ -78,7 +81,7 @@ def forge_arguments(extra):
             continue
         for prefix, forge_prefix in FORGE_PREFIXES.items():
             if argument.startswith(prefix):
-                out.append(forge_prefix + argument[len(prefix):])
+                out.append(forge_prefix + argument[len(prefix) :])
                 break
         else:
             raise ValueError(f"no forge counterpart for the encoder argument {argument!r}")
@@ -88,7 +91,9 @@ def forge_arguments(extra):
 def ffmpeg_decode(path):
     result = subprocess.run(
         ["ffmpeg", "-hide_banner", *STRICT, "-f", "truehd", "-i", str(path), "-f", "s32le", "-"],
-        capture_output=True, check=False)
+        capture_output=True,
+        check=False,
+    )
     if result.returncode != 0:
         return None, result.stderr.decode(errors="replace").strip()
     return result.stdout, ""
@@ -97,8 +102,25 @@ def ffmpeg_decode(path):
 def ffmpeg_reference_size(wav, scratch):
     out = scratch / "reference.thd"
     result = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", str(wav), "-c:a", "truehd",
-         "-strict", "-2", "-f", "truehd", str(out)], capture_output=True, check=False)
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(wav),
+            "-c:a",
+            "truehd",
+            "-strict",
+            "-2",
+            "-f",
+            "truehd",
+            str(out),
+        ],
+        capture_output=True,
+        check=False,
+    )
     if result.returncode != 0 or not out.exists():
         return None
     return out.stat().st_size
@@ -106,8 +128,22 @@ def ffmpeg_reference_size(wav, scratch):
 
 def load_flac(name, rate, channels, seconds, offset):
     """Real material from testdata/audio, as int32 in the 24 bit domain."""
-    cmd = ["ffmpeg", "-v", "error", "-i", str(AUDIO / name), "-ss", str(offset), "-t", str(seconds),
-           "-ar", str(rate), "-f", "s32le", "-"]
+    cmd = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        str(AUDIO / name),
+        "-ss",
+        str(offset),
+        "-t",
+        str(seconds),
+        "-ar",
+        str(rate),
+        "-f",
+        "s32le",
+        "-",
+    ]
     data = subprocess.run(cmd, capture_output=True, check=True).stdout
     pcm = np.frombuffer(data, dtype="<i4").reshape(-1, 2) >> 8
     if channels == 1:
@@ -116,8 +152,22 @@ def load_flac(name, rate, channels, seconds, offset):
 
 
 def load_reference_51(rate, seconds, offset):
-    cmd = ["ffmpeg", "-v", "error", "-i", str(AUDIO / "reference_51.wav"), "-ss", str(offset),
-           "-t", str(seconds), "-ar", str(rate), "-f", "s32le", "-"]
+    cmd = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        str(AUDIO / "reference_51.wav"),
+        "-ss",
+        str(offset),
+        "-t",
+        str(seconds),
+        "-ar",
+        str(rate),
+        "-f",
+        "s32le",
+        "-",
+    ]
     data = subprocess.run(cmd, capture_output=True, check=True).stdout
     return (np.frombuffer(data, dtype="<i4").reshape(-1, 6) >> 8).copy()
 
@@ -146,9 +196,11 @@ def synth(kind, rate, channels, seconds, seed):
         elif kind == "sweep":
             out[:, c] = np.round(0.4 * (1 << 23) * np.sin(2 * np.pi * (50 + 400 * t) * t * (c + 1)))
         elif kind == "mixed":
-            # A tone whose level steps and a noise burst: changes character inside a restart interval.
+            # A tone whose level steps and a noise burst: it changes character inside an interval.
             level = np.where((t * 3).astype(int) % 2 == 0, 0.6, 0.002)
-            burst = (rng.integers(-(1 << 20), 1 << 20, size=n) * (t > seconds * 0.5)).astype(np.int64)
+            burst = (rng.integers(-(1 << 20), 1 << 20, size=n) * (t > seconds * 0.5)).astype(
+                np.int64
+            )
             out[:, c] = np.round(level * (1 << 23) * np.sin(2 * np.pi * f * t)) + burst
         else:
             raise ValueError(kind)
@@ -227,7 +279,10 @@ def build_source(spec, rate, channels, bits, seconds, seed):
         pcm = synth(spec[1], rate, channels, seconds, seed)
     pcm = pcm[:, :channels]
     if pcm.shape[1] < channels:  # more channels than the material has: mix neighbours
-        extra = [np.roll(pcm[:, i % pcm.shape[1]], 37 * (i + 1)) // 3 for i in range(pcm.shape[1], channels)]
+        extra = [
+            np.roll(pcm[:, i % pcm.shape[1]], 37 * (i + 1)) // 3
+            for i in range(pcm.shape[1], channels)
+        ]
         pcm = np.column_stack([pcm, *extra])
     return to_bits(pcm.astype(np.int32), bits)
 
@@ -257,9 +312,15 @@ def main():
         "--forge", help="the forge executable: run as `forge truehd-encode in.wav out.thd`"
     )
     parser.add_argument("--full", action="store_true", help="the longer matrix")
-    parser.add_argument("--only", action="append", default=[], help="run only cases whose name contains this")
-    parser.add_argument("--max-size-ratio", type=float, default=0.0,
-                        help="fail a case whose stream is larger than this multiple of FFmpeg's")
+    parser.add_argument(
+        "--only", action="append", default=[], help="run only cases whose name contains this"
+    )
+    parser.add_argument(
+        "--max-size-ratio",
+        type=float,
+        default=0.0,
+        help="fail a case whose stream is larger than this multiple of FFmpeg's",
+    )
     parser.add_argument("--allow-permutation", action="store_true")
     parser.add_argument("--require-ffmpeg", action="store_true")
     parser.add_argument("--keep", type=pathlib.Path, help="keep the streams and WAV files here")
@@ -298,8 +359,14 @@ def main():
             else:
                 write_wav(wav, rate, source << (24 - bits), 24)
             if args.forge:
-                command = [args.forge, "truehd-encode", str(wav), str(stream), "verify",
-                           *forge_arguments(extra)]
+                command = [
+                    args.forge,
+                    "truehd-encode",
+                    str(wav),
+                    str(stream),
+                    "verify",
+                    *forge_arguments(extra),
+                ]
             else:
                 command = [
                     *args.encoder.split(),
@@ -325,10 +392,12 @@ def main():
                     elif order is not None:
                         problems.append(f"ffmpeg returns the channels reordered: {order}")
                     else:
-                        problems.append("ffmpeg's strict decode differs from the source "
-                                        f"(sha256 {hashlib.sha256(pcm).hexdigest()[:12]} vs "
-                                        f"{hashlib.sha256(expected).hexdigest()[:12]}, "
-                                        f"{len(pcm)} vs {len(expected)} bytes)")
+                        problems.append(
+                            "ffmpeg's strict decode differs from the source "
+                            f"(sha256 {hashlib.sha256(pcm).hexdigest()[:12]} vs "
+                            f"{hashlib.sha256(expected).hexdigest()[:12]}, "
+                            f"{len(pcm)} vs {len(expected)} bytes)"
+                        )
                 ours = stream.stat().st_size
                 reference = ffmpeg_reference_size(wav, scratch) if channels <= 6 else None
                 size = f"{ours:>9d} B"
@@ -338,13 +407,17 @@ def main():
                     totals[1] += reference
                     size += f"  ffmpeg {reference:>9d} B  ratio {ratio:6.3f}"
                     if args.max_size_ratio and ratio > args.max_size_ratio:
-                        problems.append(f"larger than {args.max_size_ratio:.3f} x ffmpeg's ({ratio:.3f})")
+                        problems.append(
+                            f"larger than {args.max_size_ratio:.3f} x ffmpeg's ({ratio:.3f})"
+                        )
                 else:
                     size += "  (ffmpeg's encoder does not write this layout)"
                 note = (note + "  " if note else "") + size
             failures += bool(problems)
-            print(f"{'FAIL' if problems else 'ok  '} {name}  {note}" +
-                  "".join(f"\n       {p}" for p in problems))
+            print(
+                f"{'FAIL' if problems else 'ok  '} {name}  {note}"
+                + "".join(f"\n       {p}" for p in problems)
+            )
     if totals[1]:
         print(f"size against ffmpeg over the cases it writes: {totals[0] / totals[1]:.4f}")
     print(f"{ran} cases, {failures} failing")

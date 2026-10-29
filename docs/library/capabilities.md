@@ -170,7 +170,9 @@ from the owner's TrueHD (MLP) Reference Specification v3.5; `libs/truehd/ERRATA.
 | Noise generator 0 (`0x31EA`): two noise channels through matrix coefficients | decoded | **none**: a hand-built stream only |
 | Noise generator 1 (`0x31EB`) | decoded when no matrix bypasses an LSB; refused otherwise | FFmpeg, for a 7.1 stream's third substream written with it; the specification gives no table for the bypassed bits |
 | Heavy DRC in the restart header | not read | the specification does not place it in the header |
-| Lossless encoder: 1 to 8 channels, 16/20/24 bit, 44.1 to 192 kHz, FIR prediction, pair matrices, three codebooks, the 2/6/8 channel presentations, rate control | written (`forge truehd-encode`, `iclforge_truehd_encoder_*`) | FFmpeg's strict decode, sample for sample; 32 cases and the matrix |
+| Encoder: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, restart intervals, output shift and quantiser step, pair matrices, FIR prediction up to order 8, codebook and offset choice, the declared peak rate and 75 ms latency, extra data framing, self-verification | written (`forge truehd-encode`, `iclforge_truehd_encoder_*`) | FFmpeg's strict decode, sample for sample (43 cases and a fuzzer) |
+| Encoder: the 2 and 6 channel presentations as downmixes (`DownmixMode::kStandard`) | written | FFmpeg for the full presentation; nothing checks the downmix itself |
+| Encoder: IIR filter, LSB bypass, negative output shift, heavy DRC, noise, MLP | refused with a reason | no oracle |
 | Containers: MP4, Matroska, MPEG-TS (Blu-ray), IEC 61937 MAT | written and read | FFmpeg's muxers and demuxers, bit-exact; MAT reading has none |
 | C API: decode and encode | `iclforge_truehd_*` | the fixtures through the C API, to FFmpeg's SHA-256 |
 | Atmos object audio metadata, evolution frame; Python, JavaScript and Rust bindings | not built | phase T2b; follow-ups |

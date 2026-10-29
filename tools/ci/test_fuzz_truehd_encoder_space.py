@@ -87,13 +87,16 @@ class VerdictTests(unittest.TestCase):
 
     def run_with(self, case, completed, stream_written=False, ffmpeg_pcm=None):
         with tempfile.TemporaryDirectory() as workdir:
+
             def fake_run(command, **kwargs):
                 if stream_written:
                     Path(command[2]).write_bytes(b"stream")
                 return completed
 
-            with mock.patch.object(fuzz.subprocess, "run", side_effect=fake_run), \
-                    mock.patch.object(self.interop, "ffmpeg_decode", return_value=(ffmpeg_pcm, "boom")):
+            with (
+                mock.patch.object(fuzz.subprocess, "run", side_effect=fake_run),
+                mock.patch.object(self.interop, "ffmpeg_decode", return_value=(ffmpeg_pcm, "boom")),
+            ):
                 return fuzz.run_case("tool", self.interop, "ffmpeg", case, workdir)
 
     def completed(self, code, stderr=b""):
@@ -108,21 +111,29 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual((result.status, result.stage), ("fail", "ffmpeg"))
 
     def test_a_decode_that_differs_is_a_failure(self):
-        result = self.run_with(self.case, self.completed(0), stream_written=True, ffmpeg_pcm=b"\0" * 8)
+        result = self.run_with(
+            self.case, self.completed(0), stream_written=True, ffmpeg_pcm=b"\0" * 8
+        )
         self.assertEqual((result.status, result.stage), ("fail", "ffmpeg"))
 
     def test_the_exact_source_passes(self):
         source = fuzz.make_pcm(self.case)
         expected = (source.astype(np.int64) << 8).astype("<i4").tobytes()
-        result = self.run_with(self.case, self.completed(0), stream_written=True, ffmpeg_pcm=expected)
+        result = self.run_with(
+            self.case, self.completed(0), stream_written=True, ffmpeg_pcm=expected
+        )
         self.assertEqual(result.status, "ok")
 
     def test_a_refusal_needs_a_message_and_no_stream(self):
         case = fuzz.Case(12, 48000, 2, 24, 0.02, "tone", ["restart=5"], refusal="restart")
-        self.assertEqual(self.run_with(case, self.completed(1, b"restart interval")).status, "refused")
+        self.assertEqual(
+            self.run_with(case, self.completed(1, b"restart interval")).status, "refused"
+        )
         self.assertEqual(self.run_with(case, self.completed(1, b"")).status, "fail")
         self.assertEqual(self.run_with(case, self.completed(0)).status, "fail")
-        self.assertEqual(self.run_with(case, self.completed(1, b"x"), stream_written=True).status, "fail")
+        self.assertEqual(
+            self.run_with(case, self.completed(1, b"x"), stream_written=True).status, "fail"
+        )
         self.assertEqual(self.run_with(case, self.completed(-11, b"x")).status, "fail")
 
 
