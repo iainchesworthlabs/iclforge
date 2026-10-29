@@ -136,9 +136,10 @@ extra data, so those have no external oracle. [Validation](../verification.md#tr
 
 ## What it does not do
 
-- Noise generator 1: LSB bypass under restart sync `0x31EB` is refused with `ErrorKind::kUnsupported`, because the
-  256-entry table its bits come from is not in the specification yet (§17.4). A `0x31EB` restart without LSB bypass
-  decodes: FFmpeg's streams of more than 6 channels use it, and its matrices carry no noise coefficients. Generator 0, the default (`0x31EA`), is decoded from the
+- Noise generator 1: LSB bypass, or a matrix with a non-zero noise shift, under restart sync `0x31EB` is refused with
+  `ErrorKind::kUnsupported`, because the 256-entry table the noise comes from is not in the specification yet (§17.4).
+  A `0x31EB` restart with neither decodes: FFmpeg's streams of more than 6 channels use it, and its matrices carry no
+  noise coefficients. Generator 0, the default (`0x31EA`), is decoded from the
   specification's LFSR: two noise channels follow the matrix channels and enter through ordinary matrix
   coefficients. No stream FFmpeg writes uses a non-zero noise coefficient, so that has no external oracle.
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.

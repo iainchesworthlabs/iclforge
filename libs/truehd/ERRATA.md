@@ -248,6 +248,12 @@ substream whose last row is above 5, with a zero seed, zero shifts and no matrix
 accepts a `noise_type` restart when no matrix uses a noise channel and refuses it otherwise (the generator is still not
 defined, Q5). **Provisional, owner to confirm.**
 
+As a decoder, then: a matrix under noise_type 1 whose `matrix_noise_shift` (TH spec §17.3) is non-zero injects
+noise from generator 1's table, which is not available. The decoder refuses it (`ErrorKind::kUnsupported`), as it
+refuses LSB bypass under that sync, and decodes the restart when every shift is zero. `hb_noise_type1` (decodes) and
+`hb_noise_type1_shift` (refused) hold both outcomes, in the decoder and in `tools/references/truehd_syntax.py`
+(**no oracle**).
+
 **33. FFmpeg's channel order and the six channel field.** For 7 and 8 channel streams FFmpeg's decode returns the channels
 in the order of its own layout bits: a stream in the order L R C LFE Ls Rs Lrs Rrs comes back as L R C LFE Lrs Rrs Ls Rs
 (columns 0 1 2 3 6 7 4 5), and L R C Ls Rs Lrs Rrs as columns 0 1 2 5 6 3 4. A 7 channel stream whose substream 1 held

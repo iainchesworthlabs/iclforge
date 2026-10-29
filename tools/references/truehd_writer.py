@@ -95,6 +95,7 @@ class Substream:
         data_check=False,
         noise_shift=0,
         noise_seed=0,
+        matrix_noise_shift=0,
     ):
         self.min_chan, self.max_chan, self.mm = min_chan, max_chan, mm
         self.channels = channels  # {ch: Channel}
@@ -108,6 +109,8 @@ class Substream:
         self.data_check = data_check
         self.noise_shift = noise_shift
         self.noise_seed = noise_seed
+        # The 4 bit noise shift every matrix carries under noise_type 1 (sync 0x31EB, TH spec 10.2).
+        self.matrix_noise_shift = matrix_noise_shift
 
 
 class Stream:
@@ -256,12 +259,17 @@ def write_full_block_header(w, sub, params, size):
             w.put(out, 4)
             w.put(frac_bits, 4)
             w.put(1 if lsb_bypass else 0, 1)
-            for c in range(sub.mm + 1 + ref.NOISE_CHANNELS):
+            # Under noise_type 1 the matrices have no coefficients for the noise channels, and each
+            # ends with its noise shift (ERRATA 32).
+            noise_type = sub.sync == 0x31EB
+            for c in range(sub.mm + 1 + (0 if noise_type else ref.NOISE_CHANNELS)):
                 if coeffs.get(c):
                     w.put(1, 1)
                     w.signed(coeffs[c], frac_bits + 2)
                 else:
                     w.put(0, 1)
+            if noise_type:
+                w.put(sub.matrix_noise_shift, 4)
     else:
         w.put(0, 1)
     w.put(1, 1)
@@ -658,17 +666,57 @@ def case_noise():
     return Stream([sub], n), description, ["noise_generator_0"]
 
 
+def case_noise_type1(shift=0):
+    """Restart sync 0x31EB (noise_type 1), one matrix, no noise coefficients. With every matrix
+    noise shift zero nothing draws on generator 1, whose table is not available, and the stream
+    decodes; with a non-zero shift it has to be refused."""
+    n = 40 * 40
+    s0, s1 = tone(n, 70), tone(n, 71)
+    c = 77
+    coded1 = [b - ((a * c) >> 8) for a, b in zip(s0, s1, strict=True)]
+    channels = {0: Channel(fir=([64], 6)), 1: Channel(huff_type=2)}
+    sub = Substream(
+        0,
+        1,
+        1,
+        channels,
+        list(zip(s0, s1, strict=True)),
+        {0: s0, 1: coded1},
+        matrices=[(1, 8, False, {0: c, 1: 256})],
+        sync=0x31EB,
+        matrix_noise_shift=shift,
+    )
+    if shift:
+        description = (
+            "noise_type 1 with a non-zero matrix noise shift: refused, generator 1 has no table"
+        )
+        return Stream([sub], n), description, ["noise_type_1", "matrix_noise_shift"]
+    description = "noise_type 1 (restart sync 0x31EB) with every matrix noise shift zero"
+    return Stream([sub], n), description, ["noise_type_1"]
+
+
+def case_noise_type1_shift():
+    return case_noise_type1(3)
+
+
 CASES = {
     "hb_filters": case_filters,
     "hb_lsb_bypass": case_bypass,
     "hb_matrices": case_matrices,
     "hb_noise_generator_0": case_noise,
+    "hb_noise_type1": case_noise_type1,
     "hb_data_check": case_data_check,
     "hb_marker_last": case_marker_last,
     "hb_marker_every": case_marker_every,
     "hb_extra_data": case_extra_data,
     "hb_drc_word": case_drc_word,
     "hb_sixteen_channels": case_sixteen,
+}
+
+
+# Streams a decoder has to refuse: written and listed in the manifest, but not decoded to a signal.
+REFUSED = {
+    "hb_noise_type1_shift": case_noise_type1_shift,
 }
 
 
@@ -714,12 +762,28 @@ def generate(out):
             )
             if stream.extra_data:
                 fixtures[-1]["extra_data_first_hex"] = stream.extra_data(0).hex()
+    refused = []
+    for name, make in REFUSED.items():
+        stream, description, features = make()[:3]
+        data = build_stream(stream)
+        (out / f"{name}.thd").write_bytes(data)
+        refused.append(
+            {
+                "name": name,
+                "file": f"{name}.thd",
+                "description": description,
+                "features": features,
+                "oracle": "none",
+                "error": "kUnsupported",
+                "stream_sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
     comment = (
         "Made by tools/references/truehd_writer.py. No external decoder reads these streams: "
         "pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian "
         "samples (the 24-bit value shifted left by 8)."
     )
-    manifest = {"_comment": comment, "fixtures": fixtures}
+    manifest = {"_comment": comment, "fixtures": fixtures, "refused": refused}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for fixture in fixtures:
         name, channels, samples = fixture["name"], fixture["channels"], fixture["pcm_samples"]
@@ -735,6 +799,15 @@ def check(directory):
         good = hashlib.sha256(s32le(rows)).hexdigest() == fixture["pcm_sha256"]
         failures += not good
         print(f"{'ok  ' if good else 'FAIL'} {fixture['name']}")
+    for fixture in manifest.get("refused", []):
+        data = (directory / fixture["file"]).read_bytes()
+        try:
+            ref.decode_stream(data, "best")
+            refused = False
+        except ref.StreamError:
+            refused = True
+        failures += not refused
+        print(f"{'ok  ' if refused else 'FAIL'} {fixture['name']} is refused")
     return 1 if failures else 0
 
 

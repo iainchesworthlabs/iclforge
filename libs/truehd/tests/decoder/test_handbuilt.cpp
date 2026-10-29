@@ -10,8 +10,11 @@
 #include <string>
 #include <vector>
 
+#include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 
 // The hand-built streams of testdata/truehd/handbuilt (tools/references/truehd_writer.py): an IIR
@@ -103,6 +106,49 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
             CHECK(decoder.counters().lossless_check_failures == 0);
             CHECK(decoder.counters().lossless_checks_ok > 0);
             CHECK(reader.skipped_bytes() == 0);
+        }
+    }
+}
+
+TEST_CASE("noise_type 1 decodes when no matrix has a noise shift and is refused when one has",
+          "[truehd][handbuilt][no-external-oracle]") {
+    // Restart sync 0x31EB, generator 1 (TH spec 17.3): its table is not available, so a matrix with
+    // a non-zero noise shift is kUnsupported (ERRATA entry 32). With every shift zero nothing
+    // draws on it and the stream decodes: the fixture hb_noise_type1 is in the manifest's list.
+    const auto restart_of = [](const std::vector<std::byte>& stream) {
+        ElementaryReader reader(stream);
+        const auto unit = reader.next();
+        REQUIRE(unit.has_value());
+        auto parsed = parse_access_unit(*unit, 0);
+        REQUIRE(parsed.has_value());
+        iclforge::BitReader bits(parsed->segments[0]);
+        REQUIRE(bits.read(1) == 1);  // block_header_exists
+        REQUIRE(bits.read(1) == 1);  // restart_header_exists
+        auto restart = read_restart_header(bits, parsed->segments[0], true);
+        REQUIRE(restart.has_value());
+        return *restart;
+    };
+
+    const std::vector<std::byte> plain = read_file(dir() + "/hb_noise_type1.thd");
+    CHECK(restart_of(plain).noise_type());
+
+    std::ifstream manifest_file(dir() + "/manifest.json");
+    const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
+    REQUIRE(manifest["refused"].size() >= 1);
+    for (const nlohmann::json& fixture : manifest["refused"]) {
+        DYNAMIC_SECTION(std::string(fixture["name"])) {
+            const std::vector<std::byte> stream =
+                read_file(dir() + "/" + std::string(fixture["file"]));
+            CHECK(hex(iclforge::base::crypto::sha256(stream)) ==
+                  fixture["stream_sha256"].get<std::string>());
+            CHECK(restart_of(stream).noise_type());
+            ElementaryReader reader(stream);
+            Decoder decoder;
+            const auto unit = reader.next();
+            REQUIRE(unit.has_value());
+            auto refused = decoder.decode(*unit);
+            REQUIRE_FALSE(refused.has_value());
+            CHECK(refused.error().kind == ErrorKind::kUnsupported);
         }
     }
 }

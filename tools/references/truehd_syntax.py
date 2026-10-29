@@ -229,6 +229,7 @@ class Substream:
     def __init__(self, index):
         self.index = index
         self.running = False
+        self.noise_type = False
         self.interval = None  # the fold of the output since the last restart
 
     def restart(self, bits, segment):
@@ -251,8 +252,10 @@ class Substream:
         stored = bits.read(8)
         if crc8_restart(segment, start, crc_bit) != stored:
             raise StreamError("restart header CRC")
-        if sync == 0x31EB:
-            raise StreamError("noise_type 1: its noise table is not available")
+        # Restart sync 0x31EB is noise_type 1 (generator 1, whose table is not available). Its
+        # matrices have no noise coefficients, so a stream that draws on no noise decodes; one that
+        # does (a non-zero matrix noise shift, LSB bypass) is refused in read_matrices (ERRATA 32).
+        self.noise_type = sync == 0x31EB
         if self.running and self.interval is not None:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
@@ -300,10 +303,24 @@ class Substream:
             frac_bits = bits.read(4)
             lsb_bypass = bits.read(1)
             coeffs = []
-            for _channel in range(self.max_matrix_chan + 1 + NOISE_CHANNELS):  # ERRATA 8
+            count = (
+                self.max_matrix_chan + 1 + (0 if self.noise_type else NOISE_CHANNELS)
+            )  # ERRATA 8, 32
+            for _channel in range(count):
                 coeffs.append(
                     bits.signed(frac_bits + 2) << (MATRIX_SHIFT - frac_bits) if bits.read(1) else 0
                 )
+            if self.noise_type:
+                coeffs.extend([0] * NOISE_CHANNELS)
+                if bits.read(4) != 0:
+                    raise StreamError(
+                        "noise_type 1: a non-zero matrix noise shift needs generator 1's table, "
+                        "which is not available"
+                    )
+                if lsb_bypass:
+                    raise StreamError(
+                        "noise_type 1: LSB bypass needs generator 1's table, which is not available"
+                    )
             matrices.append((out, coeffs, lsb_bypass))
         return matrices
 

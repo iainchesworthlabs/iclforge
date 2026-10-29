@@ -71,6 +71,22 @@
       "pcm_sha256": "e15ae5189f998050eea6c10aa85078e705752ac7572a680c5e20139081fbdad6"
     },
     {
+      "name": "hb_noise_type1",
+      "file": "hb_noise_type1.thd",
+      "description": "noise_type 1 (restart sync 0x31EB) with every matrix noise shift zero",
+      "features": [
+        "noise_type_1"
+      ],
+      "oracle": "none",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "298853cd7f1e8289198e3258435eac481f513343015af67990140c96bf229be3",
+      "pcm_sha256": "8bc998f43ee5f534cb998c92513b3d9da00576e13eed189d1b5dc907c65a9d83"
+    },
+    {
       "name": "hb_data_check",
       "file": "hb_data_check.thd",
       "description": "data_check_present: block_data_bits and the CRC byte",
@@ -184,6 +200,20 @@
       "pcm_samples": 1280,
       "stream_sha256": "b8d672c65898d79e16335b429d258ab179113e522b7ae78bfee1877ce75fd9ae",
       "pcm_sha256": "c368a70a2102ef043c920d84758f068d80ca574bbb0b147afb2756f5ba841e08"
+    }
+  ],
+  "refused": [
+    {
+      "name": "hb_noise_type1_shift",
+      "file": "hb_noise_type1_shift.thd",
+      "description": "noise_type 1 with a non-zero matrix noise shift: refused, generator 1 has no table",
+      "features": [
+        "noise_type_1",
+        "matrix_noise_shift"
+      ],
+      "oracle": "none",
+      "error": "kUnsupported",
+      "stream_sha256": "abdff839bcf456af22fa02172a31a367ed013b3ec998f9c0fa6c7a675a86e805"
     }
   ]
 }
