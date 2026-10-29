@@ -1581,6 +1581,43 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         const std::string_view value =
             eq == std::string_view::npos ? std::string_view{} : token.substr(eq + 1);
 
+        // TrueHD's options (Options::TrueHd), for any command that reads or writes TrueHD.
+        if (key.starts_with("truehd-")) {
+            const std::string_view name = key.substr(7);
+            const auto number = parse_u32_or(value, 0xFFFFFFFFU);
+            const bool flag = value == "1" || value == "on" || value == "yes";
+            const bool is_flag = flag || value == "0" || value == "off" || value == "no";
+            auto& th = out.truehd;
+            if (name == "restart" && number >= 8 && number <= 128) {
+                th.restart_interval = static_cast<int>(number);
+            } else if (name == "peak" && number >= 1 && number < 0xFFFFFFFFU) {
+                th.peak_kbps = number;
+            } else if (name == "fir" && number <= 8) {
+                th.max_fir_order = static_cast<int>(number);
+            } else if (name == "iir" && number <= 4) {
+                th.max_iir_order = static_cast<int>(number);
+            } else if (name == "decorrelate" && is_flag) {
+                th.decorrelate = flag;
+            } else if (name == "downmix" && is_flag) {
+                th.downmix = flag;
+            } else if (name == "verify" && is_flag) {
+                th.verify = flag;
+            } else if (name == "presentation" &&
+                       (number == 2 || number == 6 || number == 8 || number == 16)) {
+                th.presentation_channels = static_cast<int>(number);
+            } else if (name == "bits" && (number == 16 || number == 24)) {
+                th.bits = static_cast<int>(number);
+            } else {
+                fmt::println(stderr,
+                             "error: '{}': TrueHD's options are truehd-restart=8..128, "
+                             "truehd-peak=<kbit/s>, truehd-fir=0..8, truehd-iir=0..4, "
+                             "truehd-decorrelate=0|1, truehd-downmix=0|1, truehd-verify=0|1, "
+                             "truehd-presentation=2|6|8|16 and truehd-bits=16|24",
+                             token);
+                return false;
+            }
+            continue;
+        }
         // 'decode' reads these for one format only; run_decode says which it
         // ignores once it knows what the stream is. drcmode=line and rf, and
         // the object options, AC-4's decode already names.

@@ -123,6 +123,20 @@ struct PositionSourceSpec {
 // describe, which reordering for padding would scatter.
 // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 struct Options {
+    // TrueHD (MLP): 'truehd-encode', and 'decode', 'transcode' and 'probe' of a TrueHD stream
+    // (commands/truehd.hpp). Each key is truehd-<name>=, so that none shadows an AC-3 or AC-4
+    // option of the same commands.
+    struct TrueHd {
+        std::optional<int> restart_interval;        // truehd-restart=8..128 access units
+        std::optional<std::uint32_t> peak_kbps;     // truehd-peak=<kbit/s>
+        std::optional<int> max_fir_order;           // truehd-fir=0..8
+        std::optional<int> max_iir_order;           // truehd-iir=0..4
+        std::optional<bool> decorrelate;            // truehd-decorrelate=0|1
+        std::optional<bool> downmix;                // truehd-downmix=0|1
+        std::optional<bool> verify;                 // truehd-verify=0|1
+        std::optional<int> presentation_channels;   // truehd-presentation=2|6|8|16
+        std::optional<int> bits;                    // truehd-bits=16|24: decode's WAV depth
+    } truehd;
     // Decoder side, for 'decode'.
     double drc_scale = 0.0;
     // 'decode' only: when non-empty, write a bap census (ac3/verify/
