@@ -173,6 +173,12 @@ public:
     // Whether the item is TrueHD or MLP, and what the index of its stream says.
     [[nodiscard]] bool truehd() const { return index_.has_value(); }
     [[nodiscard]] const TruehdIndex* truehd_index() const { return index_ ? &*index_ : nullptr; }
+    // Where a decoder that can only join at a restart starts for a seek to `to`: the time of the
+    // last indexed unit with a major sync at or before it, in the item's own time (before its
+    // start, an edit list's priming, it is 0). For any other item, the start of the unit covering
+    // `to`. seek() does not stop there - it decodes from there and plays from `to` - but a coded
+    // output, which can only send whole units, would, and says so.
+    [[nodiscard]] std::chrono::milliseconds restart_at_or_before(std::chrono::milliseconds to) const;
     // The presentation of the stream's first table of contents that an AC-4
     // decoder set to `choice` plays (iclforge::ac4::select_presentation()); nothing for
     // an item that is not AC-4, or a choice nothing meets. A sink decodes the
@@ -218,6 +224,9 @@ public:
     // decoder is reset - what it holds belongs to the old place - and primed
     // with the unit before.
     void seek(std::chrono::milliseconds to, StreamDecoder& decoder);
+    // The same to the sample: the next frame delivered is `position`, counted from the start of
+    // what the item plays and clamped to it. What seek() does with a time at the item's rate.
+    void seek_to_sample(std::uint64_t position, StreamDecoder& decoder);
 
     // For a new decoder taking over from `current`: everything `current` has
     // held back comes out now through `deliver`, and the session carries on

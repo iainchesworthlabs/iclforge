@@ -31,6 +31,12 @@ See [README.md](README.md) for the project overview and
   TrueHD is not available" and does not send the stream to a receiver or a network sink as it is. A file with TrueHD first and AC-3 or
   E-AC-3 after it now plays the TrueHD track, where the previous change had it play the second. `hearth` may use `iclforge::truehd`
   (`tools/checks/projects.json`).
+- **Added: seeks, joins and lost units in a TrueHD item in Hearth.** A seek starts the decoder at the last indexed unit with a major sync
+  before the place asked for and plays from the unit that holds it, so the audio is what an unbroken decode gives from there and nothing is
+  rounded to the restart (`Session::restart_at_or_before` says where a coded output, which can only send whole units, would start).
+  Two TrueHD items of one rate join without a gap at the sample the first one ends, which counts the padding of its last unit. Bytes that
+  do not read as a unit are skipped and the decoder is told, so it waits for the next restart header instead of checking an interval it
+  did not see.
 - **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
   stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
   decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout

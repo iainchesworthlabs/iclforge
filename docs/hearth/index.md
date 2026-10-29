@@ -42,6 +42,14 @@ whole file, and then read as it plays. A TrueHD track in a container is demuxed 
 in memory, so a film's remux of tens of gigabytes is not something to open yet. A damaged unit plays as
 silence until the stream's next restart header, and the Media page and the diagnostics say so.
 
+A TrueHD decoder can only join a stream at a unit that carries a major sync, and the encoder decides how
+often there is one (every 16 units, 13 ms, in FFmpeg's streams; every 128, 107 ms, by default in this project's
+encoder; at most every 4,096, 3.4 s). A seek goes back to the last of those before the place asked for, decodes forward
+and drops what comes before the place, so the audio starts in the unit that holds it, within a unit (0.83 ms) and not at the restart.
+What it costs is the decode of the part between, which is some 45 ms of work at the longest interval. Two TrueHD items of
+one rate join without a gap, and the sample count at the join is the exact length of the first item: whole units,
+less the padding its last unit counts.
+
 The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 
 | Page | What it holds |

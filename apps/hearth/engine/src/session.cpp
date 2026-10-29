@@ -484,6 +484,18 @@ std::size_t Session::unit_containing(std::uint64_t sample) const {
     return static_cast<std::size_t>(std::distance(starts_.begin(), after)) - 1;
 }
 
+std::chrono::milliseconds Session::restart_at_or_before(std::chrono::milliseconds to) const {
+    const std::int64_t ms = std::max<std::int64_t>(to.count(), 0);
+    const std::uint64_t offset = static_cast<std::uint64_t>(ms) * facts_.sample_rate / 1000;
+    const std::size_t unit = unit_containing(window_start_ + std::min(offset, total_samples()));
+    const std::size_t joined =
+        index_ ? static_cast<std::size_t>(index_->restart_at_or_before(unit).unit) : unit;
+    const std::uint64_t start = start_of(joined);
+    const std::uint64_t at = start > window_start_ ? start - window_start_ : 0;
+    return std::chrono::milliseconds{
+        facts_.sample_rate == 0 ? 0 : static_cast<std::int64_t>(at * 1000 / facts_.sample_rate)};
+}
+
 void Session::play_whole_units() {
     if (whole_units_) {
         return;
@@ -634,8 +646,11 @@ void Session::start_at(std::size_t unit, StreamDecoder& decoder) {
 
 void Session::seek(std::chrono::milliseconds to, StreamDecoder& decoder) {
     const std::int64_t ms = std::max<std::int64_t>(to.count(), 0);
-    const std::uint64_t offset = static_cast<std::uint64_t>(ms) * facts_.sample_rate / 1000;
-    const std::uint64_t sample = window_start_ + std::min(offset, total_samples());
+    seek_to_sample(static_cast<std::uint64_t>(ms) * facts_.sample_rate / 1000, decoder);
+}
+
+void Session::seek_to_sample(std::uint64_t position, StreamDecoder& decoder) {
+    const std::uint64_t sample = window_start_ + std::min(position, total_samples());
     // The unit covering `sample`: the last one starting at or before it, or
     // the end when `sample` is the end.
     const std::size_t unit = unit_containing(sample);
