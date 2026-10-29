@@ -635,7 +635,7 @@ def noise_sequences(count, interval, seed, shift):
     for n in range(count):
         if n % interval == 0:
             state = seed
-        shr7 = state >> 7
+        shr7 = (state >> 7) & 0xFFFF  # 16 bits (ERRATA 23, provisional)
         first.append(ref.int8(state >> 15) * (1 << shift))
         second.append(ref.int8(shr7) * (1 << shift))
         state = ((state << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF

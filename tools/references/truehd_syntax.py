@@ -396,7 +396,7 @@ def decode_block(sub, bits, rows, first):
     # Generator 0 (TH spec 17.2, ERRATA 23): two noise channels, one step of the LFSR a sample.
     seed = sub.noise_seed
     for i in range(size):
-        shr7 = seed >> 7
+        shr7 = (seed >> 7) & 0xFFFF  # 16 bits, as FFmpeg reads it (ERRATA 23, provisional)
         rows[first + i][16] = int8(seed >> 15) * (1 << sub.noise_shift)
         rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
         seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF

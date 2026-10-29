@@ -39,7 +39,11 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
    noise table: §17.4 says the values are "pending extraction from the DEE binary". The library refuses 0x31EB with
    `ErrorKind::kUnsupported` and waits for the table from the owner; it does not take the values from anywhere else.
    Also asked, for generator 0: is `seed_shr7` in §17.2 a 32-bit or a 16-bit value? The recurrence gives different
-   sequences (bits 16 and up of the new state), and no stream here has a non-zero noise coefficient to say.
+   sequences (bits 16 and up of the new state). FFmpeg's decoder reads it as 16 bits: on the hand-built
+   `hb_noise_generator_0` its strict decode equals the library's over the whole stream (3200 values, the first
+   restart interval's 1280 among them) with `shr7 = (seed >> 7) & 0xFFFF`, while the 32-bit reading diverged at the third noise sample. The library
+   reads 16 bits. **Provisional, owner to confirm.** Evidence: `python3 tools/checks/verify_truehd_interop.py
+   --handbuilt` (`hb_noise_generator_0`).
 6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The FFmpeg-made
    streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
    `ch_assign` is the identity. FFmpeg's decoder shifts by `ch_assign[output channel]`: its strict decode of a stream
@@ -245,11 +249,12 @@ it was made from; none has an external decoder.
 **23. Noise generator 0 (§17.2, v3.5).** The two noise channels sit after the matrix channels in the coefficient order
 (coefficient indices `max_matrix_chan + 1` and `+ 2`, which entry 8 found in the streams). Each sample, in order:
 `shr7 = seed >> 7`; channel 1 is `int8(seed >> 15) << noise_shift`; channel 2 is `int8(shr7) << noise_shift`; then
-`seed = (seed << 16) ^ shr7 ^ (shr7 << 5)` in 32 bits. The seed is loaded from `noisegen_seed` at each restart and
+`seed = (seed << 16) ^ shr7 ^ (shr7 << 5)` in 32 bits, where `shr7` is the 16 bits `(seed >> 7) & 0xFFFF` (Q5: FFmpeg's
+decoder reads it so; the 32-bit `seed >> 7` of the text gives another sequence). The seed is loaded from `noisegen_seed` at each restart and
 runs on across blocks and units; it takes one step for every sample, whether or not a matrix draws on the noise.
 `matrix_noise_shift` is not sent for sync 0x31EA (the reader sends it for 0x31EB, §10.2). No stream FFmpeg writes has a
-non-zero noise coefficient: the decode is checked on one hand-built stream (`hb_noise_generator_0`) only (**no oracle**);
-`seed_shr7` is read as the 32-bit value the text shows (Q5).
+non-zero noise coefficient, so the generator is checked on the hand-built `hb_noise_generator_0`, whose every sample
+FFmpeg's strict decode reproduces (1600 samples, three restart intervals; Q5).
 
 ## Encoder (phase T2a)
 

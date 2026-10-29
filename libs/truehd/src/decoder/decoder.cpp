@@ -520,13 +520,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     }
 
     // TH spec §17.2: generator 0's two noise channels, one step of the LFSR a sample whether or not
-    // a matrix draws on them, so that the sequence runs on across blocks and units.
+    // a matrix draws on them, so that the sequence runs on across blocks and units. `shr7` is the
+    // 16 bits of the seed from bit 7 up: FFmpeg's decoder reads it so, and the 32-bit reading the
+    // text shows gives a different sequence (ERRATA.md entry 23, open question 5; provisional).
     {
         std::uint32_t seed = state.noise_seed;
         const int shift = restart.noise_shift;
         for (int i = 0; i < block; ++i) {
             std::int32_t* const row = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
-            const std::uint32_t shr7 = seed >> 7U;
+            const std::uint32_t shr7 = (seed >> 7U) & 0xFFFFU;
             row[kMaxChannels] =
                 static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << shift);
             row[kMaxChannels + 1] =
