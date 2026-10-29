@@ -7,7 +7,7 @@ newest figures were measured on and says how old it is;
 [Where each number comes from](#where-each-number-comes-from) says which job
 measures each series and when.
 
-Each card has one line per codec (AC-3, E-AC-3, and AC-4), and the speed and allocation cards add a TrueHD line once the series holds a TrueHD workload. A figure is the worst case among that
+Each card has one line per codec (AC-3, E-AC-3, and AC-4), and the speed, allocation and live-growth cards add a TrueHD line once the series holds a TrueHD workload. A figure is the worst case among that
 codec's own workloads, except on the listening-quality card, which gives the range, and the
 workload it comes from is named beside it. The figures of two codecs come from different workloads
 and do not compare with each other. Each series is written by its own job, so a line recorded on
@@ -19,10 +19,12 @@ has no colour. The listening-quality card scores the encoders of all three codec
 from the [tool comparison](tool-comparison-trend.md), AC-4 from its own series,
 [AC-4 encode quality](quality-trend.md#ac-4-encode-quality).
 
-**TrueHD is in none of these series.** Its speed and allocation are not measured by `iclforge-perf`,
-`iclforge-bench`, `iclforge-membench` or `iclforge-kernelbench`, and a lossless decoder has no quality
+**TrueHD is in the speed, allocation and live-growth series, and in no quality series.** `iclforge-perf`,
+`iclforge-bench`, `iclforge-membench` and `iclforge-kernelbench` measure it
+([what is measured](performance-trend.md#what-is-measured-and-on-what)), and a lossless decoder has no quality
 figure to trend: its check is that FFmpeg's strict decode equals the source ([Validation: TrueHD](verification.md#truehd-and-mlp)).
-Speed and memory rows for TrueHD are on the [roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
+Its line appears on the cards once the trend history holds a TrueHD row. Instruction counts and image sizes on the small parts, and the
+per-platform pages, are on the [roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
 New to codec benchmarks: start with
 [How to read these numbers](#how-to-read-these-numbers).

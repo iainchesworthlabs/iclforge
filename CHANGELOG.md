@@ -37,7 +37,7 @@ See [README.md](README.md) for the project overview and
   `support-catalogue.json`, the header map, the example list, the C API and bindings pages, `docs/verification.md` and the threat model give
   TrueHD, the MAT burst, the AC-4 content signature and TrueHD's missing counterpart of it a row each. Where TrueHD is not built the row says
   so: the Forge GUI, Hearth, Crucible, the Python, Rust and WebAssembly bindings, device output of a MAT burst, content signing of the evolution
-  frame, performance series, and seeds and corpora for its fuzz harnesses. `ROADMAP.md` replaces its TrueHD section with a table by layer,
+  frame, instruction counts and image sizes on the small parts, and seeds and corpora for its fuzz harnesses. `ROADMAP.md` replaces its TrueHD section with a table by layer,
   adds the area-by-area rows of "TrueHD and E-AC-3 as equals" and a row for Dolby's reference content, and corrects the Blocked row that said
   the reference material was non-public. The inventory of every page checked is `planning/documentation-sweep.md`.
 - **Fixed: `docs/forge/cli/commands.md` listed 46 commands, and its usage block predated TrueHD and AC-4 signing.** `forge --help` prints 49: the
