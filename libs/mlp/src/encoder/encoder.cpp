@@ -296,9 +296,28 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
         CodingParams coding;
         std::vector<std::int32_t> residuals;
     };
-    std::vector<std::vector<BlockChoice>> blocks(
-        static_cast<std::size_t>(channels),
-        std::vector<BlockChoice>(static_cast<std::size_t>(units)));
+    // The blocks: one per access unit, but the restart's first eight samples are a block of their
+    // own, coded with no prediction. FFmpeg's decoder does not clear the filters' history at a
+    // restart header, and its encoder codes the first eight samples after every restart
+    // unpredicted, which flushes that history whichever way a decoder treats it (P35); this
+    // encoder does the same, so that its streams decode alike in both and from any restart.
+    struct BlockSpan {
+        int unit;
+        int start;
+        int size;
+        bool flat;
+    };
+    std::vector<BlockSpan> spans;
+    for (int u = 0; u < units; ++u) {
+        if (u == 0) {
+            spans.push_back({0, 0, kMinBlockSize, true});
+            spans.push_back({0, kMinBlockSize, spa - kMinBlockSize, false});
+        } else {
+            spans.push_back({u, u * spa, spa, false});
+        }
+    }
+    std::vector<std::vector<BlockChoice>> blocks(static_cast<std::size_t>(channels),
+                                                 std::vector<BlockChoice>(spans.size()));
     std::array<int, kMaxSubstreams> max_lsbs{};
     auto& coder = coders[0];
     for (int c = 0; c < channels; ++c) {
@@ -333,22 +352,29 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             }
         }
         std::vector<std::int32_t> residuals;
-        for (int u = 0; u < units; ++u) {
-            const std::size_t at = static_cast<std::size_t>(u * spa);
-            const auto block = std::span(x).subspan(at, static_cast<std::size_t>(spa));
-            // The access unit's own designs, from it and the three before it.
+        for (std::size_t b = 0; b < spans.size(); ++b) {
+            const BlockSpan& span = spans[b];
+            const auto at = static_cast<std::size_t>(span.start);
+            const auto size = static_cast<std::size_t>(span.size);
+            const auto block = std::span(x).subspan(at, size);
             std::vector<Candidate> cands;
-            cands.push_back(Candidate{cc.design, true});
-            for (const auto& d : pool) {
-                cands.push_back(Candidate{d, false});
-            }
-            const std::size_t look = std::min<std::size_t>(at, static_cast<std::size_t>(3 * spa));
-            const auto window =
-                std::span(x).subspan(at - look, look + static_cast<std::size_t>(spa));
-            for (const auto& coeffs : lpc(window, config.max_fir_order)) {
-                if (!coeffs.empty()) {
-                    if (auto d = quantise(coeffs, {})) {
-                        cands.push_back(Candidate{*d, false});
+            if (span.flat) {
+                cands.push_back(Candidate{FilterDesign{}, false});
+            } else {
+                // The filter in place, the interval's pool, and the block's own designs from it
+                // and up to three access units before it.
+                cands.push_back(Candidate{cc.design, true});
+                for (const auto& d : pool) {
+                    cands.push_back(Candidate{d, false});
+                }
+                const std::size_t look =
+                    std::min<std::size_t>(at, static_cast<std::size_t>(3 * spa));
+                const auto window = std::span(x).subspan(at - look, look + size);
+                for (const auto& coeffs : lpc(window, config.max_fir_order)) {
+                    if (!coeffs.empty()) {
+                        if (auto d = quantise(coeffs, {})) {
+                            cands.push_back(Candidate{*d, false});
+                        }
                     }
                 }
             }
@@ -371,7 +397,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
                 ranked.push_back({sum, k});
             }
             std::sort(ranked.begin(), ranked.end(),
-                      [](const Ranked& a, const Ranked& b) { return a.score < b.score; });
+                      [](const Ranked& x1, const Ranked& x2) { return x1.score < x2.score; });
             std::int64_t best_bits = kInfiniteCost;
             BlockChoice best;
             ChannelFilter best_state;
@@ -429,7 +455,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             const int ss = plan.substream_of(c);
             max_lsbs[static_cast<std::size_t>(ss)] =
                 std::max(max_lsbs[static_cast<std::size_t>(ss)], best.coding.lsbs + ip.quant);
-            blocks[static_cast<std::size_t>(c)][static_cast<std::size_t>(u)] = std::move(best);
+            blocks[static_cast<std::size_t>(c)][b] = std::move(best);
         }
     }
 
@@ -439,6 +465,7 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
     const MajorSync sync = major_sync_for(config, plan);
     std::array<CodingParams, kMaxChannels> sent{};
     std::array<FilterDesign, kMaxChannels> sent_design{};
+    std::array<int, kMaxSubstreams> block_size_sent{};
     for (int c = 0; c < channels; ++c) {
         sent[static_cast<std::size_t>(c)] = CodingParams{0, 24 - ip.quant, 0};
     }
@@ -450,7 +477,6 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
         checks[static_cast<std::size_t>(ss)].reset();
     }
     first_interval = false;
-    std::vector<std::vector<std::byte>> segments_of_unit;
     for (int u = 0; u < units; ++u) {
         const bool restart = u == 0;
         const bool last = u == units - 1;
@@ -459,7 +485,6 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             const auto& sp = plan.sub[static_cast<std::size_t>(ss)];
             BitWriter w;
             SyntaxWriter io(w);
-            BlockHeader header;
             BlockContext ctx;
             ctx.presence = kPresenceAll;
             ctx.min_chan = sp.min_chan;
@@ -467,97 +492,104 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
             ctx.max_matrix_chan = sp.max_matrix_chan;
             ctx.noise_type = false;
             ctx.max_matrices = sp.max_matrices;
-            if (restart) {
-                header.block_size = static_cast<std::uint16_t>(spa);
-                const auto& stack = ip.stacks[static_cast<std::size_t>(ss)];
-                if (stack.count > 0) {
-                    header.matrix = stack;
+            for (std::size_t b = 0; b < spans.size(); ++b) {
+                const BlockSpan& span = spans[b];
+                if (span.unit != u) {
+                    continue;
                 }
-                if (ip.quant > 0) {
+                const bool restart_block = restart && span.start == 0;
+                BlockHeader header;
+                bool any = restart_block;
+                if (span.size != block_size_sent[static_cast<std::size_t>(ss)] || restart_block) {
+                    header.block_size = static_cast<std::uint16_t>(span.size);
+                    block_size_sent[static_cast<std::size_t>(ss)] = span.size;
+                    any = true;
+                }
+                if (restart_block) {
+                    // Every parameter is sent at a restart, its default value included: FFmpeg's
+                    // decoder keeps a channel's filter (and so, it is safest to assume, any
+                    // parameter) across a restart header that does not resend it (P35).
+                    header.matrix = ip.stacks[static_cast<std::size_t>(ss)];
                     std::array<std::uint8_t, kMaxChannels> quant{};
                     for (int ch = 0; ch <= sp.max_chan; ++ch) {
                         quant[static_cast<std::size_t>(ch)] = static_cast<std::uint8_t>(ip.quant);
                     }
                     header.quant_step = quant;
-                }
-                if (ip.shift > 0) {
                     std::array<std::int8_t, kMaxChannels> shifts{};
                     for (int ch = 0; ch <= sp.max_matrix_chan; ++ch) {
                         shifts[static_cast<std::size_t>(ch)] = static_cast<std::int8_t>(ip.shift);
                     }
                     header.output_shift = shifts;
                 }
-            }
-            bool any = restart;
-            for (int ch = sp.min_chan; ch <= sp.max_chan; ++ch) {
-                auto& bc = blocks[static_cast<std::size_t>(ch)][static_cast<std::size_t>(u)];
-                auto& now = sent[static_cast<std::size_t>(ch)];
-                auto& now_design = sent_design[static_cast<std::size_t>(ch)];
-                if (restart) {
-                    now = CodingParams{0, 24 - ip.quant, 0};
-                    now_design = FilterDesign{};
-                }
-                const bool fir = !same_filter(bc.design.fir, now_design.fir);
-                const bool iir = !same_filter(bc.design.iir, now_design.iir);
-                const bool coding = bc.coding.huff_type != now.huff_type ||
-                                    bc.coding.lsbs != now.lsbs || bc.coding.offset != now.offset;
-                if (fir || iir || coding) {
-                    ChannelParams cp;
-                    if (fir) {
-                        cp.fir = bc.design.fir;
-                    }
-                    if (iir) {
-                        cp.iir = bc.design.iir;
-                    }
-                    if (bc.coding.offset != now.offset) {
-                        cp.huff_offset = static_cast<std::int16_t>(bc.coding.offset);
-                    }
-                    cp.huff_type = static_cast<std::uint8_t>(bc.coding.huff_type);
-                    cp.huff_lsbs = static_cast<std::uint8_t>(bc.coding.lsbs + ip.quant);
-                    header.channels[static_cast<std::size_t>(ch)] = cp;
-                    now = bc.coding;
-                    now_design = bc.design;
-                    any = true;
-                }
-            }
-            w.write(1, any ? 1U : 0U, "block_header_exists");
-            if (any) {
-                w.write(1, restart ? 1U : 0U, "restart_header_exists");
-                if (restart) {
-                    RestartHeader rh;
-                    rh.sync_word = sp.sync_word;
-                    rh.output_timing = static_cast<std::uint16_t>(
-                        (au_index * static_cast<std::uint64_t>(spa)) & 0xFFFFU);
-                    rh.min_chan = static_cast<std::uint8_t>(sp.min_chan);
-                    rh.max_chan = static_cast<std::uint8_t>(sp.max_chan);
-                    rh.max_matrix_chan = static_cast<std::uint8_t>(sp.max_matrix_chan);
-                    rh.max_shift = static_cast<std::uint8_t>(ip.shift);
-                    rh.max_lsbs = static_cast<std::uint8_t>(max_lsbs[static_cast<std::size_t>(ss)]);
-                    rh.max_bits = static_cast<std::uint8_t>(ip.max_bits);
-                    rh.max_bits_repeat = static_cast<std::uint8_t>(ip.max_bits);
-                    rh.lossless_check = carried[static_cast<std::size_t>(ss)];
-                    for (int ch = 0; ch <= sp.max_matrix_chan; ++ch) {
-                        rh.ch_assign[static_cast<std::size_t>(ch)] = static_cast<std::uint8_t>(ch);
-                    }
-                    const std::size_t first = w.bit_count();
-                    if (auto t = transfer(io, rh, kMaxChannels); !t) {
-                        return std::unexpected(t.error());
-                    }
-                    const std::size_t count = w.bit_count() - first;
-                    w.write(8, crc8_bits(w.bytes(), first, count), "restart_header_crc");
-                }
-                if (auto t = transfer(io, header, ctx); !t) {
-                    return std::unexpected(t.error());
-                }
-            }
-            for (int i = 0; i < spa; ++i) {
                 for (int ch = sp.min_chan; ch <= sp.max_chan; ++ch) {
-                    const auto& bc =
-                        blocks[static_cast<std::size_t>(ch)][static_cast<std::size_t>(u)];
-                    write_sample(w, bc.residuals[static_cast<std::size_t>(i)], bc.coding);
+                    auto& bc = blocks[static_cast<std::size_t>(ch)][b];
+                    auto& now = sent[static_cast<std::size_t>(ch)];
+                    auto& now_design = sent_design[static_cast<std::size_t>(ch)];
+                    const bool fir = restart_block || !same_filter(bc.design.fir, now_design.fir);
+                    const bool iir = restart_block || !same_filter(bc.design.iir, now_design.iir);
+                    const bool coding = restart_block || bc.coding.huff_type != now.huff_type ||
+                                        bc.coding.lsbs != now.lsbs ||
+                                        bc.coding.offset != now.offset;
+                    if (fir || iir || coding) {
+                        ChannelParams cp;
+                        if (fir) {
+                            cp.fir = bc.design.fir;
+                        }
+                        if (iir) {
+                            cp.iir = bc.design.iir;
+                        }
+                        if (restart_block || bc.coding.offset != now.offset) {
+                            cp.huff_offset = static_cast<std::int16_t>(bc.coding.offset);
+                        }
+                        cp.huff_type = static_cast<std::uint8_t>(bc.coding.huff_type);
+                        cp.huff_lsbs = static_cast<std::uint8_t>(bc.coding.lsbs + ip.quant);
+                        header.channels[static_cast<std::size_t>(ch)] = cp;
+                        now = bc.coding;
+                        now_design = bc.design;
+                        any = true;
+                    }
                 }
+                w.write(1, any ? 1U : 0U, "block_header_exists");
+                if (any) {
+                    w.write(1, restart_block ? 1U : 0U, "restart_header_exists");
+                    if (restart_block) {
+                        RestartHeader rh;
+                        rh.sync_word = sp.sync_word;
+                        rh.output_timing = static_cast<std::uint16_t>(
+                            (au_index * static_cast<std::uint64_t>(spa)) & 0xFFFFU);
+                        rh.min_chan = static_cast<std::uint8_t>(sp.min_chan);
+                        rh.max_chan = static_cast<std::uint8_t>(sp.max_chan);
+                        rh.max_matrix_chan = static_cast<std::uint8_t>(sp.max_matrix_chan);
+                        rh.max_shift = static_cast<std::uint8_t>(ip.shift);
+                        rh.max_lsbs =
+                            static_cast<std::uint8_t>(max_lsbs[static_cast<std::size_t>(ss)]);
+                        rh.max_bits = static_cast<std::uint8_t>(ip.max_bits);
+                        rh.max_bits_repeat = static_cast<std::uint8_t>(ip.max_bits);
+                        rh.lossless_check = carried[static_cast<std::size_t>(ss)];
+                        for (int ch = 0; ch <= sp.max_matrix_chan; ++ch) {
+                            rh.ch_assign[static_cast<std::size_t>(ch)] =
+                                static_cast<std::uint8_t>(ch);
+                        }
+                        const std::size_t first = w.bit_count();
+                        if (auto r = transfer(io, rh, kMaxChannels); !r) {
+                            return std::unexpected(r.error());
+                        }
+                        const std::size_t count = w.bit_count() - first;
+                        w.write(8, crc8_bits(w.bytes(), first, count), "restart_header_crc");
+                    }
+                    if (auto r = transfer(io, header, ctx); !r) {
+                        return std::unexpected(r.error());
+                    }
+                }
+                for (int i = 0; i < span.size; ++i) {
+                    for (int ch = sp.min_chan; ch <= sp.max_chan; ++ch) {
+                        const auto& bc = blocks[static_cast<std::size_t>(ch)][b];
+                        write_sample(w, bc.residuals[static_cast<std::size_t>(i)], bc.coding);
+                    }
+                }
+                const bool last_block = b + 1 == spans.size() || spans[b + 1].unit != u;
+                w.write(1, last_block ? 1U : 0U, "last_block_in_segment");
             }
-            w.write(1, 1U, "last_block_in_segment");
             // P26: pad to a 16-bit boundary; P7: the last access unit's termination word.
             w.put(0, static_cast<int>((16U - w.bit_count() % 16U) % 16U));
             if (last && padding > 0) {
@@ -582,10 +614,6 @@ std::expected<std::vector<std::byte>, Error> Encoder::State::interval(
         }
         // Evolution payloads for this access unit, and a signature over its bytes.
         std::vector<EvolutionPayload> evo;
-        const std::uint64_t unit_first = frames_in -
-                                         pending.size() / static_cast<std::size_t>(channels) +
-                                         static_cast<std::uint64_t>(u * spa);
-        (void)unit_first;
         while (!payloads.empty() &&
                payloads.front().first < (au_index + 1U) * static_cast<std::uint64_t>(spa)) {
             evo.push_back(std::move(payloads.front().second));
