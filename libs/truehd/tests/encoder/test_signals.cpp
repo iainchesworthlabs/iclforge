@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <vector>
 
 #include "encoder/encoder_support.hpp"
@@ -64,6 +66,15 @@ TEST_CASE("full-scale squares, alternating extremes and impulses come back",
         check_round_trip(
             build(2, 4800, [](int t, int c) { return ((t / (20 + c)) % 2 == 0) ? kTop : kBottom; }),
             2, 48000, interval);
+        // Two squares of different pitch: the pair matrix leaves a row whose first block is a
+        // constant above 2^23, which only a Huffman code of a wide width can hold.
+        check_round_trip(build(2, 4800,
+                               [](int t, int c) {
+                                   const double phase = 2.0 * std::numbers::pi * 110.0 * 1.0597 *
+                                                        (c + 1) * t / 48000.0;
+                                   return std::sin(phase) >= 0 ? kTop : kBottom;
+                               }),
+                         2, 48000, interval);
         check_round_trip(build(2, 4800, [](int t, int) { return t % 2 == 0 ? kTop : kBottom; }), 2,
                          48000, interval);
         check_round_trip(
