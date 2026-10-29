@@ -253,6 +253,9 @@ struct ElementaryStreamResult {
     std::string trim_note{};
     // What the container said about the track, when `file` is one.
     ContainerFacts container{};
+    // The codec of the track taken, when `file` is a container and the reader's words for the
+    // track's codec name one of the four; unset for a bare stream, whose bytes say for themselves.
+    std::optional<TrackCodec> codec = std::nullopt;
 };
 
 [[nodiscard]] ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file,

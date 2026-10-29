@@ -22,6 +22,15 @@ See [README.md](README.md) for the project overview and
   decided (`ac4-verify` and `verify-content` still judge at the time of the check; `verify-time=` overrides both). The sample's publisher
   UUID is in none of its four certificates, so a UUID that the certificate does not carry is reported as not compared and never refused.
   Open questions 16 to 19 in `libs/ac4/ERRATA.md`; questions 2, 11 and 13 are answered by v2.5.
+- **Added: Hearth decodes and plays TrueHD and MLP.** The desktop player opens `.thd` and `.mlp` files and the TrueHD track of an MP4,
+  Matroska or MPEG-TS file, decodes them with `iclforge::truehd` (presentation `best`, strict checks) and plays the PCM to local
+  outputs and to a network group. The 25 FFmpeg-made fixtures and the hand-built streams the library decodes come out of the engine's
+  renderer sample for sample as `forge decode` writes them. A TrueHD access unit is delivered as one block of 40, 80 or 160 samples; a
+  bare file is indexed (the units a decoder can join at, and the exact length) and read as it plays, and is not held in memory. A unit
+  that does not decode plays as silence of its length until the stream's next restart header. The output decision says "Passthrough of
+  TrueHD is not available" and does not send the stream to a receiver or a network sink as it is. A file with TrueHD first and AC-3 or
+  E-AC-3 after it now plays the TrueHD track, where the previous change had it play the second. `hearth` may use `iclforge::truehd`
+  (`tools/checks/projects.json`).
 - **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
   stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
   decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout

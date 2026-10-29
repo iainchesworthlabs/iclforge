@@ -150,6 +150,7 @@ TEST_CASE("elementary_stream_from_bytes leaves a bare elementary stream untouche
     CHECK_FALSE(result.trim.length.has_value());
     CHECK(result.trim_note.empty());
     CHECK(result.container.kind == iclforge::apps::ContainerKind::kUnknown);
+    CHECK_FALSE(result.codec.has_value());
     CHECK(result.container.codec_id.empty());
     CHECK(result.container.samples == 0);
     CHECK_FALSE(result.container.codec_box.has_value());
@@ -612,6 +613,8 @@ TEST_CASE("elementary_stream_from_bytes takes the first track whose codec the ca
             CHECK(by_default.error.empty());
             CHECK_FALSE(by_default.declined_codec.has_value());
             CHECK(by_default.bytes == streams.eac3_stream);
+            // The result says which codec the track it took is in.
+            CHECK(by_default.codec == TrackCodec::kEac3);
             CHECK(by_default.container.kind == container.kind);
             if (container.kind == iclforge::apps::ContainerKind::kMpegTs) {
                 CHECK(by_default.container.stream_type == 0x87);
@@ -630,6 +633,7 @@ TEST_CASE("elementary_stream_from_bytes takes the first track whose codec the ca
                 with_truehd_first, CodecSet{.truehd = true});
             CHECK(reads_truehd.error.empty());
             CHECK(reads_truehd.bytes == streams.truehd_stream);
+            CHECK(reads_truehd.codec == TrackCodec::kTruehd);
             if (container.kind == iclforge::apps::ContainerKind::kMpegTs) {
                 CHECK(reads_truehd.container.stream_type == 0x83);
             } else {
@@ -681,6 +685,9 @@ TEST_CASE("elementary_stream_from_bytes says when a file's audio is in no codec 
             CHECK(read.error.empty());
             CHECK_FALSE(read.declined_codec.has_value());
             CHECK(read.bytes == streams.truehd_stream);
+            CHECK(read.codec == TrackCodec::kTruehd);
+            // A track declined has no codec taken.
+            CHECK_FALSE(declined.codec.has_value());
 
             // TrueHD is not special: a codec the set leaves out is reported the same way, and one
             // it allows is read.

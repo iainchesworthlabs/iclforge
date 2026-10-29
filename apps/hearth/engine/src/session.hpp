@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -13,9 +14,11 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "item_source.hpp"
 #include "container_input.hpp"
 #include "queue.hpp"
 #include "stream_decoder.hpp"
+#include "truehd_index.hpp"
 
 // One queue item, opened (planning/hearth-reference-player.md, A3: "a session
 // per item: container input, access units, decoder ...").
@@ -69,6 +72,17 @@
 // out, its latency included, as `forge decode` writes them. A frame waiting
 // for an I-frame puts out nothing, and plays as silence of its length.
 //
+// TrueHD and MLP (planning/truehd-parity-hearth-player.md, rows 5 and 14): 1,200 units a second, so
+// the units are not listed one by one. truehd_index.hpp indexes the units a decoder can join at,
+// and every unit has the same length, so a unit's start is its number times that; the session holds
+// that index and a cursor on the stream's source (which an ItemLoader may give as a file read in
+// windows rather than as bytes), and an item's duration and its samples are exact to the last,
+// less the padding the last unit counts. A decoder can only start at a unit with a major sync, so a
+// seek, or a handover to a new decoder, starts at the last indexed one before the place wanted,
+// decodes forward and drops what comes before it. The audio from the place wanted on is what an
+// unbroken decode gives, and nothing is rounded to a restart. A unit the decoder cannot read plays
+// as silence of its length until the next restart header (StreamDecoder).
+//
 // One programme: an AC-4 stream is sent to a sink whole, and a sink decodes
 // the presentation it would choose with no preferences; ac4_presentation()
 // says which the listener's choice would play, for the player to compare.
@@ -78,7 +92,15 @@ namespace iclforge::hearth {
 // What an ItemLoader hands over: the item's elementary stream, and the part
 // of it to play.
 struct LoadedItem {
+    // The stream, whole in memory. Empty when `source` is set.
     std::vector<std::byte> bytes{};
+    // A TrueHD or MLP stream the loader has not read into memory: the session indexes it and reads
+    // it as it plays (truehd_index.hpp). Set instead of `bytes`.
+    std::shared_ptr<ByteSource> source{};
+    // `bytes` or `source` is a TrueHD or MLP stream: the container's track says so, or the file's
+    // first bytes. Without it a stream whose first bytes are a TrueHD access unit with a major sync
+    // is taken for one all the same.
+    bool truehd = false;
     // Samples at the stream's rate to decode but not play, from the start.
     std::uint64_t skip_samples = 0;
     // Samples to play after those, or to the end when unset.
@@ -132,9 +154,13 @@ public:
     ~Session() = default;
 
     [[nodiscard]] const ItemFacts& facts() const { return facts_; }
-    [[nodiscard]] std::size_t unit_count() const { return units_.size(); }
+    [[nodiscard]] std::size_t unit_count() const {
+        return index_ ? static_cast<std::size_t>(index_->units) : units_.size();
+    }
     // The programme's first access unit, as the stream carries it.
-    [[nodiscard]] std::span<const std::byte> first_unit() const { return units_.front(); }
+    [[nodiscard]] std::span<const std::byte> first_unit() const {
+        return index_ ? std::span<const std::byte>(first_unit_) : units_.front();
+    }
     // The programme playing: its independent substream id (0 for AC-3 and
     // AC-4).
     [[nodiscard]] int programme() const { return programme_; }
@@ -144,6 +170,9 @@ public:
     [[nodiscard]] bool first_programme() const { return first_programme_; }
     // Whether the item is AC-4.
     [[nodiscard]] bool ac4() const { return ac4_; }
+    // Whether the item is TrueHD or MLP, and what the index of its stream says.
+    [[nodiscard]] bool truehd() const { return index_.has_value(); }
+    [[nodiscard]] const TruehdIndex* truehd_index() const { return index_ ? &*index_ : nullptr; }
     // The presentation of the stream's first table of contents that an AC-4
     // decoder set to `choice` plays (iclforge::ac4::select_presentation()); nothing for
     // an item that is not AC-4, or a choice nothing meets. A sink decodes the
@@ -229,9 +258,20 @@ private:
     void start_at(std::size_t unit, StreamDecoder& decoder);
 
     // The unit a decoder starting at `unit` begins with: the one before for
-    // AC-3 and E-AC-3, and for AC-4 an I-frame kAc4PreRollSamples or more
-    // before it, where the stream has one.
+    // AC-3 and E-AC-3, for AC-4 an I-frame kAc4PreRollSamples or more
+    // before it, where the stream has one, and for TrueHD or MLP the last
+    // indexed unit with a major sync at or before it.
     [[nodiscard]] std::size_t first_decoded(std::size_t unit) const;
+
+    // Where a unit starts, in stream samples: the sum of the lengths before it. `unit` may be
+    // unit_count(), which is the stream's end.
+    [[nodiscard]] std::uint64_t start_of(std::size_t unit) const;
+    // The last unit starting at or before `sample`, or the last unit if there is none after it.
+    [[nodiscard]] std::size_t unit_containing(std::uint64_t sample) const;
+    // Opens a TrueHD or MLP item: `loaded`'s source or bytes, indexed.
+    [[nodiscard]] std::expected<void, std::string> open_truehd(const std::string& path,
+                                                               LoadedItem& loaded,
+                                                               std::string& note);
 
     std::vector<std::byte> bytes_;
     ac3::io::ScannedStream scanned_{};
@@ -246,6 +286,14 @@ private:
     bool ac4_ = false;
     iclforge::ac4::Toc ac4_toc_{};
     std::vector<bool> iframes_;
+    // TrueHD and MLP: where the stream is read from, the index of its restarts, the cursor on
+    // it, a copy of the first unit, and the bytes the cursor had passed over as of the last unit
+    // handed to a decoder (any more is lost data).
+    std::shared_ptr<ByteSource> source_;
+    std::optional<TruehdIndex> index_;
+    std::optional<TruehdCursor> cursor_;
+    std::vector<std::byte> first_unit_;
+    std::uint64_t skipped_seen_ = 0;
     ItemFacts facts_{};
     // The part of the stream the item plays, in stream samples.
     std::uint64_t window_start_ = 0;

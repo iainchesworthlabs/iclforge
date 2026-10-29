@@ -469,7 +469,8 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
             }
             return {.bytes = concat_frames(demuxed->frames),
                     .error = {},
-                    .container = facts_of(*demuxed)};
+                    .container = facts_of(*demuxed),
+                    .codec = codec_of_matroska(demuxed->track.codec_id)};
         }
         case ContainerKind::kMp4: {
             namespace mp4 = iclforge::containers::mp4;
@@ -529,7 +530,10 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
                     }
                     out.insert(out.end(), sample.begin(), sample.end());
                 }
-                return {.bytes = std::move(out), .error = {}, .container = facts_of(*demuxed)};
+                return {.bytes = std::move(out),
+                        .error = {},
+                        .container = facts_of(*demuxed),
+                        .codec = TrackCodec::kAc4};
             }
             std::string note;
             const StreamTrim trim = trim_from_edit_list(demuxed->track, note);
@@ -537,7 +541,8 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
                     .error = {},
                     .trim = trim,
                     .trim_note = std::move(note),
-                    .container = facts_of(*demuxed)};
+                    .container = facts_of(*demuxed),
+                    .codec = codec_of_mp4(demuxed->track.codec_id)};
         }
         case ContainerKind::kMpegTs: {
             namespace ts = iclforge::containers::mpegts;
@@ -563,7 +568,8 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
             }
             return {.bytes = concat_frames(demuxed->payloads),
                     .error = {},
-                    .container = facts_of(*demuxed)};
+                    .container = facts_of(*demuxed),
+                    .codec = codec_of_mpegts(demuxed->stream)};
         }
     }
     return {.bytes = {}, .error = "unrecognised container"};

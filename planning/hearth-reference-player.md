@@ -1,6 +1,6 @@
 # Hearth: a desktop reference player and Sendspin sinks
 
-!!! note "Status as of 2026-10-13: built, with three hardware exits open"
+!!! note "Status as of 2026-10-29: built, with three hardware exits open"
     Written and decided on 2026-09-15, in one session of questions and answers recorded under
     [Decisions](#decisions). The live status board is [ROADMAP.md](../ROADMAP.md); by chip, and
     each phase below carries its own status line:
@@ -28,6 +28,12 @@
       [`planning/ac4.md`](ac4.md), and Hearth plays AC-4 through the library decoder. An ESP32-P4
       or ESP32-S3 sink built with the decoder takes AC-4 in a Sendspin group (phase I6, #1446); the
       published firmware images have the decoder off, and a C6 is sent PCM.
+    - **TrueHD and MLP in Hearth.** Decoded here (2026-10-29, phases H1 to H3 of the TrueHD parity audit): the
+      engine opens `.thd`, `.mlp` and a container's TrueHD track, decodes through `iclforge::truehd`, plays
+      the PCM to local outputs and to a network group, seeks, joins items gaplessly and recovers from a
+      damaged unit at the next restart. Tested through the engine against the 25 FFmpeg-made fixtures and the
+      library's encoder; nothing has been played to a sound device. Not built: MAT to a receiver, coded
+      TrueHD to network sinks, Hearth for Android, the AC-3 fallback (the audit's H4 to H8).
     - **Hearth for Android**, a Sendspin sink for Android TV, has a plan of its own:
       [`hearth-android.md`](hearth-android.md).
 

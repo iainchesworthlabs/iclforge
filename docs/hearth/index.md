@@ -10,26 +10,37 @@ audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group
 [Using the desktop player](desktop-player.md) walks through the window with a picture of each
 page. This page is the reference.
 
-!!! note "TrueHD and MLP are not played by Hearth"
-    The ICL Forge library decodes and encodes TrueHD, but Hearth does not link it. The desktop player's folder picker lists the
-    kinds `.ac3`, `.ec3`, `.ac4`, `.mp4`, `.mkv` and `.ts`, and `.thd` and `.mlp` are not among them; no sink (the ESP32 firmware or
-    Hearth for Android) takes TrueHD, as a bitstream or decoded; and `forge play` and `monitor` refuse a file whose audio is TrueHD alone. What the library has is
-    in [TrueHD and MLP](../library/truehd.md); the roadmap row for Hearth's TrueHD work is
+!!! note "TrueHD and MLP are decoded here, and not passed through"
+    The desktop player decodes TrueHD and MLP (`.thd`, `.mlp`, and the TrueHD track of an MP4, Matroska or MPEG-TS file) and plays
+    the result as PCM, to this computer's outputs and to a network group. It does not send TrueHD to a receiver as it is (the
+    output decision says "Passthrough of TrueHD is not available"), no network sink is sent the coded stream, and Hearth for
+    Android and the ESP32 sinks do not take it. The decode is lossless and 24 bits wide, and what reaches the output is float32
+    through the operating system's mixer, so it is not a bit-exact path. How the work is staged is in the
+    [parity audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-hearth-player.md);
+    what the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is
     [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
 ## The desktop player
 
 `hearth` runs on Windows, Linux, and macOS with a Qt 6.8 or later kit, and builds as the
-`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3` and `.ac4` elementary streams, and
-the first AC-3, E-AC-3 or AC-4 track of an MP4, Matroska or MPEG-TS file (`.mp4`, `.mkv`, `.ts`).
+`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3`, `.ac4`, `.thd` and `.mlp` elementary streams, and
+the first AC-3, E-AC-3, AC-4 or TrueHD track of an MP4, Matroska or MPEG-TS file (`.mp4`, `.mkv`, `.ts`).
 A container is told by its first bytes, not its name, and an MP4's edit list trims the priming and
-padding the encoder added. **Add folder…** lists those six kinds of file, and any file can be
+padding the encoder added. **Add folder…** lists those eight kinds of file, and any file can be
 added or dropped. The queue marks a file it cannot read as not playable, with the reason, when it
 reaches it, and skips it or stops there as Settings > Playback > **An item fails** says.
 
-Hearth does not play TrueHD yet. A TrueHD track in a container is passed over for the next AC-3,
-E-AC-3 or AC-4 track, as in a Blu-ray remux that has the TrueHD track first; a file whose audio is
-TrueHD alone is marked not playable, with the reason "TrueHD is not played by Hearth yet".
+A file with a TrueHD track first and an AC-3 or E-AC-3 track after it, as a Blu-ray remux has, plays the
+TrueHD track: it is the first track Hearth can play. The AC-3 or E-AC-3 track is listed in the Media page as
+another track of the file, and Hearth has no control yet to play it instead.
+
+TrueHD and MLP are decoded to the stream's own channels and rate (44.1 to 192 kHz, up to 8 channels of the
+2, 6 and 8 channel presentations) and placed on the output layout like any other bed: a layout that has a
+channel's speaker plays it exactly, and a channel the layout has no speaker for is panned between the speakers it has.
+A bare `.thd` or `.mlp` file is not read into memory; it is indexed once when it is opened, which reads the
+whole file, and then read as it plays. A TrueHD track in a container is demuxed from a copy of the whole file
+in memory, so a film's remux of tens of gigabytes is not something to open yet. A damaged unit plays as
+silence until the stream's next restart header, and the Media page and the diagnostics say so.
 
 The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 

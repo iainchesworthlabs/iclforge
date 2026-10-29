@@ -355,6 +355,11 @@ if(NOT ICLFORGE_BUILD_AC4 AND _iclforge_hearth_apps)
         "unless ICLFORGE_SENDSPIN_PLAYER_ONLY is set - Hearth's engine reads an AC-4 item's table "
         "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4.")
 endif()
+if(NOT ICLFORGE_BUILD_TRUEHD AND _iclforge_hearth_apps)
+    message(FATAL_ERROR "ICLFORGE_BUILD_TRUEHD=OFF requires ICLFORGE_BUILD_HEARTH to be OFF too, "
+        "unless ICLFORGE_SENDSPIN_PLAYER_ONLY is set - Hearth's engine decodes a TrueHD or MLP item "
+        "with iclforge::truehd.")
+endif()
 
 # ICLFORGE_MINIMAL_DECODER's own version of the three guards above. Everything listed here
 # either links the full iclforge::ac3 (CLI, GUI, tests, examples, the C API) or is a module the

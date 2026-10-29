@@ -9,6 +9,7 @@
 #include "iclforge/ac3/decoder/serving.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 
 // The decoder configuration model (planning/hearth-reference-player.md,
 // "Decoder configuration"): what the app's decoder controls hold, and the
@@ -81,6 +82,22 @@ struct Ac4Settings {
     bool core_decoding = false;
 
     friend bool operator==(const Ac4Settings&, const Ac4Settings&) = default;
+};
+
+// TrueHD and MLP's controls (planning/truehd-parity-hearth-player.md, row 25). The decoder reads
+// dialogue normalisation and the dynamic range words and applies neither (libs/truehd/ERRATA.md,
+// entry 10), so there is no control for either, and the Decoder tab says so.
+struct TruehdSettings {
+    // Which substreams a decode reads: the highest of the three that carry the 2, 6 and 8 channel
+    // beds (kBest), or one of them. The layout renderer places the channels that result on the
+    // output layout, panning a coded channel the layout has no speaker for.
+    iclforge::truehd::Presentation presentation = iclforge::truehd::Presentation::kBest;
+    // What a failed check does (iclforge::truehd::Strictness): strict drops the unit and the
+    // substream plays silence until its next restart header; lenient counts the failure and
+    // decodes what reads, which can be wrong for the rest of the restart interval.
+    bool lenient = false;
+
+    friend bool operator==(const TruehdSettings&, const TruehdSettings&) = default;
 };
 
 // The output levels Table 161's modes cover, which the page's control spans.
@@ -164,18 +181,20 @@ struct DecoderSettings {
     // §7.9.4 step 3's inverse transform, against its reference direct form.
     bool fast_inverse_transform = true;
     Ac4Settings ac4{};
+    TruehdSettings truehd{};
 
     friend bool operator==(const DecoderSettings&, const DecoderSettings&) = default;
 };
 
 // What `settings` make of the decoders that serve `layout`: which fold the
 // decoder does and whether it reconstructs objects, and the configuration to
-// build them with - AC-3's and E-AC-3's, and AC-4's, whose downmix is the
-// same fold.
+// build them with - AC-3's and E-AC-3's, AC-4's, whose downmix is the
+// same fold, and TrueHD's.
 struct DecoderSetup {
     ac3::render::Serving serving{};
     ac3::DecoderConfig config{};
     iclforge::ac4::DecoderConfig ac4{};
+    iclforge::truehd::DecoderConfig truehd{};
 };
 
 [[nodiscard]] DecoderSetup decoder_setup(const DecoderSettings& settings,

@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <span>
 #include <utility>
 
@@ -200,11 +201,15 @@ std::expected<Session, std::string> Session::open(
     }
 
     Session session;
-    session.bytes_ = std::move(loaded->bytes);
     std::string note = std::move(loaded->note);
     std::vector<std::uint32_t> lengths;
     std::uint32_t rate = 0;
-    if (starts_ac4(session.bytes_)) {
+    if (loaded->source || loaded->truehd || apps::looks_like_truehd(loaded->bytes)) {
+        if (auto opened = session.open_truehd(path, *loaded, note); !opened) {
+            return std::unexpected(std::move(opened.error()));
+        }
+        rate = session.index_->sample_rate;
+    } else if (session.bytes_ = std::move(loaded->bytes); starts_ac4(session.bytes_)) {
         auto units = read_ac4_units(session.bytes_);
         if (!units) {
             return std::unexpected(fmt::format("\"{}\" cannot be played: {}", path, units.error()));
@@ -225,6 +230,7 @@ std::expected<Session, std::string> Session::open(
         session.iframes_ = std::move(units->iframes);
         lengths = std::move(units->samples);
         rate = units->sample_rate;
+        session.facts_.codec = ItemCodec::kAc4;
         session.facts_.stream = ac4_link(*units);
         const std::optional<std::size_t> chosen = session.ac4_presentation(presentation);
         if (chosen && *chosen < reading.presentations.size()) {
@@ -293,6 +299,8 @@ std::expected<Session, std::string> Session::open(
                 objects_of(session.units_, session.scanned_.oba_complexity_index);
             lengths = session.scanned_.access_unit_samples;
         }
+        session.facts_.codec =
+            session.scanned_.kind == ac3::io::StreamKind::kAc3 ? ItemCodec::kAc3 : ItemCodec::kEac3;
         session.facts_.stream = format_of(session.scanned_.kind);
         // Annex C's karaoke type, of the programme that plays. An AC-3 stream is one when its
         // bsmod and acmod say so; an E-AC-3 one when the decoder's own rule does, which asks
@@ -312,23 +320,30 @@ std::expected<Session, std::string> Session::open(
         }
         rate = sample_rate_hz(session.scanned_.sample_rate);
     }
-    if (session.units_.empty()) {
+    if (session.unit_count() == 0) {
         return std::unexpected(fmt::format("\"{}\" holds no audio.", path));
     }
     std::uint64_t programme_bytes = 0;
-    for (const auto unit : session.units_) {
-        programme_bytes += unit.size();
-    }
-    session.starts_.assign(1, 0);
-    session.starts_.reserve(lengths.size() + 1);
-    for (const std::uint32_t length : lengths) {
-        session.starts_.push_back(session.starts_.back() + length);
-    }
-    const std::uint64_t stream_samples = session.starts_.back();
-    if (rate != 0 && stream_samples != 0) {
-        session.facts_.frame_rate = static_cast<double>(rate) *
-                                    static_cast<double>(lengths.size()) /
-                                    static_cast<double>(stream_samples);
+    std::uint64_t stream_samples = 0;
+    if (session.index_) {
+        // Every unit is the same length, so none is listed (the header comment says why).
+        programme_bytes = session.index_->unit_bytes;
+        stream_samples = session.index_->samples();
+    } else {
+        for (const auto unit : session.units_) {
+            programme_bytes += unit.size();
+        }
+        session.starts_.assign(1, 0);
+        session.starts_.reserve(lengths.size() + 1);
+        for (const std::uint32_t length : lengths) {
+            session.starts_.push_back(session.starts_.back() + length);
+        }
+        stream_samples = session.starts_.back();
+        if (rate != 0 && stream_samples != 0) {
+            session.facts_.frame_rate = static_cast<double>(rate) *
+                                        static_cast<double>(lengths.size()) /
+                                        static_cast<double>(stream_samples);
+        }
     }
 
     // The part the item plays, clamped to what the stream holds.
@@ -360,6 +375,50 @@ std::expected<Session, std::string> Session::open(
     }
     session.facts_.note = std::move(note);
     return session;
+}
+
+std::expected<void, std::string> Session::open_truehd(const std::string& path, LoadedItem& loaded,
+                                                      std::string& note) {
+    source_ = loaded.source ? std::move(loaded.source)
+                            : std::make_shared<MemoryByteSource>(std::move(loaded.bytes));
+    auto index = index_truehd(*source_);
+    if (!index) {
+        return std::unexpected(fmt::format(
+            "\"{}\" is not a TrueHD or MLP stream this player can read: {}.", path, index.error()));
+    }
+    if (index->units == 0) {
+        return std::unexpected(fmt::format("\"{}\" holds no audio.", path));
+    }
+    index_ = std::move(*index);
+    cursor_.emplace(*source_);
+    // The first unit, kept for first_unit(); the cursor then waits at the first restart.
+    if (!cursor_->rewind()) {
+        return std::unexpected(fmt::format("\"{}\" holds no audio.", path));
+    }
+    if (const auto first = cursor_->next()) {
+        first_unit_.assign(first->begin(), first->end());
+    }
+    cursor_->seek(index_->restarts.front());
+    skipped_seen_ = 0;
+
+    facts_.codec = index_->kind == iclforge::truehd::StreamKind::kMlp ? ItemCodec::kMlp
+                                                                      : ItemCodec::kTruehd;
+    // Passthrough of TrueHD (MAT) is not available, so it is never sent as it is.
+    facts_.stream = std::nullopt;
+    facts_.channels = static_cast<std::uint16_t>(
+        index_->channels_of(iclforge::truehd::Presentation::kBest));
+    facts_.frame_rate = static_cast<double>(index_->sample_rate) /
+                        static_cast<double>(index_->samples_per_unit);
+    if (index_->skipped_bytes > 0) {
+        note += fmt::format("{}{} bytes did not read as access units, and are skipped.",
+                            note.empty() ? "" : " ", index_->skipped_bytes);
+    }
+    if (index_->object_substream) {
+        note += fmt::format("{}It carries an object layer, which this player does not render; the "
+                            "bed plays.",
+                            note.empty() ? "" : " ");
+    }
+    return {};
 }
 
 void Session::deliver_window(const Target& target, std::span<const std::span<const float>> slots,
@@ -403,12 +462,26 @@ StreamDecoder::UnitFn Session::unit_reports(Target& target) {
 }
 
 std::uint32_t Session::unit_samples_at(std::uint64_t position) const {
-    const std::uint64_t sample = window_start_ + position;
-    // The last unit starting at or before `sample`; starts_ begins at 0, so
-    // there is always one.
+    const std::size_t unit = unit_containing(window_start_ + position);
+    return static_cast<std::uint32_t>(start_of(unit + 1) - start_of(unit));
+}
+
+std::uint64_t Session::start_of(std::size_t unit) const {
+    if (!index_) {
+        return starts_[unit];
+    }
+    return std::min<std::uint64_t>(std::uint64_t{unit} * index_->samples_per_unit,
+                                   index_->samples());
+}
+
+std::size_t Session::unit_containing(std::uint64_t sample) const {
+    if (index_) {
+        return static_cast<std::size_t>(
+            std::min<std::uint64_t>(sample / index_->samples_per_unit, index_->units - 1));
+    }
+    // The last unit starting at or before `sample`; starts_ begins at 0, so there is always one.
     const auto after = std::upper_bound(starts_.begin(), std::prev(starts_.end()), sample);
-    const auto unit = static_cast<std::size_t>(std::distance(starts_.begin(), after)) - 1;
-    return static_cast<std::uint32_t>(starts_[unit + 1] - starts_[unit]);
+    return static_cast<std::size_t>(std::distance(starts_.begin(), after)) - 1;
 }
 
 void Session::play_whole_units() {
@@ -418,10 +491,14 @@ void Session::play_whole_units() {
     whole_units_ = true;
     // The unit the first sample played is in starts at or before it; the
     // unit the last one is in ends at or after the end.
-    const auto first = std::upper_bound(starts_.begin(), std::prev(starts_.end()), window_start_);
-    window_start_ = *std::prev(first);
-    const auto last = std::lower_bound(starts_.begin(), starts_.end(), window_end_);
-    window_end_ = last == starts_.end() ? starts_.back() : *last;
+    window_start_ = start_of(unit_containing(window_start_));
+    if (index_) {
+        const std::uint64_t length = index_->samples_per_unit;
+        window_end_ = std::min((window_end_ + length - 1) / length * length, index_->samples());
+    } else {
+        const auto last = std::lower_bound(starts_.begin(), starts_.end(), window_end_);
+        window_end_ = last == starts_.end() ? starts_.back() : *last;
+    }
     if (facts_.sample_rate != 0) {
         facts_.duration = std::chrono::milliseconds{
             static_cast<std::int64_t>(total_samples() * 1000 / facts_.sample_rate)};
@@ -443,27 +520,46 @@ std::expected<std::size_t, std::string> Session::render(StreamDecoder& decoder,
                                               std::size_t n) { deliver_window(target, slots, n); };
     const StreamDecoder::UnitFn units_reported = unit_reports(target);
 
-    const std::size_t units = units_.size();
+    const std::size_t units = unit_count();
+    const UnitCodec codec = index_ ? UnitCodec::kTruehd : UnitCodec::kDetect;
     while (frames < wanted && next_ < units && next_frame_ < window_end_) {
         target.unit_start = frames;
+        std::span<const std::byte> bytes;
+        if (index_) {
+            const std::optional<std::span<const std::byte>> read = cursor_->next();
+            if (!read) {
+                // The stream ends sooner than its index said: the source changed under the
+                // item. What was read is all there is.
+                next_ = units;
+                break;
+            }
+            bytes = *read;
+            if (cursor_->skipped_bytes() != skipped_seen_) {
+                // Bytes between two units did not read as one: the decoder cannot see that a
+                // unit is missing, so it is told.
+                skipped_seen_ = cursor_->skipped_bytes();
+                decoder.note_lost_data();
+            }
+        } else {
+            bytes = units_[next_];
+        }
+        const auto unit_samples = static_cast<std::uint32_t>(start_of(next_ + 1) - start_of(next_));
         if (sent) {
             // Sent when any of it is played: not a priming unit, and not the
             // unit a part-way start decodes first and drops.
             const std::uint64_t played_from = std::max(window_start_, skip_until_);
-            if (starts_[next_ + 1] > played_from && starts_[next_] < window_end_) {
-                sent(units_[next_], static_cast<std::uint32_t>(starts_[next_ + 1] - starts_[next_]),
-                     starts_[next_] > window_start_ ? starts_[next_] - window_start_ : 0);
+            if (start_of(next_ + 1) > played_from && start_of(next_) < window_end_) {
+                sent(bytes, unit_samples,
+                     start_of(next_) > window_start_ ? start_of(next_) - window_start_ : 0);
             }
         }
-        const auto got =
-            decoder.decode(units_[next_], window, units_reported,
-                           static_cast<std::uint32_t>(starts_[next_ + 1] - starts_[next_]));
+        const auto got = decoder.decode(bytes, window, units_reported, unit_samples, codec);
         ++next_;
         if (!got) {
             // The unit's samples never arrive, and the decoder has let go of
             // anything it held; count past them, so the frames after land at
             // their own places.
-            next_frame_ = starts_[next_];
+            next_frame_ = start_of(next_);
             return std::unexpected(got.error());
         }
     }
@@ -492,6 +588,9 @@ std::size_t Session::first_decoded(std::size_t unit) const {
     if (unit == 0) {
         return 0;
     }
+    if (index_) {
+        return static_cast<std::size_t>(index_->restart_at_or_before(unit).unit);
+    }
     if (!ac4_) {
         return unit - 1;
     }
@@ -517,10 +616,20 @@ std::size_t Session::first_decoded(std::size_t unit) const {
 void Session::start_at(std::size_t unit, StreamDecoder& decoder) {
     decoder.reset();
     finished_ = false;
-    const std::size_t target = std::min(unit, units_.size());
-    skip_until_ = starts_[target];
-    next_ = std::min(first_decoded(target), units_.size() - 1);
-    next_frame_ = starts_[next_];
+    const std::size_t target = std::min(unit, unit_count());
+    skip_until_ = start_of(target);
+    if (index_ && target >= unit_count()) {
+        // The end: there is nothing to decode before it.
+        next_ = unit_count();
+        next_frame_ = start_of(next_);
+        return;
+    }
+    next_ = std::min(first_decoded(target), unit_count() - 1);
+    next_frame_ = start_of(next_);
+    if (index_) {
+        cursor_->seek(index_->restart_at_or_before(next_));
+        skipped_seen_ = 0;
+    }
 }
 
 void Session::seek(std::chrono::milliseconds to, StreamDecoder& decoder) {
@@ -529,9 +638,8 @@ void Session::seek(std::chrono::milliseconds to, StreamDecoder& decoder) {
     const std::uint64_t sample = window_start_ + std::min(offset, total_samples());
     // The unit covering `sample`: the last one starting at or before it, or
     // the end when `sample` is the end.
-    const auto after = std::upper_bound(starts_.begin(), std::prev(starts_.end()), sample);
-    const auto unit = static_cast<std::size_t>(std::distance(starts_.begin(), after)) - 1;
-    start_at(sample >= starts_.back() ? units_.size() : unit, decoder);
+    const std::size_t unit = unit_containing(sample);
+    start_at(sample >= start_of(unit_count()) ? unit_count() : unit, decoder);
 }
 
 void Session::hand_over(StreamDecoder& current, const StreamDecoder::BlockFn& deliver,

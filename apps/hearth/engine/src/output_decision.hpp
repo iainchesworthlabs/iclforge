@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "iclforge/audio/passthrough.hpp"
+#include "queue.hpp"
 
 // Which output Hearth plays through, on which endpoint, and why
 // (planning/hearth-reference-player.md, A3).
@@ -113,6 +114,10 @@ struct OutputRequest {
     // (ETSI TS 103 190-1 Annex B), which only a network sink that lists it
     // is sent (player.hpp).
     std::optional<audio::BitstreamFormat> stream = std::nullopt;
+    // What the item is coded in. TrueHD and MLP have no `stream`: IEC 61937 can wrap them (MAT),
+    // but this player does not send them so yet, and the decision says that by name where it
+    // would otherwise say the item carries nothing a bitstream output could take.
+    ItemCodec codec = ItemCodec::kUnknown;
     // Object audio (E-AC-3 JOC). It rides inside the ordinary Annex E
     // bitstream, so it changes no capability question - it only changes what
     // is LOST by not bitstreaming, which the reason text says.

@@ -368,3 +368,85 @@ TEST_CASE("output decision: every mode and capability source describes itself",
         CHECK(text != "unknown capability source");
     }
 }
+
+// TrueHD and MLP (planning/truehd-parity-hearth-player.md, H1): decoded here for every output,
+// and the decision says by name why it is not sent as it is.
+TEST_CASE("output decision: a TrueHD item is decoded here, and the reason says passthrough of it is not available",
+          "[hearth][output-decision][truehd]") {
+    using iclforge::hearth::ItemCodec;
+    const std::vector<EndpointFacts> endpoints{receiver("Receiver", true, true, true),
+                                               analogue("Speakers", 2)};
+    OutputRequest request = asking(endpoints, std::nullopt);
+    request.codec = ItemCodec::kTruehd;
+
+    // Automatic: a receiver that takes E-AC-3 and AC-3 is not sent the item, since there is no
+    // stream to send, and the reason names TrueHD and what is missing.
+    const auto automatic = choose_output(request);
+    CHECK(automatic.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(automatic.reason, "Passthrough of TrueHD is not available"));
+
+    // The same for MLP, by its own name.
+    request.codec = ItemCodec::kMlp;
+    const auto mlp = choose_output(request);
+    CHECK(mlp.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(mlp.reason, "Passthrough of MLP is not available"));
+
+    // An item of another codec says nothing of the kind.
+    request.codec = ItemCodec::kEac3;
+    request.stream = BitstreamFormat::kEac3;
+    CHECK_FALSE(mentions(choose_output(request).reason, "not available"));
+}
+
+TEST_CASE("output decision: a TrueHD item pinned to a bitstream output is decoded, or refused under follow=off",
+          "[hearth][output-decision][truehd]") {
+    using iclforge::hearth::ItemCodec;
+    const std::vector<EndpointFacts> endpoints{receiver("Receiver", true, true, true)};
+    OutputRequest request = asking(endpoints, std::nullopt);
+    request.codec = ItemCodec::kTruehd;
+    request.pinned = OutputMode::kBitstream;
+
+    const auto pinned = choose_output(request);
+    CHECK(pinned.mode == OutputMode::kLocalPcm);
+    CHECK(pinned.endpoint_name == "Receiver");
+    CHECK(mentions(pinned.reason, "Passthrough of TrueHD is not available"));
+    // Not "carries nothing IEC 61937 can wrap": it can be wrapped, and is not yet.
+    CHECK_FALSE(mentions(pinned.reason, "nothing IEC 61937"));
+
+    request.follow_sink = false;
+    const auto refused = choose_output(request);
+    CHECK(refused.mode == OutputMode::kNone);
+    CHECK(mentions(refused.reason, "Passthrough of TrueHD is not available"));
+    CHECK(mentions(refused.reason, "follow=off"));
+
+    // Automatic under follow=off is the same refusal, not a quiet decode.
+    request.pinned = std::nullopt;
+    const auto automatic = choose_output(request);
+    CHECK(automatic.mode == OutputMode::kNone);
+    CHECK(mentions(automatic.reason, "Passthrough of TrueHD is not available"));
+}
+
+TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and each sink is sent PCM",
+          "[hearth][output-decision][truehd]") {
+    using iclforge::hearth::ItemCodec;
+    const std::vector<EndpointFacts> endpoints{analogue("Speakers", 2, true)};
+    OutputRequest request = asking(endpoints, std::nullopt);
+    request.codec = ItemCodec::kTruehd;
+    request.group_name = "Living room";
+    request.group_ready = true;
+
+    const auto choice = choose_output(request);
+    CHECK(choice.mode == OutputMode::kNetworkGroup);
+    CHECK(choice.group_name == "Living room");
+    CHECK(mentions(choice.reason, "TrueHD"));
+    CHECK(mentions(choice.reason, "not available"));
+    CHECK(mentions(choice.reason, "PCM"));
+    // The sentence an item of another codec gets, that the stream travels, is not said.
+    CHECK_FALSE(mentions(choice.reason, "what travels is the stream"));
+
+    // A group that is not ready falls back to the local output, still naming TrueHD.
+    request.group_ready = false;
+    const auto fallback = choose_output(request);
+    CHECK(fallback.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(fallback.reason, "not ready"));
+    CHECK(mentions(fallback.reason, "Passthrough of TrueHD is not available"));
+}
