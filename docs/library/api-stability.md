@@ -178,7 +178,7 @@ see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
 the Public tier above until this page deliberately promotes it. The same designation applies to
 `iclforge::truehd` (TrueHD and MLP, gated behind `ICLFORGE_BUILD_TRUEHD`) and the
-`iclforge_truehd_*` functions of the C API over it; real interoperability, `IM6`, stays separately
+`iclforge_truehd_*` functions of the C API over it, decoder and encoder; real interoperability, `IM6`, stays separately
 blocked on MLP/FBA source material that isn't public). A new module defaults to
 Experimental from its first merge, and only leaves that tier through a deliberate, documented
 decision on this page, the same way `iclforge::iab` will. `iclforge::render` is one: it began in

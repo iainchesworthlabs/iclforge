@@ -680,13 +680,15 @@ mirror.
 `iclforge_truehd_decoder_t` mirrors `iclforge::truehd::Decoder` ([TrueHD and MLP](truehd.md)) behind
 the same opaque-handle, `_config_init()` and out-parameter conventions as the rest of this header;
 [`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/capi/include/iclforge_c/iclforge.h)'s
-TrueHD section has the full surface. It decodes only: the library has no TrueHD encoder yet. The
-section is declared whether or not this library was configured with `ICLFORGE_BUILD_TRUEHD` (on by
-default). Built without it, every fallible function returns `ICLFORGE_ERROR_UNSUPPORTED` (4), a
+TrueHD section has the full surface. `iclforge_truehd_encoder_t` mirrors `iclforge::truehd::Encoder`
+the same way ([TrueHD encoding](#truehd-encoding) below). The section is declared whether or not this
+library was configured with `ICLFORGE_BUILD_TRUEHD` (on by default). Built without it, every fallible function returns `ICLFORGE_ERROR_UNSUPPORTED` (4), a
 `_create()` leaves its out-parameter `NULL`, and `iclforge_c/version.h`'s `ICLFORGE_HAS_TRUEHD` says
 which library a program was built against. The status codes `ICLFORGE_ERROR_TRUEHD_*` at 100–114 are
-`iclforge::truehd::ErrorKind`'s values in its order, and
-`iclforge_truehd_decoder_last_error_detail()` gives the sentence that goes with the last one.
+`iclforge::truehd::ErrorKind`'s values in its order, and `ICLFORGE_ERROR_TRUEHD_ENCODE_*` at 120–125
+(`INVALID_CONFIG`, `BAD_INPUT`, `UNSUPPORTED`, `RATE_EXCEEDED`, `VERIFY_FAILED`, `INTERNAL`) are
+`EncodeErrorKind`'s. `iclforge_truehd_decoder_last_error_detail()` and
+`iclforge_truehd_encoder_last_error_detail()` give the sentence that goes with the last one.
 
 The codec is lossless, so a decode returns the integers the stream was made from and not floats:
 `iclforge_truehd_decoded_pcm()` is interleaved `int32_t`, each value 24 bits wide and sign-extended
@@ -746,6 +748,43 @@ the committed fixtures through these functions and hold the samples to the SHA-2
 strict decode gives; their other cases hold the argument checks, the refusals and the counters.
 With `ICLFORGE_BUILD_TRUEHD` off, `test_capi_truehd_absent.cpp` takes their place.
 
+### TrueHD encoding
+
+The encoder takes interleaved `int32_t` PCM, each value `bits` wide (16, 20 or 24) and not left-justified, and hands back the
+access units a call completed as an owned batch. It codes a restart interval at a time (128 units, 107 ms at 48 kHz by
+default), so most `iclforge_truehd_encoder_encode()` calls give `NULL`; `iclforge_truehd_encoder_flush()` codes what is held,
+pads the last unit and ends the stream.
+
+```c
+iclforge_truehd_encoder_config_t config;
+iclforge_truehd_encoder_config_init(&config);  /* 48 kHz stereo, 24 bit, 128-unit restart intervals */
+config.verify = 1;                             /* the library decodes every unit as it writes it */
+iclforge_truehd_encoder_t* encoder = NULL;
+iclforge_status_t status = iclforge_truehd_encoder_create(&config, &encoder);
+/* on ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG, iclforge_truehd_encoder_refusal_reason(&config) says why */
+
+iclforge_truehd_encoded_t* encoded = NULL;     /* NULL while a restart interval is filling */
+status = iclforge_truehd_encoder_encode(encoder, pcm + at * 2, frames, &encoded);
+for (size_t i = 0; i < iclforge_truehd_encoded_count(encoded); ++i) {
+    /* one whole access unit: a .thd file is these one after another, and a container takes each as a sample */
+    const uint8_t* unit = iclforge_truehd_encoded_data(encoded, i);
+    size_t size = iclforge_truehd_encoded_size(encoded, i);
+    /* iclforge_truehd_encoded_has_major_sync(encoded, i): a sync sample */
+}
+iclforge_truehd_encoded_destroy(encoded);      /* NULL is fine */
+status = iclforge_truehd_encoder_flush(encoder, &encoded);
+```
+
+`iclforge_truehd_encoder_config_t` carries the encoder's choices: `channel_assignment` (0 for the default layout of the count,
+`iclforge_truehd_default_channel_assignment()`), `restart_interval_units`, `peak_data_rate_bps` and `allow_rate_violations`,
+`downmix` (`ICLFORGE_TRUEHD_DOWNMIX_NONE` or `_STANDARD`) with its four gains, `stereo_mode`, `max_fir_order` and
+`matrix_search`. A stream that cannot be sent within the peak rate is `ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED` unless
+violations are allowed, and then `iclforge_truehd_encoder_stats()` counts them beside the unit, byte and interval counts. After
+an error the encoder should be destroyed.
+[`examples/capi_encode_truehd.c`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_truehd.c) encodes a
+tone, decodes it with the functions above and compares, and ctest runs it; the encoder cases of `test_capi_truehd.cpp` encode every
+TrueHD fixture's PCM and decode it again to the manifest's SHA-256.
+
 ## What is deliberately out of scope
 
 The self-check/mirror tracing (`iclforge::ac3::verify::FrameTrace`) is a C++-oriented encoder-implementer
@@ -781,10 +820,12 @@ metadata beyond the loudness values (the DRC, dialogue enhancement and downmix i
 `iclforge_ac4_encoder_toc()` and the functions that take its result cover what a container muxer
 needs from the encoder's own stream.
 
-The TrueHD surface is the decoder. There is no encoder to mirror yet, and neither the stream-level
-inspection of the C++ library beyond `iclforge_truehd_probe()` (the major sync's own fields, the
-substream directory, the check values) nor the object audio metadata in the extra data is exposed;
-the MP4, Matroska and MPEG-TS containers that carry TrueHD are not in this header at all.
+The TrueHD surface is the decoder and the encoder's lossless core. The encoder's experimental tools (an IIR
+filter and LSB bypass, which it does not write yet), its extra data source (the evolution payload) and the channel meaning
+fields (dialogue normalisation, mix levels, DRC start-up gains) are not mirrored, and neither the stream-level inspection of
+the C++ library beyond `iclforge_truehd_probe()` (the major sync's own fields, the substream directory, the check values) nor
+the object audio metadata in the extra data is exposed; the MP4, Matroska and MPEG-TS containers that carry TrueHD are not in
+this header at all. The Python, JavaScript and Rust bindings over this surface are not written.
 
 `iclforge::objects::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
 export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobjectsobaobjectscene)) is not

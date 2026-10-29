@@ -975,7 +975,7 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
                      in_path);
         return kExitUsage;
     } else if (!profile_name.empty() && profile_name != "dvb") {
-        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb, atsc or bluray)",
+        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb or atsc)",
                      profile_name);
         return kExitUsage;
     }

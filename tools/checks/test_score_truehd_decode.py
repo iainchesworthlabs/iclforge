@@ -1,4 +1,4 @@
-"""Unit tests for score_truehd_decode.py: a made-up gold set, and a decoder that is a few lines of Python.
+"""Unit tests for score_truehd_decode.py: a made-up gold set and a decoder of a few lines.
 
 No Dolby stream is involved. The set's streams are placeholder files, and the decoder (a program the
 test writes) gives the WAV that sits beside the stream, so what is exercised is the scorer: the
@@ -23,32 +23,48 @@ np = S.np
 
 def write_wav(path, rate, samples, bits, extensible=False):
     """samples: (frames, channels) integers in the 24 bit domain."""
-    frames, channels = samples.shape
+    channels = samples.shape[1]
     width = bits // 8
     values = samples >> (24 - bits)
-    body = b"".join(
-        int(v).to_bytes(width, "little", signed=True) for v in values.reshape(-1)
-    )
+    body = b"".join(int(v).to_bytes(width, "little", signed=True) for v in values.reshape(-1))
     if extensible:
-        fmt = struct.pack("<HHIIHHHHI", 0xFFFE, channels, rate, rate * channels * width,
-                          channels * width, bits, 22, bits, 0) + bytes(
-            [1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xAA, 0, 0x38, 0x9B, 0x71])
+        fmt = struct.pack(
+            "<HHIIHHHHI",
+            0xFFFE,
+            channels,
+            rate,
+            rate * channels * width,
+            channels * width,
+            bits,
+            22,
+            bits,
+            0,
+        ) + bytes([1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xAA, 0, 0x38, 0x9B, 0x71])
     else:
-        fmt = struct.pack("<HHIIHH", 1, channels, rate, rate * channels * width,
-                          channels * width, bits)
-    path.write_bytes(b"RIFF" + struct.pack("<I", 4 + 8 + len(fmt) + 8 + len(body)) + b"WAVE"
-                     + b"fmt " + struct.pack("<I", len(fmt)) + fmt
-                     + b"data" + struct.pack("<I", len(body)) + body)
+        fmt = struct.pack(
+            "<HHIIHH", 1, channels, rate, rate * channels * width, channels * width, bits
+        )
+    path.write_bytes(
+        b"RIFF"
+        + struct.pack("<I", 4 + 8 + len(fmt) + 8 + len(body))
+        + b"WAVE"
+        + b"fmt "
+        + struct.pack("<I", len(fmt))
+        + fmt
+        + b"data"
+        + struct.pack("<I", len(body))
+        + body
+    )
 
 
-FAKE_DECODER = '''
+FAKE_DECODER = """
 import pathlib, shutil, sys
 stream, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 if (stream.parent / "undecodable").exists():
     print("error: access unit 3: BadParity", file=sys.stderr)
     sys.exit(2)
 shutil.copy(stream.parent / "decoded.wav", out)
-'''
+"""
 
 
 @unittest.skipIf(np is None, "numpy is needed")
@@ -74,15 +90,29 @@ class Scorer(unittest.TestCase):
         (self.root / "streams" / name).mkdir()
         (self.root / "streams" / name / "dee.mlp").write_bytes(b"placeholder")
         if decoded is not None:
-            write_wav(self.root / "streams" / name / "decoded.wav", 48000, decoded, 24, extensible=True)
-        self.legs[name] = {"codec": "truehd", "sources": [f"{name}.wav"], "stream": "dee.mlp",
-                           **(entry or {})}
+            write_wav(
+                self.root / "streams" / name / "decoded.wav", 48000, decoded, 24, extensible=True
+            )
+        self.legs[name] = {
+            "codec": "truehd",
+            "sources": [f"{name}.wav"],
+            "stream": "dee.mlp",
+            **(entry or {}),
+        }
         self.sources[name] = {"seconds": seconds}
 
     def run_scorer(self, *extra):
-        (self.root / S.MANIFEST).write_text(json.dumps({"legs": self.legs, "sources": self.sources}))
-        argv = ["score_truehd_decode.py", "--set", str(self.root), "--decoder",
-                f"{sys.executable} {self.root / 'decoder.py'}", *extra]
+        (self.root / S.MANIFEST).write_text(
+            json.dumps({"legs": self.legs, "sources": self.sources})
+        )
+        argv = [
+            "score_truehd_decode.py",
+            "--set",
+            str(self.root),
+            "--decoder",
+            f"{sys.executable} {self.root / 'decoder.py'}",
+            *extra,
+        ]
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             old, sys.argv = sys.argv, argv

@@ -32,6 +32,27 @@ See [README.md](README.md) for the project overview and
   byte for byte at 44.1, 48, 96 and 192 kHz. FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT, so reading MAT
   has no oracle; nothing here has been played into a receiver or a disc player. The readers and `iclforge-truehd-container-tool`
   have fuzz seeds, a `fuzz_mat_unwrap` harness and tests; the open questions are in `libs/containers/ERRATA.md`.
+- **Added: TrueHD and MLP in the `forge` commands, and `forge truehd-encode`.** `probe` (a stream in a container too), `levels`,
+  `loudness` (BS.1770-5 Annex 3 weights from the speakers the stream names), `mkv`, `mp4`, `ts` (Blu-ray profile; `dvb` and `atsc`
+  are refused), `spdif` (MAT 1.0 into an eight-channel PCM16 WAV or raw bursts), `unspdif`, `demux` and `remux` take a `.thd`,
+  a `.mlp` or a container holding one; `transcode`, `qc`, `fmp4`, `monitor` and `play` refuse it with exit status 1.
+  `truehd-encode` codes a WAV losslessly (`iclforge::truehd::Encoder`) bare or into mkv, mp4 and ts, with `truehd-downmix=`,
+  `truehd-downmix-gains=`, `truehd-restart=`, `truehd-fir-order=`, `truehd-matrix=`, `truehd-stereo-mode=`, `truehd-peak-rate=`,
+  `truehd-rate-check=` and `verify`; the WAV's channel mask names its speakers (a 7.1 file in WAV order is coded as the channels
+  it carries), and the readings that are this command's own are `libs/truehd/ERRATA.md` open questions 16 and 17. The codec matrix
+  runs the TrueHD legs against FFmpeg's strict decode: every fixture decoded, levelled and wrapped in each container and MAT, and the
+  encoder's streams in stereo, 5.1 and 7.1 at 44.1 to 192 kHz and 16 and 24 bits, each equal to the source byte for byte (898
+  commands in the full matrix). `verify_truehd_encode_interop.py --forge` runs its 32 cases through the command, and the gold-reference
+  gate, the `ffmpeg-validate` job and the nightly fuzz job run the TrueHD decode, encode, container and encoder-space checks.
+- **Added: TrueHD and MLP in the C API.** `iclforge_truehd_*` probes, scans and decodes streams into 24-bit `int32` PCM and encodes
+  PCM into access units, declared with or without `ICLFORGE_BUILD_TRUEHD` (`ICLFORGE_HAS_TRUEHD`; the absent library answers
+  `ICLFORGE_ERROR_UNSUPPORTED`). The fixtures decode through the C API to FFmpeg's SHA-256 and their PCM encodes and decodes again to the
+  same; `examples/capi_decode_truehd.c` and `capi_encode_truehd.c` run under ctest. New status codes 100 to 114 and 120 to 125, and
+  ABI allowlists for `libiclforge_truehd.so` (new, seeded with GCC 13 and not the pinned LLVM), `libiclforge_c.so` and
+  `libiclforge_containers.so`. The Python, JavaScript and Rust bindings are not written.
+- **Added: `tools/checks/score_truehd_decode.py` scores a decoder against the DEE gold set's TrueHD legs** (`--forge` or `--decoder`,
+  channel matching by content, a delay allowed, legs whose DEE options alter the audio reported, not failed), with a unit test,
+  and `docs/verification.md` gives the commands to run before DEE's licence ends on 2026-11-06.
 
 - **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
   the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one

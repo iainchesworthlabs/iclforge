@@ -93,8 +93,9 @@ C version macros; release criteria written.
 In progress as `libs/truehd` (`iclforge::truehd`, `ICLFORGE_BUILD_TRUEHD`), written from the owner's
 specification and checked against FFmpeg's encoder and decoder: [`planning/truehd.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md).
 Phase T1 (the bitstream layer, the lossless decoder, and `forge decode` and `forge probe`) is done: bit-exact with FFmpeg on its
-fixtures, with the features its encoders do not write checked against hand-built streams only; the encoder, the Atmos substream and the
-Forge front ends follow (was UX10). The branch `feature/truehd-atmos-support` is superseded: no TrueHD
+fixtures, with the features its encoders do not write checked against hand-built streams only. The containers, the Forge commands
+(including `forge truehd-encode`), the C API and the CI legs against FFmpeg are done too; the Atmos substream, and the Python,
+JavaScript and Rust bindings, follow (was UX10). The branch `feature/truehd-atmos-support` is superseded: no TrueHD
 decoder reads its block layout and it carries non-redistributable PDFs, so nothing is taken from it.
 Dolby Encoding Engine's TrueHD streams of known sources (2, 6 and 8
 channels, 48 and 96 kHz, 16 and 24 bits, several presentations), made by

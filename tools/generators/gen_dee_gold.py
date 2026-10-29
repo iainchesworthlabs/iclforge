@@ -74,8 +74,8 @@ made them. Each TrueHD entry says so (TRUEHD_NOTE).
 What DEE 6.5.4 could not be made to write is in the manifest's dee_cannot (DEE_CANNOT).
 
 The TrueHD legs are what tools/checks/score_truehd_decode.py scores a decoder with, from this
-manifest and the streams and sources it names (docs/verification.md, "Scoring DEE's TrueHD streams").
-Make them before the licence ends: --only thd- makes just those.
+manifest and the streams and sources it names (docs/verification.md, "Scoring DEE's TrueHD
+streams"). Make them before the licence ends: --only thd- makes just those.
 
 Usage (repo root):
   python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold [--cli ICLFORGE_CLI]

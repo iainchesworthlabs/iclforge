@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
 """Scores a TrueHD decoder against the Dolby Encoding Engine's TrueHD streams of known sources.
 
-Run on the owner's machine, while the gold set exists: the set is not committed (DEE's licence ends on
-2026-11-06 and its streams stay with the owner; planning/truehd.md, "Oracles"). tools/generators/
-gen_dee_gold.py makes it, and this reads its manifest:
+Run on the owner's machine, while the gold set exists: the set is not committed (DEE's licence
+ends on 2026-11-06 and its streams stay with the owner; planning/truehd.md, "Oracles").
+tools/generators/gen_dee_gold.py makes it, and this reads its manifest:
 
     DIR/dee-gold-manifest.json         the legs, each with its sources and its stream
     DIR/streams/<leg>/dee.mlp          the stream DEE wrote (TrueHD, whatever the extension)
     DIR/sources/<name>.wav             the PCM it was made from, 24 or 16 bit
 
 For every TrueHD leg the stream is decoded and compared with the first source, sample for sample:
-the codec is lossless, so the decode is the source, with the stream's channels in the stream's order
-(each source channel is matched to the decoded channel that equals it) and, at most, a delay of the
-first samples. The streams are test inputs only (the user's decision of 2026-09-26): they are decoded
-and compared with the PCM that went in, and nothing here reads one to learn how the encoder made it.
+the codec is lossless, so the decode is the source, with the stream's channels in the stream's
+order (each source channel is matched to the decoded channel that equals it) and, at most, a delay
+of the first samples. The streams are test inputs only (the user's decision of 2026-09-26): they
+are decoded and compared with the PCM that went in, and nothing here reads one to learn how the
+encoder made it.
 
   PASS   the decoder succeeded and the decode is the source, bit for bit
-  ALTER  the decoder succeeded, and the leg's DEE options alter the audio (loudness correction, the
-         surround attenuation, --optimize-data-rate), so the decode is not expected to be the source;
-         the figures say how far it is
-  FAIL   the decoder failed (strict checks, a CRC, the lossless check), or a lossless leg decodes to
-         something else
+  ALTER  the decoder succeeded, and the leg's DEE options alter the audio (loudness correction,
+         the surround attenuation, --optimize-data-rate), so the decode is not expected to be
+         the source; the figures say how far it is
+  FAIL   the decoder failed (strict checks, a CRC, the lossless check), or a lossless leg
+         decodes to something else
   SKIP   no stream or source on disk, or a source longer than --max-seconds
 
-    score_truehd_decode.py --set DIR --forge PATH/TO/forge [--only NAME_PART ...] [--report out.json]
-    score_truehd_decode.py --set DIR --decoder 'PROGRAM [ARGS]'    # run as PROGRAM [ARGS] STREAM OUT.wav
+    score_truehd_decode.py --set DIR --forge PATH/TO/forge [--only NAME_PART ...] [--report FILE]
+    score_truehd_decode.py --set DIR --decoder 'PROGRAM [ARGS]'   # PROGRAM [ARGS] STREAM OUT.wav
 
 With no set, or one with no TrueHD legs, it says so and exits 0, so that a CI job without the set
 passes. Exit status 1 if any leg FAILs.
@@ -73,7 +74,9 @@ def read_wav(path):
     if tag == 0xFFFE and len(fmt) >= 26:
         tag = int.from_bytes(fmt[24:26], "little")
     if tag != 1 or bits not in (16, 24, 32) or channels == 0:
-        raise ValueError(f"{path}: only integer PCM at 16, 24 or 32 bits is read (tag {tag}, {bits} bits)")
+        raise ValueError(
+            f"{path}: only integer PCM at 16, 24 or 32 bits is read (tag {tag}, {bits} bits)"
+        )
     width = bits // 8
     frames = len(payload) // (width * channels)
     raw = np.frombuffer(payload[: frames * width * channels], dtype=np.uint8).reshape(-1, width)
@@ -90,8 +93,12 @@ def compare(decoded, source):
     """How `decoded` relates to `source`: each source channel is matched to the first unused decoded
     channel equal to it over its first samples, at a delay of up to MAX_DELAY samples; then every
     sample is compared."""
-    out = {"decoded_channels": int(decoded.shape[1]), "decoded_samples": int(len(decoded)),
-           "source_channels": int(source.shape[1]), "source_samples": int(len(source))}
+    out = {
+        "decoded_channels": int(decoded.shape[1]),
+        "decoded_samples": len(decoded),
+        "source_channels": int(source.shape[1]),
+        "source_samples": len(source),
+    }
     probe = min(PROBE_SAMPLES, len(source))
     for offset in range(MAX_DELAY):
         length = min(len(decoded) - offset, len(source))
@@ -99,16 +106,26 @@ def compare(decoded, source):
             break
         mapping, used = [], set()
         for c in range(source.shape[1]):
-            hit = [d for d in range(decoded.shape[1]) if d not in used
-                   and np.array_equal(decoded[offset : offset + probe, d], source[:probe, c])]
+            hit = [
+                d
+                for d in range(decoded.shape[1])
+                if d not in used
+                and np.array_equal(decoded[offset : offset + probe, d], source[:probe, c])
+            ]
             mapping.append(hit[0] if hit else None)
             used.update(hit[:1])
         if all(m is not None for m in mapping):
             diff = decoded[offset : offset + length][:, mapping] - source[:length]
             wrong = int(np.count_nonzero(diff))
-            out.update({"lossless": wrong == 0 and length == len(source), "delay": offset,
-                        "channel_map": mapping, "mismatched_values": wrong,
-                        "compared_samples": int(length)})
+            out.update(
+                {
+                    "lossless": wrong == 0 and length == len(source),
+                    "delay": offset,
+                    "channel_map": mapping,
+                    "mismatched_values": wrong,
+                    "compared_samples": int(length),
+                }
+            )
             if wrong:
                 out["max_abs_error_24bit"] = int(np.max(np.abs(diff)))
             return out
@@ -123,14 +140,17 @@ def compare(decoded, source):
         best = int(np.argmax(np.abs(r @ d) / norms))
         mapping.append(best)
         err = d[:, best] - r
-        errors.append(round(10.0 * np.log10(max(float(err @ err), 1e-30) / (float(r @ r) or 1.0)), 1))
+        errors.append(
+            round(10.0 * np.log10(max(float(err @ err), 1e-30) / (float(r @ r) or 1.0)), 1)
+        )
     out.update({"lossless": False, "channel_map": mapping, "error_db_per_channel": errors})
     return out
 
 
 def decode(command, stream, out):
-    result = subprocess.run([*command, str(stream), str(out)], capture_output=True, check=False,
-                            timeout=3600)
+    result = subprocess.run(
+        [*command, str(stream), str(out)], capture_output=True, check=False, timeout=3600
+    )
     text = (result.stderr + result.stdout).decode("utf-8", "replace").strip().splitlines()
     return result.returncode, (text[-1] if text else "")
 
@@ -171,27 +191,51 @@ def score_leg(name, entry, root, command, scratch, max_seconds, manifest):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--set", type=pathlib.Path, help="the gold set's directory")
-    parser.add_argument("--forge", type=pathlib.Path, help="a forge executable: run as `forge decode STREAM OUT.wav`")
+    parser.add_argument(
+        "--forge",
+        type=pathlib.Path,
+        help="a forge executable: run as `forge decode STREAM OUT.wav`",
+    )
     parser.add_argument("--decoder", help="PROGRAM [ARGS], run as PROGRAM [ARGS] STREAM OUT.wav")
-    parser.add_argument("--only", nargs="+", metavar="NAME_PART", help="score only the legs whose names contain one of these")
-    parser.add_argument("--max-seconds", type=float, default=120.0,
-                        help="skip legs whose source is longer (the 300 s soak programmes); 0 scores all")
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="NAME_PART",
+        help="score only the legs whose names contain one of these",
+    )
+    parser.add_argument(
+        "--max-seconds",
+        type=float,
+        default=120.0,
+        help="skip legs whose source is longer (the 300 s soak programmes); 0 scores all",
+    )
     parser.add_argument("--report", type=pathlib.Path, help="write the results here as JSON")
     args = parser.parse_args()
 
     manifest_path = args.set / MANIFEST if args.set else None
     if manifest_path is None or not manifest_path.is_file():
-        print("score_truehd_decode: no DEE gold set (--set DIR with dee-gold-manifest.json); nothing to score")
+        print(
+            "score_truehd_decode: no DEE gold set (--set DIR with dee-gold-manifest.json); "
+            "nothing to score"
+        )
         return 0
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    legs = {n: e for n, e in manifest.get("legs", {}).items()
-            if e.get("codec") == "truehd" and "refused" not in e and "failed" not in e
-            and (not args.only or any(part in n for part in args.only))}
+    legs = {
+        n: e
+        for n, e in manifest.get("legs", {}).items()
+        if e.get("codec") == "truehd"
+        and "refused" not in e
+        and "failed" not in e
+        and (not args.only or any(part in n for part in args.only))
+    }
     if not legs:
         print("score_truehd_decode: the set has no TrueHD legs to score")
         return 0
     if bool(args.forge) == bool(args.decoder):
-        sys.exit("score_truehd_decode: give exactly one of --forge and --decoder when there is something to score")
+        sys.exit(
+            "score_truehd_decode: give exactly one of --forge and --decoder "
+            "when there is something to score"
+        )
     if np is None:
         sys.exit("score_truehd_decode: numpy is required")
     command = [str(args.forge), "decode"] if args.forge else args.decoder.split()
@@ -200,7 +244,9 @@ def main():
     with tempfile.TemporaryDirectory() as scratch_name:
         scratch = pathlib.Path(scratch_name)
         for name in sorted(legs):
-            result = score_leg(name, legs[name], args.set, command, scratch, args.max_seconds, manifest)
+            result = score_leg(
+                name, legs[name], args.set, command, scratch, args.max_seconds, manifest
+            )
             results[name] = result
             counts[result["status"]] += 1
             detail = result.get("why", "")
@@ -209,10 +255,14 @@ def main():
             if result["status"] == "FAIL" and result.get("ffmpeg_lossless") is False:
                 detail += " (FFmpeg's decode is not the source either)"
             print(f"{result['status']:5} {name}" + (f": {detail}" if detail else ""), flush=True)
-    print(f"{len(results)} legs: {counts['PASS']} pass, {counts['ALTER']} altered by DEE's options, "
-          f"{counts['FAIL']} fail, {counts['SKIP']} skipped")
+    print(
+        f"{len(results)} legs: {counts['PASS']} pass, {counts['ALTER']} altered by DEE's options, "
+        f"{counts['FAIL']} fail, {counts['SKIP']} skipped"
+    )
     if args.report:
-        args.report.write_text(json.dumps({"counts": counts, "legs": results}, indent=2) + "\n", encoding="utf-8")
+        args.report.write_text(
+            json.dumps({"counts": counts, "legs": results}, indent=2) + "\n", encoding="utf-8"
+        )
     return 1 if counts["FAIL"] else 0
 
 

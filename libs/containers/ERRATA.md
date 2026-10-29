@@ -40,6 +40,15 @@ repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]`
    reports which form it found (`ReadStream::signalling`). Keep it permissive?
 6. **Matroska (C7).** TH spec §21.4 gives the CodecID and nothing else. No CodecPrivate, one whole access unit to a
    SimpleBlock, keyframe flag on the units with a major sync: all FFmpeg's. Does a Matroska document say otherwise?
+7. **The PCM carrier of MAT in a WAV (`forge spdif`).** A MAT burst is 61,440 bytes. `forge spdif` writes it into a WAV as
+   eight channels of 16-bit PCM, 3,840 frames to the burst, at 192,000 Hz for 48, 96 and 192 kHz content and 176,400 Hz for the
+   44.1 family, because 24 access units of 40, 80 or 160 samples at those rates fill 3,840 frames at that rate. That is
+   arithmetic on the burst size and an eight-channel assumption, not a statement of TH spec §21.3, and nothing has played the
+   WAV into a receiver. Is eight channels at four times the family rate (HDMI's MAT carrier) the carrier? **Provisional,
+   owner to confirm.**
+8. **TrueHD in a transport stream is Blu-ray's alone (`forge ts`).** The command writes TrueHD with `stream_type` 0x83 and the
+   `HDMV` registration, and refuses the `dvb` and `atsc` profiles with a usage error, because neither defines TrueHD carriage in
+   anything found for this work (C8 is about the same stream_type). Does DVB or ATSC define one?
 
 ## MP4 (`mlpa`, `dmlp`)
 

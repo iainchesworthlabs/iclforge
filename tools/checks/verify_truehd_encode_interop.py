@@ -249,9 +249,13 @@ def find_permutation(expected, got, channels):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--encoder",
-                        help="program run as PROGRAM in.wav out.thd [ARGS] (iclforge-truehd-encode-tool)")
-    parser.add_argument("--forge", help="the forge executable: run as `forge truehd-encode in.wav out.thd`")
+    parser.add_argument(
+        "--encoder",
+        help="program run as PROGRAM in.wav out.thd [ARGS] (iclforge-truehd-encode-tool)",
+    )
+    parser.add_argument(
+        "--forge", help="the forge executable: run as `forge truehd-encode in.wav out.thd`"
+    )
     parser.add_argument("--full", action="store_true", help="the longer matrix")
     parser.add_argument("--only", action="append", default=[], help="run only cases whose name contains this")
     parser.add_argument("--max-size-ratio", type=float, default=0.0,
@@ -297,7 +301,14 @@ def main():
                 command = [args.forge, "truehd-encode", str(wav), str(stream), "verify",
                            *forge_arguments(extra)]
             else:
-                command = [*args.encoder.split(), str(wav), str(stream), "verify=1", f"bits={bits}", *extra]
+                command = [
+                    *args.encoder.split(),
+                    str(wav),
+                    str(stream),
+                    "verify=1",
+                    f"bits={bits}",
+                    *extra,
+                ]
             run = subprocess.run(command, capture_output=True, check=False)
             if run.returncode != 0:
                 problems.append("encoder failed: " + run.stderr.decode(errors="replace").strip())

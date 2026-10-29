@@ -127,12 +127,12 @@ mp4::AudioTrack mp4_track(const Scan& scan) {
     };
 }
 
-// libs/containers/ERRATA.md M6: the level a carrier of MAT bursts runs at. A burst is 61,440 bytes
+// libs/containers/ERRATA.md open question 7: the level a carrier of MAT bursts runs at. A burst is 61,440 bytes
 // of 16-bit words: eight channels is 3,840 frames, which is 24 access units of
 // samples_per_access_unit samples at the content rate, so the carrier is 160 times the content
 // rate over the unit length: 192 kHz for the 48 kHz family and 176.4 kHz for 44.1 kHz. Worked out
 // from the burst size and the 24 units of TH spec §21.3, with eight channels assumed; no stream or
-// receiver has confirmed it (libs/containers/ERRATA.md, open question M7).
+// receiver has confirmed it (the same open question).
 std::uint32_t mat_carrier_rate(const Scan& scan) {
     const std::uint32_t family = scan.info.sample_rate % 44100U == 0 ? 44100U : 48000U;
     return family * 4U;

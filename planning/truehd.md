@@ -42,7 +42,19 @@ the codec's name, as [layout.md](layout.md) decision 12 recommends. The ROADMAP'
 | T1 | The library skeleton wired into the build; the syntax layer (access units, major sync, substream directory, restart header, block header, filters, matrices, the CRCs and parities), both directions; an elementary stream reader; the lossless decoder for substreams 0 to 2 and a generic 16-channel substream 3 with its extra data carried as opaque bytes; an independent Python transcription; bit-exact interoperability with FFmpeg's encoder and decoder. | Done; noise generator 1 and heavy DRC are not decoded |
 | T2a | The encoder: matrices, prediction filters, codebook and offset choice, restart cadence, the FIFO and `input_timing` rate control, the 2ch and 6ch downmix substreams, verification by decoding. | Not started |
 | T2b | Atmos: the sixteen-channel substream, the evolution frame, object audio metadata (ETSI TS 103 420, `iclforge::objects`), and an optional operator-keyed check of the frame in the style of [object signing](../docs/concepts/object-signing.md). Blocked on the owner's answers about the evolution payload (ERRATA.md, open questions). | Not started |
-| T2c | Containers (MP4 `mlpa`, Matroska `A_TRUEHD`, MPEG-TS, IEC 61937 and MAT), the `forge` commands, C API and Python bindings, the FFmpeg legs of `run_codec_matrix.sh` and the gold-reference gate, and the DEE scoring harness. T1 adds the minimum `forge decode` and `forge probe` for `.thd` and `.mlp` that its interoperability check needs. | Not started |
+| T2c | Containers (MP4 `mlpa`, Matroska `A_TRUEHD`, MPEG-TS, IEC 61937 and MAT), the `forge` commands, C API and Python bindings, the FFmpeg legs of `run_codec_matrix.sh` and the gold-reference gate, and the DEE scoring harness. T1 adds the minimum `forge decode` and `forge probe` for `.thd` and `.mlp` that its interoperability check needs. | Done except the bindings: the containers (T2c1); `forge` on every command that reads an AC-3 family stream and `truehd-encode`, the C API (decode and encode), the matrix, the gold-reference gate, the workflows and `score_truehd_decode.py` with its instructions (T2c2). Python, JavaScript and Rust bindings: see below |
+
+### Not done in T2c
+
+- **Bindings.** `iclforge_truehd_*` is in the C API. Nothing wraps it in `bindings/python`, `bindings/rust` or the JavaScript/WebAssembly
+  package; the Rust crate's build script lists no `libs/truehd` path. Each is a follow-up on the C API alone.
+- **A `.forgeproj` for TrueHD.** The project file's commands (`apps/shared/project`) do not name `truehd-encode`.
+- **MLP encoding.** The encoder writes TrueHD (`0xF8726FBA`); `forge truehd-encode` refuses an `.mlp` name.
+- **Scoring against DEE.** `tools/checks/score_truehd_decode.py` has been run on streams this tree made, not on DEE's. It has to be run
+  on the owner's machine before 2026-11-06 ([Scoring DEE's TrueHD streams](../docs/verification.md#scoring-dees-truehd-streams)).
+- **Readings that are this work's own** and wait for the owner: the WAV channel mask as TrueHD channels, the speakers the loudness
+  weights are keyed on (`libs/truehd/ERRATA.md`, open questions 16 and 17), and the MAT carrier's rate and channel count in a WAV
+  (`libs/containers/ERRATA.md`, open question 2).
 
 ## Oracles
 
