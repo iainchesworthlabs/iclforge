@@ -1494,6 +1494,7 @@ for fixture in "${truehd_streams[@]}"; do
     run probe "th_$fixture"
     run probe "th_$fixture" json=1
     run_truehd_probe_json_check "th_$fixture"
+    run probe - <"th_$fixture" # a pipe has no name to sniff by
     run decode "th_$fixture" "th_$name.wav"
     run_truehd_bitexact_check "th_$name.wav" "th_$fixture" "$codec"
     run levels "th_$fixture"

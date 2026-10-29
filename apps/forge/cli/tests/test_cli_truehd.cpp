@@ -592,3 +592,54 @@ TEST_CASE("a command that does not read TrueHD takes the track after a TrueHD on
         CHECK(read_text(log).find("which 'transcode' does not read") != std::string::npos);
     }
 }
+
+// --- the commands around a stream ---------------------------------------------------------------
+
+namespace {
+
+std::string cli_arg(const fs::path& path) {
+    return "\"" + path.string() + "\" ";
+}
+
+// The report of a run without its first line, which names the file.
+std::string after_first_line(const std::string& text) {
+    return text.substr(text.find('\n') + 1);
+}
+
+}  // namespace
+
+TEST_CASE("forge probe reads a TrueHD or MLP stream from stdin", "[forge-cli][truehd]") {
+    // The TrueHD test opened the file by name, which a pipe has not got, and a pipe skipped it.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "stdin_probe.log";
+    for (const auto& item : fixture_list()) {
+        const std::string name = item["name"];
+        DYNAMIC_SECTION(name) {
+            const std::string input = cli_arg(fixture(item["file"]));
+            REQUIRE(run_cli("probe - < " + input, log) == 0);
+            const std::string piped = read_text(log);
+            REQUIRE(run_cli("probe " + input, log) == 0);
+            const std::string named = read_text(log);
+            CHECK(after_first_line(piped) == after_first_line(named));
+            CHECK(piped.find("codec") != std::string::npos);
+
+            REQUIRE(run_cli("probe - json=1 < " + input, log) == 0);
+            const auto document = nlohmann::json::parse(read_text(log));
+            CHECK(document["truehd"]["access_units"] == item["access_units"]);
+            CHECK(document["file"] == "-");
+        }
+    }
+    SECTION("an AC-3 family stream on stdin still reads as it did") {
+        const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
+        REQUIRE(run_cli("probe - < " + cli_arg(ec3), log) == 0);
+        const std::string piped = read_text(log);
+        REQUIRE(run_cli("probe " + cli_arg(ec3), log) == 0);
+        CHECK(after_first_line(piped) == after_first_line(read_text(log)));
+        CHECK(piped.find("E-AC-3") != std::string::npos);
+    }
+    SECTION("an empty pipe is an error, not a TrueHD stream") {
+        const fs::path empty = dir / "empty.bin";
+        std::ofstream{empty, std::ios::binary};
+        CHECK(run_cli("probe - < " + cli_arg(empty), log) == kExitUsage);
+    }
+}

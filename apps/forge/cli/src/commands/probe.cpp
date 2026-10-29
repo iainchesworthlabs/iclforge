@@ -6,12 +6,15 @@
 #include <cstdio>
 #include <fmt/base.h>
 #include <fmt/format.h>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <span>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -692,6 +695,34 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
     return summary.crc_failures > 0 || summary.parse_error ? 1 : 0;
 }
 
+// The bytes already taken from a pipe to tell what the stream is, given back ahead of the rest of
+// it: a pipe cannot be read twice, and the AC-3 family's reader below pulls forward from the start.
+class ReplayBuffer final : public std::streambuf {
+   public:
+    ReplayBuffer(std::span<const char> head, std::streambuf* rest)
+        : head_(head.begin(), head.end()), rest_(rest) {
+        setg(head_.data(), head_.data(), head_.data() + head_.size());
+    }
+
+   protected:
+    int_type underflow() override {
+        if (gptr() < egptr()) {
+            return traits_type::to_int_type(*gptr());
+        }
+        const std::streamsize got = rest_->sgetn(tail_.data(), std::ssize(tail_));
+        if (got <= 0) {
+            return traits_type::eof();
+        }
+        setg(tail_.data(), tail_.data(), tail_.data() + got);
+        return traits_type::to_int_type(*gptr());
+    }
+
+   private:
+    std::vector<char> head_;
+    std::array<char, 8192> tail_{};
+    std::streambuf* rest_;
+};
+
 }  // namespace
 
 int run_probe(std::string_view in_path, const Options& meta) {
@@ -722,6 +753,32 @@ int run_probe(std::string_view in_path, const Options& meta) {
     iclforge::apps::ContainerFacts container;
     std::istringstream demuxed;
     std::istream* source = is_stdio_path(in_path) ? static_cast<std::istream*>(&std::cin) : &file;
+    // A bare stream on stdin is told by its first bytes, which are read once and handed back to
+    // whichever reader takes the stream (ReplayBuffer).
+    std::unique_ptr<ReplayBuffer> replay;
+    std::istream replayed{nullptr};
+    if (is_stdio_path(in_path)) {
+        std::array<char, 4096> head{};
+        std::cin.read(head.data(), static_cast<std::streamsize>(head.size()));
+        const auto got = static_cast<std::size_t>(std::cin.gcount());
+        std::cin.clear();
+        if (is_truehd_stream(std::as_bytes(std::span{head}).first(got))) {
+            // TrueHD and MLP are read whole, as a container's track is.
+            std::vector<std::byte> all(got);
+            std::memcpy(all.data(), head.data(), got);
+            std::vector<char> chunk(65536);
+            while (const std::streamsize n =
+                       std::cin.rdbuf()->sgetn(chunk.data(), std::ssize(chunk))) {
+                const auto* bytes = reinterpret_cast<const std::byte*>(chunk.data());
+                all.insert(all.end(), bytes, bytes + n);
+            }
+            return run_probe_truehd_stream(all, in_path, meta, {}, {});
+        }
+        replay = std::make_unique<ReplayBuffer>(std::span<const char>{head}.first(got),
+                                                std::cin.rdbuf());
+        replayed.rdbuf(replay.get());
+        source = &replayed;
+    }
     if (!is_stdio_path(in_path)) {
         // The sniff decides within a few hundred bytes (sniff_container).
         std::array<char, 4096> head{};
