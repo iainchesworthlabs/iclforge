@@ -513,7 +513,8 @@ at 360 MHz takes 2.0 and 5.1 in real time and states 6 channels
 ESP32-S3 with the 64 KB data cache takes 2.0 and states 2 channels and 25 frames a second
 ([on the S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). Neither decodes a
 presentation's objects, and the desktop player decodes what is past a sink's limits and sends it
-PCM. The published firmware images have the decoder off and list `ac3` and `eac3` alone, and an
+PCM. The published ESP32-P4 v1.x image carries the decoder and lists `ac4`; the published v3.x (P4X) and ESP32-S3 images have it off and
+list `ac3` and `eac3` alone (what carries it, and what stops it, is measured in `planning/ac4-in-release-images.md`), and an
 ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes as PCM.
 
 ## Where it runs

@@ -3,7 +3,7 @@
 # measured. Declared in profiles.json, where the keys it may touch are listed; the guard holds
 # the build to them, so an image built with it is the profile's and not a scratch build.
 #
-#   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults p4-rev1-ac4 --overlay measure)"
+#   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults p4-rev1 --overlay measure)"
 #
 # The AC-4 decoder hashes the bit pattern of every sample it hands over (ac4.pcm_hash, the
 # probe's FNV-1a), which is what says whether the float output equals the host's

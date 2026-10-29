@@ -115,13 +115,12 @@ struct LayoutEvidence {
 // no underruns, on the kit, 2026-10-20), and planning/esp32-sink-compatibility-matrix.md, Matrix 1
 // (the S3 plays a 7.1.4 Atmos stream "at the line", 1.08 of real time with Wi-Fi up). No S3 or C6
 // profile has a play wider than stereo in its suite, so theirs stop at 2.
-inline constexpr std::array<LayoutEvidence, 7> kLayoutEvidence{{
+inline constexpr std::array<LayoutEvidence, 6> kLayoutEvidence{{
     {"s3-n16r8", 2, 12, "a 7.1.4 Atmos stream took 1.08 of real time on this board with Wi-Fi up"},
     {"s3-n16r8-ac4", 2, 12, "a 7.1.4 Atmos stream took 1.08 of real time on this board with Wi-Fi up"},
     {"c6-16mb", 2, 0, {}},
     {"c6-4mb", 2, 0, {}},
     {"p4-rev1", 2, 0, {}},
-    {"p4-rev1-ac4", 2, 0, {}},
     {"p4-rev3", 16, 0, {}},
 }};
 

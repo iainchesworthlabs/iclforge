@@ -290,7 +290,7 @@ TEST_CASE("an ESP32-C6 offers what its single 16-bit line carries and says its b
 }
 
 TEST_CASE("an ESP32-P4 below v3.0 offers mono and stereo and PUT /layout refuses the rest with the chip as the reason", "[device][layout_options]") {
-    for (const char* profile : {"p4-rev1", "p4-rev1-ac4"}) {
+    for (const char* profile : {"p4-rev1"}) {
         BoardCaps caps = p4_rev1();
         caps.profile = profile;
         const auto options = layout_options(caps);
@@ -389,14 +389,14 @@ TEST_CASE("every profile the project defines has an evidence row", "[device][lay
     // A new hardware variant is a new profile (firmware/hearth-sink/profiles.json) and a row in
     // kLayoutEvidence; tools/hearth/test_sink_profile.py holds the two lists to each other.
     for (const char* profile :
-         {"s3-n16r8", "s3-n16r8-ac4", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev1-ac4", "p4-rev3"}) {
+         {"s3-n16r8", "s3-n16r8-ac4", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev3"}) {
         bool found = false;
         for (const auto& row : iclforge::kLayoutEvidence) {
             found = found || row.profile == profile;
         }
         CHECK(found);
     }
-    CHECK(iclforge::kLayoutEvidence.size() == 7);
+    CHECK(iclforge::kLayoutEvidence.size() == 6);
 }
 
 TEST_CASE("GET /layout-options is the head and one object a layout, in a fixed key order", "[device][layout_options]") {

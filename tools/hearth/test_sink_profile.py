@@ -214,11 +214,11 @@ class TheFile(unittest.TestCase):
     def test_a_measure_image_is_the_profile_s_and_its_hash_key_may_differ_from_the_locked_value(
         self,
     ) -> None:
-        locked = self.data["profiles"]["p4-rev1-ac4"]["locked"]
+        locked = self.data["profiles"]["p4-rev1"]["locked"]
         self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH"], "0")
         moved = sp.touched(self.data, ("measure",))
         self.assertTrue(sp._matches("CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH", moved))
-        names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
+        names = sp.fragment_names(self.data, "p4-rev1", ("measure",))
         self.assertEqual(names[-1], "sdkconfig.measure")
 
     def test_a_published_image_does_not_serve_its_screen_over_http(self) -> None:
@@ -343,7 +343,7 @@ class TheFile(unittest.TestCase):
         and no rate limit; no other profile lists it."""
         listed = {
             "s3-n16r8-ac4": ("1", "2", "25"),
-            "p4-rev1-ac4": ("1", "6", "0"),
+            "p4-rev1": ("1", "6", "0"),
         }
         for ident, spec in self.data["profiles"].items():
             locked = spec["locked"]
@@ -359,7 +359,7 @@ class TheFile(unittest.TestCase):
                 self.assertEqual(got[2], "0", ident)
 
     def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
-        for ident in ("s3-n16r8-ac4", "p4-rev1-ac4"):
+        for ident in ("s3-n16r8-ac4", "p4-rev1"):
             locked = self.data["profiles"][ident]["locked"]
             self.assertEqual(
                 locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
@@ -377,7 +377,6 @@ class TheFile(unittest.TestCase):
             "c6-16mb",
             "c6-4mb",
             "p4-rev1",
-            "p4-rev1-ac4",
             "p4-rev3",
         }
         self.assertEqual(read, board_builds)
