@@ -4604,6 +4604,29 @@ Dolby's Spott reference files (`docs/verification.md`, "A second source") decode
   (`ConcealmentAction::kBedOnly`) is exempt. Open for the owner: whether an error is the right policy for a
   spliced programme, against writing one WAV per layout or rendering every unit to the first layout.
 
+### Content signing against CS spec v2.5 (2026-10-29)
+
+Content signing (`pace-ccjf1`, `forge ac4-sign` and `ac4-verify`) has no phase of its own; its questions are the numbered list at the
+top of [libs/ac4/ERRATA.md](../libs/ac4/ERRATA.md) (cited as `AC4-n`). The owner released version 2.5 of the specification on 2026-10-29
+(version 2.4 was not seen); it differs from 2.3 in 62 places, and the library, `forge`, the tests and the documents were reconciled
+with it that day.
+
+- **Answered:** 2 (MP4: out of scope, §8.3.2; refused by name), 11 (no DER on the wire, no DER scan), 13 (the 24-bit frame size
+  escape), and the choice about version numbers (§3.16: the wire version is 1; "3" names the scheme release). The signature input
+  (SHA-256 of `SignedInfoWire`) was already what the library did. Question 3 (signer information) is answered in part by the new §5.3.
+- **Changed in the code:** an MP4 is refused with its own error and a message that gives the reason; the signature is verified before the
+  digests it holds (§6.1, "verification order matters"); the publisher, product, platform and application are written from options and
+  reported on verifying; a nonce that is not 128 bytes, a publisher UUID that is not a UUID and one the signing certificate contradicts are
+  refused when signing; `check-content` judges the certificates at the signed date (the owner's decision on the time), and `ac4-verify` and
+  `verify-content` at the time of the check.
+- **Still the owner's:** the validity time (the mapping of "strict" and "own-QC" to commands is a reading, question 1), exactly one
+  signature entry (6), revocation (7), trust anchors (8), `ContentSignatureInfo` (5), the ID3 and damaged-frame trailers (14, 15). v2.5
+  does not change what it says of them.
+- **New, from §5.3 and its "may":** where a certificate binds the publisher UUID (16: the sample's UUID is in none of its certificates,
+  so a UUID the certificate does not carry is reported as not compared, never refused); what a verifier does with a bad nonce or UUID (17:
+  reported always, refused by `verify-content`); whether `std::random_device` is the CSPRNG (18); whether the digest is over the bytes
+  received or a fresh serialisation (19). `signed-date=` stays, with a warning, against §5.3's "actual signing time" (question 10).
+
 ## Coordination
 
 - Branch names are `<type>/<kebab-name>` with the type `feature`, `bugfix`, `hotfix`, `docs` or

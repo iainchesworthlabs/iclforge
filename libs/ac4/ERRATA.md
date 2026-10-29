@@ -9,39 +9,91 @@ the encoder's.
 Everything under this heading is about the content signature appended to a raw `.ac4` stream
 (`libs/base/src/crypto`, `libs/ac4/src/io/content_signature.cpp`, `forge ac4-sign` and
 `ac4-verify`), not about ETSI TS 103 190. It follows the owner-supplied "AC-4 content signing"
-specification, version 2.3, cited here as "CS spec" with section numbers. That specification and the
-sample blob below were supplied by the owner; parts derive from analysis of DEE and FFmpeg, per the
-owner. Only wire-format facts are used. The sample is kept outside the repository, with its
-certificates, and the tests that read it take its path from `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` and
-skip when it is unset.
+specification, version 2.5 of 2026-10-29 (version 2.4 was not seen), cited here as "CS spec" with
+section numbers. That specification and the sample blob below were supplied by the owner; parts
+derive from analysis of DEE and FFmpeg, per the owner. Only wire-format facts are used. The sample is
+kept outside the repository, with its certificates, and the tests that read it take its path from
+`ICLFORGE_CONTENT_SIGNATURE_SAMPLE` and skip when it is unset.
+
+The questions are numbered in the order they were met, and other documents cite them as `AC4-n`; a
+question that has been answered keeps its number.
+
+### What CS spec v2.5 settled
+
+Version 2.5 differs from 2.3 in 62 places. Each was checked against the code on 2026-10-29. Answered:
+
+- **The signature input (measured correction 1).** §2.2, §5.2 step 6 and §6.1 step 6 now say the
+  signature is over the SHA-256 of the Thrift serialisation of `SignedInfoWire`, which is what the
+  sample showed and what the library has done since it was written. No change in the code.
+- **Raw `r` and `s`, no DER (AC4-11, measured correction 7).** §1.2, §2.3, §8.5 and §9.2 now agree:
+  `r` and `s` are 32 raw bytes each in a map, and the DER pattern and the backward scan for it are
+  gone from the text. The library reads them from the map, never searches for a DER pattern, and
+  finds the blob by walking the sync frames. No change in the code.
+- **The frame-size escape (AC4-13).** §8.5 now says `frame_size` is 16 bits and `0xFFFF` means a
+  24-bit size follows. `iclforge::ac4::scan` and the trailer walk have always followed it; the tests
+  build frames of 330, 970 and 70 000 bytes with the escape. No change in the code.
+- **MP4 (AC4-2).** §8.3.2 now puts signing an MP4 out of scope (it names no box, and DEE writes
+  none) and says a signer shall refuse `sign-content` on MP4 input and sign the raw `.ac4` stream
+  instead. Changed: `sign_stream` refuses a stream that opens with an ISO base media box (`ftyp`,
+  `styp`, `moov`, `moof` or `mdat`) with its own error kind (`kContainerNotSupported`) and a message
+  that gives the reason and the stream that can be signed; `forge ac4-sign` of an MP4 and
+  `sign-content` to a file named `.mp4` both exit 1 with that message (the second before anything is
+  encoded); `ac4-verify` of an MP4 says it is an MP4 and not a damaged AC-4 stream. Before, the
+  messages said "not implemented" and "does not begin with an AC-4 sync frame".
+- **Version fields (the first choice under "Where the code differs").** §3.16 now says that
+  "scheme version 3" (`kSignatureValuesVersion3`) names the scheme's release and is not a field, that
+  every wire version field is 1, and that an implementation shall write 1. The code writes 1
+  everywhere and refuses any other marker (`LibDoesntSupportContentSignature`). No change in the
+  code; the choice is no longer a departure.
+- **The order of the checks (§6.1, "Verification order matters").** The signature over
+  `SignedInfoWire` is verified before the two digests it holds, which carry weight only after it.
+  Changed: `verify_content_signature` used to check the digests first and the signature last, so a
+  forged signature over altered content was reported as a digest mismatch. The signature check now
+  comes first, is the first fault when it fails, and the digest checks that follow say that they
+  rest on a signature that did not verify. The verdict is the same as before; the order of the report
+  and the first fault differ.
+- **Signer information (AC4-3, in part).** §5.3 is new. It says what an operator writes in
+  `SignerInfoWire`; what it settles, and what the code does, is under question 3. What it leaves to
+  the implementation is questions 16 and 17.
+
+Not changed by v2.5, and read again for it: the time the certificates are judged at (question 1),
+exactly one signature entry (6), revocation and the leaf's other properties (7), trust anchors (8),
+`ContentSignatureInfo` (5) and the ID3 and damaged-frame trailers (14, 15). §8.5 still walks the sync
+frames and takes what follows as the blob; it says nothing of tags or of a damaged frame. Questions
+5 to 8, 14 and 15 stand as they were.
 
 ### Open questions for the owner
 
 Each of these was met while writing the code. The code does what the second sentence says until the
 owner decides; none of them blocks the rest.
 
-1. **What time should a certificate be valid at?** CS spec §6.1 step 3 says every certificate must be
-   valid "now". The sample's chain has a CA certificate that expired before the signature's own
-   `signedDate`, so a genuine signature fails that check today (see measured correction 4). Strict
-   mode follows the spec: `verify-time=now`. `verify-time=signed` (judged at the date the signer
-   wrote, which is only as good as the signer), `ignore` and a fixed instant are there, and a report
-   names the time used. Should strict mode keep `now`, or should own-QC default to `signed`?
-2. **How is a signature carried in an MP4?** §8.3.2 says "container-level metadata on the audio
-   track, using the MP4 muxer infrastructure" and gives no box, no payload layout and no digest
-   boundary beyond "the raw bitstream in `mdat`". `sign-content` therefore refuses an MP4 and says so;
-   only the raw `.ac4` trailer of §8.3.1 is implemented. Which box, and does the digest cover the
-   samples as the muxer stores them, or the sync frames they came from? §8.2 says the digest is
-   over "all sync-wrapped or raw frames as they exist prior to the signing step", which cannot be
-   both: an MP4 sample is the raw frame alone, with no sync word, size or CRC, so the sync-wrapped
-   bytes a raw-file signer hashed cannot be rebuilt from an MP4 (the sync word, 0xAC40 or
-   0xAC41, is not recorded in it). A signature made over one cannot be checked over the other
-   unless the spec says which bytes are hashed.
-3. **What goes in the signer information of a signature made with an operator's own key?** The
-   sample names a publisher (type, UUID, name, role), a product, a platform and an application. We
-   write a random 128-byte nonce, publisher type 1 with no name, and the application as "ICL Forge
-   forge". A verifier that reads these fields downstream may expect more, or must not trust any of it.
-   Should `ac4-sign` take the publisher and product from options, and may a verifier refuse an empty
-   publisher?
+1. **What time should a certificate be valid at?** CS spec §6.1 steps 3 and 4 (unchanged in v2.5)
+   say every certificate must be valid "now". The sample's chain has a CA certificate that expired
+   before the signature's own `signedDate`, so a genuine signature fails that check today (see
+   measured correction 4). *Decided by the owner on 2026-10-29: strict mode keeps `now`; own-QC
+   defaults to the signed date.* forge reads that as follows. `ac4-verify` and `verify-content`, which
+   refuse what does not check, judge at the time of the check. `check-content`, which reports what it
+   finds and carries on, judges at the date the signature records, and the report line says so
+   (`validity judged at 2025-06-01T00:00:00 (signed, the default of check-content)`).
+   `verify-time=now|signed|ignore|<instant>` overrides either. The library's default is still
+   `TimeBasis::kNow`; the choice is the front end's. Which commands are "strict" and which are
+   "own-QC" is my reading: confirm it, or name the commands.
+2. **How is a signature carried in an MP4?** *Answered by v2.5 §8.3.2: it is not; signing an MP4 is
+   out of scope and a signer refuses it (see above).* If a convention is defined later, §8.3.2 says
+   the digest would cover the raw frames in `mdat` and not the container; that is an inference and
+   is not built.
+3. **What goes in the signer information of a signature made with an operator's own key?** *Answered
+   in part by v2.5 §5.3.* `signerNonce` is 128 bytes from a CSPRNG, fresh for every signature;
+   `publisher.publisherUUID` is the UUID of the operator's PACE publisher account and shall match the
+   one bound to the signing certificate; `signedDate` is the time of signing, in UTC; the platform
+   and application are informational. `ac4-sign` and `sign-content` take `publisher-uuid=`,
+   `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
+   `os-description=`; the application is this program, its version and its commit; the nonce and the
+   date are drawn and read from the clock for each signature. A nonce of another length and a
+   malformed publisher UUID are refused when signing, and so is a UUID that the signing certificate's
+   subject contradicts. A signature without `publisher-uuid=` is made, with a warning, because
+   nothing says an operator without a PACE account may not sign. What the verifier does with all this
+   is question 17; where a certificate binds the UUID is question 16; the clock is question 10.
 4. **Are digests or curves other than SHA-256 and secp256r1 ever written?** The spec fixes both
    (§1.1) but the wire carries them as strings (`sha256`, `ecdsa`, `secp256r1`). We refuse anything
    else with `BadContentSignaturePKStandard`. Say if SHA-384, SHA-512 or P-384 appear in practice.
@@ -67,25 +119,26 @@ owner decides; none of them blocks the rest.
    reader stops at the first non-sync byte, as §8.5 describes. Only files that go through FFmpeg
    are affected.
 10. **What is an acceptable `signedDate`?** `BadContentSignatureDate` is "outside acceptable range"
-    (§6.2) with no range. We require `YYYY-MM-DDTHH:MM:SS`, a date inside the signer certificate's
-    validity unless `verify-time=ignore`, and accept a date in the future without complaint.
-11. **The DER fallback scan of §8.5 and the DER steps of §1.2 and §9.2.** v2.3 stores `r` and `s`
-    raw in a map (§2.3, §3.13), but §1.2 step 4 ("Encode signature as DER"), the fallback scan of
-    §8.5 and §9.2's "DER encoding of (r, s)" still describe a DER signature. No DER pattern follows
-    in a signed file, so the fallback finds nothing. We do not implement it. Delete these from the
-    specification, or say what they are for.
+    (§6.2) with no range, and §5.3 adds that a verifier "may reject signatures whose timestamp falls
+    outside its acceptable window" without saying what the window is. We require
+    `YYYY-MM-DDTHH:MM:SS`, a date inside the signer certificate's validity unless `verify-time=ignore`,
+    and, when the certificates are judged now, a date no more than a day ahead of the clock. §5.3 also
+    says `signedDate` "shall reflect the actual signing time", and `signed-date=` can write any date.
+    It is kept because the certificates the tests and demonstrations use have expired and a
+    signature has to be made at a date they were valid; `ac4-sign` and `sign-content` warn when it
+    differs from the clock by more than five minutes. Should the option go, be refused unless it is
+    near the clock, or stay with the warning?
+11. **The DER fallback scan of §8.5 and the DER steps of §1.2 and §9.2.** *Answered by v2.5: they are
+    gone from the text (see above).*
 12. **Keep the specification's error names, or use neutral ones?** The names in §6.2
     (`CertifierNoPrivateKey`, `BadCredentialsForSigningContent`, `CertNotPrivilegedToSignContent`,
     `LibDoesntSupportContentSignature`, ...) come from the owner's table. They are the library's
     `SignatureError` values and are printed in `forge` output (`fault: DigestMismatch: ...`) and
     in the documentation. They are kept; say if neutral names are wanted instead.
-13. **The trailer walk of §8.5 does not mention the frame-size escape.** It says to read each sync
-    word and `frame_length` and advance. In the Dolby kit's streams six of twelve write every
-    frame's size with the escape (0xFFFF in the 16-bit field, then a 24-bit size) on frames of 61 to
-    1425 bytes, in both sync words, so a walk that reads only 16 bits misreads them. The walk here
-    follows the escape (it is `iclforge::ac4::scan`'s), and signing, finding and verifying a
-    signature work on all twelve. Add the escape to §8.5, or say that a signed stream may not use
-    it.
+13. **The trailer walk of §8.5 does not mention the frame-size escape.** *Answered by v2.5 §8.5: it
+    does (see above).* In the Dolby kit's streams six of twelve write every frame's size with the
+    escape on frames of 61 to 1425 bytes, in both sync words, and signing, finding and verifying a
+    signature work on all twelve.
 14. **Non-frame bytes between frames.** HLS packed-audio files carry ID3v2 tags between frames,
     which stop a sync-word walk. We take bytes after the walk's end as a trailer only if they begin
     as a ContentSignature does (version and schema version fields); anything else is reported with
@@ -98,10 +151,40 @@ owner decides; none of them blocks the rest.
     signature` with the byte where the frames stop, and a flipped payload byte (the framing holds)
     is reported as a digest mismatch. A signature found by its own structure at the end of the file
     would give the better message (digest mismatch) at the cost of a search; say if that is wanted.
+16. **Where does a certificate bind the publisher UUID?** §5.3 says `publisherUUID` "shall match the
+    UUID bound to the operator's signing certificate" and that a mismatch "between the claimed
+    publisher and the certificate's subject allows a verifier to reject". It does not say which
+    attribute or extension holds the UUID. Measured on the sample: the publisher UUID it names is in
+    none of its four certificates, not in any subject attribute, not in the private extensions, and
+    not as 16 raw bytes either. The reading taken is the narrowest that cannot refuse a genuine
+    signature: the claim is compared with every attribute of the signer certificate's subject; one
+    that is that UUID (in either case) matches; a subject that carries a UUID and not this one is a
+    mismatch; a subject that carries none is "not compared", reported and never a failure. The
+    sample is the last case. Say where the binding is, and the comparison can be made for real.
+17. **What does a verifier do with a nonce that is not 128 bytes, a publisher UUID that is empty or
+    not a UUID, or one the certificate contradicts?** §5.3 says "may reject" for the last and is
+    silent on the others. The reading taken: always reported (the lines `signer nonce` and
+    `publisher UUID` in `ac4-verify`'s output, which do not change the verdict); with
+    `verify-content`, the strict reading, a bad nonce, a missing or malformed UUID and a
+    contradicted UUID make the signature INVALID (`BadOrMissingSignature`, and
+    `BadCredentialsForSigningContent` for the contradiction); "not compared" never does. Should a
+    signature without a publisher UUID be refused by the strict check, as it is now?
+18. **Is `std::random_device` the CSPRNG §5.3 asks for?** It is the platform's entropy source on the
+    toolchains this builds with (hardware or the operating system's generator under libstdc++,
+    libc++ and MSVC), and it is what draws the nonce. The language does not promise that, and
+    `libs/` may not contain a per-platform call. Keep it, or wrap the operating system's generator
+    for each platform?
+19. **Does a verifier hash the bytes it received, or serialise the parsed struct again?** §6.1 steps
+    6 and 7 say "serialize" `SignedInfoWire` and `SignerInfoWire` and hash the result. Measured
+    correction 2 hashes the exact received bytes, and the two agree for a writer that emits the
+    fields in id order and no unknown ones, which is every signature seen. They differ for a blob
+    with an unknown field or another field order, and then only the received bytes can be checked.
+    Keep the received bytes?
 
 ### Measured corrections
 
-Measured on the owner's sample blob, with OpenSSL and a Thrift reader written separately from the
+Measured on the owner's sample blob (against CS spec v2.3; where v2.5 now says what was measured, the
+entry says so), with OpenSSL and a Thrift reader written separately from the
 library's (`tools/checks/check_content_signature_openssl.py --sample`, which runs no forge code). The
 library's own tests assert the same facts (`ICLFORGE_CONTENT_SIGNATURE_SAMPLE=<blob> ctest -R
 "owner's sample"`). Each entry is the spec's reading, what was measured, and the lines the command
@@ -114,8 +197,8 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
 ```
 
 1. **The ECDSA signature is over the bytes of `SignedInfoWire`, not over the content digest.**
-   §2.2, §5.2 step 6 and §6.1 step 8 sign and verify the content digest (the 32-byte SHA-256 of the
-   stream) directly.
+   v2.3's §2.2, §5.2 step 6 and §6.1 step 8 signed and verified the content digest (the 32-byte
+   SHA-256 of the stream) directly; v2.5 §2.2, §5.2 step 6 and §6.1 step 6 say what is measured here.
    The signature in the sample verifies under the signing certificate's key over SHA-256 of the
    Thrift serialisation of `SignedInfoWire` (field 1 of the signature entry, from its first field
    header to its STOP byte). The content digest is covered because it is a field inside that struct.
@@ -124,8 +207,9 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
    ok    the signature does not verify over SHA-256 of the content digest
    ok    the signature does not verify with the content digest taken as the hash that was signed
    ```
-2. **The signer-information digest is over the bytes as received.** §5.2 step 3 and §6.1 step 6 hash
-   the serialised `SignerInfoWire`, the second by serialising the parsed struct again. The digest
+2. **The signer-information digest is over the bytes as received.** §5.2 step 3 and §6.1 step 7 hash
+   the serialised `SignerInfoWire`, the second by serialising the parsed struct again (v2.5 still
+   words it so; see question 19). The digest
    stored in `SignedInfoWire` field 6 is that of the exact received bytes of field 3 of the blob,
    through its STOP byte. A re-serialisation need not reproduce those bytes, so the verifier keeps the
    span it parsed.
@@ -165,14 +249,16 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
    ok    fields are written in ascending id order in every struct
    ```
 7. **`r` and `s` are raw, 32 bytes each, in a map keyed `ecc_r_value` and `ecc_s_value`.** v2.3 §3.13 and
-   §5.2 step 6 say so, but §8.5 (the fallback scan for `30 44..48 02 20..21 ...`) and §9.2 ("DER encoding of (r, s)")
-   still describe a DER signature. The sample has no DER signature. To check it with OpenSSL the
+   §5.2 step 6 said so, but §8.5 (the fallback scan for `30 44..48 02 20..21 ...`) and §9.2 ("DER encoding of (r, s)")
+   still described a DER signature; v2.5 removes those, and the DER certificate signatures inside the chain are the only
+   DER ECDSA structures left in a signed file. The sample has no DER signature. To check it with OpenSSL the
    two integers are wrapped into an `Ecdsa-Sig-Value` first, which the script does.
    ```
    ok    r and s are raw 32-byte values, not DER: 32 and 32
    ```
-8. **`signedDate` is `YYYY-MM-DDTHH:MM:SS`, UTC, with no `Z`.** The spec says "ISO 8601". The reader
-   accepts a trailing `Z` and the writer never adds one. Asserted by the sample test, not printed.
+8. **`signedDate` is `YYYY-MM-DDTHH:MM:SS`, UTC, with no `Z`.** The spec says "ISO 8601" (v2.5 §5.3: "ISO 8601 UTC
+   timestamp of the signing moment"). The reader accepts a trailing `Z` and the writer never adds one. Asserted by
+   the sample test, not printed.
 9. **A signed file is not what FFmpeg's raw AC-4 demuxer expects.** Frame counts by `ffprobe -v error
    -f ac4 -count_packets -show_entries stream=nb_read_packets -of csv=p=0`, on a 50-frame stream
    from `forge ac4-encode` and the same stream after `forge ac4-sign` with a 2 026-byte trailer:
@@ -198,16 +284,26 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
     ones (up to 70 000 bytes), a damaged frame followed by a valid signature, an ID3v2 tag between
     frames.
 
+11. **The publisher UUID the sample names is in none of its certificates.** §5.3 (v2.5) says it shall match
+    the UUID bound to the signing certificate. The sample's `publisherUUID` appears in no subject
+    attribute of any of the four certificates, and not in their extensions, as text or as 16 raw
+    bytes (the extensions under the 1.3.6.1.4.1.11620 arc are opaque to the library and were searched
+    as bytes). The subjects carry `serialNumber`, `dnQualifier`, `commonName`, `generationQualifier`,
+    `organizationName` and `organizationalUnitName`, and the signer's also `businessCategory` and
+    `title`; none is a UUID. So a verifier that required the UUID to be found in the certificate would
+    refuse this signature (question 16). Asserted by the sample test, not printed.
+12. **Every wire version field in the sample is 1, the nonce is 128 bytes, `r` and `s` are 32 bytes.**
+    §3.16, §3.2 and §2.3 of v2.5 say so; asserted field by field by the sample test, which also
+    checks that the strict reading of the signer information (nonce and publisher UUID required)
+    does not refuse it. Not printed.
+
 ### Where the code differs from the specification without a measurement behind it
 
-These are choices, not findings. Each differs from the text of CS spec v2.3 and is listed so that
-the owner can overrule it.
+These are choices, not findings. Each differs from the text of CS spec v2.5 and is listed so that
+the owner can overrule it. (The choice about version numbers that stood first is gone: v2.5 §3.16
+says the scheme release is 3, the wire version is 1, and an implementation shall write 1, which is
+what the code does and what the sample's markers are. Numbering of the rest is kept.)
 
-1. **Version numbers.** §1.1 and §10.1 give the scheme version as 3 (`kSignatureValuesVersion3`).
-   §3.16 says the embedded sample uses version 1 throughout, and the sample's markers are all 1.
-   The code writes 1 everywhere and requires every version marker to be 1 (the report line
-   `version markers: all version markers are 1`), refusing any other. If version 3 exists on the
-   wire, nothing here reads it.
 2. **Certificates above the trust anchor are not time-checked.** §6.1 step 3 checks the validity
    period of every certificate in the chain at the current time. The code validates a path from its
    anchor down (RFC 5280 §6.1): an expired CA *above* a `trust-anchor=` or `pin=` certificate does
@@ -221,9 +317,12 @@ the owner can overrule it.
    memory or time in proportion to its size.
 
 What does follow the specification: the signature is ECDSA P-256 over SHA-256 with RFC 6979 nonces
-(§9.1 allows either); the content digest is SHA-256 of every byte before the trailer; the trailer
-is found by walking the sync frames; the leaf must carry the title `Code/Content Signer` (unless
-`leaf-title=any`) and Digital Signature; and each certificate must verify under its issuer's key.
+(§9.1 allows either) of the serialised `SignedInfoWire`; the content digest is SHA-256 of every byte
+before the trailer; the trailer is found by walking the sync frames, with the frame-size escape; the
+signature is checked before the digests it holds; the leaf must carry the title `Code/Content
+Signer` (unless `leaf-title=any`) and Digital Signature; each certificate must verify under its
+issuer's key; every wire version field is 1; `signerNonce` is 128 bytes drawn afresh for each
+signature; and an MP4 is refused.
 
 ## The decoder
 
