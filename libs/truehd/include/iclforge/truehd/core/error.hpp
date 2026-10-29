@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "iclforge/truehd/export.hpp"
+
 namespace iclforge::truehd {
 
 // Why a read or a decode stopped. Every one is an expected condition of untrusted input and is
@@ -32,6 +34,6 @@ struct Error {
     std::string_view detail;
 };
 
-[[nodiscard]] std::string_view to_string(ErrorKind kind) noexcept;
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::string_view to_string(ErrorKind kind) noexcept;
 
 }  // namespace iclforge::truehd

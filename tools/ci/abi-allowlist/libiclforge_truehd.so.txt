@@ -48,6 +48,7 @@ iclforge::truehd::starts_with_major_sync(std::span<std::byte const, 184467440737
 iclforge::truehd::substream_crc(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::substream_parity(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::to_string(iclforge::truehd::EncodeErrorKind)
+iclforge::truehd::to_string(iclforge::truehd::ErrorKind)
 iclforge::truehd::write_access_unit_prefix(std::optional<iclforge::truehd::MajorSync> const&, std::span<iclforge::truehd::SubstreamEntry const, 18446744073709551615ul>, unsigned short, unsigned long)
 iclforge::truehd::write_block_header(iclforge::BitWriter&, iclforge::truehd::BlockContext const&, iclforge::truehd::BlockHeaderSpec const&)
 iclforge::truehd::write_major_sync(iclforge::truehd::MajorSync const&)
