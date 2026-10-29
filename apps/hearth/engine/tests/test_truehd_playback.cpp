@@ -443,11 +443,18 @@ TEST_CASE("truehd playback: a unit's report says what the unit said and what the
     CHECK(decoder.truehd_counters() == counted);
 }
 
-TEST_CASE("truehd playback: a stream the decoder refuses plays as silence of its length, and says why",
+TEST_CASE("truehd playback: a stream the decoder cannot decode plays as silence of its length, and says why",
           "[hearth][truehd]") {
-    // noise_type 1 with a non-zero noise shift: the library refuses it by name (ERRATA entry 32).
-    const std::vector<std::byte> stream =
-        read_file(truehd_dir() + "/handbuilt/hb_noise_type1_shift.thd");
+    // One restart at the start and a damaged first unit: the decoder fails the unit's checks, and
+    // with no restart header after it every later unit waits for one. (The test once used a
+    // hand-built stream that the library refused by name, noise generator 1 with a non-zero noise
+    // shift; the library decodes that now, ERRATA entry 44.)
+    const MadeStream made = make_stream(2, 24000, 48000, 1000, 11);
+    REQUIRE(made.has_major_sync[0]);
+    REQUIRE_FALSE(made.has_major_sync[1]);
+    std::vector<std::byte> stream = made.bytes;
+    const std::uint64_t at = made.unit_offsets[0] + (made.unit_offsets[1] - made.unit_offsets[0]) / 2;
+    stream[at] = static_cast<std::byte>(std::to_integer<unsigned>(stream[at]) ^ 0x55U);
     auto session = Session::open("refused", loader_of(stream));
     REQUIRE(session.has_value());
     const auto layout = iclforge::render::OutputLayout::stereo();
