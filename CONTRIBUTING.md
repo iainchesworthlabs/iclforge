@@ -354,6 +354,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    Weaker than a decoder — two transcriptions can share a misreading — but they catch slips a
    self-consistent round trip cannot.
 5. **Dolby's Reference Player and Media Encoder**, for object-layer syntax.
+6. **Dolby's Online Delivery Kit tools** (`streamdemuxer`, `mp4drop`), for what the MP4, DASH, HLS and TS writers produce: free to download, run locally by the `tools/checks/check_dolby_*.py` scripts (which skip without them), never committed and never fetched by CI; see [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#dolbys-online-delivery-kit-tools).
 
 **AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4)
 and in `planning/ac4.md`. FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so

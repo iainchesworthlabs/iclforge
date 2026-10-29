@@ -240,6 +240,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--samples", default=os.environ.get("ICLFORGE_DOLBY_ODK_SAMPLES"))
     parser.add_argument("--work", help="working directory (default: a temporary one)")
+    parser.add_argument(
+        "--verbose", action="store_true", help="list every leg, not only the failures and skips"
+    )
     args = parser.parse_args(argv)
     reason = odk.skip_reason("mp4drop")
     if reason:
@@ -254,7 +257,9 @@ def main(argv: list[str] | None = None) -> int:
             results += check_dolby_written(args.cli, Path(args.samples), counts)
         else:
             results.append(odk.Result("Dolby sample files", odk.SKIP, "no --samples directory"))
-        return odk.print_report("Dolby mp4drop against forge's sample entries", results)
+        return odk.print_report(
+            "Dolby mp4drop against forge's sample entries", results, args.verbose
+        )
 
 
 if __name__ == "__main__":

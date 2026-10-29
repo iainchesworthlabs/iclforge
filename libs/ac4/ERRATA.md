@@ -3000,6 +3000,18 @@ equal on every ASPX stream they write:
 - **Evidence:** Streams. The inspector's check of this coverage passes on every frame of DEE's 0xAC41
   streams, and the encoder-space harness computes it again from the text.
 
+#### The sync word and the length form of a sync frame
+
+- **Where:** Part 1 Annex G.3.1 and G.3.2: `sync_word` 0xAC40 for a frame without `crc_word` and 0xAC41
+  for one with it; `frame_size` in 16 bits, escaped by 0xFFFF to a further 24.
+- **Reading:** the writer sends 0xAC41, the CRC and a 16-bit length, and the 24-bit form only for a
+  frame of 65,535 bytes or more (`sync_frame.cpp`); the reader takes either sync word and either form.
+  Dolby's `streamdemuxer` (Online Delivery Kit 1.5, 1.0.0.5519896) writes 0xAC40, no CRC and the 24-bit
+  length on every frame. The 73 raw frames it extracts from a forge MP4 equal the 73 forge's own
+  stream holds, and `forge probe` reads its file. Nothing here is wrong; the two writers differ, and
+  `tools/checks/check_dolby_demux_roundtrip.py` compares raw frames and not the framing.
+- **Evidence:** A reader outside the project (single oracle: Dolby tool). The text allows both.
+
 #### Leftover bytes go in payload_base
 
 - **Where:** Part 1 4.3.3.2.10 and 4.3.3.2.11: `payload_base` places the first substream that many

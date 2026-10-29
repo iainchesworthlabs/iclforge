@@ -176,6 +176,12 @@ The signing key sets the precedent and the plan copies it (`signing_key.hpp`, `o
   entries; a sample count; per sample an IV of `tenc`'s per-sample IV size and, if flagged, a count
   of subsamples with a 16-bit clear and a 32-bit protected length each [recalled]. One `senc` per
   `traf` [seen: DASH-IF IOP-6 6.2].
+- Where `sinf` sits in the entry: Dolby's AC-4 page for encrypted DASH puts `sinf` right after the
+  `dac4` (inside `enca`: `dac4`, then `sinf` holding `frma` = `ac-4`, `schm`, `schi`), the E-AC-3
+  pages put it after `dec3`, and the AC-4 page adds that a parser must also take it first. The
+  reader walks the entry's children, so either order is read, and a unit test builds the `sinf`-first
+  entry. `mp4drop` has read the Dolby order in 108 files (M13); the other order has not been run
+  through it.
 - `saiz` and `saio`: optional, left out when the parameters are the same for all samples
   [seen: IOP-6 6.2]. The reader checks them against `senc` when both are present and takes the
   data from `senc`. Two `saio` layouts exist in practice, a base data offset (GPAC) and
@@ -255,7 +261,11 @@ The ladder follows the "Oracles" ranking in CONTRIBUTING.md and section 8 of the
 | 7. Negative and leak tests | Wrong key (sync-word check), missing key, truncated `senc`; the key never reaches stdout, stderr or a written file in hex, base64 or raw; the key scrubs. | n/a |
 | 8. Fuzz | `fuzz_mp4_demux` gains a keyring so the decrypt paths run, with the protected fixtures as seeds; ASan and UBSan. | n/a |
 | 9. Somebody else's streams | Shaka's Clear Key demo asset is AAC, not Dolby, and its key was not obtained (M8). Keep looking for a Dolby stream with a published key; Dolby's browser test kit lists `cbcs` streams, unverified. | n/a |
+| 10. Dolby's own tools (M13) | `mp4drop` reads the protection boxes and `senc` counts of the generator's and GPAC's files, in all four schemes, so the parse of rung 2 has a second reader written by the format owner. Run locally by `check_dolby_cenc.py`; skips without the tools. | The cipher: `streamdemuxer` 1.0.0.5519896 decrypted no file. If a newer build does, its output joins rung 4 as a third decryption oracle and `--require-decrypt` makes it a gate. |
 | The standard | Every [recalled] rule above. | Interoperability |
+
+Rung 10 stays local until the owner decides whether CI may download Dolby's kit (the project has not
+read its licence terms in full). Nothing from the kit is committed.
 
 ## 8. Risks
 
@@ -349,3 +359,5 @@ the result checked.
 3. May the plan's key surface drop the inline `key=` on the command line the owner sketched, for the
    reasons in D4?
 4. May the first release refuse subsample maps and audio patterns other than 1:0 and 0:0 (D6, D7)?
+5. May CI download Dolby's Online Delivery Kit tools (rung 10)? The project has not read the kit's licence
+   terms in full; until the owner says yes, the checks run locally and skip without them.
