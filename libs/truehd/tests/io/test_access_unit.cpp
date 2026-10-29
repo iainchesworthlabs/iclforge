@@ -98,6 +98,32 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
     }
 }
 
+TEST_CASE("extended_substream_info is the low pair of the four bits after the substream count",
+          "[truehd][io]") {
+    // TH spec §4.1: "2+2 bits (low 2 bits used, upper 2 reserved)". The owner's Blu-ray (an Atmos
+    // 7.1 stream of four substreams) has 0x43 there: the count 4, the upper pair 0, the low pair 3.
+    MajorSync sync = stereo_major_sync();
+    sync.num_substreams = 4;
+    sync.extended_substream_info = 3;
+    auto bytes = write_major_sync(sync);
+    REQUIRE(bytes.has_value());
+    CHECK((*bytes)[16] == std::byte{0x43});
+    auto read = parse_major_sync(*bytes);
+    REQUIRE(read.has_value());
+    CHECK(read->extended_substream_info == 3);
+    CHECK(read->extended_reserved == 0);
+
+    sync.extended_substream_info = 1;
+    sync.extended_reserved = 2;
+    bytes = write_major_sync(sync);
+    REQUIRE(bytes.has_value());
+    CHECK((*bytes)[16] == std::byte{0x49});
+    read = parse_major_sync(*bytes);
+    REQUIRE(read.has_value());
+    CHECK(read->extended_substream_info == 1);
+    CHECK(read->extended_reserved == 2);
+}
+
 TEST_CASE("an MLP major sync keeps the bytes the specification does not describe", "[truehd][io]") {
     MajorSync major_sync;
     major_sync.kind = StreamKind::kMlp;

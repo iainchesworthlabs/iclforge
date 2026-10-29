@@ -79,8 +79,8 @@ struct MajorSync {
     bool is_vbr = false;
     std::uint16_t peak_data_rate = 0;          // 15 bits; TH spec §4.4, see peak_data_rate_bps()
     std::uint8_t num_substreams = 1;           // 4 bits
-    std::uint8_t extended_substream_info = 0;  // 2 bits
-    std::uint8_t extended_reserved = 0;        // the 2 bits after it
+    std::uint8_t extended_substream_info = 0;  // 2 bits, the low pair of the 4 after num_substreams
+    std::uint8_t extended_reserved = 0;        // the upper pair of them
     std::uint8_t substream_info = 0;  // 8 bits; TH spec §6.4's bit table does not fit the streams
     // The 8 bytes after substream_info as written. For a TrueHD stream `channel_meaning` is those
     // bits parsed; for an MLP stream they are not (the specification does not describe them).
