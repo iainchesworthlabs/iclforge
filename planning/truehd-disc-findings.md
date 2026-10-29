@@ -66,3 +66,21 @@ with the DRC start-up gain counting up; the stream's average rate is 4.77 Mbps.
   kept across each restart and with them zeroed gives the same samples for substreams 0, 1 and 2 (all 568
   intervals ok in each, all eight channels equal to FFmpeg's), so this encoder does not rely on the history
   after a restart.
+
+## Second disc: *Dune: Part Two* (UHD BD, 2026-10-30)
+
+A second owner's disc (G:, a decrypted image). Its main feature, `BDMV/STREAM/00075.m2ts` (9,949 s), carries three
+TrueHD + Atmos 7.1 streams (streams 2, 5 and 8 of the clip), each 48 kHz. A 60 s excerpt of each (from 1800 s, about
+72,830 access units) is in `D:/ac3bld/bd-dune/` and stays there. Results, with forge at `2f9a3a907` (the output-shift fix):
+
+- **The fix holds on a second encode.** All three streams decode at 2, 6 and 8 channels with every lossless-check
+  interval ok (569, 1,138 and 1,707 for streams 2 and 5; 568, 1,136 and 1,704 for stream 8), and the 8-channel output equals FFmpeg's
+  strict decode sample for sample on all eight channels (2.91 million samples each, FFmpeg's channel order of ERRATA 33).
+- **Q 19 holds exactly.** Every one of the 5,691 extra-data frames in the three excerpts is 64 bytes, has `extra_data_length`
+  31, a payload length of 58, a trailing parity byte that is right, a header nibble that is the complement of the library's, and one
+  frame per 1536 samples (gaps of 38 and 39 units).
+- **Q 2 holds.** The major sync is 32 bytes with the same extension, `1fc6bc00`, in all three; no terminators in any substream
+  (only chance matches); four substreams of 2, 6, 8 and 12 channels with restart syncs 0x31EA, 0x31EB, 0x31EB and 0x31EC again.
+- **`ch_assign` changes mid-stream.** Stream 2's second and third substreams change their `ch_assign` at a restart (from
+  (4,5,1,0,2,3) to (4,5,2,1,0,3), for example), so a permutation is not fixed for a stream; the fix handles it.
+- `peak_data_rate` raw: 1849, 1792 and 1817 (against 2417 on the first disc); `twoch_control_enabled` is set here and not there.
