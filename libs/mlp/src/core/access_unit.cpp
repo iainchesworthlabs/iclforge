@@ -194,8 +194,8 @@ std::expected<std::vector<std::byte>, Error> assemble_access_unit(const AccessUn
     if (parts.extra_data.size() % 2U != 0) {
         return std::unexpected(Error::kInvalidConfiguration);
     }
-    std::size_t total = kHeaderBytes + sync_bytes.size() + dir.size() + words * 2U +
-                        parts.extra_data.size();
+    std::size_t total =
+        kHeaderBytes + sync_bytes.size() + dir.size() + words * 2U + parts.extra_data.size();
     if (total / 2U > 0x0FFFU) {
         return std::unexpected(Error::kInvalidConfiguration);
     }

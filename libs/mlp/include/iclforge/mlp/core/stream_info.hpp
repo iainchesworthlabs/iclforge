@@ -74,7 +74,7 @@ struct SpeakerList {
 struct FormatInfo {
     std::uint8_t sample_rate_code = 0;  // audio_sampling_frequency, 1.4
     std::uint8_t reserved = 0;
-    std::uint8_t twoch_modifier = 0;    // twoch_decoder_channel_modifier, 5.4
+    std::uint8_t twoch_modifier = 0;  // twoch_decoder_channel_modifier, 5.4
     std::uint8_t sixch_modifier = 0;
     std::uint8_t sixch_assignment = 0;  // 5 bits, 13.1's low five
     std::uint8_t eightch_modifier = 0;
@@ -112,12 +112,12 @@ struct ExtraChannelMeaning {
     std::uint8_t sixteench_mix_level = 0;
     std::uint8_t sixteench_channel_count = 0;  // the presentation's channels, less one
     bool dyn_object_only = false;
-    bool lfe_present = false;                    // when dyn_object_only
+    bool lfe_present = false;                        // when dyn_object_only
     std::uint8_t sixteench_content_description = 0;  // 4 bits, when not dyn_object_only
     bool chan_distribute = false;                    // content_description bit 0
     bool lfe_only = false;
-    std::uint16_t sixteench_channel_assignment = 0;  // 10 bits, unless lfe_only
-    std::uint8_t sixteench_isf = 0;                  // content_description bit 1
+    std::uint16_t sixteench_channel_assignment = 0;   // 10 bits, unless lfe_only
+    std::uint8_t sixteench_isf = 0;                   // content_description bit 1
     std::uint8_t sixteench_dynamic_object_count = 0;  // content_description bit 2, 5 bits
 };
 

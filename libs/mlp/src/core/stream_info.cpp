@@ -88,8 +88,7 @@ SpeakerList speakers(std::uint16_t assignment) noexcept {
 
 std::uint32_t FormatInfo::pack() const noexcept {
     return (std::uint32_t{sample_rate_code} & 0xFU) << 28U |
-           (std::uint32_t{reserved} & 0xFU) << 24U |
-           (std::uint32_t{twoch_modifier} & 0x3U) << 22U |
+           (std::uint32_t{reserved} & 0xFU) << 24U | (std::uint32_t{twoch_modifier} & 0x3U) << 22U |
            (std::uint32_t{sixch_modifier} & 0x3U) << 20U |
            (std::uint32_t{sixch_assignment} & 0x1FU) << 15U |
            (std::uint32_t{eightch_modifier} & 0x3U) << 13U |
@@ -168,7 +167,8 @@ std::string_view describe(Error error) noexcept {
         case Error::kMatrixFracBits:
             return "frac_bits exceeds 14 (10.2)";
         case Error::kNoiseChannel:
-            return "a primitive matrix takes a noise channel, whose generator is not specified (17)";
+            return "a primitive matrix takes a noise channel, whose generator is not specified "
+                   "(17)";
         case Error::kOutputShift:
             return "output_shift exceeds max_shift (9.3)";
         case Error::kQuantStepSize:

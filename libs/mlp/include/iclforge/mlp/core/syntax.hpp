@@ -61,7 +61,7 @@ struct RestartHeader {
     std::uint8_t lossless_check = 0;
     std::uint16_t reserved = 0;
     std::array<std::uint8_t, kMaxChannels> ch_assign{};  // [0, max_matrix_chan]
-    std::uint8_t crc = 0;  // as read; the writer computes it
+    std::uint8_t crc = 0;                                // as read; the writer computes it
 
     // P22: the sync word's last bit is the noise type; 0x31EC's substream has none.
     [[nodiscard]] bool noise_type() const noexcept { return sync_word == kRestartSyncB; }
@@ -100,8 +100,8 @@ struct MatrixParams {
 
 // Section 8.3 for one channel. An absent optional is a new_* bit of 0.
 struct ChannelParams {
-    std::optional<FilterParams> fir;  // filter A
-    std::optional<FilterParams> iir;  // filter B
+    std::optional<FilterParams> fir;          // filter A
+    std::optional<FilterParams> iir;          // filter B
     std::optional<std::int16_t> huff_offset;  // 15 bits, signed
     std::uint8_t huff_type = 0;
     std::uint8_t huff_lsbs = 0;
@@ -124,7 +124,7 @@ struct BlockHeader {
     std::optional<MatrixParams> matrix;
     std::optional<std::array<std::int8_t, kMaxChannels>> output_shift;  // [0, max_matrix_chan]
     std::optional<std::array<std::uint8_t, kMaxChannels>> quant_step;   // [0, max_chan]
-    std::array<std::optional<ChannelParams>, kMaxChannels> channels{};   // [min_chan, max_chan]
+    std::array<std::optional<ChannelParams>, kMaxChannels> channels{};  // [min_chan, max_chan]
 };
 
 }  // namespace iclforge::mlp
