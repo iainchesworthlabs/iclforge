@@ -2063,7 +2063,11 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    while the decoder was written. That comparison found the check values, the matrix scaling, the lossless check's fold
    and a marker FFmpeg's decoder obeys and the specification does not describe (`libs/truehd/ERRATA.md`): the last access unit
    of a stream whose length is not a multiple of the unit carries a 32-bit marker with the number of padding samples,
-   which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's.
+   which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's. The
+   encoder is held to the same oracle the other way round: FFmpeg's strict decode of what `forge truehd-encode` writes
+   must equal the samples that went in (`tools/checks/verify_truehd_encode_interop.py --forge`, 32 cases of rates, 1 to 8
+   channels, 16, 20 and 24 bits and signals, and the encode legs of `tools/ci/run_codec_matrix.sh`, which also read the
+   same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
    do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
    block data check, the marker in every unit, extra data, the directory's DRC word, and a 16-channel fourth substream. **None has
@@ -2071,10 +2075,47 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
    follows ERRATA.md's reading of the specification, and a misreading is in the writer and in both decoders alike.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
    is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
-   would be the only outside check of that substream.
+   would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
 
-Not covered: noise generator 1 (its table is not available) and heavy DRC (refused or not read), and the block data CRC (the length is checked, the
+Not covered: noise generator 1 beyond a stream whose matrices do not bypass an LSB (its table is not available, so a
+bypassed LSB under restart sync 0x31EB is refused; `libs/truehd/ERRATA.md`, entry 32) and heavy DRC (not read), and the block data CRC (the length is checked, the
 algorithm is not known).
+
+### Scoring DEE's TrueHD streams
+
+DEE's licence ends on 2026-11-06, and after that no stream of this kind can be made. The TrueHD legs of the gold set
+(`tools/generators/gen_dee_gold.py`, the `truehd` group: 2, 6 and 8 channels at 48 and 96 kHz, 16 and 24 bits, from tones,
+music, film, noise and sweeps, with downmix and independent presentations, DRC profiles, dialnorm and loudness presets) are
+streams of known sources, and a lossless decoder has to give each source back. On the machine that has DEE, with a forge
+built from the tree under test:
+
+```sh
+python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold --cli build/config-windows-msvc/bin/forge.exe --only thd-
+python tools/checks/score_truehd_decode.py --set D:/ac3bld/dee-gold --forge build/config-windows-msvc/bin/forge.exe --report truehd-scores.json
+```
+
+The first makes, or tops up, the TrueHD legs and records what FFmpeg's decode of each gives against its source in the
+manifest (`DIR/dee-gold-manifest.json`); it needs DEE and runs once. The second needs only the set: it decodes each leg's
+stream with `forge decode` under the strict checks (CRCs, parity and the lossless check of every restart interval) and
+compares the result with the leg's first source, sample for sample. The decoder's channels are matched to the source's by
+content and a delay of the first samples is allowed, because DEE's channel order and delay are not in the source. A leg is
+
+- **PASS** when the decode succeeds and equals the source bit for bit;
+- **ALTER** when the leg's DEE options change the audio (loudness correction, the surround attenuation,
+  `--optimize-data-rate`), so the decode is held to nothing but succeeding, and the number of values that differ is shown;
+- **FAIL** when the decoder stops on a check, or a lossless leg decodes to something else (the report says whether FFmpeg's
+  decode is the source either);
+- **SKIP** when a stream or source is not on disk, or the source is over `--max-seconds` (120; the 300 s soak programmes).
+
+The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
+`PROGRAM [ARGS] STREAM OUT.wav`. After the licence ends the script needs no DEE and reads the set as it is left. The
+script's own test (`python -m unittest tools.checks.test_score_truehd_decode`) uses made-up streams and a decoder of a few
+lines of Python.
+
+The streams are test inputs only (the decision of 2026-09-26): they are decoded and compared with the PCM that went in, and
+no one reads a stream to learn how DEE wrote it. A FAIL is therefore not a reason to change the decoder to fit one stream;
+it is an entry in `libs/truehd/ERRATA.md` (the leg, the check that failed, what the specification says) and, if it is the
+sixteen-channel substream, the terminators or the evolution payload (open questions 1 and 3), a question for the owner.
 
 ## What untrusted input is checked against
 
