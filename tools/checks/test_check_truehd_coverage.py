@@ -40,6 +40,20 @@ class Census(unittest.TestCase):
         self.assertIn(0x31EB, record["restart_syncs"])
         self.assertEqual(census("hb_noise_generator_0.thd")["noise_coefficients"], True)
 
+    def test_the_census_sees_noise_generator_1_and_the_v37_streams(self):
+        noise = census("hb_noise_generator_1_96k.thd")
+        self.assertTrue(noise["matrix_noise_shift"])
+        self.assertEqual(noise["sample_rate"], 96000)
+        self.assertTrue(census("hb_noise_type1_lsb_bypass.thd")["lsb_bypass_noise_type"])
+        self.assertFalse(census("hb_noise_type1.thd")["matrix_noise_shift"])
+        self.assertTrue(census("hb_iir_state.thd")["iir_state_shift"])
+        self.assertFalse(census("hb_filters.thd")["iir_state"])
+        self.assertTrue(census("hb_output_shift_negative.thd")["output_shift_negative"])
+        self.assertTrue(census("hb_output_shift_permuted.thd")["output_shift_on_moved_channel"])
+        self.assertFalse(census("hb_matrices.thd")["output_shift_on_moved_channel"])
+        self.assertTrue(census("hb_mlp_word16.thd")["mlp_word16_low_bits"])
+        self.assertFalse(census("hb_filters.thd")["mlp_word16_low_bits"])
+
 
 class Evaluate(unittest.TestCase):
     def test_a_feature_no_stream_carries_is_missing(self):
@@ -59,9 +73,9 @@ class Evaluate(unittest.TestCase):
         self.assertEqual(carriers["IIR order 3"], ["b.thd"])
 
     def test_a_known_gap_that_a_stream_closes_is_reported(self):
-        record = dict(census("hb_filters.thd"), iir_state=True)
+        record = dict(census("hb_filters.thd"), fir_state=True)
         _missing, closed, _carriers = coverage.evaluate({"a.thd": record})
-        self.assertEqual(closed, ["IIR filter state (new_states)"])
+        self.assertEqual(closed, ["FIR filter state"])
 
 
 if __name__ == "__main__":

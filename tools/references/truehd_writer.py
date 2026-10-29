@@ -70,11 +70,14 @@ class BitWriter:
 class Channel:
     """How one channel's samples are coded: its filters, quantiser step and residual codebook."""
 
-    def __init__(self, fir=None, iir=None, huff_type=0, quant=0):
+    def __init__(self, fir=None, iir=None, huff_type=0, quant=0, iir_state=None):
         self.fir = fir  # (coefficients, shift)
         self.iir = iir
         self.huff_type = huff_type
         self.quant = quant
+        # (state_bits, state_shift, values): the IIR filter's new_states, sent with its parameters
+        # at every restart. The history at lag i + 1 becomes values[i] << state_shift (TH spec 9.2).
+        self.iir_state = iir_state
 
 
 class Substream:
@@ -135,6 +138,7 @@ class Stream:
         extra_data=None,
         terminator_b=False,
         channel_assignment=None,
+        word_code=2,
     ):
         self.substreams = substreams
         self.samples = samples
@@ -145,6 +149,7 @@ class Stream:
         self.drc_words = drc_words
         self.extra_data = extra_data  # a function of the unit's index giving its payload
         self.terminator_b = terminator_b
+        self.word_code = word_code  # an MLP stream's group 1 word length code: 0 16, 1 20, 2 24 bit
         self.channel_assignment = channel_assignment or DEFAULT_ASSIGNMENT[self.channels]
 
     @property
@@ -168,16 +173,20 @@ class Stream:
 # --- the residuals ----------------------------------------------------------------------------
 
 
-def residuals(channel, coded):
+def residuals(channel, coded, interval=None):
     """The residual of each sample (ERRATA 13): the coded value less the prediction, in units of
     2^quant. The filters' histories start at zero at the first restart and run on across the later
-    ones, as FFmpeg's decoder runs them (provisional, owner to confirm)."""
+    ones (TH spec 9.6), unless the channel's IIR filter sends new_states, which replace the IIR
+    history at each restart, every `interval` samples."""
     fir, iir = channel.fir, channel.iir
     shift = fir[1] if fir else (iir[1] if iir else 0)
     out = []
     fir_history = [0] * 8
     iir_history = [0] * 8
-    for value in coded:
+    for n, value in enumerate(coded):
+        if channel.iir_state and iir and n % interval == 0:
+            _bits, state_shift, values = channel.iir_state
+            iir_history = [v << state_shift for v in values] + [0] * (8 - len(values))
         prediction = 0
         if fir:
             prediction += sum(h * c for h, c in zip(fir_history, fir[0], strict=False))
@@ -231,7 +240,7 @@ def encode_residual(w, channel, value, huff_lsbs, offset):
 # --- the syntax, written ----------------------------------------------------------------------
 
 
-def write_filter(w, flt, is_iir):
+def write_filter(w, flt, is_iir, state=None):
     coeffs, shift = flt
     w.put(len(coeffs), 4)
     w.put(shift, 4)
@@ -240,7 +249,16 @@ def write_filter(w, flt, is_iir):
     w.put(0, 3)  # coeff_shift
     for c in coeffs:
         w.signed(c, bits)
-    w.put(0, 1)  # new_states / the FIR filter's flag (ERRATA 9)
+    if state:
+        state_bits, state_shift, values = state
+        w.put(1, 1)  # new_states
+        w.put(state_bits, 4)
+        w.put(state_shift, 4)
+        if state_bits:
+            for value in values:
+                w.signed(value, state_bits)
+    else:
+        w.put(0, 1)  # new_states / the FIR filter's flag (ERRATA 9)
 
 
 def write_restart_header(sub, check, timing=0):
@@ -300,7 +318,7 @@ def write_full_block_header(w, sub, params, size):
         for flt, is_iir in ((channel.fir, False), (channel.iir, True)):
             if flt:
                 w.put(1, 1)
-                write_filter(w, flt, is_iir)
+                write_filter(w, flt, is_iir, channel.iir_state if is_iir else None)
             else:
                 w.put(0, 1)
         lsbs, offset = params[ch]
@@ -360,7 +378,7 @@ def build_stream(stream):
         lsb_limit = 31 if sub.sync == 0x31EC else 24
         for ch in range(sub.min_chan, sub.max_chan + 1):
             channel = sub.channels[ch]
-            res[ch] = residuals(channel, sub.coded[ch])
+            res[ch] = residuals(channel, sub.coded[ch], interval)
             coding[ch] = choose_coding(channel, res[ch], lsb_limit)
         prepared.append((coding, res))
 
@@ -477,7 +495,8 @@ def write_major_sync(stream):
         format_info = (stream.rate_code << 28) | (modifier << 22) | (modifier << 20)
         format_info |= ((six & 0x1F) << 15) | (modifier << 13) | (assignment & 0x1FFF)
     else:
-        format_info = (0x2F << 24) | (stream.rate_code << 20) | 0x0F0000
+        format_info = (stream.word_code << 28) | (0xF << 24) | (stream.rate_code << 20) | 0x0F0000
+        format_info |= {1: 0, 2: 1}.get(stream.channels, 0)  # the channel arrangement
     body = sync + format_info.to_bytes(4, "big") + (0xB752).to_bytes(2, "big")
     body += (0x4000 if stream.kind == "mlp" else 0).to_bytes(2, "big") + b"\x00\x00"
     body += ((1 << 15) | 0x0C7F).to_bytes(2, "big")
@@ -780,6 +799,108 @@ def noise_sequences(count, interval, seed, shift):
     return first, second
 
 
+def case_iir_state():
+    """new_states with a state_shift (TH spec 9.2): the IIR history at lag i + 1 is
+    values[i] << state_shift, sent with the filter at every restart. Two channels with an IIR
+    filter, the states of 4 and 8 bits wide and shifted by 6 and 0, and one with a state of zero
+    width (all zero). The first samples after each restart depend on the states."""
+    n = 40 * 40
+    sources = [tone(n, 100 + c, 2**20) for c in range(3)]
+    channels = {
+        0: Channel(iir=filt([40, -12], 6), iir_state=(6, 9, [23, -17])),
+        1: Channel(fir=filt([48], 6), iir=filt([20, -8, 4], 6), iir_state=(8, 0, [90, -101, 33])),
+        2: Channel(iir=filt([30], 6), iir_state=(0, 5, [0])),
+    }
+    sub = Substream(
+        0, 2, 2, channels, list(zip(*sources, strict=True)), dict(enumerate(sources))
+    )
+    return (
+        Stream([sub], n),
+        "IIR new_states: signed values loaded shifted left by state_shift, at every restart",
+        ["iir", "iir_state"],
+    )
+
+
+def case_output_shift_permuted():
+    """The output shift belongs to the matrix channel (TH spec 7.3: output_shift[mat_ch]), and a
+    ch_assign that is a three-cycle puts a different output position on each: the first header
+    value shifts matrix channel 0, which output position 2 takes. FFmpeg's decode agrees."""
+    n = 40 * 24
+    assign = [1, 2, 0]  # matrix channel m goes to output position assign[m]
+    shifts = [1, 2, 3]  # indexed by matrix channel
+    wanted = [tone(n, 110 + p, 2**20) for p in range(3)]  # by output position
+    coded = {}
+    for m, position in enumerate(assign):
+        # the low `shifts[m]` bits of the output are zero: the output is the coded value << shift
+        wanted[position] = [v & ~((1 << shifts[m]) - 1) for v in wanted[position]]
+        coded[m] = [v >> shifts[m] for v in wanted[position]]
+    channels = {m: Channel(fir=filt([40], 6) if m == 1 else None, huff_type=m) for m in range(3)}
+    sub = Substream(
+        0,
+        2,
+        2,
+        channels,
+        list(zip(*wanted, strict=True)),
+        coded,
+        ch_assign=assign,
+        out_shift=shifts,
+    )
+    return (
+        Stream([sub], n),
+        "ch_assign [1, 2, 0] with output shifts 1, 2, 3 by matrix channel",
+        ["ch_assign", "output_shift"],
+    )
+
+
+def case_output_shift_negative():
+    """A negative output shift is valid and scales the output down by an arithmetic right shift
+    (TH spec 8.2.1): the coded values are the output shifted up, with low bits that the shift
+    drops. FFmpeg's decoder does not apply it (it forces the shift to zero) and returns the coded
+    values."""
+    n = 40 * 24
+    assign = [2, 0, 1]
+    shifts = [-1, -3, 0]  # by matrix channel
+    wanted = [tone(n, 120 + p, 2**19) for p in range(3)]  # the coded values stay within 24 bits
+    rng = random.Random(7)
+    coded = {}
+    for m, position in enumerate(assign):
+        low = -shifts[m]
+        coded[m] = [(v << low) + rng.randrange(1 << low) if low else v for v in wanted[position]]
+    channels = {
+        m: Channel(fir=filt([40], 6) if m != 1 else None, huff_type=m + 1) for m in range(3)
+    }
+    sub = Substream(
+        0,
+        2,
+        2,
+        channels,
+        list(zip(*wanted, strict=True)),
+        coded,
+        ch_assign=assign,
+        out_shift=shifts,
+    )
+    return (
+        Stream([sub], n),
+        "negative output shifts -1 and -3: an arithmetic right shift of the coded values",
+        ["output_shift", "output_shift_negative", "ch_assign"],
+    )
+
+
+def case_mlp_word16():
+    """An MLP stream that declares 16 bit words (group 1 word length code 0) and codes samples
+    that have bits set below bit 8 (TH spec 7.4): the decoder does not clear them. FFmpeg's
+    decoder does, and returns the samples with their low byte zero."""
+    n = 40 * 24
+    s0, s1 = tone(n, 130, 2**20), tone(n, 131, 2**20)
+    channels = {0: Channel(fir=filt([64], 6)), 1: Channel(fir=filt([32], 6))}
+    sub = Substream(0, 1, 1, channels, list(zip(s0, s1, strict=True)), {0: s0, 1: s1})
+    return (
+        Stream([sub], n, kind="mlp", word_code=0),
+        "an MLP stream declaring 16 bit words and coding bits below bit 8",
+        ["mlp", "word_length_16"],
+    )
+
+
 def case_noise():
     n = 40 * 40
     s0, s1 = tone(n, 60), tone(n, 61)
@@ -979,6 +1100,10 @@ CASES = {
     "hb_filter_orders": case_filter_orders,
     "hb_lsb_bypass": case_bypass,
     "hb_matrices": case_matrices,
+    "hb_iir_state": case_iir_state,
+    "hb_output_shift_permuted": case_output_shift_permuted,
+    "hb_output_shift_negative": case_output_shift_negative,
+    "hb_mlp_word16": case_mlp_word16,
     "hb_noise_generator_0": case_noise,
     "hb_noise_type1": case_noise_type1,
     "hb_noise_type1_shift": case_noise1_shift,
@@ -1007,6 +1132,8 @@ REFUSED = {}
 #   short    - it returns `returned` samples, the first `equal_samples` of them the signal's
 #   refused  - it fails
 #   decodes  - it decodes, and the library refuses the stream (REFUSED)
+#   differs  - it decodes to other samples than the signal (the manifest's `ffmpeg` entry holds
+#              the SHA-256 of what it returns: the model of what it does is in ffmpeg_outcome)
 FFMPEG_VERSION = "6.1.1"
 FFMPEG = {
     "hb_marker_every": {
@@ -1024,6 +1151,17 @@ FFMPEG = {
         "bits, the back pair before the side pair (ERRATA 33): its column k holds the stream's "
         "channel `columns`[k]",
     },
+    "hb_output_shift_negative": {
+        "outcome": "differs",
+        "note": "FFmpeg does not apply a negative output shift (it forces the shift to zero) and "
+        "returns the coded values of the matrix channels (TH spec 8.2.1)",
+    },
+    "hb_mlp_word16": {
+        "outcome": "differs",
+        "codec": "mlp",
+        "note": "FFmpeg writes a 16 bit MLP stream as 16 bit samples and clears the bits below bit "
+        "8; the decoder does not (TH spec 7.4)",
+    },
     "hb_sixteen_channels": {
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
@@ -1033,14 +1171,31 @@ FFMPEG = {
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
 }
-ORACLE = {"equal": "ffmpeg", "short": "ffmpeg-short", "refused": "none", "decodes": "ffmpeg-only"}
+ORACLE = {
+    "equal": "ffmpeg",
+    "short": "ffmpeg-short",
+    "refused": "none",
+    "decodes": "ffmpeg-only",
+    "differs": "none",
+}
 
 
-def ffmpeg_outcome(name, rows):
+def ffmpeg_outcome(name, rows, stream=None):
     """What the manifest says FFmpeg's strict decode of stream `name` does (its signal is rows)."""
     outcome = dict(FFMPEG.get(name, {"outcome": "equal"}))
     if outcome["outcome"] == "short":
         outcome["pcm_sha256"] = hashlib.sha256(s32le(rows[: outcome["equal_samples"]])).hexdigest()
+    if outcome["outcome"] == "differs":
+        if name == "hb_mlp_word16":  # the bits below bit 8 cleared
+            returned = [tuple(v >> 8 << 8 for v in row) for row in rows]
+        else:  # hb_output_shift_negative: the coded values, by output position
+            sub = stream.substreams[0]
+            sources = output_sources(sub.ch_assign)
+            returned = [
+                tuple(sub.coded[sources[p]][i] for p in range(len(sources)))
+                for i in range(stream.samples)
+            ]
+        outcome["pcm_sha256"] = hashlib.sha256(s32le(returned)).hexdigest()
     return outcome
 
 
@@ -1066,7 +1221,7 @@ def generate(out):
         presentations = ["all", "best"] if len(stream.substreams) == 4 else ["best"]
         for presentation in presentations:
             rows = expected(stream, presentation)
-            outcome = ffmpeg_outcome(name, rows)
+            outcome = ffmpeg_outcome(name, rows, stream)
             fixtures.append(
                 {
                     "name": name
@@ -1077,6 +1232,7 @@ def generate(out):
                     "features": features,
                     "oracle": ORACLE[outcome["outcome"]],
                     "ffmpeg": outcome,
+                    "codec": outcome.get("codec", "truehd"),
                     "presentation": presentation,
                     "sample_rate": stream.sample_rate,
                     "channels": len(rows[0]),

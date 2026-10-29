@@ -40,6 +40,9 @@ class Census:
         self.matrix_noise_shift = False  # a non-zero matrix_noise_shift (noise generator 1)
         self.noise_coefficients = False
         self.output_shifts = False
+        self.output_shift_negative = False
+        self.output_shift_on_moved_channel = False  # a shift on a matrix channel ch_assign moves
+        self.iir_state_shift = False  # an IIR new_states with a non-zero state_shift
         self.quant_steps = set()
         self.ch_assign_permuted = False
         self.noise_shift = False
@@ -86,6 +89,10 @@ def census_of(data):
         c.block_sizes.add(self.block_size)
         c.matrix_counts.add(len(self.matrices))
         c.output_shifts |= any(self.output_shift)
+        c.output_shift_negative |= any(shift < 0 for shift in self.output_shift)
+        c.output_shift_on_moved_channel |= any(
+            shift != 0 and self.ch_assign[m] != m for m, shift in enumerate(self.output_shift)
+        )
         for ch in range(self.min_chan, self.max_chan + 1):
             channel = self.channels[ch]
             c.huff_types.add(channel.huff_type)
@@ -115,6 +122,7 @@ def census_of(data):
                 c.fir_state = True
             else:
                 c.iir_state = True
+                c.iir_state_shift |= flt.state_shift != 0
         return flt
 
     def decode_segment(sub, entry, segment, rows):
@@ -143,6 +151,13 @@ def census_of(data):
         ref.Substream.read_matrices = original["read_matrices"]
         ref.Filter.read = staticmethod(original["filter_read"])
     facts = _stream_facts(data, rate, len(rows))
+    # An MLP stream that declares 16 bit words (group 1 word length code 0) and codes samples
+    # with bits set below bit 8 (TH spec 7.4).
+    facts["mlp_word16_low_bits"] = bool(
+        facts["kind"] == "mlp"
+        and facts["word_code"] == 0
+        and any(value & 0xFF for row in rows for value in row)
+    )
     facts["channels"] = len(rows[0]) if rows else 0  # all substreams read: 16 for the object stream
     return {**facts, **_syntax_facts(c)}
 
@@ -156,6 +171,7 @@ def _stream_facts(data, rate, samples):
     facts["kind"] = "mlp" if first[7] == 0xBB else "truehd"
     count = first[4 + 16] >> 4
     facts["substreams"] = count
+    facts["word_code"] = int.from_bytes(first[8:12], "big") >> 28 if first[7] == 0xBB else None
     major = [i for i, u in enumerate(units) if u[4:7] == ref.SYNC_WORD]
     facts["major_sync_units"] = len(major)
     facts["major_sync_gaps"] = sorted({b - a for a, b in itertools.pairwise(major)})
@@ -194,6 +210,9 @@ def _syntax_facts(c):
         "matrix_noise_shift": c.matrix_noise_shift,
         "noise_coefficients": c.noise_coefficients,
         "output_shifts": c.output_shifts,
+        "output_shift_negative": c.output_shift_negative,
+        "output_shift_on_moved_channel": c.output_shift_on_moved_channel,
+        "iir_state_shift": c.iir_state_shift,
         "quant_steps": sorted(c.quant_steps),
         "ch_assign_permuted": c.ch_assign_permuted,
         "noise_shift": c.noise_shift,

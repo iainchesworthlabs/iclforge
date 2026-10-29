@@ -19,8 +19,8 @@ difference.
 With --handbuilt the same is done for the hand-built streams of testdata/truehd/handbuilt
 (tools/references/truehd_writer.py). FFmpeg's decode of those is held to the outcome their manifest
 names for each stream: the whole signal it was built from (equal), fewer samples of which the
-first are the signal's (short), a failure (refused), or a success on a stream the library refuses
-(decodes). --forge and --reference
+first are the signal's (short), a failure (refused), a success on a stream the library refuses
+(decodes), or other samples than the signal (differs). --forge and --reference
 are held to the signals (or to refusing the stream).
 """
 
@@ -137,10 +137,11 @@ def in_stream_order(pcm, channels, columns):
 def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
     """The problems with FFmpeg's strict decode of a hand-built stream against the outcome the
     manifest names for it (equal: the whole signal; short: fewer samples, the first of them the
-    signal's; refused: it fails; decodes: it succeeds, the library refusing the stream). The
+    signal's; refused: it fails; decodes: it succeeds, the library refusing the stream; differs: it
+    succeeds and returns other samples, whose hash the manifest holds). The
     outcomes other than equal were seen with one FFmpeg version and are held only if `held`."""
     if path not in cache:
-        cache[path] = ffmpeg_pcm(path, "truehd")
+        cache[path] = ffmpeg_pcm(path, fixture.get("codec", "truehd"))
     pcm, error = cache[path]
     outcome = fixture["ffmpeg"]
     kind = outcome["outcome"]
@@ -151,6 +152,12 @@ def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
     if pcm is None:
         return [f"ffmpeg strict decode failed: {error}"]
     if kind == "decodes":
+        return []
+    if kind == "differs":
+        if sha256(pcm) == fixture["pcm_sha256"]:
+            return ["ffmpeg returned the signal, where the manifest says it differs"]
+        if sha256(pcm) != outcome["pcm_sha256"]:
+            return ["ffmpeg did not return the samples the manifest says it returns"]
         return []
     if kind == "short":
         width = fixture["channels"] * 4

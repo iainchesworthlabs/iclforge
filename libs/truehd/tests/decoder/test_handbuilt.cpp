@@ -19,9 +19,10 @@
 #include "iclforge/truehd/io/elementary.hpp"
 
 // The hand-built streams of testdata/truehd/handbuilt (tools/references/truehd_writer.py): an IIR
-// filter, LSB bypass, several matrices with a permuted ch_assign and an output shift, noise
-// generator 0, the block data check, the end-of-stream marker, extra data, the directory's DRC
-// word, and the 16-channel substream.
+// filter and its new_states, LSB bypass, several matrices with a permuted ch_assign and output
+// shifts, a negative output shift, noise generators 0 and 1, a 16 bit MLP stream, the block data
+// check, the end-of-stream marker, extra data, the directory's DRC word, and the 16-channel
+// substream.
 //
 // The expected PCM is the signal each was built from. FFmpeg 6.1.1's strict decode of most of them
 // gives the same signal (tools/checks/verify_truehd_interop.py --handbuilt holds it to the outcome
@@ -107,7 +108,8 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
             // The manifest names what FFmpeg's strict decode of the stream does; the python leg
             // holds FFmpeg to it. Here the library is held to the signal.
             const std::string outcome = fixture["ffmpeg"]["outcome"];
-            CHECK((outcome == "equal" || outcome == "short" || outcome == "refused"));
+            CHECK((outcome == "equal" || outcome == "short" || outcome == "refused" ||
+                   outcome == "differs"));
             const std::vector<std::byte> stream =
                 read_file(dir() + "/" + std::string(fixture["file"]));
             CHECK(hex(iclforge::base::crypto::sha256(stream)) ==

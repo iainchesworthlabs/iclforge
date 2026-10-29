@@ -78,6 +78,12 @@ REQUIRED.update(
         ),
         "a matrix coefficient on a noise channel": lambda r: r["noise_coefficients"],
         "an output shift": lambda r: r["output_shifts"],
+        "a negative output shift": lambda r: r["output_shift_negative"],
+        "an output shift on a matrix channel that ch_assign moves": lambda r: (
+            r["output_shift_on_moved_channel"]
+        ),
+        "IIR filter state (new_states) with a state shift": lambda r: r["iir_state_shift"],
+        "a 16 bit MLP stream with bits set below bit 8": lambda r: r["mlp_word16_low_bits"],
         "a quantiser step": lambda r: bool(r["quant_steps"]),
         "a permuted ch_assign": lambda r: r["ch_assign_permuted"],
         "a noise shift in the restart header": lambda r: r["noise_shift"],
@@ -92,11 +98,6 @@ REQUIRED.update(
 )
 
 KNOWN_GAPS = {
-    "IIR filter state (new_states)": (
-        lambda r: r["iir_state"],
-        "no stream sends it: FFmpeg's encoders do not, and the hand-built writer writes "
-        "new_states 0 (libs/truehd/ERRATA.md, question 8)",
-    ),
     "FIR filter state": (
         lambda r: r["fir_state"],
         "the streams send the flag clear and the library refuses a FIR filter that sets it "

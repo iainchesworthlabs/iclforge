@@ -66,12 +66,20 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    (the first `hb_matrices.thd`, its major sync patched to a channel assignment FFmpeg accepts), and 0xEC is the fold
    shifted by the matrix channel. The committed `hb_matrices` carries 0xEC and FFmpeg decodes it to the stream's signal
    (`python3 tools/checks/verify_truehd_interop.py --handbuilt`). The library follows FFmpeg, in decoder and encoder through
-   one helper (`lossless_fold_step`). Does the specification mean the matrix channel? A Blu-ray stream with a permuted `ch_assign` fits the matrix channel for both this fold and `output_shift` (entry 43). **Provisional, owner to confirm.**
-7. **Negative `output_shift` (§8.2).** The field is signed; the specification allows no negative value and the
-   streams have none. The library shifts right (arithmetically) for a negative value (**no oracle**).
-8. **IIR state (§9.2, §9.5).** The streams never send `new_states`. The library loads `state[i]` as the history at
-   lag i + 1 without scaling by `state_shift`; §9.5's pseudo-code scales the state a filter *produces* by
-   `state_shift`, which no stream shows (**no oracle**).
+   one helper (`lossless_fold_step`). TH spec v3.9 §7.3 answers it: the shift is by the matrix channel, `mat_ch = ch_assign[out_ch]`,
+   the sample masked to 24 bits after `output_shift`, the fold since the previous restart header, the first header after a start or
+   seek checking nothing (TH-6). **Confirmed by TH spec v3.9 §7.3; awaiting the DEE score.** A Blu-ray stream with a permuted `ch_assign` fits the matrix channel for both this fold and `output_shift`
+   (entry 43); entry 45 has the rest.
+7. **Negative `output_shift` (§8.2).** The field is signed; the streams FFmpeg writes have none. TH spec v3.9 §8.2.1 answers it
+   (TH-7): the field is a signed 4-bit value in [-8, +7] and a negative one is an arithmetic right shift, which DEE writes to gain
+   headroom (FFmpeg's decoder does not apply it: it forces the shift to zero). The library shifts right (arithmetically) for a negative
+   value; `hb_output_shift_negative` holds it (FFmpeg's decode of that stream differs from the signal, and the manifest says so).
+   **Confirmed by TH spec v3.9 §8.2.1.**
+8. **IIR state (§9.2, §9.5).** The streams FFmpeg writes never send `new_states`. TH spec v3.9 §9.2 answers it (TH-8): each value is
+   loaded as `sbits(state_bits) << state_shift` and becomes the IIR history at lag i + 1. The library loads it so (`read_filter`
+   scales when it reads; the history takes the scaled value), which an earlier version of this entry described wrongly as unscaled.
+   `hb_iir_state` holds it with a non-zero `state_shift` and FFmpeg's strict decode of it equals the signal. **Confirmed by TH spec
+   v3.9 §9.2.**
 9. **The block data CRC (§8.1, App. B).** Polynomial 0x63; the initial value and the bytes covered are not given and
    no stream FFmpeg writes sets `data_check_present`. The library checks `block_data_bits` (the length, entry 21) and does
    not check the CRC; FFmpeg's strict decode of `hb_data_check`, whose CRC byte is zero, does not object either.
@@ -503,7 +511,7 @@ position, the second and third substreams fail every interval. The streams that 
 encoder's, the hand-built ones) cannot tell the two apart, which is why no fixture caught it. `test_channel_assignment.cpp` and
 `test_kernels.cpp` hold both; `tools/references/truehd_syntax.py` reads it the same way. The encoder writes one shift for all channels
 and is unchanged. **Provisional, owner to confirm** (the specification's §8.2 does not say which index).
-**44. Noise generator 1 (§17.3, §17.4; TH spec v3.7).** Restart sync 0x31EB is `noise_type` 1. Under it a substream fills a buffer of
+**44. Noise generator 1 (§17.3, §17.4; TH spec v3.7 and v3.9).** Restart sync 0x31EB is `noise_type` 1. Under it a substream fills a buffer of
 int8 values for every access unit from the table of §17.4, indexed by `seed >> 15` (low 8 bits), with `seed = (seed << 8) ^ index ^ (index
 << 5)` in 32 bits, and a matrix with a non-zero `matrix_noise_shift` adds `buffer[index] * 2^(shift + 7)` to its sum before the sum is
 shifted down by 14 (the quantiser mask and the explicit LSB of `lsb_bypass`, entry 11, come after). The table, the recurrence and the
@@ -523,6 +531,16 @@ and the three rules above independently of the decoders, equals those samples in
 library, at 48, 96 and 192 kHz, with 1 to 3 matrices, shifts from 1 to 15, a quantised output channel and a restart interval that loads the
 seed three times. **Provisional, owner to confirm** (question 43). Held by `libs/truehd/tests/decoder/test_handbuilt.cpp`, `test_kernels.cpp`
 and `tools/checks/test_truehd_noise_table.py` (the table typed twice).
+
+**45. The output shift is listed by matrix channel: what the other oracles say (§7.3, §8.2; TH spec v3.9; with entry 43).** Entry 43 is
+the owner's Blu-ray; the same fault was found a second way. `output_shift[ch]` for `ch` = 0 to `max_matrix_chan` is the shift of *matrix
+channel* `ch`, not of output position `ch`: the output position `p` takes the matrix channel `m` with `ch_assign[m] == p` (entry 42) and
+is shifted by `output_shift[m]`; the lossless fold takes the shifted sample (entry 12). TH spec v3.9 §7.3 writes `output_shift[mat_ch]`,
+and FFmpeg 6.1.1's strict decode of `hb_output_shift_permuted` (`ch_assign` [1, 2, 0], shifts 1, 2, 3) shifts by matrix channel, which the
+FFmpeg-made streams and `hb_matrices` (whose one shifted channel is a fixed point of its `ch_assign`) could not show. The DEE gold set
+showed it too: the 6 and 8 channel legs of `testdata/truehd-dee` stopped at access unit 128 with a failing lossless check in the second
+substream (`thd-fx-6ch-music-48k24`, `thd-fx-8ch-tones-48k24-dmx6-dmx2`) and decode to their sources, with every substream's check
+passing, since this was changed. Held by `hb_output_shift_permuted`, `hb_output_shift_negative` and `test_kernels.cpp`.
 
 ## Atmos, spec v3.6
 

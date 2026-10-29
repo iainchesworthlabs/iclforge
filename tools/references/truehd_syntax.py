@@ -219,9 +219,11 @@ class Filter:
             coeff_shift = bits.read(3)
             flt.coeff = [bits.signed(coeff_bits) << coeff_shift for _ in range(order)]
             state = None
+            flt.state_shift = 0
             if bits.read(1):  # ERRATA 9: the FIR filter has the flag too
                 state_bits = bits.read(4)
                 state_shift = bits.read(4)
+                flt.state_shift = state_shift
                 state = [
                     bits.signed(state_bits) << state_shift if state_bits else 0
                     for _ in range(order)
@@ -229,6 +231,7 @@ class Filter:
             flt.state = state
         else:
             flt.state = None
+            flt.state_shift = 0
         return flt
 
 
@@ -447,7 +450,8 @@ def decode_block(sub, bits, rows, first):
                 total += sub.noise_buffer[slot] * (1 << (noise_shift + 7))
             row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
-    # output shift (ERRATA 12).
+    # output shift of that matrix channel (TH spec 7.3, ERRATA 12): the shifts are listed by matrix
+    # channel.
     output_rows = []
     for i in range(size):
         out_row = []

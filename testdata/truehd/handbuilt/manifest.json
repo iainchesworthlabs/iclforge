@@ -15,6 +15,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -36,6 +37,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 6,
@@ -56,6 +58,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -77,6 +80,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 6,
@@ -84,6 +88,96 @@
       "pcm_samples": 1600,
       "stream_sha256": "e8daad174f68ab30f93f04da9e04ffbab8c3b3d5d6b77fc647b3406053347d05",
       "pcm_sha256": "30167119ba28821123ab6cc56bc21dc93c618995920ad46a9f7e55257063f1ed"
+    },
+    {
+      "name": "hb_iir_state",
+      "file": "hb_iir_state.thd",
+      "description": "IIR new_states: signed values loaded shifted left by state_shift, at every restart",
+      "features": [
+        "iir",
+        "iir_state"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 3,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "4f7fb1823fc16150c75b3ac2c680f5bbe2249ce848f5868cc35c631ef0e3bf11",
+      "pcm_sha256": "e16ee5155af46da62086624e8a4ac8084f0a070600a7d535ae84057312e51e94"
+    },
+    {
+      "name": "hb_output_shift_permuted",
+      "file": "hb_output_shift_permuted.thd",
+      "description": "ch_assign [1, 2, 0] with output shifts 1, 2, 3 by matrix channel",
+      "features": [
+        "ch_assign",
+        "output_shift"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 3,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "86d3fb389516e494c44b1c4e76d949afb999e8ea1f164dbcc6de7a34327916f7",
+      "pcm_sha256": "784814eada02e51f8610e8ace9db0736d661bda5fc15f9687901605225e43dd6"
+    },
+    {
+      "name": "hb_output_shift_negative",
+      "file": "hb_output_shift_negative.thd",
+      "description": "negative output shifts -1 and -3: an arithmetic right shift of the coded values",
+      "features": [
+        "output_shift",
+        "output_shift_negative",
+        "ch_assign"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "differs",
+        "note": "FFmpeg does not apply a negative output shift (it forces the shift to zero) and returns the coded values of the matrix channels (TH spec 8.2.1)",
+        "pcm_sha256": "7a67ef00a7324ee60c36369bdf98e11681eb1c835fcd00c71023495708834b77"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 3,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "64a8aa6e7774a0bf65b7859b784b623730a74cae35a89054e0ecaadc0db17975",
+      "pcm_sha256": "b953c785fe48c4bc775d66ee545038c82e259b4b0127f2838c37548054e1617a"
+    },
+    {
+      "name": "hb_mlp_word16",
+      "file": "hb_mlp_word16.thd",
+      "description": "an MLP stream declaring 16 bit words and coding bits below bit 8",
+      "features": [
+        "mlp",
+        "word_length_16"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "differs",
+        "codec": "mlp",
+        "note": "FFmpeg writes a 16 bit MLP stream as 16 bit samples and clears the bits below bit 8; the decoder does not (TH spec 7.4)",
+        "pcm_sha256": "f2c23f8dc25d52fe9136a2550502cf6d844af43d0dbf875c925b03429561c6c0"
+      },
+      "codec": "mlp",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 2,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "3313c2f3b53ec42d81b4be2789088081921efd616f302772727b7cbbb0bd81e7",
+      "pcm_sha256": "fd1adade4993a78612004c72bfbc15031fdf5467c4b355ef4c63aa00ad4c3688"
     },
     {
       "name": "hb_noise_generator_0",
@@ -96,6 +190,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -115,6 +210,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -126,7 +222,7 @@
     {
       "name": "hb_noise_type1_shift",
       "file": "hb_noise_type1_shift.thd",
-      "description": "noise_type 1 with a matrix noise shift of 3: the smallest stream that draws on it",
+      "description": "noise_type 1 with a matrix noise shift of 3: the smallest stream drawing on it",
       "features": [
         "noise_type_1",
         "noise_generator_1",
@@ -136,6 +232,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -157,6 +254,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -178,6 +276,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 4,
@@ -199,6 +298,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 96000,
       "channels": 4,
@@ -220,6 +320,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 192000,
       "channels": 4,
@@ -239,6 +340,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -258,6 +360,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -281,6 +384,7 @@
         "note": "with the end-of-stream marker in every access unit FFmpeg returns two of the 20 (the first is the signal's) and skips the rest (\"Stream parameters not seen; skipping frame\")",
         "pcm_sha256": "4c1608e2aa82458e6411d883a1f158b23937e582e69ea6c59269fea1264a51a0"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -300,6 +404,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -320,6 +425,7 @@
       "ffmpeg": {
         "outcome": "equal"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 2,
@@ -341,6 +447,7 @@
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
       },
+      "codec": "truehd",
       "presentation": "all",
       "sample_rate": 48000,
       "channels": 16,
@@ -362,6 +469,7 @@
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 8,
@@ -393,6 +501,7 @@
         ],
         "note": "FFmpeg returns the channels of a 7.1 stream in the order of its own layout bits, the back pair before the side pair (ERRATA 33): its column k holds the stream's channel `columns`[k]"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 8,
@@ -417,6 +526,7 @@
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
       },
+      "codec": "truehd",
       "presentation": "all",
       "sample_rate": 48000,
       "channels": 16,
@@ -441,6 +551,7 @@
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
       },
+      "codec": "truehd",
       "presentation": "best",
       "sample_rate": 48000,
       "channels": 8,
