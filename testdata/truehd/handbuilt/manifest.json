@@ -295,6 +295,54 @@
       "pcm_samples": 960,
       "stream_sha256": "1f691df661d46fd798f5d02343fd384fcf82ad2a19a9faa2fdc552c8b1ac2a76",
       "pcm_sha256": "e2b64351d3a6c4b59a2b49a1ef22b6d828be6f75d78123835319323f453a21cb"
+    },
+    {
+      "name": "hb_substream3_limits_all",
+      "file": "hb_substream3_limits.thd",
+      "description": "substream 3 with 15 matrices, huff_lsbs up to 31 and coded values past 24 bits",
+      "features": [
+        "substream_3",
+        "terminator_b",
+        "matrices_15",
+        "huff_lsbs_31",
+        "wide_prediction"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 16,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "d6585c5047061cc0fef7e94cebf3387fd06cfb39bd82bbf190083bd795856137",
+      "pcm_sha256": "0e804e2f355f4bbcd8d972ff4fa42535ae5ef0f2cb3a4171c12178b5b6cc58c1"
+    },
+    {
+      "name": "hb_substream3_limits_best",
+      "file": "hb_substream3_limits.thd",
+      "description": "substream 3 with 15 matrices, huff_lsbs up to 31 and coded values past 24 bits",
+      "features": [
+        "substream_3",
+        "terminator_b",
+        "matrices_15",
+        "huff_lsbs_31",
+        "wide_prediction"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "d6585c5047061cc0fef7e94cebf3387fd06cfb39bd82bbf190083bd795856137",
+      "pcm_sha256": "616e6835a6dec24256eb9569f071ce1f215f29126a3d90af7dffd10f2a90cd11"
     }
   ],
   "refused": [

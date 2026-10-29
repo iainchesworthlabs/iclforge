@@ -369,7 +369,8 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
         }
         if (update.huff_lsbs > lsb_limit) {
             return std::unexpected(
-                make_error(ErrorKind::kBadParameter, "huff_lsbs above 24 (TH spec §8.3)"));
+                make_error(ErrorKind::kBadParameter,
+                           "huff_lsbs above 24, or above 31 under restart sync 0x31EC (TH spec §8.3)"));
         }
         channel.huff_type = update.huff_type;
         channel.huff_lsbs = update.huff_lsbs;

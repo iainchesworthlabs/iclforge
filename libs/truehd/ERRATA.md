@@ -646,10 +646,11 @@ no TrueHD stream here has an evolution frame, so nothing decides it.
     substream; the "9.1.6" mask that is 14 channels. **Recommendation:** treat 16 as the limit of `object_count` for TrueHD, state the channel
     order as the standard's (beds in Table 12's order with L/R first, then ISF, then dynamic), and say whether a 7.1.4 program with fewer
     objects is padded to 12 channels.
-33. **Sample rate, sync and limits (C3, C4).** Is Atmos 48 kHz only, and is the rule for the encoder or for the decoder? Does 0x31EC mark
-    substream 3 only (§15.3) or 2 and 3 (§7.2, §17.5)? Do the 31-bit `huff_lsbs` and the 2^31 filter range apply to every substream with
-    sync 0x31EC or by index? **Recommendation:** the decoder keys on the sync, accepts any rate and refuses nothing the sync does not
-    allow; the encoder writes 48 kHz only. (The decoder's behaviour is tested in `libs/truehd/tests/decoder/test_handbuilt.cpp`.)
+33. **Sample rate, sync and limits (C3, C4; G below).** Is Atmos 48 kHz only, and is the rule for the encoder or for the decoder? Does
+    0x31EC mark substream 3 only (§15.3) or 2 and 3 (§7.2, §17.5)? Do the 31-bit `huff_lsbs` and the 2^31 filter range apply to every
+    substream with sync 0x31EC or by index? What width is an Atmos channel's output (the decoder keeps the low 24 bits of a value, as
+    the lossless check's three bytes do)? **Recommendation:** the decoder keys the `huff_lsbs` limit on the sync, accepts any rate and
+    refuses nothing the sync does not allow; the encoder writes 48 kHz only. Section G says what the decoder does and the tests that hold it.
 34. **Appendix E and §15.16 (B42, C2).** Appendix E uses the v3.5 field names and says ISF SHALL be NULL, which §15.6 contradicts.
     Can an Atmos program carry ISF objects? **Recommendation:** treat ISF as allowed (the standard defines it), and the rest of §15.16 as
     rules for an encoder that this library's encoder will keep (nothing is enforced on the read side).
@@ -715,3 +716,27 @@ frame, and the owner has not said that §15.4 and not §16.3 is what real stream
   `read_extra_data`) and `ctest -L truehd` failed each time.
 - What this does not show: that any TrueHD stream looks like this. The vectors, the Python transcription and the C++ reader share one
   author's reading of §15.4; the E-AC-3 reader does not, and is why `kEmdf` is the default.
+
+### G. Substream 3 against the decoder (TH spec v3.6 §7.2, §8.3, §9.3, §10.3, §15.3)
+
+What a stream whose substream 3 uses restart sync 0x31EC, a 32-bit Filter B range, up to 15 matrices and `huff_lsbs` up to 31 does in
+this decoder, and what holds it. The library and v3.6 agree on every point below, because the decoder is more permissive than v3.6
+wherever the two differ; nothing needed fixing. (The brief named `hb_eight_channels`; the tree has no such stream. The eight channel case
+is entry 32: three substreams, the third with sync 0x31EB, made by the encoder and checked in FFmpeg's strict decode.)
+
+| v3.6 | The decoder | Held by |
+|---|---|---|
+| restart sync 0x31EC marks the object substreams (§7.2: 2 and 3; §15.3: 3) | read in any substream: the three syncs 0x31EA, 0x31EB and 0x31EC are accepted everywhere and only the sync's own rules differ; an MLP stream is not held to 0x31EA | `hb_sixteen_channels`, `hb_substream3_limits` (0x31EC in substreams 2 and 3), `test_decoder.cpp` (0x31EC in substream 0) |
+| `min_chan`, `max_chan`, `max_matrix_chan` at most 15 in substream 3 (§15.3); 7 for TrueHD and 5 for MLP otherwise (§10.3) | by substream index: 15 in substream 3, 7 or 5 in the others, `kBadParameter` above | `test_substream3.cpp` (8 refused in substream 0 under 0x31EA and 0x31EC, 7 accepted), `hb_substream3_limits` (15 accepted in substream 3) |
+| up to 15 primitive matrices in substream 3 (§10.3: 2, 6, 8 and 15 by substream, 6 or 8 globally) | the 4-bit count, up to 15, in every substream; the smaller limits are not enforced (a superset of v3.6) | `hb_substream3_limits` (15 matrices in one block header, in a 16-channel substream; FFmpeg's decode refuses 0x31EC, so none outside this repository) |
+| `huff_lsbs` at most 24, 31 for the object substreams (§8.3) | at most 24, or 31 when the restart sync is 0x31EC, whatever the substream index; above that `kBadParameter` (the message now says which limit) | `test_substream3.cpp` (31 accepted under 0x31EC and decoded, 25 refused under 0x31EA and 0x31EB, 24 accepted under all three), `hb_substream3_limits` (residuals that need `huff_lsbs` 29 to 31) |
+| Filter B (and A) output ±2^23 for substreams 0 and 1, ±2^31 for 2 and 3 (§9.3) | 32-bit samples and 64-bit sums in every substream; no 24-bit limit is applied anywhere (entry 41), so the 32-bit range is read as it is sent | `hb_substream3_limits`: a prediction filter of gain about -6 and an IIR filter whose residual reaches 2^28 or more, and coded channels of 25 bits before 15 matrices, decode to the 24-bit signal they were built from (the Python reference decodes it too) |
+| terminatorB (0x1234) ends substream 3 (§15.3, §16.5.2) | read after the last block of substream 3 | `hb_sixteen_channels`, `hb_substream3_limits` |
+| Atmos is 48 kHz only (§15.2) | not tested; any rate is decoded | -- (question 33) |
+
+The stream `hb_substream3_limits` is made by `tools/references/truehd_writer.py`: four substreams, the last of 16 channels with sync 0x31EC,
+`max_matrix_chan` 15 and 15 primitive matrices on channels 8 to 15, two channels with a FIR filter of gain -5.9 and two with an IIR filter whose
+residual reaches 2^28, `huff_lsbs` 29 to 31, terminatorB. `python3 tools/checks/verify_truehd_interop.py --handbuilt --forge forge --reference`
+holds `forge decode` and the Python reference to its signal (15 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
+Only PCM of 24 bits is given back: a value of an object channel that needs more would lose its top bits in the output (and in the lossless check,
+which folds the low three bytes), and v3.6 says nothing about the width (question 33).

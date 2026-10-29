@@ -5,7 +5,7 @@ FFmpeg's encoders do not write an IIR filter, LSB bypass, several matrices with 
 assignment, noise generator 0, the block data check, the end-of-stream marker in every unit, extra
 data, the DRC word of the directory, or the 16-channel substream. The decoders have to read them
 all. The streams carry a major sync FFmpeg accepts, and FFmpeg's strict decode is held to each of
-them (tools/checks/verify_truehd_interop.py --handbuilt): for eleven of the fourteen it returns the
+them (tools/checks/verify_truehd_interop.py --handbuilt): for eleven of the fifteen it returns the
 signal the stream was made from, which is the outside check; the manifest's `ffmpeg` field says
 what it does with the others. What FFmpeg does not read has no outside reader: the extra data, the
 values of the DRC word, the block data CRC, the 16-channel substream.
@@ -702,6 +702,57 @@ def case_eight_channels():
     )
 
 
+def case_substream3_limits():
+    """Substream 3 at the limits TH spec v3.6 gives it (8.3, 9.3, 10.3, 15.3): restart sync
+    0x31EC, 15 primitive matrices, max_matrix_chan 15, `huff_lsbs` above 24 and values past 24
+    bits before the matrices. The signal is 24 bit throughout; what is large is the prediction. A
+    filter that predicts badly (a gain of about -6, or an IIR filter fed by residuals of 2^28)
+    leaves a residual of 2^28 and more, which `huff_lsbs` 29 to 31 carry, and the inverse of the
+    matrices makes the coded channels larger than the output."""
+    n = 40 * 32
+    src = [tone(n, 70 + c, 2**22) for c in range(16)]
+    plan = [(8 + i % 8, 8 + (i * 3 + 1) % 8) for i in range(15)]
+    assert all(out != other for out, other in plan)
+    weights = [41, -23, 90, -61, 17, -75, 33, 120, -9, 64, -111, 5, 77, -48, 100]
+    matrices = [
+        (out, 8, False, {out: 256, other: w}) for (out, other), w in zip(plan, weights, strict=True)
+    ]
+    coded = [list(column) for column in src]
+    for (out, other), w in reversed(list(zip(plan, weights, strict=True))):
+        coded[out] = [o - ((x * w) >> 8) for o, x in zip(coded[out], coded[other], strict=True)]
+
+    def sub_for(lo, hi, sync=0x31EA):
+        channels = {
+            c: Channel(fir=filt([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
+            for c in range(lo, hi + 1)
+        }
+        rows = [tuple(src[c][i] for c in range(hi + 1)) for i in range(n)]
+        return Substream(
+            lo, hi, hi, channels, rows, {c: src[c] for c in range(lo, hi + 1)}, sync=sync
+        )
+
+    bad_fir, bad_iir = filt([-1500], 8), filt([200], 8)
+    wide = {
+        c: Channel(
+            fir=bad_fir if c in (8, 10, 12) else None,
+            iir=bad_iir if c in (9, 11) else None,
+            huff_type=0,
+        )
+        for c in range(8, 16)
+    }
+    rows = [tuple(src[c][i] for c in range(16)) for i in range(n)]
+    last = Substream(
+        8, 15, 15, wide, rows, {c: coded[c] for c in range(8, 16)}, matrices=matrices, sync=0x31EC
+    )
+    subs = [sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EC), last]
+    stream = Stream(subs, n, terminator_b=True)
+    return (
+        stream,
+        "substream 3 with 15 matrices, huff_lsbs up to 31 and coded values past 24 bits",
+        ["substream_3", "terminator_b", "matrices_15", "huff_lsbs_31", "wide_prediction"],
+    )
+
+
 def noise_sequences(count, interval, seed, shift):
     """Generator 0's two noise channels (TH spec 17.2); the state restarts with each interval."""
     first, second = [], []
@@ -788,6 +839,7 @@ CASES = {
     "hb_drc_word": case_drc_word,
     "hb_sixteen_channels": case_sixteen,
     "hb_eight_channels": case_eight_channels,
+    "hb_substream3_limits": case_substream3_limits,
 }
 
 
@@ -820,6 +872,10 @@ FFMPEG = {
         "channel `columns`[k]",
     },
     "hb_sixteen_channels": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+    },
+    "hb_substream3_limits": {
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
