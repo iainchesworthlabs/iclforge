@@ -153,6 +153,7 @@ def main(argv: list[str]) -> int:
     results.append(
         run([py, "tools/checks/check_truehd_manifests.py"], name="truehd fixture manifests")
     )
+    results.append(run([py, "tools/checks/check_fuzz_harnesses.py"], name="fuzz harnesses"))
     results.append(
         run([py, "tools/checks/generate_support_matrices.py", "--check"], name="support matrices")
     )

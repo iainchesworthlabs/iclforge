@@ -10,8 +10,7 @@
 #                      minutes; runs on every push/PR to main and is
 #                      NOT experimental - a regression here means a fixed bug
 #                      came back.
-#   fuzz-short         A bounded mutation budget (60s/target, ~8 minutes
-#                      total), push only, so pull requests are not slowed by
+#   fuzz-short         A bounded mutation budget (60s/target), push only, so pull requests are not slowed by
 #                      it. Required, not experimental (promoted fuzz jobs) - see
 #                      that item for the track record this rests on.
 #   fuzz-differential  Same mutation approach, over the two differential
@@ -84,14 +83,16 @@
 # infrastructure - see tools/fuzz/README.md.
 #
 # fuzz-regress, fuzz-short and fuzz-nightly cover every harness in
-# tools/fuzz/run.sh's default list, which is fifteen: the four original entry
+# tools/fuzz/run.sh's default list (BASE_TARGETS): the AC-3 and E-AC-3 entry
 # points, fuzz_iec61937_unwrap (IEC 61937 de-framing), fuzz_emdf_parse,
 # fuzz_oamd_parse, fuzz_joc_parse, fuzz_signing_verify over the object and
 # metadata layer, fuzz_osc_parse over the live object-position listener's
 # OSC 1.0 parser - this project's first network-facing input rather than a
 # bitstream one (docs/threat-model.md) - the three container demuxers
-# (fuzz_matroska_demux, fuzz_mp4_demux, fuzz_mpegts_demux), and the IAB and
-# AC-4 readers (fuzz_iab_parse, fuzz_ac4_parse). They need no per-job
+# (fuzz_matroska_demux, fuzz_mp4_demux, fuzz_mpegts_demux), the IAB and AC-4
+# readers, the two content-signature readers, the Sendspin parsers and the
+# TrueHD reader, decoder and encoder (fuzz_truehd_parse, fuzz_truehd_decode,
+# fuzz_truehd_encode) with the MAT unwrapper (fuzz_mat_unwrap). They need no per-job
 # wiring - run.sh owns the list, and a new entry there is picked up by all
 # three at once. Instrumentation needs none either: which libraries are
 # built with ASan, UBSan and coverage counters is decided in

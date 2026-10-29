@@ -10,6 +10,7 @@
 #   tools/fuzz/run.sh fuzz_scan            # build, then run just this harness
 #   tools/fuzz/run.sh regress              # replay every seed + regression corpus once, no mutation
 #   tools/fuzz/run.sh minimize <target> <path-to-crash-file>
+#   tools/fuzz/run.sh merge <target> <input-dir>...   # keep one file for each set of branches
 #
 # The differential harnesses (fuzz_differential_ac3_decode,
 # fuzz_differential_eac3_decode - differential decoder fuzzing: same mutated bytes decoded by
@@ -60,7 +61,8 @@ readonly BASE_TARGETS=(fuzz_scan fuzz_ac3_decode fuzz_eac3_decode fuzz_wav_read
                        fuzz_mp4_demux fuzz_mpegts_demux fuzz_iab_parse fuzz_ac4_parse
                        fuzz_ac4_decode fuzz_ac4_encode fuzz_content_signature
                        fuzz_ac4_content_signature fuzz_sendspin_json fuzz_sendspin_frames
-                       fuzz_sendspin_handshake fuzz_sendspin_messages)
+                       fuzz_sendspin_handshake fuzz_sendspin_messages
+                       fuzz_truehd_parse fuzz_truehd_decode fuzz_truehd_encode fuzz_mat_unwrap)
 
 adm_enabled() { [[ -n "${ICLFORGE_FUZZ_ADM:-}" ]]; }
 
@@ -131,6 +133,7 @@ seed_source_for() {
         fuzz_differential_ac3_decode)  echo fuzz_ac3_decode ;;
         fuzz_differential_eac3_decode) echo fuzz_eac3_decode ;;
         fuzz_ac4_decode)               echo fuzz_ac4_parse ;;
+        fuzz_truehd_decode)            echo fuzz_truehd_parse ;;
         *)                              echo "$1" ;;
     esac
 }
@@ -142,6 +145,21 @@ seed_source_for() {
 prepare_dirs() {
     local target="$1"
     mkdir -p "$CORPUS_ROOT/$target" "$ARTIFACT_DIR"
+}
+
+# The libFuzzer dictionary of a target, if it has one: libs/<lib>/fuzz/dictionaries/<harness>.dict,
+# the harness's own or its seed source's (a target that shares seeds shares the dictionary). A
+# dictionary is the format's fixed byte patterns (sync words, start codes, signatures), which the
+# engine splices in whole where a mutation would have to guess them.
+dictionary_for() {
+    local target dir
+    for target in "$1" "$(seed_source_for "$1")"; do
+        dir="$(fuzz_dir_of "$target")" || return 0
+        if [[ -f "$dir/dictionaries/$target.dict" ]]; then
+            echo "$dir/dictionaries/$target.dict"
+            return 0
+        fi
+    done
 }
 
 cmd_run() {
@@ -166,9 +184,13 @@ cmd_run() {
         local extra_corpora=()
         [[ -d "$seeds" ]] && extra_corpora+=("$seeds")
         [[ -d "$regressions" ]] && extra_corpora+=("$regressions")
+        local dictionary dictionary_args=()
+        dictionary="$(dictionary_for "$target")"
+        [[ -n "$dictionary" ]] && dictionary_args+=("-dict=$dictionary")
         echo "==> $target: ${SECONDS_PER_TARGET}s (corpus: $CORPUS_ROOT/$target)"
         if ! "$(target_binary "$target")" \
                 -max_total_time="$SECONDS_PER_TARGET" \
+                "${dictionary_args[@]}" \
                 -rss_limit_mb=2048 \
                 -timeout=10 \
                 -artifact_prefix="$ARTIFACT_DIR/${target}-" \
@@ -232,8 +254,24 @@ cmd_minimize() {
     echo "minimized input written to $ARTIFACT_DIR/${target}-minimized"
 }
 
+# Reduces input directories to one file for each set of branches the target reaches, with the
+# engine's merge mode: the seeds a harness starts from are cut down this way, so that each one is
+# there for a reason. The kept files are written to $CORPUS_ROOT/merged/<target>.
+cmd_merge() {
+    local target="${1:?usage: tools/fuzz/run.sh merge <target> <input-dir>...}"
+    shift
+    [[ "$#" -gt 0 ]] || { echo "usage: tools/fuzz/run.sh merge <target> <input-dir>..." >&2; exit 2; }
+    configure_and_build
+    local out="$CORPUS_ROOT/merged/$target"
+    rm -rf "$out"
+    mkdir -p "$out"
+    "$(target_binary "$target")" -merge=1 -rss_limit_mb=2048 -timeout=10 "$out" "$@"
+    echo "kept $(find "$out" -type f | wc -l) files in $out"
+}
+
 case "${1:-run}" in
     minimize) shift; cmd_minimize "$@" ;;
+    merge)    shift; cmd_merge "$@" ;;
     regress)  shift; cmd_regress "$@" ;;
     run)      shift || true; cmd_run "$@" ;;
     *)        cmd_run "$@" ;;

@@ -37,7 +37,9 @@ trap 'rm -rf "$WORK"' EXIT
 # The corpus is assembled here, a directory per harness, and copied out at the end.
 OUT="$WORK/seeds"
 
-mkdir -p "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
+mkdir -p "$OUT/fuzz_truehd_parse" "$OUT/fuzz_truehd_encode" "$OUT/fuzz_mat_unwrap" \
+         "$OUT/fuzz_mp4_demux" "$OUT/fuzz_matroska_demux" "$OUT/fuzz_mpegts_demux" \
+         "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
          "$OUT/fuzz_signing_verify" "$OUT/fuzz_iec61937_unwrap" \
          "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse" "$OUT/fuzz_content_signature" \
          "$OUT/fuzz_ac4_content_signature"
@@ -307,6 +309,21 @@ add_seed "fuzz_iec61937_unwrap" "$WORK/carrier-not.wav"
 # (planning/ac4.md, I1), so the seed script packs its first four frames.
 python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
     "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
+
+# TrueHD and MLP, from the committed fixtures (testdata/truehd) and nothing else: cuts of every
+# stream for the reader, the decoder and the differential harness (which share fuzz_truehd_parse's
+# seeds), the encoder's configuration space, MAT bursts of three of them made by 'forge spdif', and
+# three streams wrapped by 'forge mp4', 'mkv' and 'ts'. All of it is more than the engine needs:
+# the committed seeds are the subset that reaches different branches, which
+#
+#     tools/fuzz/run.sh merge fuzz_truehd_decode <the fuzz_truehd_parse directory written here>
+#
+# finds (and the same with each other harness), so that every file is there for a reason.
+echo "==> TrueHD and MLP: the fixtures cut, the encoder's space, MAT bursts and containers"
+python3 "$SCRIPT_DIR/truehd-seeds.py" streams "$OUT/fuzz_truehd_parse"
+python3 "$SCRIPT_DIR/truehd-seeds.py" encoder "$OUT/fuzz_truehd_encode"
+python3 "$SCRIPT_DIR/truehd-seeds.py" mat "$OUT/fuzz_mat_unwrap" --forge "$ICLFORGE_CLI"
+python3 "$SCRIPT_DIR/truehd-seeds.py" containers "$OUT" --forge "$ICLFORGE_CLI"
 
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do

@@ -474,6 +474,10 @@ way the fixed findings used to.
 | `fuzz_signing_verify`  | `iclforge::ac3::signing::verify_atmos_stream` + `verify_atmos_frame` - operator-supplied stream, operator-supplied key, no CRC check in front of either |
 | `fuzz_ac4_content_signature` | `iclforge::ac4::locate_signature_trailer`, `signed_content_digest`, `summarise_signature`, `strip_signature` and `verify_stream` on a raw AC-4 stream - the walk that finds where the sync frames stop and the digest boundary, then the verifier under each way of judging time, with and without the blob's own certificates as trust anchors |
 | `fuzz_content_signature` | The Thrift binary reader, DER and X.509 (`parse_certificate`), PEM and base64, the key and certificate loaders, `parse_content_signature`, `validate_chain` and `verify_content_signature`; the first input byte picks the entry point. The certificates are inside the signature, so they are as untrusted as the stream |
+| `fuzz_truehd_parse`    | `iclforge::truehd::probe_stream`, `parse_major_sync`, `parse_access_unit`, `ElementaryReader`, `read_restart_header` and `read_block_header` on one input - the stream's units, the major syncs and directories, the restart headers and the extra data, then the block header reader over the raw bytes in a context the first two bytes choose. Built with `ICLFORGE_BUILD_TRUEHD` |
+| `fuzz_truehd_decode`   | `iclforge::truehd::Decoder::decode` over the units `ElementaryReader` finds, in every presentation, strict and lenient, and over the bytes as one unit - the block headers, filters, matrices and residuals are all sized from the stream. Its seeds and dictionary are `fuzz_truehd_parse`'s |
+| `fuzz_truehd_encode`   | `iclforge::truehd::Encoder` over the configuration the input's first eight bytes choose (rate, channels, width, restart interval, FIR order, matrix search, downmix, chunk size) and the 16-bit PCM after them, with the encoder's own verification on: what it writes must decode back to the PCM, and an encode that does not is a trap |
+| `fuzz_mat_unwrap`      | `iclforge::containers::iec61937::unwrap_mat_stream` and `MatPacker` - TrueHD in MAT bursts, whose 24 slots each open with a self-declared length. The units unwrapped are wrapped again and must unwrap to the same units |
 | `fuzz_osc_parse`       | `iclforge::objects::oba::parse_osc_packet` - the OSC 1.0 wire form of a live object-position update (live OSC object positions), reached straight from a UDP datagram by `iclforge::audio::LivePositionSource` whenever `positions=osc:<port>` is in play. No CRC, no container, no bitstream ahead of it at all - this project's first NETWORK-facing input rather than a file or capture-device one; see `docs/threat-model.md` |
 | `fuzz_adm_parse`       | `iclforge::adm::parse_bw64(std::istream&)` - BW64/RF64 chunks plus an arbitrary ADM XML document. Opt-in, see below |
 | `fuzz_sendspin_json`   | `iclforge::sendspin::json::Document::parse` - the JSON of every Sendspin message, the first code a network peer's bytes reach on hearth's server and on a sink. Every accessor runs on every value parsed, and the document is written back out and parsed again, which must give the same text; `TokenStorage` and `count_tokens` must agree with a parse into fixed storage |
@@ -832,6 +836,7 @@ tools/fuzz/run.sh                    # build, then run every default-list harnes
 tools/fuzz/run.sh fuzz_scan          # just one harness
 ICLFORGE_FUZZ_SECONDS=600 tools/fuzz/run.sh   # a deeper local run
 tools/fuzz/run.sh regress            # replay seeds + regressions, no mutation (fast)
+tools/fuzz/run.sh merge fuzz_truehd_decode <dir>...   # keep one file for each set of branches
 tools/fuzz/run.sh minimize fuzz_scan fuzz/artifacts/fuzz_scan-crash-<hash>
 
 # Differential harnesses need `ffmpeg` on PATH and are named explicitly -
@@ -858,8 +863,9 @@ collects the resulting streams. What it does not write is committed as it is:
 the AC-4 seeds (below), `fuzz_iab_parse`'s one file (`encode_iab
 --write-fixture`), and the seeds of `fuzz_osc_parse` and the four
 `fuzz_sendspin_*` harnesses. The three container demuxers
-(`fuzz_matroska_demux`, `fuzz_mp4_demux` and `fuzz_mpegts_demux`) have no seed
-directory and start from an empty corpus.
+(`fuzz_matroska_demux`, `fuzz_mp4_demux` and `fuzz_mpegts_demux`) start from
+the committed files (protected ones among them) and from TrueHD and MLP wrapped by `forge`
+(below).
 
 The corpora of `fuzz_emdf_parse`, `fuzz_oamd_parse`, `fuzz_joc_parse` and
 `fuzz_adm_parse`, and one file of `fuzz_iec61937_unwrap`'s, are not raw `forge`
@@ -906,6 +912,36 @@ time and has no significance beyond making the signed copy verifiable. Starting 
 streams is what lets a fuzzer's mutations explore "almost valid" input
 instead of spending its budget on bytes that get rejected before line one of
 the parser.
+
+The TrueHD and MLP corpora are made by `tools/fuzz/truehd-seeds.py` from the streams of
+`testdata/truehd` and nothing else. `fuzz_truehd_parse`, whose seeds `fuzz_truehd_decode` shares,
+holds a cut of every fixture and hand-built stream: the
+head of each, up to its second major sync (a few kilobytes), so that there are streams of every
+rate from 44.1 to 192 kHz, of one to eight channels, of one to four substreams, with restart
+gaps of 8 and 128 units, in TrueHD and MLP, and one hand-built stream for each syntax path
+(filters, matrices, LSB bypass, both noise forms, the data check, the end marker, extra data, the
+DRC word, sixteen channels). `fuzz_truehd_encode` holds 18 files, each an encoder configuration
+and a signal chosen to stress one part of the coder (a sine, a chord, noise, a square wave, DC,
+harmonics followed by digital silence, silence). `fuzz_mat_unwrap` has MAT bursts that `forge
+spdif` made, in both word orders, and the three demuxers have TrueHD and MLP wrapped by `forge mp4`,
+`mkv` and `ts`. None of it comes from a disc.
+
+Every seed is there for a reason: a directory is reduced with the engine's merge mode, which keeps
+one file for each set of branches the target reaches (`tools/fuzz/run.sh merge fuzz_truehd_decode
+<directory>` writes the kept files to the corpus directory). `generate-seeds.sh` writes the
+unreduced set; the committed seeds are the reduced one.
+
+A harness can have a libFuzzer dictionary, `dictionaries/<harness>.dict` beside it, which `run.sh`
+passes as `-dict=`: the format's fixed byte patterns, which a mutation would have to guess. The
+TrueHD one lists the two major sync words (with the rate nibble that follows each), the signature,
+the three restart syncs as they sit after a block's flag bits, the end-of-stream markers and the
+directory entries with a CRC; the MAT one the preamble, the three code words and their swapped
+forms. A dictionary shared by the harnesses that share seeds is the seed source's. Its patterns are
+read from the library's headers, never from a stream.
+
+`tools/checks/check_fuzz_harnesses.py` (the `_static.yml` job and the pre-push check) fails on a
+harness that its CMake file does not register, that is in no run list, that has no seeds, or whose
+dictionary is not libFuzzer's syntax, and on an exception that no longer applies.
 
 Regenerate it with:
 
