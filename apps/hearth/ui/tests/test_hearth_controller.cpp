@@ -1421,3 +1421,92 @@ TEST_CASE("decoder_changes_from_sink_request: only a member of the group being p
     pending.group_id.clear();
     CHECK(ui::decoder_changes_from_sink_request(pending, QStringLiteral("g1")).isEmpty());
 }
+
+// --- TrueHD and MLP (planning/truehd-parity-hearth-player.md, H3) ------------
+
+TEST_CASE("queue_row: a TrueHD or MLP item reads its codec off the facts, since it has no bitstream format",
+          "[hearth][hearth-controller][truehd]") {
+    QueueItem item = queue_item("C:/film/title.thd", "title.thd");
+    item.facts.codec = iclforge::hearth::ItemCodec::kTruehd;
+    item.facts.sample_rate = 48000;
+    item.facts.channels = 8;
+    item.facts.duration = std::chrono::milliseconds(7'200'000);
+    const QVariantMap row = iclforge::hearth::ui::queue_row(item, /*current=*/false);
+    CHECK(row.value(QStringLiteral("streamKind")).toString().toStdString() == "TrueHD");
+    CHECK(row.value(QStringLiteral("codecBadge")).toString().toStdString() == "TH");
+    CHECK(row.value(QStringLiteral("durationMs")).toLongLong() == 7'200'000);
+    CHECK(row.value(QStringLiteral("channels")).toInt() == 8);
+
+    item.facts.codec = iclforge::hearth::ItemCodec::kMlp;
+    const QVariantMap mlp = iclforge::hearth::ui::queue_row(item, /*current=*/false);
+    CHECK(mlp.value(QStringLiteral("streamKind")).toString().toStdString() == "MLP");
+    CHECK(mlp.value(QStringLiteral("codecBadge")).toString().toStdString() == "ML");
+}
+
+TEST_CASE("media_info_to_map: a TrueHD item has a truehd map and no ac4 or programmes",
+          "[hearth][hearth-controller][truehd]") {
+    MediaInfo info;
+    info.path = "C:/film/title.thd";
+    info.codec = iclforge::hearth::MediaCodec::kTruehd;
+    info.sample_rate = 48000;
+    info.stream_samples = 48000;
+    iclforge::hearth::TruehdIndex index;
+    index.sample_rate = 48000;
+    index.samples_per_unit = 40;
+    index.substreams = 3;
+    index.channels = {2, 6, 8, 0};
+    index.units = 1200;
+    index.unit_bytes = 600000;
+    index.major_syncs = 10;
+    index.variable_rate = true;
+    info.truehd = index;
+
+    const QVariantMap map = iclforge::hearth::ui::media_info_to_map(info);
+    CHECK(map.value(QStringLiteral("codec")).toString().toStdString() == "truehd");
+    CHECK_FALSE(map.contains(QStringLiteral("ac4")));
+    REQUIRE(map.contains(QStringLiteral("truehd")));
+    const QVariantMap truehd = map.value(QStringLiteral("truehd")).toMap();
+    CHECK(truehd.value(QStringLiteral("substreams")).toInt() == 3);
+    CHECK(truehd.value(QStringLiteral("channels")).toList().size() == 3);
+    CHECK(truehd.value(QStringLiteral("channels")).toList().at(2).toInt() == 8);
+    CHECK(truehd.value(QStringLiteral("accessUnits")).toLongLong() == 1200);
+    CHECK(truehd.value(QStringLiteral("samplesPerAccessUnit")).toInt() == 40);
+    CHECK(truehd.value(QStringLiteral("majorSyncs")).toLongLong() == 10);
+    CHECK(truehd.value(QStringLiteral("restartIntervalUnits")).toDouble() == Catch::Approx(120.0));
+    CHECK(truehd.value(QStringLiteral("restartIntervalMs")).toDouble() == Catch::Approx(100.0));
+    CHECK(truehd.value(QStringLiteral("variableRate")).toBool());
+    CHECK(truehd.value(QStringLiteral("bitrateKbps")).toDouble() == Catch::Approx(4800.0));
+
+    // An item of another codec has none.
+    MediaInfo other;
+    other.codec = iclforge::hearth::MediaCodec::kAc3;
+    CHECK_FALSE(iclforge::hearth::ui::media_info_to_map(other).contains(QStringLiteral("truehd")));
+}
+
+TEST_CASE("decoder settings: the TrueHD presentation and strictness round-trip, and \"all\" reads as best",
+          "[hearth][hearth-controller][truehd]") {
+    DecoderSettings settings;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map(settings)
+              .value(QStringLiteral("truehdPresentation")).toString().toStdString() == "best");
+    CHECK_FALSE(iclforge::hearth::ui::decoder_settings_to_map(settings)
+                    .value(QStringLiteral("truehdLenient")).toBool());
+
+    for (const auto presentation :
+         {iclforge::truehd::Presentation::k2ch, iclforge::truehd::Presentation::k6ch,
+          iclforge::truehd::Presentation::k8ch}) {
+        settings.truehd.presentation = presentation;
+        settings.truehd.lenient = true;
+        const QVariantMap map = iclforge::hearth::ui::decoder_settings_to_map(settings);
+        CHECK(map.value(QStringLiteral("truehdLenient")).toBool());
+        CHECK(iclforge::hearth::ui::decoder_settings_from_map(map, DecoderSettings{}) == settings);
+    }
+    settings.truehd.presentation = iclforge::truehd::Presentation::kAll;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map(settings)
+              .value(QStringLiteral("truehdPresentation")).toString().toStdString() == "best");
+
+    // A map that carries neither key keeps the base's.
+    DecoderSettings base;
+    base.truehd.presentation = iclforge::truehd::Presentation::k6ch;
+    CHECK(iclforge::hearth::ui::decoder_settings_from_map(QVariantMap{}, base).truehd.presentation ==
+          iclforge::truehd::Presentation::k6ch);
+}

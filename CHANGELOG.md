@@ -37,6 +37,12 @@ See [README.md](README.md) for the project overview and
   Two TrueHD items of one rate join without a gap at the sample the first one ends, which counts the padding of its last unit. Bytes that
   do not read as a unit are skipped and the decoder is told, so it waits for the next restart header instead of checking an interval it
   did not see.
+- **Added: what Hearth's window says of a TrueHD or MLP item.** The queue names it (TH and ML chips, "TrueHD" and "MLP" in the row and the
+  Signal path, which says "lossless, strict checks" in place of an A/52 mode); the file picker lists `.thd` and `.mlp` and the drop text
+  names them; the Media page has a Stream card and the `iclforge.hearth.media/1` document an additive `truehd` member (null for every other
+  item); the Decoder page has a TrueHD and MLP tab (presentation: best, 2, 6 or 8 channels; strict or lenient checks); the This frame card
+  shows the substream, the dialogue normalisation word as sent and not applied, and the decoder's counts; and the diagnostics file adds the
+  counts to each TrueHD item played. The Qt controller and QML changes were written without a Qt kit and are not built or run.
 - **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
   stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
   decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout

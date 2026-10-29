@@ -18,6 +18,7 @@
 #include "container_input.hpp"
 #include "probe_json.hpp"
 #include "session.hpp"
+#include "truehd_index.hpp"
 
 // The media information (planning/hearth-reference-player.md, Media
 // information): what a queue item's file says about itself, read once for the
@@ -35,6 +36,13 @@
 //   presentations, substream groups, channel modes, bitrates and A-JOC - and
 //   what iclforge::ac4::Decoder reads of the whole stream (apps/shared/media/src/probe_json.hpp's
 //   Ac4Summary).
+// - For TrueHD and MLP: what the index of the stream says (truehd_index.hpp), which is one pass over the
+//   whole file: the rate, the substreams and their channels, the access units, how often a decoder
+//   can join, the padding that ends the stream. forge probe's report of a TrueHD stream
+//   (apps/forge/cli/src/commands/truehd.cpp) also checks the parity and CRC of every segment and
+//   surveys the evolution frames; it is not called from here, because it is written to print and to
+//   write forge's JSON in the same loop and does not return its figures. The members of "truehd"
+//   below that are forge probe's own are named as it names them.
 //
 // Reading a whole stream takes a noticeable part of a second for a long item,
 // so describe_media() runs on MediaInspector's thread (media_inspector.hpp),
@@ -74,7 +82,15 @@
 //                  mixing, fold_levels} - see write_bitstream() for each,
 //     "probe": null, or {schema: "iclforge.probe/1", stream}: the stream
 //              object forge probe json=1 writes (docs/forge/cli/commands.md),
-//              the AC-4 one for an AC-4 item
+//              the AC-4 one for an AC-4 item; null for TrueHD and MLP,
+//     "truehd": null, or for a TrueHD or MLP item {codec: "truehd" or "mlp",
+//               sample_rate, substreams, channels: [per substream],
+//               access_units, samples_per_access_unit, padding_samples,
+//               variable_rate, peak_data_rate, object_substream,
+//               major_syncs, restart_interval_units (the access units to
+//               a major sync, on average; null with none), skipped_bytes,
+//               bitrate_kbps}  (added in this version: members are only
+//               ever added)
 //   }
 //
 // Members are only ever added within a version, and one that does not apply
@@ -89,9 +105,11 @@ enum class MediaCodec : std::uint8_t {
     // (io::StreamKind::kAc3CoreEac3Extension).
     kAc3WithEac3,
     kAc4,
+    kTruehd,
+    kMlp,
 };
 
-// "ac3", "eac3", "ac3+eac3" or "ac4".
+// "ac3", "eac3", "ac3+eac3", "ac4", "truehd" or "mlp".
 [[nodiscard]] std::string_view codec_token(MediaCodec codec);
 
 // One programme (§E2.3.1.2): an independent substream and its dependents. An
@@ -160,6 +178,8 @@ struct MediaInfo {
     std::optional<oba::DecodedProgram> objects = std::nullopt;
     // AC-4.
     std::optional<apps::probe_json::Ac4Summary> ac4 = std::nullopt;
+    // TrueHD and MLP: the stream's index (every field but the restarts' list, which is the player's).
+    std::optional<TruehdIndex> truehd = std::nullopt;
 
     // The samples the item plays: what is left after the skip, cut to
     // play_samples.

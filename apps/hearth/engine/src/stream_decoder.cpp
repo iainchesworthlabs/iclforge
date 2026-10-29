@@ -162,6 +162,19 @@ TruehdCounters& TruehdCounters::operator+=(const TruehdCounters& other) {
     return *this;
 }
 
+TruehdCounters since(const TruehdCounters& now, const TruehdCounters& earlier) {
+    const auto minus = [](std::uint64_t a, std::uint64_t b) { return a > b ? a - b : 0; };
+    return TruehdCounters{
+        .units = minus(now.units, earlier.units),
+        .units_decoded = minus(now.units_decoded, earlier.units_decoded),
+        .units_waiting = minus(now.units_waiting, earlier.units_waiting),
+        .restarts = minus(now.restarts, earlier.restarts),
+        .lossless_checks_ok = minus(now.lossless_checks_ok, earlier.lossless_checks_ok),
+        .lossless_check_failures =
+            minus(now.lossless_check_failures, earlier.lossless_check_failures),
+        .check_failures = minus(now.check_failures, earlier.check_failures)};
+}
+
 namespace {
 
 [[nodiscard]] TruehdCounters counted(const iclforge::truehd::DecoderCounters& counters) {

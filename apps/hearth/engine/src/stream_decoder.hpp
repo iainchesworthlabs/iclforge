@@ -175,6 +175,11 @@ struct TruehdCounters {
     friend bool operator==(const TruehdCounters&, const TruehdCounters&) = default;
 };
 
+// What was counted since `earlier`, each figure held at 0 where `earlier` is the larger: counters
+// of a decoder that has been replaced start again, and the difference of two readings across that
+// is not negative.
+[[nodiscard]] TruehdCounters since(const TruehdCounters& now, const TruehdCounters& earlier);
+
 // What a TrueHD or MLP access unit said about itself, as decoded.
 struct TruehdUnitReport {
     bool mlp = false;

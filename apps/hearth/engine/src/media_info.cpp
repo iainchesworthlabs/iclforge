@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
+#include <memory>
 #include <span>
 #include <utility>
 
@@ -664,6 +665,49 @@ void write_bitstream(JsonSink& json, const std::optional<MediaBitstream>& bits) 
     json.end_object();
 }
 
+void write_truehd(JsonSink& json, const MediaInfo& info) {
+    json.key("truehd");
+    if (!info.truehd) {
+        json.value_null();
+        return;
+    }
+    const TruehdIndex& index = *info.truehd;
+    json.begin_object();
+    json.member("codec", codec_token(*info.codec));
+    json.member("sample_rate", static_cast<std::uint64_t>(index.sample_rate));
+    json.member("substreams", static_cast<std::int64_t>(index.substreams));
+    json.key("channels");
+    json.begin_array();
+    for (int i = 0; i < index.substreams; ++i) {
+        json.value(static_cast<std::int64_t>(index.channels[static_cast<std::size_t>(i)]));
+    }
+    json.end_array();
+    json.member("access_units", index.units);
+    json.member("samples_per_access_unit", static_cast<std::uint64_t>(index.samples_per_unit));
+    json.member("padding_samples", static_cast<std::uint64_t>(index.padding_samples));
+    json.member("variable_rate", index.variable_rate);
+    json.member("peak_data_rate", static_cast<std::uint64_t>(index.peak_data_rate));
+    json.member("object_substream", index.object_substream);
+    json.member("major_syncs", index.major_syncs);
+    if (index.major_syncs > 0) {
+        json.member("restart_interval_units",
+                    static_cast<double>(index.units) / static_cast<double>(index.major_syncs), 1);
+    } else {
+        json.member_null("restart_interval_units");
+    }
+    json.member("skipped_bytes", index.skipped_bytes);
+    const double seconds = index.sample_rate == 0
+                               ? 0.0
+                               : static_cast<double>(index.samples()) /
+                                     static_cast<double>(index.sample_rate);
+    if (seconds > 0.0) {
+        json.member("bitrate_kbps", static_cast<double>(index.unit_bytes) * 8.0 / 1000.0 / seconds, 3);
+    } else {
+        json.member_null("bitrate_kbps");
+    }
+    json.end_object();
+}
+
 void write_probe(JsonSink& json, const MediaInfo& info) {
     json.key("probe");
     if (info.probe) {
@@ -691,6 +735,8 @@ std::string_view codec_token(MediaCodec codec) {
         case MediaCodec::kEac3: return "eac3";
         case MediaCodec::kAc3WithEac3: return "ac3+eac3";
         case MediaCodec::kAc4: return "ac4";
+        case MediaCodec::kTruehd: return "truehd";
+        case MediaCodec::kMlp: return "mlp";
     }
     return "eac3";
 }
@@ -708,6 +754,29 @@ MediaInfo describe_media(const std::string& path, const LoadedItem& loaded) {
     info.play_samples = loaded.play_samples;
     info.note = loaded.note;
     const std::span<const std::byte> bytes{loaded.bytes};
+
+    if (loaded.source || loaded.truehd || apps::looks_like_truehd(bytes)) {
+        // One pass over the stream, as the session makes of it. A source is read by offset and is
+        // this thread's own: the loader gave it for this call.
+        std::shared_ptr<ByteSource> source =
+            loaded.source ? loaded.source : std::make_shared<MemoryByteSource>(loaded.bytes);
+        auto index = index_truehd(*source);
+        if (!index) {
+            info.error = fmt::format("The stream could not be read: {}.", index.error());
+            return info;
+        }
+        info.codec = index->kind == truehd::StreamKind::kMlp ? MediaCodec::kMlp : MediaCodec::kTruehd;
+        info.sample_rate = index->sample_rate;
+        info.stream_samples = index->samples();
+        if (index->skipped_bytes > 0) {
+            info.note += fmt::format("{}{} bytes did not read as access units, and are skipped.",
+                                     info.note.empty() ? "" : " ", index->skipped_bytes);
+        }
+        index->restarts.clear();
+        index->restarts.shrink_to_fit();
+        info.truehd = std::move(*index);
+        return info;
+    }
 
     if (is_ac4(bytes)) {
         info.codec = MediaCodec::kAc4;
@@ -812,6 +881,7 @@ std::string media_info_json(const MediaInfo& info) {
     }
     write_bitstream(json, info.bitstream);
     write_probe(json, info);
+    write_truehd(json, info);
     json.end_object();
     return out;
 }

@@ -171,4 +171,27 @@ TestCase {
         tryVerify(function() { return HearthController.decoderSettings.stereoFold === "loro"; }, 15000);
         compare(loro.Accessible.checked, true);
     }
+
+    // The TrueHD and MLP tab (DecoderTruehd.qml): the presentation and what a failed check does,
+    // written through the same controller call the other tabs use. The tab is chosen on the page
+    // as the segmented switch would, since no TrueHD item is playing.
+    function test_truehdPresentationAndChecksRoundTripThroughTheTab() {
+        const page = createTemporaryObject(decoderPageComponent, testCase.parent);
+        verify(page !== null);
+        page.format = "truehd";
+        waitForRendering(page);
+        verify(findChild(page, "truehdLevelNotice") !== null, "the TrueHD tab's notice is not on the page");
+
+        const six = clickSegment(page, "6ch");
+        tryVerify(function() { return HearthController.decoderSettings.truehdPresentation === "6ch"; }, 15000);
+        compare(six.Accessible.checked, true);
+
+        clickSegment(page, "lenient");
+        tryVerify(function() { return HearthController.decoderSettings.truehdLenient === true; }, 15000);
+        clickSegment(page, "strict");
+        tryVerify(function() { return HearthController.decoderSettings.truehdLenient === false; }, 15000);
+
+        clickSegment(page, "best");
+        tryVerify(function() { return HearthController.decoderSettings.truehdPresentation === "best"; }, 15000);
+    }
 }

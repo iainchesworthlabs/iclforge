@@ -51,6 +51,10 @@ struct TruehdIndex {
     int substreams = 0;
     // What each substream's first restart header says it decodes to; 0 where it did not reach one.
     std::array<int, iclforge::truehd::kMaxSubstreams> channels{};
+    // The major sync's rate fields (TH spec section 4.4): variable, and the peak the stream is
+    // declared not to pass, in the unit the field has.
+    bool variable_rate = false;
+    std::uint32_t peak_data_rate = 0;
     // A fourth substream, or an object bit in the major sync: the stream has an object layer the
     // decoder does not render.
     bool object_substream = false;

@@ -203,6 +203,8 @@ std::expected<TruehdIndex, std::string> index_truehd(ByteSource& source,
         index.substreams = info->num_substreams;
         index.channels = info->channels;
         index.object_substream = info->has_object_substream;
+        index.variable_rate = info->major_sync.is_vbr;
+        index.peak_data_rate = info->major_sync.peak_data_rate;
     }
     if (index.sample_rate == 0 || index.samples_per_unit == 0) {
         return std::unexpected(std::string{"the major sync names no sample rate this player knows"});

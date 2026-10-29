@@ -122,7 +122,8 @@ struct MadeStream {
 };
 
 inline MadeStream make_stream(int channels, std::uint64_t frames, std::uint32_t sample_rate = 48000,
-                              int restart_interval_units = 128, std::uint32_t seed = 7) {
+                              int restart_interval_units = 128, std::uint32_t seed = 7,
+                              int silent_channel = -1) {
     MadeStream out;
     out.channels = channels;
     out.frames = frames;
@@ -145,7 +146,9 @@ inline MadeStream make_stream(int channels, std::uint64_t frames, std::uint32_t 
             }
             out.pcm[static_cast<std::size_t>(t) * static_cast<std::size_t>(channels) +
                     static_cast<std::size_t>(c)] =
-                static_cast<std::int32_t>(std::lround(std::clamp(v, -0.999, 0.999) * full));
+                c == silent_channel
+                    ? 0
+                    : static_cast<std::int32_t>(std::lround(std::clamp(v, -0.999, 0.999) * full));
         }
     }
     iclforge::truehd::EncoderConfig config;

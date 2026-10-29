@@ -40,7 +40,7 @@ channel's speaker plays it exactly, and a channel the layout has no speaker for 
 A bare `.thd` or `.mlp` file is not read into memory; it is indexed once when it is opened, which reads the
 whole file, and then read as it plays. A TrueHD track in a container is demuxed from a copy of the whole file
 in memory, so a film's remux of tens of gigabytes is not something to open yet. A damaged unit plays as
-silence until the stream's next restart header, and the Media page and the diagnostics say so.
+silence until the stream's next restart header; the This frame card shows the counts, and the diagnostics file adds them to the line of each item played.
 
 A TrueHD decoder can only join a stream at a unit that carries a major sync, and the encoder decides how
 often there is one (every 16 units, 13 ms, in FFmpeg's streams; every 128, 107 ms, by default in this project's
@@ -54,10 +54,10 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 
 | Page | What it holds |
 |---|---|
-| **Play** | The queue (add files or a folder, or drop them on the page), the transport bar (play and pause, stop, previous and next, a position scrubber, the Gapless toggle, volume), per-channel levels, BS.1770-4 loudness, the metadata of the frame being decoded, the Objects card for E-AC-3 with Atmos objects, and the signal path from decoder to output |
-| **Media** | What the decoder reads from a queued item: its stream, bitstream or presentation information and metadata, with **Copy** and **Export JSON…** |
+| **Play** | The queue (add files or a folder, or drop them on the page), the transport bar (play and pause, stop, previous and next, a position scrubber, the Gapless toggle, volume), per-channel levels, BS.1770-4 loudness, the metadata of the frame being decoded (for TrueHD, the substream, the dialogue normalisation word as sent, and the restarts, units that waited for one and lossless checks that failed so far), the Objects card for E-AC-3 with Atmos objects, and the signal path from decoder to output |
+| **Media** | What the decoder reads from a queued item: its stream, bitstream or presentation information and metadata, with **Copy** and **Export JSON…**. For a TrueHD or MLP item a Stream card gives the rate, the substreams and their channels, the access units, the bit rate and how often a decoder can join the stream |
 | **Speakers** | The speaker layout, the routing of each speaker to an output of the device, size, trim and delay per speaker, the bass-management crossover, and an identify tone |
-| **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab and an AC-4 tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame |
+| **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab, an AC-4 tab and a TrueHD and MLP tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame (a TrueHD change, at its next restart). The TrueHD tab chooses the presentation (best, or the 2, 6 or 8 channel one) and whether a failed check drops the unit (strict) or is counted and decoded on (lenient); it has no control for dialogue normalisation or dynamic range, which the stream carries and nothing applies |
 | **Network** | The Sendspin players found on the network, pairing, groups and their volumes, and each paired Hearth sink's own settings and firmware |
 | **Settings** | Playback, the network name and discovery, pairing records, appearance, language and diagnostics |
 | **Karaoke** | What a karaoke AC-3 or E-AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, which part each speaker carries, and the lyrics. See [Karaoke](#karaoke) |

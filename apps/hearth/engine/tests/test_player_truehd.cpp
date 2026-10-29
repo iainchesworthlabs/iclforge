@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "iclforge/render/layout.hpp"
+#include "diagnostics_report.hpp"
+#include "engine_thread.hpp"
 #include "item_source.hpp"
 #include "pcm_sink.hpp"
 #include "player.hpp"
@@ -489,4 +491,73 @@ TEST_CASE("truehd session: bytes that do not read as a unit are skipped, the dec
     const std::vector<std::int32_t> after = pcm_part(made, 32 * 40, 48000 - 32 * 40);
     expected.insert(expected.end(), after.begin(), after.end());
     CHECK(heard == expected);
+}
+
+TEST_CASE("truehd player: what the decoder counted for an item is on its record, and in the diagnostics",
+          "[hearth][truehd][player]") {
+    // A restart every 16 units; unit 20 damaged, so 12 units wait for the restart at unit 32.
+    const MadeStream made = make_stream(2, 48000, 48000, 16, 31);
+    std::vector<std::byte> damaged = made.bytes;
+    const std::uint64_t at = made.unit_offsets[20] + (made.unit_offsets[21] - made.unit_offsets[20]) / 2;
+    damaged[at] = static_cast<std::byte>(std::to_integer<unsigned>(damaged[at]) ^ 0x55U);
+    Library library;
+    library.files["clean.thd"] = made.bytes;
+    library.files["damaged.thd"] = damaged;
+    auto log = std::make_shared<FakeDevice::Log>();
+    Player player(std::make_unique<FakeDevice>(log, 8192), library.loader(), stereo_room());
+    player.queue().add(item("clean.thd"));
+    player.queue().add(item("damaged.thd"));
+    player.play();
+    REQUIRE(play_out(player, *log));
+
+    // Each item's own, though one decoder served both.
+    REQUIRE(player.history().size() == 2);
+    REQUIRE(player.history()[0].truehd.has_value());
+    CHECK(player.history()[0].truehd->units == 1200);
+    CHECK(player.history()[0].truehd->units_waiting == 0);
+    CHECK(player.history()[0].truehd->restarts == 75);
+    CHECK(player.history()[0].truehd->lossless_check_failures == 0);
+    REQUIRE(player.history()[1].truehd.has_value());
+    CHECK(player.history()[1].truehd->units == 1200);
+    CHECK(player.history()[1].truehd->units_waiting >= 11);
+    CHECK(player.history()[1].truehd->units_decoded < 1200);
+
+    // The diagnostics file says it, beside the frames the item delivered.
+    EngineStatus status;
+    status.history = player.history();
+    const std::string report =
+        render_report(ReportFacts{}, status, DiagnosticLog{}, Secrets{});
+    CHECK(report.find("TrueHD: 75 restarts, 0 units waited for a restart, 0 lossless checks failed") !=
+          std::string::npos);
+    CHECK(report.find("units waited for a restart, 0 lossless checks failed, 1 other checks failed") !=
+          std::string::npos);
+}
+
+TEST_CASE("truehd player: the meters read the decoded channels, one to a speaker",
+          "[hearth][truehd][player]") {
+    // Stereo with the right channel silent: the left meter moves and the right does not.
+    const MadeStream made = make_stream(2, 24000, 48000, 128, 37, /*silent_channel=*/1);
+    Library library;
+    library.files["quiet-right.thd"] = made.bytes;
+    auto log = std::make_shared<FakeDevice::Log>();
+    Player player(std::make_unique<FakeDevice>(log, 8192), library.loader(), stereo_room());
+    player.queue().add(item("quiet-right.thd"));
+    player.play();
+    MeterSnapshot latest;
+    bool seen = false;
+    for (int step = 0; step < 100000; ++step) {
+        player.pump();
+        advance(*log, 480);
+        seen = player.meters(latest) || seen;
+        if (player.transport().state() == TransportState::kStopped && !log->open) {
+            break;
+        }
+    }
+    REQUIRE(seen);
+    REQUIRE(latest.levels.size() == 2);
+    // The left channel's tone peaks at about -6 dBFS; the right is digital silence.
+    CHECK(latest.levels[0].peak_db > -20.0);
+    CHECK(latest.levels[0].peak_db < 0.0);
+    CHECK(latest.levels[1].peak_db < -90.0);
+    CHECK_FALSE(latest.levels[0].clipped);
 }
