@@ -160,6 +160,29 @@ TEST_CASE("the reader takes an 'mlpa' sample rate written either way", "[truehd]
     }
 }
 
+TEST_CASE("without a usable rate code in dmlp the sample entry's field decides", "[truehd][mp4]") {
+    // ratebits 0xF names no rate (TH spec §1.4), so the field is all the reader has, and it has to read it as the
+    // integer FFmpeg writes (a low half of 0x7700 here) or as 16.16 (a low half of zero).
+    const TruehdStream stream = load("truehd_st96_s24.thd");
+    mp4::AudioTrack track = track_of(stream);
+    track.codec_config = mp4::build_dmlp_payload({.format_info = 0xF0000000U, .peak_data_rate = 1});
+    const auto file = mp4::mux(track, stream.units);
+    REQUIRE(file.has_value());
+    const auto plain = mp4::demux(*file);
+    REQUIRE(plain.has_value());
+    CHECK(plain->track.sample_rate == 96000);
+
+    std::vector<std::byte> fixed = *file;
+    const std::size_t at = find_code(fixed, "mlpa") + 4 + 24;
+    fixed[at] = std::byte{0xBB};
+    fixed[at + 1] = std::byte{0x80};
+    fixed[at + 2] = std::byte{0};
+    fixed[at + 3] = std::byte{0};
+    const auto sixteen_sixteen = mp4::demux(fixed);
+    REQUIRE(sixteen_sixteen.has_value());
+    CHECK(sixteen_sixteen->track.sample_rate == 48000);
+}
+
 TEST_CASE("an edit drops the padding samples of the last access unit", "[truehd][mp4]") {
     const TruehdStream stream = load("truehd_st44_s24.thd");  // 276 units of 40 samples, 15 of them padding
     REQUIRE(stream.padding_samples == 15);
