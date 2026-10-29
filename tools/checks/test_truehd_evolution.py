@@ -2,7 +2,7 @@
 extra data and evolution frame (TH spec v3.6 sections 16.1, 16.2, 16.4 and 15.4) that the vectors
 for libs/truehd/tests/io/test_evolution.cpp come from.
 
-Provisional, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20): there is no
+Provisional, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 22): there is no
 stream to hold the transcription to, so what is checked is that it agrees with numbers worked out by
 hand, that its writer and reader are inverses under both readings, and that the vectors file is
 what it writes.

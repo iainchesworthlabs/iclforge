@@ -26,7 +26,7 @@
 // What TH spec v3.6 §7.2, §8.3, §9.3, §10.3 and §15.3 ask of the substream that carries the object
 // audio (restart sync 0x31EC; up to 15 primitive matrices; max_matrix_chan 15; huff_lsbs up to 31;
 // a Filter B range of 32 bits) against what the decoder does (libs/truehd/ERRATA.md, "Atmos, spec
-// v3.6", question 33). The streams are the hand-built hb_substream3_limits (decoded to its signal
+// v3.6", question 35). The streams are the hand-built hb_substream3_limits (decoded to its signal
 // by test_handbuilt.cpp, and by tools/references/truehd_syntax.py) and units built here from the
 // library's writers. No decoder outside this repository reads 0x31EC: [no-external-oracle].
 

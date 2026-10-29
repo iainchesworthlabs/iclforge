@@ -1,7 +1,7 @@
 # TrueHD Atmos: the write side
 
 As of 2026-10-29. A plan; nothing in it is built. [truehd.md](truehd.md) is the plan for the codec as a whole (phase T2b is this page);
-[libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md), "Atmos, spec v3.6", has the questions this page waits on (20 to 37) and the comparison of
+[libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md), "Atmos, spec v3.6", has the questions this page waits on (22 to 39) and the comparison of
 the owner's specification with ETSI TS 103 420 that they come from.
 
 ## Where this stands
@@ -12,7 +12,7 @@ widths of the fields the two share, and differs on the structure of nearly every
 data follows TS 103 420, so the plan takes the standard's syntax, which `iclforge::objects` already writes and reads for E-AC-3, wherever v3.6
 differs. The owner's answer of 2026-10-29 is that real streams carry both layouts of v3.6, nested: §15.4's bit-level container outside and §16.3's Thrift
 ContentSignature inside one of its payloads (which payload, where, what its digest covers and what the protection bytes cover are still open,
-questions 20 and 35). The owner has also authorised settling these questions from the owner's own discs, run on the owner's machine with
+questions 22 and 37). The owner has also authorised settling these questions from the owner's own discs, run on the owner's machine with
 `forge probe DISC detail=format` (ERRATA section H says which field answers which question). What rests on the owner's word alone is everything
 about TrueHD itself: the extra data framing, substream 3, the 12, 14 and 16 channel
 presentations, the signing.
@@ -34,13 +34,13 @@ Sizes are the ROADMAP's: S an afternoon, M a day or two, L a focused week, XL se
 
 | Phase | What | Needs | Size |
 |---|---|---|---|
-| W0 | The owner's answers to questions 20 to 22, 31 and 32, from `forge probe DISC detail=format` on two or three of the owner's Atmos tracks (the output is metadata; the owner pastes it back) | the owner | the owner's time |
-| W1 | An evolution frame writer. If the container is the EMDF one (`kEmdf`), none is needed in the library: `iclforge::objects::emdf::build_container` writes the body, a program that links both libraries hands it to `EncoderConfig::extra_data`, and the reader's test already shows the bytes survive. A writer in `libs/truehd` is then a convenience of about 60 lines whose only test is "the same bytes as `build_container`". If the stream proves to be the letter of §15.4, `libs/truehd` writes it (the layering rule keeps `objects` out) and the Python transcription already builds the vectors | W0 (question 20 to 22) | S |
-| W2 | The OAMD writer: reuse `oba::build_payload_updates` (§5.5; `Program`, up to 31 objects, one to eight update blocks, bed and dynamic objects, ISF is read but not written). The new part is the mapping from the placements a front end supplies (`oba::ObjectPlacement`, ADM, IAB: the front halves of `forge atmos-adm`, `atmos-iab` and `atmos-cbi` exist) to evolution frames at the cadence TrueHD uses, which depends on question 31 (an access unit is 40 samples, an E-AC-3 frame 1536, and the standard's block offset factor runs to 2016) | W0 (31) | M |
-| W3 | The 16 channel substream: channel order (beds in Table 12's order, then ISF, then dynamic objects, §15.6.3, question 32), padding to the 12, 14 or 16 channel presentations (§15.17), `extended_substream_info` and `substream_info` bit 7 in the major sync, the extra channel meaning (§14.2, whose length unit is question 2), restart sync 0x31EC, terminatorB, the matrices of §10.3 for substream 3. The encoder's substream splitter has to learn a fourth substream whose channels follow rows 0 to 7 | W0 (32), question 2 | L |
+| W0 | The owner's answers to questions 22 to 24, 33 and 34, from `forge probe DISC detail=format` on two or three of the owner's Atmos tracks (the output is metadata; the owner pastes it back) | the owner | the owner's time |
+| W1 | An evolution frame writer. If the container is the EMDF one (`kEmdf`), none is needed in the library: `iclforge::objects::emdf::build_container` writes the body, a program that links both libraries hands it to `EncoderConfig::extra_data`, and the reader's test already shows the bytes survive. A writer in `libs/truehd` is then a convenience of about 60 lines whose only test is "the same bytes as `build_container`". If the stream proves to be the letter of §15.4, `libs/truehd` writes it (the layering rule keeps `objects` out) and the Python transcription already builds the vectors | W0 (question 22 to 24) | S |
+| W2 | The OAMD writer: reuse `oba::build_payload_updates` (§5.5; `Program`, up to 31 objects, one to eight update blocks, bed and dynamic objects, ISF is read but not written). The new part is the mapping from the placements a front end supplies (`oba::ObjectPlacement`, ADM, IAB: the front halves of `forge atmos-adm`, `atmos-iab` and `atmos-cbi` exist) to evolution frames at the cadence TrueHD uses, which depends on question 33 (an access unit is 40 samples, an E-AC-3 frame 1536, and the standard's block offset factor runs to 2016) | W0 (31) | M |
+| W3 | The 16 channel substream: channel order (beds in Table 12's order, then ISF, then dynamic objects, §15.6.3, question 34), padding to the 12, 14 or 16 channel presentations (§15.17), `extended_substream_info` and `substream_info` bit 7 in the major sync, the extra channel meaning (§14.2, whose length unit is question 2), restart sync 0x31EC, terminatorB, the matrices of §10.3 for substream 3. The encoder's substream splitter has to learn a fourth substream whose channels follow rows 0 to 7 | W0 (32), question 2 | L |
 | W4 | The presentations the other substreams carry. A TrueHD Atmos stream is also a 7.1 stream (§20.2: 8 channels from substreams 0 to 2), so the encoder needs the bed mix: either the caller supplies it or `libs/render`'s bed and object renderer makes it from the objects, with the 2 and 6 channel downmixes the encoder already writes (`DownmixMode::kStandard`, ERRATA 38). Which is wanted is a design choice (decision 6) | W3 | M |
 | W5 | Rate control for the larger stream. The §18 FIFO model and `input_timing` are kept per unit for up to 3 substreams (ERRATA 37); a fourth substream of up to 16 channels, and the evolution frames in the extra data (a frame with a few objects is tens of bytes; a signed one would be 3.5 to 4 KiB, §16.3.3), change the peak. What `peak_data_rate` means is question 12 | W3, W1 | M |
-| W6 | Signing. On the owner's reading the ContentSignature (§16.3, §16.6) is a Thrift struct inside one payload of the §15.4 container, and `evo_protection()` is a further field (an HMAC, the owner says). Nothing is written until the payload id, the digest scope and what the protection covers are known (questions 20 and 35) and the owner decides whether a stream should be signed at all (decision 4). `libs/base/src/crypto` and `libs/ac4/src/io/content_signature.cpp` hold the primitives and the Thrift reader for AC-4; the same envelope is claimed for TrueHD | W0, decision 4 | L, if wanted |
+| W6 | Signing. On the owner's reading the ContentSignature (§16.3, §16.6) is a Thrift struct inside one payload of the §15.4 container, and `evo_protection()` is a further field (an HMAC, the owner says). Nothing is written until the payload id, the digest scope and what the protection covers are known (questions 22 and 37) and the owner decides whether a stream should be signed at all (decision 4). `libs/base/src/crypto` and `libs/ac4/src/io/content_signature.cpp` hold the primitives and the Thrift reader for AC-4; the same envelope is claimed for TrueHD | W0, decision 4 | L, if wanted |
 | W7 | The forge surface. Either `forge truehd-encode` takes the object inputs (`objects=`, `adm=`, `iab=`) or a new `truehd-atmos` command does (the second keeps `truehd-encode`'s WAV-in rule simple); and `forge decode truehd-presentation=all` gains an object output beside the WAV (`objects_dir=`, as the E-AC-3 decode has). The project file's command (`apps/shared/project`) and the GUI follow (neither names TrueHD yet, [truehd.md](truehd.md), "Not done in T2c") | W2, W3 | M, then M |
 | W8 | Tests and oracles (below) | all | M |
 
@@ -64,7 +64,7 @@ no encoder for them; no other decoder is used here (the owner's rule). So:
   truehd-presentation=all truehd-check=lenient` on the same track writes a WAV the owner can discard and prints a `lossless check: N
   interval(s) ok, M failed` line, which for a real substream 3 is a check of the decoder against Dolby's encoder that needs no reference decoder at all.
   Neither command prints content. What to paste back: the `evolution` lines of the probe and the `lossless` line of the decode. This is the
-  step that settles questions 20 to 22 and 31 to 33 for the read side, and the write side should not start before it.
+  step that settles questions 22 to 24 and 33 to 35 for the read side, and the write side should not start before it.
 - **A DEE gold set could prove the write side, if DEE writes it.** `tools/generators/gen_dee_gold.py` has an Atmos leg for TrueHD
   (`--presentation atmos` with an ADM master; whether DEE accepts it for TrueHD is not known, [truehd.md](truehd.md), "Oracles" item 3). A DEE
   stream of a known master, decoded here and scored against the master, would be the only external check of both the substream 3 layout
@@ -74,10 +74,10 @@ no encoder for them; no other decoder is used here (the owner's rule). So:
 
 ## Risks
 
-1. The specification contradicts itself and the standard in §15 (ERRATA B and C); a writer built on the wrong side of question 20 or 21
+1. The specification contradicts itself and the standard in §15 (ERRATA B and C); a writer built on the wrong side of question 22 or 23
    produces streams that parse here and nowhere else. Mitigation: no writing before the owner's answers (W0), and the reader's two readings.
-2. The time base (question 31). A wrong cadence is invisible to our own decoder and audible to a real renderer.
-3. Channel order and the 12, 14 and 16 presentations (question 32): the same, and the bed mix of W4 has to agree with the object mix or a
+2. The time base (question 33). A wrong cadence is invisible to our own decoder and audible to a real renderer.
+3. Channel order and the 12, 14 and 16 presentations (question 34): the same, and the bed mix of W4 has to agree with the object mix or a
    legacy decoder plays a different programme from an Atmos one.
 4. Signing: a licensed decoder may require the signature (§16.3.1 says verification happens before the payload is used, §16.6.4). If it
    does, an unsigned stream carries no objects for it and the work is for nothing without W6; if the signing material is Dolby's, it cannot
@@ -89,10 +89,10 @@ no encoder for them; no other decoder is used here (the owner's rule). So:
 
 ## Decisions for the owner
 
-1. Which container real streams carry, and the coding of variable-length numbers (questions 20 to 22). Settled by the probe on real tracks.
-2. The cadence and time base of the object metadata (question 31) and what the 12, 14 and 16 channel presentations are (question 32).
-3. Whether the write side should follow the standard's syntax where v3.6 differs (recommended; questions 24 to 30).
-4. Whether a stream this project writes should be signed, with what key, and what an unsigned stream is for (question 35, question 1). Recommended:
+1. Which container real streams carry, and the coding of variable-length numbers (questions 22 to 24). Settled by the probe on real tracks.
+2. The cadence and time base of the object metadata (question 33) and what the 12, 14 and 16 channel presentations are (question 34).
+3. Whether the write side should follow the standard's syntax where v3.6 differs (recommended; questions 26 to 32).
+4. Whether a stream this project writes should be signed, with what key, and what an unsigned stream is for (question 37, question 1). Recommended:
    unsigned, labelled in the stream's documentation as not accepted by every licensed decoder, until the owner has seen one of the owner's
    decoders play it.
 5. The input for an Atmos encode: an ADM BWF master and the IAB reader (both exist for E-AC-3 and AC-4), or a pair of a 7.1 bed WAV and an
@@ -105,6 +105,6 @@ no encoder for them; no other decoder is used here (the owner's rule). So:
 ## Not in scope
 
 Rendering the objects to speakers in `libs/truehd` (the decoder hands out bytes and channels; `libs/render` renders); headphone or binaural
-rendering (the headphone element is reserved in the standard and has no layout in v3.6, question 26); 44.1 kHz-family Atmos (§15.2 allows 48 kHz
+rendering (the headphone element is reserved in the standard and has no layout in v3.6, question 28); 44.1 kHz-family Atmos (§15.2 allows 48 kHz
 only); MLP; and anything that analyses a Dolby-made stream beyond what the owner's specification and the owner's own tracks, read by the
 owner's own machine, show.

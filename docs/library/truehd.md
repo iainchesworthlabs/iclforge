@@ -62,7 +62,7 @@ bit-level container of TH spec v3.6 section 15.4 (version, key id, payloads with
 protection field, which is returned and not verified). `EvolutionFrame::oamd()` hands out the bytes of payload id 11, the
 object audio metadata, for a program that links `iclforge::objects` to parse with `iclforge::objects::oba::parse_payload`;
 this library links `iclforge::base` and nothing else. `forge probe` prints what it finds. The reading is provisional
-(`libs/truehd/ERRATA.md`, questions 20 to 22): the owner's reading is that this container is the outer one and the Thrift content
+(`libs/truehd/ERRATA.md`, questions 22 to 24): the owner's reading is that this container is the outer one and the Thrift content
 signature is nested in one of its payloads, so every payload is carried as bytes with its id and size and none but the object audio
 metadata is looked into here.
 

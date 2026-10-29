@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """An independent transcription of the TrueHD extra data and of the evolution frame inside it.
 
-PROVISIONAL, OWNER TO CONFIRM (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20). It is
+PROVISIONAL, OWNER TO CONFIRM (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 22). It is
 written from the owner's TrueHD (MLP) Reference Specification v3.6, sections 16.1, 16.2 and 16.4
 (the extra data region, its check nibble and its parity) and section 15.4 (evo_frame()), in plain
 Python with no code shared with libs/truehd. No stream this project has carries an evolution
 frame, so the vectors are built here, by a writer that is also a transcription, and the C++ reader
 (libs/truehd/include/iclforge/truehd/io/evolution.hpp) is held to what this module reads from them.
 
-Two readings of section 15.4 (ERRATA questions 21 and 22):
+Two readings of section 15.4 (ERRATA questions 23 and 24):
 
   emdf    the EMDF container of ETSI TS 102 366 Annex H that section 15.4 renames: variable_bits
           are groups of n bits each followed by a read-more flag (ETSI TS 103 420 5.5.1), payload

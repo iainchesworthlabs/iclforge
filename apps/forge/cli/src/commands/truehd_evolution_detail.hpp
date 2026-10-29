@@ -15,7 +15,7 @@ class JsonSink;
 
 // `forge probe detail=evolution`: the structure of the evolution frames of a TrueHD stream, in
 // enough detail to settle the open questions about them from the output alone
-// (libs/truehd/ERRATA.md, "Atmos, spec v3.6", questions 20 to 22 and 35). For the first frames, one
+// (libs/truehd/ERRATA.md, "Atmos, spec v3.6", questions 22 to 24 and 37). For the first frames, one
 // by one: the extra data's check nibble, framing and parity, and the container's fields (version,
 // key id, each payload's id, size and configuration flags, the protection length codes). For every
 // distinct shape of frame (the list of payload ids, the protection length codes, the reading that
@@ -28,8 +28,8 @@ class JsonSink;
 // Metadata only. No payload byte, certificate, digest, signature or protection byte is printed, and
 // no value of a Thrift field: the walk gives the shape of the struct, not what is in it.
 //
-// PROVISIONAL, owner to confirm: the readings are the library's two (ERRATA question 21), and where
-// the Thrift struct starts inside a payload is not known (question 20), so the walk tries offsets 0
+// PROVISIONAL, owner to confirm: the readings are the library's two (ERRATA question 23), and where
+// the Thrift struct starts inside a payload is not known (question 22), so the walk tries offsets 0
 // to 16 and reports the first at which a whole struct reads.
 
 namespace forge_cli::commands {

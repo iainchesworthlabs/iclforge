@@ -974,7 +974,7 @@ are clean (a payload, and only zero bits after the protection field); which payl
 object audio metadata read by `iclforge::objects`: the object count, the bed channels, the number of dynamic objects and of update
 blocks; how many units apart the frames come; and the first four bytes of the first frame (the container's version, key id and
 the start of its first payload id). It prints metadata only. The protection bytes and any signature are not verified, and the report says so. The reading is
-provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 20), and
+provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 22), and
 this report is the check to run on a real Atmos track.
 
 `detail=evolution`, `detail=structure` and `detail=format` (both) are for the owner's check of a disc's stream and describe TrueHD and MLP

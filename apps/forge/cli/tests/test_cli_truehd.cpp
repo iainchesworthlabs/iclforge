@@ -256,7 +256,7 @@ TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][trueh
 }
 
 // --- the evolution frame in probe --------------------------------------------------------------
-// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20): no real
+// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 22): no real
 // stream carries an evolution frame, so the stream here is the encoder's, with the extra data
 // framing it writes around the E-AC-3 container's body holding an OAMD payload from
 // iclforge::objects.

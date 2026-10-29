@@ -71,7 +71,7 @@ See [README.md](README.md) for the project overview and
   reading is provisional; the probe is the check to run on a real Atmos track. A new hand-built stream, `hb_substream3_limits`, holds the
   decoder to substream 3's limits in v3.6 (restart sync 0x31EC, 15 matrices, `huff_lsbs` 29 to 31, values past 24 bits before the matrices):
   the decoder already accepts all of it, and the refusal of `huff_lsbs` above the limit now names both limits. `libs/truehd/ERRATA.md`
-  sets sections 15.4 to 15.15 of v3.6 against ETSI TS 103 420 statement by statement, with 18 new questions for the owner (20 to 37).
+  sets sections 15.4 to 15.15 of v3.6 against ETSI TS 103 420 statement by statement, with 18 new questions for the owner (22 to 39).
 - **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
   tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
   out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,

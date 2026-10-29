@@ -13,7 +13,7 @@
 
 // The evolution frame of a unit's extra data (TH spec v3.6 §15.4, §16.1), read into plain
 // structures: the payload ids, their configuration, their bytes and the protection field.
-// PROVISIONAL, OWNER TO CONFIRM (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20): no stream
+// PROVISIONAL, OWNER TO CONFIRM (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 22): no stream
 // this project has carries an evolution frame. v3.6 describes the same bytes twice, as the bit-level
 // container read here (§15.4) and as a Thrift container with a signature (§16.3, whose layout
 // §16.3.3 says is not confirmed). The owner's reading (2026-10-29) is that real streams carry both,
@@ -40,8 +40,8 @@
 // takes a bare payload, and that is how `forge probe` reads the object count and the bed
 // assignment.
 //
-// Two readings, because §15.4's text and the standard it renames differ (ERRATA questions 21 and
-// 22):
+// Two readings, because §15.4's text and the standard it renames differ (ERRATA questions 23 and
+// 24):
 //
 //   kEmdf   the container of ETSI TS 102 366 Annex H as iclforge::objects::emdf::parse_container
 //           reads it: variable_bits are groups of n bits each followed by a read-more flag

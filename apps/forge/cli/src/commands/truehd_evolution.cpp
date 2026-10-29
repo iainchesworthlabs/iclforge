@@ -164,7 +164,7 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
 void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     json.begin_object();
     json.member("provisional", true);
-    json.member("question", "libs/truehd/ERRATA.md, Atmos spec v3.6, question 20");
+    json.member("question", "libs/truehd/ERRATA.md, Atmos spec v3.6, question 22");
     json.member("regions", regions_);
     if (regions_ == 0) {
         if (detail_enabled_) {
@@ -280,7 +280,7 @@ void EvolutionSurvey::print_text() const {
     }
     fmt::println(
         "{:<16}{} unit(s) carry extra data, {} read as an evolution frame (provisional, "
-        "ERRATA question 20)",
+        "ERRATA question 22)",
         "evolution", regions_, frames_read_);
     continuation(
         fmt::format("check nibble {}/{}, framing {}/{}, parity {}/{}, evo_reserved 0 in "

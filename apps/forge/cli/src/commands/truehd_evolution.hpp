@@ -20,7 +20,7 @@ class JsonSink;
 // frame comes. Metadata only: no payload byte is printed except the first four of the first frame
 // (the container's version, key id and the start of its first payload id).
 //
-// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 20). The
+// PROVISIONAL, owner to confirm (libs/truehd/ERRATA.md, "Atmos, spec v3.6", question 22). The
 // frames are read as TH spec v3.6 §15.4 under both readings the library has (the EMDF container's
 // and the letter of §15.4), and the report says which one read each. Nothing is verified: the
 // protection bytes (§15.4) and any signature (§16.3, §16.6) are returned by the library and not
