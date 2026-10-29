@@ -48,6 +48,7 @@
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "associated_mix.hpp"
+#include "truehd.hpp"
 #include "stream_playback.hpp"
 
 namespace forge_cli::commands {
@@ -1440,6 +1441,15 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     const auto stream = read_elementary_stream(in_path);
     if (stream.empty()) {
         return kExitInput;
+    }
+    // TrueHD and MLP have no sync word at the start: the first access unit's four header bytes come
+    // before its major sync (0xF8726FBA, 0xF8726FBB).
+    if (is_truehd_stream(stream)) {
+        return run_decode_truehd(stream, in_path, out_path, requested);
+    }
+    if (!requested.truehd_presentation.empty() || requested.truehd_lenient) {
+        fmt::println(stderr, "warning: {} is not TrueHD or MLP: truehd-presentation= and truehd-check= are ignored",
+                     in_path);
     }
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where
     // AC-3's and E-AC-3's is 0x0B77; the first two bytes decide which decoder

@@ -132,6 +132,10 @@ struct Options {
     // pays one null pointer and no per-block work. See the header for why this
     // has to exist before any masked comparison does.
     std::string bap_census_path;
+    // 'decode' of TrueHD and MLP only: the substreams to read (best, 2ch, 6ch, 8ch or all; empty is
+    // best), and whether a failed check is counted instead of stopping the decode.
+    std::string truehd_presentation;
+    bool truehd_lenient = false;
     // 'ac4-encode' and 'decode' of AC-4 only: when non-empty, write the
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value

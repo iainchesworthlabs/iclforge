@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 112> kOptionTokens{{
+constexpr std::array<OptionToken, 114> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -89,6 +89,8 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"dialogue-enhancement=", "decode of AC-4: raise the dialogue by 0 to 12 dB, capped by the stream"},
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
+    {"truehd-presentation=", "decode of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all"},
+    {"truehd-check=", "decode of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},

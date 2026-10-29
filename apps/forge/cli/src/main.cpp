@@ -387,7 +387,7 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kStdio | topic::kAc4Encode,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
-    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
+    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "
      "direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and "

@@ -2312,6 +2312,23 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.bap_census_path = std::string{value};
             continue;
         }
+        // TrueHD and MLP, which 'decode' alone reads; run_decode says when the input is something else.
+        if (command == "decode" && key == "truehd-presentation") {
+            if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
+                fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
+                return false;
+            }
+            out.truehd_presentation = std::string{value};
+            continue;
+        }
+        if (command == "decode" && key == "truehd-check") {
+            if (value != "strict" && value != "lenient") {
+                fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);
+                return false;
+            }
+            out.truehd_lenient = value == "lenient";
+            continue;
+        }
         // Scoped like bap-census, and for the same reason: only these two
         // record an AC-4 syntax trace. 'decode' refuses it for AC-3 and E-AC-3
         // input itself, since which syntax a stream holds is known only once
