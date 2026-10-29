@@ -2349,22 +2349,23 @@ only, and part of the second has no outside reader.
    channels, 16, 20 and 24 bits and signals, and the encode legs of `tools/ci/run_codec_matrix.sh`, which also read the
    same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
 2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
-   do not write: an IIR filter, LSB bypass, noise generator 0, several matrices with a permuted `ch_assign` and an output shift, the
-   block data check, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
+   do not write: an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1, several matrices with a permuted `ch_assign` and an output shift (also a negative one, and one on a moved channel), 16 bit MLP words, the
+   block data check, terminators, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
-   it: for eleven of the fifteen it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, LSB bypass, three matrices
-   with a permuted `ch_assign` and an output shift, noise generator 0, `noise_type` 1 with zero noise shifts, the block data
-   length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other four: with the marker in
-   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel stream and the one at substream 3's limits, whose
-   substreams 2 and 3 use restart sync `0x31EC`; and it decodes the stream with a non-zero matrix noise shift under `0x31EB`, which the library refuses because noise
-   generator 1's table is not available. Comparing found four readings the first writer and the library had wrong, each now
+   it: for eighteen of the twenty-eight it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
+   `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` and an output shift (also on a moved channel),
+   noise generator 0, noise generator 1 at 48, 96 and 192 kHz, the block data
+   length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other ten: with the marker in
+   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel streams and the one at substream 3's limits, whose
+   substreams 2 and 3 use restart sync `0x31EC`, and a stream with a terminator after the last block; it does not apply a negative output shift; and it clears the low bits of a 16 bit MLP word.
+   The noise generator 1 streams carry the readings of ERRATA entry 44 (the buffer size, start index and stride), which FFmpeg's decode fixed. Comparing found four readings the first writer and the library had wrong, each now
    FFmpeg's and marked provisional in ERRATA.md: the lossless check's channel shift (question 6), the filter histories across a
    restart (question 18), the width of `shr7` in noise generator 0 (question 5) and the block data length (entry 21). What FFmpeg
    does not read stays without an outside reader: the layout of the extra data, the values of the DRC word, the block data CRC,
    and the 16-channel substream; for those a misreading of the specification is in the writer and in both decoders alike.
    `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
-   (63 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
+   (71 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
    the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
    failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
@@ -2386,8 +2387,8 @@ finished on a constant block far from zero, which is now a regression seed and a
 over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
 outside the library reads the 2 and 6 channel presentations.
 
-Not covered: noise generator 1 beyond a stream whose matrices have no non-zero noise shift and bypass no LSB (its table is
-not available, so a restart under sync 0x31EB with either is refused; `libs/truehd/ERRATA.md`, entry 32), heavy DRC (not read, and not written)
+Not covered: the details of noise generator 1 that the specification leaves out (the buffer size, start index and stride are measured
+against FFmpeg and wait for the owner: `libs/truehd/ERRATA.md`, entry 44), heavy DRC (not read, and not written)
 and the block data CRC (the length is checked, the algorithm is not known); and, in the encoder, the IIR filter, LSB bypass
 and a negative output shift, which it does not write.
 

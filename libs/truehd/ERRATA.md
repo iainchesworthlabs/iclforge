@@ -996,7 +996,7 @@ is entry 32: three substreams, the third with sync 0x31EB, made by the encoder a
 The stream `hb_substream3_limits` is made by `tools/references/truehd_writer.py`: four substreams, the last of 16 channels with sync 0x31EC,
 `max_matrix_chan` 15 and 15 primitive matrices on channels 8 to 15, two channels with a FIR filter of gain -5.9 and two with an IIR filter whose
 residual reaches 2^28, `huff_lsbs` 29 to 31, terminatorB. `python3 tools/checks/verify_truehd_interop.py --handbuilt --forge forge --reference`
-holds `forge decode` and the Python reference to its signal (15 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
+holds `forge decode` and the Python reference to its signal (28 hand-built streams, 0 failing) and FFmpeg 6.1.1 to refusing it, as the manifest says.
 Only PCM of 24 bits is given back: a value of an object channel that needs more would lose its top bits in the output (and in the lossless check,
 which folds the low three bytes), and v3.6 says nothing about the width (question 35).
 
