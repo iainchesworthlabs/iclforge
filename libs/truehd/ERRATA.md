@@ -46,6 +46,13 @@ The scripts quoted as evidence are the exploration scripts of the T1 work; the c
 9. **The block data CRC (§8.1, App. B).** Polynomial 0x63; the initial value and the bytes covered are not given and
    no stream sets `data_check_present`. The library checks `block_data_bits` (the length) and does not check the CRC.
 
+10. **Heavy DRC (§7.1, §12.2).** The restart header is listed with `heavy_drc_present` and, when set, a 9-bit gain and a
+    3-bit time. The streams' header has no room for them where the specification puts them (entry 7: its fields after
+    `lossless_check` replace reserved bits the streams have), so where they sit cannot be told, and a header that
+    sets the bit may be longer than any stream here. The library reads the 16 bits as `tail` and writes nothing for
+    heavy DRC; the directory's standard DRC word (§12.1) is read and carried (entry 18). Please give the layout, or
+    a DEE stream that sets `heavy_drc_present`.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -166,6 +173,14 @@ every channel is `huff_type` 0 with `huff_lsbs` 24. The bit that gives each pres
 **20. The Huffman codebooks (App. C).** The three codebooks decode every residual of every stream. Their codes use
 255/256 of the code space (the codes are prefix-free: checked at compile time), so an unused 9-bit prefix is an error
 (`ErrorKind::kBadBlockData`).
+
+**22. Extra data (§16.1) and the terminators written by `tools/references/truehd_writer.py`.** Read and written as
+the specification lays them out: a header word (`header_check_nibble`, `extra_data_length`), a word with
+`evo_reserved` and `evo_frame_byte_length`, the payload, zero padding, and the parity byte; the length is taken as the
+words of the whole extra data (§16.2 says only "in 16-bit words"), and the decoder does not depend on it. The payload
+is carried as opaque bytes. `terminatorB` (0x1234) is read right after the last block's flag of substream 3. No stream
+has either (**no oracle**; `testdata/truehd/handbuilt/`). Every hand-built stream is expected to decode to the signal
+it was made from; none has an external decoder.
 
 **21. Block data length (§8.1).** With `data_check_present`, `block_data_bits` counts the sample data from the end of
 the 16-bit field to the block data CRC, which follows it. No stream sets the flag; the library checks the length as

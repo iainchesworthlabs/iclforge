@@ -334,6 +334,8 @@ def residual(bits, channel, quant):
 def decode_block(sub, bits, rows, first):
     """Decode one block into rows[first:first + block_size], which the substreams share."""
     size = sub.block_size
+    expected_bits = bits.read(16) if sub.data_check else None
+    start = bits.pos
     for row in rows[first : first + size]:
         for column in range(sub.max_matrix_chan + 1):
             if sub.index == 0:
@@ -347,7 +349,9 @@ def decode_block(sub, bits, rows, first):
         for ch in range(sub.min_chan, sub.max_chan + 1):
             rows[first + i][ch] = residual(bits, sub.channels[ch], sub.quant[ch])
     if sub.data_check:
-        raise StreamError("data_check_present is not supported by the reference")
+        if bits.pos - start != expected_bits:
+            raise StreamError("block data length")
+        bits.read(8)  # block_data_crc: the algorithm is not known (ERRATA open question 9)
     # The prediction filters (ERRATA 13).
     for ch in range(sub.min_chan, sub.max_chan + 1):
         channel = sub.channels[ch]
@@ -412,7 +416,9 @@ def decode_segment(sub, entry, segment, rows):
         if bits.read(1):
             break
     padding = 0
-    if bits.left() >= 32 and bits.bits(len(payload) * 8 - 32, 20) == END_MARKER:
+    if sub.index == 3 and bits.left() >= 16 and bits.bits(bits.pos, 16) == 0x1234:
+        bits.pos += 16  # terminatorB (TH spec 16.5): no stream of FFmpeg's has it
+    elif bits.left() >= 32 and bits.bits(len(payload) * 8 - 32, 20) == END_MARKER:
         padding = bits.bits(len(payload) * 8 - 12, 12)
     return out, padding
 
@@ -435,7 +441,7 @@ def nibble_fold(data):
     return ((folded >> 4) ^ folded) & 0xF
 
 
-def decode_stream(data):
+def decode_stream(data, presentation="best"):
     """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
     substreams = [Substream(i) for i in range(4)]
     count = 0
@@ -466,7 +472,8 @@ def decode_stream(data):
         rows = []
         previous = 0
         out = padding = None
-        for index, entry in enumerate(entries):
+        wanted = {"best": min(count, 3), "2ch": 1, "6ch": 2, "8ch": 3, "all": count}[presentation]
+        for index, entry in enumerate(entries[:wanted]):
             segment = unit[offset + previous * 2 : offset + entry["end"] * 2]
             previous = entry["end"]
             out, padding = decode_segment(substreams[index], entry, segment, rows)

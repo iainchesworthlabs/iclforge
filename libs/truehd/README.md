@@ -43,3 +43,7 @@ so those have no external oracle (see the plan).
 
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
+The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
+do not write: an IIR filter, LSB bypass, several matrices, the block data check, the end-of-stream marker, extra data,
+the directory's DRC word and the 16-channel substream. They have no external oracle: they are held to the signal each
+was made from, by this decoder and by `tools/references/truehd_syntax.py`.
