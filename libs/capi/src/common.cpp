@@ -43,6 +43,22 @@ const char* iclforge_status_message(iclforge_status_t status) {
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG: return "invalid AC-4 encoder configuration";
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT: return "invalid AC-4 encoder input";
         case ICLFORGE_ERROR_LYRICS_UNREADABLE: return "not lyrics";
+        case ICLFORGE_ERROR_TRUEHD_TRUNCATED: return "truncated TrueHD data";
+        case ICLFORGE_ERROR_TRUEHD_BAD_SYNC: return "no TrueHD major sync or access unit";
+        case ICLFORGE_ERROR_TRUEHD_BAD_CHECK_NIBBLE: return "bad TrueHD check nibble";
+        case ICLFORGE_ERROR_TRUEHD_BAD_LENGTH: return "bad TrueHD length";
+        case ICLFORGE_ERROR_TRUEHD_BAD_SIGNATURE: return "bad TrueHD major sync signature";
+        case ICLFORGE_ERROR_TRUEHD_BAD_MAJOR_SYNC_CRC: return "bad TrueHD major sync CRC";
+        case ICLFORGE_ERROR_TRUEHD_BAD_RESTART_SYNC: return "bad TrueHD restart sync";
+        case ICLFORGE_ERROR_TRUEHD_BAD_RESTART_CRC: return "bad TrueHD restart header CRC";
+        case ICLFORGE_ERROR_TRUEHD_BAD_PARITY: return "bad TrueHD substream parity";
+        case ICLFORGE_ERROR_TRUEHD_BAD_SUBSTREAM_CRC: return "bad TrueHD substream CRC";
+        case ICLFORGE_ERROR_TRUEHD_BAD_PARAMETER: return "TrueHD parameter out of range";
+        case ICLFORGE_ERROR_TRUEHD_BAD_BLOCK_DATA: return "bad TrueHD block data";
+        case ICLFORGE_ERROR_TRUEHD_BAD_LOSSLESS_CHECK: return "TrueHD lossless check failed";
+        case ICLFORGE_ERROR_TRUEHD_NEEDS_RESTART:
+            return "TrueHD substream needs a restart header not yet seen";
+        case ICLFORGE_ERROR_TRUEHD_UNSUPPORTED: return "legal but unsupported TrueHD syntax";
     }
     return "unknown status";
 }

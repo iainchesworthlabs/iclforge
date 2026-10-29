@@ -67,6 +67,11 @@
 # inspector, the decoder and the encoder, with the tables and transforms they
 # share inside it.
 #
+# TrueHD and MLP (libs/truehd, the iclforge_truehd_* functions of iclforge.h) follow the same
+# rule: truehd.cpp with ICLFORGE_BUILD_TRUEHD on, with iclforge::truehd_static embedded,
+# truehd_absent.cpp (which names no iclforge::truehd:: type) with it off. The decoder is the whole of
+# it for now; the encoder follows when libs/truehd has one.
+#
 # The lyrics reader (libs/lyrics, the iclforge_lyrics_* functions of iclforge.h) is COMPILED INTO
 # this library, not linked: iclforge::lyrics is an internal library that is never installed, so an
 # installed archive of this one cannot name it as a dependency, and its code is standard-library
@@ -111,6 +116,12 @@ if(ICLFORGE_BUILD_AC4)
 else()
     list(APPEND _capi_sources src/ac4_absent.cpp)
 endif()
+if(ICLFORGE_BUILD_TRUEHD)
+    list(APPEND _capi_sources src/truehd.cpp)
+    list(APPEND _capi_embeds iclforge::truehd_static)
+else()
+    list(APPEND _capi_sources src/truehd_absent.cpp)
+endif()
 
 iclforge_add_library(capi
     NO_C4251_SUPPRESSION
@@ -140,6 +151,7 @@ set(ICLFORGE_C_VERSION_MINOR "${CMAKE_MATCH_2}")
 set(ICLFORGE_C_VERSION_PATCH "${CMAKE_MATCH_3}")
 # Feeds version.h.in's #cmakedefine ICLFORGE_HAS_AC4 - see that file's comment.
 set(ICLFORGE_HAS_AC4 ${ICLFORGE_BUILD_AC4})
+set(ICLFORGE_HAS_TRUEHD ${ICLFORGE_BUILD_TRUEHD})
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/iclforge_c/version.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge_c/version.h"
