@@ -33,7 +33,18 @@
 //      not become a false finding. Anything on the benign list below is the exception.
 //
 // When both hold, the codec is lossless and nothing is left to interpret: the two must agree on
-// the sample rate, the channel count, the number of samples and every sample. FFmpeg returns the
+// the sample rate, the channel count, the number of samples and every sample, at the word length
+// FFmpeg writes. That is the stream's: an MLP stream whose major sync declares 16-bit words
+// (group 1's word length code 0) comes out of FFmpeg as 16-bit samples (ffprobe says s16 and
+// bits_per_raw_sample 16), every other stream, TrueHD at any rate and MLP at 20 or 24 bits, as 24
+// (s32 and 24). The library returns the 24-bit value the stream decodes to, whatever the declared
+// width. A stream that is what it declares never shows the difference, because a 16-bit stream's
+// samples have eight zero bits below them, but a mutation of the audio of one does: the first
+// finding of this harness was a 16-bit MLP stream whose residual change left bit 7 of a
+// channel set, which FFmpeg dropped (80256 against 80128, in a stream that declared 16 bits and
+// carried 17). So for an MLP stream of 16-bit words the library's samples are compared with the
+// eight bits below the declared width cleared; libs/truehd/ERRATA.md question 40 asks whether the
+// library should do that itself. FFmpeg returns the
 // channels of a 7 or 8 channel stream in its own order (verify_truehd_interop.py puts them back),
 // so a channel-for-channel mismatch is then retried with each decoder's channels sorted by their
 // samples, and only a difference that remains is a divergence: which channel is which is a
@@ -98,8 +109,10 @@ inline constexpr std::array<std::string_view, 0> kBenignWarnings{};
 struct Pcm {
     std::uint32_t sample_rate = 0;
     int channels = 0;
-    bool mlp =
-        false;  // the stream's major sync is MLP's, which FFmpeg reads as "mlp", not "truehd"
+    // The stream's major sync is MLP's, which FFmpeg reads as "mlp", not "truehd".
+    bool mlp = false;
+    // The width FFmpeg writes the samples at (see the rule at the top of this file).
+    int word_bits = 24;
     std::vector<std::int32_t> samples;
 };
 
@@ -182,6 +195,9 @@ inline std::optional<Pcm> decode_ours(std::span<const std::byte> bytes) {
     }
     const DecoderCounters& counters = decoder.counters();
     pcm.mlp = decoder.major_sync() && decoder.major_sync()->kind == StreamKind::kMlp;
+    if (pcm.mlp && mlp_word_bits(decoder.major_sync()->group1_bits_code()) == 16) {
+        pcm.word_bits = 16;
+    }
     if (units == 0 || reader.skipped_bytes() != 0 || reader.offset() != bytes.size() ||
         counters.check_failures != 0 || counters.lossless_check_failures != 0 ||
         counters.units_waiting != 0 || counters.units_decoded != units) {
@@ -347,7 +363,13 @@ enum class Verdict : std::uint8_t {
         ours.samples.size() % static_cast<std::size_t>(ours.channels) != 0) {
         return Verdict::kNotComparable;
     }
-    if (ours.samples == theirs.samples) {
+    // The library's samples at the width FFmpeg writes: the bits below it cleared.
+    const std::int32_t keep = ~((std::int32_t{1} << (24 - ours.word_bits)) - 1);
+    Pcm narrowed = ours;
+    for (std::int32_t& sample : narrowed.samples) {
+        sample &= keep;
+    }
+    if (narrowed.samples == theirs.samples) {
         return Verdict::kEqual;
     }
     if (ours.samples.size() != theirs.samples.size()) {
@@ -356,7 +378,7 @@ enum class Verdict : std::uint8_t {
     std::vector<std::vector<std::int32_t>> a;
     std::vector<std::vector<std::int32_t>> b;
     for (int c = 0; c < ours.channels; ++c) {
-        a.push_back(channel_of(ours, c));
+        a.push_back(channel_of(narrowed, c));
         b.push_back(channel_of(theirs, c));
     }
     std::sort(a.begin(), a.end());

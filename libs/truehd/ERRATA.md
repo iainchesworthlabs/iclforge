@@ -171,6 +171,19 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     and a recommendation for each. Section H there says which fields of `forge probe DISC detail=format` answer questions 2, 3, 10 and 11
     above and the Atmos ones, for the owner to run on a disc's stream.
 
+40. **The word length of an MLP stream (§1.4, §5.2; FFmpeg's decoder).** An MLP major sync declares the word length of
+    its output (group 1: code 0 is 16 bits, 1 is 20, 2 is 24); a TrueHD stream has no such field. FFmpeg's decoder writes
+    a 16-bit MLP stream as 16-bit samples (`ffprobe`: `s16`, 16 bits per raw sample) and every other stream as 24. The
+    library returns the 24-bit value a stream decodes to. A stream that is what it declares never shows the difference,
+    since the samples of a 16-bit stream have eight zero bits below them, but a stream whose coded samples have a bit set
+    below its declared width does: the differential fuzzer's first finding was `mlp_st44_s16.mlp` with two bytes of audio
+    changed (the checks put right), whose right channel decoded to 80256 in the library and 80128 in FFmpeg. Should the
+    decoder clear the bits below the declared word length, as FFmpeg does, or return what the stream codes?
+    Recommendation: return what the stream codes, and leave the width to the caller, since the declared width is
+    metadata about the stream and no valid stream differs; `libs/truehd/fuzz/differential_oracle.hpp` clears the bits
+    on the library's side before it compares. Evidence: `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/`
+    (replay it with `ICLFORGE_DIFF_MEASURE_ONLY=1` to see the outcome).
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".

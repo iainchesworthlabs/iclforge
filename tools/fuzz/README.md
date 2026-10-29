@@ -703,9 +703,14 @@ in `libs/truehd/fuzz/differential_oracle.hpp`, and is this:
   nothing about the samples. Any warning takes the case out of the comparison, not only that one,
   because the text of FFmpeg's other warnings has not been read here.
 - When both hold the samples must be equal: the same rate, the same channel count, the same number
-  of samples, every sample. FFmpeg returns a 7 or 8 channel stream's channels in its own order, so
-  a mismatch is retried with both decoders' channels sorted, and only what still differs is a
-  divergence.
+  of samples, every sample, at the word length FFmpeg writes. FFmpeg returns a 7 or 8 channel
+  stream's channels in its own order, so a mismatch is retried with both decoders' channels sorted,
+  and only what still differs is a divergence. It writes an MLP stream that declares 16-bit words as
+  16-bit samples and everything else as 24, and the library returns the 24-bit value a stream
+  decodes to, so for the first the library's samples are compared with the low eight bits cleared.
+  The two differ only on a stream that codes a bit below its declared width, which is what the
+  first finding was (`regressions/fuzz_differential_truehd_decode/`, and `libs/truehd/ERRATA.md`
+  question 40 asks whether the library should do the clearing).
 
 Everything else is skipped without comment: a stream either decoder refuses, a stream FFmpeg warns
 about or declines (it refuses restart sync 0x31EC, and warns that it does not implement a block
