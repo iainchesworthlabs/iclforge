@@ -1051,8 +1051,8 @@ void print_option_blocks(std::uint32_t mask) {
                      "decode; any order, after the positional arguments):");
         fmt::println("  sign-content      ac4-encode/atmos-encode: sign the file once it is written; "
                      "needs content-key= and content-chain=");
-        fmt::println("  verify-content    decode: stop (exit 6) unless the signature, its chain and an "
-                     "anchor all check");
+        fmt::println("  verify-content    decode: stop (exit 2) unless the signature, its chain and an "
+                     "anchor all check; ac4-verify exits 6 for the same");
         fmt::println("  check-content     decode: report what the checks find and play on");
         fmt::println("  unanchored-ok     with verify-content: a signature that checks out but whose "
                      "chain reaches no trust-anchor= or pin= also passes; it is still reported as "

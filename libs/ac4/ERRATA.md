@@ -44,9 +44,11 @@ owner decides; none of them blocks the rest.
    `kContentSignatureInfoThriftDataId` and say its wire layout is not confirmed. We neither write nor
    read it. If it is needed, a layout or a sample is.
 6. **More than one signature entry, or more than one content digest.** The blob holds a list of
-   entries and a list of digests. We verify the first entry and the digest whose reference is
-   `digest_data_ref_win_signature_data`, and do not look at the rest. Should a second entry be
-   refused, verified too, or reported?
+   entries and a list of digests. A blob with anything but exactly one signature entry is refused,
+   so a copy of a valid signature with a second, damaged entry cannot pass for valid; so is a list
+   of more than eight content digests. The digest used is the one whose reference is
+   `digest_data_ref_win_signature_data`. Is exactly one right, or does a second entry mean
+   something (a countersignature) that should be verified as well?
 7. **Which leaf checks beyond the title and key usage?** §6.1 step 4 asks for `Code/Content Signer` and
    Digital Signature. The sample's leaf is also `CA:TRUE`, which we accept. Revocation (CRL, OCSP) is
    not checked at all, as the spec does not mention it. Is that intended?
@@ -65,6 +67,11 @@ owner decides; none of them blocks the rest.
 11. **The DER fallback scan of §8.5 and the DER step of §9.2.** v2.3 stores `r` and `s` raw in a map,
     so no DER pattern follows in a signed file and the fallback finds nothing. We do not implement
     it. Delete it from the specification, or say what it is for.
+12. **Keep the specification's error names, or use neutral ones?** The names in §6.2
+    (`CertifierNoPrivateKey`, `BadCredentialsForSigningContent`, `CertNotPrivilegedToSignContent`,
+    `LibDoesntSupportContentSignature`, ...) come from the owner's table. They are the library's
+    `SignatureError` values and are printed in `forge` output (`fault: DigestMismatch: ...`) and
+    in the documentation. They are kept; say if neutral names are wanted instead.
 
 ### Measured corrections
 
@@ -150,11 +157,32 @@ ctest -R "owner's sample"        # with the same variable set; "Passed", not "Sk
    forge's `decode` reads the same 50 frames from both and produces identical PCM
    (`tools/ci/run_codec_matrix.sh`, "AC-4 content signing").
 
-The chain, nonce and digest handling that the measurements did not change follow the spec: the
-signature is ECDSA P-256 over SHA-256 with RFC 6979 nonces; the content digest is SHA-256 of every
-byte before the trailer; the trailer is found by walking the sync frames; the leaf must carry the
-title `Code/Content Signer` unless `leaf-title=any`; and the chain is validated from the trust
-anchor down.
+### Where the code differs from the specification without a measurement behind it
+
+These are choices, not findings. Each differs from the text of CS spec v2.3 and is listed so that
+the owner can overrule it.
+
+1. **Version numbers.** §1.1 and §10.1 give the scheme version as 3 (`kSignatureValuesVersion3`).
+   §3.16 says the embedded sample uses version 1 throughout, and the sample's markers are all 1.
+   The code writes 1 everywhere and requires every version marker to be 1 (the report line
+   `version markers: all version markers are 1`), refusing any other. If version 3 exists on the
+   wire, nothing here reads it.
+2. **Certificates above the trust anchor are not time-checked.** §6.1 step 3 checks the validity
+   period of every certificate in the chain at the current time. The code validates a path from its
+   anchor down (RFC 5280 §6.1): an expired CA *above* a `trust-anchor=` or `pin=` certificate does
+   not fail the chain. With no anchor, every certificate is judged.
+3. **The first certificate need not be self-signed when a trust anchor is supplied.** §6.1 step 3.5
+   makes the root self-signed (issuer = subject). The code also accepts a chain whose first
+   certificate was issued by a supplied trust anchor that is not itself in the chain, and checks a
+   self-signature only when the first certificate is self-issued.
+4. **A chain is at most eight certificates, and a blob at most one signature entry** (open
+   question 6). The specification sets no limit; the caps keep a hostile signature from costing
+   memory or time in proportion to its size.
+
+What does follow the specification: the signature is ECDSA P-256 over SHA-256 with RFC 6979 nonces
+(§9.1 allows either); the content digest is SHA-256 of every byte before the trailer; the trailer
+is found by walking the sync frames; the leaf must carry the title `Code/Content Signer` (unless
+`leaf-title=any`) and Digital Signature; and each certificate must verify under its issuer's key.
 
 ## The decoder
 

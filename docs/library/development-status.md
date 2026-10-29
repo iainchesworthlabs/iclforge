@@ -133,7 +133,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Object unlock in Dolby decoder | 🟡🔵 | High | Essential | Spec-correct streams; the proprietary key gate has no shipped key and will not — see [Object signing](signing.md) |
 | | AC-4 content signature: sign, verify, strict and report modes | 🟢 | High | Essential | `pace-ccjf1` (ECDSA P-256, SHA-256, Thrift, X.509 chain) on a raw `.ac4` stream; `forge ac4-sign`, `ac4-verify`, `sign-content`, `verify-content`, `check-content`. Opt-in everywhere, the operator's own key and chain, no key or certificate of any issuer shipped; a chain no trust anchor or pin vouches for is `chain unanchored`, never valid. Checked against OpenSSL and the owner's sample. See [Signing](signing.md#ac-4-content-signing) |
 | | AC-4 content signature in an MP4 | 🔴 | Medium | Important | §8.3.2 gives one sentence and no layout; `sign-content` refuses an MP4. Open question 2 in `libs/ac4/ERRATA.md` |
-| | AC-4 content signature: revocation, a second entry, other digests | 🔴🔵 | Low | Optional | Not read, not checked, not written; the specification names none of them. Open questions 4, 6 and 7 in `libs/ac4/ERRATA.md` |
+| | AC-4 content signature: revocation, a second entry, other digests | 🔴🔵 | Low | Optional | Not checked, not written; a blob with a second signature entry is refused; the specification names none of them. Open questions 4, 6 and 7 in `libs/ac4/ERRATA.md` |
 
 ---
 

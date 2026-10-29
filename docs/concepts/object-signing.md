@@ -280,8 +280,8 @@ The rest follows this page's stance:
   carries on.
 - It cannot call a signature valid on its own say-so. The chain has to lead to a `trust-anchor=`
   certificate or a `pin=` fingerprint the operator names. A signature that checks out against a chain
-  nothing the operator trusts vouches for is reported as `chain unanchored` (exit 6 unless
-  `unanchored-ok`), which says the file agrees with its own signature and nothing about who made it.
+  nothing the operator trusts vouches for is reported as `chain unanchored` (`ac4-verify` exits 6 and
+  `decode` exits 2, unless `unanchored-ok`), which says the file agrees with its own signature and nothing about who made it.
 - Certificates are judged at the time `verify-time=` names: now (the specification's, and the
   default), the date the signer wrote (only as good as the signer), a given instant or never.
 

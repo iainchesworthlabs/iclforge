@@ -203,7 +203,8 @@ The sections below contain the complete change list and fixes.
   `40 82 LL LL` wrapper; a CA in the chain had expired before the signature was made (so "valid now" rejects a genuine signature, and
   `verify-time=` exists); the signer's certificate is `CA:TRUE`; byte lists are lists of BYTE; `r` and `s` are raw. Eleven open
   questions for the owner, among them the validity-time default and MP4 carriage, are at the top of `libs/ac4/ERRATA.md`. Not
-  implemented: carriage in an MP4, a second signature entry, revocation, digests other than SHA-256. See
+  implemented: carriage in an MP4, a second signature entry (a blob with one is refused), revocation, digests other than
+  SHA-256; a chain is at most eight certificates. See
   [Signing](docs/library/signing.md#ac-4-content-signing).
 
 **What the P4X's panel shows while a song has no lyrics**
