@@ -20,10 +20,10 @@
 // A signature that checks out against a chain nothing the operator trusts vouches for is reported
 // as unanchored, never as valid.
 
+#include <fmt/printf.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <fmt/printf.h>
 #include <fstream>
 #include <ios>
 #include <iterator>
@@ -44,7 +44,8 @@ namespace crypto = iclforge::base::crypto;
 
 std::vector<std::byte> read_file(const char* path) {
     std::ifstream in(path, std::ios::binary);
-    const std::vector<char> raw{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    const std::vector<char> raw{std::istreambuf_iterator<char>(in),
+                                std::istreambuf_iterator<char>()};
     std::vector<std::byte> bytes(raw.size());
     for (std::size_t i = 0; i < raw.size(); ++i) {
         bytes[i] = static_cast<std::byte>(raw[i]);
@@ -76,9 +77,10 @@ void describe(std::span<const std::byte> stream) {
                     summary.blob_size, summary.problem.c_str());
         return;
     }
-    fmt::printf("a %zu-byte content signature by %s, dated %s (UTC), %zu certificate(s); unverified\n",
-                summary.blob_size, summary.signer.c_str(), summary.signed_date.c_str(),
-                summary.certificates);
+    fmt::printf(
+        "a %zu-byte content signature by %s, dated %s (UTC), %zu certificate(s); unverified\n",
+        summary.blob_size, summary.signer.c_str(), summary.signed_date.c_str(),
+        summary.certificates);
 }
 
 // Checks the stream: every certificate valid now, the leaf titled "Code/Content Signer", and the
