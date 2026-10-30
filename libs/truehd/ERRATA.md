@@ -354,6 +354,32 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     today plays nowhere the owner can test. Left as it is until answered; `compare_truehd_encoders.py` lists the rows as an FFmpeg
     refusal, not a failure of forge.
 
+91. **IIR, and a filter order above 8, for material that was resampled up (TH spec §9.5; `libs/truehd/ERRATA.md` question 8, entry 13).**
+    The encoder writes no IIR filter. Measured with `tools/checks/compare_truehd_encoders.py`: on the 96 kHz music source
+    (`thd-fx-2ch-music-96k24`, a 48 kHz recording resampled up, so a band-limited signal) a least-squares FIR of order 32 needs about 11 per cent
+    fewer bits than order 8 by an estimate with exact coefficients (38,408 against 43,251 bytes of residual), while at 48 kHz the same
+    estimate gains under 3 per cent beyond order 8 (36,412 against 37,051 for the stereo music, 92,831 against 94,962 for the 5.1). forge is
+    0.932 of FFmpeg's size on that 96 kHz source and DEE's stream of it is not the source (entry 50), so no stream says how much of the 11 per
+    cent the format's FIR 8 plus IIR 4 reaches. A prototype fit of the two (FIR 8 and IIR 4 by regression on the residuals of a long fit) was
+    unstable once the coefficients were quantised and run in the decoder's recursion, which is the work an IIR writer has to do. Windowed and
+    least-squares FIR coefficients make the same stream within 0.04 per cent. **Recommendation:** do not write the IIR filter now: the gain is
+    on one kind of source, no external decoder but FFmpeg's exercises the tool, and the encoder is already smaller than FFmpeg's wherever
+    the comparison is valid except at 192 kHz, where the limit is the specification's (entry 35). Revisit if the owner's material is mostly
+    resampled up.
+92. **The corpus for the encoder comparison.** The repository has no 24-bit programme material: `testdata/audio` is 16 bit (a Mendelssohn
+    recording, a spoken-word recording, a 2.5 s 5.1 reference), so the 24-bit rows of `compare_truehd_encoders.py --programme` are 16-bit samples
+    in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. **Recommendation:** 5 to 10
+    excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
+    music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
+93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,
+    9,954 from forge and 19,598 from FFmpeg's encoder, while the 16-bit stream of the same tones is 9,140 (DEE) and 9,116 (forge). Is there a DEE
+    option or behaviour that explains DEE's larger 20-bit stream? **Recommendation:** ask the owner, who has DEE's options; do not look in the stream.
+94. **What "better than DEE" means for the encoder (WP5 question 1).** The comparison reports size at equal losslessness, the only measure two
+    lossless streams of one source have, and not speed: DEE is a licensed binary on another machine, so its speed is not comparable.
+    **Recommendation:** size first (bytes for the same bit-exact decode), then forge's own speed against the real-time budget (`iclforge-perf`).
+    On the 11 committed legs where DEE's stream is the source forge is 0.734 of its size in all and not larger on any (0.553 to 0.997); on the
+    5.1 music, the row that decided it, 0.966.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".

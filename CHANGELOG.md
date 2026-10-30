@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: the TrueHD encoder sends each channel's own output shift and quantiser step.** One step for every channel was the smallest the whole
+  interval allowed, so a 5.1 programme whose L, R, Ls and Rs are 16-bit material and whose C and LFE use 24 bits sent the low 8 bits of four
+  channels for nothing: the 5.1 music of the DEE fixtures was 101,314 bytes, against FFmpeg's encoder's 63,254 and DEE's 58,688, and is 56,672
+  (0.896 and 0.966). A pair matrix is tried between rows with the same step only, and the downmix presentations keep one step. FFmpeg's strict
+  decode and the library's decoder return every sample (`libs/truehd/ERRATA.md` entry 90).
+- **Added: `tools/checks/compare_truehd_encoders.py` and `compare_truehd_decoders.py`, and the page [TrueHD against FFmpeg and DEE](docs/truehd-comparison.md).**
+  The first sizes forge's streams against FFmpeg's encoder's and DEE's (the 13 committed legs, programme material, a directory of WAV files), checks
+  that every stream counted decodes to the source, and fails the pull-request flow's FFmpeg job if forge is larger than either on a committed source.
+  The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
+  forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
+  says where forge is larger: 1.06 and 1.14 times FFmpeg's size at 192 kHz.
+- **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
+  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. FFmpeg 8.0.1's strict decode refuses the encoder's 192 kHz
+  streams of 3 or more channels, which have one substream as TH spec §9.6 says (`libs/truehd/ERRATA.md` question 90).
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
