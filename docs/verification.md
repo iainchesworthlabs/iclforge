@@ -2368,8 +2368,8 @@ only, and part of the second has no outside reader.
    (72 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
    the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
    failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
-3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
-   is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
+3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the full
+   set is not committed, 13 of its streams are in `testdata/truehd-dee`, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
 
 The encoder is held to the first tier from the other side. `tools/checks/verify_truehd_encode_interop.py` encodes 43 cases
@@ -2421,6 +2421,12 @@ content and a delay of the first samples is allowed, because DEE's channel order
 - **FAIL** when the decoder stops on a check, a lossless check fails, or a lossless leg decodes to something else (the report
   says whether FFmpeg's decode is the source either);
 - **SKIP** when a stream or source is not on disk, or the source is over `--max-seconds` (120; the 300 s soak programmes).
+
+The 13 streams in `testdata/truehd-dee` (0.25 s each: 2.0, 5.1 and 7.1 with three presentations, 48 and 96 kHz, 16, 20 and 24 bits, one DRC profile,
+an embedded timecode, and four lengths that are not a whole number of access units) are scored the same way with `--set testdata/truehd-dee`. On
+2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL. The full set of 2026-10-29 was scored
+before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128); its rescore and the last legs (group `truehd-last`) are in
+[planning/truehd-validation.md](../planning/truehd-validation.md), and the numbers go here when they are in.
 
 The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
 `PROGRAM [ARGS] STREAM OUT.wav`. After the licence ends the script needs no DEE and reads the set as it is left. The
