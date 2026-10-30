@@ -44,6 +44,26 @@ namespace perf::truehd_bench {
 
 inline constexpr std::array<std::size_t, 2> kStereoChannels = {0, 1};  // FL, FR
 inline constexpr std::array<std::size_t, 6> kFiveOneChannels = {0, 1, 2, 3, 4, 5};
+// 7.1: the file has six channels, so the rear surrounds are its first two again (the channel index
+// wraps in make_source): a copy costs the encoder what a channel of its own would.
+inline constexpr std::array<std::size_t, 8> kSevenOneChannels = {0, 1, 2, 3, 4, 5, 0, 1};
+
+// The workloads: a layout and a sample rate, named truehd_<name>_encode and truehd_<name>_decode.
+// The source is the 48 kHz file, declared at `sample_rate` where that is not 0: what is measured is
+// the codec's work for a second of audio at 96 or 192 kHz (twice and four times the samples, a
+// different substream layout and filter limit), not the music's spectrum at that rate.
+struct Layout {
+    const char* name;
+    std::span<const std::size_t> channels;
+    std::uint32_t sample_rate;  // 0: the file's own
+};
+inline constexpr std::array<Layout, 5> kLayouts = {{
+    {"stereo", kStereoChannels, 0},
+    {"51", kFiveOneChannels, 0},
+    {"71", kSevenOneChannels, 0},
+    {"51_96k", kFiveOneChannels, 96000},
+    {"stereo_192k", kStereoChannels, 192000},
+}};
 
 // Access units a memory-bench or hard-gate run feeds: three restart intervals.
 inline constexpr int kIntervalUnits = 128;
@@ -59,10 +79,11 @@ struct Source {
 
 // `channels` of the WAV, interleaved, `bits` wide (16 or 24).
 inline Source make_source(const iclforge::ac3::io::WavData& wav,
-                          std::span<const std::size_t> channels, int bits) {
+                          std::span<const std::size_t> channels, int bits,
+                          std::uint32_t sample_rate = 0) {
     Source source{.channels = static_cast<int>(channels.size()),
                   .bits = bits,
-                  .sample_rate = wav.sample_rate,
+                  .sample_rate = sample_rate != 0 ? sample_rate : wav.sample_rate,
                   .pcm = {}};
     const std::size_t frames = wav.frame_count();
     source.pcm.reserve(frames * channels.size());
