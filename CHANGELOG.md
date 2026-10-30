@@ -10,6 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `gen_dee_gold.py` makes the last TrueHD legs (group `truehd-last`), and `planning/truehd-validation.md` is the owner's runbook for the last days of DEE's licence.** Fourteen legs: an impulse and band-limited tones at 96 kHz, the stepped tone with and without `--optimize-data-rate`, dialnorm and DRC on streams of three presentations. The runbook has the commands and the pasted-back form for the full rescore, the legs and three disc probes, and each provisional mark with what would remove it; `planning/truehd-spec-issues.md` is the list for the specification's author; ERRATA questions 100 and 101 are new. The documents now say that 13 DEE streams are committed and score 11 PASS and 2 UNEXPLAINED.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
