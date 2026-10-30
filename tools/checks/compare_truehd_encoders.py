@@ -210,6 +210,8 @@ def row_for(args, scratch, name, wav, dee_stream, note):
         "forge_encode_x_realtime": None,
         "forge_decode_exact": None,
         "ffmpeg_decode_exact": None,
+        "ffmpeg_stream_exact": None,
+        "dee_stream_exact": None,
         "dee_probe": None,
     }
     if code != 0:
@@ -220,10 +222,15 @@ def row_for(args, scratch, name, wav, dee_stream, note):
     row["forge_decode_exact"] = forge_decode_exact(args.forge, stream, wav, scratch)
     if shutil.which("ffmpeg"):
         row["ffmpeg_decode_exact"] = ffmpeg_decode_exact(stream, samples, channels, bits)
-        row["ffmpeg_bytes"] = ffmpeg_encode(wav, scratch / f"{name}.ffmpeg.thd")
+        reference = scratch / f"{name}.ffmpeg.thd"
+        row["ffmpeg_bytes"] = ffmpeg_encode(wav, reference)
+        if row["ffmpeg_bytes"]:
+            row["ffmpeg_stream_exact"] = ffmpeg_decode_exact(reference, samples, channels, bits)
     if dee_stream is not None:
         row["dee_bytes"] = dee_stream.stat().st_size
         row["dee_probe"] = probe_summary(args.forge, dee_stream)
+        if shutil.which("ffmpeg"):
+            row["dee_stream_exact"] = ffmpeg_decode_exact(dee_stream, samples, channels, bits)
     return row
 
 
@@ -231,8 +238,18 @@ def ratio(a, b):
     return round(a / b, 3) if a and b else None
 
 
+def counted(row, other):
+    """The other encoder's bytes for the totals, or None when its stream is not the source.
+
+    A smaller stream that does not decode to the source (a different layout, an altered level) is
+    no smaller: the row still shows its bytes, marked, and the ratio and totals leave it out."""
+    exact = row["ffmpeg_stream_exact" if other == "ffmpeg_bytes" else "dee_stream_exact"]
+    return row[other] if exact in (True, None) else None
+
+
 def totals(rows, other):
-    pairs = [(r["forge_bytes"], r[other]) for r in rows if r["forge_bytes"] and r[other]]
+    pairs = [(r["forge_bytes"], counted(r, other)) for r in rows if r["forge_bytes"]]
+    pairs = [(a, b) for a, b in pairs if b]
     if not pairs:
         return None
     return {
@@ -250,8 +267,10 @@ def markdown(rows, versions, args):
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
 
-    def cell(value):
-        return f"{value:,}" if isinstance(value, int) else "-"
+    def cell(value, exact=True):
+        if not isinstance(value, int):
+            return "-"
+        return f"{value:,}" if exact in (True, None) else f"{value:,} *"
 
     for r in rows:
         exact = (
@@ -262,7 +281,8 @@ def markdown(rows, versions, args):
         label = r["name"] + (f" ({r['note']})" if r["note"] else "")
         lines.append(
             f"| {label} | {r['rate']} | {r['channels']} | {r['bits']} | {r['seconds']:g} | "
-            f"{cell(r['dee_bytes'])} | {cell(r['ffmpeg_bytes'])} | {cell(r['forge_bytes'])} | "
+            f"{cell(r['dee_bytes'], r['dee_stream_exact'])} | "
+            f"{cell(r['ffmpeg_bytes'], r['ffmpeg_stream_exact'])} | {cell(r['forge_bytes'])} | "
             f"{r['ratio_ffmpeg'] or '-'} | {r['ratio_dee'] or '-'} | {exact} |"
         )
     lines.append("")
@@ -273,6 +293,16 @@ def markdown(rows, versions, args):
                 f"Over the {t['rows']} rows with {label}'s stream: forge "
                 f"{t['forge_bytes']:,} bytes, {label} {t[other]:,}, ratio {t['ratio']}."
             )
+    if any(
+        r["ffmpeg_stream_exact"] not in (True, None) or r["dee_stream_exact"] not in (True, None)
+        for r in rows
+    ):
+        lines.append("")
+        lines.append(
+            r"\* the other encoder's stream does not decode to the source (FFmpeg's strict "
+            "decode: a different layout, a leg that alters the level, or a refusal); its bytes "
+            "are shown and left out of the ratio and the totals."
+        )
     lines.append("")
     lines.append("Tools: " + "; ".join(f"{k} {v}" for k, v in versions.items()))
     return "\n".join(lines)
@@ -330,8 +360,8 @@ def main():
             if args.only and not any(token in name for token in args.only):
                 continue
             row = row_for(args, scratch, name, wav, dee_stream, note)
-            row["ratio_ffmpeg"] = ratio(row["forge_bytes"], row["ffmpeg_bytes"])
-            row["ratio_dee"] = ratio(row["forge_bytes"], row["dee_bytes"])
+            row["ratio_ffmpeg"] = ratio(row["forge_bytes"], counted(row, "ffmpeg_bytes"))
+            row["ratio_dee"] = ratio(row["forge_bytes"], counted(row, "dee_bytes"))
             rows.append(row)
             print(
                 f"{name}: forge {row['forge_bytes']} ffmpeg {row['ffmpeg_bytes']} "

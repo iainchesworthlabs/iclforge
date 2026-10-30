@@ -128,6 +128,19 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(run_main(1100, 1000, ["--max-ratio-dee", "1.05"])[0], 2)
         self.assertEqual(run_main(1040, 1000, ["--max-ratio-dee", "1.05"])[0], 0)
 
+    def test_a_stream_that_is_not_the_source_is_left_out_of_ratios_and_totals(self):
+        rows = [
+            {"forge_bytes": 100, "ffmpeg_bytes": 50, "ffmpeg_stream_exact": True,
+             "dee_bytes": 10, "dee_stream_exact": "differs from the source"},
+            {"forge_bytes": 100, "ffmpeg_bytes": 200, "ffmpeg_stream_exact": "failed",
+             "dee_bytes": None, "dee_stream_exact": None},
+        ]  # fmt: skip
+        self.assertEqual(C.counted(rows[0], "ffmpeg_bytes"), 50)
+        self.assertIsNone(C.counted(rows[0], "dee_bytes"))
+        self.assertIsNone(C.counted(rows[1], "ffmpeg_bytes"))
+        self.assertEqual(C.totals(rows, "ffmpeg_bytes")["ratio"], 2.0)
+        self.assertIsNone(C.totals(rows, "dee_bytes"))
+
     def test_no_set_reads_no_dee_stream(self):
         status, report, _ = run_main(900, 1000, ["--set", "none"])
         self.assertEqual((status, report["rows"]), (0, []))
