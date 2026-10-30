@@ -7,6 +7,7 @@ The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of 
 
     truehd_substream3_search.py STREAM [--units N] [--trace] [--restart-index K] [--trace-only]
                                      [--directory] [--agreement] [--common-prefix]
+                                     [--dump-header]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -457,10 +458,9 @@ def common_prefix_bits(first, second):
     return min(len(first), len(second)) * 8
 
 
-def print_common_prefix(data, units):
-    """For every restart of substream 3, how many bits after the restart header it shares with the
-    first restart and with the one before. A restart whose matrices and filters repeat shares them
-    up to where its sample data begins, which is the length of its block header. Counts only."""
+def restart_tails(data, units):
+    """(unit, segment bytes, the bits after the restart header, from a byte boundary) for every
+    restart of substream 3."""
     restarts = []
     for number, unit, entries, offset, count in units_of(data, units):
         if count < 4:
@@ -483,6 +483,14 @@ def print_common_prefix(data, units):
         length = (total - start + 7) // 8
         tail <<= length * 8 - (total - start)
         restarts.append((number, len(payload), tail.to_bytes(length, "big")))
+    return restarts
+
+
+def print_common_prefix(data, units):
+    """For every restart of substream 3, how many bits after the restart header it shares with the
+    first restart and with the one before. A restart whose matrices and filters repeat shares them
+    up to where its sample data begins, which is the length of its block header. Counts only."""
+    restarts = restart_tails(data, units)
     print(
         f"{len(restarts)} restarts of substream 3 in {units} units (bits after the restart header)"
     )
@@ -496,11 +504,32 @@ def print_common_prefix(data, units):
         with_previous = common_prefix_bits(previous, tail)
         shown.append(with_first)
         previous = tail
-        if len(shown) <= 24:
-            print(f"  {number:5d}  {size:12d}  {with_first:20d}  {with_previous:24d}")
+        print(f"  {number:5d}  {size:12d}  {with_first:20d}  {with_previous:24d}")
     others = shown[1:]
     if others:
         print(f"shared with the first, over the others: min {min(others)} max {max(others)}")
+
+
+def print_header_dump(data, units, skip=2, margin=8):
+    """The bits after the restart header that every restart of substream 3 shares from the
+    `skip`-th on, less a margin, as hex. Restarts seconds apart that agree on them cannot be
+    carrying audio there: it is the block header of an encoder that repeats its parameters."""
+    restarts = restart_tails(data, units)[skip:]
+    if len(restarts) < 3:
+        print(f"only {len(restarts)} restarts after the first {skip}: nothing to compare")
+        return
+    base = restarts[0][2]
+    shared = min(common_prefix_bits(base, tail) for _n, _s, tail in restarts[1:]) - margin
+    print(
+        f"{len(restarts)} restarts from unit {restarts[0][0]} share {shared} bits "
+        f"(less a margin of {margin})"
+    )
+    nbytes = (shared + 7) // 8
+    value = int.from_bytes(base[:nbytes], "big") >> (nbytes * 8 - shared)
+    text = f"{value:0{(shared + 3) // 4}x}"
+    print(f"bits {shared}, hex:")
+    for at in range(0, len(text), 64):
+        print(text[at : at + 64])
 
 
 def main():
@@ -529,6 +558,11 @@ def main():
         help="compare the matrices of the first block of every restart under each layout",
     )
     parser.add_argument(
+        "--dump-header",
+        action="store_true",
+        help="print the bits after the restart header that the steady-state restarts all share",
+    )
+    parser.add_argument(
         "--common-prefix",
         action="store_true",
         help="count the bits each restart of substream 3 shares with the first after its header",
@@ -540,6 +574,9 @@ def main():
     data = args.stream.read_bytes()
     if args.directory:
         print_directory(data, min(args.units, 80))
+        return 0
+    if args.dump_header:
+        print_header_dump(data, args.units)
         return 0
     if args.common_prefix:
         print_common_prefix(data, args.units)
