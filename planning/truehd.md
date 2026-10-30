@@ -152,9 +152,9 @@ Open from the fuzzing task, for the owner (the first three are `libs/truehd/ERRA
 6. An MLP stream that declares 16-bit words but codes a bit below them: the library returns the 24-bit value, FFmpeg 16 bits (question 40).
 7. A `ch_assign` that repeats a value: refused, where FFmpeg gives the unassigned output matrix channel 0 (question 41; the direction of the field is entry 42, found by the same harness and fixed).
 8. A major sync that changes the channel assignment words: the library resets the filter histories, FFmpeg keeps them (question 42, a corner of question 18).
-9. `fuzz_iamf_parse` is built and has no seeds and no place in the run list, like the TrueHD harnesses were. `check_fuzz_harnesses.py` names it as a known gap. Give it seeds (the IAMF examples make streams) and a place in `BASE_TARGETS`?
+9. `fuzz_iamf_parse` was built and had no seeds and no place in the run list, like the TrueHD harnesses. Done (2026-10-31, WP7): 17 seeds from `iclforge-iamf-seed-tool`, which writes each programme as an OBU stream and as a file with the module's own writers, and a place in `BASE_TARGETS`; `check_fuzz_harnesses.py` has no known gap left.
 10. The TrueHD differential harness is in the required `fuzz-differential` job in steps that cannot fail it, because it has not run against the FFmpeg of the runners (8.0.1). Promote it after a clean week, or leave it to the nightly job?
-11. Should a stream with a cyclic `ch_assign` join `testdata/truehd/handbuilt`? The decoder's tests build one, and FFmpeg's strict decode agrees with it, but the fixtures are the fixtures task's.
+11. Should a stream with a cyclic `ch_assign` join `testdata/truehd/handbuilt`? Done (2026-10-31, WP7): `hb_ch_assign_cycle`, a six-cycle in a substream of six channels after one of two; FFmpeg 8.0.1's strict decode, `forge decode` and the reference give the signal, and the other reading of the field does not.
 
 ## Not in scope here
 
