@@ -74,6 +74,6 @@ Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; st
 - Step 3: `objects_dir`, `adm_out` and `truehd-render=` (ERRATA 61, questions 61, 62). The render of a stream's objects equals its bed
   when the stream was written by `truehd-atmos`; on a disc the same comparison (`truehd-presentation=8ch` against `truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs`)
   is the check of the channel-to-object mapping that question 61 asks for.
-- Step 4 (the owner said yes to the write side on 2026-10-30): `EncoderConfig::object_channels`, `forge truehd-atmos` (ERRATA 63, 64). Left: ADM
-  and IAB input (decision 5), signing (decision 4), the project file and the GUI.
+- Step 4 (the owner said yes to the write side on 2026-10-30): `EncoderConfig::object_channels`, `forge truehd-atmos` (ERRATA 63, 64). ADM master input is
+  there (decision 5). Left: IAB input, signing (decision 4), the project file and the GUI.
 

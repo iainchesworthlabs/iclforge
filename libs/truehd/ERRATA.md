@@ -807,7 +807,10 @@ the bed and the object channels, sample for sample, for the real-audio programme
 (`forge decode` and `ObjectScene` positions evaluated at the frame's end). The evolution frame is `iclforge::objects::emdf::build_container`
 without the 32 bits of sync and length that introduce it in E-AC-3's skip field; the payload configuration is Table 56's, the protection codes
 are 32 and 8 bits of zeros. The 7.1 bed is the objects placed on 7.1 speakers by `iclforge::render`'s layout renderer from the positions as the
-payload codes them (so it equals `forge decode truehd-render=`'s output exactly). **Provisional, owner to confirm** (question 64).
+payload codes them (so it equals `forge decode truehd-render=`'s output exactly). An ADM master (BW64, or a RIFF file with an `axml` chunk) is
+read as `atmos-adm` reads one: its LFE channels summed into channel 0 and every other channel, bed or object, a dynamic object on the path the
+master gives it (a bed channel pinned at its speaker's position; the stream's own beds, §15.6, are not written); the master's 24 bit samples
+survive. **Provisional, owner to confirm** (question 64).
 
 ## Atmos, spec v3.6
 

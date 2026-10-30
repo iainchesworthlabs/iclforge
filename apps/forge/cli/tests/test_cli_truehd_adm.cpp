@@ -3,12 +3,14 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 #include "iclforge/adm/bridge.hpp"
 #include "iclforge/objects/motion.hpp"
@@ -175,4 +177,73 @@ TEST_CASE("decode does not write an ADM master where the channels cannot be name
     CHECK(read_text(log).find("no object audio metadata") != std::string::npos);
     CHECK(read_text(log).find("the stream carries no object audio metadata") != std::string::npos);
     CHECK_FALSE(fs::exists(adm));
+}
+
+TEST_CASE("truehd-atmos reads an ADM master: its LFE first, its objects on the paths it gives them",
+          "[forge-cli][truehd][atmos][adm]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = fixture("hb_atmos_objects.thd");
+    const fs::path master = dir / "readback_master.wav";
+    fs::remove(master);
+    const fs::path log = dir / "readback.log";
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(dir / "readback_all.wav") + " \"\" " +
+                        quoted(master) + " truehd-presentation=all",
+                    log) == 0);
+    const fs::path again = dir / "readback.thd";
+    REQUIRE(run_cli("truehd-atmos " + quoted(master) + " " + quoted(again) + " verify", log) == 0);
+    CHECK(read_text(log).find("12 object channel(s)") != std::string::npos);
+
+    // The channels are the stream's own, the LFE first: 24 bit samples survive the ADM master.
+    const fs::path first = dir / "readback_first";
+    const fs::path second = dir / "readback_second";
+    fs::remove_all(first);
+    fs::remove_all(second);
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(dir / "a.wav") + " " + quoted(first) +
+                        " truehd-presentation=all",
+                    log) == 0);
+    REQUIRE(run_cli("decode " + quoted(again) + " " + quoted(dir / "b.wav") + " " + quoted(second) +
+                        " truehd-presentation=all",
+                    log) == 0);
+    for (std::size_t c = 0; c < 12; ++c) {
+        char name[32];
+        std::snprintf(name, sizeof name, "object_%02zu.wav", c);
+        const auto a = iclforge::ac3::io::read_wav((first / name).string());
+        const auto b = iclforge::ac3::io::read_wav((second / name).string());
+        REQUIRE(a.has_value());
+        REQUIRE(b.has_value());
+        CHECK(a->channels[0] == b->channels[0]);
+    }
+
+    // The positions are the master's paths, evaluated at the end of the frame.
+    const auto parsed = iclforge::adm::parse_bw64(master.string());
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::adm::build(*parsed);
+    REQUIRE(bridged.has_value());
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
+    for (std::size_t i = 0; i < bridged->channel_count(); ++i) {
+        if (!bridged->is_lfe[i]) {
+            paths.push_back(bridged->paths[i]);
+        }
+    }
+    const auto expected = iclforge::objects::oba::evaluate_placements(paths, 1536.0 / 48000.0);
+    const auto programs = oamd_programs(again);
+    REQUIRE(programs.size() == 1);
+    REQUIRE(programs[0].blocks.front().objects.size() == 11);
+    for (std::size_t i = 0; i < 11; ++i) {
+        CHECK(std::abs(programs[0].blocks.front().objects[i].position.x - expected[i].position.x) <
+              0.02);
+        CHECK(std::abs(programs[0].blocks.front().objects[i].position.y - expected[i].position.y) <
+              0.02);
+    }
+
+    // A scene file has nothing to add to a master that has its own paths.
+    const fs::path scene = dir / "readback_paths.txt";
+    {
+        std::ofstream out{scene};
+        out << "0 0.0 0.5 0.5 0.0 1.0 0.0\n";
+    }
+    CHECK(run_cli("truehd-atmos " + quoted(master) + " " + quoted(dir / "readback_refused.thd") +
+                      " " + quoted(scene),
+                  log) == 1);
+    CHECK(read_text(log).find("carries its own positions") != std::string::npos);
 }

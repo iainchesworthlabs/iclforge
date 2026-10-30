@@ -19,6 +19,7 @@
 #include <string_view>
 #include <vector>
 
+#include "../adm/atmos_adm.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/base/wav.hpp"
@@ -117,6 +118,48 @@ std::optional<oba::ObjectScene> read_scene_for(std::string_view path, std::size_
 // The evolution frame (TH spec §15.4, the EMDF reading) that holds one OAMD payload: the container
 // iclforge::objects builds for E-AC-3's skip field, without the 32 bits of sync word and length
 // that introduce it there.
+// Whether the file is an ADM master: a BW64 or RF64 container, or a RIFF one that has an `axml`
+// chunk (a master small enough for 32-bit sizes is written as RIFF, with a JUNK chunk where ds64
+// would be).
+bool is_adm_master(std::string_view path) {
+    if (is_stdio_path(path)) {
+        return false;
+    }
+    std::ifstream in{std::string{path}, std::ios::binary};
+    std::array<char, 12> header{};
+    in.read(header.data(), 12);
+    if (in.gcount() != 12) {
+        return false;
+    }
+    const std::string_view tag{header.data(), 4};
+    if (tag == "BW64" || tag == "RF64") {
+        return true;
+    }
+    if (tag != "RIFF") {
+        return false;
+    }
+    for (int chunks = 0; chunks < 64; ++chunks) {
+        std::array<unsigned char, 8> chunk{};
+        in.read(reinterpret_cast<char*>(chunk.data()), 8);
+        if (in.gcount() != 8) {
+            return false;
+        }
+        const std::string_view id{reinterpret_cast<const char*>(chunk.data()), 4};
+        if (id == "axml") {
+            return true;
+        }
+        const std::uint32_t size = static_cast<std::uint32_t>(chunk[4]) |
+                                   (static_cast<std::uint32_t>(chunk[5]) << 8U) |
+                                   (static_cast<std::uint32_t>(chunk[6]) << 16U) |
+                                   (static_cast<std::uint32_t>(chunk[7]) << 24U);
+        in.seekg(static_cast<std::streamoff>(size) + (size & 1U), std::ios::cur);
+        if (!in) {
+            return false;
+        }
+    }
+    return false;
+}
+
 std::vector<std::byte> evolution_frame_of(std::span<const std::byte> oamd) {
     const iclforge::objects::emdf::Payload payload{.id = iclforge::objects::emdf::kPayloadIdOamd,
                                                    .bytes = oamd};
@@ -183,19 +226,71 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
         return kExitUsage;
     }
 
-    auto objects_wav = read_wav_arg(objects_path);
-    if (!objects_wav) {
-        fmt::println(stderr, "error: {}: {}", objects_path,
-                     iclforge::ac3::io::describe(objects_wav.error()));
-        return kExitInput;
+    // An ADM master (BW64 or RF64, as `atmos-adm` reads) gives the channels and their paths itself:
+    // the LFE first, then every bed channel (pinned at its speaker) and every dynamic object in the
+    // programme's order, as objects. Anything else is a WAV of object channels.
+    std::optional<iclforge::ac3::io::WavData> objects_wav_data;
+    std::vector<oba::ObjectPath> adm_paths;
+    bool adm_lfe = false;
+    if (is_adm_master(objects_path)) {
+        if (!paths_path.empty()) {
+            fmt::println(stderr,
+                         "error: {} is an ADM master, which carries its own positions: leave out "
+                         "the scene file",
+                         objects_path);
+            return kExitUsage;
+        }
+        if (!adm_capability().available) {
+            fmt::println(stderr, "error: {}", adm_capability().reason);
+            return kExitInput;
+        }
+        auto source = load_adm_atmos_source(objects_path, "");
+        if (!source) {
+            fmt::println(stderr, "error: {}: {}", objects_path, source.error());
+            return kExitInput;
+        }
+        for (const std::string& warning : source->warnings) {
+            fmt::println(stderr, "warning: {}", warning);
+        }
+        iclforge::ac3::io::WavData wav;
+        wav.sample_rate = source->sample_rate;
+        std::vector<float> lfe_mix;
+        for (std::size_t i = 0; i < source->channel_count(); ++i) {
+            if (source->is_lfe[i]) {  // several LFE channels are summed into the one
+                lfe_mix.resize(std::max(lfe_mix.size(), source->pcm[i].size()), 0.0F);
+                for (std::size_t t = 0; t < source->pcm[i].size(); ++t) {
+                    lfe_mix[t] += source->pcm[i][t];
+                }
+            }
+        }
+        adm_lfe = !lfe_mix.empty();
+        if (adm_lfe) {
+            wav.channels.push_back(std::move(lfe_mix));
+        }
+        for (std::size_t i = 0; i < source->channel_count(); ++i) {
+            if (!source->is_lfe[i]) {
+                wav.channels.emplace_back(source->pcm[i].begin(), source->pcm[i].end());
+                adm_paths.push_back(source->paths[i]);
+            }
+        }
+        objects_wav_data = std::move(wav);
+    } else {
+        auto read = read_wav_arg(objects_path);
+        if (!read) {
+            fmt::println(stderr, "error: {}: {}", objects_path,
+                         iclforge::ac3::io::describe(read.error()));
+            return kExitInput;
+        }
+        objects_wav_data = std::move(*read);
     }
+    const iclforge::ac3::io::WavData* const objects_wav = &*objects_wav_data;
     const std::size_t frames = objects_wav->frame_count();
     const std::size_t channels = objects_wav->channels.size();
     if (frames == 0) {
         fmt::println(stderr, "error: {}: no samples to encode", objects_path);
         return kExitInput;
     }
-    const bool lfe = meta.thd_objects_lfe;
+    const bool lfe = adm_paths.empty() ? meta.thd_objects_lfe : adm_lfe;
     const std::size_t dynamic = channels - (lfe ? 1U : 0U);
     if (channels < 2 || channels > 16 || dynamic < 1) {
         fmt::println(stderr,
@@ -245,10 +340,12 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     // The placements of frame k: from the scene at the frame's end, as atmos-encode and atmos-path
     // evaluate theirs, or the fan.
     const auto objects_of_frame = [&](std::uint64_t frame) {
+        const double end_s = static_cast<double>((frame + 1) * kFrameSamples) /
+                             static_cast<double>(objects_wav->sample_rate);
         const std::vector<oba::ObjectPlacement> placements =
-            scene ? scene->evaluate(static_cast<double>((frame + 1) * kFrameSamples) /
-                                    static_cast<double>(objects_wav->sample_rate))
-                  : rest;
+            !adm_paths.empty() ? oba::evaluate_placements(adm_paths, end_s)
+            : scene            ? scene->evaluate(end_s)
+                               : rest;
         std::vector<oba::DynamicObject> objects(dynamic);
         for (std::size_t i = 0; i < dynamic && i < placements.size(); ++i) {
             objects[i] = object_of(placements[i]);

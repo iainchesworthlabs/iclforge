@@ -16,12 +16,12 @@ the owner's specification with ETSI TS 103 420 that they come from.
 | W4 | built, both ways: the caller's 7.1 bed (`truehd-bed=`) or the objects placed on 7.1 by `libs/render` (decision 6: the owner's call; both are there) |
 | W5 | not measured beyond the real-audio test (15 Mbps over a unit for 7.1 + 12 channels); no rate model change |
 | W6 | not built: signing |
-| W7 | built: `forge truehd-atmos`, `forge decode` with `objects_dir`, `adm_out` and `truehd-render=`; not the project file or the GUI |
+| W7 | built: `forge truehd-atmos` (a WAV of object channels with a scene file, or an ADM master), `forge decode` with `objects_dir`, `adm_out` and `truehd-render=`; not IAB, the project file or the GUI |
 | W8 | built: `test_encoder_atmos.cpp`, `test_cli_truehd_objects.cpp`, `test_cli_truehd_adm.cpp`, the hand-built streams `hb_substream3_fine_matrices` and `hb_atmos_objects`, `verify_truehd_atmos_interop.py`; FFmpeg reads the bed of a written stream |
 
 The decoder reads matrix coefficients to `frac_bits` 15 (entry 60). What is not done is the first thing WP1 asked: the owner's 12 channel
 substream does not decode, because the fields of its block header are not known. The input an encode takes is a WAV of object channels with
-a scene file, not yet ADM or IAB (decision 5).
+a scene file, or an ADM master (decision 5; IAB is not read).
 
 ## Where this stands
 

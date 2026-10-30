@@ -478,3 +478,22 @@ TEST_CASE("truehd-atmos refuses what substream 3 cannot carry",
     CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.thd"), log) == kExitUsage);
     CHECK(read_text(log).find("48 kHz only") != std::string::npos);
 }
+
+TEST_CASE("truehd-atmos takes a RIFF file with an axml chunk for an ADM master and says so",
+          "[forge-cli][truehd][atmos][truehd-atmos]") {
+    // 'RIFF', a size, 'WAVE', an empty 'axml' chunk: no master that reads (forge built with or
+    // without ADM refuses it, exit 2), but not a WAV of object channels either.
+    const fs::path dir = scratch_dir();
+    const fs::path file = dir / "not_a_master.wav";
+    {
+        std::ofstream out{file, std::ios::binary};
+        const char bytes[] = {'R', 'I', 'F', 'F', 12,  0,   0, 0, 'W', 'A',
+                              'V', 'E', 'a', 'x', 'm', 'l', 0, 0, 0,   0};
+        out.write(bytes, sizeof bytes);
+    }
+    const fs::path log = dir / "not_a_master.log";
+    CHECK(run_cli("truehd-atmos " + quoted(file) + " " + quoted(dir / "o.thd"), log) == kExitInput);
+    const std::string text = read_text(log);
+    CHECK((text.find("ICLFORGE_BUILD_ADM") != std::string::npos ||
+           text.find("not_a_master.wav") != std::string::npos));
+}

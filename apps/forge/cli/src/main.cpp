@@ -412,8 +412,10 @@ constexpr std::array<Command, 50> kCommands{{
      topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
-    {"truehd-atmos", 3, "<objects.wav> <out.thd|out.mkv|out.mp4|out.ts> [paths.txt]",
-     "2 to 16 channels of 24 bit PCM at 48 kHz as the object channels of a TrueHD Atmos stream: "
+    {"truehd-atmos", 3, "<objects.wav|master.adm.wav> <out.thd|out.mkv|out.mp4|out.ts> [paths.txt]",
+     "2 to 16 channels of 24 bit PCM at 48 kHz, or an ADM master (BW64; needs -DICLFORGE_BUILD_ADM=ON, "
+     "its LFE first and then its beds and objects, on the paths it gives them), as the object channels "
+     "of a TrueHD Atmos stream: "
      "substream 3 (restart sync 0x31EC), the first channel the LFE (truehd-objects-lfe=off: all "
      "objects), beside a 7.1 bed in substreams 0 to 2 (truehd-bed=<7.1 WAV>, or the objects "
      "placed on 7.1 by the renderer from the same metadata) and the objects' positions in the "

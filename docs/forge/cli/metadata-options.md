@@ -1351,7 +1351,7 @@ truehd-encode (after the positional arguments):
 `truehd-atmos` applies the same options, and:
 
 ```text
-truehd-atmos (after the positional arguments; provisional):
+truehd-atmos (after the positional arguments; provisional; the input is a WAV of object channels or an ADM master):
   truehd-bed=FILE   the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate);
                     without it the bed is the objects placed on 7.1 by the renderer
   truehd-objects-lfe=on|off
