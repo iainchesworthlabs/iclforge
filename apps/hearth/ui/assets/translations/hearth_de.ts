@@ -898,49 +898,167 @@
 <context>
     <name>DecoderPage</name>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="41"/>
+        <location filename="../qml/DecoderPage.qml" line="42"/>
         <source>Decoder</source>
         <translation>Decoder</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="44"/>
+        <location filename="../qml/DecoderPage.qml" line="45"/>
         <source>AC-3 and E-AC-3</source>
         <translation>AC-3 und E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="45"/>
+        <location filename="../qml/DecoderPage.qml" line="46"/>
         <source>AC-4</source>
         <translation>AC-4</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="51"/>
+        <location filename="../qml/DecoderPage.qml" line="47"/>
+        <source>TrueHD and MLP</source>
+        <translation>TrueHD und MLP</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="53"/>
         <source>Changes reach the playing item at its next frame.</source>
         <translation>Änderungen erreichen das laufende Element mit dem nächsten Frame.</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="52"/>
+        <location filename="../qml/DecoderPage.qml" line="55"/>
+        <source>Changes reach the playing item at its next restart, the next point a TrueHD stream can be joined at.</source>
+        <translation>Änderungen erreichen den laufenden Titel beim nächsten Neustart, dem nächsten Punkt, an dem in einen TrueHD-Stream eingestiegen werden kann.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="56"/>
         <source>Changes reach the playing item at its next access unit.</source>
         <translation>Änderungen erreichen das laufende Element mit der nächsten Zugriffseinheit.</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="63"/>
+        <location filename="../qml/DecoderPage.qml" line="67"/>
         <source>Karaoke: as coded</source>
         <translation>Karaoke: wie codiert</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="64"/>
+        <location filename="../qml/DecoderPage.qml" line="68"/>
         <source>Karaoke: capable</source>
         <translation>Karaoke: tauglich</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="64"/>
+        <location filename="../qml/DecoderPage.qml" line="68"/>
         <source>Karaoke: aware</source>
         <translation>Karaoke: fähig</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="71"/>
+        <location filename="../qml/DecoderPage.qml" line="75"/>
         <source>Karaoke page</source>
         <translation>Karaoke-Seite</translation>
+    </message>
+</context>
+<context>
+    <name>DecoderTruehd</name>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="43"/>
+        <location filename="../qml/DecoderTruehd.qml" line="62"/>
+        <source>Presentation</source>
+        <translation>Präsentation</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="48"/>
+        <source>A TrueHD stream carries a 2 channel, a 6 channel and an 8 channel presentation as substreams, each built on the ones before it. Best plays the highest, and reading fewer is less work. The channels are placed on the speaker layout; one it has no speaker for is panned between those it has.</source>
+        <translation>Ein TrueHD-Stream enthält eine 2-Kanal-, eine 6-Kanal- und eine 8-Kanal-Präsentation als Substreams, die jeweils auf den vorherigen aufbauen. Beste spielt die höchste ab, und weniger zu lesen bedeutet weniger Aufwand. Die Kanäle werden auf das Lautsprecher-Layout gelegt; ein Kanal, für den es keinen Lautsprecher gibt, wird auf die vorhandenen verteilt.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="59"/>
+        <source>Plays</source>
+        <translation>Spielt</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="65"/>
+        <source>Best</source>
+        <translation>Beste</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="66"/>
+        <source>2 channels</source>
+        <translation>2 Kanäle</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="67"/>
+        <source>6 channels</source>
+        <translation>6 Kanäle</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="68"/>
+        <source>8 channels</source>
+        <translation>8 Kanäle</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="77"/>
+        <source>Checks</source>
+        <translation>Prüfungen</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="82"/>
+        <source>Every restart interval of a TrueHD stream is checked against the next restart header, as are the parity and CRC bytes. Strict drops a unit that fails a check and plays silence until the stream&apos;s next restart header. Lenient counts the failure and decodes what it can read, which can be wrong until the next restart.</source>
+        <translation>Jedes Neustartintervall eines TrueHD-Streams wird mit dem nächsten Neustart-Header abgeglichen, ebenso die Paritäts- und CRC-Bytes. Strikt verwirft eine Einheit, die eine Prüfung nicht besteht, und spielt Stille bis zum nächsten Neustart-Header des Streams. Tolerant zählt den Fehler und decodiert, was sich lesen lässt, was bis zum nächsten Neustart falsch sein kann.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="94"/>
+        <location filename="../qml/DecoderTruehd.qml" line="97"/>
+        <source>When a check fails</source>
+        <translation>Wenn eine Prüfung fehlschlägt</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="100"/>
+        <source>Strict</source>
+        <translation>Strikt</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="101"/>
+        <source>Lenient</source>
+        <translation>Tolerant</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="110"/>
+        <source>Level</source>
+        <translation>Pegel</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="116"/>
+        <source>The stream&apos;s dialogue normalisation and dynamic range words are read and shown, and nothing applies them: the level is the stream&apos;s own. The output is float32 through the operating system&apos;s mixer, which is not a bit-exact path.</source>
+        <translation>Die Wörter des Streams für Dialognormalisierung und Dynamikbereich werden gelesen und angezeigt, aber nichts wendet sie an: Der Pegel ist der des Streams selbst. Die Ausgabe erfolgt als float32 über den Mixer des Betriebssystems, der kein bitgenauer Pfad ist.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="128"/>
+        <source>This stream</source>
+        <translation>Dieser Stream</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="131"/>
+        <source>Nothing TrueHD is playing.</source>
+        <translation>Es wird nichts im Format TrueHD abgespielt.</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
+        <translation>
+            <numerusform>%1 · %2 kHz · %n Substream mit %3 Kanälen</numerusform>
+            <numerusform>%1 · %2 kHz · %n Substreams mit %3 Kanälen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <source>MLP</source>
+        <translation>MLP</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <source>TrueHD</source>
+        <translation>TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="148"/>
+        <source>A decoder can join it about every %1 ms; a seek decodes from the join point before the place asked for.</source>
+        <translation>Ein Decoder kann etwa alle %1 ms einsteigen; ein Suchlauf decodiert ab dem Einstiegspunkt vor der gewünschten Stelle.</translation>
     </message>
 </context>
 <context>
@@ -1903,569 +2021,653 @@
 <context>
     <name>Media</name>
     <message>
-        <location filename="../qml/Media.qml" line="66"/>
+        <location filename="../qml/Media.qml" line="69"/>
         <source>AC-3</source>
         <translation>AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="67"/>
+        <location filename="../qml/Media.qml" line="70"/>
         <source>E-AC-3</source>
         <translation>E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="68"/>
+        <location filename="../qml/Media.qml" line="71"/>
         <source>AC-3 core + E-AC-3</source>
         <translation>AC-3-Kern + E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="69"/>
+        <location filename="../qml/Media.qml" line="72"/>
         <source>AC-4</source>
         <translation>AC-4</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="70"/>
-        <location filename="../qml/Media.qml" line="426"/>
-        <location filename="../qml/Media.qml" line="434"/>
-        <location filename="../qml/Media.qml" line="557"/>
-        <location filename="../qml/Media.qml" line="567"/>
-        <location filename="../qml/Media.qml" line="592"/>
+        <location filename="../qml/Media.qml" line="73"/>
+        <source>TrueHD</source>
+        <translation>TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="74"/>
+        <source>MLP</source>
+        <translation>MLP</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="75"/>
+        <location filename="../qml/Media.qml" line="431"/>
+        <location filename="../qml/Media.qml" line="439"/>
+        <location filename="../qml/Media.qml" line="593"/>
+        <location filename="../qml/Media.qml" line="655"/>
+        <location filename="../qml/Media.qml" line="665"/>
+        <location filename="../qml/Media.qml" line="690"/>
         <source>unknown</source>
         <translation>unbekannt</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="76"/>
+        <location filename="../qml/Media.qml" line="81"/>
         <source>MP4</source>
         <translation>MP4</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="77"/>
+        <location filename="../qml/Media.qml" line="82"/>
         <source>Matroska</source>
         <translation>Matroska</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="78"/>
-        <location filename="../qml/Media.qml" line="382"/>
+        <location filename="../qml/Media.qml" line="83"/>
+        <location filename="../qml/Media.qml" line="387"/>
         <source>MPEG-TS</source>
         <translation>MPEG-TS</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="84"/>
-        <location filename="../qml/Media.qml" line="494"/>
-        <location filename="../qml/Media.qml" line="787"/>
-        <location filename="../qml/Media.qml" line="798"/>
-        <location filename="../qml/Media.qml" line="810"/>
-        <location filename="../qml/Media.qml" line="821"/>
-        <location filename="../qml/Media.qml" line="837"/>
-        <location filename="../qml/Media.qml" line="870"/>
-        <location filename="../qml/Media.qml" line="957"/>
-        <location filename="../qml/Media.qml" line="967"/>
+        <location filename="../qml/Media.qml" line="89"/>
+        <location filename="../qml/Media.qml" line="500"/>
+        <location filename="../qml/Media.qml" line="885"/>
+        <location filename="../qml/Media.qml" line="896"/>
+        <location filename="../qml/Media.qml" line="908"/>
+        <location filename="../qml/Media.qml" line="919"/>
+        <location filename="../qml/Media.qml" line="935"/>
+        <location filename="../qml/Media.qml" line="968"/>
+        <location filename="../qml/Media.qml" line="1055"/>
+        <location filename="../qml/Media.qml" line="1065"/>
         <source>not carried</source>
         <translation>nicht enthalten</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="102"/>
+        <location filename="../qml/Media.qml" line="107"/>
         <source>main</source>
         <translation>Hauptton</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="103"/>
+        <location filename="../qml/Media.qml" line="108"/>
         <source>music and effects</source>
         <translation>Musik und Effekte</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="104"/>
+        <location filename="../qml/Media.qml" line="109"/>
         <source>dialogue</source>
         <translation>Dialog</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="105"/>
+        <location filename="../qml/Media.qml" line="110"/>
         <source>audio description</source>
         <translation>Audiodeskription</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="106"/>
+        <location filename="../qml/Media.qml" line="111"/>
         <source>hearing impaired</source>
         <translation>Hörgeschädigte</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="107"/>
+        <location filename="../qml/Media.qml" line="112"/>
         <source>commentary</source>
         <translation>Kommentar</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="108"/>
+        <location filename="../qml/Media.qml" line="113"/>
         <source>emergency</source>
         <translation>Notfall</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="109"/>
+        <location filename="../qml/Media.qml" line="114"/>
         <source>voice over</source>
         <translation>Voice-over</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="110"/>
+        <location filename="../qml/Media.qml" line="115"/>
         <source>associated audio</source>
         <translation>zugehöriges Audio</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="119"/>
+        <location filename="../qml/Media.qml" line="124"/>
         <source>presentation_id %1</source>
         <translation>presentation_id %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="122"/>
+        <location filename="../qml/Media.qml" line="127"/>
         <source>&quot;%1&quot;</source>
         <translation>„%1“</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="125"/>
+        <location filename="../qml/Media.qml" line="130"/>
         <source>alternative</source>
         <translation>alternativ</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="128"/>
+        <location filename="../qml/Media.qml" line="133"/>
         <source>made for headphones</source>
         <translation>für Kopfhörer gemacht</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="131"/>
+        <location filename="../qml/Media.qml" line="136"/>
         <source>disabled</source>
         <translation>deaktiviert</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="134"/>
+        <location filename="../qml/Media.qml" line="139"/>
         <source>not decoded in this build</source>
         <translation>in diesem Build nicht decodiert</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="140"/>
+        <location filename="../qml/Media.qml" line="145"/>
         <source>home theatre</source>
         <translation>Heimkino</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="141"/>
+        <location filename="../qml/Media.qml" line="146"/>
         <source>flat panel TV</source>
         <translation>Flachbildfernseher</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="142"/>
+        <location filename="../qml/Media.qml" line="147"/>
         <source>portable speakers</source>
         <translation>tragbare Lautsprecher</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="143"/>
+        <location filename="../qml/Media.qml" line="148"/>
         <source>portable headphones</source>
         <translation>tragbare Kopfhörer</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="144"/>
+        <location filename="../qml/Media.qml" line="149"/>
         <source>mode %1</source>
         <translation>Modus %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="149"/>
+        <location filename="../qml/Media.qml" line="154"/>
         <source>default profile</source>
         <translation>Standardprofil</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="150"/>
+        <location filename="../qml/Media.qml" line="155"/>
         <source>its own curve</source>
         <translation>eigene Kurve</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="151"/>
+        <location filename="../qml/Media.qml" line="156"/>
         <source>transmitted gains</source>
         <translation>übertragene Verstärkungen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="157"/>
+        <location filename="../qml/Media.qml" line="162"/>
         <source>Lo/Ro</source>
         <translation>Lo/Ro</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="158"/>
+        <location filename="../qml/Media.qml" line="163"/>
         <source>Lt/Rt</source>
         <translation>Lt/Rt</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="159"/>
+        <location filename="../qml/Media.qml" line="164"/>
         <source>Lt/Rt, Pro Logic II</source>
         <translation>Lt/Rt, Pro Logic II</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="160"/>
+        <location filename="../qml/Media.qml" line="165"/>
         <source>not indicated</source>
         <translation>nicht angegeben</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="165"/>
+        <location filename="../qml/Media.qml" line="170"/>
         <source>off</source>
         <translation>aus</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="172"/>
-        <location filename="../qml/Media.qml" line="462"/>
+        <location filename="../qml/Media.qml" line="177"/>
+        <location filename="../qml/Media.qml" line="467"/>
         <source>reading…</source>
         <translation>wird gelesen…</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="175"/>
-        <location filename="../qml/Media.qml" line="347"/>
-        <location filename="../qml/Media.qml" line="988"/>
+        <location filename="../qml/Media.qml" line="180"/>
+        <location filename="../qml/Media.qml" line="352"/>
+        <location filename="../qml/Media.qml" line="605"/>
+        <location filename="../qml/Media.qml" line="1086"/>
         <source>none</source>
         <translation>keine</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="182"/>
+        <location filename="../qml/Media.qml" line="187"/>
         <source>reconstructed by JOC from the %1</source>
         <translation>von JOC aus %1 rekonstruiert</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="184"/>
-        <location filename="../qml/Media.qml" line="574"/>
+        <location filename="../qml/Media.qml" line="189"/>
+        <location filename="../qml/Media.qml" line="672"/>
         <source>%1 · %2</source>
         <translation>%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="203"/>
+        <location filename="../qml/Media.qml" line="208"/>
         <source>Export JSON</source>
         <translation>JSON exportieren</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="205"/>
+        <location filename="../qml/Media.qml" line="210"/>
         <source>JSON (*.json)</source>
         <translation>JSON (*.json)</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="205"/>
+        <location filename="../qml/Media.qml" line="210"/>
         <source>All files (*)</source>
         <translation>Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="227"/>
-        <location filename="../qml/Media.qml" line="240"/>
+        <location filename="../qml/Media.qml" line="232"/>
+        <location filename="../qml/Media.qml" line="245"/>
         <source>Showing</source>
         <extracomment>Label before a drop-down that chooses what the page shows: which stream or track of the file.</extracomment>
         <translation>Anzeige</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="254"/>
+        <location filename="../qml/Media.qml" line="259"/>
         <source>Copy</source>
         <translation>Kopieren</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="259"/>
+        <location filename="../qml/Media.qml" line="264"/>
         <source>Export JSON…</source>
         <translation>JSON exportieren…</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="268"/>
+        <location filename="../qml/Media.qml" line="273"/>
         <source>Nothing in the queue yet. Add files on the Play page.</source>
         <translation>Noch nichts in der Warteschlange. Fügen Sie auf der Seite Abspielen Dateien hinzu.</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="308"/>
-        <location filename="../qml/Media.qml" line="456"/>
+        <location filename="../qml/Media.qml" line="313"/>
+        <location filename="../qml/Media.qml" line="461"/>
         <source>Container</source>
         <translation>Container</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="318"/>
+        <location filename="../qml/Media.qml" line="323"/>
         <source>Format</source>
         <translation>Format</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="322"/>
-        <location filename="../qml/Media.qml" line="332"/>
+        <location filename="../qml/Media.qml" line="327"/>
+        <location filename="../qml/Media.qml" line="337"/>
         <source> · %1</source>
         <translation> · %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="326"/>
+        <location filename="../qml/Media.qml" line="331"/>
         <source>Track</source>
         <extracomment>A track of an MP4 file.</extracomment>
         <translation>Spur</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="330"/>
-        <location filename="../qml/Media.qml" line="601"/>
-        <location filename="../qml/Media.qml" line="606"/>
-        <location filename="../qml/Media.qml" line="685"/>
-        <location filename="../qml/Media.qml" line="870"/>
-        <location filename="../qml/Media.qml" line="912"/>
+        <location filename="../qml/Media.qml" line="335"/>
+        <location filename="../qml/Media.qml" line="699"/>
+        <location filename="../qml/Media.qml" line="704"/>
+        <location filename="../qml/Media.qml" line="783"/>
+        <location filename="../qml/Media.qml" line="968"/>
+        <location filename="../qml/Media.qml" line="1010"/>
         <source>%1</source>
         <translation>%1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="338"/>
+        <location filename="../qml/Media.qml" line="343"/>
         <source>Edit list</source>
         <extracomment>The elst box of an MP4 track: a list of edits that trim or shift it. Not a playlist.</extracomment>
         <translation>Schnittliste</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="348"/>
+        <location filename="../qml/Media.qml" line="356"/>
         <source>dec3</source>
         <translation>dec3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="363"/>
+        <location filename="../qml/Media.qml" line="371"/>
         <source> · LFE on</source>
         <translation> · LFE an</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="372"/>
+        <location filename="../qml/Media.qml" line="377"/>
         <source>Atmos extension</source>
         <translation>Atmos-Erweiterung</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="378"/>
+        <location filename="../qml/Media.qml" line="383"/>
         <source>complexity index %1</source>
         <translation>Komplexitätsindex %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="389"/>
+        <location filename="../qml/Media.qml" line="394"/>
         <source>program %1 · PMT PID %2 · stream type %3</source>
         <translation>Programm %1 · PMT-PID %2 · Stream-Typ %3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="400"/>
-        <location filename="../qml/Media.qml" line="537"/>
+        <location filename="../qml/Media.qml" line="405"/>
+        <location filename="../qml/Media.qml" line="544"/>
+        <location filename="../qml/Media.qml" line="635"/>
         <source>Stream</source>
         <translation>Stream</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="416"/>
-        <location filename="../qml/Media.qml" line="547"/>
+        <location filename="../qml/Media.qml" line="421"/>
+        <location filename="../qml/Media.qml" line="554"/>
+        <location filename="../qml/Media.qml" line="645"/>
         <source>Codec</source>
         <translation>Codec</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="422"/>
-        <location filename="../qml/Media.qml" line="553"/>
+        <location filename="../qml/Media.qml" line="427"/>
+        <location filename="../qml/Media.qml" line="560"/>
+        <location filename="../qml/Media.qml" line="651"/>
         <source>Sample rate</source>
         <translation>Abtastrate</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="425"/>
-        <location filename="../qml/Media.qml" line="556"/>
+        <location filename="../qml/Media.qml" line="430"/>
+        <location filename="../qml/Media.qml" line="563"/>
+        <location filename="../qml/Media.qml" line="654"/>
         <source>%1 kHz</source>
         <translation>%1 kHz</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="429"/>
-        <location filename="../qml/Media.qml" line="587"/>
+        <location filename="../qml/Media.qml" line="434"/>
+        <location filename="../qml/Media.qml" line="685"/>
         <source>Bitrate</source>
         <translation>Bitrate</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="433"/>
+        <location filename="../qml/Media.qml" line="438"/>
         <source>%1 kbit/s measured</source>
         <translation>%1 kbit/s gemessen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="437"/>
+        <location filename="../qml/Media.qml" line="442"/>
         <source>Duration</source>
         <translation>Dauer</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="443"/>
-        <location filename="../qml/Media.qml" line="860"/>
+        <location filename="../qml/Media.qml" line="448"/>
+        <location filename="../qml/Media.qml" line="611"/>
+        <location filename="../qml/Media.qml" line="958"/>
         <source>Objects</source>
         <translation>Objekte</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="462"/>
+        <location filename="../qml/Media.qml" line="467"/>
         <source>none: an elementary stream</source>
         <translation>keine: ein Elementarstream</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="471"/>
+        <location filename="../qml/Media.qml" line="476"/>
         <source>Bitstream information</source>
         <translation>Bitstream-Informationen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="482"/>
+        <location filename="../qml/Media.qml" line="488"/>
         <source>Service</source>
         <extracomment>The audio service type of an AC-3 or E-AC-3 stream (bsmod), such as main or music and effects.</extracomment>
         <translation>Dienst</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="488"/>
-        <location filename="../qml/Media.qml" line="782"/>
+        <location filename="../qml/Media.qml" line="494"/>
+        <location filename="../qml/Media.qml" line="880"/>
         <source>Dialogue level</source>
         <translation>Dialogpegel</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="492"/>
+        <location filename="../qml/Media.qml" line="498"/>
         <source>dialnorm %1, %2 dB down</source>
         <translation>dialnorm %1, %2 dB leiser</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="497"/>
+        <location filename="../qml/Media.qml" line="503"/>
         <source>Surround</source>
         <translation>Surround</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="503"/>
+        <location filename="../qml/Media.qml" line="509"/>
         <source>Lo/Ro mix levels</source>
         <translation>Lo/Ro-Mischpegel</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="506"/>
+        <location filename="../qml/Media.qml" line="512"/>
         <source>centre %1 · surround %2%3</source>
         <translation>Mitte %1 · Surround %2%3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="510"/>
-        <location filename="../qml/Media.qml" line="834"/>
+        <location filename="../qml/Media.qml" line="516"/>
+        <location filename="../qml/Media.qml" line="932"/>
         <source> · LFE %1</source>
         <translation> · LFE %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="515"/>
+        <location filename="../qml/Media.qml" line="521"/>
         <source>Lt/Rt mix levels</source>
         <translation>Lt/Rt-Mischpegel</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="518"/>
+        <location filename="../qml/Media.qml" line="524"/>
         <source>centre %1 · surround %2</source>
         <translation>Mitte %1 · Surround %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="524"/>
+        <location filename="../qml/Media.qml" line="530"/>
         <source>Copyright</source>
         <translation>Copyright</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="528"/>
-        <location filename="../qml/Media.qml" line="922"/>
+        <location filename="../qml/Media.qml" line="534"/>
+        <location filename="../qml/Media.qml" line="1020"/>
         <source>yes</source>
         <translation>ja</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="528"/>
-        <location filename="../qml/Media.qml" line="922"/>
+        <location filename="../qml/Media.qml" line="534"/>
+        <location filename="../qml/Media.qml" line="1020"/>
         <source>no</source>
         <translation>nein</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="530"/>
+        <location filename="../qml/Media.qml" line="536"/>
         <source>original bitstream: yes</source>
         <translation>Original-Bitstream: ja</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="530"/>
+        <location filename="../qml/Media.qml" line="536"/>
         <source>original bitstream: no</source>
         <translation>Original-Bitstream: nein</translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="571"/>
+        <source>%n substream(s), %1 channels</source>
+        <translation>
+            <numerusform>%n Substream, %1 Kanäle</numerusform>
+            <numerusform>%n Substreams, %1 Kanäle</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/Media.qml" line="579"/>
+        <location filename="../qml/Media.qml" line="576"/>
+        <source>Access units</source>
+        <translation>Zugriffseinheiten</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="580"/>
+        <source>%1 · %2 samples each · %3</source>
+        <translation>%1 · je %2 Samples · %3</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="587"/>
+        <source>Bit rate</source>
+        <translation>Bitrate</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="591"/>
+        <source>%1 kbit/s, %2</source>
+        <translation>%1 kbit/s, %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="592"/>
+        <source>variable</source>
+        <translation>variabel</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="592"/>
+        <source>constant</source>
+        <translation>konstant</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="596"/>
+        <source>Join points</source>
+        <translation>Einstiegspunkte</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="602"/>
+        <source>%1 · one every %2 ms on average</source>
+        <translation>%1 · im Mittel einer alle %2 ms</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="616"/>
+        <source>An object layer is present and is not rendered; the bed plays.</source>
+        <translation>Eine Objektebene ist vorhanden und wird nicht gerendert; das Bett wird abgespielt.</translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="622"/>
+        <source>Skipped</source>
+        <translation>Übersprungen</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="627"/>
+        <source>%n byte(s) did not read as access units</source>
+        <translation>
+            <numerusform>%n Byte ließ sich nicht als Zugriffseinheit lesen</numerusform>
+            <numerusform>%n Bytes ließen sich nicht als Zugriffseinheiten lesen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/Media.qml" line="677"/>
         <source>Sync frames</source>
         <translation>Sync-Frames</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="583"/>
+        <location filename="../qml/Media.qml" line="681"/>
         <source>%1 · CRC %2 failed</source>
         <translation>%1 · CRC fehlgeschlagen: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="613"/>
+        <location filename="../qml/Media.qml" line="566"/>
+        <location filename="../qml/Media.qml" line="711"/>
         <source>Presentations</source>
         <translation>Präsentationen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="607"/>
+        <location filename="../qml/Media.qml" line="705"/>
         <source>Substreams</source>
         <translation>Substreams</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="674"/>
+        <location filename="../qml/Media.qml" line="772"/>
         <source>Programmes</source>
         <translation>Programme</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="691"/>
+        <location filename="../qml/Media.qml" line="789"/>
         <source>%1 · %2 channels · %3</source>
         <translation>%1 · %2 Kanäle · %3</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="705"/>
+        <location filename="../qml/Media.qml" line="803"/>
         <source>Substream groups</source>
         <translation>Substream-Gruppen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="716"/>
+        <location filename="../qml/Media.qml" line="814"/>
         <source>Group %1 · %2</source>
         <translation>Gruppe %1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="717"/>
+        <location filename="../qml/Media.qml" line="815"/>
         <source>channels</source>
         <translation>Kanäle</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="717"/>
+        <location filename="../qml/Media.qml" line="815"/>
         <source>objects</source>
         <translation>Objekte</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="739"/>
+        <location filename="../qml/Media.qml" line="837"/>
         <source>Immersive</source>
         <translation>Immersiv</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="749"/>
+        <location filename="../qml/Media.qml" line="847"/>
         <source>A-JOC</source>
         <translation>A-JOC</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="752"/>
+        <location filename="../qml/Media.qml" line="850"/>
         <source>present</source>
         <translation>vorhanden</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="755"/>
+        <location filename="../qml/Media.qml" line="853"/>
         <source>Object metadata</source>
         <translation>Objekt-Metadaten</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="758"/>
+        <location filename="../qml/Media.qml" line="856"/>
         <source>present · not read by this build&apos;s inspector</source>
         <translation>vorhanden · vom Inspektor dieses Builds nicht gelesen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="846"/>
+        <location filename="../qml/Media.qml" line="944"/>
         <source>Objects · OAMD</source>
         <translation>Objekte · OAMD</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="866"/>
+        <location filename="../qml/Media.qml" line="964"/>
         <source>Complexity index</source>
         <translation>Komplexitätsindex</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="873"/>
+        <location filename="../qml/Media.qml" line="971"/>
         <source>Authenticity tag</source>
         <translation>Authentizitäts-Tag</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="877"/>
+        <location filename="../qml/Media.qml" line="975"/>
         <source>%1 of %2 access units</source>
         <translation>%1 von %2 Zugriffseinheiten</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="879"/>
+        <location filename="../qml/Media.qml" line="977"/>
         <source>none in this stream</source>
         <translation>keine in diesem Stream</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="622"/>
-        <location filename="../qml/Media.qml" line="892"/>
+        <location filename="../qml/Media.qml" line="720"/>
+        <location filename="../qml/Media.qml" line="990"/>
         <source>#</source>
         <translation>#</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Media.qml" line="346"/>
+        <location filename="../qml/Media.qml" line="351"/>
         <source>%n entries</source>
         <extracomment>How many edits an MP4 track&apos;s edit list holds, beside the label &apos;Edit list&apos;.</extracomment>
         <translation>
@@ -2474,7 +2676,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Media.qml" line="359"/>
+        <location filename="../qml/Media.qml" line="364"/>
         <source>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</source>
         <extracomment>The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.</extracomment>
         <translation>
@@ -2483,195 +2685,195 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="550"/>
+        <location filename="../qml/Media.qml" line="648"/>
         <source>AC-4 · bitstream version %1</source>
         <translation>AC-4 · Bitstream-Version %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="560"/>
+        <location filename="../qml/Media.qml" line="658"/>
         <source>Frame rate</source>
         <translation>Framerate</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="564"/>
+        <location filename="../qml/Media.qml" line="662"/>
         <source>%1 fps · %2 samples a frame</source>
         <translation>%1 fps · %2 Samples pro Frame</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="570"/>
+        <location filename="../qml/Media.qml" line="668"/>
         <source>Frames</source>
         <translation>Frames</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="591"/>
+        <location filename="../qml/Media.qml" line="689"/>
         <source>%1 kbit/s</source>
         <translation>%1 kbit/s</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="595"/>
+        <location filename="../qml/Media.qml" line="693"/>
         <source>I-frames</source>
         <translation>I-Frames</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="599"/>
+        <location filename="../qml/Media.qml" line="697"/>
         <source>%1, every %2 to %3 frames</source>
         <translation>%1, alle %2 bis %3 Frames</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="605"/>
+        <location filename="../qml/Media.qml" line="703"/>
         <source>Splices</source>
         <extracomment>Splice points of an AC-4 stream: where two streams were joined.</extracomment>
         <translation>Schnittstellen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="624"/>
+        <location filename="../qml/Media.qml" line="722"/>
         <source>Language</source>
         <translation>Sprache</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="626"/>
+        <location filename="../qml/Media.qml" line="724"/>
         <source>Channels</source>
         <translation>Kanäle</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="628"/>
+        <location filename="../qml/Media.qml" line="726"/>
         <source>Content</source>
         <translation>Inhalt</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="630"/>
+        <location filename="../qml/Media.qml" line="728"/>
         <source>Groups</source>
         <translation>Gruppen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="770"/>
+        <location filename="../qml/Media.qml" line="868"/>
         <source>Metadata</source>
         <translation>Metadaten</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="773"/>
+        <location filename="../qml/Media.qml" line="871"/>
         <source>presentation %1</source>
         <translation>Präsentation %1</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="786"/>
+        <location filename="../qml/Media.qml" line="884"/>
         <source>dialnorm %1 dBFS</source>
         <translation>dialnorm %1 dBFS</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="790"/>
+        <location filename="../qml/Media.qml" line="888"/>
         <source>Loudness</source>
         <translation>Lautheit</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="794"/>
+        <location filename="../qml/Media.qml" line="892"/>
         <source>%1 LKFS integrated</source>
         <translation>%1 LKFS integriert</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="796"/>
+        <location filename="../qml/Media.qml" line="894"/>
         <source> · true peak %1 dBTP</source>
         <translation> · True Peak %1 dBTP</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="807"/>
+        <location filename="../qml/Media.qml" line="905"/>
         <source>%1 (%2)</source>
         <translation>%1 (%2)</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="814"/>
+        <location filename="../qml/Media.qml" line="912"/>
         <source>Dialogue enhancement</source>
         <translation>Dialoganhebung</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="818"/>
+        <location filename="../qml/Media.qml" line="916"/>
         <source>up to %1 dB · method %2</source>
         <translation>bis zu %1 dB · Methode %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="824"/>
+        <location filename="../qml/Media.qml" line="922"/>
         <source>Downmix</source>
         <translation>Downmix</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="828"/>
+        <location filename="../qml/Media.qml" line="926"/>
         <source>Lo/Ro centre %1 · surround %2; Lt/Rt centre %3 · surround %4%5 · prefers %6</source>
         <translation>Lo/Ro Mitte %1 · Surround %2; Lt/Rt Mitte %3 · Surround %4%5 · bevorzugt %6</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="894"/>
+        <location filename="../qml/Media.qml" line="992"/>
         <source>X</source>
         <translation>X</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="896"/>
+        <location filename="../qml/Media.qml" line="994"/>
         <source>Y</source>
         <translation>Y</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="898"/>
+        <location filename="../qml/Media.qml" line="996"/>
         <source>Z</source>
         <translation>Z</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="900"/>
+        <location filename="../qml/Media.qml" line="998"/>
         <source>GAIN</source>
         <translation>VERSTÄRKUNG</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="902"/>
+        <location filename="../qml/Media.qml" line="1000"/>
         <source>ACTIVE</source>
         <translation>AKTIV</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="930"/>
+        <location filename="../qml/Media.qml" line="1028"/>
         <source>The object layer could not be read as per-object detail for this stream.</source>
         <translation>Die Objektebene konnte für diesen Stream nicht als Detail pro Objekt gelesen werden.</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="940"/>
+        <location filename="../qml/Media.qml" line="1038"/>
         <source>Probe summary</source>
         <translation>Analyse-Zusammenfassung</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="802"/>
-        <location filename="../qml/Media.qml" line="950"/>
+        <location filename="../qml/Media.qml" line="900"/>
+        <location filename="../qml/Media.qml" line="1048"/>
         <source>Dynamic range</source>
         <translation>Dynamikbereich</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="954"/>
-        <location filename="../qml/Media.qml" line="964"/>
+        <location filename="../qml/Media.qml" line="1052"/>
+        <location filename="../qml/Media.qml" line="1062"/>
         <source>%1 to %2</source>
         <translation>%1 bis %2</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="960"/>
+        <location filename="../qml/Media.qml" line="1058"/>
         <source>Heavy compression</source>
         <translation>Starke Kompression</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="970"/>
+        <location filename="../qml/Media.qml" line="1068"/>
         <source>Block switching</source>
         <translation>Blockumschaltung</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="973"/>
+        <location filename="../qml/Media.qml" line="1071"/>
         <source>in %1 of %2 blocks read</source>
         <translation>in %1 von %2 Blöcken gelesen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="977"/>
+        <location filename="../qml/Media.qml" line="1075"/>
         <source>CRC</source>
         <translation>CRC</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="980"/>
+        <location filename="../qml/Media.qml" line="1078"/>
         <source>%1 access units · %2 failed</source>
         <translation>%1 Zugriffseinheiten · %2 fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="984"/>
+        <location filename="../qml/Media.qml" line="1082"/>
         <source>EMDF payloads</source>
         <translation>EMDF-Nutzdaten</translation>
     </message>
@@ -3770,32 +3972,32 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="58"/>
+        <location filename="../qml/NetworkSinkList.qml" line="57"/>
         <source>+ New group…</source>
         <translation>+ Neue Gruppe…</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="60"/>
+        <location filename="../qml/NetworkSinkList.qml" line="59"/>
         <source>New group</source>
         <translation>Neue Gruppe</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="64"/>
+        <location filename="../qml/NetworkSinkList.qml" line="63"/>
         <source>↻ Look again</source>
         <translation>↻ Erneut suchen</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="96"/>
+        <location filename="../qml/NetworkSinkList.qml" line="95"/>
         <source>%1, group</source>
         <translation>%1, Gruppe</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="197"/>
+        <location filename="../qml/NetworkSinkList.qml" line="196"/>
         <source>%1, %2</source>
         <translation>%1, %2</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkList.qml" line="311"/>
+        <location filename="../qml/NetworkSinkList.qml" line="310"/>
         <source>Sendspin players announce themselves on this network. A Hearth sink takes the E-AC-3 stream itself; any other Sendspin player takes stereo.</source>
         <translation>Sendspin-Player melden sich in diesem Netzwerk selbst. Ein Hearth-Wiedergabegerät nimmt den E-AC-3-Stream selbst an; jeder andere Sendspin-Player nimmt Stereo.</translation>
     </message>
@@ -3953,12 +4155,12 @@
 <context>
     <name>NetworkSinkSpeakers</name>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="58"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="57"/>
         <source>✓ Every speaker reaches a slot, and every slot has one.</source>
         <translation>✓ Jeder Lautsprecher erreicht einen Platz, und jeder Platz hat einen.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="62"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="61"/>
         <source> and </source>
         <translation> und </translation>
     </message>
@@ -3980,184 +4182,184 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="81"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="80"/>
         <source>This sink does not take settings from Hearth, so nothing here can be changed. It is set up on the sink itself.</source>
         <translation>Dieses Wiedergabegerät übernimmt keine Einstellungen von Hearth, daher lässt sich hier nichts ändern. Es wird am Wiedergabegerät selbst eingerichtet.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="100"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="99"/>
         <source>Layout</source>
         <translation>Layout</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="107"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="106"/>
         <source>Speaker layout</source>
         <translation>Lautsprecher-Layout</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="111"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="110"/>
         <source>2.0</source>
         <translation>2.0</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="112"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="111"/>
         <source>5.1</source>
         <translation>5.1</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="113"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="112"/>
         <source>7.1</source>
         <translation>7.1</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="114"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="113"/>
         <source>5.1.2</source>
         <translation>5.1.2</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="115"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="114"/>
         <source>List</source>
         <translation>Liste</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="140"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="139"/>
         <source>Layout, as text</source>
         <translation>Layout als Text</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="149"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="148"/>
         <source>Crossover</source>
         <translation>Trennfrequenz</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="159"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="158"/>
         <source>Crossover, Hz</source>
         <translation>Trennfrequenz, Hz</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="174"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="173"/>
         <source>Speakers marked small below send their bass here instead.</source>
         <translation>Unten als klein markierte Lautsprecher senden ihre Bässe stattdessen hierher.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="175"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="174"/>
         <source>No small speakers, so nothing is crossed over.</source>
         <translation>Keine kleinen Lautsprecher, daher wird nichts abgetrennt.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="239"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="238"/>
         <source>SPEAKER</source>
         <translation>LAUTSPRECHER</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="261"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="260"/>
         <source>NONE</source>
         <translation>KEINE</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="326"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="325"/>
         <source>%1 to slot %2</source>
         <translation>%1 auf Platz %2</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="375"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="374"/>
         <source>%1 to no slot</source>
         <translation>%1 auf keinen Platz</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="425"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="424"/>
         <source>✓ %1 slots at %2-bit, as the sink reports. Slot width is set on the sink&apos;s own page, to match its DACs.</source>
         <translation>✓ %1 Plätze mit %2 Bit, wie das Wiedergabegerät meldet. Die Platzbreite wird auf der Seite des Wiedergabegeräts eingestellt, passend zu seinen DACs.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="461"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="460"/>
         <source>SPK</source>
         <extracomment>Narrow column heading: short for SPEAKER.</extracomment>
         <translation>LS</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="470"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="469"/>
         <source>OUT</source>
         <extracomment>Narrow column heading: short for OUTPUT, the sink&apos;s audio slot the speaker goes to.</extracomment>
         <translation>AUS</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="479"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="478"/>
         <source>SIZE</source>
         <extracomment>Column heading: a speaker&apos;s size for bass management, Large or Small.</extracomment>
         <translation>GRÖSSE</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="487"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="486"/>
         <source>TRIM</source>
         <extracomment>Column heading: a level adjustment for the speaker, in dB.</extracomment>
         <translation>TRIM</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="492"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="491"/>
         <source>DELAY</source>
         <translation>VERZÖG.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="498"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="497"/>
         <source>IDENTIFY</source>
         <extracomment>Column heading of the buttons that play pink noise on one speaker, to hear which it is.</extracomment>
         <translation>IDENTIFIZ.</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="551"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="550"/>
         <source>Size for %1</source>
         <translation>Größe für %1</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="555"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="554"/>
         <source>Large</source>
         <extracomment>A speaker&apos;s size: a large speaker plays the full range.</extracomment>
         <translation>Groß</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="557"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="556"/>
         <source>Small</source>
         <extracomment>A speaker&apos;s size: a small speaker&apos;s bass goes to the LFE output instead.</extracomment>
         <translation>Klein</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="578"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="577"/>
         <source>dB</source>
         <translation>dB</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="591"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="590"/>
         <source>Trim for %1, dB</source>
         <translation>Trim für %1, dB</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="608"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="607"/>
         <source>ms</source>
         <translation>ms</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="621"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="620"/>
         <source>Delay for %1, milliseconds</source>
         <translation>Verzögerung für %1, Millisekunden</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="652"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="651"/>
         <source>Stop the identify tone on %1</source>
         <translation>Identifikationston auf %1 stoppen</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="653"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="652"/>
         <source>Identify %1, pink noise</source>
         <translation>%1 identifizieren, rosa Rauschen</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="678"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="677"/>
         <source>Stop</source>
         <translation>Stopp</translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="680"/>
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="679"/>
         <source>Identify</source>
         <extracomment>Button: play pink noise on this speaker&apos;s output, to hear which speaker it is.</extracomment>
         <translation>Identifizieren</translation>
@@ -4401,7 +4603,7 @@
     <message>
         <location filename="../qml/PlayPage.qml" line="104"/>
         <location filename="../qml/PlayPage.qml" line="150"/>
-        <location filename="../qml/PlayPage.qml" line="734"/>
+        <location filename="../qml/PlayPage.qml" line="768"/>
         <source>%1 kbit/s</source>
         <translation>%1 kbit/s</translation>
     </message>
@@ -4461,49 +4663,42 @@
         <translation>Ordner hinzufügen…</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="322"/>
+        <location filename="../qml/PlayPage.qml" line="324"/>
         <source>playing</source>
         <translation>wird abgespielt</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="322"/>
+        <location filename="../qml/PlayPage.qml" line="324"/>
         <source>not playable</source>
         <translation>nicht abspielbar</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="379"/>
-        <source>Nothing in the queue.
-Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.</source>
-        <translation>Nichts in der Warteschlange.
-Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) oder einen Ordner hier ab.</translation>
-    </message>
-    <message>
-        <location filename="../qml/PlayPage.qml" line="404"/>
+        <location filename="../qml/PlayPage.qml" line="406"/>
         <source>Drop files or folders here to add them to the queue</source>
         <translation>Dateien oder Ordner hier ablegen, um sie der Warteschlange hinzuzufügen</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="446"/>
+        <location filename="../qml/PlayPage.qml" line="448"/>
         <source>Now playing</source>
         <translation>Läuft gerade</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="453"/>
+        <location filename="../qml/PlayPage.qml" line="455"/>
         <source>Nothing playing</source>
         <translation>Es wird nichts abgespielt</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="477"/>
+        <location filename="../qml/PlayPage.qml" line="479"/>
         <source>Levels · at play time</source>
         <translation>Pegel · zur Abspielzeit</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="486"/>
+        <location filename="../qml/PlayPage.qml" line="488"/>
         <source>%1 · %2 outputs</source>
         <translation>%1 · %2 Ausgaben</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="482"/>
+        <location filename="../qml/PlayPage.qml" line="484"/>
         <source>No output device chosen yet</source>
         <translation>Noch kein Ausgabegerät gewählt</translation>
     </message>
@@ -4515,6 +4710,16 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
             <numerusform>%n Elemente</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="125"/>
+        <source>TrueHD</source>
+        <translation>TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="125"/>
+        <source>MLP</source>
+        <translation>MLP</translation>
+    </message>
     <message numerus="yes">
         <location filename="../qml/PlayPage.qml" line="137"/>
         <source> bed + %n objects</source>
@@ -4524,183 +4729,238 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
         </translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="485"/>
+        <location filename="../qml/PlayPage.qml" line="381"/>
+        <source>Nothing in the queue.
+Drop AC-3, E-AC-3, AC-4, TrueHD or MLP files (raw, MP4, Matroska or MPEG-TS) or a folder here.</source>
+        <translation>Nichts in der Warteschlange.
+Legen Sie hier AC-3-, E-AC-3-, AC-4-, TrueHD- oder MLP-Dateien (roh, MP4, Matroska oder MPEG-TS) oder einen Ordner ab.</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="487"/>
         <source>%1 · a decode made here</source>
         <translation>%1 · eine hier vorgenommene Decodierung</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="492"/>
-        <location filename="../qml/PlayPage.qml" line="641"/>
-        <location filename="../qml/PlayPage.qml" line="691"/>
+        <location filename="../qml/PlayPage.qml" line="494"/>
+        <location filename="../qml/PlayPage.qml" line="643"/>
+        <location filename="../qml/PlayPage.qml" line="693"/>
         <source>Nothing playing.</source>
         <translation>Es wird nichts abgespielt.</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="589"/>
+        <location filename="../qml/PlayPage.qml" line="591"/>
         <source>CLIP</source>
         <extracomment>Clip indicator of a level meter: lit when the signal reached full scale.</extracomment>
         <translation>CLIP</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="611"/>
+        <location filename="../qml/PlayPage.qml" line="613"/>
         <source>unrouted</source>
         <extracomment>A speaker that goes to no output.</extracomment>
         <translation>nicht geroutet</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="615"/>
+        <location filename="../qml/PlayPage.qml" line="617"/>
         <source>%1 %2</source>
         <translation>%1 %2</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="628"/>
+        <location filename="../qml/PlayPage.qml" line="630"/>
         <source>−60 · −48 · −36 · −24 · −12 · −6 · 0 dB</source>
         <translation>−60 · −48 · −36 · −24 · −12 · −6 · 0 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="637"/>
+        <location filename="../qml/PlayPage.qml" line="639"/>
         <source>Loudness · BS.1770-4</source>
         <translation>Lautheit · BS.1770-4</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="640"/>
+        <location filename="../qml/PlayPage.qml" line="642"/>
         <source>Integrated since this item started</source>
         <translation>Integriert seit Beginn dieses Elements</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="649"/>
+        <location filename="../qml/PlayPage.qml" line="651"/>
         <source>Scroll for this frame, objects and signal path.</source>
         <translation>Scrollen Sie für diesen Frame, Objekte und Signalweg.</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="663"/>
+        <location filename="../qml/PlayPage.qml" line="665"/>
         <source>MOMENTARY</source>
         <translation>MOMENTAN</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="663"/>
-        <location filename="../qml/PlayPage.qml" line="664"/>
         <location filename="../qml/PlayPage.qml" line="665"/>
+        <location filename="../qml/PlayPage.qml" line="666"/>
+        <location filename="../qml/PlayPage.qml" line="667"/>
         <source>LUFS</source>
         <translation>LUFS</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="664"/>
+        <location filename="../qml/PlayPage.qml" line="666"/>
         <source>SHORT-TERM</source>
         <translation>KURZZEIT</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="665"/>
+        <location filename="../qml/PlayPage.qml" line="667"/>
         <source>INTEGRATED</source>
         <translation>INTEGRIERT</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="667"/>
+        <location filename="../qml/PlayPage.qml" line="669"/>
         <source>RANGE</source>
         <extracomment>Loudness range (LRA), one of the loudness figures beside MOMENTARY and SHORT-TERM.</extracomment>
         <translation>BEREICH</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="667"/>
+        <location filename="../qml/PlayPage.qml" line="669"/>
         <source>LU</source>
         <translation>LU</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="668"/>
+        <location filename="../qml/PlayPage.qml" line="670"/>
         <source>TRUE PEAK</source>
         <translation>TRUE PEAK</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="668"/>
+        <location filename="../qml/PlayPage.qml" line="670"/>
         <source>dBTP</source>
         <translation>dBTP</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="678"/>
-        <location filename="../qml/PlayPage.qml" line="703"/>
-        <location filename="../qml/PlayPage.qml" line="709"/>
-        <location filename="../qml/PlayPage.qml" line="717"/>
-        <location filename="../qml/PlayPage.qml" line="735"/>
+        <location filename="../qml/PlayPage.qml" line="680"/>
+        <location filename="../qml/PlayPage.qml" line="708"/>
+        <location filename="../qml/PlayPage.qml" line="715"/>
+        <location filename="../qml/PlayPage.qml" line="724"/>
+        <location filename="../qml/PlayPage.qml" line="731"/>
+        <location filename="../qml/PlayPage.qml" line="737"/>
+        <location filename="../qml/PlayPage.qml" line="743"/>
+        <location filename="../qml/PlayPage.qml" line="751"/>
+        <location filename="../qml/PlayPage.qml" line="769"/>
         <source>—</source>
         <translation>—</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="686"/>
+        <location filename="../qml/PlayPage.qml" line="688"/>
         <source>This frame</source>
         <translation>Dieser Frame</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="689"/>
+        <location filename="../qml/PlayPage.qml" line="691"/>
         <source>At play time · access unit %1</source>
         <translation>Zur Abspielzeit · Zugriffseinheit %1</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="701"/>
+        <location filename="../qml/PlayPage.qml" line="704"/>
+        <source>SUBSTREAM</source>
+        <translation>SUBSTREAM</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="706"/>
+        <source>%1 · %n channels</source>
+        <translation>
+            <numerusform>%1 · %n Kanal</numerusform>
+            <numerusform>%1 · %n Kanäle</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="712"/>
+        <location filename="../qml/PlayPage.qml" line="735"/>
         <source>DIALNORM</source>
         <translation>DIALNORM</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="703"/>
+        <location filename="../qml/PlayPage.qml" line="714"/>
+        <source>%1 (not applied)</source>
+        <translation>%1 (nicht angewendet)</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="719"/>
+        <source>RESTARTS</source>
+        <translation>NEUSTARTS</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="721"/>
+        <source>%1 · %2 units waited</source>
+        <translation>%1 · %2 Einheiten haben gewartet</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="728"/>
+        <source>LOSSLESS CHECKS</source>
+        <translation>PRÜFUNGEN DER VERLUSTFREIHEIT</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="730"/>
+        <source>%1 failed</source>
+        <translation>%1 fehlgeschlagen</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="737"/>
         <source>−%1 dB</source>
         <translation>−%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="706"/>
+        <location filename="../qml/PlayPage.qml" line="740"/>
         <source>COMPR</source>
         <translation>COMPR</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="708"/>
+        <location filename="../qml/PlayPage.qml" line="742"/>
         <source>%1 dB</source>
         <translation>%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="712"/>
+        <location filename="../qml/PlayPage.qml" line="746"/>
         <source>DYNRNG</source>
         <translation>DYNRNG</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="714"/>
+        <location filename="../qml/PlayPage.qml" line="748"/>
         <source>%1…%2 dB</source>
         <translation>%1…%2 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="720"/>
+        <location filename="../qml/PlayPage.qml" line="754"/>
         <source>SHORT BLOCKS</source>
         <translation>KURZE BLÖCKE</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="724"/>
+        <location filename="../qml/PlayPage.qml" line="758"/>
         <source>%1 of %2</source>
         <translation>%1 von %2</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="726"/>
+        <location filename="../qml/PlayPage.qml" line="760"/>
         <source>n/a</source>
         <translation>n/v</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="729"/>
+        <location filename="../qml/PlayPage.qml" line="763"/>
         <source>BITRATE</source>
         <translation>BITRATE</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="783"/>
+        <location filename="../qml/PlayPage.qml" line="817"/>
         <source>Add files</source>
         <translation>Dateien hinzufügen</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="785"/>
+        <location filename="../qml/PlayPage.qml" line="819"/>
+        <source>AC-3 / E-AC-3 / AC-4 / TrueHD / MLP (*.ac3 *.ec3 *.ac4 *.thd *.mlp)</source>
+        <translation>AC-3 / E-AC-3 / AC-4 / TrueHD / MLP (*.ac3 *.ec3 *.ac4 *.thd *.mlp)</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayPage.qml" line="820"/>
         <source>All files (*)</source>
         <translation>Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="785"/>
-        <source>AC-3 / E-AC-3 / AC-4 (*.ac3 *.ec3 *.ac4)</source>
-        <translation>AC-3 / E-AC-3 / AC-4 (*.ac3 *.ec3 *.ac4)</translation>
+        <location filename="../qml/PlayPage.qml" line="820"/>
+        <source>MP4, Matroska and MPEG-TS (*.mp4 *.mkv *.ts)</source>
+        <translation>MP4, Matroska und MPEG-TS (*.mp4 *.mkv *.ts)</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="791"/>
+        <location filename="../qml/PlayPage.qml" line="826"/>
         <source>Add folder</source>
         <translation>Ordner hinzufügen</translation>
     </message>
@@ -4723,43 +4983,61 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
         <translation>Es wird nichts abgespielt</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="62"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="65"/>
+        <source>lossless, lenient checks</source>
+        <translation>verlustfrei, tolerante Prüfungen</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlaySignalPathCard.qml" line="66"/>
+        <source>lossless, strict checks</source>
+        <translation>verlustfrei, strikte Prüfungen</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlaySignalPathCard.qml" line="68"/>
         <source>transcoded to AC-3</source>
         <translation>nach AC-3 transcodiert</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="63"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="69"/>
         <source>sent as it is</source>
         <translation>unverändert gesendet</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="64"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="70"/>
         <source>RF mode</source>
         <translation>RF-Modus</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="65"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="71"/>
         <source>custom mode</source>
         <translation>benutzerdefinierter Modus</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="65"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="71"/>
         <source>line mode</source>
         <translation>Line-Modus</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="67"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="73"/>
         <source>stream</source>
         <extracomment>Shown when the kind of the stream is not known, as in &apos;stream · RF mode&apos;. The stream itself.</extracomment>
         <translation>Stream</translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/PlaySignalPathCard.qml" line="84"/>
+        <source>Substream %1, %n channels. Dialogue normalisation and dynamic range are read and not applied. Passthrough of TrueHD is not available, so it is decoded here.</source>
+        <translation>
+            <numerusform>Substream %1, %n Kanal. Dialognormalisierung und Dynamikbereich werden gelesen, aber nicht angewendet. Passthrough von TrueHD ist nicht verfügbar, daher wird es hier decodiert.</numerusform>
+            <numerusform>Substream %1, %n Kanäle. Dialognormalisierung und Dynamikbereich werden gelesen, aber nicht angewendet. Passthrough von TrueHD ist nicht verfügbar, daher wird es hier decodiert.</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="77"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="95"/>
         <source>dialnorm −%1: %2 dB down%3</source>
         <translation>dialnorm −%1: %2 dB leiser%3</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/PlaySignalPathCard.qml" line="81"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="99"/>
         <source> · %n objects</source>
         <translation>
             <numerusform> · %n Objekt</numerusform>
@@ -4767,92 +5045,92 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
         </translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="109"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="127"/>
         <source>2 · RENDER</source>
         <translation>2 · RENDERN</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="116"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="134"/>
         <source>Not rendered here</source>
         <translation>Hier nicht gerendert</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="118"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="136"/>
         <source>%1 onto %2 outputs</source>
         <translation>%1 auf %2 Ausgaben</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="120"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="138"/>
         <source>Not rendering</source>
         <translation>Kein Rendering</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="130"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="148"/>
         <source>the receiver decodes it for its own speakers · the levels show a decode made here</source>
         <translation>der Receiver decodiert es für seine eigenen Lautsprecher · die Pegel zeigen eine hier vorgenommene Decodierung</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="140"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="158"/>
         <source>%1 small at %2 Hz</source>
         <translation>%1 klein bei %2 Hz</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="140"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="158"/>
         <source> and </source>
         <translation> und </translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="142"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="160"/>
         <source>no small speakers</source>
         <translation>keine kleinen Lautsprecher</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="143"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="161"/>
         <source> · trims and delays</source>
         <translation> · Trims und Verzögerungen</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="172"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="190"/>
         <source>3 · YOU HEAR IT ON</source>
         <translation>3 · SIE HÖREN ES AUF</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="179"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="197"/>
         <source>No output chosen</source>
         <translation>Keine Ausgabe gewählt</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="192"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="210"/>
         <source>%1 bitstream over IEC 61937 at %2 kHz</source>
         <translation>%1-Bitstream über IEC 61937 bei %2 kHz</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="195"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="213"/>
         <source>%1 ch %2 at %3 kHz</source>
         <translation>%1 Kan. %2 bei %3 kHz</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="197"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="215"/>
         <source>PCM</source>
         <translation>PCM</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="197"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="215"/>
         <source>bitstream</source>
         <translation>Bitstream</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="209"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="227"/>
         <source>output: your choice</source>
         <translation>Ausgabe: Ihre Wahl</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="215"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="233"/>
         <source>Choose…</source>
         <translation>Wählen…</translation>
     </message>
     <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="231"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="249"/>
         <source>A paired network sink isn&apos;t playing: no group is chosen as the output. Choose one above, or make one on the Network page.</source>
         <translation>Ein gekoppeltes Netzwerk-Wiedergabegerät spielt nicht ab: Es ist keine Gruppe als Ausgabe gewählt. Wählen Sie oben eine oder erstellen Sie eine auf der Seite Netzwerk.</translation>
     </message>
@@ -4860,56 +5138,56 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="342"/>
+        <location filename="../../src/network_controller.cpp" line="353"/>
         <source>not sent: the sink refused the settings.</source>
         <translation>nicht gesendet: Das Wiedergabegerät hat die Einstellungen abgelehnt.</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="343"/>
+        <location filename="../../src/network_controller.cpp" line="354"/>
         <source>not sent: the sink does not take settings from Hearth.</source>
         <translation>nicht gesendet: Das Wiedergabegerät übernimmt keine Einstellungen von Hearth.</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="345"/>
+        <location filename="../../src/network_controller.cpp" line="356"/>
         <source>The sink does not take settings from Hearth.</source>
         <translation>Das Wiedergabegerät übernimmt keine Einstellungen von Hearth.</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="349"/>
+        <location filename="../../src/network_controller.cpp" line="360"/>
         <source>revision %1 sent, not reported yet</source>
         <translation>Revision %1 gesendet, noch nicht gemeldet</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="351"/>
+        <location filename="../../src/network_controller.cpp" line="362"/>
         <source>revision %1 refused: %2</source>
         <translation>Revision %1 abgelehnt: %2</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="355"/>
+        <location filename="../../src/network_controller.cpp" line="366"/>
         <source>revision %1 · applied</source>
         <translation>Revision %1 · angewendet</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="357"/>
+        <location filename="../../src/network_controller.cpp" line="368"/>
         <source>revision %1 sent · sink on %2</source>
         <translation>Revision %1 gesendet · Wiedergabegerät auf %2</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="362"/>
+        <location filename="../../src/network_controller.cpp" line="373"/>
         <source>Nothing playing.</source>
         <translation>Es wird nichts abgespielt.</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="363"/>
-        <location filename="../../src/network_controller.cpp" line="376"/>
+        <location filename="../../src/network_controller.cpp" line="374"/>
+        <location filename="../../src/network_controller.cpp" line="385"/>
         <source>none</source>
         <translation>keine</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="364"/>
-        <location filename="../../src/network_controller.cpp" line="407"/>
-        <location filename="../../src/network_controller.cpp" line="413"/>
-        <location filename="../../src/network_controller.cpp" line="415"/>
+        <location filename="../../src/network_controller.cpp" line="375"/>
+        <location filename="../../src/network_controller.cpp" line="416"/>
+        <location filename="../../src/network_controller.cpp" line="422"/>
+        <location filename="../../src/network_controller.cpp" line="424"/>
         <source>not reported</source>
         <translation>nicht gemeldet</translation>
     </message>
@@ -4930,32 +5208,32 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
         </translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="377"/>
+        <location filename="../../src/network_controller.cpp" line="386"/>
         <source>%1 carried · %2</source>
         <translation>%1 enthalten · %2</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="378"/>
+        <location filename="../../src/network_controller.cpp" line="387"/>
         <source>placed</source>
         <translation>platziert</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="379"/>
+        <location filename="../../src/network_controller.cpp" line="388"/>
         <source>not placed</source>
         <translation>nicht platziert</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="380"/>
+        <location filename="../../src/network_controller.cpp" line="389"/>
         <source>dialnorm %1</source>
         <translation>dialnorm %1</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="390"/>
+        <location filename="../../src/network_controller.cpp" line="399"/>
         <source>%1 underruns · %2 late · %3 dropped · %4 invalid</source>
         <translation>%1 Underruns · %2 verspätet · %3 verworfen · %4 ungültig</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="406"/>
+        <location filename="../../src/network_controller.cpp" line="415"/>
         <source>%1-bit · %2 slots</source>
         <translation>%1 Bit · %2 Plätze</translation>
     </message>
@@ -5830,17 +6108,17 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1534"/>
+        <location filename="../../src/hearth_controller.cpp" line="1631"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>Dieser Build enthält keine eingebettete Hinweisdatei (:/notices/NOTICES.txt wurde nicht einkompiliert); die NOTICES.txt neben der Anwendung und die LICENSE des Repositorys sagen, was er ausliefert.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2707"/>
+        <location filename="../../src/hearth_controller.cpp" line="2830"/>
         <source>saved to %1</source>
         <translation>gespeichert unter %1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2710"/>
+        <location filename="../../src/hearth_controller.cpp" line="2833"/>
         <source>could not write %1: %2</source>
         <translation>%1 konnte nicht geschrieben werden: %2</translation>
     </message>
@@ -5876,12 +6154,12 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="932"/>
+        <location filename="../../src/network_controller.cpp" line="941"/>
         <source>it could not be read: %1</source>
         <translation>es konnte nicht gelesen werden: %1</translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="935"/>
+        <location filename="../../src/network_controller.cpp" line="944"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation>es hat %1 Bytes, mehr als der App-Platz jedes Wiedergabegeräts fasst</translation>
     </message>
