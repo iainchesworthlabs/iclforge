@@ -621,7 +621,7 @@
       "channels": 16,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "d6585c5047061cc0fef7e94cebf3387fd06cfb39bd82bbf190083bd795856137",
+      "stream_sha256": "d49c8130c9b366583961ce84899941b2b6700cff586103bb8fdf33870659c931",
       "pcm_sha256": "0e804e2f355f4bbcd8d972ff4fa42535ae5ef0f2cb3a4171c12178b5b6cc58c1"
     },
     {
@@ -646,7 +646,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "d6585c5047061cc0fef7e94cebf3387fd06cfb39bd82bbf190083bd795856137",
+      "stream_sha256": "d49c8130c9b366583961ce84899941b2b6700cff586103bb8fdf33870659c931",
       "pcm_sha256": "616e6835a6dec24256eb9569f071ce1f215f29126a3d90af7dffd10f2a90cd11"
     },
     {
@@ -681,7 +681,7 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "5840320bde784ac32f908ba139b10734186bbe95885afa6a6840bec6223a3be3",
+      "stream_sha256": "f7b64911da59eb2bdd8be62b6cd9a8eb8056cf3995583c2afcf661b26b690a97",
       "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34"
     },
     {
@@ -716,7 +716,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "5840320bde784ac32f908ba139b10734186bbe95885afa6a6840bec6223a3be3",
+      "stream_sha256": "f7b64911da59eb2bdd8be62b6cd9a8eb8056cf3995583c2afcf661b26b690a97",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
     },
     {
@@ -751,7 +751,7 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "5601941c0153670142b3a329f74a2ca1e594699ce8715f9e7636f904011f6bdd",
+      "stream_sha256": "e8142d94d6caceacc242bcb0f31e9dc98c7f6637495c864245817431158aa3ef",
       "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34",
       "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     },
@@ -787,7 +787,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "5601941c0153670142b3a329f74a2ca1e594699ce8715f9e7636f904011f6bdd",
+      "stream_sha256": "e8142d94d6caceacc242bcb0f31e9dc98c7f6637495c864245817431158aa3ef",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0",
       "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     }

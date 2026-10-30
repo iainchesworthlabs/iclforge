@@ -91,8 +91,100 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     return context.max_matrix_chan + 1 + (context.noise_type ? 0 : kNoiseChannels);
 }
 
+// TH spec §10.2.1a, restart sync 0x31EC: the matrix section of the object substream. Two present
+// bits, the count less one, then every matrix's header (output channel, frac_bits, f_shift + 1,
+// two reserved bits, four bits per matrix, and a presence mask over the matrix channels), then every
+// matrix's coefficients, then one bit that says whether a second precision term follows (DEE never
+// sets it; it is refused here). Provisional for what the owner's discs do not show (ERRATA.md
+// entry 69).
+[[nodiscard]] std::expected<MatrixSet, Error> read_object_matrices(BitReader& reader,
+                                                                  const BlockContext& context) {
+    MatrixSet set;
+    if (reader.read(1) == 0) {
+        return set;  // no matrices follow
+    }
+    if (reader.read(1) == 0) {
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "object matrices without their header loop"});
+    }
+    const unsigned count = reader.read(4) + 1;
+    if (count > kMaxMatrices) {
+        return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
+    }
+    set.count = static_cast<std::uint8_t>(count);
+    const int channels = context.max_matrix_chan + 1;
+    std::array<std::uint32_t, kMaxMatrices> masks{};
+    for (unsigned m = 0; m < count; ++m) {
+        MatrixSpec& matrix = set.items[m];
+        matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
+        matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
+        matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
+        matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
+        matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
+        masks[m] = reader.read(channels);
+        if (matrix.frac_bits - matrix.f_shift > 15) {
+            return std::unexpected(
+                Error{ErrorKind::kBadParameter, "matrix coefficients finer than 2^-15"});
+        }
+    }
+    for (unsigned m = 0; m < count; ++m) {
+        MatrixSpec& matrix = set.items[m];
+        for (int c = 0; c < channels; ++c) {
+            const auto index = static_cast<std::size_t>(c);
+            matrix.present[index] = ((masks[m] >> c) & 1U) != 0;
+            if (matrix.present[index]) {
+                matrix.coeff[index] = read_signed(reader, matrix.frac_bits + 2);
+            }
+        }
+    }
+    if (reader.read(1) != 0) {
+        return std::unexpected(
+            Error{ErrorKind::kBadParameter, "matrix extension (never written by DEE)"});
+    }
+    return set;
+}
+
+void write_object_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
+    if (set.count == 0) {
+        put_field(writer, 0, 1);
+        return;
+    }
+    put_field(writer, 1, 1);
+    put_field(writer, 1, 1);
+    put_field(writer, set.count - 1U, 4);
+    const int channels = context.max_matrix_chan + 1;
+    for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
+        const MatrixSpec& matrix = set.items[m];
+        std::uint32_t mask = 0;
+        for (int c = 0; c < channels; ++c) {
+            if (matrix.present[static_cast<std::size_t>(c)]) {
+                mask |= 1U << c;
+            }
+        }
+        put_field(writer, matrix.out_ch, 4);
+        put_field(writer, matrix.frac_bits, 4);
+        put_field(writer, static_cast<unsigned>(matrix.f_shift + 1), 3);
+        put_field(writer, matrix.field_2b, 2);
+        put_field(writer, matrix.field_m4, 4);
+        put_field(writer, mask, channels);
+    }
+    for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
+        const MatrixSpec& matrix = set.items[m];
+        for (int c = 0; c < channels; ++c) {
+            const auto index = static_cast<std::size_t>(c);
+            if (matrix.present[index]) {
+                put_signed(writer, matrix.coeff[index], matrix.frac_bits + 2);
+            }
+        }
+    }
+    put_field(writer, 0, 1);
+}
+
 [[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,
                                                             const BlockContext& context) {
+    if (context.object_matrices) {
+        return read_object_matrices(reader, context);
+    }
     const unsigned count = reader.read(4);
     if (count > kMaxMatrices) {
         return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
@@ -127,6 +219,10 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 }
 
 void write_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
+    if (context.object_matrices) {
+        write_object_matrices(writer, context, set);
+        return;
+    }
     put_field(writer, set.count, 4);
     const int coefficients = matrix_coefficients(context);
     for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {

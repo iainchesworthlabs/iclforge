@@ -346,6 +346,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // matrices have no coefficients for the noise channels (ERRATA.md entry 32): the noise they
     // draw is generator 1's (§17.3).
     state.context.noise_type = header->noise_type();
+    // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
+    state.context.object_matrices = header->sync == kRestartSyncAtmos;
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
@@ -422,7 +424,8 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                            ? c
                                            : kMaxChannels + (c - restart.matrix_channels());
                     plan.channel[slot] = static_cast<std::uint8_t>(column);
-                    plan.coeff[slot] = spec.coeff[index] * (1 << (kMatrixShift - spec.frac_bits));
+                    plan.coeff[slot] =
+                        spec.coeff[index] * (1 << (kMatrixShift - spec.frac_bits + spec.f_shift));
                 }
             }
         }

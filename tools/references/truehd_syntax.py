@@ -254,6 +254,7 @@ class Substream:
         self.index = index
         self.running = False
         self.noise_type = False
+        self.object_matrices = False
         self.interval = None  # the fold of the output since the last restart
         self.noise_buffer = None  # generator 1's values for this access unit (TH spec 17.3)
         self.noise_size = 64  # access_unit_size_pow2: 64, 128 or 256 (ERRATA, noise generator 1)
@@ -287,6 +288,8 @@ class Substream:
         # Restart sync 0x31EB is noise_type 1: generator 1 (TH spec 17.3) and matrices with no noise
         # coefficients but a noise shift each (ERRATA 32).
         self.noise_type = sync == 0x31EB
+        # Restart sync 0x31EC has the object-audio matrix section (TH spec 10.2.1a).
+        self.object_matrices = sync == 0x31EC
         if self.running and self.interval is not None:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
@@ -334,7 +337,45 @@ class Substream:
             channel.huff_type = bits.read(2)
             channel.huff_lsbs = bits.read(5)
 
+    def read_object_matrices(self, bits):
+        """TH spec 10.2.1a: two present bits, the count less one, every matrix's header (output
+        channel, frac_bits, f_shift + 1, 2 reserved bits, 4 bits per matrix, a presence mask), every
+        matrix's coefficients, then a bit for a second precision term DEE never sets."""
+        if not bits.read(1):
+            return []
+        if not bits.read(1):
+            raise StreamError("object matrices without their header loop")
+        count = bits.read(4) + 1
+        if count > 15:
+            raise StreamError("more than 15 primitive matrices")
+        channels = self.max_matrix_chan + 1
+        headers = []
+        for _ in range(count):
+            out = bits.read(4)
+            frac_bits = bits.read(4)
+            f_shift = bits.read(3) - 1
+            bits.read(2)
+            bits.read(4)
+            mask = bits.read(channels)
+            if frac_bits - f_shift > MATRIX_SHIFT:
+                raise StreamError("matrix coefficients finer than 2^-15")
+            headers.append((out, frac_bits, f_shift, mask))
+        matrices = []
+        for out, frac_bits, f_shift, mask in headers:
+            coeffs = [0] * (channels + NOISE_CHANNELS)
+            for channel in range(channels):
+                if mask >> channel & 1:
+                    coeffs[channel] = bits.signed(frac_bits + 2) << (
+                        MATRIX_SHIFT - frac_bits + f_shift
+                    )
+            matrices.append((out, coeffs, 0, 0))
+        if bits.read(1):
+            raise StreamError("matrix extension (never written by DEE)")
+        return matrices
+
     def read_matrices(self, bits):
+        if self.object_matrices:
+            return self.read_object_matrices(bits)
         matrices = []
         for _ in range(bits.read(4)):
             out = bits.read(4)

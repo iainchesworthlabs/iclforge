@@ -1275,6 +1275,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             context.max_chan = stage.spec.last_row;
             context.max_matrix_chan = stage.spec.last_row;
             context.noise_type = stage.noise;
+            context.object_matrices = stage.sync == kRestartSyncAtmos;
             context.presence_flags = presence::kAll;
 
             // The coding in force at the start of this access unit's first block is rebuilt by the

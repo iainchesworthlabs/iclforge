@@ -129,6 +129,12 @@ struct MatrixSpec {
     std::array<bool, kMaxChannels + kNoiseChannels> present{};
     std::array<std::int32_t, kMaxChannels + kNoiseChannels> coeff{};
     std::uint8_t noise_shift = 0;  // 4 bits, sent when the restart's noise_type is set
+    // The matrices of restart sync 0x31EC (TH spec §10.2.1a) also send these three. f_shift widens
+    // the range of the coefficients: the real value is coeff / 2^(frac_bits - f_shift), -1 to 6.
+    // field_2b and field_m4 are reserved and carried as read.
+    std::int8_t f_shift = 0;
+    std::uint8_t field_2b = 0;  // 2 bits
+    std::uint8_t field_m4 = 0;  // 4 bits
     friend bool operator==(const MatrixSpec&, const MatrixSpec&) = default;
 };
 
@@ -157,6 +163,8 @@ struct BlockContext {
     int max_chan = 0;
     int max_matrix_chan = 0;
     bool noise_type = false;
+    // Restart sync 0x31EC: the matrix section is the object-audio variant of TH spec §10.2.1a.
+    bool object_matrices = false;
     std::uint8_t presence_flags = presence::kAll;  // in effect before this header
     friend bool operator==(const BlockContext&, const BlockContext&) = default;
 };

@@ -148,6 +148,7 @@ TEST_CASE("the sixteen-channel stream sits at substream 3's limits",
     context.min_chan = restart->min_chan;
     context.max_chan = restart->max_chan;
     context.max_matrix_chan = restart->max_matrix_chan;
+    context.object_matrices = restart->sync == kRestartSyncAtmos;
     const auto block = read_block_header(bits, context);
     REQUIRE(block.has_value());
     REQUIRE(block->matrices.has_value());

@@ -74,6 +74,8 @@ class Variant(ref.Substream):
         return self.noise_type if mode == "by_sync" else mode == "always"
 
     def read_matrices(self, bits):
+        if self.object_matrices:
+            return self.read_object_matrices(bits)
         matrices = []
         for _ in range(bits.read(4)):
             out = bits.read(4)

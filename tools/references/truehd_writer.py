@@ -301,7 +301,29 @@ def write_full_block_header(w, sub, params, size):
     w.put(0, 1)  # new_guards: the flags stay 0xFF
     w.put(1, 1)
     w.put(size, 9)
-    if sub.matrices:
+    if sub.matrices and sub.sync == 0x31EC:
+        # TH spec 10.2.1a: the object-audio matrix section.
+        w.put(1, 1)
+        w.put(1, 1)
+        w.put(1, 1)
+        w.put(len(sub.matrices) - 1, 4)
+        channels = sub.mm + 1
+        # (out, frac_bits, lsb_bypass, {channel: coefficient}, f_shift): f_shift widens the range
+        for out, frac_bits, lsb_bypass, coeffs, *_noise in sub.matrices:
+            assert not lsb_bypass, "the object-audio matrices carry no bypass bit"
+            mask = sum(1 << c for c in range(channels) if coeffs.get(c))
+            w.put(out, 4)
+            w.put(frac_bits, 4)
+            w.put((_noise[0] if _noise else 0) + 1, 3)  # f_shift + 1
+            w.put(0, 2)
+            w.put(0, 4)
+            w.put(mask, channels)
+        for _out, frac_bits, _bypass, coeffs, *_noise in sub.matrices:
+            for c in range(channels):
+                if coeffs.get(c):
+                    w.signed(coeffs[c], frac_bits + 2)
+        w.put(0, 1)  # no second precision term
+    elif sub.matrices:
         w.put(1, 1)
         w.put(len(sub.matrices), 4)
         for out, frac_bits, lsb_bypass, coeffs, *noise in sub.matrices:
@@ -838,12 +860,20 @@ def case_substream3_fine_matrices(extra_data=None):
         (11, 13, {10: 4001, 7: -3333}),
         (9, 0, {11: 1}),
         (8, 15, {3: 65535, 5: -65536}),
+        # f_shift 1 (TH spec 10.2.1a): the coefficient is raw / 2^(frac_bits - 1), so 9489 at
+        # frac_bits 13 is 2.3167 and the unity coefficient of the output is 4096
+        (11, 13, {0: 9489, 6: -4001}, 1),
     ]
-    matrices = [(out, frac, False, {out: 1 << frac, **others}) for out, frac, others in plan]
+    matrices = [
+        (out, frac, False, {out: 1 << (frac - fs), **others}, fs)
+        for out, frac, others, fs in ((*item, 0) if len(item) == 3 else item for item in plan)
+    ]
     coded = [list(column) for column in src]
-    for out, frac, others in reversed(plan):
+    for out, frac, others, fs in reversed(
+        [(*item, 0) if len(item) == 3 else item for item in plan]
+    ):
         coded[out] = [
-            o - ((sum(coded[c][i] * w for c, w in others.items())) >> frac)
+            o - ((sum(coded[c][i] * w for c, w in others.items())) >> (frac - fs))
             for i, o in enumerate(coded[out])
         ]
 
@@ -932,9 +962,7 @@ def case_iir_state():
         1: Channel(fir=filt([48], 6), iir=filt([20, -8, 4], 6), iir_state=(8, 0, [90, -101, 33])),
         2: Channel(iir=filt([30], 6), iir_state=(0, 5, [0])),
     }
-    sub = Substream(
-        0, 2, 2, channels, list(zip(*sources, strict=True)), dict(enumerate(sources))
-    )
+    sub = Substream(0, 2, 2, channels, list(zip(*sources, strict=True)), dict(enumerate(sources)))
     return (
         Stream([sub], n),
         "IIR new_states: signed values loaded shifted left by state_shift, at every restart",
@@ -1149,12 +1177,10 @@ def case_noise1(rate_code=0, shifts=(3, 0, 12), seed=0x2A5F31, label="48 kHz"):
     # matrix 0: row 1 += (row 0 * a + noise) >> 14 ; matrix 1: row 2 += row 1 * b >> 8 ;
     # matrix 2: row 3 += (row 0 * d + noise) >> 14, kept to a multiple of 2.
     coded[1] = [
-        x1 - (((x0 * a << 6) + t) >> 14)
-        for x0, x1, t in zip(src[0], src[1], terms[0], strict=True)
+        x1 - (((x0 * a << 6) + t) >> 14) for x0, x1, t in zip(src[0], src[1], terms[0], strict=True)
     ]
     coded[2] = [
-        x2 - (((x1 * b << 6) + t) >> 14)
-        for x1, x2, t in zip(src[1], src[2], terms[1], strict=True)
+        x2 - (((x1 * b << 6) + t) >> 14) for x1, x2, t in zip(src[1], src[2], terms[1], strict=True)
     ]
     coded[3] = [
         x3 - ((((x0 * d << 6) + t) >> 14) & ~1)

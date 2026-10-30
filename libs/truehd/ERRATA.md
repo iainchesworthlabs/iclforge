@@ -870,6 +870,22 @@ coefficients, and the 1,714 bit steady header on the disc is probably the whole 
 bit 1,133 and then fails), so its length is not evidence of anything about the sample data. No reference exists in the repository: DEE deletes its matrix file, and its debug
 log has no per-restart counts. **Open (question 60), parked as WP1b.** What would settle it: a licensed decoder's parse log for one restart interval, or the matrix file.
 
+**69. The matrix section of substream 3 (TH spec v3.20 §10.2.1a; entries 8, 10, 60, 65, 67, 68).** Restart sync 0x31EC has its own matrix section, and
+the decoder, the Python reference, the encoder and the hand-built streams now read and write it. The section is: two present bits (both 1), the count
+less one (4 bits), then the header of every matrix (output channel 4 bits, `frac_bits` 4, `f_shift` + 1 in 3, two reserved bits, `field_m4` 4, and a
+presence mask of `max_matrix_chan` + 1 bits, channel 0 first), then the coefficients of every matrix (`frac_bits` + 2 bits signed, by ascending channel
+in each mask), then one bit for a second precision term. The coefficient is `raw / 2^(frac_bits - f_shift)`; `f_shift` of -1 to 6 is how a coefficient past
+2 (2.3167, 6.2) is sent. There are no noise columns and no bypass bit in this section. A set extension bit is refused (nothing the owner has shows it).
+**Checked on the owner's streams:** the section reads to the bit, with the extension bit 0, in nine restarts of DEE's silent encodes (matrices of
+`frac_bits` 5, 12 and 13 whose coefficients are 1, -0.3015 = -1/√11 on ten channels, and 2.3167) and in the steady restart of the disc, where it is ten
+matrices ending at bit 1,658 of the 1,714 shared, each with a coefficient of exactly 1.0 on its own output channel (a primitive matrix). This corrects
+entries 65 (b) and (c), 67 and 68: the "13 matrices", the 29 bit stretch and the 14 bit period were this layout read as the standard one. Held by
+`test_syntax.cpp` (a section written bit by bit; a set extension bit refused) and `hb_substream3_fine_matrices` (a matrix with `f_shift` 1; the decode is
+sample for sample, and fails when the shift is left out). **Provisional until the owner's streams decode with every lossless check passing**
+(`forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient`): the filter, channel-parameter and block-data sections after the matrices are
+the standard ones by TH spec v3.20, which this repository has not yet run on a real stream. Not changed: the encoder still writes an independent substream 3
+with `min_chan` 0 (question 63); the discs and DEE code channels 8 to 11 and let the matrices rebuild 0 to 7.
+
 ## Atmos, spec v3.6
 
 TH spec v3.6 (released 2026-10-29) rewrites §15 and leaves every other section as v3.5 has it. It now gives the bit-level syntax of the

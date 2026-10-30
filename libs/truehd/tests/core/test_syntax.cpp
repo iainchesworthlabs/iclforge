@@ -212,6 +212,106 @@ TEST_CASE("a matrix may write an output channel above max_matrix_chan", "[truehd
     CHECK(read->matrices == matrices);
 }
 
+TEST_CASE("the matrices of restart sync 0x31EC send every header, then every coefficient",
+          "[truehd][syntax]") {
+    // TH spec §10.2.1a, written here bit by bit and not through write_matrices: two present bits,
+    // the count less one, each matrix's header (output channel 4, frac_bits 4, f_shift + 1 3, two
+    // reserved bits, four bits, a presence mask over the matrix channels), each matrix's
+    // coefficients (frac_bits + 2 bits, signed, by ascending channel), and the extension bit.
+    BlockContext context;
+    context.min_chan = 2;
+    context.max_chan = 3;
+    context.max_matrix_chan = 3;
+    context.object_matrices = true;
+    context.presence_flags = presence::kMatrix;
+
+    iclforge::BitWriter bits;
+    bits.put(0, 1);  // new_guards
+    bits.put(1, 1);  // matrix present (the block size flag is not sent: only the matrix group is on)
+    bits.put(1, 1);  // matrix_subsection_present
+    bits.put(1, 1);  // reserved_present
+    bits.put(1, 4);  // two matrices
+    // Matrix 0: out 3, frac_bits 7, f_shift -1 (code 0), field_m4 5, channels 0 and 3.
+    bits.put(3, 4);
+    bits.put(7, 4);
+    bits.put(0, 3);
+    bits.put(0, 2);
+    bits.put(5, 4);
+    bits.put(0b1001, 4);
+    // Matrix 1: out 0, frac_bits 12, f_shift +1 (code 2), channels 1 and 2.
+    bits.put(0, 4);
+    bits.put(12, 4);
+    bits.put(2, 3);
+    bits.put(0, 2);
+    bits.put(0, 4);
+    bits.put(0b0110, 4);
+    // Coefficients: matrix 0 channel 0 and 3 (9 bits each), matrix 1 channel 1 and 2 (14 bits).
+    bits.put(75, 9);
+    bits.put(static_cast<std::uint32_t>(-256) & 0x1FFU, 9);
+    bits.put(4096, 14);
+    bits.put(static_cast<std::uint32_t>(-1235) & 0x3FFFU, 14);
+    bits.put(0, 1);  // no second precision term
+    bits.align();
+    const std::vector<std::byte> bytes = bits.take();
+
+    iclforge::BitReader reader(bytes);
+    const auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    REQUIRE(read->matrices.has_value());
+    const MatrixSet& set = *read->matrices;
+    REQUIRE(set.count == 2);
+    CHECK(set.items[0].out_ch == 3);
+    CHECK(set.items[0].frac_bits == 7);
+    CHECK(set.items[0].f_shift == -1);
+    CHECK(set.items[0].field_m4 == 5);
+    CHECK(set.items[0].present[0]);
+    CHECK_FALSE(set.items[0].present[1]);
+    CHECK(set.items[0].present[3]);
+    CHECK(set.items[0].coeff[0] == 75);
+    CHECK(set.items[0].coeff[3] == -256);
+    CHECK(set.items[1].f_shift == 1);
+    CHECK(set.items[1].present[1]);
+    CHECK(set.items[1].present[2]);
+    CHECK(set.items[1].coeff[1] == 4096);
+    CHECK(set.items[1].coeff[2] == -1235);
+
+    // And the writer sends the same bits.
+    BlockHeaderSpec header;
+    header.matrices = set;
+    iclforge::BitWriter again;
+    write_block_header(again, context, header);
+    CHECK(again.bit_count() == 1 + 1 + 1 + 1 + 4 + 2 * 21 + 18 + 28 + 1);
+}
+
+TEST_CASE("the matrices of restart sync 0x31EC refuse what the owner's discs never send",
+          "[truehd][syntax]") {
+    BlockContext context;
+    context.max_chan = 3;
+    context.max_matrix_chan = 3;
+    context.object_matrices = true;
+    context.presence_flags = presence::kMatrix;
+    // A set extension bit after one matrix with no coefficients.
+    iclforge::BitWriter bits;
+    bits.put(0, 1);
+    bits.put(1, 1);
+    bits.put(1, 1);
+    bits.put(1, 1);
+    bits.put(0, 4);
+    bits.put(2, 4);
+    bits.put(5, 4);
+    bits.put(1, 3);
+    bits.put(0, 2);
+    bits.put(0, 4);
+    bits.put(0, 4);
+    bits.put(1, 1);  // matrix_extension_present
+    bits.align();
+    const std::vector<std::byte> bytes = bits.take();
+    iclforge::BitReader reader(bytes);
+    const auto read = read_block_header(reader, context);
+    REQUIRE_FALSE(read.has_value());
+    CHECK(read.error().kind == ErrorKind::kBadParameter);
+}
+
 TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 0;
