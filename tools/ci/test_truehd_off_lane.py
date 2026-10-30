@@ -1,9 +1,10 @@
-"""Unit tests for the truehd-off job: the library built with ICLFORGE_BUILD_TRUEHD=OFF and the tests
-on, the one configuration that builds the C API's TrueHD stand-ins (libs/capi/src/truehd_absent.cpp).
+"""Unit tests for the truehd-off job: the library built with ICLFORGE_BUILD_TRUEHD=OFF and the
+tests on, the one configuration that builds the C API's TrueHD stand-ins
+(libs/capi/src/truehd_absent.cpp).
 
-stdlib only, like the other suites in tools/ci. They read the preset file, the workflow and the C API's
-CMake rule, because what could rot unseen is the wiring: a preset that quietly turned the tests off,
-or a job that stopped running the stand-ins' test, would stay green and prove nothing.
+stdlib only, like the other suites in tools/ci. They read the preset file, the workflow and the C
+API's CMake rule, because what could rot unseen is the wiring: a preset that quietly turned the
+tests off, or a job that stopped running the stand-ins' test, would stay green and prove nothing.
 """
 
 from __future__ import annotations
@@ -35,8 +36,8 @@ class Presets(unittest.TestCase):
         # The root CMakeLists.txt refuses the option off beside these two, which use the codec.
         self.assertEqual(variables["ICLFORGE_BUILD_CLI"], "OFF")
         self.assertEqual(variables["ICLFORGE_BUILD_HEARTH"], "OFF")
-        # The point of the preset: the tests stay on (the core fragment turns them on), and nothing here
-        # turns them or the examples off.
+        # The point of the preset: the tests stay on (the core fragment turns them on), and
+        # nothing here turns them or the examples off.
         self.assertNotIn("ICLFORGE_BUILD_TESTS", variables)
         self.assertNotIn("ICLFORGE_BUILD_EXAMPLES", variables)
         core = preset("configurePresets", "core")["cacheVariables"]
