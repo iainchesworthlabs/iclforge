@@ -524,6 +524,9 @@ def print_header_dump(data, units, skip=2, margin=8):
         f"{len(restarts)} restarts from unit {restarts[0][0]} share {shared} bits "
         f"(less a margin of {margin})"
     )
+    if shared <= 0:
+        print("the restarts share nothing to speak of: their parameters differ")
+        return
     nbytes = (shared + 7) // 8
     value = int.from_bytes(base[:nbytes], "big") >> (nbytes * 8 - shared)
     text = f"{value:0{(shared + 3) // 4}x}"
