@@ -75,11 +75,15 @@ In rough order of strength:
    are not redistributable and are not used here.
 5. **Fuzzing, in both directions.** Into the decoder: the libFuzzer harnesses under `fuzz/` drive
    the codecs' untrusted-input entry points looking for crashes and undefined behaviour
-   (ASan+UBSan). There are 24, listed in [Threat model](threat-model.md#memory-safety-posture);
+   (ASan+UBSan). There are 32, listed in [Threat model](threat-model.md#memory-safety-posture);
    AC-4's are `fuzz_ac4_parse` (the inspector and the sync-frame splitter), `fuzz_ac4_decode`
-   (the syntax layer and the reconstruction to PCM) and `fuzz_ac4_encode`. Two differential
+   (the syntax layer and the reconstruction to PCM), `fuzz_ac4_encode`, and for the content
+   signature `fuzz_ac4_content_signature` (where the sync frames stop and what the digest covers)
+   and `fuzz_content_signature` (the Thrift, DER, X.509, PEM and verification readers it hands
+   the trailer to). Three differential
    harnesses decode each mutated stream with both this project's decoder and FFmpeg's and diff
-   the PCM; they cover AC-3 and E-AC-3, since FFmpeg does not decode AC-4. CI runs them:
+   the PCM; they cover AC-3, E-AC-3 and TrueHD (whose rule is stricter, since the codec is lossless:
+   a stream both decode without a complaint must give equal samples), because FFmpeg does not decode AC-4. CI runs them:
    `Fuzz Regress` replays the checked-in seed and regression corpora on every push and on pull
    requests (a repository variable can pause the pull-request run; see
    [Where each check runs](#where-each-check-runs)), `Fuzz Short` and `Fuzz Differential` add a
@@ -102,6 +106,18 @@ In rough order of strength:
    through the GF(2) polynomial inverse it has to be solved with — while leaving one mutation in
    four unrepaired so the rejection path itself stays reachable. AC-4's decoder does not refuse a
    frame on its CRC, so its harnesses need no such mutator.
+
+   TrueHD's reader meets the same wall at five doors: the unit's check nibble, the major sync's CRC-16,
+   the restart header's CRC-8, a segment's parity byte and CRC-8, and the extra data's nibble and parity
+   byte. `fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_differential_truehd_decode` carry a mutator
+   (`libs/truehd/fuzz/truehd_mutator.hpp`) that rewrites them with the library's own routines after each
+   mutation, leaving one mutation in four unrepaired. The lossless check is a function of the decoded
+   samples and is not repaired. The differential harness found three disagreements with FFmpeg in its
+   first ten minutes: an MLP stream of 16-bit words that codes a bit below the word, a `ch_assign` read
+   the wrong way round (fixed: `libs/truehd/ERRATA.md` entry 42) and a changed major sync, which resets
+   the library's filter histories and not FFmpeg's (`ERRATA.md` questions 40 to 42 hold the two open
+   ones and the refusal of a repeated `ch_assign`). [`tools/fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md)
+   has the runs.
 
    Out of the encoder: `tools/ci/fuzz_encoder_space.py` (AC-3) and
    `tools/ci/fuzz_eac3_encoder_space.py` (E-AC-3) draw random legal encoder
@@ -160,10 +176,10 @@ scheduled workflows are separate.
 
 | Check | Codecs | Runs |
 |---|---|---|
-| The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams | AC-3, E-AC-3, AC-4 | Gate, queue, after a merge, nightly |
+| The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams, and the tests that read the owner's AC-4 content-signature sample skip when `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` is unset | AC-3, E-AC-3, AC-4, TrueHD | Gate, queue, after a merge, nightly |
 | The unit tests of the oracle scripts (`tools/checks`, `tools/ci`), which include the AC-4 syntax digests and presentation tables | all | The gate's static job |
-| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones) | AC-3, E-AC-3 | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
-| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, and the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
+| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones), and for TrueHD a bit-exact comparison with FFmpeg's strict decode of the committed fixtures and of `forge truehd-encode`'s stream | AC-3, E-AC-3, TrueHD | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
+| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
 | Hearth's engine against the AC-4 gain formulas (`gain_ac4_decode.py --engine`) | AC-4 | After a merge, nightly |
 | The ASan + UBSan leg with the codec matrix, and the TSan leg | all | Nightly |
 | `Fuzz Regress` | all | Every push to `main`, and every pull request unless the repository variable `PAUSE_NONESSENTIAL_CI` is `true` |
@@ -172,7 +188,8 @@ scheduled workflows are separate.
 | `Interop`: eight FATE excerpts | AC-3, E-AC-3 | Daily, and on pull requests that change the decode path |
 | `tools/checks/ac4_syntax_differential.py`, 3,000 mutated DEE frames and 800 synthetic tables of contents at a fixed seed | AC-4 | Daily, in the SonarCloud workflow, where it feeds the coverage scan and does not gate |
 | `tools/checks/check_install_consumer.sh`, and the ABI gate (advisory until the API freeze) | all | Nightly |
-| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; listening | AC-4 mostly | Locally, by hand |
+| Dolby Encoding Engine, MediaInfo, librempeg and the Reference Player; the `--gold` races and the census; `check_ac4_encode_readers.py`; `race_ac4_presentations.py`; `check_ac4_kit_streams.py` on Dolby's kit streams and `check_dolby_spott_streams.py` on the Spott files (both are Dolby's and not in the tree); `score_truehd_decode.py` on DEE's TrueHD streams (kept on the owner's machine; DEE's licence ends on 2026-11-06); listening | AC-4 mostly, TrueHD for the DEE scorer | Locally, by hand |
+| Dolby's Online Delivery Kit tools, `check_dolby_*.py` ([below](#dolbys-online-delivery-kit-tools)) | AC-3, E-AC-3, AC-4 containers | Locally, by hand; skip when the tools are absent |
 
 `PAUSE_NONESSENTIAL_CI` is a pause the workflows describe as temporary: while it is `true`, pull
 requests skip `Fuzz Regress`, OSV Scanner and Zizmor, which leaves the hosted runners to the
@@ -664,9 +681,42 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 type 2 substream (`strmtyp` 2, "previously coded in AC-3") | yes | yes |
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
+| TrueHD and MLP, 1 to 6 channels, as FFmpeg's encoders write them | yes | yes |
+| TrueHD with an IIR filter, LSB bypass, noise generator 0 or 1, a negative output shift, a permuted `ch_assign` or the block data check | yes, on hand-built streams (its encoders do not write them) | yes ([TrueHD and MLP](#truehd-and-mlp)) |
+| TrueHD with the 16-channel substream (restart sync `0x31EC`) | no, it refuses it | yes, held to a hand-built stream only |
+| TrueHD 7.1, as this library's encoder writes it | yes | yes |
+| A TrueHD MAT burst, read | no: FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT | yes, to the access units that went in |
+| The TrueHD Atmos substream's objects, and the evolution frame | refused or not read | not built: the frame's bytes are carried |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
+
+TrueHD's containers are not in this table either. FFmpeg's muxers write MP4, Matroska, MPEG-TS and MAT for it, and
+`tools/checks/verify_truehd_containers.py` has FFmpeg read what this project writes and this project read what FFmpeg
+writes, bit for bit (decoded PCM for the first three, the elementary stream for the second direction; MAT is compared
+as bytes). Each layout therefore has one oracle and no document: FFmpeg's `spdif` demuxer reads no stream from its own
+TrueHD MAT, so reading MAT has no oracle at all, and no receiver or disc player has read any of it
+([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
+
+**The AC-4 content signature** has an oracle for its cryptography and none for its meaning.
+OpenSSL checks what it can check without forge: that the certificates the blob carries parse and
+chain, that the ECDSA signature verifies over the bytes of the signed information, that it does not
+verify over the content digest (the reading CS spec v2.6 gives; v2.3 said the content digest), and that one changed bit is
+refused (`tools/checks/check_content_signature_openssl.py`, on a signature forge wrote and on the
+owner's sample blob, kept out of the repository and read through
+`ICLFORGE_CONTENT_SIGNATURE_SAMPLE`). What v2.5 and v2.6 added is held by signatures written by hand in the
+library tests (the signer information of §5.3 with a nonce, a publisher UUID and the accounts a verifier
+expects in every combination, and a certificate that carries another UUID or none; the signature checked before the digests; every wire version field 1) and by the CLI tests, each
+with a mutation that fails it; the sample is held to what v2.5 states of it (version fields, nonce, raw `r` and `s`)
+and to not being refused for a publisher UUID that none of its certificates carries (it passes with its own
+UUID as the expected account and is refused with another). What no oracle reaches is whether a Dolby verifier accepts
+what forge writes: the structure is that of one sample and one specification
+([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
+and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
+demuxer takes the trailer for five more packets, so ffprobe does not agree with forge's frame count on
+a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart: nothing signs or
+verifies a TrueHD stream, and the owner's specification lists the evolution frame's signature layout as unconfirmed
+([Object signing](concepts/object-signing.md#sibling-truehd-evolution)).
 
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
 it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's
@@ -903,6 +953,117 @@ with no published binary; it was built from its tag with its own Gradle wrapper.
 java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMPAnalyzer track.mxf
 java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMFTrackFileReader track.mxf <empty working dir>
 ```
+
+## Dolby's Online Delivery Kit tools
+
+Dolby publishes, free of charge on ott.dolby.com, kits for delivering Dolby Digital Plus and Dolby
+AC-4 online. The AC-4 kit (1.5) has a `Test_Tools` folder with two programs that read what this
+project writes. `streamdemuxer` (1.0.0.5519896, built 14 September 2020) demultiplexes MP4,
+fragmented MP4, DASH, HLS and MPEG-2 TS into elementary streams and takes `--decryption-keys
+<kid>:<key>`. `mp4drop` dumps the boxes of an ISO base media file as XML. Both are written by the
+format's owner, so they are the strongest outside reader of the container layer this project has:
+FFmpeg and GPAC read the same files, but neither is Dolby's. Neither decodes audio, so they sit
+beside the decoder oracles and not above them.
+
+They are optional and local. Nothing from the kit is committed (not the programs, not Dolby's
+streams, not XML dumps of them) and CI does not fetch it. The project has not read the kit's
+licence terms in full, and whether CI may download the kit is the owner's decision. A check skips
+with exit status 77 when the tools are absent.
+
+```
+python3 tools/checks/dolby_odk.py fetch dolby-odk-tools
+export ICLFORGE_DOLBY_ODK_TOOLS=$PWD/dolby-odk-tools
+python3 tools/checks/check_dolby_mp4_boxes.py --cli build/bin/forge
+python3 tools/checks/check_dolby_demux_roundtrip.py --cli build/bin/forge
+python3 tools/checks/check_dolby_cenc.py --cli build/bin/forge
+```
+
+`fetch` is the only step that touches the network. It reads the two tool archives (1.3 MB) out of
+the kit's 1.1 GB zip with HTTP range requests, checks each against a SHA-256 recorded in the
+script and extracts the program for this platform. `dolby-odk-tools/` is in `.gitignore`. The
+first two checks also take `--samples DIR` (or `ICLFORGE_DOLBY_ODK_SAMPLES`), a directory of MP4
+files from the kit itself, which stay on the machine that downloaded them. The programs are run
+the careful way, because they are Dolby's and not this project's: an empty environment, no
+network where `unshare -n` works, a temporary working directory, a time limit and a cap on what
+they may print.
+
+| Check | What it compares | Result, 2026-10-29 |
+|---|---|---|
+| `check_dolby_mp4_boxes.py` | mp4drop's reading of `dac3`, `dec3` (with the JOC flag and complexity index) and `dac4` in the MP4 and the init segment forge writes for AC-3, E-AC-3, E-AC-3 JOC and AC-4, against `forge probe` of the stream the box was made from; then `forge probe` of the box in Dolby's two sample MP4s against mp4drop | 10 pass, 1 note |
+| `check_dolby_demux_roundtrip.py` | forge's MP4, fragmented MP4 (init, DASH and HLS media), and MPEG-2 TS (DVB and ATSC) of the same four streams, through streamdemuxer, against the stream put in (AC-4 by raw frame, since two writers may frame the same frames differently); then forge's demux of Dolby's two sample MP4s against streamdemuxer's | 23 pass, 2 skip (AC-3 in TS: the tool does not list AC-3) |
+| `check_dolby_cenc.py` | 108 protected files (`tools/generators/cenc_make_protected.py` and GPAC's `MP4Box -crypt`; four codecs, four schemes, clear-lead, key-rotation and 16-byte-IV layouts): mp4drop's reading of the protection boxes against what the generator wrote, then streamdemuxer's decryption against the clear stream | 108 box legs pass; the 108 decryption legs skip |
+
+### Findings from Dolby's tools
+
+Each of these has one oracle, Dolby's tool, and is recorded as such. None is a defect found in
+forge; they are the places the tools say something forge's own tests could not.
+
+**Agreement.** On forge's containers the two programs read what forge wrote. streamdemuxer's
+elementary stream equals the stream that went in for 21 of 21 legs (MP4, DASH, HLS media and master,
+and TS for AC-3, E-AC-3, JOC and AC-4, less AC-3 in TS, which the tool does not list), and
+mp4drop's configuration-box fields equal what forge reads from the stream in 8 of 8 files (MP4 and
+init segment, four streams). The other way, forge reads Dolby's two sample MP4s (a stereo and a
+5.1 JOC E-AC-3 file) as streamdemuxer and mp4drop do. A reader written by the format's owner finds
+the output well formed.
+
+**Two framings of AC-4.** streamdemuxer writes an AC-4 elementary stream with sync word 0xAC40,
+no CRC and, on every frame, the 0xFFFF escape followed by a 24-bit length. forge writes 0xAC41, a
+CRC-16 and a 16-bit length. Both carry the same 73 raw frames and `forge probe` reads the tool's
+file, so the checks compare raw frames and not framing. ETSI TS 103 190-1 Annex G allows either; a
+consumer that needs one form should say so. Single oracle: Dolby's tool.
+
+**The channelcount of a JOC entry.** forge writes 6 in the `channelcount` of the `ec-3` sample
+entry for a 5.1 JOC stream; the kit's 5.1 JOC sample, made by Dolby's muxer, writes 2. The field
+is the player's hint, and the project has not established which value ETSI TS 103 420 asks for.
+The check prints it as a note, not a failure. Single oracle: a Dolby sample and Dolby's muxer. The
+owner decides whether the writer follows it; read the text before changing the writer.
+
+**The cipher is not checked.** streamdemuxer answered "Need a key for decryption" for 76 of the
+108 protected files with the matching key supplied (the other 32 are below). Trying the key in
+lower case, upper case, dashed and `0x` prefixed, with `--track-id`, and with two key pairs made no
+difference, nor did a control file FFmpeg had encrypted. The tool stops after the `moov` box. Whatever the cause, a tool that cannot be told from "ignores the key"
+proves nothing, so the check reports one skip for the decryption legs and `--require-decrypt` turns
+it into an error. No cipher output of forge's generator has been decrypted by a Dolby tool, and
+GPAC and FFmpeg remain the only decryption oracles ([planning/cenc-conformance.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md),
+section 6). Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
+Dolby Digital Plus kit was not examined), or a protected stream from Dolby with a published key.
+
+**Layouts the tool does not read.** For the 32 files that put a clear sample entry beside an
+`enca` entry, in either order, streamdemuxer exits 0 and writes no stream. It crashes (SIGSEGV) on
+a clear or protected MP4 that GPAC fragmented with `MP4Box -frag`, for E-AC-3 and for AC-4, though
+it reads the fragmented MP4 forge writes. Neither is a reason to change forge. They are why those
+legs are skipped, and the second was seen while exploring and is not one of the checks.
+
+**The protection boxes.** mp4drop reads `enca`, `sinf`, `frma`, `schm`, `schi` and `tenc` in all
+108 files and reports the scheme, the original format, the default KID, the IV size, the
+constant IV and the pattern the generator wrote, and a `senc` entry count equal to the `trun`
+sample count in each fragment that sends IVs. That puts the layout of the protection boxes (the
+order Dolby's AC-4 page gives: the configuration box, then `sinf`) under a Dolby parser. It says
+nothing about the cipher. The 1:9 pattern files are among the 108 and pass this leg for the same
+reason: it reads fields, not audio.
+
+### StreamValidator
+
+The kit also points at a hosted StreamValidator (and an MPD validator) on ott.dolby.com. It runs
+in a browser, takes `.mpd`, `.m3u8`, `.mp4`, `.m4a`, `.ts` or a zip of manifests and media, and has
+a Decryption box for `kid:key` pairs. Nothing here drives it. From the environment this project's
+automated work runs in, a default headless Chromium (no changed headers, one navigation each) was
+refused at both addresses the kit names:
+
+| Address | Answer |
+|---|---|
+| `https://ott.dolby.com/OnDel_Tools/validator/Start_Here.html` | HTTP 403, AccessDenied |
+| `https://ott.dolby.com/OnDelKits_dev/StreamValidator/Start_Here.html` | HTTP 403, AccessDenied |
+
+The attempt stopped there. `python3 tools/checks/dolby_validator_bundle.py --cli build/bin/forge
+--out DIR` writes `validator-bundle.zip`, which a person opens from their own browser: forge's
+elementary streams, MP4, DASH and HLS sets and TS files, the protected files, a `keys.txt` of
+made-up test values, and a checklist. Run it, then add one line per run below. Say whether the
+validator printed PASSED or FAILED and copy the error class and message.
+
+| File | Validator version and date | Result | Error class and message |
+|---|---|---|---|
+| (not run) | | | |
 
 ## Going the other way: published conformance vectors
 
@@ -1344,6 +1505,133 @@ processing" and in "A change of source" and "What an I-frame does not restore".
   undamaged decode's up to the lost audio and again from the second good frame after it; muted frames
   are silent, repeated ones fade by more than 20 dB a frame, and a frame whose table of contents does
   not read keeps the stream's counter and the converter's counts.
+
+### Dolby's Online Delivery Kit streams
+
+Dolby's AC-4 Online Delivery Kit (1.5, from ott.dolby.com) has a folder of test streams,
+`Test_Signals/elementary_streams/Audio`, that Dolby made to check playback and content-creation
+products. The kit is Dolby's, so none of it is committed; `tools/checks/check_ac4_kit_streams.py`
+reads the folder from `ICLFORGE_DOLBY_AC4_KIT_STREAMS` and prints SKIP when the variable is unset.
+`Audio.zip`, beside the folder, holds the same 14 files, byte for byte (SHA-256 compared member by
+member).
+
+| File | Bytes | SHA-256 |
+|---|---|---|
+| `Audio_ID_2ch_64kbps_25fps_ac4.ac4` | 263,586 | `cb6c8cd2fa7a6ac3225e98663a84088b0df52bc89ba8754b540f30c5b34d5b4e` |
+| `Audio_ID_2ch_64kbps_2997fps_ac4.ac4` | 265,240 | `68a99f710967fb8fe007ac3bae9696cbf6851220ab74afafaa56ebf5743b9663` |
+| `Audio_ID_514ch_192kbps_25fps_ac4.ac4` | 773,600 | `aacf8e50363def6ae7d2d89e595ff4d3319096a8209b74ddbe4d78fa2b35faff` |
+| `Audio_ID_514ch_192kbps_2997fps_ac4.ac4` | 775,488 | `958b18e481ed88bd1ecbd5f772076920f8259ca8c3f14ffbe2a4c29f854ffdc3` |
+| `Audio_ID_6ch_128kbps_25fps_ac4.ac4` | 520,816 | `5634921ddb5b14e32dce026f13a80b1e31d349059eb898f369c9350ac5616855` |
+| `Audio_ID_6ch_128kbps_2997fps_ac4.ac4` | 522,319 | `6de4fb2662a3122d377f66df47f8566b3221eba8053d5c3653f867d7ce510a11` |
+| `Audio_ID_ims_112kbps_25fps_ac4.ac4` | 452,800 | `714b599950526c207144c57915dbf2e2dcf58c5c675cf47bab984c1755cb7ebf` |
+| `Audio_ID_ims_112kbps_2997fps_ac4.ac4` | 454,208 | `772c24599837598879f60316f1c496191e4a71515dd0d0c776a63e61ad779292` |
+| `Holi_en_6ch_128kbps_25fps_ac4.ac4` | 1,374,688 | `1b43b761e10909da9b1b16d4c1f8433cd26b73ebbf00aee04153795e867eded5` |
+| `Holi_en_6ch_128kbps_2997fps_ac4.ac4` | 1,377,740 | `8c3451f20fc4b916e80ae375b21188ddf35e3f65b1068da26770845b70fbd6be` |
+| `Holi_fr_6ch_128kbps_25fps_ac4.ac4` | 1,374,688 | `33f4c6331485e773ad96bcb9a53a156b7710c82ba8486d57b84178ed552779fc` |
+| `Holi_fr_6ch_128kbps_2997fps_ac4.ac4` | 1,377,740 | `83484674fa8389b3ab01dcac25e753c91490d243c6a8674c13bff084e30dbc0c` |
+| `Audio_ID_6ch_256kbps_ddp.ec3` (E-AC-3) | 1,024,000 | `62b463a20ab6ef89562c198ad451f3ae5badb80049f7293cc8312029b1bf764e` |
+| `Audio_ID_2ch_64kbps_aac.aac` (AAC, not read) | 256,238 | `c81f7b3d189150fdd5a505ba27c01596850130b35dc9f06b1f643e21202184c7` |
+
+`Audio_ID_*` is a 32 s programme, 800 frames at 25 fps or 960 at 29.97, in 2.0, 5.1, 5.1.4 and
+immersive stereo; `Holi_en` and `Holi_fr` are one 5.1 programme in two languages, 2,128 or 2,552
+frames. The sync words are 0xAC41 except in the 5.1.4 pair (0xAC40, no CRC), and the frame size is
+the two-byte form in the immersive stereo and `Holi` streams and the 0xFFFF escape with three more
+bytes in the rest, on frames of 330 to 970 bytes. The kit comes with no PCM and no second AC-4
+decoder is installed, so the decode is not scored against a known answer. The check holds it to what
+the streams and their siblings make checkable, 134 lines over the 12 AC-4 streams, none failing:
+
+- forge decodes every frame, the CRC of every frame is valid, the sample count is the frame count
+  times the frame length at the stream's exact rate (30000/1001 at "29.97"), no sample is NaN or over
+  full scale, and the programme is not silent.
+- The WAV has the channels the decode reports, and those are the channels the probe names, in the
+  same order. (The probe once named 12 channels for a 5.1.4 stream, Table 56's 7.1.4 with Lb and Rb,
+  where the decode writes 10; it lists the source layout's now, and the check still accepts the
+  decode's names as an ordered subset of the probe's.)
+- The LFE holds at most 0.04 % of its energy above 200 Hz; the four heights of 5.1.4 carry signal in 88
+  to 89 % of the loud windows; the immersive stereo and the 2.0 streams are not dual mono.
+- The integrated loudness (BS.1770-4, measured with its own K-weighting) of every 2.0 and 5.1 decode
+  is within 0.2 LU of the LKFS the stream declares (immersive stereo -18.4 against -18.5, the rest -23.1
+  or -23.2 against -23.0). The 5.1.4 pair declares -16.0 and is not measured: BS.1770 gives heights no
+  weight.
+- The 25 and 29.97 fps versions of a programme match in level per channel to 0.5 dB, `Holi_en` and
+  `Holi_fr` correlate above 0.98 in every channel but the centre (0.04), and `Audio_ID_6ch_256kbps_ddp.ec3`
+  decoded by forge lines up with the AC-4 5.1 stream at a 1,982-sample lag, with the same loud and
+  quiet stretches in every window and a centre at 0.9967 and an LFE at 0.9957 correlation. Its L, R,
+  Ls and Rs correlate at 0.87 to 0.92, which two lossy codings at 256 and 128 kbps can account for;
+  that is a measurement and not a proof that those channels are right. Forge's decode of the E-AC-3
+  file and FFmpeg's, run once with both DRCs off, agree at lag 0 and at 0.9995 to 1.0 per channel but
+  are not the same samples (the difference is 57 to 94 dB below full scale; the stream uses dither
+  and spectral extension in nearly every block, and the cause was not isolated). Nothing here rests
+  on that comparison.
+
+The immersive stereo pair did not decode before this check: Dolby labels immersive stereo made from
+Dolby Atmos content `channel_mode` 0b1111001, and the decoder read only 0b1111000 as stereo. The
+reading, the evidence and the test (which builds the second kind from a DEE stream by setting one
+bit per frame) are in `libs/ac4/ERRATA.md`, "presentation_version 2 is read as immersive stereo".
+
+**No signature, no protection.** The kit does not say its streams are signed and a stream's
+`content_signature` trailer would show in three ways, each checked. Each of the 12 AC-4 files is a
+whole number of sync frames, found by walking `sync_word`, `frame_size` and the CRC of a 0xAC41 frame
+from byte 0 to the end of the file, with no byte after the last frame; a trailer, which
+[signing](library/signing.md) appends there, would leave bytes. None of the 14 files holds the
+content-signature UUID (as text or as 16 bytes), `pace-ccjf1`, `ecc_r_value` or `ContentSignature`.
+Nor does any of the 538 DASH, HLS and MP4 files fetched from the kit (audio-only DASH and HLS, and ten
+MP4 examples with video) hold those markers, a protection box (`sinf`, `schm`, `schi`, `tenc`, `pssh`,
+`senc`, `enca`, `saiz`, `saio`, `frma`) or manifest signalling (`EXT-X-KEY`, `ContentProtection`,
+`cenc:default_KID`, `urn:mpeg:dash:mp4protection`). The streams are neither signed nor encrypted, so
+they test the decoder and not the verifier or the CENC reader.
+
+**Carriage.** The kit's topics `codec_c_ac4_sync_frames`, `ac4_c_raw_ac4_frame` and
+`ac4_in_mpeg_dash_c_mp4_samp` say that an elementary stream (and HLS packed audio) is AC-4 sync
+frames, with a two-byte frame size or 0xFF 0xFF and three more bytes, and that an MP4 sample is one
+raw AC-4 frame, so it has no sync word, size or CRC. The files agree. Decoded by forge, the DASH Live
+files (init segment and media segments joined, which make a fragmented MP4), DASH On Demand and HLS
+fMP4 audio of each of the 12 streams, and the ten MP4 examples (H.265 video at 720p, 25 to 59.94
+fps, plain and fragmented), give the same samples, to the last bit, as the elementary stream.
+Forge cannot read the 12 HLS packed-audio files (`HLS/Audio_ID3/*_sub.ac4`). Each has an ID3v2 tag
+before every segment, 200 frames at 25 fps and 240 at 29.97, and forge, finding no AC-4 sync word at
+byte 0, tries the file as AC-3 and stops. With the tags skipped, the frames are the elementary
+stream's, byte for byte. The gap is in format detection and not in the decoder, and is recorded in
+`planning/ac4.md`.
+
+**A second source: Dolby's Spott reference files.** Thirteen audio-only MP4 files from Dolby's public test
+application (not in the kit, not committed, local only), each a codecs string in its name: four E-AC-3
+(`OTTEP00104` to `OTTEP00107`, `ec-3`: stereo, 5.1 and Atmos JOC 5.1.4 and 16 objects) and nine AC-4. The
+full SHA-256 of each:
+
+| File | SHA-256 |
+|---|---|
+| `OTT00232_ac-4-02-01-03.mp4` | `5be9f9cd8a3677ae57aa764b851ea6e000e50b31c709aa30229649c326dda4fd` |
+| `OTT00234_ac-4-02-01-01.mp4` | `fbff5c71109be23f887f515540754a0f29587080fb2289daf6b77f16d84c0738` |
+| `OTT00236_ac-4-02-01-02.mp4` | `7c11949f25ca7c3a34ed7858d66876ef0987945f8ad00381b636ecd26a57290e` |
+| `OTTEP00104_ec-3.mp4` | `3094de6b7b70e1be7a8175d7368d265ef0247afc082672adbaa52bbf2dec1dd0` |
+| `OTTEP00105_ec-3.mp4` | `150f99900ecbe00e5ceab707387689f9d50b2a87bcbe0f535b76b84e81fe5d5e` |
+| `OTTEP00106_ec-3.mp4` | `49bba472ab6b6e77e263766334d7b17a9a2d6170a68360b851c4cb7b5754d96e` |
+| `OTTEP00107_ec-3.mp4` | `9f901a50d1e8d86935ae55bc9ceb1af1df8f38f3c6a042bbae2bbdc3e296f15b` |
+| `OTTEP00124_ac-4-02-02-00.mp4` | `2476c74cf1571fdd317d3c784e3170782992b39186fd7555405a6713ed92f012` |
+| `OTTEP00125_ac-4-02-01-02.mp4` | `8f52849d67cfde99ea002709d5ae9511fa7d82c1922a48fafe7687737289f716` |
+| `OTTEP00126_ac-4-02-01-00.mp4` | `62714617e177366413afbe41f2ed05a8dddc131934dcd7e6b5a24df96dcd1943` |
+| `OTTEP00127_ac-4-02-01-01.mp4` | `08d7efce67fcbd4652603263f972cd6877229aa4bdb45a1ea71f3c89306b8f2e` |
+| `OTTEP00128_ac-4-02-01-03.mp4` | `6ac2f5887a5122e83849d160233cfa7fa480dad50363e86fcd76ac7cc6b76d42` |
+| `OTTEP00129_ac-4-02-01-04.mp4` | `deb68aa1d5f60b8f7ef4edddc7ce1a192d1b05fc15c0e34a7fef61c7cd42376d` |
+
+| AC-4 stream | Result | Evidence |
+|---|---|---|
+| `OTTEP00124` (`02-02-00`, immersive stereo), `OTTEP00126` (`02-01-00`, 2.0), `OTTEP00127` (`02-01-01`, 5.1), `OTTEP00125` (`02-01-02`, 5.1.4), `OTT00236` (`02-01-02`, 5 presentations) | decode in full | 800 frames each (2,000 for `OTT00236`); per-channel levels plausible |
+| `OTT00232` (`02-01-03`, A-JOC 7 downmix + 9 upmix) | decodes in full since 2026-10-29 | 2,000 of 2,000 frames; it decoded the 80 I-frames before |
+| `OTTEP00128` (`02-01-03`, "OBI L3", 16 objects) | decodes in full since 2026-10-29 | 750 of 750 frames; it decoded 32 before; traces of the two transcriptions agree |
+| `OTTEP00129` (`02-01-04`, "OBI L4", 5 downmix + 20 upmix) | decodes in full since 2026-10-29 | 4,450 of 4,450 frames, 21 objects; traces agree; refused before as no selectable presentation. Its 7.1.4 render peaks at +1.5 dBFS in float: the renderer is not normative, and `check_dolby_spott_streams.py` notes it and does not fail |
+| `OTT00234` (`02-01-01`, 4 presentations over one pair of dialogue objects) | decodes in full since 2026-10-29 | 1,861 of 1,861 frames; it stopped at frame 1 ("tools_metadata_size does not match") because the pair's metadata is read as stereo's, as `audio_data_objs()` sets the channel mode (`libs/ac4/ERRATA.md`) |
+
+The four E-AC-3 files decode in full (the integration build's run), and the stereo and 5.1 ones agree
+with FFmpeg's decode at lag 0, at 23.8 and 27.9 dB overall (FFmpeg's default dynamic range control on,
+forge's off) and at 31.7 and 33.1 dB with both off, which is the range this project's dither-on
+third-party E-AC-3 streams give and not a failure. Dolby's muxer (Bento4 here) writes `channelcount` 2 in
+every ec-3 sample entry, the 5.1 and JOC files included, so a reader must take the channel count from the
+stream and not from the sample entry. `tools/checks/check_dolby_spott_streams.py` reads them from
+`ICLFORGE_DOLBY_SPOTT_STREAMS` (SKIP when unset): every access unit decoded and none left waiting for an
+I-frame, the sample count, the channels, no NaN or clipping, not silent, no signature or protection marker,
+and as notes the sample entry's channel count and FFmpeg's agreement.
 
 ### The decoder's presentations
 
@@ -2042,6 +2330,145 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
   presentation the listener chose that a sink would not choose itself reaches the group as PCM
   alone.
 
+## TrueHD and MLP
+
+`iclforge::truehd` ([TrueHD and MLP](library/truehd.md)) is checked in three tiers. The third is scored on the owner's machine
+only, and part of the second has no outside reader.
+
+1. **FFmpeg's strict decode** (`-err_detect crccheck+bitstream+buffer+explode`) of the streams its `truehd` and `mlp`
+   encoders write. The codec is lossless, so a decode either equals FFmpeg's sample for sample or is wrong: 25 committed
+   fixtures (`testdata/truehd/`, 1 to 6 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, both stream types, restart intervals of 8, 16 and 128 units) are held to the
+   SHA-256 of FFmpeg's decode by the library's test, by `forge decode` (`tools/checks/verify_truehd_interop.py --forge`)
+   and by `tools/references/truehd_syntax.py`, an independent transcription. Nineteen more streams were compared
+   while the decoder was written. That comparison found the check values, the matrix scaling, the lossless check's fold
+   and a marker FFmpeg's decoder obeys and the specification does not describe (`libs/truehd/ERRATA.md`): the last access unit
+   of a stream whose length is not a multiple of the unit carries a 32-bit marker with the number of padding samples,
+   which FFmpeg removes from its output. Without it a 44.1 kHz fixture decoded 15 samples longer than FFmpeg's. The
+   encoder is held to the same oracle the other way round: FFmpeg's strict decode of what `forge truehd-encode` writes
+   must equal the samples that went in (`tools/checks/verify_truehd_encode_interop.py --forge`, 32 cases of rates (43 with `--full`), 1 to 8
+   channels, 16, 20 and 24 bits and signals, and the encode legs of `tools/ci/run_codec_matrix.sh`, which also read the
+   same streams back out of Matroska, MP4 and MPEG-TS), and the encoder's size is recorded beside FFmpeg's.
+2. **Hand-built streams** (`tools/references/truehd_writer.py`, `testdata/truehd/handbuilt/`) for what FFmpeg's encoders
+   do not write: an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1, several matrices with a permuted `ch_assign` and an output shift (also a negative one, and one on a moved channel), 16 bit MLP words, the
+   block data check, terminators, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
+   stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
+   accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
+   it: for nineteen of the twenty-nine it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
+   `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` (also one that changes at each restart) and an output shift (also on a moved channel),
+   noise generator 0, noise generator 1 at 48, 96 and 192 kHz, the block data
+   length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other ten: with the marker in
+   every unit FFmpeg returns two of the twenty units; it refuses the 16-channel streams and the one at substream 3's limits, whose
+   substreams 2 and 3 use restart sync `0x31EC`, and a stream with a terminator after the last block; it does not apply a negative output shift; and it clears the low bits of a 16 bit MLP word.
+   The noise generator 1 streams carry the readings of ERRATA entry 44 (the buffer size, start index and stride), which FFmpeg's decode fixed. Comparing found four readings the first writer and the library had wrong, each now
+   FFmpeg's and marked provisional in ERRATA.md: the lossless check's channel shift (question 6), the filter histories across a
+   restart (question 18), the width of `shr7` in noise generator 0 (question 5) and the block data length (entry 21). What FFmpeg
+   does not read stays without an outside reader: the layout of the extra data, the values of the DRC word, the block data CRC,
+   and the 16-channel substream; for those a misreading of the specification is in the writer and in both decoders alike.
+   `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
+   (72 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
+   the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
+   failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
+3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
+   is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
+   would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
+
+The encoder is held to the first tier from the other side. `tools/checks/verify_truehd_encode_interop.py` encodes 43 cases
+(real music, speech and 5.1 programme material and synthetic signals that are hard for a lossless coder: full-scale squares and
+alternating extremes, impulses, silence, DC, noise, a level that steps inside a restart interval; stereo to 7.1, 44.1 to 192 kHz,
+16, 20 and 24 bits, restart intervals of 1, 8 and 128 units, lengths that are not whole units, the downmix presentations) and
+requires FFmpeg's strict decode to return every sample, with the library's own decoder reading every unit back as it is written.
+That is a stronger test of a reading of the specification than decoding FFmpeg's streams, because the encoder writes things
+FFmpeg's never do and FFmpeg's decoder says whether they are right; it added nine entries to `libs/truehd/ERRATA.md` (30 to 38),
+among them the scale of `peak_data_rate`, how channels are spread over
+substreams, that a substream reads its predecessor's rows before that predecessor's matrices, and that FFmpeg's decoder takes a
+substream of more than 6 channels only under restart sync `0x31EB`. `tools/ci/fuzz_truehd_encoder_space.py` draws random legal
+configurations against adversarial PCM (about 800 cases in 100 s) and the same check; its first run found an encoder that never
+finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.95 times the size of FFmpeg's encoder's
+over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
+outside the library reads the 2 and 6 channel presentations.
+
+Not covered: the details of noise generator 1 that the specification leaves out (the buffer size, start index and stride are measured
+against FFmpeg and wait for the owner: `libs/truehd/ERRATA.md`, entry 44), heavy DRC (not read, and not written)
+and the block data CRC (the length is checked, the algorithm is not known); and, in the encoder, the IIR filter, LSB bypass
+and a negative output shift, which it does not write.
+
+### Scoring DEE's TrueHD streams
+
+DEE's licence ends on 2026-11-06, and after that no stream of this kind can be made. The TrueHD legs of the gold set
+(`tools/generators/gen_dee_gold.py`, the `truehd` group: 2, 6 and 8 channels at 48 and 96 kHz, 16 and 24 bits, from tones,
+music, film, noise and sweeps, with downmix and independent presentations, DRC profiles, dialnorm and loudness presets) are
+streams of known sources, and a lossless decoder has to give each source back. On the machine that has DEE, with a forge
+built from the tree under test:
+
+```sh
+python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold --cli build/config-windows-msvc/bin/forge.exe --only thd-
+python tools/checks/score_truehd_decode.py --set D:/ac3bld/dee-gold --forge build/config-windows-msvc/bin/forge.exe --report truehd-scores.json
+```
+
+The first makes, or tops up, the TrueHD legs and records what FFmpeg's decode of each gives against its source in the
+manifest (`DIR/dee-gold-manifest.json`); it needs DEE and runs once. The second needs only the set: it decodes each leg's
+stream with `forge decode` under the strict checks (CRCs, parity and the lossless check of every restart interval) and
+compares the result with the leg's first source, sample for sample. The decoder's channels are matched to the source's by
+content and a delay of the first samples is allowed, because DEE's channel order and delay are not in the source. A leg is
+
+- **PASS** when the decode succeeds and equals the source bit for bit;
+- **ALTER** when the leg's DEE options change the audio (loudness correction, the surround attenuation,
+  `--optimize-data-rate`), so the decode is held to nothing but succeeding, and the number of values that differ is shown;
+- **UNEXPLAINED** when the decode is not the source and no option of the leg says why, but the stream's own lossless check
+  passes on every restart interval (and on at least one): the decoder returned what the encoder coded, so the difference
+  arose before coding. The leg is listed and does not fail the run; the report keeps the check's counts and whether FFmpeg's
+  decode is the source;
+- **FAIL** when the decoder stops on a check, a lossless check fails, or a lossless leg decodes to something else (the report
+  says whether FFmpeg's decode is the source either);
+- **SKIP** when a stream or source is not on disk, or the source is over `--max-seconds` (120; the 300 s soak programmes).
+
+The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
+`PROGRAM [ARGS] STREAM OUT.wav`. After the licence ends the script needs no DEE and reads the set as it is left. The
+script's own test (`python -m unittest tools.checks.test_score_truehd_decode`) uses made-up streams and a decoder of a few
+lines of Python.
+
+The streams are test inputs only (the decision of 2026-09-26): they are decoded and compared with the PCM that went in, and
+no one reads a stream to learn how DEE wrote it. A FAIL is therefore not a reason to change the decoder to fit one stream;
+it is an entry in `libs/truehd/ERRATA.md` (the leg, the check that failed, what the specification says) and, if it is the
+sixteen-channel substream, the terminators or the evolution payload (open questions 1 and 3), a question for the owner.
+
+### Checking your own Blu-ray soundtracks
+
+The codec is lossless, so two correct decoders return the same samples. `tools/checks/verify_truehd_local_streams.py` holds
+`forge decode` to FFmpeg's strict decode on TrueHD tracks you ripped from your own discs. They are never committed or copied:
+the script reads them where they are.
+
+Put the tracks in one directory (BDAV `.m2ts`, `.ts`, Matroska, MP4 or a raw `.thd`), have `ffmpeg` and `ffprobe` on `PATH`
+and run, with a forge built from this tree:
+
+```sh
+ICLFORGE_TRUEHD_STREAMS=/path/to/tracks ICLFORGE_CLI=build/bin/forge \
+    python3 tools/checks/verify_truehd_local_streams.py --anonymous --report truehd-local.txt
+```
+
+With the variable unset it prints SKIP and exits 0. `--self-test` runs it on stand-ins built from the committed fixtures instead
+(a BDAV `.m2ts`, Matroska, MP4, and transport streams with AC-3 frames in the stream), which is also a test of the script itself.
+
+For each TrueHD or MLP track, FFmpeg extracts the stream, and FFmpeg's strict decode and `forge decode` of it are compared
+channel by channel, sample for sample (FFmpeg returns the channels of a 7 or 8 channel stream in its own order, so they are
+matched by content and the order is reported). FFmpeg only warns when a lossless check fails, so its warnings are counted. When
+the file is not over `--max-container-mib` (2048) and forge's first stream in it is this track, `forge decode` of the file as it
+is must give the same samples, which tests the container reader and the handling of an AC-3 core. The table has the container,
+rate, channel layout, sample width, duration, access units, restart headers, mean and peak rate, the AC-3 frames that share the
+stream, access units with extra data (evolution frames), whether an object substream (Atmos) is present, each decoder's
+lossless-check failures, and anything forge refused. A track with an object substream is decoded as its 7.1 bed; the objects
+and the payload are carried, not read (`libs/truehd/ERRATA.md`, question 1), and FFmpeg may refuse such a track outright.
+
+The script writes a copy of each track and its decode to the system temporary directory and removes them; keep free space
+for about the size of the largest decoded track (a two-hour 5.1 film is several gigabytes). forge reads a stream whole, so its
+memory is of that order too. The output is names (or numbers with `--anonymous`), counts and rates, never samples.
+
+Send back the table (`--report`), the "Transport stream layout" lines it ends with for a `.m2ts` or `.ts` file, and the first
+lines of `ffmpeg -version` and `forge --version`. The layout lines say, for a track's PID, which PES packets hold access units
+(T), AC-3 frames (A) or both (M) and what their headers say; they answer how a disc lays out its AC-3 core
+(`libs/containers/ERRATA.md`, open question 9). A row that says DIFFERENT, or a lossless-check count that is not zero, is a
+defect in one decoder: send the row, not the audio.
+
 ## What untrusted input is checked against
 
 Correctness and robustness are different questions, and this page answers only the first. What
@@ -2073,6 +2500,9 @@ covered where it's most relevant rather than repeated here:
   E-AC-3/Atmos passthrough over HDMI to a real AV receiver, with object audio confirmed
   reconstructable (not just the panned bed). Verification specific to this one Android app on this
   one Shield + receiver pair, not a general claim about Android as a platform.
+- [TrueHD and MLP](#truehd-and-mlp) — nothing has reached hardware: no Dolby decoder, disc player or receiver has read a
+  TrueHD stream or a MAT burst this project wrote, no sound device is sent one (`PassthroughSink` has no TrueHD format), and
+  Hearth and Crucible do not link the library. Its only outside reader is FFmpeg.
 - [AC-4 passthrough](library/muxing-and-sinks.md) — no receiver found accepts AC-4, so no AC-4
   burst has reached hardware; ALSA's and Android's paths send the bursts as opaque data (ALSA's
   runs against ALSA's `null` device), and Windows, PipeWire and macOS cannot send AC-4 at all.

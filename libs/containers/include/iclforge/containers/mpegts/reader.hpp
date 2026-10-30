@@ -46,6 +46,13 @@
 // Reed-Solomon parity after each, so 204. The grid size is detected from the
 // sync-byte spacing rather than assumed.
 //
+// SCRAMBLED STREAMS ARE REFUSED, NOT READ. The two transport_scrambling_control bits of a packet
+// header say the payload is scrambled (ISO/IEC 13818-1 section 2.4.3.2; conditional access, not
+// Common Encryption). A scrambled packet of the audio PID is ciphertext that the PES parse would
+// take for audio, so the reader stops at the first one with kScrambled. Payloads delivered before
+// it were clear packets. The PMT's conditional_access_descriptor is not read: it says a stream may
+// be scrambled, and the packet bits say whether this one is. Nothing here descrambles.
+//
 // UNTRUSTED INPUT. A transport stream is the format most likely to arrive
 // damaged - it is designed to be tuned into mid-flight and to survive bit
 // errors - so "malformed" is the normal case rather than the exceptional
@@ -69,6 +76,7 @@ enum class DemuxError : std::uint8_t {
     kNoAudioStream,       // the PMT held no AC-3/E-AC-3 elementary stream
     kMalformed,           // a PES or section layout that cannot be parsed
     kLimitExceeded,       // a PES or section beyond ReadOptions
+    kScrambled,           // a packet of the audio PID has transport_scrambling_control set
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);
@@ -79,10 +87,12 @@ enum class DemuxError : std::uint8_t {
 // PID, and a registration descriptor is a format identifier. A caller
 // remuxing back out wants to know which it was.
 enum class CodecSignalling : std::uint8_t {
-    kAtscStreamType,           // stream_type 0x81 / 0x87
-    kDvbDescriptor,            // stream_type 0x06 + AC3_descriptor / Enhanced_AC3_descriptor
-    kRegistrationDescriptor,   // format_identifier 'AC-3' / 'EAC3'
-    kDvbExtensionDescriptor,   // stream_type 0x06 + extension descriptor 0x7F/0x15 (AC-4)
+    kAtscStreamType,          // stream_type 0x81 / 0x87
+    kDvbDescriptor,           // stream_type 0x06 + AC3_descriptor / Enhanced_AC3_descriptor
+    kRegistrationDescriptor,  // format_identifier 'AC-3' / 'EAC3'
+    kDvbExtensionDescriptor,  // stream_type 0x06 + extension descriptor 0x7F/0x15 (AC-4)
+    kHdmvStreamType,          // stream_type 0x83 under a program-level 'HDMV' registration (TrueHD)
+    kBareTruehdStreamType,    // stream_type 0x83 alone, as FFmpeg's muxer writes it (TrueHD)
 };
 
 struct ReadStream {
@@ -95,6 +105,11 @@ struct ReadStream {
     // is meaningless - the payload is TS 103 190 sync frames, not A/52 ones,
     // and this module hands its PES bytes back without framing them.
     bool ac4 = false;
+    // Dolby TrueHD (stream_type 0x83, TH spec §21.2). The reader is more permissive here than
+    // FFmpeg's demuxer, which needs the HDMV registration: signalling says which of the two forms
+    // was found (ERRATA C8). The PES payloads, concatenated, are the elementary stream; a PES holds
+    // one or several whole access units.
+    bool truehd = false;
     CodecSignalling signalling = CodecSignalling::kAtscStreamType;
     // The detected grid: 188 (TS), 192 (M2TS) or 204 (TS with RS parity).
     std::size_t packet_size = 188;
@@ -115,11 +130,23 @@ struct ReadStream {
     std::optional<ServiceInfo> service = std::nullopt;
 };
 
+// The codecs the reader may take the programme's stream from. A stream of a codec left false is
+// passed over as if the PMT did not list it, so the next one that is wanted is taken. Every codec
+// this reader selects is on by default, which is what the reader did before a caller could say.
+struct AutoSelect {
+    bool ac3 = true;
+    bool eac3 = true;
+    bool ac4 = true;
+    bool truehd = true;
+};
+
 struct ReadOptions {
     // The programme to extract. 0 takes the first one whose PMT names an
     // AC-3/E-AC-3 stream, which for a single-programme capture is the only
     // one there is.
     std::uint16_t program_number = 0;
+    // Which codecs the first stream of the programme may be of.
+    AutoSelect auto_select{};
     // The largest PES packet the reader will assemble. PES_packet_length is
     // 16 bits, so a bounded PES cannot exceed 64 KiB - but the UNBOUNDED
     // form (length 0) has no ceiling of its own and ends only at the next

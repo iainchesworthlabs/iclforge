@@ -146,6 +146,9 @@ Bytes build_tracks(const AudioTrack& track) {
     Bytes audio;
     put_float_element(audio, kSamplingFrequency, static_cast<double>(track.sample_rate));
     put_uint_element(audio, kChannels, static_cast<std::uint64_t>(track.channels));
+    if (track.bit_depth != 0) {
+        put_uint_element(audio, kBitDepth, track.bit_depth);
+    }
 
     Bytes entry;
     put_uint_element(entry, kTrackNumber, 1);
@@ -173,6 +176,8 @@ std::string_view describe(MuxError error) {
             return "invalid track: channels, sample rate and codec id are required";
         case MuxError::kFrameTooLarge:
             return "frame too large for one SimpleBlock";
+        case MuxError::kInvalidOptions:
+            return "invalid options: key_frames must be empty or one flag a frame";
     }
     return "unknown error";
 }
@@ -186,6 +191,9 @@ std::expected<std::vector<std::byte>, MuxError> mux(
     if (track.channels <= 0 || track.sample_rate == 0 || track.codec_id.empty() ||
         track.samples_per_frame == 0) {
         return std::unexpected(MuxError::kInvalidTrack);
+    }
+    if (!options.key_frames.empty() && options.key_frames.size() != frames.size()) {
+        return std::unexpected(MuxError::kInvalidOptions);
     }
 
     // Timestamps run off the CUMULATIVE sample count rather than a per-frame
@@ -220,13 +228,14 @@ std::expected<std::vector<std::byte>, MuxError> mux(
             }
             // SimpleBlock: track number as a vint, a signed 16-bit timestamp
             // relative to the cluster, one flags byte, then the frame. Bit 7
-            // of the flags marks a keyframe, which every audio frame is.
+            // of the flags marks a keyframe, which every AC-3/E-AC-3 frame is
+            // (MuxOptions::key_frames says otherwise for TrueHD).
             Bytes block;
             put_vint(block, 1);
             const auto relative = static_cast<std::int16_t>(delta);
             put_byte(block, static_cast<std::uint8_t>(relative >> 8));
             put_byte(block, static_cast<std::uint8_t>(relative & 0xFF));
-            put_byte(block, 0x80);
+            put_byte(block, options.key_frames.empty() || options.key_frames[index] ? 0x80 : 0x00);
             block.insert(block.end(), frame.begin(), frame.end());
 
             put_id(cluster, kSimpleBlock);
@@ -289,6 +298,11 @@ std::vector<std::byte> Writer::close_cluster() {
 }
 
 std::expected<std::vector<std::byte>, MuxError> Writer::push(std::span<const std::byte> frame) {
+    return push(frame, true);
+}
+
+std::expected<std::vector<std::byte>, MuxError> Writer::push(std::span<const std::byte> frame,
+                                                             bool keyframe) {
     if (static_cast<std::uint64_t>(frame.size()) > (1ULL << 40)) {
         return std::unexpected(MuxError::kFrameTooLarge);
     }
@@ -322,7 +336,7 @@ std::expected<std::vector<std::byte>, MuxError> Writer::push(std::span<const std
     const auto relative = static_cast<std::int16_t>(delta);
     put_byte(block, static_cast<std::uint8_t>(relative >> 8));
     put_byte(block, static_cast<std::uint8_t>(relative & 0xFF));
-    put_byte(block, 0x80);
+    put_byte(block, keyframe ? 0x80 : 0x00);
     block.insert(block.end(), frame.begin(), frame.end());
 
     put_id(cluster_body_, kSimpleBlock);

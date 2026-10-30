@@ -10,8 +10,8 @@ to backport to yet.
 
 Before linking this decoder against input you do not control, read the
 [threat model](https://iainchesworthlabs.github.io/iclforge/threat-model/). It states what is treated as untrusted (AC-3,
-E-AC-3 and AC-4 elementary streams, MP4, Matroska and MPEG-TS containers, EMDF/OAMD/JOC payloads,
-WAV headers, ADM documents, OSC live-position control packets, Sendspin network messages)
+E-AC-3, AC-4 and TrueHD/MLP elementary streams, MP4, Matroska and MPEG-TS containers, EMDF/OAMD/JOC payloads,
+AC-4 content signatures, WAV headers, ADM documents, OSC live-position control packets, Sendspin network messages)
 and what is not, the memory-safety
 posture and where the raw-pointer boundaries are (the C API, the WASM bindings, the JNI bridge),
 the per-access-unit resource limits and what a hostile `frmsiz` does, and the gaps — including

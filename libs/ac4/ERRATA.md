@@ -4,6 +4,335 @@ Where ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1 (Part 2) co
 leave a case open or print a defect, and the reading the library takes for each: the decoder's, then
 the encoder's.
 
+## Content signing (pace-ccjf1)
+
+Everything under this heading is about the content signature appended to a raw `.ac4` stream
+(`libs/base/src/crypto`, `libs/ac4/src/io/content_signature.cpp`, `forge ac4-sign` and
+`ac4-verify`), not about ETSI TS 103 190. It follows the owner-supplied "AC-4 content signing"
+specification, version 2.6 of 2026-10-29 (versions 2.5 and 2.6 came the same day; 2.4 was not seen),
+cited here as "CS spec" with section numbers. That specification and the sample blob below were supplied by the owner; parts
+derive from analysis of DEE and FFmpeg, per the owner. Only wire-format facts are used. The sample is
+kept outside the repository, with its certificates, and the tests that read it take its path from
+`ICLFORGE_CONTENT_SIGNATURE_SAMPLE` and skip when it is unset.
+
+The questions are numbered in the order they were met, and other documents cite them as `AC4-n`; a
+question that has been answered keeps its number.
+
+### What CS spec v2.5 and v2.6 settled
+
+Version 2.5 differs from 2.3 in 62 places. Each was checked against the code on 2026-10-29. Answered:
+
+- **The signature input (measured correction 1).** §2.2, §5.2 step 6 and §6.1 step 6 now say the
+  signature is over the SHA-256 of the Thrift serialisation of `SignedInfoWire`, which is what the
+  sample showed and what the library has done since it was written. No change in the code.
+- **Raw `r` and `s`, no DER (AC4-11, measured correction 7).** §1.2, §2.3, §8.5 and §9.2 now agree:
+  `r` and `s` are 32 raw bytes each in a map, and the DER pattern and the backward scan for it are
+  gone from the text. The library reads them from the map, never searches for a DER pattern, and
+  finds the blob by walking the sync frames. No change in the code.
+- **The frame-size escape (AC4-13).** §8.5 now says `frame_size` is 16 bits and `0xFFFF` means a
+  24-bit size follows. `iclforge::ac4::scan` and the trailer walk have always followed it; the tests
+  build frames of 330, 970 and 70 000 bytes with the escape. No change in the code.
+- **MP4 (AC4-2).** §8.3.2 now puts signing an MP4 out of scope (it names no box, and DEE writes
+  none) and says a signer shall refuse `sign-content` on MP4 input and sign the raw `.ac4` stream
+  instead. Changed: `sign_stream` refuses a stream that opens with an ISO base media box (`ftyp`,
+  `styp`, `moov`, `moof` or `mdat`) with its own error kind (`kContainerNotSupported`) and a message
+  that gives the reason and the stream that can be signed; `forge ac4-sign` of an MP4 and
+  `sign-content` to a file named `.mp4` both exit 1 with that message (the second before anything is
+  encoded); `ac4-verify` of an MP4 says it is an MP4 and not a damaged AC-4 stream. Before, the
+  messages said "not implemented" and "does not begin with an AC-4 sync frame".
+- **Version fields (the first choice under "Where the code differs").** §3.16 now says that
+  "scheme version 3" (`kSignatureValuesVersion3`) names the scheme's release and is not a field, that
+  every wire version field is 1, and that an implementation shall write 1. The code writes 1
+  everywhere and refuses any other marker (`LibDoesntSupportContentSignature`). No change in the
+  code; the choice is no longer a departure.
+- **The order of the checks (§6.1, "Verification order matters").** The signature over
+  `SignedInfoWire` is verified before the two digests it holds, which carry weight only after it.
+  Changed: `verify_content_signature` used to check the digests first and the signature last, so a
+  forged signature over altered content was reported as a digest mismatch. The signature check now
+  comes first, is the first fault when it fails, and the digest checks that follow say that they
+  rest on a signature that did not verify. The verdict is the same as before; the order of the report
+  and the first fault differ.
+- **Signer information (AC4-3, in part).** §5.3 is new. It says what an operator writes in
+  `SignerInfoWire`; what it settles, and what the code does, is under question 3. What it leaves to
+  the implementation is questions 17 to 19.
+- **Where the publisher UUID is bound (AC4-16), v2.6.** v2.5's §5.3 had `publisherUUID` match the
+  UUID bound to the signing certificate. v2.6 withdraws that: the UUID is the PACE publisher account's
+  GUID, carried out of band in the PACE licence data and copied into `signerInfo`; it is not in the
+  X.509 certificate, which the sample bears out (it is in none of the four). A verifier must not
+  require it there and may compare it with an expected publisher account; the chain authenticates the
+  signer on its own, and report-only is the safe behaviour. Changed: the comparison with the signer
+  certificate's subject is gone, from signing (which no longer refuses a UUID the certificate
+  "contradicts") and from verifying; `expect-publisher-uuid=` names the accounts to accept, a finding
+  in `ac4-verify` and a refusal with `verify-content`, and without it the UUID is reported and
+  compared with nothing. Still checked: that it is a UUID, and that it is there (question 17).
+
+Not changed by v2.5 or v2.6, and read again for them: the time the certificates are judged at (question 1),
+exactly one signature entry (6), revocation and the leaf's other properties (7), trust anchors (8),
+`ContentSignatureInfo` (5) and the ID3 and damaged-frame trailers (14, 15). §8.5 still walks the sync
+frames and takes what follows as the blob; it says nothing of tags or of a damaged frame. Questions
+5 to 8, 14 and 15 stand as they were.
+
+### Open questions for the owner
+
+Each of these was met while writing the code. The code does what the second sentence says until the
+owner decides; none of them blocks the rest.
+
+1. **What time should a certificate be valid at?** CS spec §6.1 steps 3 and 4 (unchanged in v2.5)
+   say every certificate must be valid "now". The sample's chain has a CA certificate that expired
+   before the signature's own `signedDate`, so a genuine signature fails that check today (see
+   measured correction 4). *Decided by the owner on 2026-10-29: strict mode keeps `now`; own-QC
+   defaults to the signed date.* forge reads that as follows. `ac4-verify` and `verify-content`, which
+   refuse what does not check, judge at the time of the check. `check-content`, which reports what it
+   finds and carries on, judges at the date the signature records, and the report line says so
+   (`validity judged at 2025-06-01T00:00:00 (signed, the default of check-content)`).
+   `verify-time=now|signed|ignore|<instant>` overrides either. The library's default is still
+   `TimeBasis::kNow`; the choice is the front end's. Which commands are "strict" and which are
+   "own-QC" is my reading: confirm it, or name the commands.
+2. **How is a signature carried in an MP4?** *Answered by v2.5 §8.3.2: it is not; signing an MP4 is
+   out of scope and a signer refuses it (see above).* If a convention is defined later, §8.3.2 says
+   the digest would cover the raw frames in `mdat` and not the container; that is an inference and
+   is not built.
+3. **What goes in the signer information of a signature made with an operator's own key?** *Answered
+   in part by v2.5 §5.3.* `signerNonce` is 128 bytes from a CSPRNG, fresh for every signature;
+   `publisher.publisherUUID` is the UUID of the operator's PACE publisher account (v2.6: not in the
+   signing certificate); `signedDate` is the time of signing, in UTC; the platform and application
+   are informational. `ac4-sign` and `sign-content` take `publisher-uuid=`,
+   `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
+   `os-description=`; the application is this program, its version and its commit; the nonce and the
+   date are drawn and read from the clock for each signature. A nonce of another length and a
+   publisher UUID that is not a UUID are refused when signing. A signature without
+   `publisher-uuid=` is made, with a warning, because nothing says an operator without a PACE account
+   may not sign. What the verifier does with all this is question 17; the clock is question 10.
+4. **Are digests or curves other than SHA-256 and secp256r1 ever written?** The spec fixes both
+   (§1.1) but the wire carries them as strings (`sha256`, `ecdsa`, `secp256r1`). We refuse anything
+   else with `BadContentSignaturePKStandard`. Say if SHA-384, SHA-512 or P-384 appear in practice.
+5. **What is `ContentSignatureInfo`?** §3.15 and §8.4 name a companion structure under
+   `kContentSignatureInfoThriftDataId` and say its wire layout is not confirmed. We neither write nor
+   read it. If it is needed, a layout or a sample is.
+6. **More than one signature entry, or more than one content digest.** The blob holds a list of
+   entries and a list of digests. A blob with anything but exactly one signature entry is refused,
+   so a copy of a valid signature with a second, damaged entry cannot pass for valid; so is a list
+   of more than eight content digests. The digest used is the one whose reference is
+   `digest_data_ref_win_signature_data`. Is exactly one right, or does a second entry mean
+   something (a countersignature) that should be verified as well?
+7. **Which leaf checks beyond the title and key usage?** §6.1 step 4 asks for `Code/Content Signer` and
+   Digital Signature. The sample's leaf is also `CA:TRUE`, which we accept. Revocation (CRL, OCSP) is
+   not checked at all, as the spec does not mention it. Is that intended?
+8. **Trust model.** §4.4 says to accept any valid Dolby-issued chain, which needs the issuer's roots.
+   None ships here. A chain that checks out but leads to no `trust-anchor=` or `pin=` is reported as
+   `chain unanchored` and exits 6 unless `unanchored-ok` is given; it is never called valid. Pins
+   take a SHA-1 (as §10.1 gives them) or a SHA-256 fingerprint. Confirm that is the right split.
+9. **Is the trailer meant to be invisible to other readers?** §8.6 says the frames are unmodified so
+   "the audio content is byte-identical". FFmpeg's raw AC-4 demuxer does not stop at the trailer: it
+   reads it as five more packets and reports a corrupt one (measured correction 9). forge's own
+   reader stops at the first non-sync byte, as §8.5 describes. Only files that go through FFmpeg
+   are affected.
+10. **What is an acceptable `signedDate`?** `BadContentSignatureDate` is "outside acceptable range"
+    (§6.2) with no range, and §5.3 adds that a verifier "may reject signatures whose timestamp falls
+    outside its acceptable window" without saying what the window is. We require
+    `YYYY-MM-DDTHH:MM:SS`, a date inside the signer certificate's validity unless `verify-time=ignore`,
+    and, when the certificates are judged now, a date no more than a day ahead of the clock. §5.3 also
+    says `signedDate` "shall reflect the actual signing time", and `signed-date=` can write any date.
+    It is kept because the certificates the tests and demonstrations use have expired and a
+    signature has to be made at a date they were valid; `ac4-sign` and `sign-content` warn when it
+    differs from the clock by more than five minutes. Should the option go, be refused unless it is
+    near the clock, or stay with the warning?
+11. **The DER fallback scan of §8.5 and the DER steps of §1.2 and §9.2.** *Answered by v2.5: they are
+    gone from the text (see above).*
+12. **Keep the specification's error names, or use neutral ones?** The names in §6.2
+    (`CertifierNoPrivateKey`, `BadCredentialsForSigningContent`, `CertNotPrivilegedToSignContent`,
+    `LibDoesntSupportContentSignature`, ...) come from the owner's table. They are the library's
+    `SignatureError` values and are printed in `forge` output (`fault: DigestMismatch: ...`) and
+    in the documentation. They are kept; say if neutral names are wanted instead.
+13. **The trailer walk of §8.5 does not mention the frame-size escape.** *Answered by v2.5 §8.5: it
+    does (see above).* In the Dolby kit's streams six of twelve write every frame's size with the
+    escape on frames of 61 to 1425 bytes, in both sync words, and signing, finding and verifying a
+    signature work on all twelve.
+14. **Non-frame bytes between frames.** HLS packed-audio files carry ID3v2 tags between frames,
+    which stop a sync-word walk. We take bytes after the walk's end as a trailer only if they begin
+    as a ContentSignature does (version and schema version fields); anything else is reported with
+    the byte where the frames stop (and, for a tag, that it is an ID3v2 tag), and nothing is
+    signed, stripped or hashed past it. Should a signer hash a stream with tags in it (the spec
+    says "every byte before the trailer"), and where is its trailer then?
+15. **A damaged frame mid-stream.** The walk stops at it, so a trailer cannot be told from the rest
+    of the stream by looking for the first non-sync byte alone: the damaged frame and every frame
+    after it would be "the trailer". We do not take them for one; verification reports `no content
+    signature` with the byte where the frames stop, and a flipped payload byte (the framing holds)
+    is reported as a digest mismatch. A signature found by its own structure at the end of the file
+    would give the better message (digest mismatch) at the cost of a search; say if that is wanted.
+16. **Where does a certificate bind the publisher UUID?** *Answered by v2.6 §5.3: nowhere. The UUID is
+    the PACE publisher account's, carried out of band and copied into `signerInfo`; it is not in the
+    certificate (see above).* Measured on the sample before the answer: the publisher UUID it names
+    is in none of its four certificates, not in any subject attribute, not in the private
+    extensions, and not as 16 raw bytes either (measured correction 11).
+17. **What does a verifier do with a nonce that is not 128 bytes, a publisher UUID that is empty or
+    not a UUID, or one that is not an expected account?** §5.3 says a verifier "may" compare the
+    UUID with an expected publisher account (v2.6) and is silent on the other two. The reading
+    taken: always reported (the lines `signer nonce` and `publisher UUID` in `ac4-verify`'s output,
+    which do not change the verdict); with `verify-content`, the strict reading, a bad nonce, a
+    missing or malformed UUID, and a UUID that is none of the `expect-publisher-uuid=` accounts (if
+    any are given) make the signature INVALID (`BadOrMissingSignature`, and
+    `BadCredentialsForSigningContent` for the account). Without `expect-publisher-uuid=` a well
+    formed UUID is reported and compared with nothing. Should a signature without a publisher UUID
+    be refused by the strict check, as it is now, or only the allow-list be strict?
+18. **Is `std::random_device` the CSPRNG §5.3 asks for?** It is the platform's entropy source on the
+    toolchains this builds with (hardware or the operating system's generator under libstdc++,
+    libc++ and MSVC), and it is what draws the nonce. The language does not promise that, and
+    `libs/` may not contain a per-platform call. Keep it, or wrap the operating system's generator
+    for each platform?
+19. **Does a verifier hash the bytes it received, or serialise the parsed struct again?** §6.1 steps
+    6 and 7 say "serialize" `SignedInfoWire` and `SignerInfoWire` and hash the result. Measured
+    correction 2 hashes the exact received bytes, and the two agree for a writer that emits the
+    fields in id order and no unknown ones, which is every signature seen. They differ for a blob
+    with an unknown field or another field order, and then only the received bytes can be checked.
+    Keep the received bytes?
+
+### Measured corrections
+
+Measured on the owner's sample blob (against CS spec v2.3; where v2.5 now says what was measured, the
+entry says so), with OpenSSL and a Thrift reader written separately from the
+library's (`tools/checks/check_content_signature_openssl.py --sample`, which runs no forge code). The
+library's own tests assert the same facts (`ICLFORGE_CONTENT_SIGNATURE_SAMPLE=<blob> ctest -R
+"owner's sample"`). Each entry is the spec's reading, what was measured, and the lines the command
+prints. To repeat them:
+
+```
+ICLFORGE_CONTENT_SIGNATURE_SAMPLE=<blob>
+python3 tools/checks/check_content_signature_openssl.py --sample "$ICLFORGE_CONTENT_SIGNATURE_SAMPLE"
+ctest -R "owner's sample"        # with the same variable set; "Passed", not "Skipped"
+```
+
+1. **The ECDSA signature is over the bytes of `SignedInfoWire`, not over the content digest.**
+   v2.3's §2.2, §5.2 step 6 and §6.1 step 8 signed and verified the content digest (the 32-byte
+   SHA-256 of the stream) directly; v2.5 §2.2, §5.2 step 6 and §6.1 step 6 say what is measured here.
+   The signature in the sample verifies under the signing certificate's key over SHA-256 of the
+   Thrift serialisation of `SignedInfoWire` (field 1 of the signature entry, from its first field
+   header to its STOP byte). The content digest is covered because it is a field inside that struct.
+   ```
+   ok    openssl dgst -verify accepts the signature over the signed information
+   ok    the signature does not verify over SHA-256 of the content digest
+   ok    the signature does not verify with the content digest taken as the hash that was signed
+   ```
+2. **The signer-information digest is over the bytes as received.** §5.2 step 3 and §6.1 step 7 hash
+   the serialised `SignerInfoWire`, the second by serialising the parsed struct again (v2.5 still
+   words it so; see question 19). The digest
+   stored in `SignedInfoWire` field 6 is that of the exact received bytes of field 3 of the blob,
+   through its STOP byte. A re-serialisation need not reproduce those bytes, so the verifier keeps the
+   span it parsed.
+   ```
+   ok    SHA-256 of the signer information, as received, is the digest the signed information holds
+   ```
+3. **The certificates are wrapped.** §3.7 says the field holds "concatenated DER certificates". It is
+   a Thrift list of bytes whose first four bytes are `40 82 LL LL` (a long-form length of `LLLL`
+   bytes), followed by the certificates back to back, root first. `LLLL` equals the rest of the list.
+   ```
+   ok    the certificates start with a 40 82 LL LL wrapper whose length is the rest of the list
+   ok    openssl reads carried certificate 3 of 4
+   ```
+4. **A CA certificate in the chain had expired before the signature was made.** §6.1 step 3 checks that
+   every certificate is valid now. The second CA certificate (depth 2 from the signer) expired in
+   November 2025, months before the sample's `signedDate`. OpenSSL chains the signer to the root only
+   with the time check off. The default of `verify-time` is open question 1.
+   ```
+   ok    openssl verify chains the last certificate to the first, ignoring validity times
+   info  the same with validity times checked today: exit 2: error 10 at 2 depth lookup: certificate has expired
+   ```
+5. **The signer's certificate is `CA:TRUE`, and the subjects carry more than the spec lists.** §4.2 and
+   §4.3 give a leaf with Key Usage Digital Signature and a short subject. The sample's leaf is also
+   BasicConstraints `CA:TRUE` (critical), and every subject carries `serialNumber`, `dnQualifier`,
+   `generationQualifier`, `businessCategory` and `title` besides the common name and organisation. The
+   chain code accepts a `CA:TRUE` leaf and compares names as a whole. All four certificates are
+   `ecdsa-with-SHA256`.
+   ```
+   ok    the signing certificate is signed ecdsa-with-SHA256
+   ok    the signing certificate also carries BasicConstraints CA:TRUE, which a verifier must not reject
+   ```
+6. **Every byte list is a Thrift list of BYTE, and fields are in ascending id order.** The spec writes
+   `list<byte>` and `binary` interchangeably. In the sample the nonce, the digests, `r`, `s` and the
+   certificates are all lists with element type BYTE, never binary strings. The writer does the same.
+   ```
+   ok    every byte list is a Thrift list of BYTE elements: nonce, content digest, signer information digest, certificates, r, s
+   ok    fields are written in ascending id order in every struct
+   ```
+7. **`r` and `s` are raw, 32 bytes each, in a map keyed `ecc_r_value` and `ecc_s_value`.** v2.3 §3.13 and
+   §5.2 step 6 said so, but §8.5 (the fallback scan for `30 44..48 02 20..21 ...`) and §9.2 ("DER encoding of (r, s)")
+   still described a DER signature; v2.5 removes those, and the DER certificate signatures inside the chain are the only
+   DER ECDSA structures left in a signed file. The sample has no DER signature. To check it with OpenSSL the
+   two integers are wrapped into an `Ecdsa-Sig-Value` first, which the script does.
+   ```
+   ok    r and s are raw 32-byte values, not DER: 32 and 32
+   ```
+8. **`signedDate` is `YYYY-MM-DDTHH:MM:SS`, UTC, with no `Z`.** The spec says "ISO 8601" (v2.5 §5.3: "ISO 8601 UTC
+   timestamp of the signing moment"). The reader accepts a trailing `Z` and the writer never adds one. Asserted by
+   the sample test, not printed.
+9. **A signed file is not what FFmpeg's raw AC-4 demuxer expects.** Frame counts by `ffprobe -v error
+   -f ac4 -count_packets -show_entries stream=nb_read_packets -of csv=p=0`, on a 50-frame stream
+   from `forge ac4-encode` and the same stream after `forge ac4-sign` with a 2 026-byte trailer:
+   ```
+   plain.ac4   50
+   signed.ac4  55      (and, at -v warning: "Packet corrupt")
+   ```
+   forge's `decode` reads the same 50 frames from both and produces identical PCM
+   (`tools/ci/run_codec_matrix.sh`, "AC-4 content signing").
+10. **What Dolby's kit streams show about the trailer walk.** Twelve AC-4 elementary streams from
+    the kit (never committed; `ICLFORGE_DOLBY_AC4_KIT_STREAMS=<directory>`): 800 to 2552 frames
+    each, both sync words, six with every frame's size written with the escape (open question 13),
+    none with a trailer or anything after the last frame. Each one signs, verifies against the
+    signing root (exit 0) and reads back byte for byte after stripping; the signed prefix is the
+    stream, and `probe` on the unsigned stream reports no trailer and no parse error. An AAC and an
+    E-AC-3 stream in the same directory are refused as not AC-4.
+    ```
+    ICLFORGE_DOLBY_AC4_KIT_STREAMS=<directory> ctest -R "kit streams"     # Passed, not Skipped
+    ```
+    What is done about bytes that are not frames: only bytes that begin as a ContentSignature do
+    are a trailer; others are stray, named with the byte where the frames stop (open questions 14
+    and 15). The unit tests build the cases the kit does not contain: escaped sizes mixed with plain
+    ones (up to 70 000 bytes), a damaged frame followed by a valid signature, an ID3v2 tag between
+    frames.
+
+11. **The publisher UUID the sample names is in none of its certificates.** v2.5's §5.3 said it shall
+    match the UUID bound to the signing certificate; v2.6 withdraws that and says the UUID is not in the
+    certificate. The sample's `publisherUUID` appears in no subject attribute of any of the four
+    certificates, and not in their extensions, as text in either case or as 16 raw bytes (the
+    extensions under the 1.3.6.1.4.1.11620 arc are opaque to the library and were searched as bytes).
+    The subjects carry `serialNumber`, `dnQualifier`, `commonName`, `generationQualifier`,
+    `organizationName` and `organizationalUnitName`, and the signer's also `businessCategory` and
+    `title`; none is a UUID. So a verifier that required the UUID to be found in the certificate
+    would refuse this signature. Asserted by the sample test, which reads the UUID from the sample
+    and searches each certificate's bytes for it; not printed.
+12. **Every wire version field in the sample is 1, the nonce is 128 bytes, `r` and `s` are 32 bytes.**
+    §3.16, §3.2 and §2.3 of v2.5 say so; asserted field by field by the sample test, which also
+    checks that the strict reading of the signer information (nonce and publisher UUID required)
+    does not refuse it, with no expected account and with its own UUID as the expected account in
+    either case, and refuses it when the expected account is another. Not printed.
+
+### Where the code differs from the specification without a measurement behind it
+
+These are choices, not findings. Each differs from the text of CS spec v2.6 and is listed so that
+the owner can overrule it. (The choice about version numbers that stood first is gone: v2.5 §3.16
+says the scheme release is 3, the wire version is 1, and an implementation shall write 1, which is
+what the code does and what the sample's markers are. Numbering of the rest is kept.)
+
+2. **Certificates above the trust anchor are not time-checked.** §6.1 step 3 checks the validity
+   period of every certificate in the chain at the current time. The code validates a path from its
+   anchor down (RFC 5280 §6.1): an expired CA *above* a `trust-anchor=` or `pin=` certificate does
+   not fail the chain. With no anchor, every certificate is judged.
+3. **The first certificate need not be self-signed when a trust anchor is supplied.** §6.1 step 3.5
+   makes the root self-signed (issuer = subject). The code also accepts a chain whose first
+   certificate was issued by a supplied trust anchor that is not itself in the chain, and checks a
+   self-signature only when the first certificate is self-issued.
+4. **A chain is at most eight certificates, and a blob at most one signature entry** (open
+   question 6). The specification sets no limit; the caps keep a hostile signature from costing
+   memory or time in proportion to its size.
+
+What does follow the specification: the signature is ECDSA P-256 over SHA-256 with RFC 6979 nonces
+(§9.1 allows either) of the serialised `SignedInfoWire`; the content digest is SHA-256 of every byte
+before the trailer; the trailer is found by walking the sync frames, with the frame-size escape; the
+signature is checked before the digests it holds; the leaf must carry the title `Code/Content
+Signer` (unless `leaf-title=any`) and Digital Signature; each certificate must verify under its
+issuer's key; every wire version field is 1; `signerNonce` is 128 bytes drawn afresh for each
+signature; and an MP4 is refused.
+
 ## The decoder
 
 The places where ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1 (Part 2) contradict
@@ -56,10 +385,26 @@ depends on the same reading.
   gives to 7.0 (3/4/0). Read as 7.0, `metadata()` fails its `tools_metadata_size` check in I-frames, the
   presentation substream reads one bit past its end, and the audio fails in its section data. Read as
   stereo, every frame of every stream ends exactly.
-- **Reading:** in a presentation_version 2 presentation, a channel-coded substream with that code is
+- **Second code, 0b1111001 (7.1: 3/4/0.1).** Dolby's *AC-4 in MPEG-DASH* specification, in the Online
+  Delivery Kit 1.5 (topic "Signaling immersive stereo content", with the HLS volume's "Signaling
+  immersive stereo with Dolby Atmos"), says a presentation_version 2 presentation signals immersive
+  stereo with `channel_mode` 0b1111000 for any content or 0b1111001 for immersive stereo made from Dolby
+  Atmos content, with `ch_mode` 1 in both cases. Dolby's own test streams
+  `Audio_ID_ims_112kbps_25fps_ac4.ac4` and `..._2997fps_...` (800 and 960 frames) are the 0b1111001 kind.
+  Read as the 7.1 Table 56 names, frame 0's presentation substream reads one bit past its end
+  (`Refused`: "read of 1 bits at bit 208 runs past the end") and the audio fails in its section data
+  (`sect_cb 14 is not a Huffman codebook`; the C++ decoder: "sect_cb 12 to 15 name no codebook"), in both
+  transcriptions. Read as stereo, every substream of every frame ends exactly (Python: 800 frames,
+  0 failures, 0 refusals), the C++ and Python traces agree record for record over all frames of all 12
+  elementary streams of the kit, and the C++ decoder returns two channels, 32.0 s and 32.03 s.
+- **Reading:** in a presentation_version 2 presentation, a channel-coded substream with either code is
   stereo wherever its channel mode is used: its channel element, its `metadata()` and the
-  presentation's `pres_ch_mode`.
-- **Evidence:** Observation.
+  presentation's `pres_ch_mode`. The Atmos indication (0b1111001) changes nothing in the audio syntax;
+  it is a label for the DSI's `dolby_atmos_indicator`, which this library does not write.
+- **Evidence:** Observation for 0b1111000 (DEE); text of a supplementary specification, confirmed by
+  observation of Dolby's streams, for 0b1111001. Part 2 itself still says nothing.
+  `libs/ac4/tests/decoder/test_decoder.cpp` builds the second kind from DEE's stream by setting one bit
+  per frame.
 
 #### The frame rate factor of a substream group
 
@@ -654,10 +999,21 @@ random payloads, reach the rest.
   1 §4.3.14.3.2 sets Gmax to 0 dB where an I-frame sends no `de_max_gain`, leaving no dialogue objects. The
   coefficients are read where the syntax says, `b_keep_dmx_de_coeffs` 0; "ignored" means that in an I-frame
   or with a new configuration nothing is kept from before, so a 1 there leaves no coefficients rather than
-  reading ones the syntax does not send. A frame that is not an I-frame and needs coefficients read for a
-  configuration no frame has sent fails as missing its I-frame.
-- **Evidence:** Text. Chromium's stream sends the configuration in every frame with no dialogue objects and
-  `b_keep_dmx_de_coeffs` 0.
+  reading ones the syntax does not send. A frame that is not an I-frame, with no I-frame or configuration
+  read before it, has not been told how many dialogue objects there are and fails as missing its I-frame.
+  After an I-frame that sent no configuration there are none, so the loop reads nothing: the decoder keeps
+  that apart from "not known yet" (`AjocDmxDeState::known`; the Python transcription keeps a count of 0
+  where it kept no count).
+- **A first reading that was wrong:** the decoder took "no configuration" after an I-frame for "no
+  I-frame has sent one" and refused every frame after such an I-frame whose `b_keep_dmx_de_coeffs` was 0,
+  as missing its I-frame. Spott's A-JOC streams send `b_dmx_de_cfg` 0 in every frame and
+  `b_keep_dmx_de_coeffs` 0 in all of them (Dolby's OTT00232, OTTEP00128 and OTTEP00129): the first two
+  decoded only their I-frames, 80 of 2,000 frames and 32 of 750, and `forge decode` said so on one line
+  and exited 0; the third stopped earlier, at its presentation substream (see below).
+- **Evidence:** Text for the reading. Observation for the fault: Chromium's stream sends the configuration
+  in every frame with no dialogue objects, and Spott's three never send one. `test_frames.cpp` builds the
+  frames: an I-frame without a configuration followed by frames of none, a frame of none with no I-frame
+  before it, and a configuration of one dialogue object kept across a frame that sends its coefficient.
 
 #### ajoc_num_dpoints of 3
 
@@ -670,12 +1026,25 @@ random payloads, reach the rest.
 
 - **Where:** Part 2 §6.2.2.2 passes `channel_mode` to `metadata()`, and its NOTE 2: "If channel_mode has not
   been set by a preceding info element, it shall be considered undefined and be represented by a negative
-  numeric value"; the object substreams' info elements set none.
-- **Reading:** negative for every A-JOC and direct-coded substream, whatever an earlier
-  `ac4_substream_info_chan()` of the table of contents set: `basic_metadata()` then reads none of its
-  channel-mode branches, `extended_metadata()`'s `pan_dialog` the branch for "not mono" (two pans and
-  `pan_signal_selector`), and `dialog_enhancement()` no simulcast data.
-- **Evidence:** Text. Chromium's stream sends no dialogue or downmix metadata in its substream.
+  numeric value"; the object substreams' info elements set none. §6.2.3.2 `audio_data_objs()` does:
+  `channel_mode = objs_to_channel_mode(n_objects)` (§6.2.3.3: 1 object mono, 2 stereo, 3 the 3.0 mode, 5
+  the 5.0 mode, any other count none) before it reads the element, and nothing unsets it.
+- **Reading:** negative for an A-JOC substream, whatever an earlier `ac4_substream_info_chan()` of the
+  table of contents set: `basic_metadata()` then reads none of its channel-mode branches, `extended_metadata()`'s
+  `pan_dialog` the branch for "not mono" (two pans and `pan_signal_selector`), and `dialog_enhancement()` no
+  simulcast data. For a direct-coded substream it is the mode `audio_data_objs()` assigned, so a substream of
+  two objects is read as stereo (`b_prev_dmx_info` in `basic_metadata()`), one object as mono (one
+  `pan_dialog`), three as 3.0 and five as 5.0; a count it gives no mode, or an LFE alone, leaves it negative.
+- **A first reading that was wrong:** the decoder took it negative for direct-coded substreams too. Dolby's
+  OTT00234 (`ac-4.02.01.01`, four presentations over one pair of dialogue objects) sends `b_prev_dmx_info`
+  in the I-frame's metadata of that pair, so the size field read where the next flag was and the frame
+  failed with "tools_metadata_size does not match": the whole stream stopped at frame 1. The frames after
+  the I-frame send `b_more_basic_metadata` 0 and read either way.
+- **Evidence:** Text for the rule; Observation for the fault: with the pair read as stereo, the I-frame's
+  metadata reads to the end of its substream and agrees with the P-frames', and all 1,861 frames
+  decode. Chromium's stream sends no dialogue or downmix metadata in its A-JOC substream. The encoder
+  writes `b_more_basic_metadata` 0 and no dialogue for object substreams, which both readings take alike.
+  `test_frames.cpp` builds a pair and a single object with the fields that tell the two readings apart.
 
 #### Prefix codes in the trace
 
@@ -2225,9 +2594,10 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   4.3.3.3.8 and Table 86, p. 76.
 - **Text:** a decoder of compatibility level n "shall not decode (i.e. select) presentations with md_compat
   > n"; a disabled presentation "shall not be selected"; a decoder decodes presentation versions 1 and 2,
-  and version 0 is Part 1's; Table 55 reserves md_compat 4 to 6 and calls 7 "Unrestricted".
+  and version 0 is Part 1's; Table 55 reserves md_compat 4 to 6 and calls 7 "Unrestricted" (but see
+  "md_compat 4" below for 4).
 - **Reading:** a presentation can be selected when its presentation_version is 0, 1 or 2, its md_compat is
-  one its table defines (Table 55: 0 to 3 and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
+  one its table defines (Table 55: 0 to 3, 4 as below, and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
   level, the stream has not disabled it, it carries audio (a single substream or group, or
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
   channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
@@ -2238,6 +2608,34 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   system that wants the choice of a level 3 receiver, the floor DVB and ATSC set, lowers it
   (`DecoderConfig::level`, `md-compat=`). It was 3 until 2026-10-10.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.
+
+#### md_compat 4
+
+- **Where:** Part 2 6.3.2.2.3 and Table 55, p. 157 (md_compat 4 to 6 reserved); 6.3.3.1.28, Table 71
+  and Pseudocode 26, p. 172 (`pres_ch_mode_core`: an A-JOC substream has a core only where `b_static_dmx`
+  is true); 6.2.2.3 (`custom_dmx_data()` and `loud_corr()` read from it).
+- **What the streams do:** Dolby's Spott test stream OTTEP00129 (codecs `ac-4.02.01.04`, "OBI L4") has one
+  version 1 presentation of `md_compat` 4 over an adaptive A-JOC substream of five downmix signals and an
+  LFE (`b_static_dmx` 0, 20 upmix signals). Its presentation substream is 19 bytes in an I-frame, and read
+  as Part 2 reads it (no core) leaves the last byte unread in each of its 186 I-frames. Read with a 5.1
+  core (`pres_ch_mode_core` 4) every presentation substream of its 4,450 frames ends exactly at its size:
+  `b_stereo_dmx_coeff` 0, `b_obj_loud_corr` 1, `b_loro_loud_comp` 1 with `loro_dmx_loud_corr` 8, and
+  `b_loud_comp` 0 for the other corrections, the last of them `loud_corr_9_X_4`. Dolby's AC-4 white paper (6.1)
+  says a level 3 decoder, the one every consumer device has, ignores presentations of a higher level; the
+  public ETSI text (V1.3.1, 2025-07 is the latest) defines no level 4.
+- **Reading:** md_compat 4 in a version 1 presentation is the level it names, so a decoder of level 4 or
+  more (7 by default) selects it and one of level 3 does not; 5 and 6 stay reserved. In a presentation of
+  md_compat 4 an adaptive A-JOC substream of five downmix signals has a core, 5.0 or 5.1 by `b_lfe`, as a
+  static one does, so `custom_dmx_data()` and `loud_corr()` read the core's fields. Nothing else changes for
+  any other md_compat: an md_compat 0 to 3 presentation is read exactly as Part 2 says.
+- **Open:** whether Dolby's level 4 gives every adaptive A-JOC substream a core, or only five downmix
+  signals, or only md_compat 4. Streams with another downmix count at level 4 would show it; none is in
+  hand, so the narrowest reading that fits is taken. The decoder claims no level 4 constraints (a track
+  limit): Table 55 gives none for it.
+- **Evidence:** Observation: OTTEP00129 decodes 4,450 of 4,450 frames to 21 objects and 12 channels, and
+  the two transcriptions' traces agree (`tools/checks/ac4_syntax_differential.py --inputs`).
+  `test_frames.cpp` builds the presentation substream with the core's fields for md_compat 4 and 3, and
+  the selection table has the cases for levels 3, 4 and 7.
 
 #### The order of the preferences
 
@@ -2999,6 +3397,18 @@ equal on every ASPX stream they write:
   24-bit extension) and the raw frame.
 - **Evidence:** Streams. The inspector's check of this coverage passes on every frame of DEE's 0xAC41
   streams, and the encoder-space harness computes it again from the text.
+
+#### The sync word and the length form of a sync frame
+
+- **Where:** Part 1 Annex G.3.1 and G.3.2: `sync_word` 0xAC40 for a frame without `crc_word` and 0xAC41
+  for one with it; `frame_size` in 16 bits, escaped by 0xFFFF to a further 24.
+- **Reading:** the writer sends 0xAC41, the CRC and a 16-bit length, and the 24-bit form only for a
+  frame of 65,535 bytes or more (`sync_frame.cpp`); the reader takes either sync word and either form.
+  Dolby's `streamdemuxer` (Online Delivery Kit 1.5, 1.0.0.5519896) writes 0xAC40, no CRC and the 24-bit
+  length on every frame. The 73 raw frames it extracts from a forge MP4 equal the 73 forge's own
+  stream holds, and `forge probe` reads its file. Nothing here is wrong; the two writers differ, and
+  `tools/checks/check_dolby_demux_roundtrip.py` compares raw frames and not the framing.
+- **Evidence:** A reader outside the project (single oracle: Dolby tool). The text allows both.
 
 #### Leftover bytes go in payload_base
 

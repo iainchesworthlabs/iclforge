@@ -19,6 +19,7 @@
 #include "commands/atmos.hpp"
 #include "commands/audio_io.hpp"
 #include "commands/containers.hpp"
+#include "commands/content_signature.hpp"
 #include "commands/decode.hpp"
 #include "commands/encode.hpp"
 #include "commands/live_audio.hpp"
@@ -27,6 +28,7 @@
 #include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
 #include "commands/synth.hpp"
+#include "commands/truehd.hpp"
 #include "exit_codes.hpp"
 #include "platform/console_encoding.hpp"
 #include "support.hpp"
@@ -212,13 +214,13 @@ int run_words(const std::vector<std::string>& words) {
     return run_main(static_cast<int>(pointers.size()), pointers.data());
 }
 
-// 46 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// 48 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 46> kCommands{{
+constexpr std::array<Command, 49> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -265,7 +267,8 @@ constexpr std::array<Command, 46> kCommands{{
      "file (same formats as atmos-path), objects it doesn't mention keep their default "
      "placement; with codec=ac4, AC-4 objects (A-JOC, or coding=direct) in a raw stream or an "
      "MP4 file",
-     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta | topic::kObjects,
+     topic::kStdio | topic::kAtmos | topic::kPaths | topic::kMulti | topic::kMeta |
+         topic::kObjects | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) {
          return run_atmos_encode(x.str(1), x.str(2), x.u32(3, 448), x.u32(4, 0), x.meta,
@@ -384,10 +387,54 @@ constexpr std::array<Command, 46> kCommands{{
      "dialogue enhancement metadata; substreamN= and presentationN= add substreams, each an input "
      "of its own, and the presentations that play them; syntax-trace=<file> writes what the "
      "encoder writes",
-     topic::kStdio | topic::kAc4Encode,
+     topic::kStdio | topic::kAc4Encode | topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_ac4_encode(x.str(1), x.str(2), x.u32(3, 192), x.meta); }},
-    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
+    {"truehd-encode", 3, "<in.wav> <out.thd|out.mkv|out.mp4|out.ts>",
+     "1 to 8 channels of 16 or 24 bit PCM at 44.1, 48, 88.2, 96, 176.4 or 192 kHz, with the speakers "
+     "the WAV's channel mask names, or in the order decode writes them (L R C LFE Ls Rs Lrs Rrs) when "
+     "it has none, to a lossless TrueHD stream: bare, or in Matroska, MP4 "
+     "or a Blu-ray transport stream when the output is .mkv, .mp4 or .ts. Decoding it gives the "
+     "samples back, bit for bit, and so does FFmpeg's strict decode. Each restart interval "
+     "(truehd-restart=, 128 access units by default) is coded whole, with FIR prediction "
+     "(truehd-fir-order=), a pair matrix where it helps (truehd-matrix=) and the shortest of three "
+     "codebooks or raw residuals; the 2, 6 and 8 channel presentations are a stereo and 5.1 downmix "
+     "of the source with truehd-downmix=standard (truehd-downmix-gains=), and the first two "
+     "channels and so on as they are with none. The stream is kept within truehd-peak-rate= "
+     "(18000 kbit/s, Blu-ray's) and TH spec section 18's 75 ms, or truehd-rate-check=lenient writes "
+     "it anyway and counts the violations; verify decodes every access unit as it is coded and "
+     "compares it with the input. 24 bit input is coded as 24 bit and 16 bit input as the same "
+     "samples with their clear low bits sent as an output shift. The stream's channel meaning "
+     "(TH spec section 14: dialogue norm, mix level, source format, control-enabled bit per "
+     "presentation, and the two DRC start-up gains) is written into every major sync from "
+     "truehd-dialnorm-6ch= and the options like it, zero when none is given; provisional, no "
+     "oracle until the DEE set",
+     topic::kStdio | topic::kTruehd,
+     Needs::kNothing,
+     [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
+    {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path> [publisher-uuid=<uuid>]",
+     "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
+     "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
+     "operator's own; none is built in. The sync frames are not touched, so a signed file plays as "
+     "the unsigned one. An MP4 is refused: CS spec v2.6 puts signing one out of scope. "
+     "publisher-uuid= (your publisher account's UUID), publisher-name=, product-id=, "
+     "product-name=, wrapper-name=, os-name=, os-version= and os-description= say who signed and "
+     "where; leaf-title= and signed-date= adjust what is written and checked",
+     topic::kStdio | topic::kContentSignature,
+     Needs::kNothing,
+     [](const Args& x) { return run_ac4_sign(x.str(1), x.str(2), x.meta); }},
+    {"ac4-verify", 2, "<in.ac4> [trust-anchor=<path>] [pin=<fingerprint>]",
+     "check a raw AC-4 stream's content signature: the digests, the ECDSA signature, the chain and "
+     "its validity, and the leaf's title. Exit 0 only when it is valid and a trust-anchor= or pin= "
+     "vouches for its certificates (unanchored-ok accepts one that checks but has no anchor); "
+     "check-content prints the checks and exits 0 whatever they find, judging the certificates at "
+     "the signed date unless verify-time= says otherwise; verify-content also refuses a signature "
+     "whose signer nonce or publisher UUID is not as CS spec v2.6 section 5.3 asks (expect-publisher-uuid= "
+     "names the publisher accounts to accept; the UUID is not in the certificate)",
+     topic::kStdio | topic::kContentSignature,
+     Needs::kNothing,
+     [](const Args& x) { return run_ac4_verify(x.str(1), x.meta); }},
+    {"decode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out]",
      "AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up "
      "to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or "
      "direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and "
@@ -396,14 +443,21 @@ constexpr std::array<Command, 46> kCommands{{
      "for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): "
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
-     "pinned to their speaker, dynamic objects positioned by their own timeline",
-     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kObjects,
+     "pinned to their speaker, dynamic objects positioned by their own timeline. strict: exit 2, "
+     "after writing what could be decoded, when any frame or unit was lost after the first one "
+     "decoded (an AC-4 frame waiting for an I-frame, a concealed frame, a TrueHD unit a lenient "
+     "decode dropped); without it such a decode exits 0 and warns",
+     topic::kStdio | topic::kDecode | topic::kAc4Decode | topic::kTruehd | topic::kObjects |
+         topic::kContentSignature,
      Needs::kNothing,
      [](const Args& x) { return run_decode(x.str(1), x.str(2), x.meta, x.str(3), x.str(4)); }},
-    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
+    {"probe", 2, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks]",
      "inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 "
-     "TOC/presentations/substream groups, bare or inside a container, and what the container "
-     "says of its track; table or documented JSON",
+     "TOC/presentations/substream groups, or a TrueHD/MLP stream's substreams, rate and parity "
+     "and CRC checks and, for TrueHD, the channel meaning of TH spec section 14 (dialogue norm, "
+     "mix level, source format, control bit per presentation, DRC start-up gains; provisional, no "
+     "oracle until the DEE set), bare or inside a container, and what the container says of its "
+     "track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
     {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
@@ -419,16 +473,21 @@ constexpr std::array<Command, 46> kCommands{{
      [](const Args& x) {
          return run_transcode(x.str(1), x.str(2), x.u32(3, 0), x.str(4), x.meta);
      }},
-    {"metadata", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3>",
+    {"metadata", 3, "<in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>",
      "rewrite dialnorm/compr/bsmod/dsurmod on an existing stream and re-stamp its CRCs; the "
-     "audio is copied through untouched, not re-encoded",
-     topic::kStreamTools,
+     "audio is copied through untouched, not re-encoded. A TrueHD stream's channel meaning (TH "
+     "spec section 14: dialogue norm, mix level, source format and control bit per presentation, "
+     "and the two DRC start-up gains) is set in every major sync, with its CRC, from "
+     "truehd-dialnorm-6ch= and the options like it; provisional, no oracle until the DEE set",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_metadata(x.str(1), x.str(2), x.meta); }},
-    {"normalize", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3>",
+    {"normalize", 3, "<in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>",
      "measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio "
-     "untouched",
-     topic::kStreamTools,
+     "untouched. A TrueHD stream: each presentation's integrated loudness (BS.1770-5 Annex 3) "
+     "sets that presentation's dialogue norm in every major sync; no gain is applied, since the "
+     "stream is lossless, only the field changes; provisional, no oracle until the DEE set",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_normalize(x.str(1), x.str(2), x.meta); }},
     {"cut", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds]",
@@ -444,32 +503,39 @@ constexpr std::array<Command, 46> kCommands{{
          const auto inputs = x.tail(2);
          return run_cat(x.str(1), inputs);
      }},
-    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
-     "per-channel peak/RMS report; an AC-4 presentation as coded",
-     topic::kProgramme | topic::kAc4Decode,
+    {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
+     "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded "
+     "(truehd-presentation=, truehd-check=)",
+     topic::kProgramme | topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_levels(x.str(1), x.meta); }},
-    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts>",
+    {"loudness", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
      "BS.1770-4 loudness -> dialnorm, beside a stream's own: an AC-3 or E-AC-3 stream's first "
-     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB",
-     topic::kAc4Decode,
+     "programme, or an AC-4 presentation as coded, in AC-4's steps of 0.25 dB; a TrueHD or MLP "
+     "stream's integrated loudness and true peak (BS.1770-5 Annex 3 weights; truehd-presentation=, "
+     "truehd-check=)",
+     topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_loudness(x.str(1), x.meta); }},
     {"qc", 2,
-     "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [preset=<name>|all] [layout=bed|rendered] "
-     "[objects=<71|512|514|714>]",
+     "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [preset=<name>|all] "
+     "[layout=bed|rendered] [objects=<71|512|514|714>]",
      "bitstream-aware loudness QC: measured loudness vs. embedded dialnorm/compr, optional "
      "preset gate, optional BS.1770-5 Annex 4 object re-render; an AC-4 presentation as coded, "
-     "against its dialnorm and the loudness it states",
-     topic::kQc | topic::kProgramme | topic::kAc4Decode,
+     "against its dialnorm and the loudness it states; a TrueHD or MLP stream's integrity gate "
+     "(lossless check, CRCs and parity, TH spec section 18's data rate) and the loudness of "
+     "each presentation beside its dialogue norm, the preset judged on truehd-presentation= "
+     "(the largest by default); exit 6 when a gate fails",
+     topic::kQc | topic::kProgramme | topic::kAc4Decode | topic::kTruehd,
      Needs::kNothing, [](const Args& x) { return run_qc(x.str(1), x.meta); }},
-    {"spdif", 3, "<in.ac3|in.ec3|in.ac4> <out.wav>",
+    {"spdif", 3, "<in.ac3|in.ec3|in.ac4|in.thd> <out.wav>",
      "IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream "
-     "(programme=); AC-4 in IEC 61937-14's bursts",
+     "(programme=); AC-4 in IEC 61937-14's bursts; TrueHD in MAT bursts (an eight-channel WAV, or "
+     "the raw bursts when the output is not .wav)",
      topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_spdif(x.str(1), x.str(2), x.meta); }},
-    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|->",
+    {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|out.thd|->",
      "the inverse: recover the elementary stream from IEC 61937 bursts, as captured from "
      "an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end",
      topic::kStdio,
@@ -495,13 +561,15 @@ constexpr std::array<Command, 46> kCommands{{
          }
          return run_project(x.str(1), out, print, run_words);
      }},
-    {"mkv", 3, "<in.ac3|in.ec3> <out.mkv>",
-     "wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it",
+    {"mkv", 3, "<in.ac3|in.ec3|in.thd|in.mlp> <out.mkv>",
+     "wrap as a playable Matroska file (A_AC3, A_EAC3 or A_TRUEHD); AC-4 is refused, Matroska "
+     "registering no codec ID for it",
      topic::kMkv,
      Needs::kNothing,
      [](const Args& x) { return run_mkv(x.str(1), x.str(2), x.meta); }},
-    {"mp4", 3, "<in.ac3|in.ec3|in.ac4> <out.mp4>",
-     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4", topic::kNone,
+    {"mp4", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.mp4>",
+     "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3, dac4 for AC-4 or 'mlpa'/'dmlp' for "
+     "TrueHD and MLP", topic::kNone,
      Needs::kNothing,
      [](const Args& x) { return run_mp4(x.str(1), x.str(2), x.meta); }},
     {"fmp4", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment]",
@@ -512,22 +580,24 @@ constexpr std::array<Command, 46> kCommands{{
      topic::kFmp4 | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) { return run_fmp4(x.str(1), x.str(2), x.u32(3, 48), x.meta); }},
-    {"ts", 3, "<in.ac3|in.ec3|in.ac4> <out.ts> [dvb|atsc]",
-     "wrap as MPEG-2 TS; AC-4 supports DVB only",
+    {"ts", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ts> [dvb|atsc|bluray]",
+     "wrap as MPEG-2 TS; AC-4 supports DVB only; TrueHD and MLP are Blu-ray's stream_type 0x83 "
+     "(profile bluray, the default for them)",
      topic::kTs | topic::kMeta,
-     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3, "dvb"), x.meta); }},
-    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4>",
+     Needs::kNothing, [](const Args& x) { return run_ts(x.str(1), x.str(2), x.str(3), x.meta); }},
+    {"demux", 3, "<in.mkv|in.mp4|in.ts> <out.ac3|out.ec3|out.ac4|out.thd>",
      "the inverse of 'mkv': unwrap the elementary stream a container carries. The container is "
      "identified by its own magic bytes, not by the file name",
      topic::kStdio,
      Needs::kNothing, [](const Args& x) { return run_demux(x.str(1), x.str(2)); }},
-    {"remux", 3, "<in.mkv|in.mp4|in.ts> <out.mkv|out.mp4|out.ts> [dvb|atsc]",
+    {"remux", 3, "<in.mkv|in.mp4|in.ts> <out.mkv|out.mp4|out.ts> [dvb|atsc|bluray]",
      "container-to-container: the input is identified by its magic bytes, the output by its "
      "extension, and everything either declares is re-derived from the bitstream - the dec3-repair "
-     "case",
+     "case. A .ts output without a profile is DVB for AC-3, E-AC-3 and AC-4, and Blu-ray for "
+     "TrueHD and MLP, which only bluray carries",
      topic::kTs | topic::kMeta,
      Needs::kNothing,
-     [](const Args& x) { return run_remux(x.str(1), x.str(2), x.str(3, "dvb"), x.meta); }},
+     [](const Args& x) { return run_remux(x.str(1), x.str(2), x.str(3), x.meta); }},
     {"devices", 1, "", "input and loopback capture endpoints", topic::kNone,
      Needs::kCapture,
      [](const Args&) { return run_devices(); }},
@@ -716,6 +786,8 @@ int run_main(int argc, char** argv) {
                                token == "couple" || token == "heavy" || token == "heavy2" ||
                                token == "mixmeta" || token == "sign-objects" ||
                                token == "verify-objects" || token == "gate-objects" ||
+                               token == "sign-content" || token == "verify-content" ||
+                               token == "check-content" || token == "unanchored-ok" ||
                                token == "verify" ||
                                token == "bed-only" ||
                                token == "keep-partial" || token == "fast-mdct" ||
@@ -726,7 +798,7 @@ int run_main(int argc, char** argv) {
                                token == "infomdat" || token == "encinfo" ||
                                token == "langcod" || token == "langcod2" ||
                                token == "copyright" || token == "sourcefscod" ||
-                               token == "quiet" || token == "verbose" ||
+                               token == "quiet" || token == "verbose" || token == "strict" ||
                                is_extra_programme_token(token);
         if (token == "couple") {
             couple_flag = true;

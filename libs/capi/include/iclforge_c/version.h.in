@@ -23,3 +23,6 @@
  * ICLFORGE_ERROR_UNSUPPORTED - #ifdef this where a program needs to know which library it
  * was built against. */
 #cmakedefine ICLFORGE_HAS_AC4
+
+/* The same for the iclforge_truehd_* surface (ICLFORGE_BUILD_TRUEHD, on by default). */
+#cmakedefine ICLFORGE_HAS_TRUEHD

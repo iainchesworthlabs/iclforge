@@ -37,6 +37,7 @@
 #include "ac4_bench.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "bench_memory.hpp"
 #include "mem_probe.hpp"
 
 namespace {
@@ -132,17 +133,7 @@ void operator delete[](void* p, std::size_t, std::align_val_t align) noexcept {
     ::operator delete(p, align);
 }
 
-namespace {
-
-constexpr int kFrames = 200;
-constexpr double kSampleRate = 48000.0;
-
-struct Snap {
-    std::uint64_t allocs = 0;
-    std::uint64_t bytes = 0;
-    std::int64_t live = 0;
-    std::int64_t peak = 0;
-};
+namespace membench {
 
 Snap snap() {
     return {.allocs = g_alloc_calls.load(std::memory_order_relaxed),
@@ -154,6 +145,18 @@ Snap snap() {
 void reset_peak() {
     g_peak_live.store(g_live_bytes.load(std::memory_order_relaxed), std::memory_order_relaxed);
 }
+
+}  // namespace membench
+
+namespace {
+
+using membench::reset_peak;
+using membench::Result;
+using membench::Snap;
+using membench::snap;
+
+constexpr int kFrames = 200;
+constexpr double kSampleRate = 48000.0;
 
 // Real-ish content on purpose: two detuned partials plus deterministic noise
 // per channel. Silence (or a lone pure tone) under-exercises the mantissa
@@ -171,19 +174,6 @@ std::vector<float> signal_frame(std::uint64_t& n, double base_freq, std::uint32_
     }
     return samples;
 }
-
-struct Result {
-    std::string name;
-    int frames = 0;
-    std::uint64_t setup_allocs = 0;
-    std::uint64_t setup_bytes = 0;
-    std::uint64_t first_allocs = 0;
-    std::uint64_t first_bytes = 0;
-    double allocs_per_frame = 0.0;  // steady state: frames 1..N-1
-    double bytes_per_frame = 0.0;
-    std::int64_t steady_live_growth = 0;  // live-byte drift across steady state
-    std::int64_t peak_live_delta = 0;     // peak transient above pre-loop live
-};
 
 using Channels = std::vector<std::vector<float>>;
 
@@ -620,13 +610,15 @@ int main(int argc, char** argv) {
         "ac4_51_decode", perf::ac4_bench::encode_frames(
                              ac4_five_one, perf::ac4_bench::five_one_config(), kFrames)));
 
+    membench::add_truehd_results(results, audio);
+
     fmt::printf(
-        "%-18s %7s | %9s %12s | %9s %12s | %11s %13s | %12s %11s\n", "workload", "frames",
+        "%-20s %7s | %9s %12s | %9s %12s | %11s %13s | %12s %11s\n", "workload", "frames",
         "setup#", "setup B", "first#", "first B", "steady #/fr", "steady B/fr", "live growth",
         "peak delta");
     for (const auto& r : results) {
         fmt::printf(
-            "%-18s %7d | %9llu %12llu | %9llu %12llu | %11.1f %13.0f | %12lld %11lld\n",
+            "%-20s %7d | %9llu %12llu | %9llu %12llu | %11.1f %13.0f | %12lld %11lld\n",
             r.name.c_str(), r.frames, static_cast<unsigned long long>(r.setup_allocs),
             static_cast<unsigned long long>(r.setup_bytes),
             static_cast<unsigned long long>(r.first_allocs),

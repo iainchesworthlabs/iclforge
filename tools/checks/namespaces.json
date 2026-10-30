@@ -14,7 +14,8 @@
     "pitch": ["pitch"],
     "render": ["render", "spatial"],
     "sendspin": ["sendspin"],
-    "sink": ["sink"]
+    "sink": ["sink"],
+    "truehd": ["truehd"]
   },
   "debts": [
     {

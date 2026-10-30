@@ -100,3 +100,6 @@ dist/
 # pins Python tooling).
 bindings/rust/target/
 firmware/esphome/tests/too-small.yaml
+
+# Dolby Online Delivery Kit tools fetched with tools/checks/dolby_odk.py fetch (never committed)
+/dolby-odk-tools/

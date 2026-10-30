@@ -42,17 +42,21 @@
 #include "iclforge/ac3/verify/bap_census.hpp"
 #include "iclforge/ac3/verify/eac3_mirror.hpp"
 #include "iclforge/ac3/verify/mirror.hpp"
+#include "iclforge/ac4/io/content_signature.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "associated_mix.hpp"
+#include "truehd.hpp"
+#include "content_signature.hpp"
 #include "stream_playback.hpp"
 
 namespace forge_cli::commands {
 
 using iclforge::apps::ac4_bed_acmod;
+using iclforge::apps::ac4_location;
 using iclforge::apps::ac4_meter_rank;
 using iclforge::apps::ac4_order;
 using iclforge::apps::ac4_wav_rank;
@@ -492,8 +496,10 @@ iclforge::objects::oba::DynamicObject to_oba_dynamic_object(
 // 7.1.4 by default, through the layout renderer Hearth plays E-AC-3's objects
 // with (apps/shared/media/src/ac4_object_render.hpp); the object options, which write
 // E-AC-3's objects out, are reported rather than applied.
-int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, std::string_view out_path,
-                   const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
+int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path,
+                   std::string_view out_path, const forge_cli::Options& meta,
+                   std::string_view objects_dir, std::string_view adm_out,
+                   forge_cli::DecodeLoss& loss) {
     const auto status = status_stream(out_path);
     if (meta.output.mode != iclforge::ac3::OperatingMode::kCustom) {
         fmt::println(
@@ -533,14 +539,32 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         fmt::println(stderr, "warning: {} is AC-4: karaoke is AC-3's (Annex C), and ignored",
                      in_path);
     }
+    // verify-content / check-content: the content signature is checked before anything is decoded,
+    // so a stream that is refused is never played.
+    if (const int refused = check_content_before_decode(stream, in_path, meta, status);
+        refused != kExitOk) {
+        return refused;
+    }
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     if (scan.frames.empty()) {
         fmt::println(stderr, "error: {} holds no AC-4 sync frame", in_path);
         return kExitInput;
     }
     if (scan.stopped_at.has_value()) {
-        fmt::println(stderr, "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
-                     in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at), scan.frames.size());
+        // A content signature is written after the last sync frame: that is where the frames are
+        // meant to stop, not a fault.
+        const auto trailer = iclforge::ac4::locate_signature_trailer(stream);
+        if (trailer.has_value() && trailer->present &&
+            trailer->content_size == scan.stopped_at_offset) {
+            status_println(status, "{}: a {} byte content signature follows the last sync frame",
+                           in_path, trailer->blob.size());
+        } else {
+            fmt::println(
+                stderr,
+                "warning: {}: the sync frames stop at byte {} ({}); decoding the {} before it",
+                in_path, scan.stopped_at_offset, iclforge::ac4::describe(*scan.stopped_at),
+                scan.frames.size());
+        }
     }
     // syntax-trace=: every record the decoder reads, frame by frame, as
     // ac4_syntax.py's `trace` writes what it reads.
@@ -672,13 +696,18 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         }
         if (!decoded->has_value()) {
             // A frame waiting for an I-frame, at the start or after a change
-            // of source: nothing to write.
+            // of source: nothing to write. Only one that waits after output has begun is a loss
+            // (`strict`): the leading frames of a stream cut mid-group wait by design.
             ++waiting_frames;
+            if (decoded_frames > 0) {
+                ++loss.waiting;
+            }
             continue;
         }
         const iclforge::ac4::DecodedFrame& pcm = **decoded;
         if (pcm.concealed.has_value()) {
             ++concealed_frames;
+            ++loss.concealed;
         }
         if (!sink.is_open()) {
             first = pcm;
@@ -689,8 +718,23 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
             } else {
                 speakers = pcm.speakers;
             }
+            // Which speaker each WAV position is, for three channels or more, as the AC-3 and
+            // E-AC-3 paths write it: a header that says so, and none where a channel has no
+            // WAVEFORMATEXTENSIBLE speaker (plan::wav_channel_mask()).
+            const std::vector<std::size_t> wav_order = ac4_order(speakers, ac4_wav_rank);
+            std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+            for (const std::size_t c : wav_order) {
+                const auto location = ac4_location(speakers[c]);
+                if (!location.has_value()) {
+                    in_wav_order.clear();
+                    break;
+                }
+                in_wav_order.push_back(*location);
+            }
+            const std::uint32_t wav_mask =
+                in_wav_order.size() == wav_order.size() ? plan::wav_channel_mask(in_wav_order) : 0;
             if (!sink.open(out_path, static_cast<std::uint32_t>(pcm.sample_rate_hz),
-                           speakers.size(), ac4_order(speakers, ac4_wav_rank))) {
+                           speakers.size(), wav_order, wav_mask)) {
                 fmt::println(stderr, "error: cannot open {} for writing", out_path);
                 return kExitOutput;
             }
@@ -794,8 +838,12 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
         }
     }
     if (waiting_frames > 0) {
-        status_println(status, "          {} frames waiting for an I-frame produced no output",
-                       waiting_frames);
+        // On stderr whatever the report goes to: a run that loses frames still exits 0 (what exit
+        // code a loss should give is open, planning/ac4.md), so this line is what says so.
+        fmt::println(stderr,
+                     "warning: {} frames waiting for an I-frame produced no output, of {} in the "
+                     "stream; the output holds the other {}",
+                     waiting_frames, scan.frames.size(), decoded_frames);
     }
     if (concealed_frames > 0) {
         status_println(status, "          {} of them concealed ({})", concealed_frames,
@@ -811,7 +859,8 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
 }
 
 int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path,
-                     const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
+                    const forge_cli::Options& meta, std::string_view objects_dir,
+                    std::string_view adm_out, forge_cli::DecodeLoss& loss) {
     if (!adm_out.empty() && !forge_cli::adm_capability().available) {
         fmt::println(stderr, "error: {}", forge_cli::adm_capability().reason);
         return kExitInput;
@@ -901,6 +950,10 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // (the transient-pre-noise flush below).
     PlanarWavSink sink;
     std::size_t sink_slots = 0;
+    // Whether sink_slots is the programme's width, which a concealed first unit's is not.
+    bool sink_width_is_programme = false;
+    // The access unit being decoded, counted from 1; the frame an error names.
+    std::uint64_t units_done = 0;
     const auto open_sink = [&](const iclforge::ac3::DecodedAccessUnit& unit,
                                std::size_t slots) -> bool {
         sink_slots = slots;
@@ -1185,12 +1238,29 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (!sink.is_open()) {
             first = out;
             programme_layout = out.layout;
+            // A first unit that was concealed down to its bed is narrower than the stream promised,
+            // so its width is not the programme's and later units are not held to it.
+            sink_width_is_programme = !out.concealed.has_value();
             if (!open_sink(first, out.channels.size())) {
                 return kExitOutput;
             }
         }
+        // The sink is as wide as the first unit. A stream whose layout changes after it (a
+        // different acmod, or a dependent substream that comes or goes) cannot be written into it:
+        // the extra channels would be cut off, or the missing ones leave the sink's slots uneven.
+        // Stopping here is what the AC-3 and AC-4 paths do. A unit concealed down to its bed
+        // (ConcealmentAction::kBedOnly) is narrower on purpose and is written as it is.
+        if (sink_width_is_programme && !out.concealed.has_value() &&
+            out.channels.size() != sink_slots) {
+            fmt::println(stderr,
+                         "error: frame {}: the channel layout changes mid-stream ({} channels, then {})",
+                         units_done, sink_slots, out.channels.size());
+            abort_all();
+            return kExitInput;
+        }
         if (out.concealed.has_value()) {
             ++concealed_units;
+            ++loss.concealed;
         }
         track_metadata(out.dynrng, out.numblkscod, out.compr);
         for (std::size_t ch = 0; ch < out.channels.size() && ch < sink_slots; ++ch) {
@@ -1231,7 +1301,6 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
 
     Progress progress;
     progress.start("decoding", units->size());
-    std::uint64_t units_done = 0;
     for (const auto& unit : *units) {
         progress.tick(++units_done);
         // Not const: a released unit is moved on to the mix, not copied.
@@ -1434,21 +1503,54 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
 
 }  // namespace
 
-int run_decode(std::string_view in_path, std::string_view out_path,
-               const forge_cli::Options& requested, std::string_view objects_dir,
-               std::string_view adm_out) {
+namespace {
+
+// A decode of `in_path` to `out_path`, counting in `loss` what it lost after the first frame or
+// unit had decoded; run_decode turns that into an exit status when asked to be strict.
+int run_decode_counting(std::string_view in_path, std::string_view out_path,
+                        const forge_cli::Options& requested, std::string_view objects_dir,
+                        std::string_view adm_out, forge_cli::DecodeLoss& loss) {
     const auto stream = read_elementary_stream(in_path);
     if (stream.empty()) {
         return kExitInput;
     }
+    // TrueHD and MLP have no sync word at the start: the first access unit's four header bytes come
+    // before its major sync (0xF8726FBA, 0xF8726FBB).
+    if (is_truehd_stream(stream)) {
+        // What decode does not apply to it is refused by name (check_options_applied): the output
+        // stage, the DRC options, the programme choice, the object outputs and every verification
+        // flag, none of which a TrueHD decode reads. verify-content passing here would pass
+        // without verifying anything.
+        if (const int refused = check_options_applied(
+                requested, {"truehd-presentation=", "truehd-check=", "strict"});
+            refused != kExitOk) {
+            return refused;
+        }
+        if (!objects_dir.empty() || !adm_out.empty()) {
+            fmt::println(stderr,
+                         "error: {} is TrueHD or MLP, whose object layer this build does not "
+                         "decode, so decode writes no objects: leave out '{}'",
+                         in_path, !objects_dir.empty() ? objects_dir : adm_out);
+            return kExitUsage;
+        }
+        return run_decode_truehd(stream, in_path, out_path, requested, loss);
+    }
+    warn_truehd_options_unused(requested, in_path);
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where
     // AC-3's and E-AC-3's is 0x0B77; the first two bytes decide which decoder
     // reads the stream, before anything below reads it as AC-3.
     if (is_ac4_stream(stream)) {
-        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out);
+        return run_decode_ac4(stream, in_path, out_path, requested, objects_dir, adm_out, loss);
     }
     if (!requested.syntax_trace_path.empty()) {
         fmt::println(stderr, "error: syntax-trace= records AC-4 syntax, and {} is AC-3 or E-AC-3", in_path);
+        return kExitUsage;
+    }
+    if (requested.verify_content || requested.check_content) {
+        fmt::println(stderr,
+                     "error: verify-content and check-content check an AC-4 content signature, and "
+                     "{} is AC-3 or E-AC-3 (verify-objects is E-AC-3's)",
+                     in_path);
         return kExitUsage;
     }
     if (requested.ac4_fold_5x) {
@@ -1497,7 +1599,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // the stream is not: an AC-3 bed with Annex E dependents extending it goes
     // down the access-unit path too, which reads the core natively.
     if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(playable)) {
-        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out);
+        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out, loss);
     }
     if (!objects_dir.empty()) {
         fmt::println(stderr,
@@ -1566,6 +1668,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
         }
         if (decoded->concealed.has_value()) {
             ++concealed_frames;
+            ++loss.concealed;
         }
         for (const auto word : decoded->dynrng) {
             const double db = iclforge::ac3::meta::to_db(iclforge::ac3::meta::dynrng_gain(word));
@@ -1738,6 +1841,38 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     print_channel_summary(*meter, status);
     return 0;
+}
+
+}  // namespace
+
+int run_decode(std::string_view in_path, std::string_view out_path,
+               const forge_cli::Options& requested, std::string_view objects_dir,
+               std::string_view adm_out) {
+    forge_cli::DecodeLoss loss;
+    const int status =
+        run_decode_counting(in_path, out_path, requested, objects_dir, adm_out, loss);
+    // Without `strict` a decode that lost frames exits 0, and says so where it always has (AC-4's
+    // warning, the concealment summary, TrueHD's counters). With it, once everything that could be
+    // decoded is written, the loss is an input fault: the stream was not whole.
+    if (status != kExitOk || !requested.strict || loss.total() == 0) {
+        return status;
+    }
+    std::string detail;
+    const auto add = [&detail](std::size_t count, std::string_view what) {
+        if (count != 0) {
+            detail += fmt::format("{}{} {}", detail.empty() ? "" : ", ", count, what);
+        }
+    };
+    add(loss.waiting,
+        "waited for a sync point (an I-frame or a restart header) after the first had "
+        "decoded");
+    add(loss.concealed, "concealed");
+    add(loss.dropped, "unreadable or skipped");
+    fmt::println(stderr,
+                 "error: strict: {} frame(s) or unit(s) lost after the first one decoded ({}); "
+                 "what could be decoded is in {}",
+                 loss.total(), detail, out_path);
+    return kExitInput;
 }
 
 }  // namespace forge_cli::commands

@@ -2,11 +2,11 @@
 
 # capi
 
-The C API over the AC-3 and AC-4 libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23.
+The C API over the AC-3, AC-4 and TrueHD libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23.
 
 A library.
 
-- **Uses:** `ac3`, `ac4`, `lyrics`
+- **Uses:** `ac3`, `ac4`, `lyrics`, `truehd`
 - **Used by:** `examples`, `rust`
 - **CI lanes:** core
 - **CMake target:** `iclforge::capi`

@@ -16,6 +16,9 @@
     | Multi-programme E-AC-3 | Authoring done; mixing-metadata reporting open | Reporting done (#797); combining an associated service with the main programme is built (`AssociatedServiceMixer`, `forge decode associated=`); live `monitor`, `play` and Hearth do not mix yet ([the plan](eac3-programme-mixing-metadata.md)) |
     | QC delivery report file, DAW host plugin, topology | Proposed | Unchanged: nothing is built ([qc-report.md](qc-report.md), [host-plugin.md](host-plugin.md), [topology.md](topology.md)) |
     | `AC3FORGE_BUILD_HEARTH` | Default OFF | Default ON; `AC3FORGE_BUILD_AC4` now builds the encoder as well as the inspector and decoder |
+    | IM5 TrueHD module | No `AC3FORGE_BUILD_MLP` on `main`; work on a branch | `libs/truehd` is on the integration branch (2026-10-29): the decoder, the encoder, the containers, `forge`, the C API; the branch is superseded ([truehd.md](truehd.md)) |
+    | IM6 TrueHD interop | Blocked on non-public MLP material and the clean-room policy | Checked against FFmpeg's encoders and decoder, from a specification the owner supplied; no Dolby decoder or receiver has read output ([ROADMAP.md](../ROADMAP.md)) |
+    | Common Encryption, AC-4 content signing | Not on the roadmap | A protected MP4 track is refused by name ([cenc-conformance.md](cenc-conformance.md)); AC-4 content signing is built ([libs/ac4/ERRATA.md](../libs/ac4/ERRATA.md)); neither has a TrueHD counterpart |
     | The "UX12 stale text" | To fix when rewriting | Fixed by the rewrite |
 
     The other rows (IM5, VX9, VX12, AP1, UX12, UX7, DR9 and the proposed and blocked items) were

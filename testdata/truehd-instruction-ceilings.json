@@ -1,0 +1,9 @@
+{
+  "_comment": "The most x86-64 instructions an access unit may take in each iclforge-bench TrueHD workload, as tools/checks/truehd_instructions.py counts them under valgrind (callgrind, inside Decoder::decode, Encoder::encode and Encoder::flush; GCC 13.3 -O3, glibc 2.39; reference_51.wav at 24 bits, 48 kHz). Measured 2026-10-29: stereo decode 24,074, 5.1 decode 59,974, stereo encode 265,778, 5.1 encode 732,361; each ceiling is about a sixth over its figure, the headroom the Cortex-M3 leg's ceilings carry. A count is the same on every run of one binary and moves a few per cent with the C library's memset, so the ceilings are for the machine they were taken on.",
+  "ceilings": {
+    "truehd_stereo_decode": 28000,
+    "truehd_51_decode": 70000,
+    "truehd_stereo_encode": 310000,
+    "truehd_51_encode": 850000
+  }
+}

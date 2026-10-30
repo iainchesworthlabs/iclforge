@@ -37,9 +37,12 @@ trap 'rm -rf "$WORK"' EXIT
 # The corpus is assembled here, a directory per harness, and copied out at the end.
 OUT="$WORK/seeds"
 
-mkdir -p "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
+mkdir -p "$OUT/fuzz_truehd_parse" "$OUT/fuzz_truehd_encode" "$OUT/fuzz_mat_unwrap" \
+         "$OUT/fuzz_mp4_demux" "$OUT/fuzz_matroska_demux" "$OUT/fuzz_mpegts_demux" \
+         "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
          "$OUT/fuzz_signing_verify" "$OUT/fuzz_iec61937_unwrap" \
-         "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse"
+         "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse" "$OUT/fuzz_content_signature" \
+         "$OUT/fuzz_ac4_content_signature"
 
 run() { "$ICLFORGE_CLI" "$@" >/dev/null; }
 
@@ -59,6 +62,81 @@ add_seed() {
 # synthesise for a format it only reads.
 echo "==> AC-4: the checked-in DEE baseline, as a parser seed"
 add_seed "fuzz_ac4_parse" "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
+
+# Content signing: a short stream signed with a throwaway root and signer that openssl makes here
+# and nothing keeps, and the parts of that signature as the two harnesses read them. fuzz_content_
+# signature takes a mode byte first (see the harness): 0 Thrift, 1 DER, 2 text, 3 blob, 4 blob
+# verified, 5 certificates, 6 base64. No private key is written to a seed: the one text seed that
+# a key loader reads is a bare scalar of no value to anyone.
+echo "==> AC-4 content signature: a short stream signed with a throwaway key, and its parts"
+if command -v openssl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    cs="$WORK/content-signature"
+    mkdir -p "$cs"
+    python3 - "$cs/tone.wav" <<'PY'
+import math, struct, sys, wave
+with wave.open(sys.argv[1], "wb") as w:
+    w.setnchannels(2)
+    w.setsampwidth(2)
+    w.setframerate(48000)
+    w.writeframes(b"".join(
+        struct.pack("<hh", int(6000 * math.sin(2 * math.pi * 440 * n / 48000)),
+                    int(6000 * math.sin(2 * math.pi * 660 * n / 48000)))
+        for n in range(6144)))
+PY
+    openssl ecparam -name prime256v1 -genkey -noout -out "$cs/root.key"
+    openssl req -new -x509 -key "$cs/root.key" -sha256 -days 30 -subj "/CN=Seed Root CA" \
+        -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" \
+        -out "$cs/root.pem"
+    openssl ecparam -name prime256v1 -genkey -noout -out "$cs/signer.key"
+    openssl req -new -key "$cs/signer.key" -sha256 \
+        -subj "/CN=Seed Content Signer/title=Code\/Content Signer" -out "$cs/signer.csr"
+    printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n' > "$cs/signer.ext"
+    openssl x509 -req -in "$cs/signer.csr" -CA "$cs/root.pem" -CAkey "$cs/root.key" \
+        -CAcreateserial -sha256 -days 30 -extfile "$cs/signer.ext" -out "$cs/signer.pem"
+    cat "$cs/signer.pem" "$cs/root.pem" > "$cs/chain.pem"
+    run ac4-encode "$cs/tone.wav" "$cs/plain.ac4" 64
+    run ac4-sign "$cs/plain.ac4" "$cs/signed.ac4" content-key="$cs/signer.key" \
+        content-chain="$cs/chain.pem"
+    plain_size="$(wc -c < "$cs/plain.ac4")"
+    signed_size="$(wc -c < "$cs/signed.ac4")"
+    tail -c +"$((plain_size + 1))" "$cs/signed.ac4" > "$cs/blob.bin"
+    cp "$cs/signed.ac4" "$OUT/fuzz_ac4_content_signature/ac4-signed-stereo-64.ac4"
+    cp "$cs/plain.ac4" "$OUT/fuzz_ac4_content_signature/ac4-unsigned-stereo-64.ac4"
+    head -c "$((signed_size - 700))" "$cs/signed.ac4" \
+        > "$OUT/fuzz_ac4_content_signature/ac4-signed-cut-in-trailer.ac4"
+    seed="$OUT/fuzz_content_signature"
+    { printf '\000'; cat "$cs/blob.bin"; } > "$seed/thrift-blob.bin"
+    { printf '\001'; openssl x509 -in "$cs/signer.pem" -outform DER; } > "$seed/der-signer.bin"
+    { printf '\002'; cat "$cs/chain.pem"; } > "$seed/text-pem-chain.bin"
+    { printf '\002'; head -c 32 /dev/zero | tr '\000' '\021'; } > "$seed/text-bare-scalar.bin"
+    { printf '\003'; cat "$cs/blob.bin"; } > "$seed/blob-parse.bin"
+    { printf '\004'; cat "$cs/blob.bin"; } > "$seed/blob-verify.bin"
+    { printf '\005'; openssl x509 -in "$cs/root.pem" -outform DER
+      openssl x509 -in "$cs/signer.pem" -outform DER; } > "$seed/certs-der-pair.bin"
+    { printf '\006'; base64 -w0 "$cs/blob.bin"; } > "$seed/blob-base64.bin"
+else
+    echo "    openssl or python3 not found: the content signature seeds are left as committed"
+fi
+
+# More of the same, from tools/fuzz/signature-seeds.py: the chains a signature can carry (leaf, root
+# and an intermediate in order, leaf and root, the leaf alone, the root first), a mono and a 5.1
+# stream, a leaf with another title and a later signing date, the certificates as DER and PEM
+# (with and without a key usage, with names, on an ECDSA P-384 key and an RSA key), the blob alone
+# and as base64. Synthetic keys only: nothing here reads or derives from anyone's signed file.
+if command -v openssl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    echo "==> AC-4 content signature: chains, streams and certificates"
+    python3 "$SCRIPT_DIR/signature-seeds.py" "$OUT" --forge "$ICLFORGE_CLI"
+fi
+
+# Protected MP4s for the box walk and the sinf/frma/schm/tenc parse: TrueHD ('mlpa'), E-AC-3 and
+# AC-4 under the schemes and the clear-lead-in, clear-first-fragment and key-rotation layouts that
+# the committed seeds do not cover (the generator is tools/generators/cenc_make_protected.py).
+if python3 -c "import cryptography" >/dev/null 2>&1; then
+    echo "==> Protected MP4: mlpa, ec-3 and ac-4 in more layouts"
+    python3 "$SCRIPT_DIR/protected-seeds.py" "$OUT/fuzz_mp4_demux" --forge "$ICLFORGE_CLI"
+else
+    echo "    the 'cryptography' package is missing: the protected MP4 seeds are left as committed"
+fi
 
 # The IAB seed comes from examples/encode_iab.cpp's own --write-fixture mode,
 # the one tools/ci/run_codec_matrix.sh drives, so it needs that example built -
@@ -251,6 +329,21 @@ add_seed "fuzz_iec61937_unwrap" "$WORK/carrier-not.wav"
 # (planning/ac4.md, I1), so the seed script packs its first four frames.
 python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
     "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
+
+# TrueHD and MLP, from the committed fixtures (testdata/truehd) and nothing else: cuts of every
+# stream for the reader, the decoder and the differential harness (which share fuzz_truehd_parse's
+# seeds), the encoder's configuration space, MAT bursts of three of them made by 'forge spdif', and
+# three streams wrapped by 'forge mp4', 'mkv' and 'ts'. All of it is more than the engine needs:
+# the committed seeds are the subset that reaches different branches, which
+#
+#     tools/fuzz/run.sh merge fuzz_truehd_decode <the fuzz_truehd_parse directory written here>
+#
+# finds (and the same with each other harness), so that every file is there for a reason.
+echo "==> TrueHD and MLP: the fixtures cut, the encoder's space, MAT bursts and containers"
+python3 "$SCRIPT_DIR/truehd-seeds.py" streams "$OUT/fuzz_truehd_parse"
+python3 "$SCRIPT_DIR/truehd-seeds.py" encoder "$OUT/fuzz_truehd_encode"
+python3 "$SCRIPT_DIR/truehd-seeds.py" mat "$OUT/fuzz_mat_unwrap" --forge "$ICLFORGE_CLI"
+python3 "$SCRIPT_DIR/truehd-seeds.py" containers "$OUT" --forge "$ICLFORGE_CLI"
 
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do

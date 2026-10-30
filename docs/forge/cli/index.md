@@ -1,10 +1,12 @@
 # forge
 
-`forge` is the command-line front end over the ICL Forge library — 46 commands covering
+`forge` is the command-line front end over the ICL Forge library — 49 commands covering
 synthesis, file encoding/decoding, container wrapping, inspection, live capture/playback, and the
 tool's own self-description (`help`, `man`, `completions`). It reads and writes AC-3, E-AC-3 (with
-the Atmos object layer) and AC-4; the [Commands](commands.md) page says which command takes which.
-Two of the 46 (`atmos-adm` and `atmos-iab`) only *run* in a build configured with
+the Atmos object layer) and AC-4, and decodes, inspects, measures and wraps TrueHD and MLP and
+encodes TrueHD; the [Commands](commands.md) page says which command takes which, and which refuse
+TrueHD.
+Two of the 49 (`atmos-adm` and `atmos-iab`) only *run* in a build configured with
 `-DICLFORGE_BUILD_ADM=ON`, but are always *listed* — the same "shown, not hidden" treatment
 this page's own live-audio commands get when the platform can't run them either (see
 [Commands](commands.md)'s own ADM section). Every command it can run is backed by the same public
@@ -60,7 +62,7 @@ between releases is not mistaken for the tagged one. `kernels:` is `generic`, `x
 `aarch64-neon`, the `arch-*` directory of `libs/base/variants/` the binary was built from. A tree with
 uncommitted changes adds a `state:   dirty (uncommitted changes)` line.
 
-`--version` (or its `-v` alias) is a flag, not one of the 46 commands — it's handled
+`--version` (or its `-v` alias) is a flag, not one of the 49 commands — it's handled
 before argument parsing and exits immediately. So are `--help` and `-h`, which print the named
 command's own help (or the full listing when no command was named).
 
@@ -107,6 +109,8 @@ command's own help (or the full listing when no command was named).
 - **Metadata options** (`drc=`, `heavy`, `dialnorm=`, `cmixlev=`, …) can follow the positional
   arguments of any encoding command, in any order — see
   [Options & grammars](metadata-options.md), including which commands ignore which options.
+  A TrueHD or MLP run applies few options and refuses the rest by name with exit status 1, rather
+  than accepting and dropping them; [TrueHD and MLP](commands.md#truehd-and-mlp) lists which.
 - **PCM-carrying commands report per-channel peak/RMS levels when they finish**; `record` meters
   live. With `-` as the output path, every encode and decode path sends that report (and the rest
   of its status text — `dialnorm=auto`'s measurement line and the `src=`/`map=` multi-source
@@ -135,7 +139,7 @@ command's own help (or the full listing when no command was named).
 
 ## Next
 
-- [Commands](commands.md) — all 46 commands, grouped and with the usage text they print
+- [Commands](commands.md) — all 49 commands, grouped and with the usage text they print
   (`atmos-adm` and `atmos-iab` only *run* with `-DICLFORGE_BUILD_ADM=ON`, but are listed either
   way), plus the exit-code table.
 - [Options & grammars](metadata-options.md) — the `drc=`/`heavy`/`dialnorm=`/… options grammar,

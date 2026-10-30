@@ -268,10 +268,11 @@ endif()
 # these first means the root CMakeLists.txt's own option(...) calls see the
 # values already set and leave them alone.
 #
-# This is the same fourteen the root's own guard (CMakeLists.txt:230) refuses
-# the profile alongside. They are spelled out rather than looped because the
-# guard names them individually too, and a mismatch between the two lists should
-# be visible in a diff.
+# This is the same fifteen the root's own guard (the _ac3_minimal_conflicts list
+# in CMakeLists.txt) refuses the profile alongside. They are spelled out rather
+# than looped because the guard names them individually too, and a mismatch
+# between the two lists should be visible in a diff (tools/checks/
+# test_minimal_profile_options.py holds them to each other).
 set(ICLFORGE_BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_GUI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -286,6 +287,7 @@ set(ICLFORGE_BUILD_ADM OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_PYTHON OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_AC4 OFF CACHE BOOL "" FORCE)
+set(ICLFORGE_BUILD_TRUEHD OFF CACHE BOOL "" FORCE)
 
 # The AC-4 decoder is the one addition to that list, behind a switch that is off
 # by default. ICLFORGE_BUILD_AC4 above stays off, since it also builds the

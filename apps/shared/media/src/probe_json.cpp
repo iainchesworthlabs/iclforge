@@ -418,7 +418,13 @@ Ac4Summary summarize_ac4(std::span<const std::byte> data) {
             }
         }
     }
-    if (scanned.stopped_at.has_value() && !summary.parse_error.has_value()) {
+    // A content signature follows the last sync frame, which is where the frames are meant to
+    // stop, so the scan ending there is not a parse error.
+    summary.content_signature = iclforge::ac4::summarise_signature(data);
+    const auto trailer = iclforge::ac4::locate_signature_trailer(data);
+    const bool trailer_follows = trailer.has_value() && trailer->present &&
+                                 trailer->content_size == scanned.stopped_at_offset;
+    if (scanned.stopped_at.has_value() && !summary.parse_error.has_value() && !trailer_follows) {
         summary.parse_error = scanned.stopped_at;
     }
     if (summary.first_frame.has_value()) {
@@ -858,6 +864,32 @@ void write_ac4_stream(JsonSink& json, const Ac4Summary& summary) {
     }
     json.end_object();
 
+    // null without a content signature. "verified" is always false: probe reads the signature, it
+    // is not given a trust anchor to check it against (forge ac4-verify).
+    json.key("content_signature");
+    if (summary.content_signature.present) {
+        const iclforge::ac4::SignatureSummary& signature = summary.content_signature;
+        json.begin_object();
+        json.member("verified", false);
+        json.member("readable", signature.readable);
+        json.member("size_bytes", static_cast<std::uint64_t>(signature.blob_size));
+        if (signature.readable) {
+            json.member_null("problem");
+            json.member("signer", signature.signer);
+            json.member("signer_serial", signature.signer_serial);
+            json.member("signed_date", signature.signed_date);
+            json.member("signing_method", signature.signing_method);
+            json.member("certificates", static_cast<std::uint64_t>(signature.certificates));
+            json.member("publisher", signature.publisher);
+            json.member("application", signature.application);
+        } else {
+            json.member("problem", signature.problem);
+        }
+        json.end_object();
+    } else {
+        json.value_null();
+    }
+
     json.key("ac4");
     if (!summary.first_frame.has_value()) {
         json.value_null();
@@ -1034,6 +1066,24 @@ void write_container(JsonSink& json, const ContainerFacts& facts) {
         json.member("kind", other.kind);
         text_or_null("codec_id", other.codec_id);
         text_or_null("language", other.language);
+        // null for a track that is not protected; for one that is, what its sample entry says
+        // (Common Encryption). The track is not read either way.
+        json.key("protection");
+        if (other.protection.has_value()) {
+            const ProtectionFacts& p = *other.protection;
+            json.begin_object();
+            json.member("entry_type", p.entry_type);
+            text_or_null("scheme", p.scheme);
+            text_or_null("original_format", p.original_format);
+            text_or_null("default_kid", p.default_kid);
+            json.member("default_iv_size", static_cast<std::int64_t>(p.default_iv_size));
+            json.member("crypt_byte_block", static_cast<std::int64_t>(p.crypt_byte_block));
+            json.member("skip_byte_block", static_cast<std::int64_t>(p.skip_byte_block));
+            json.member("has_clear_entry", p.has_clear_entry);
+            json.end_object();
+        } else {
+            json.value_null();
+        }
         json.end_object();
     }
     json.end_array();

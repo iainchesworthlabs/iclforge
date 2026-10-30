@@ -88,6 +88,11 @@ metadata options (any order, after the positional arguments):
   couple            enable channel coupling - honored by 'encode' and 'sine' ('sine' can also
                     spell it as a 'c' layout suffix); E-AC-3 coupling is the tools argument's
                     cpl token instead
+  strict            decode: exit 2, after writing what could be decoded, when any frame or unit was
+                    lost after the first one decoded (an AC-4 frame waiting for an I-frame, a
+                    concealed frame or unit, a TrueHD unit a lenient decode dropped); the frames
+                    that wait before the first one decodes are not a loss. Without it such a decode
+                    exits 0 and warns, as it always has
   keep-partial      encode/eac3-encode/atmos-encode/atmos-cbi: if the run fails partway, keep
                     whatever frames were already encoded (named beside the intended output as
                     <name>.partial.<ext>) instead of discarding them - off by default, matching
@@ -169,6 +174,44 @@ metadata options (any order, after the positional arguments):
                     ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give
                     verify-objects and gate-objects several keys - a frame is good under any
                     of them; sign-objects takes one
+  sign-content      ac4-encode/atmos-encode/atmos-adm/atmos-iab (codec=ac4): sign the AC-4 file
+                    once it is written, with content-key= and content-chain=; see
+                    docs/library/signing.md
+  verify-content    decode/ac4-verify: refuse unless the AC-4 content signature, its chain
+                    and a trust anchor or pin all check, and the signer information is as CS
+                    spec v2.6 section 5.3 asks: a 128 byte nonce, a publisher UUID that is
+                    there, and one of the expect-publisher-uuid= accounts if any are given
+  check-content     decode/ac4-verify: print what the content-signature checks find and carry
+                    on, judging the certificates at the signed date unless verify-time=
+                    says otherwise. Not combinable with verify-content
+  unanchored-ok     with verify-content: accept a signature that checks out against a chain
+                    no trust-anchor= or pin= vouches for (still reported as unanchored)
+  content-key=<path>  the operator's P-256 private key, PEM or DER (or
+                    ICLFORGE_CONTENT_KEY_FILE / ICLFORGE_CONTENT_KEY)
+  content-chain=<path>  the certificates for that key, a bundle; repeat for more (or
+                    ICLFORGE_CONTENT_CHAIN_FILE)
+  trust-anchor=<path>  a certificate to trust as the top of the chain; repeat for more
+  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted
+                    wherever it appears in the chain; repeat for more
+  leaf-title=<text|any>  the title the signing certificate must carry (default
+                    Code/Content Signer)
+  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC (default now,
+                    which is what CS spec v2.6 section 5.3 asks for; another date is warned about)
+  publisher-uuid=<UUID>  ac4-sign/sign-content: the UUID of your publisher account, written as
+                    the signature's publisherUUID; it is not in the signing certificate and is not
+                    compared with it. Without it a warning, and verify-content refuses the
+                    signature
+  expect-publisher-uuid=<UUID>  ac4-verify/decode: a publisher account to accept; repeat for
+                    more. A signature naming another is a finding in ac4-verify and a refusal
+                    with verify-content; without it the UUID is only reported
+  publisher-name=<text>  your legal or trade name
+  product-id=<n>    your product identifier, a whole number (default 0)
+  product-name=<text>, wrapper-name=<text>  the product and, if one is used, the PACE wrapper
+  os-name=<text>, os-version=<text>, os-description=<text>  the operating system of the
+                    signing host; informational, and bound by the signature
+  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>  when every certificate must be valid:
+                    now by default (ac4-verify, verify-content), the signed date for
+                    check-content
   verify            eac3-encode: decode every access unit as it is encoded and diff the
                     decoder's model against the encoder's own, refusing the run at the first
                     disagreement - off by default, since it roughly doubles the work
@@ -821,7 +864,7 @@ only *that* it did. `forge help exit-codes` prints the same table.
 |---|---|
 | `0` | Success. |
 | `1` | Usage — a bad or missing argument, an unknown command or option, or a configuration the encoder cannot express (an illegal bitrate for a layout, more objects than a stream can carry). Retrying the same command line cannot help. |
-| `2` | Input — unreadable, absent, or not a valid AC-3/E-AC-3/AC-4/WAV/ADM file, or a stream that stopped decoding part-way. |
+| `2` | Input — unreadable, absent, or not a valid AC-3/E-AC-3/AC-4/WAV/ADM file, or a stream that stopped decoding part-way (and, with `decode ... strict`, one that lost frames or units after the first one decoded, once what could be decoded is written). |
 | `3` | Output — the destination could not be created, written or finalized. |
 | `4` | Unavailable here — this build or this machine cannot run the command at all (no audio backend, no capture/render endpoint, an endpoint that refuses the format, a library this build was not configured with). The same command line may well succeed elsewhere. |
 | `5` | Runtime — the run started and then failed for none of the above reasons: a capture device that stopped delivering audio (the `record`/`live` watchdog), an output device that went away mid-playback (`play`, `monitor`, `identify`, `live`'s output legs), a loudness measurement with nothing above the gate, a signing pass that could not complete. |
@@ -1261,6 +1304,68 @@ objects (try layout=rendered or layout=bed instead)
 Omitting `preset=` entirely leaves `qc` in measure-and-report mode — every number is still printed, there is
 just no PASS/FAIL verdict and nothing to gate on. See [Commands → `qc`](commands.md#decoding-inspection) for the
 full report format and the exit-code convention this drives.
+
+## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`, `metadata`)
+
+```text
+decode, levels and loudness of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
+  truehd-presentation=best|2ch|6ch|8ch|all
+                    the substreams read; best (default) is the highest of substreams 0 to 2
+  truehd-check=strict|lenient
+                    strict (default) stops with exit status 2 at the first failed check;
+                    lenient counts failed checks and decodes on
+```
+
+A TrueHD or MLP run refuses every other option it is given, by name, with exit status 1: `decode` applies these two,
+`levels` and `loudness` the same two, and `mkv`, `mp4`, `ts`, `spdif` and `remux` none. `truehd-encode` applies its own
+options and `verify`:
+
+```text
+truehd-encode (after the positional arguments):
+  truehd-downmix=none|standard
+                    none (default): the first two channels are substream 0 as they are;
+                    standard: a stereo and 5.1 downmix, undone exactly by the later substreams
+  truehd-downmix-gains=C,S,LFE,R
+                    four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs
+                    folded into the downmix (default -3,-3,off,-3)
+  truehd-restart=N  access units between restart headers, 1 or 8 to 4096 (default 128)
+  truehd-peak-rate=KBPS
+                    the rate the stream is declared not to exceed, kbit/s (default 18000)
+  truehd-rate-check=strict|lenient
+                    strict (default) refuses a stream that cannot be sent within the peak rate;
+                    lenient writes it and counts
+  truehd-fir-order=0..8
+                    the largest FIR prediction order tried (default 8)
+  truehd-matrix=on|off
+                    decorrelate channel pairs with a primitive matrix (default on)
+  truehd-stereo-mode=stereo|ltrt|headphone
+                    the 2 channel mode the stream declares (default stereo)
+  verify            decode every access unit as it is coded and compare it with the input
+```
+
+The channel meaning of TH spec section 14, written into every major sync (and set in a finished stream by `metadata`,
+with the same options). Per presentation, 2, 6 and 8 channels, each refused by name outside its field's width; a field
+left out is 0 and a control bit off, as in FFmpeg's streams. **Provisional, no oracle until the DEE set** (FFmpeg writes
+zeros): the specification gives the widths and, for the 6 and 8 channel dialogue norms, a unit (n is -n dBFS), and gives
+no unit for the mix level, no table for the source format and no word on what a control bit gates
+([`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), questions
+51 to 55):
+
+```text
+truehd-encode and metadata, of TrueHD (after the positional arguments):
+  truehd-dialnorm-2ch=0..63    truehd-dialnorm-6ch=0..31    truehd-dialnorm-8ch=0..31
+                    the presentation's dialogue norm (6 bits for 2 channels, 5 for the others)
+  truehd-mix-level-2ch=0..63   truehd-mix-level-6ch=0..63   truehd-mix-level-8ch=0..63
+                    the presentation's mix level (6 bits; no unit is given, so the number is not converted)
+  truehd-source-format-6ch=0..31   truehd-source-format-8ch=0..63
+                    the presentation's source format (5 and 6 bits; no table is given); the 2 channel
+                    presentation has none
+  truehd-control-2ch=on|off    truehd-control-6ch=on|off    truehd-control-8ch=on|off
+                    the presentation's control-enabled bit (what it gates is not given)
+  truehd-heavy-drc-start-up-gain=-32..31
+  truehd-drc-start-up-gain=-64..63
+                    the two DRC start-up gains (6 and 7 bits, signed)
+```
 
 ## Probe options (`probe`): `json=`, `detail=`
 

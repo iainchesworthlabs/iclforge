@@ -9,6 +9,9 @@ Roadmap item AP9: the first non-Python binding over `iclforge_c/iclforge.h`. Two
 - **`iclforge`** — a safe, idiomatic wrapper over it: `Result`/`Option` instead of status codes
   and out-parameters, RAII handles, slices instead of raw pointers.
 
+The header also declares the TrueHD and MLP functions (`iclforge_truehd_*`). `iclforge-sys` declares them like the rest;
+the safe `iclforge` crate wraps none of them, and `build.rs` lists no `libs/truehd` path to watch for changes.
+
 ## Why this lives in-tree
 
 AP10 (an out-of-tree GStreamer element) is out-of-tree for a reason specific to it — it sits

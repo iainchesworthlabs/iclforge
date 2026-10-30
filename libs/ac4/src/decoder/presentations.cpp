@@ -66,6 +66,8 @@ Member& add_member(PresentationPlan& plan, std::size_t& count, std::optional<int
     m.ch_mode = -1;
     m.iframe = !b_iframe.empty() && b_iframe.front();
     m.coding = Coding::kChannel;
+    m.backs = true;
+    m.tops = 3;
     return m;
 }
 
@@ -76,6 +78,10 @@ void add_member(PresentationPlan& plan, std::size_t& count, const ChannelSubstre
                            content);
     m.ch_mode = chan.ch_mode.value_or(-1);
     m.rate_multiplier = rate_multiplier_of(chan.sf_multiplier);
+    if (chan.original_content) {
+        m.backs = chan.original_content->b_4_back_channels_present;
+        m.tops = chan.original_content->top_channels_present;
+    }
 }
 
 // Whether decode() turns an object audio substream into PCM: at 48 or 44.1
@@ -450,7 +456,10 @@ bool selectable(const PresentationPlan& plan, int level) noexcept {
     }
     // Part 1 Table 86 defines md_compat 0 to 4 and Part 2 Table 55 0 to 3,
     // each with 7 unrestricted; a reserved value has no meaning to be within.
-    const int reserved_from = plan.v1 ? 4 : 5;
+    // Dolby's level 4 streams (codecs="ac-4.02.01.04") use 4 in a version 1 presentation, which
+    // Table 55 reserves: it is taken as the level it names (libs/ac4/ERRATA.md, "md_compat 4"),
+    // so 5 and 6 are the reserved values left.
+    const int reserved_from = 5;
     if (!plan.md_compat || (*plan.md_compat >= reserved_from && *plan.md_compat < 7)) {
         return false;
     }

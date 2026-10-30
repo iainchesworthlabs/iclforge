@@ -160,6 +160,7 @@ OutputChoice OutputSelector::choose(const ItemFacts& item, const HeldOutput& hel
     OutputRequest request;
     request.endpoints = endpoints(rate, held);
     request.stream = item.stream;
+    request.codec = item.codec;
     request.has_objects = item.has_objects;
     request.pinned = preferences_.pinned;
     request.preferred_endpoint_id = preferences_.endpoint_id;

@@ -27,6 +27,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_play_meters.cpp
     test_player.cpp
     test_player_bitstream.cpp
+    test_player_truehd.cpp
     test_queue.cpp
     test_reference_melody.cpp
     test_session.cpp
@@ -36,6 +37,8 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_stream_decoder.cpp
     test_take_recorder.cpp
     test_transport.cpp
+    test_truehd_playback.cpp
+    test_truehd_index.cpp
     test_voice_file_input.cpp)
 target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
 # test_karaoke_example.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
@@ -243,4 +246,6 @@ target_link_libraries(iclforge-hearth-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::truehd
+        iclforge::json)

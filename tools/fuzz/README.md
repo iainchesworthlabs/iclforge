@@ -299,6 +299,14 @@ its own, four so far:
 `fuzz_ac4_encode` has no regression inputs: a violation aborts, and libFuzzer
 keeps the input.
 
+`fuzz_ac4_content_signature` and `fuzz_content_signature` (an AC-4 stream's content signature, which
+arrives with the file it signs) were added without a libFuzzer run: the machine they were written
+on had Clang without the libFuzzer and sanitizer runtimes. They were then run under AddressSanitizer
+and UndefinedBehaviorSanitizer with a coverage-blind replay driver, and had their first libFuzzer
+runs on 2026-10-29 ("Status: the TrueHD harnesses ..." below). Their `regressions/` hold hand-built
+boundary inputs (the walk that finds the trailer, Thrift counts and lengths past the blob, DER
+lengths past the end), not crashes.
+
 The corpus `tools/fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
 `tools/checks/ac4_syntax_differential.py` (`--inputs <directory>`), which reads
 every frame of each file through both syntax transcriptions, the decoder's and
@@ -306,6 +314,68 @@ every frame of each file through both syntax transcriptions, the decoder's and
 the script compares them on mutated DEE frames and on synthetic tables of
 contents; the nightly SonarCloud workflow runs it so, and it does not gate a
 merge.
+
+## Status: the TrueHD harnesses, MAT, the demuxers and the signing harnesses
+
+On 2026-10-29 these harnesses were built under Clang 18 with AddressSanitizer and UndefinedBehaviorSanitizer
+(`RelWithDebInfo`, `tools/fuzz/run.sh`'s configuration; libFuzzer from `libclang-rt-18-dev`, with
+`__cpp_concepts` raised to 202002 on the command line because libstdc++ 13 gates `<expected>` on it and
+Clang 18 reports 201907) and each run for 600 seconds from the committed seeds and dictionary, with the
+flags `run.sh` uses (`-rss_limit_mb=2048 -timeout=10`), `nice -n 15`, two processes at a time. CI uses
+LLVM 22 on Ubuntu 26.04, which has not run them. Executions are the 600-second totals; coverage is
+libFuzzer's edges and features, when the seeds had been loaded and at the end; new entries are the files
+the run added to its corpus beyond the seeds.
+
+| Harness | Executions | per second | Edges | Features | New entries | Found |
+|---|---:|---:|---:|---:|---:|---|
+| `fuzz_truehd_parse` | 3,190,685 | 5,308 | 259 to 527 | 569 to 2,985 | 803 | nothing |
+| `fuzz_truehd_decode` | 114,754 | 190 | 570 to 817 | 1,314 to 4,439 | 1,011 | nothing |
+| `fuzz_truehd_encode` | 27,014 | 44 | 1,531 to 1,601 | 5,469 to 9,193 | 642 | nothing |
+| `fuzz_mat_unwrap` | 1,638,742 | 2,726 | 113 to 159 | 147 to 399 | 52 | nothing |
+| `fuzz_matroska_demux` | 6,123,051 | 10,188 | 233 to 498 | 269 to 2,181 | 649 | nothing |
+| `fuzz_mpegts_demux` | 1,138,506 | 1,894 | 185 to 281 | 254 to 1,251 | 344 | nothing |
+| `fuzz_mp4_demux` | 1,163,860 | 1,936 | 713 to 1,023 | 953 to 3,060 | 741 | nothing |
+| `fuzz_content_signature` | 605,132 | 1,006 | 1,395 to 2,095 | 3,686 to 7,674 | 1,253 | nothing |
+| `fuzz_ac4_content_signature` | 120,110 | 199 | 1,165 to 1,703 | 1,847 to 4,076 | 505 | nothing |
+| `fuzz_differential_truehd_decode` | 973,729 | 1,620 | 897 to 1,147 | 2,175 to 4,524 | 707 | nothing, after the three below |
+
+The decode and encode harnesses are slow because each input is decoded ten times (five presentations,
+strict and lenient) and the encoder verifies every unit it writes. The decode and differential rows are
+the runs on the final library and oracle; the first run of `fuzz_truehd_decode`, before the `ch_assign`
+fix below, was clean too (89,988 executions, 149 a second, 925 new entries). Most differential inputs
+never reach FFmpeg: the library refuses them, and an FFmpeg process is spent only on a stream it reads
+whole.
+
+The differential harness found three things, each within its first ten minutes (the table's row is its run
+on the code with all three dealt with):
+
+- **An MLP stream of 16-bit words has bits below the word.** `mlp_st44_s16.mlp` with two bytes of audio
+  changed gave a right channel of 80256 in the library and 80128 in FFmpeg. FFmpeg writes a 16-bit
+  MLP stream as 16-bit samples; the library returns the 24-bit value. The oracle now compares at
+  FFmpeg's width, and `libs/truehd/ERRATA.md` question 40 asks whether the library should do it.
+  Regression: `mlp-16-bit-words-bit-7-set-in-a-channel`.
+- **`ch_assign` read the wrong way round.** `truehd_c40_s16.thd` with one `ch_assign` value changed
+  decoded to other channels in the library than in FFmpeg. The specification's sentence reads the field as a
+  map from matrix channels to output channels, FFmpeg does, and the library read its inverse; the two are
+  the same for the identity and for a swap, which is all the fixtures hold. The decoder now reads it as
+  the specification does (`ERRATA.md` entry 42), refuses a value that repeats (question 41), and
+  `libs/truehd/tests/decoder/test_channel_assignment.cpp` holds it with streams of a cyclic assignment.
+  Regression: `ch-assign-repeats-an-output-channel`.
+- **A changed major sync resets the library's filter histories and not FFmpeg's.** `hb_marker_last.thd`
+  with the channel assignment word of its second major sync changed: same rate, same channel count,
+  other samples from that unit on, FFmpeg's and the Python transcription's agreeing with each other. The
+  library treats a major sync that changes the stream's kind, format word or substream count as a new
+  stream and starts its substreams from zero histories; FFmpeg does not tell the two apart. This is
+  `ERRATA.md` question 18 in a corner, and question 42 asks it. The oracle skips such a stream.
+  Regression: `major-sync-format-info-changes-mid-stream`.
+
+What the mutator bought, for `fuzz_truehd_decode`: from the same seeds, dictionary and engine seed, 20,000
+executions reach 768 edges and 3,678 features (671 new files) with it and 751 and 3,491 (585) without it. That
+is a small gain, 2% of the edges and 5% of the features, and not the order of magnitude a checksum repair
+gives where every mutation otherwise dies at it. The harness decodes in lenient mode as well as strict, and a
+lenient decode counts a failed check and reads on; `ElementaryReader` finds a unit by its major sync and its
+length word, so a mutation in a unit it keeps (one that passes the nibble and the major sync CRC) is read
+either way. What the repair adds there is the strict path to the restart header and the blocks.
 
 ## Status: the ADM harness, instrumented
 
@@ -461,6 +531,13 @@ way the fixed findings used to.
 | `fuzz_oamd_parse`      | `iclforge::objects::oba::parse_payload` - TS 103 420 §5's `object_audio_metadata_payload`, as recovered from an EMDF payload with id 11 |
 | `fuzz_joc_parse`       | `iclforge::ac3::oba::joc::parse_payload` - TS 103 420 §6's `joc()` payload: Huffman-coded coefficients into a matrix sized from the stream's own numbers |
 | `fuzz_signing_verify`  | `iclforge::ac3::signing::verify_atmos_stream` + `verify_atmos_frame` - operator-supplied stream, operator-supplied key, no CRC check in front of either |
+| `fuzz_ac4_content_signature` | `iclforge::ac4::locate_signature_trailer`, `signed_content_digest`, `summarise_signature`, `strip_signature` and `verify_stream` on a raw AC-4 stream - the walk that finds where the sync frames stop and the digest boundary, then the verifier under each way of judging time, with and without the blob's own certificates as trust anchors |
+| `fuzz_content_signature` | The Thrift binary reader, DER and X.509 (`parse_certificate`), PEM and base64, the key and certificate loaders, `parse_content_signature`, `validate_chain` and `verify_content_signature`; the first input byte picks the entry point. The certificates are inside the signature, so they are as untrusted as the stream |
+| `fuzz_truehd_parse`    | `iclforge::truehd::probe_stream`, `parse_major_sync`, `parse_access_unit`, `ElementaryReader`, `read_restart_header` and `read_block_header` on one input - the stream's units, the major syncs and directories, the restart headers and the extra data, then the block header reader over the raw bytes in a context the first two bytes choose. Built with `ICLFORGE_BUILD_TRUEHD` |
+| `fuzz_truehd_decode`   | `iclforge::truehd::Decoder::decode` over the units `ElementaryReader` finds, in every presentation, strict and lenient, and over the bytes as one unit - the block headers, filters, matrices and residuals are all sized from the stream. Its seeds and dictionary are `fuzz_truehd_parse`'s |
+| `fuzz_truehd_encode`   | `iclforge::truehd::Encoder` over the configuration the input's first eight bytes choose (rate, channels, width, restart interval, FIR order, matrix search, downmix, chunk size) and the 16-bit PCM after them, with the encoder's own verification on: what it writes must decode back to the PCM, and an encode that does not is a trap |
+| `fuzz_mat_unwrap`      | `iclforge::containers::iec61937::unwrap_mat_stream` and `MatPacker` - TrueHD in MAT bursts, whose 24 slots each open with a self-declared length. The units unwrapped are wrapped again and must unwrap to the same units |
+| `fuzz_differential_truehd_decode` | The path of `fuzz_truehd_decode` in strict mode, then FFmpeg's strict decode of the same bytes; the codec is lossless, so when both decode the input cleanly the samples must be equal. Not in the default list; see "TrueHD and MLP" under "Differential mode" below |
 | `fuzz_osc_parse`       | `iclforge::objects::oba::parse_osc_packet` - the OSC 1.0 wire form of a live object-position update (live OSC object positions), reached straight from a UDP datagram by `iclforge::audio::LivePositionSource` whenever `positions=osc:<port>` is in play. No CRC, no container, no bitstream ahead of it at all - this project's first NETWORK-facing input rather than a file or capture-device one; see `docs/threat-model.md` |
 | `fuzz_adm_parse`       | `iclforge::adm::parse_bw64(std::istream&)` - BW64/RF64 chunks plus an arbitrary ADM XML document. Opt-in, see below |
 | `fuzz_sendspin_json`   | `iclforge::sendspin::json::Document::parse` - the JSON of every Sendspin message, the first code a network peer's bytes reach on hearth's server and on a sink. Every accessor runs on every value parsed, and the document is written back out and parsed again, which must give the same text; `TokenStorage` and `count_tokens` must agree with a parse into fixed storage |
@@ -570,6 +647,48 @@ siblings' seed corpora, so they inherit the deeper inputs this finds, but
 adding the mutator there would multiply the number of inputs both decoders
 accept - and every one of those spawns a real FFmpeg process.
 
+## The TrueHD mutator
+
+A TrueHD or MLP stream puts five checks between a mutated byte and the parser it was aimed at: the
+access unit's check nibble (TH spec section 3.2), the major sync's CRC-16 (4.1), the restart
+header's CRC-8 (7.1), a segment's parity byte and CRC-8 (6.2), and the extra data's check nibble
+and parity byte (16). A unit that does not pass the first two is not read at all, one that does
+not pass the third is refused before its channel layout and filters are read, and one that does
+not pass the fourth is refused before its first block. So a mutation that changes any byte of a
+unit but its checks is thrown away at one of them, and nothing it did to the fields behind them is
+read, which is the loss the AC-3 mutator above exists for, in a format with more doors.
+
+`fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_differential_truehd_decode` define a custom
+mutator (`libs/truehd/fuzz/truehd_mutator.hpp`): libFuzzer's own mutation first, then a walk over
+the result as access units, from the first major sync, each unit's length being the 12-bit word
+count that opens it, and a rewrite of the five checks with the library's own routines
+(`major_sync_crc`, `restart_header_crc`, `substream_parity`, `substream_crc`,
+`extra_data_check_nibble`), which `libs/truehd/tests` hold to FFmpeg's streams. They are written in
+the order they nest: the restart header's CRC, then the segment's parity and CRC that cover it,
+then the nibble that covers the directory. After a unit that does not fit the walk resumes at the
+next major sync, as `ElementaryReader` does, so a damaged unit costs only itself.
+
+Deliberate limits, as with the AC-3 mutator:
+
+- **Nothing but the checks is repaired.** Lengths, end pointers, counts and every field the syntax
+  gives meaning to stay as the mutation left them.
+- **The lossless check is not repaired.** It is the check of the decoded samples of the interval
+  before a restart header, so putting it right takes a decode. A mutation in the audio of an
+  interval that a restart header follows is refused by strict decode at that header; lenient decode
+  counts it and goes on, and the last interval of a stream, which no restart header follows, is
+  never checked. `fuzz_truehd_decode` runs both.
+- **A restart header that is not at the head of a segment's first block is not found**, because
+  where a later block begins is known only by decoding the one before.
+- **Some mutations are left unrepaired.** One in four is not repaired at all, and in the rest each
+  of the five checks is left alone one time in sixteen, so that the paths that refuse a bad check
+  stay reachable. Both draws come from libFuzzer's seed argument, so a mutation reproduces.
+
+`libs/truehd/tests/fuzz/test_truehd_mutator.cpp` holds the repair to the streams (an unmodified
+committed stream comes back byte for byte), to each door (the decoder stops at a corrupted field
+for the check that covers it, the repair opens it, and the same repair with that check left out of
+the mask does not), and to the draw (a quarter of seeds repair nothing, each check is left out in
+about one in sixteen of the rest).
+
 ## Differential mode (differential decoder fuzzing)
 
 `fuzz_differential_ac3_decode` and `fuzz_differential_eac3_decode` drive the
@@ -624,6 +743,52 @@ compare anything at all (silently a no-op otherwise, same as running without
 corpora rather than duplicating those files (`tools/fuzz/run.sh`'s
 `seed_source_for`) - same bytes, same decode path, just with an extra
 comparison bolted on.
+
+### TrueHD and MLP
+
+`fuzz_differential_truehd_decode` does the same for TrueHD and MLP with one difference that
+matters: the codec is lossless, so there is no agreement floor to calibrate. The rule is written
+in `libs/truehd/fuzz/differential_oracle.hpp`, and is this:
+
+- The library must have decoded the whole input cleanly: its elementary reader reads every byte as
+  access units with none skipped, the strict decoder returns samples for every unit (no error, no
+  wait for a restart header), no check and no lossless check failed, and every unit has the
+  format of the first.
+- FFmpeg must have decoded it cleanly: its strict decode (`-xerror -err_detect
+  crccheck+bitstream+buffer+explode`, as `tools/checks/verify_truehd_interop.py` runs it) exits 0
+  **and writes nothing to its standard error at `-v warning`**. FFmpeg does not stop at a failed
+  lossless check: it logs "Lossless check failed - expected 00, calculated 8d" as a warning, exits
+  0 and writes the samples (`libs/truehd/ERRATA.md`, entry 20), so a clean exit status says
+  nothing about the samples. Any warning takes the case out of the comparison, not only that one,
+  because the text of FFmpeg's other warnings has not been read here.
+- When both hold the samples must be equal: the same rate, the same channel count, the same number
+  of samples, every sample, at the word length FFmpeg writes. FFmpeg returns a 7 or 8 channel
+  stream's channels in its own order, so a mismatch is retried with both decoders' channels sorted,
+  and only what still differs is a divergence. It writes an MLP stream that declares 16-bit words as
+  16-bit samples and everything else as 24, and the library returns the 24-bit value a stream
+  decodes to, so for the first the library's samples are compared with the low eight bits cleared.
+  The two differ only on a stream that codes a bit below its declared width, which is what the
+  first finding was (`regressions/fuzz_differential_truehd_decode/`, and `libs/truehd/ERRATA.md`
+  question 40 asks whether the library should do the clearing).
+
+Everything else is skipped without comment: a stream either decoder refuses, a stream FFmpeg warns
+about or declines (it refuses restart sync 0x31EC, and warns that it does not implement a block
+data check), or a disagreement on the rate or channel count. `ICLFORGE_DIFF_MEASURE_ONLY=1` prints
+which of these each input was and never aborts; replaying the committed seeds that way gives 33
+equal (one in another channel order), one refused by FFmpeg and two it warns about, and the
+library refusing the joined stream (strict decode stops at the join, `ERRATA.md` question 20).
+That the harness can fail was shown by changing one sample of the library's decode: it aborted on
+the first seed.
+
+It has the repairing mutator, unlike the AC-3 pair, and for the opposite reason to the one given
+for them. A TrueHD stream the strict library decode accepts needs five checks and the lossless
+check of every restart interval to hold, so without the repair a mutation almost never leaves one,
+and the harness would spend its budget on inputs the first rule skips. Whatever the repair leaves
+for FFmpeg is a mutation in the fields that decode to the same samples or in the last interval,
+which nothing checks. Measured over 4,000 executions from the seeds with one engine seed: with the
+mutator 139 inputs reached FFmpeg and 124 were compared and equal (the library refused the other
+3,860); without it 40 reached FFmpeg and 37 were compared (3,959 refused). The repair makes three and
+a half times as many comparisons, and about 97% of the inputs are still refused by the library.
 
 ## The other direction: the encoder's input space
 
@@ -819,6 +984,7 @@ tools/fuzz/run.sh                    # build, then run every default-list harnes
 tools/fuzz/run.sh fuzz_scan          # just one harness
 ICLFORGE_FUZZ_SECONDS=600 tools/fuzz/run.sh   # a deeper local run
 tools/fuzz/run.sh regress            # replay seeds + regressions, no mutation (fast)
+tools/fuzz/run.sh merge fuzz_truehd_decode <dir>...   # keep one file for each set of branches
 tools/fuzz/run.sh minimize fuzz_scan fuzz/artifacts/fuzz_scan-crash-<hash>
 
 # Differential harnesses need `ffmpeg` on PATH and are named explicitly -
@@ -845,8 +1011,9 @@ collects the resulting streams. What it does not write is committed as it is:
 the AC-4 seeds (below), `fuzz_iab_parse`'s one file (`encode_iab
 --write-fixture`), and the seeds of `fuzz_osc_parse` and the four
 `fuzz_sendspin_*` harnesses. The three container demuxers
-(`fuzz_matroska_demux`, `fuzz_mp4_demux` and `fuzz_mpegts_demux`) have no seed
-directory and start from an empty corpus.
+(`fuzz_matroska_demux`, `fuzz_mp4_demux` and `fuzz_mpegts_demux`) start from
+the committed files (protected ones among them) and from TrueHD and MLP wrapped by `forge`
+(below).
 
 The corpora of `fuzz_emdf_parse`, `fuzz_oamd_parse`, `fuzz_joc_parse` and
 `fuzz_adm_parse`, and one file of `fuzz_iec61937_unwrap`'s, are not raw `forge`
@@ -894,6 +1061,61 @@ streams is what lets a fuzzer's mutations explore "almost valid" input
 instead of spending its budget on bytes that get rejected before line one of
 the parser.
 
+The content-signature corpora are grown by `tools/fuzz/signature-seeds.py` from files `forge` signs
+with keys made on the spot by openssl and thrown away: the chains a signature can carry (leaf, root
+and an intermediate in order; leaf and root; the leaf alone; the root first), a mono and a 5.1
+stream beside the stereo one, a leaf with another title and a signing date days later, the
+certificates as DER and as PEM (a root, an intermediate with a path length, leaves with and without
+a key usage, with names, on an ECDSA P-384 key and on an RSA key, which the verifier refuses by
+algorithm), the Thrift blob alone and as base64, and streams cut inside the certificate list or
+with the trailer twice. They are reduced by `run.sh merge` to the files that reach different
+branches: `fuzz_content_signature` has 31 seeds and `fuzz_ac4_content_signature` 11. No private key
+is written to a seed, so that a secret scanner has nothing to find; the key loader's PEM path is
+reached by mutation and by the dictionary (`dictionaries/fuzz_content_signature.dict`: the PEM
+markers and labels, the DER encodings of the object identifiers the X.509 reader compares against,
+the default leaf title and a date's shape). Nothing is made from, or derived from, anyone's signed
+file.
+
+`fuzz_mp4_demux` starts from protected files as well as clear ones: the three layouts
+`tools/generators/gen_cenc_reader_fixtures.py` makes for the reader's tests and Dolby's four, and the
+files `tools/fuzz/protected-seeds.py` adds with `tools/generators/cenc_make_protected.py` (TrueHD
+`mlpa`, E-AC-3 and AC-4 in `cenc`, `cens`, `cbc1` and `cbcs`, with a clear lead-in entry in either
+order, a clear first fragment marked by a `seig` group, and a second key rotated in by one). Their
+`sinf`, `frma`, `schm`, `schi` and `tenc` are what the reader parses; `senc`, `saiz`, `saio`,
+`pssh` and `seig` it walks over, so the seeds carry them for the day a reader decrypts and add
+nothing to coverage today, and `dictionaries/fuzz_mp4_demux.dict` lists every box type the reader
+matches and the protection boxes and scheme names.
+
+The TrueHD and MLP corpora are made by `tools/fuzz/truehd-seeds.py` from the streams of
+`testdata/truehd` and nothing else. `fuzz_truehd_parse`, whose seeds and dictionary
+`fuzz_truehd_decode` and `fuzz_differential_truehd_decode` share, holds a cut of every fixture and hand-built stream: the
+head of each, up to its second major sync (a few kilobytes), so that there are streams of every
+rate from 44.1 to 192 kHz, of one to eight channels, of one to four substreams, with restart
+gaps of 8 and 128 units, in TrueHD and MLP, and one hand-built stream for each syntax path
+(filters, matrices, LSB bypass, both noise forms, the data check, the end marker, extra data, the
+DRC word, sixteen channels). `fuzz_truehd_encode` holds 18 files, each an encoder configuration
+and a signal chosen to stress one part of the coder (a sine, a chord, noise, a square wave, DC,
+harmonics followed by digital silence, silence). `fuzz_mat_unwrap` has MAT bursts that `forge
+spdif` made, in both word orders, and the three demuxers have TrueHD and MLP wrapped by `forge mp4`,
+`mkv` and `ts`. None of it comes from a disc.
+
+Every seed is there for a reason: a directory is reduced with the engine's merge mode, which keeps
+one file for each set of branches the target reaches (`tools/fuzz/run.sh merge fuzz_truehd_decode
+<directory>` writes the kept files to the corpus directory). `generate-seeds.sh` writes the
+unreduced set; the committed seeds are the reduced one.
+
+A harness can have a libFuzzer dictionary, `dictionaries/<harness>.dict` beside it, which `run.sh`
+passes as `-dict=`: the format's fixed byte patterns, which a mutation would have to guess. The
+TrueHD one lists the two major sync words (with the rate nibble that follows each), the signature,
+the three restart syncs as they sit after a block's flag bits, the end-of-stream markers and the
+directory entries with a CRC; the MAT one the preamble, the three code words and their swapped
+forms. A dictionary shared by the harnesses that share seeds is the seed source's. Its patterns are
+read from the library's headers, never from a stream.
+
+`tools/checks/check_fuzz_harnesses.py` (the `_static.yml` job and the pre-push check) fails on a
+harness that its CMake file does not register, that is in no run list, that has no seeds, or whose
+dictionary is not libFuzzer's syntax, and on an exception that no longer applies.
+
 Regenerate it with:
 
 ```bash
@@ -937,16 +1159,20 @@ gitignored; `tools/fuzz/run.sh` creates it on demand.
   harnesses (every harness in `tools/fuzz/run.sh`'s default list), push only (not
   pull_request, to keep PR turnaround unaffected).
 - `fuzz-differential` - the same 60-second-per-harness mutation budget, push
-  only, but over ONLY the two differential harnesses (see "Differential
+  only, but over ONLY the three differential harnesses (see "Differential
   mode" above) - a separate job rather than folded into `fuzz-short` because
   it needs `ffmpeg` installed and is much slower per-exec (an FFmpeg process
   per comparable input), so sharing a budget with the crash-only harnesses
   would have starved them of iterations. Also replays
   `fuzz/regressions/fuzz_differential_*` first, same shape as `fuzz-regress`.
+  The TrueHD harness runs in steps of its own with `continue-on-error`, so that it cannot
+  fail the job: it has run against FFmpeg 6.1.1 only and the runners install the Ubuntu
+  package, whose warnings and rounding it has not met. Promote it the way `fuzz-short` was,
+  by deleting those two lines once it has a clean record.
 - `fuzz-nightly` - a 10-minute-per-harness mutation budget (the
   `seconds_per_target` input, default 600) on a daily schedule (03:17 UTC), plus
   `workflow_dispatch` with a configurable budget for an on-demand deeper run.
-  It runs the default list, then the two differential harnesses in steps of
+  It runs the default list, then the three differential harnesses in steps of
   their own, each with its regression replay first. It restores `fuzz/corpus/`
   from the Actions cache and saves it again, so a night starts from the last
   one's grown corpus.

@@ -94,6 +94,12 @@ as `SimpleBlock`, several tracks, 32-bit as well as 64-bit `SamplingFrequency`, 
 left at EBML's unknown size rather than only the Segment. A file truncated mid-cluster returns
 every whole frame before the cut rather than an error — that is how a live recording ends.
 
+An audio track whose `TrackEntry` carries a `ContentEncodings` with a `ContentEncryption` is
+encrypted with Matroska's own scheme. Nothing else in the entry marks its frames as ciphertext, so
+the reader never selects it and returns `kEncryptedTrack` when it was the only candidate; it does
+not decrypt. (A `ContentEncodings` that holds only compression is not applied either, and is read
+as before.)
+
 **Untrusted input.** Every length in an EBML file is self-declared, and a container arrives from
 a rip, a capture or a download rather than from this project's own writer. `ReadOptions` bounds
 the element size the reader will hold (16 MiB by default; anything larger that it does not need
@@ -207,6 +213,18 @@ so a caller that has to treat samples by codec (AC-4's raw frames need a sync fr
 around them) knows which it is. A sample whose range runs past `size` ends delivery there, as
 `demux` does for a truncated file. `forge demux` uses it for a file path, and keeps the chunked
 `Reader` for a pipe.
+
+**A protected track is refused, not read.** A track whose sample entry is `enca` is encrypted with
+Common Encryption (ISO/IEC 23001-7) and holds ciphertext. The reader reads its `sinf` (`frma`, `schm`,
+`tenc`), never selects the track, and returns `DemuxError::kProtectedTrack` when it was the only
+candidate; `describe_refusal(refused)` says which track, with its scheme, original format and default
+KID, and `Reader::refused_tracks()` or `list_refused_tracks()` supplies the tracks. A protected track
+beside a readable one is listed in `Demuxed::skipped` with its `Protection`. A track that holds a clear
+sample entry beside a protected one, the layout of a clear lead-in, is refused whole: the entry a
+sample belongs to is named per chunk or per fragment, and reading only the clear entry would return
+a truncated programme as if it were all of it. Nothing here decrypts or reads a key. See
+[the CENC audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md)
+and [the read-side plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md).
 
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
 twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
@@ -414,6 +432,12 @@ if (!reader.finish(on_payload)) { /* ... */ }
 still emit: the unbounded PES form ends only at the next
 `payload_unit_start_indicator` or at end of input, so the last payload of a capture is only
 complete here.
+
+A packet of the audio PID whose `transport_scrambling_control` bits are not 00 carries a scrambled
+payload (conditional access, not Common Encryption). The PES parse would take it for audio, so the
+reader stops at the first one with `kScrambled`; payloads delivered before it were clear packets.
+The PMT's `conditional_access_descriptor` is not read: it says a stream may be scrambled, and the
+packet bits say whether this one is. Nothing descrambles.
 
 **Untrusted input, and more so than the sibling formats.** A transport stream is designed to be
 tuned into mid-flight and to survive bit errors, so "malformed" is the ordinary case here, not
@@ -650,6 +674,27 @@ read back the exact original frame count and duration. The same holds for what `
 streams, and for the DASH MPD: see [Validation](../verification.md#where-the-oracles-dont-reach)
 for exactly what was and was not checked externally.
 
+## TrueHD in the containers
+
+`iclforge::containers` carries Dolby TrueHD in MP4, Matroska and MPEG-TS, and packs it as MAT for HDMI. As for the
+other codecs, the containers read no codec: the caller passes whole access units, each with its 4-byte header and
+unmodified (`iclforge::truehd::ElementaryReader` yields exactly that), and tells the container which units open with a
+major sync. TH spec §21 names these formats but gives no layout for any of them, so each is the layout FFmpeg's muxer
+writes, with FFmpeg's own demuxer and muxer as the check in both directions. No document was found for the MP4 and MAT
+layouts, and no receiver or disc player has read either. [`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)
+records each layout, the evidence and the questions that are open.
+
+| Container | How | Notes |
+|---|---|---|
+| MP4 | `mp4::mux` and `mp4::fragment` with `AudioTrack::codec_id` `kCodecTruehd` (`mlpa`), the `dmlp` payload from `mp4::build_dmlp_payload` and `sync_samples` set on the units with a major sync | One access unit to a sample. The sample entry's rate field is a plain integer, not 16.16, so 96 and 192 kHz fit. An `Edit` drops the padding samples the last unit's end-of-stream marker counts. `mp4::demux` and `mp4::Reader` return the `dmlp` fields in `ReadTrack::codec_config`. |
+| Matroska | `matroska::mux` and `matroska::Writer` with `kCodecTruehd` (`A_TRUEHD`), no CodecPrivate, `MuxOptions::key_frames` (or `Writer::push(frame, keyframe)`) set on the units with a major sync, and `AudioTrack::bit_depth` if the caller knows it | `matroska::demux` selects an `A_TRUEHD` track as it does `A_AC3` and `A_EAC3`. |
+| MPEG-TS | `mpegts::mux` and `mpegts::Writer` with `AudioCodec::kTruehd` and `BroadcastProfile::kBluray`: stream_type 0x83 and a program-level `HDMV` registration descriptor | `mpegts::demux` takes 0x83 with or without the registration (`ReadStream::signalling` says which) and reads 188- and 192-byte packets. There is no M2TS writer. The payloads concatenated are the elementary stream. |
+| MAT | `iec61937::MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream` (`iclforge/containers/iec61937/mat.hpp`) | 24 access units to a 61,440-byte IEC 61937 burst of data type 22, written as 16-bit little-endian words. The last frame is padded; FFmpeg drops it. |
+
+The checks are `tools/checks/verify_truehd_containers.py` (FFmpeg, over the committed fixtures: 120 legs, 8 skipped
+because FFmpeg's `spdif` demuxer reads no stream from its own MAT) and the cases tagged `[truehd]` in
+`iclforge-containers-tests`, which hold the MAT bytes to FFmpeg's by SHA-256.
+
 ## Muxer errors
 
 Every muxing entry point above returns `std::expected`, against a per-module `MuxError` enum
@@ -668,9 +713,9 @@ its own `describe()` overload beside `MuxError`'s:
 
 | Enum | Values |
 |---|---|
-| `iclforge::containers::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`). |
-| `iclforge::containers::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`). |
-| `iclforge::containers::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`). |
+| `iclforge::containers::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`); `kProtectedTrack` (the audio track has a protected sample entry, see above). |
+| `iclforge::containers::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`); `kEncryptedTrack` (the audio track declares `ContentEncryption`; see its demuxing section). |
+| `iclforge::containers::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`); `kScrambled` (a packet of the audio PID has `transport_scrambling_control` set). |
 
 ## Bitstream sinks (`iclforge::audio`)
 
@@ -779,6 +824,12 @@ refuses AC-4 there with `kUnsupportedFormat`. Every backend refuses `kAc4Hbr16` 
 since none opens the eight-channel high-bit-rate link it needs.
 `RenderDeviceInfo::supports_ac4_passthrough` says whether an endpoint takes the base link; no
 platform reports whether the receiver decodes AC-4, and no receiver found so far does.
+
+**TrueHD.** None. `BitstreamFormat` names AC-3, E-AC-3 and AC-4 only, so there is no way to ask a backend for a MAT link, and the
+ALSA capability parser files a TrueHD coding type under "other". The library packs MAT bursts
+([TrueHD in the containers](#truehd-in-the-containers)) and `forge spdif` writes them to a file; nothing sends one to a device,
+and no receiver has been tried with one. This is a gap against E-AC-3 and AC-4 on this page, tracked in the roadmap row
+[TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
 When the device goes away mid-stream (the cable pulled, the receiver switched off, the endpoint
 disabled), the sink stops itself. `running()` turns false, `position()` reports nothing,

@@ -570,13 +570,30 @@ std::vector<std::byte> filters_v1() {
         ac4_toc_test::presentation_v1(w, pres);
     };
     p(0, 0, 1, 1, false);        // 0: disabled
-    p(0, 1, 4, 1, std::nullopt);  // 1: md_compat 4, reserved for version 1
+    p(0, 1, 5, 1, std::nullopt);  // 1: md_compat 5, reserved
     p(0, 2, 1, 3, std::nullopt);  // 2: presentation_version 3
     p(0, 3, 7, 1, std::nullopt);  // 3: unrestricted
     p(1, 4, 0, 1, true);          // 4: stereo, enabled
     ac4_toc_test::chan_group(w, {{.ch_mode = 4, .substream_index = 5}});
     ac4_toc_test::chan_group(w, {{.ch_mode = 1, .substream_index = 6}});
     return frame_of(w, 7);
+}
+
+// Two stereo presentations, the first of md_compat 4 (Dolby's level 4) and the second of level 3.
+std::vector<std::byte> level_4_v1() {
+    BitWriter w;
+    ac4_toc_test::toc_start(w, {.bitstream_version = 2, .sequence_counter = 1, .fs_index = 1,
+                                .frame_rate_index = 13, .b_iframe_global = true, .n_presentations = 2});
+    for (int i = 0; i < 2; ++i) {
+        ac4_toc_test::PresV1 pres;
+        pres.groups = {i};
+        pres.presentation_substream = i;
+        pres.md_compat = i == 0 ? 4 : 3;
+        ac4_toc_test::presentation_v1(w, pres);
+    }
+    ac4_toc_test::chan_group(w, {{.ch_mode = 1, .substream_index = 2}});
+    ac4_toc_test::chan_group(w, {{.ch_mode = 1, .substream_index = 3}});
+    return frame_of(w, 4);
 }
 
 // A presentation this decoder cannot decode, 5.1 at 96 kHz (its HSF extension);
@@ -712,6 +729,10 @@ std::vector<SelectionCase> selection_cases() {
     const std::vector<std::byte> filters = filters_v1();
     add("v1 disabled reserved and unknown versions are not selected", filters, {}, 3, 4);
     add("v1 level 7 takes md_compat 7", filters, {}, 7, 3);
+    const std::vector<std::byte> level_4 = level_4_v1();
+    add("v1 level 3 leaves out md_compat 4", level_4, {}, 3, 1);
+    add("v1 level 4 takes md_compat 4", level_4, {}, 4, 0);
+    add("v1 level 7 takes md_compat 4", level_4, {}, 7, 0);
     {
         iclforge::ac4::PresentationChoice c;
         c.index = 0;

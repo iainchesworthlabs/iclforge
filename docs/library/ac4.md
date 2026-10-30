@@ -519,6 +519,15 @@ probe:
   sample of a CMAF track may carry both. `libs/ac4/ERRATA.md` ("Manifests and CMAF tracks") has
   the readings these take.
 
+## Content signature and protected files
+
+An AC-4 stream can carry a content signature after its last sync frame, made and checked with the operator's own key and
+certificate chain (`iclforge/ac4/io/content_signature.hpp`, over the codec-neutral core in `iclforge::base::crypto`;
+`forge ac4-sign` and `ac4-verify`). It is opt-in at every call, and the frames are not touched. The API, the modes and the
+open questions are under [AC-4 content signing](signing.md#ac-4-content-signing). An MP4 whose AC-4 track is protected (Common
+Encryption) is refused by name, with its scheme, original format and default key ID, and nothing decrypts it
+([Muxing and sinks](muxing-and-sinks.md)).
+
 ## Errors
 
 Nothing throws for a stream or a configuration. `iclforge::ac4::Error` (`kTruncated`, `kLostSync`,

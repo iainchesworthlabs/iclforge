@@ -12,10 +12,11 @@
   {% if not page.url %}
     <section class="ac3f-hero">
       <div class="ac3f-hero-inner">
-        <p class="ac3f-kicker">AC&#8209;3 &middot; E&#8209;AC&#8209;3 &middot; AC&#8209;4 &middot; Dolby Atmos</p>
+        <p class="ac3f-kicker">AC&#8209;3 &middot; E&#8209;AC&#8209;3 &middot; AC&#8209;4 &middot; TrueHD &middot; Dolby Atmos</p>
         <h1>ICL Forge</h1>
         <p class="ac3f-lede">A clean-room AC-3, E-AC-3, AC-4 and Dolby Atmos codec, written from the
-          published standards in C++23 — <strong>Library</strong> — with <strong>Forge</strong>,
+          published standards in C++23, and a TrueHD and MLP codec written from a specification
+          the project's owner supplied — <strong>Library</strong> — with <strong>Forge</strong>,
           the CLI and GUI; <strong>Crucible</strong>, a desktop per-application Atmos mixer; and
           <strong>Hearth</strong>, the player, its network sinks and karaoke.</p>
         <div class="ac3f-cta-row">
@@ -32,11 +33,12 @@
     <section class="ac3f-hero-section">
       <div class="ac3f-family-grid">
         <a class="ac3f-fam-card" href="{{ 'library/'|url }}">
-          <span class="ac3f-fam-tag">iclforge::ac3 &middot; iclforge::ac4</span>
+          <span class="ac3f-fam-tag">iclforge::ac3 &middot; iclforge::ac4 &middot; iclforge::truehd</span>
           <h3>Library</h3>
           <p>Encodes and decodes AC-3 and E-AC-3, including Atmos objects via Joint Object
-            Coding, and decodes and encodes AC-4. C++23, with C, Python, Rust and WebAssembly
-            bindings for AC-3, E-AC-3 and AC-4.</p>
+            Coding, decodes and encodes AC-4, and decodes and encodes TrueHD (MLP is decode only).
+            C++23, with C, Python, Rust and WebAssembly bindings for AC-3, E-AC-3 and AC-4; TrueHD
+            is in the C interface only so far.</p>
           <span class="ac3f-fam-go">Read the library docs &rarr;</span>
         </a>
         <a class="ac3f-fam-card" href="{{ 'forge/'|url }}">
@@ -45,7 +47,8 @@
           <p><code>forge</code> and <code>forge-gui</code> are one product: they build together,
             ship together, and the GUI shows the equivalent CLI command live at the bottom of
             its window. Both read and write AC-4, and both build karaoke streams: the GUI in a
-            Karaoke flow with project files, the CLI with lyrics written beside the stream.</p>
+            Karaoke flow with project files, the CLI with lyrics written beside the stream. The
+            CLI also decodes, inspects and wraps TrueHD and MLP and encodes TrueHD; the GUI does not.</p>
           <span class="ac3f-fam-go">Read the Forge docs &rarr;</span>
         </a>
         <a class="ac3f-fam-card" href="{{ 'crucible/'|url }}">
@@ -55,7 +58,8 @@
             position, and whatever is not placed stays in the 5.1 bed. The output follows the
             hardware, E-AC-3 with the objects to an Atmos receiver and AC-3 5.1 to a Dolby
             Digital one. It can show the lyrics of the application you select. Windows and
-            Linux run it; the macOS half compiles but has never been launched.</p>
+            Linux run it; the macOS half compiles but has never been launched. It handles AC-3 and
+            E-AC-3 only.</p>
           <span class="ac3f-fam-go">Read the Crucible docs &rarr;</span>
         </a>
         <a class="ac3f-fam-card" href="{{ 'hearth/'|url }}">
@@ -64,7 +68,8 @@
           <p>Plays through this computer's outputs or synchronised network sinks. The desktop
             player finds sinks on the network, plays to them, plays AC-4, and has a Karaoke page
             with timed lyrics and a microphone pitch score; sink firmware is built for the
-            ESP32-S3, ESP32-C6 and ESP32-P4, and Hearth for Android is a sink for Android TV.</p>
+            ESP32-S3, ESP32-C6 and ESP32-P4, and Hearth for Android is a sink for Android TV. None of
+            them plays TrueHD.</p>
           <span class="ac3f-fam-go">Read the Hearth docs &rarr;</span>
         </a>
       </div>

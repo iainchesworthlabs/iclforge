@@ -23,6 +23,7 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/encoder/config.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "content_signature.hpp"
 #include "encode.hpp"
 
 // ac4-encode with objects=<scene>, experimental: the WAV file's channels as
@@ -295,7 +296,7 @@ int run_ac4_encode_objects(std::string_view in_path, std::string_view out_path,
                    frames->size(), out_path, config.sample_rate_hz, wav->channels.size(), bitrate);
     status_println(status, "          the decoder's output lags the input by {} samples",
                    encoder->delay_samples() + encoder->decoder_delay_samples());
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace forge_cli::commands

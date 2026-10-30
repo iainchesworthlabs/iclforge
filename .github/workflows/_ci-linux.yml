@@ -653,6 +653,10 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1
           ICLFORGE_CROSS_TIER_CHECK: ${{ matrix.preset == 'linux-llvm-asan-ubsan' && '1' || '0' }}
+          # The AC-4 content signing section makes its throwaway keys with the openssl program
+          # (ca-certificates, in the bootstrap above, depends on it): a runner without it fails
+          # the section instead of skipping it.
+          ICLFORGE_REQUIRE_OPENSSL: '1'
           MATRIX_PRESET: ${{ matrix.preset }}
         run: bash tools/ci/run_codec_matrix.sh "build/config-${MATRIX_PRESET}/bin/forge"
 

@@ -45,6 +45,7 @@
 #include "ac4_channels.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "stream_playback.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -783,6 +784,13 @@ std::optional<std::size_t> decode_ac4_as_coded(
         fmt::println(stderr, "error: {}: no frame decoded; the stream sent no I-frame", in_path);
         return std::nullopt;
     }
+    if (decoded_frames < scan.frames.size()) {
+        fmt::println(stderr,
+                     "warning: {}: {} frames waiting for an I-frame produced no output, of {} in "
+                     "the stream; the measurement is of the other {}",
+                     in_path, scan.frames.size() - decoded_frames, scan.frames.size(),
+                     decoded_frames);
+    }
     return decoded_frames;
 }
 
@@ -974,64 +982,7 @@ bool report_qc_programme(const QcProgrammeResult& p, const std::optional<std::st
                      implied == p.dialnorm ? " (matches)" : fmt::format(", not {}", p.dialnorm));
     }
 
-    if (!preset_arg) {
-        return true;
-    }
-    bool all_pass = true;
-    fmt::println("{}gates:", heading);
-    const auto check_one = [&](iclforge::ac3::meta::QcPresetId id) {
-        const auto preset = iclforge::ac3::meta::qc_preset(id);
-        const auto name = iclforge::ac3::meta::qc_preset_name(id);
-        const auto verdict = iclforge::ac3::meta::evaluate_qc_gate(preset, p.integrated_lkfs, p.true_peak_dbtp);
-        fmt::println("  {}:  [{}]", name, preset.source);
-        // A band preset prints its tolerance; a ceiling preset has none to
-        // print, and showing "+/-0.0" would read as an impossibly tight band
-        // rather than as the one-sided limit the source actually states.
-        const std::string loudness_limit =
-            preset.loudness_limit == iclforge::ac3::meta::QcLoudnessLimit::kCeiling
-                ? fmt::format("limit  <= {:+.1f} LKFS", preset.target_lkfs)
-                : fmt::format("target {:+.1f} +/-{:.1f} LKFS", preset.target_lkfs,
-                              preset.tolerance_lu);
-        if (p.integrated_lkfs.has_value()) {
-            fmt::println("    loudness   {}   measured {:+.2f} LKFS   delta {:+.2f} LU   {}",
-                         loudness_limit, *p.integrated_lkfs, *verdict.loudness_delta_lu,
-                         verdict.loudness_pass ? "PASS" : "FAIL");
-        } else {
-            fmt::println("    loudness   {}   measured n/a   FAIL", loudness_limit);
-        }
-        if (p.true_peak_dbtp.has_value()) {
-            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured {:+.2f} dBTP        "
-                         "{}",
-                         preset.max_true_peak_dbtp, *p.true_peak_dbtp,
-                         verdict.true_peak_pass ? "PASS" : "FAIL");
-        } else {
-            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured n/a   FAIL",
-                         preset.max_true_peak_dbtp);
-        }
-        fmt::println("    verdict: {}", verdict.pass() ? "PASS" : "FAIL");
-        if (!verdict.pass()) {
-            all_pass = false;
-        }
-    };
-    if (*preset_arg == "all") {
-        for (const auto id : iclforge::ac3::meta::kQcPresetIds) {
-            check_one(id);
-        }
-    } else {
-        iclforge::ac3::meta::QcPresetId id{};
-        if (iclforge::ac3::meta::parse_qc_preset(*preset_arg, id)) {
-            check_one(id);
-        } else {
-            // parse_options already validates preset= against
-            // kQcPresetNames/"all" before dispatch ever reaches here (see
-            // its own "preset" handling) - kept as a defensive fallback
-            // rather than an assert, since main.cpp has no
-            // exception-based unreachable() convention of its own.
-            fmt::println(stderr, "error: unknown qc preset '{}'", *preset_arg);
-            all_pass = false;
-        }
-    }
-    return all_pass;
+    return report_qc_gates(heading, p.integrated_lkfs, p.true_peak_dbtp, preset_arg);
 }
 
 // E-AC-3's own level report. The rendered layout is a chanmap rather than an
@@ -1180,6 +1131,71 @@ bool wrap_eac3_units(std::span<const std::span<const std::byte>> units, std::uin
 
 }  // namespace
 
+bool report_qc_gates(const std::string& heading, std::optional<double> integrated_lkfs,
+                     std::optional<double> true_peak_dbtp,
+                     const std::optional<std::string>& preset_arg) {
+    if (!preset_arg) {
+        return true;
+    }
+    bool all_pass = true;
+    fmt::println("{}gates:", heading);
+    const auto check_one = [&](iclforge::ac3::meta::QcPresetId id) {
+        const auto preset = iclforge::ac3::meta::qc_preset(id);
+        const auto name = iclforge::ac3::meta::qc_preset_name(id);
+        const auto verdict =
+            iclforge::ac3::meta::evaluate_qc_gate(preset, integrated_lkfs, true_peak_dbtp);
+        fmt::println("  {}:  [{}]", name, preset.source);
+        // A band preset prints its tolerance; a ceiling preset has none to
+        // print, and showing "+/-0.0" would read as an impossibly tight band
+        // rather than as the one-sided limit the source actually states.
+        const std::string loudness_limit =
+            preset.loudness_limit == iclforge::ac3::meta::QcLoudnessLimit::kCeiling
+                ? fmt::format("limit  <= {:+.1f} LKFS", preset.target_lkfs)
+                : fmt::format("target {:+.1f} +/-{:.1f} LKFS", preset.target_lkfs,
+                              preset.tolerance_lu);
+        if (integrated_lkfs.has_value()) {
+            fmt::println("    loudness   {}   measured {:+.2f} LKFS   delta {:+.2f} LU   {}",
+                         loudness_limit, *integrated_lkfs, *verdict.loudness_delta_lu,
+                         verdict.loudness_pass ? "PASS" : "FAIL");
+        } else {
+            fmt::println("    loudness   {}   measured n/a   FAIL", loudness_limit);
+        }
+        if (true_peak_dbtp.has_value()) {
+            fmt::println(
+                "    true peak  limit  <= {:+.1f} dBTP        measured {:+.2f} dBTP        "
+                "{}",
+                preset.max_true_peak_dbtp, *true_peak_dbtp,
+                verdict.true_peak_pass ? "PASS" : "FAIL");
+        } else {
+            fmt::println("    true peak  limit  <= {:+.1f} dBTP        measured n/a   FAIL",
+                         preset.max_true_peak_dbtp);
+        }
+        fmt::println("    verdict: {}", verdict.pass() ? "PASS" : "FAIL");
+        if (!verdict.pass()) {
+            all_pass = false;
+        }
+    };
+    if (*preset_arg == "all") {
+        for (const auto id : iclforge::ac3::meta::kQcPresetIds) {
+            check_one(id);
+        }
+    } else {
+        iclforge::ac3::meta::QcPresetId id{};
+        if (iclforge::ac3::meta::parse_qc_preset(*preset_arg, id)) {
+            check_one(id);
+        } else {
+            // parse_options already validates preset= against
+            // kQcPresetNames/"all" before dispatch ever reaches here (see
+            // its own "preset" handling) - kept as a defensive fallback
+            // rather than an assert, since main.cpp has no
+            // exception-based unreachable() convention of its own.
+            fmt::println(stderr, "error: unknown qc preset '{}'", *preset_arg);
+            all_pass = false;
+        }
+    }
+    return all_pass;
+}
+
 std::optional<StreamLoudness> measure_stream_loudness(std::span<const std::byte> stream) {
     const auto bsid = iclforge::ac3::stream_bsid(stream);
     if (!bsid.has_value()) {
@@ -1252,10 +1268,14 @@ int run_qc(std::string_view in_path, const Options& meta) {
     const bool rendered_layout = meta.qc_rendered_layout;
     const std::optional<int> want_programme = meta.programme;
     const std::optional<iclforge::ac3::plan::LayoutId> objects_layout = meta.qc_objects_layout;
-    const auto stream = read_elementary_stream(in_path);
+    const auto stream = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (stream.empty()) {
         return kExitInput;
     }
+    if (is_truehd_stream(stream)) {
+        return run_qc_truehd(stream, in_path, meta);
+    }
+    warn_truehd_options_unused(meta, in_path);
     std::optional<QcResult> result;
     std::optional<QcProgrammeResult> object_result;
     if (is_ac4_stream(stream)) {
@@ -1372,6 +1392,15 @@ int run_levels(std::string_view in_path, const Options& meta) {
     if (bytes.empty()) {
         return kExitInput;
     }
+    if (is_truehd_stream(bytes)) {
+        if (const int refused =
+                check_options_applied(meta, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
+        return run_levels_truehd(bytes, in_path, meta);
+    }
+    warn_truehd_options_unused(meta, in_path);
     // AC-4: the presentation decode's options choose, as the stream codes it,
     // each channel under its own name in the order the level meter reports A/52
     // in (L C R Ls Rs, the LFE, then a 7.X element's last pair).
@@ -1515,6 +1544,15 @@ int run_loudness(std::string_view in_path, const Options& meta) {
     if (bytes.empty()) {
         return kExitInput;
     }
+    if (is_truehd_stream(bytes)) {
+        if (const int refused =
+                check_options_applied(meta, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
+        return run_loudness_truehd(bytes, in_path, meta);
+    }
+    warn_truehd_options_unused(meta, in_path);
     if (is_ac4_stream(bytes)) {
         iclforge::ac4::Decoder decoder(ac4_coded_config(meta));
         std::optional<Ac4Meter> meter;
@@ -1695,6 +1733,12 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
     if (stream.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
         return kExitInput;
+    }
+    if (is_truehd_stream(stream)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
+        return run_spdif_truehd(stream, in_path, out_path);
     }
     // associated= names a second programme to mix into the main, and this
     // decodes nothing: said once, as 'play' says it, since wrapping the main
@@ -1898,6 +1942,19 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         in.seekg(0, std::ios::beg);
     }
 
+    // TrueHD's MAT bursts (IEC 61937 data type 22) are 61 kB each and the unit table is read from
+    // the whole carrier, so that carrier is read in one go (truehd_containers.cpp).
+    if (!stdio) {
+        std::array<std::byte, 4096> head{};
+        in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+        const auto got = static_cast<std::size_t>(in.gcount());
+        in.clear();
+        in.seekg(0, std::ios::beg);
+        if (is_mat_carrier(std::span<const std::byte>{head}.first(got))) {
+            const auto carrier = read_all(in_path);
+            return run_unspdif_mat(carrier, in_path, out_path, keep_partial);
+        }
+    }
     // A WAV carrier (what 'spdif' writes, and what a capture tool saves) or a
     // bare dump of carrier bytes. Both are ordinary inputs here, so neither
     // is an error: if the RIFF walk does not find a data chunk, the whole

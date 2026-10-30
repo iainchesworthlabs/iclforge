@@ -22,6 +22,8 @@
 #include "iclforge/render/render.hpp"
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 #include "decoder_settings.hpp"
 
 // Access units in, rendered blocks out (planning/hearth-reference-player.md,
@@ -88,7 +90,31 @@
 // stays true. The unit report says what the frame was: its presentation, its
 // speakers as an acmod, its dialnorm and DRC mode and the decoder's latency.
 
+// TrueHD and MLP (planning/truehd-parity-hearth-player.md, row 6): a unit is one access unit, which
+// the session says is one with a UnitCodec because its first bytes are a length and a check nibble
+// and say nothing else. iclforge::truehd::Decoder gives it as 24-bit integers; they become floats
+// by 2^-23, which is exact, and go to the layout renderer as one block of the unit's own length -
+// 40, 80 or 160 samples, not 256 - with the bed the stream's channel names make (truehd_bed()), so
+// that on an output layout that has the stream's channels every sample comes out as the decoder
+// gave it. No A/52 fold is made: a layout without a coded channel's speaker gets it panned by the
+// renderer, as it does for a bed of any codec. The stream's own dialogue normalisation and dynamic
+// range words are read and not applied (libs/truehd/ERRATA.md, entry 10). A unit the decoder gives
+// nothing for, because the stream was joined part-way or a unit before it was lost, and a unit
+// that fails, play as silence of the unit's length, so that the item's time passes as it should;
+// the decoder then waits for its next restart header, and what it counted is truehd_counters().
+
 namespace iclforge::hearth {
+
+// What a unit is when its bytes cannot say so themselves. An AC-3, E-AC-3 or AC-4 unit starts with
+// a sync word; a TrueHD or MLP access unit starts with a check nibble and its length, which can
+// read as any of them.
+enum class UnitCodec : std::uint8_t { kDetect, kTruehd };
+
+// The coded layout a TrueHD stream's channels make, for the renderer: each speaker at the location
+// of the same name. Nothing for a stream whose major sync does not name its channels
+// (DecodedAccessUnit::layout is empty), which the renderer then takes in order, one to a speaker.
+[[nodiscard]] std::optional<ac3::eac3::chanmap::Layout> truehd_bed(
+    std::span<const iclforge::truehd::Channel> channels);
 
 // The coded layout an AC-4 decoder's channels make, for the renderer: each
 // speaker at the E-AC-3 channel map's location of the same place. Ls and Rs
@@ -129,6 +155,48 @@ struct Ac4UnitReport {
     // The frame's samples at the output rate, and the decoder's delay.
     std::size_t samples = 0;
     int latency_samples = 0;
+};
+
+// What a TrueHD or MLP decoder has counted (iclforge::truehd::DecoderCounters, the parts a
+// listener is told).
+struct TruehdCounters {
+    std::uint64_t units = 0;
+    std::uint64_t units_decoded = 0;
+    // Units that gave no samples because no restart header had come yet: the stream was joined
+    // part-way, or a unit before them was lost.
+    std::uint64_t units_waiting = 0;
+    std::uint64_t restarts = 0;
+    std::uint64_t lossless_checks_ok = 0;
+    std::uint64_t lossless_check_failures = 0;
+    // The access unit, CRC and parity checks that failed, together.
+    std::uint64_t check_failures = 0;
+
+    TruehdCounters& operator+=(const TruehdCounters& other);
+    friend bool operator==(const TruehdCounters&, const TruehdCounters&) = default;
+};
+
+// What was counted since `earlier`, each figure held at 0 where `earlier` is the larger: counters
+// of a decoder that has been replaced start again, and the difference of two readings across that
+// is not negative.
+[[nodiscard]] TruehdCounters since(const TruehdCounters& now, const TruehdCounters& earlier);
+
+// What a TrueHD or MLP access unit said about itself, as decoded.
+struct TruehdUnitReport {
+    bool mlp = false;
+    // The substream the PCM is from (0, 1 or 2 for the 2, 6 or 8 channel bed) and its channels.
+    int substream = 0;
+    int channels = 0;
+    // A restart header was read in it.
+    bool restarted = false;
+    // The unit's bytes after its last segment, carried and not read.
+    std::size_t extra_data_bytes = 0;
+    // The major sync's dialogue normalisation and mix level words for that substream, as sent
+    // (TH spec section 14.1) and not applied; unset for MLP, whose channel meaning is not read.
+    std::optional<int> dialogue_norm = std::nullopt;
+    std::optional<int> mix_level = std::nullopt;
+    bool variable_rate = false;
+    // What the decoder has counted, since it was made.
+    TruehdCounters counters{};
 };
 
 // What one access unit said about itself, as decoded.
@@ -182,6 +250,10 @@ struct UnitReport {
     // hold what maps (acmod, lfe, layout, concealment, bitrate), `blocks` is
     // 0 and compr, dynrng and dialnorm are A/52's and unset or default.
     std::optional<Ac4UnitReport> ac4 = std::nullopt;
+    // Set for a TrueHD or MLP unit, where the fields above hold what maps (acmod, lfe, layout,
+    // bitrate) and `blocks` is 0, compr and dynrng are A/52's and unset or default, and the
+    // dialogue normalisation of the major sync is in here.
+    std::optional<TruehdUnitReport> truehd = std::nullopt;
 };
 
 // Which of an access unit's substreams are decoded.
@@ -219,10 +291,20 @@ public:
     // attempts each frame afresh, and keeps what the stream has configured.
     // `unit_samples`, what the unit codes, is delivered as silence for an AC-4
     // frame that waits for an I-frame; 0 delivers nothing for it.
-    [[nodiscard]] std::expected<std::size_t, std::string> decode(std::span<const std::byte> unit,
-                                                                 const BlockFn& deliver,
-                                                                 const UnitFn& reported = {},
-                                                                 std::uint32_t unit_samples = 0);
+    // `codec` says what the unit is where its bytes cannot (UnitCodec). For a TrueHD or MLP unit
+    // `unit_samples` is delivered as silence when the unit gives no samples or does not decode,
+    // so that the item's time still passes.
+    [[nodiscard]] std::expected<std::size_t, std::string> decode(
+        std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported = {},
+        std::uint32_t unit_samples = 0, UnitCodec codec = UnitCodec::kDetect);
+
+    // Input was dropped between the last unit decoded and the next one (a reader skipped bytes to
+    // find the next TrueHD access unit): the decoder cannot see that, so it is told, and waits for
+    // its next restart header. Nothing for the other codecs, which tell a lost unit by themselves.
+    void note_lost_data();
+
+    // What the TrueHD or MLP decoders this one has used have counted in all, resets included.
+    [[nodiscard]] TruehdCounters truehd_counters() const;
 
     // One rendered block of a further layout: a span per slot of that layout,
     // `frames` long, valid for the duration of the call.
@@ -295,7 +377,7 @@ private:
     // with no variants (set_variants()).
     [[nodiscard]] std::expected<std::size_t, std::string> decode_unit(
         std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
-        std::uint32_t unit_samples);
+        std::uint32_t unit_samples, UnitCodec codec);
     std::size_t finish_unit(const BlockFn& deliver, const UnitFn& reported);
     // `deliver` for this decoder's blocks while it has variants: each block of
     // theirs that goes with `frames` first, then the block.
@@ -306,6 +388,13 @@ private:
     void place(const ac3::PcmBlock& block, const BlockFn& deliver);
     std::size_t render_flushed(std::span<ac3::DecodedSubstream> substreams, const BlockFn& deliver,
                                const UnitFn& reported);
+    // The TrueHD and MLP path (the header comment says what differs).
+    [[nodiscard]] std::expected<std::size_t, std::string> decode_truehd(
+        std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
+        std::uint32_t unit_samples);
+    void place_truehd(const iclforge::truehd::DecodedAccessUnit& pcm, const BlockFn& deliver);
+    void report_truehd(const iclforge::truehd::DecodedAccessUnit& pcm, std::size_t unit_bytes,
+                       const UnitFn& reported);
     // The AC-4 path (the header comment says what differs).
     [[nodiscard]] std::expected<std::size_t, std::string> decode_ac4(
         std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
@@ -396,6 +485,14 @@ private:
     std::vector<std::span<const float>> ac4_channel_spans_;
     // A block of silence, for deliver_silence().
     std::array<float, ac3::kSamplesPerBlock> zeros_{};
+    // TrueHD and MLP: the decoder's configuration, the decoder once a unit has needed it, what
+    // decoders reset away had counted, and the unit's channels as floats, planar, with a view of
+    // each (all reused from unit to unit).
+    iclforge::truehd::DecoderConfig truehd_config_{};
+    std::optional<iclforge::truehd::Decoder> truehd_decoder_;
+    TruehdCounters truehd_before_{};
+    std::vector<float> truehd_planar_;
+    std::vector<std::span<const float>> truehd_channel_spans_;
 };
 
 }  // namespace iclforge::hearth

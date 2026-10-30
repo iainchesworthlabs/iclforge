@@ -224,6 +224,12 @@ void register_containers(py::module_& m) {
             const auto bytes = to_bytes(file);
             const auto demuxed = iclforge::containers::mp4::demux(bytes);
             if (!demuxed) {
+                if (demuxed.error() == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                    // Which track, and with what scheme and KID, as `forge demux` says it.
+                    if (const auto refused = iclforge::containers::mp4::list_refused_tracks(bytes)) {
+                        throw py::value_error(iclforge::containers::mp4::describe_refusal(*refused));
+                    }
+                }
                 throw py::value_error(
                     std::string{iclforge::containers::mp4::describe(demuxed.error())});
             }

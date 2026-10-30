@@ -83,6 +83,24 @@ struct CodecBox {
     std::size_t bytes = 0;
 };
 
+// What a protected MP4 track's sample entry says about its protection (Common Encryption, ISO/IEC
+// 23001-7: the 'sinf' and its 'tenc'), as text and numbers for whoever shows the file. Nothing
+// here is a key; the default KID names one and is public.
+struct ProtectionFacts {
+    std::string entry_type{};       // "enca" or "encv"
+    std::string scheme{};           // "cenc", "cbc1", "cens", "cbcs"; empty when not stated
+    std::string original_format{};  // "ec-3", "ac-3", "ac-4", "avc1"; empty when not stated
+    std::string default_kid{};      // 8-4-4-4-12 hex; empty when the entry has no 'tenc'
+    // The three above as a person reads them: "cenc, original format ec-3, default KID ...".
+    std::string description{};
+    int default_iv_size = 0;   // 8 or 16, or 0 for a constant IV
+    int crypt_byte_block = 0;  // 'tenc' version 1's pattern
+    int skip_byte_block = 0;
+    // The track also holds a clear sample entry, so a reader cannot tell its clear samples from
+    // its protected ones and reads none.
+    bool has_clear_entry = false;
+};
+
 // A track the file declares and the reader did not read: a picture, a subtitle track, a second
 // audio track. What its container says of it and nothing of its content, so that a person can be
 // told what else a file carries (a karaoke video's picture, a text track that holds its words).
@@ -94,6 +112,8 @@ struct OtherTrack {
     // MP4's first sample entry ("avc1", "tx3g", "wvtt") or Matroska's CodecID ("S_TEXT/UTF8").
     std::string codec_id{};
     std::string language{};
+    // Set when the track is protected: it is not read, whatever its codec.
+    std::optional<ProtectionFacts> protection = std::nullopt;
 };
 
 // What a container declared about the track it gave up, for whoever shows the
@@ -126,8 +146,8 @@ struct ContainerFacts {
     std::vector<OtherTrack> other_tracks{};
     // MPEG-TS: the programme, its PMT's PID, the stream_type, how the PMT
     // named the codec ("atsc_stream_type", "dvb_descriptor",
-    // "registration_descriptor" or "dvb_extension_descriptor") and the
-    // packet size.
+    // "registration_descriptor", "dvb_extension_descriptor",
+    // "hdmv_stream_type" or "bare_truehd_stream_type") and the packet size.
     std::uint16_t program_number = 0;
     std::uint16_t pmt_pid = 0;
     std::uint8_t stream_type = 0;
@@ -164,11 +184,63 @@ struct StreamTrim {
     std::optional<std::uint64_t> length = std::nullopt;
 };
 
+// An audio codec a container's track can be in, as far as choosing a track goes.
+enum class TrackCodec : std::uint8_t { kAc3, kEac3, kAc4, kTruehd };
+
+// The codecs a caller can use, which decides the track taken from a file that holds several
+// (a Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it): the first audio track whose
+// codec is in the set. A codec left out is passed over as if its tracks were not in the file.
+// Matroska has no CodecID for AC-4 in use here, so `ac4` has no effect on a Matroska file.
+//
+// What a caller that does not say gets is what every caller got before TrueHD tracks were read
+// at all: AC-3, E-AC-3 and AC-4. A caller that handles TrueHD (forge's decode, probe and the
+// commands that carry it) says so with `.truehd = true`; one that cannot play it (Hearth) leaves
+// it out.
+struct CodecSet {
+    bool ac3 = true;
+    bool eac3 = true;
+    bool ac4 = true;
+    bool truehd = false;
+
+    [[nodiscard]] constexpr bool contains(TrackCodec codec) const {
+        switch (codec) {
+            case TrackCodec::kAc3: return ac3;
+            case TrackCodec::kEac3: return eac3;
+            case TrackCodec::kAc4: return ac4;
+            case TrackCodec::kTruehd: return truehd;
+        }
+        return false;
+    }
+};
+
+// The name of a codec as a person reads it: "AC-3", "E-AC-3", "AC-4" or "TrueHD".
+[[nodiscard]] std::string_view codec_name(TrackCodec codec);
+
+// Whether `head` opens a bare TrueHD or MLP elementary stream: an access unit's four header bytes
+// (check nibble, length, timing) and then a major sync 0xF8726FBA or 0xF8726FBB (TH spec section
+// 4.2). A stream cut at an access-unit boundary opens that way, and so does every file `forge`
+// writes. Such a stream is not a container, and sniff_container calls it ContainerKind::kUnknown
+// (it recognises the major sync before the packet grid, as it does AC-3's sync word: a steady
+// signal repeats bytes at a fixed period, and the grid test only counts recurrence); a caller
+// that cannot play it uses this to say so. Defined here, not in container_input.cpp, because
+// Hearth's engine calls it (session.cpp, media_info.cpp) and the engine compiles none of this
+// file's container readers: the application supplies those (apps/hearth/engine/CMakeLists.txt).
+[[nodiscard]] inline bool looks_like_truehd(std::span<const std::byte> head) {
+    if (head.size() < 8) {
+        return false;
+    }
+    return std::to_integer<std::uint8_t>(head[4]) == 0xF8 &&
+           std::to_integer<std::uint8_t>(head[5]) == 0x72 &&
+           std::to_integer<std::uint8_t>(head[6]) == 0x6F &&
+           (std::to_integer<std::uint8_t>(head[7]) == 0xBA ||
+            std::to_integer<std::uint8_t>(head[7]) == 0xBB);
+}
+
 // `file`'s elementary stream: `file` itself, unchanged, if it does not sniff
-// as one of the three containers this build reads, or the first AC-3/E-AC-3
-// track demuxed out of one - the same three readers `forge demux` already
-// streams through, run here in their batch/zero-copy form since every caller
-// already holds the whole file in memory.
+// as one of the three containers this build reads, or the first track of a
+// codec in the caller's CodecSet demuxed out of one - the same three readers
+// `forge demux` already streams through, run here in their batch/zero-copy
+// form since every caller already holds the whole file in memory.
 struct ElementaryStreamResult {
     std::vector<std::byte> bytes;
     // Empty on success (including the "not a container at all" case, where
@@ -178,6 +250,11 @@ struct ElementaryStreamResult {
     // "malformed MP4" and "no AC-3 track" want different messages than "file
     // not found" does.
     std::string error;
+    // Set with `error` when the container is sound and its audio is in a codec outside the
+    // caller's CodecSet: the codec of the track the reader would have taken had the set allowed
+    // it, so that a caller can say what the file holds ("TrueHD") in its own words. `container`
+    // then describes that track, and `bytes` is empty.
+    std::optional<TrackCodec> declined_codec = std::nullopt;
     // From an MP4 track's edit list, when it has the shape an audio encoder
     // writes: any empty edits (a delay before the track, which is not audio),
     // then one edit at normal speed. Decoding does not apply it; a player
@@ -190,9 +267,13 @@ struct ElementaryStreamResult {
     std::string trim_note{};
     // What the container said about the track, when `file` is one.
     ContainerFacts container{};
+    // The codec of the track taken, when `file` is a container and the reader's words for the
+    // track's codec name one of the four; unset for a bare stream, whose bytes say for themselves.
+    std::optional<TrackCodec> codec = std::nullopt;
 };
 
-[[nodiscard]] ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file);
+[[nodiscard]] ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> file,
+                                                                  const CodecSet& codecs = {});
 
 // The trim an MP4 track's edit list describes, as elementary_stream_from_bytes
 // reads it: whole, with `note` empty, for a track with no edit list or only

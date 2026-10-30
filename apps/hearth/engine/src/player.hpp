@@ -132,6 +132,11 @@ struct PlayedItem {
     // How many times the output had been opened when this item started: the
     // same figure for two items means the second joined the first.
     std::uint32_t output_opens = 0;
+    // A TrueHD or MLP item: what its decoder counted while the item was decoded, in the unit the
+    // decoder counts - restarts read, units that waited for one, lossless checks that failed. Unset
+    // for any other codec. A decoder replaced during the item (its settings changed) starts its
+    // count again, and only what the replacement counted is here.
+    std::optional<TruehdCounters> truehd = std::nullopt;
 };
 
 // Where the item being heard has got to.
@@ -756,6 +761,11 @@ private:
     bool tail_waiting_ = false;
 
     std::optional<SeekOnStart> seek_on_start_;
+
+    // What the decoder had counted of TrueHD when the item being decoded began, and the item's own
+    // from there (PlayedItem::truehd).
+    TruehdCounters truehd_baseline_{};
+    void note_truehd_counters();
 
     std::uint64_t submitted_since_open_ = 0;
     std::uint32_t opens_ = 0;

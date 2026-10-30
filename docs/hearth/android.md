@@ -8,7 +8,7 @@ with a lyrics file, it shows the words in time on the TV.
 !!! note "Status as of 2026-10-13: built from source; no release carries it"
     The app pairs, passes AC-3 and E-AC-3 to a receiver and draws the lyric screen. It does not
     decode anything itself yet, so a stream that reaches it as PCM, FLAC or Opus is accepted and
-    not heard, and it does not list AC-4. CI builds a debug APK and runs its tests on an emulator;
+    not heard, and it does not list AC-4 or TrueHD. CI builds a debug APK and runs its tests on an emulator;
     no release publishes one, and it is not in an app store. The plan and what is left are in
     [`planning/hearth-android.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md).
 

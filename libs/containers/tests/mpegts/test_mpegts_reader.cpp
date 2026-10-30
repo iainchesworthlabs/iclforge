@@ -11,6 +11,7 @@
 
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "iclforge/containers/mpegts/reader.hpp"
+#include "multi_track_files.hpp"
 
 // The same two halves the Matroska and MP4 reader tests have.
 //
@@ -550,7 +551,8 @@ TEST_CASE("MPEG-TS describe() names every demux error", "[mpegts][reader]") {
                              iclforge::containers::mpegts::DemuxError::kNoProgramme,
                              iclforge::containers::mpegts::DemuxError::kNoAudioStream,
                              iclforge::containers::mpegts::DemuxError::kMalformed,
-                             iclforge::containers::mpegts::DemuxError::kLimitExceeded}) {
+                             iclforge::containers::mpegts::DemuxError::kLimitExceeded,
+                             iclforge::containers::mpegts::DemuxError::kScrambled}) {
         CHECK_FALSE(iclforge::containers::mpegts::describe(error).empty());
         CHECK(iclforge::containers::mpegts::describe(error) != "unknown error");
     }
@@ -1380,4 +1382,147 @@ TEST_CASE("MPEG-TS round-trips an AC-4 track", "[mpegts][reader][ac4]") {
           iclforge::containers::mpegts::CodecSignalling::kDvbExtensionDescriptor);
     // The payload passes through untouched - the reader never frames it.
     CHECK(concat(out->payloads) == concat(frames));
+}
+
+namespace {
+
+// Sets transport_scrambling_control (the top two bits of header byte 3) on every packet of `pid`
+// from packet number `first` on.
+Bytes scrambled(Bytes ts, std::uint16_t pid, std::uint8_t control, std::size_t first = 0) {
+    for (std::size_t at = 0; at + 188 <= ts.size(); at += 188) {
+        const auto packet_pid = static_cast<std::uint16_t>(
+            ((std::to_integer<std::uint16_t>(ts[at + 1]) & 0x1FU) << 8U) |
+            std::to_integer<std::uint16_t>(ts[at + 2]));
+        if (packet_pid == pid && at / 188 >= first) {
+            const auto byte3 = std::to_integer<std::uint8_t>(ts[at + 3]);
+            ts[at + 3] = static_cast<std::byte>((byte3 & 0x3FU) | (static_cast<unsigned>(control) << 6U));
+        }
+    }
+    return ts;
+}
+
+}  // namespace
+
+TEST_CASE("MPEG-TS refuses an audio PID whose packets are scrambled",
+          "[mpegts][reader][scrambled]") {
+    using iclforge::containers::mpegts::DemuxError;
+    // The packet bits are the only thing that says the payload is ciphertext; the PES parse
+    // would take it for audio, and the demuxed stream would be noise with exit code 0 (G5).
+    const std::array<EsSpec, 1> streams{
+        EsSpec{.stream_type = 0x87, .pid = 0x0100, .descriptors = {}}};
+    const std::vector<Bytes> frames{frame_of(300, 0x61), frame_of(300, 0x62), frame_of(300, 0x63)};
+    const auto clear = build_stream(streams, frames);
+
+    SECTION("the clear stream reads, as before") {
+        const auto out = iclforge::containers::mpegts::demux(clear);
+        REQUIRE(out.has_value());
+        CHECK(concat(out->payloads) == concat(frames));
+    }
+
+    SECTION("any non-zero control on the audio PID is a refusal") {
+        for (const int control : {1, 2, 3}) {
+            CAPTURE(control);
+            const auto file = scrambled(clear, 0x0100, static_cast<std::uint8_t>(control));
+            const auto out = iclforge::containers::mpegts::demux(file);
+            REQUIRE_FALSE(out.has_value());
+            CHECK(out.error() == DemuxError::kScrambled);
+        }
+    }
+
+    SECTION("the streaming Reader stops at the first scrambled packet") {
+        // Packets 0 and 1 are the PAT and PMT; the audio starts at 2, so the first PES is
+        // clear and delivered when the second starts, and the scrambling begins in the second.
+        const auto file = scrambled(clear, 0x0100, 2, /*first=*/5);
+        iclforge::containers::mpegts::Reader reader{};
+        const auto sink = [](std::span<const std::byte>) {};
+        std::optional<DemuxError> error;
+        for (std::size_t offset = 0; offset < file.size() && !error; offset += 188) {
+            const auto pushed =
+                reader.push(std::span<const std::byte>{file}.subspan(offset, 188), sink);
+            if (!pushed.has_value()) {
+                error = pushed.error();
+            }
+        }
+        REQUIRE(error.has_value());
+        CHECK(*error == DemuxError::kScrambled);
+    }
+
+    SECTION("scrambling on another PID is not this stream's") {
+        // A second elementary stream the PMT does not name, scrambled: not the audio, not read.
+        std::uint8_t other_cc = 0;
+        Bytes file = clear;
+        const auto extra = ts_packet(0x0200, false, other_cc, frame_of(184, 0x5A));
+        file.insert(file.end(), extra.begin(), extra.end());
+        file = scrambled(file, 0x0200, 2);
+        const auto out = iclforge::containers::mpegts::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(concat(out->payloads) == concat(frames));
+    }
+}
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// stream of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("MPEG-TS auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[mpegts][reader][truehd]") {
+    using iclforge::containers::mpegts::AutoSelect;
+    using iclforge::containers::mpegts::ReadOptions;
+    namespace mt = iclforge::test::multi_track;
+    const Bytes truehd_a = frame_of(80, 0x31);
+    const Bytes truehd_b = frame_of(96, 0x33);
+    const Bytes eac3_a = frame_of(120, 0x32);
+    const Bytes eac3_b = frame_of(130, 0x34);
+    const std::array<mt::Track, 3> tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 8, .units = {truehd_a, truehd_b}},
+        mt::Track{.codec = mt::Codec::kEac3, .channels = 6, .units = {eac3_a, eac3_b}},
+        mt::Track{.codec = mt::Codec::kAc3, .channels = 6, .units = {eac3_b}}};
+    const Bytes file = mt::mpegts_file(tracks);
+
+    SECTION("by default the first stream is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::mpegts::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->stream.elementary_pid == 0x100);
+        CHECK(out->stream.truehd);
+        CHECK(concat(out->payloads) == concat(std::vector<Bytes>{truehd_a, truehd_b}));
+    }
+
+    SECTION("without TrueHD the next stream is taken") {
+        const ReadOptions options{.auto_select = AutoSelect{.truehd = false}};
+        const auto out = iclforge::containers::mpegts::demux(file, options);
+        REQUIRE(out.has_value());
+        CHECK(out->stream.elementary_pid == 0x101);
+        CHECK_FALSE(out->stream.truehd);
+        CHECK(out->stream.eac3);
+        CHECK(concat(out->payloads) == concat(std::vector<Bytes>{eac3_a, eac3_b}));
+
+        // The streaming reader makes the same choice.
+        iclforge::containers::mpegts::Reader reader{options};
+        Bytes got;
+        const auto sink = [&got](std::span<const std::byte> payload) {
+            got.insert(got.end(), payload.begin(), payload.end());
+        };
+        for (std::size_t offset = 0; offset < file.size(); offset += 97) {
+            REQUIRE(reader
+                        .push(std::span<const std::byte>{file}.subspan(
+                                  offset, std::min<std::size_t>(97, file.size() - offset)),
+                              sink)
+                        .has_value());
+        }
+        REQUIRE(reader.finish(sink).has_value());
+        CHECK(got == concat(std::vector<Bytes>{eac3_a, eac3_b}));
+    }
+
+    SECTION("each codec can be left out in turn") {
+        const auto without_eac3 = iclforge::containers::mpegts::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE(without_eac3.has_value());
+        CHECK(without_eac3->stream.elementary_pid == 0x102);
+        CHECK_FALSE(without_eac3->stream.eac3);
+        const auto nothing = iclforge::containers::mpegts::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.ac3 = false,
+                                                        .eac3 = false,
+                                                        .ac4 = false,
+                                                        .truehd = false}});
+        REQUIRE_FALSE(nothing.has_value());
+        CHECK(nothing.error() == iclforge::containers::mpegts::DemuxError::kNoAudioStream);
+    }
 }

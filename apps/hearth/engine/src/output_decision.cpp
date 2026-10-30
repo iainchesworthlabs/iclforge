@@ -43,6 +43,20 @@ using audio::BitstreamFormat;
            request.transcode_available;
 }
 
+// TrueHD and MLP, which this player decodes and never sends as they are or to a network sink
+// (planning/truehd-parity-hearth-player.md, H5 and H6): the name to say, and empty for any other.
+[[nodiscard]] std::string_view lossless_name(ItemCodec codec) {
+    switch (codec) {
+        case ItemCodec::kTruehd: return "TrueHD";
+        case ItemCodec::kMlp: return "MLP";
+        case ItemCodec::kUnknown:
+        case ItemCodec::kAc3:
+        case ItemCodec::kEac3:
+        case ItemCodec::kAc4: break;
+    }
+    return {};
+}
+
 // What a capability answer is worth saying about, and nothing when it needs
 // no explanation. A probe or a descriptor answered the question; the other
 // two did not, and which of them it was is gap 6's whole point.
@@ -102,6 +116,11 @@ using audio::BitstreamFormat;
     reason += ".";
     if (!because.empty()) {
         reason += fmt::format(" {}", because);
+    }
+    if (const std::string_view lossless = lossless_name(request.codec); !lossless.empty()) {
+        // Said whichever output it is, since none can be sent it as it is: the receiver that takes
+        // MAT, if there is one, is not offered it.
+        reason += fmt::format(" Passthrough of {} is not available, so it is decoded here.", lossless);
     }
     if (request.has_objects) {
         reason +=
@@ -203,6 +222,17 @@ OutputChoice choose_output(const OutputRequest& request) {
     const bool wants_group = request.pinned == OutputMode::kNetworkGroup ||
                               (!request.group_name.empty() && !request.pinned.has_value());
     if (wants_group) {
+        if (request.group_ready && !lossless_name(request.codec).empty()) {
+            return OutputChoice{
+                .mode = OutputMode::kNetworkGroup,
+                .endpoint_id = {},
+                .endpoint_name = {},
+                .group_name = request.group_name,
+                .reason = fmt::format(
+                    "Playing to the group \"{}\". Sending {} to a network sink as it is is not "
+                    "available, so it is decoded here and each sink is sent PCM.",
+                    request.group_name, lossless_name(request.codec))};
+        }
         if (request.group_ready) {
             return OutputChoice{
                 .mode = OutputMode::kNetworkGroup,
@@ -249,6 +279,19 @@ OutputChoice choose_output(const OutputRequest& request) {
         preferred != nullptr ? std::span<const EndpointFacts>{preferred, 1} : request.endpoints;
 
     if (request.pinned == OutputMode::kBitstream || request.pinned == OutputMode::kBitstreamAsAc3) {
+        if (!request.stream && !lossless_name(request.codec).empty()) {
+            // Not that it carries nothing a bitstream output could take: passthrough of it is
+            // not available. A decode takes its place unless follow=off asked for a refusal.
+            const auto* fallback = preferred != nullptr ? preferred : best_for_pcm(request.endpoints);
+            if (!request.follow_sink || fallback == nullptr) {
+                return nothing(fmt::format(
+                    "Passthrough of {} is not available.{}", lossless_name(request.codec),
+                    request.follow_sink ? std::string{}
+                                        : std::string{" follow=off, so this is a refusal rather "
+                                                      "than a decode."}));
+            }
+            return local_pcm(*fallback, request, {});
+        }
         if (!request.stream) {
             return nothing(
                 "This item carries nothing IEC 61937 can wrap - a bitstream output has no format "
@@ -314,6 +357,12 @@ OutputChoice choose_output(const OutputRequest& request) {
         if (carries_as_ac3(endpoint, request.stream, request)) {
             return transcoded(endpoint, request);
         }
+    }
+    if (!request.follow_sink && !lossless_name(request.codec).empty()) {
+        return nothing(fmt::format(
+            "Passthrough of {} is not available, and follow=off refuses a decode in its place.{}",
+            lossless_name(request.codec),
+            preferred != nullptr ? unknown_note(*preferred) : std::string{}));
     }
     if (!request.follow_sink && request.stream) {
         return nothing(fmt::format(

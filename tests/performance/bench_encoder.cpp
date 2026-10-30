@@ -52,99 +52,20 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
+#include "bench_encoder.hpp"
 
 namespace {
 
+using perf::bench::fail;
+using perf::bench::FrameTimer;
+using perf::bench::kSampleRate;
+using perf::bench::kWarmupFrames;
+using perf::bench::real_time_budget_ms;
+using perf::bench::Result;
+
 constexpr int kFrames = 200;
-constexpr double kSampleRate = 48000.0;
 // The object count the Atmos encode and decode workloads share.
 constexpr int kObjects = 4;
-
-double real_time_budget_ms(int frames) {
-    return 1000.0 * static_cast<double>(frames) * iclforge::ac3::kSamplesPerFrame / kSampleRate;
-}
-
-struct Result {
-    std::string name;
-    int frames = 0;
-    double total_ms = 0.0;
-    double ms_per_frame = 0.0;
-    // The tail, not just the average. A real-time codec is bounded by its
-    // WORST frame, not its mean one: a block-switched frame on a transient
-    // costs more than a steady-state frame, and a change that doubles the
-    // tail while leaving the mean flat is invisible to a mean-only series -
-    // which is exactly the shape of regression the whole performance suite
-    // exists to catch. Both are per-frame milliseconds, same unit as
-    // ms_per_frame, so a reader can compare them directly against the
-    // real-time budget printed beside them.
-    double p95_ms_per_frame = 0.0;
-    double max_ms_per_frame = 0.0;
-    // The frame's duration, which is the real-time budget: A/52's 1 536
-    // samples for AC-3 and E-AC-3, AC-4's own frame length for AC-4. Written
-    // per result because the two codecs' frames differ.
-    double budget_ms_per_frame = real_time_budget_ms(1);
-};
-
-// Times each frame individually rather than the loop as a whole, so the
-// distribution above can be computed. The extra cost is one steady_clock
-// read per frame against a frame that takes milliseconds - under 0.01% at
-// the fastest workload here, measured, and it buys the tail.
-class FrameTimer {
-public:
-    explicit FrameTimer(int expected_frames) {
-        per_frame_ms_.reserve(static_cast<std::size_t>(expected_frames));
-    }
-
-    template <typename Fn>
-    void time_frame(Fn&& fn) {
-        const auto start = std::chrono::steady_clock::now();
-        fn();
-        per_frame_ms_.push_back(
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
-                .count());
-    }
-
-    [[nodiscard]] Result result(std::string name) const {
-        const auto frames = static_cast<int>(per_frame_ms_.size());
-        double total = 0.0;
-        for (const double ms : per_frame_ms_) {
-            total += ms;
-        }
-        // Nearest-rank percentile on a sorted copy: with 200 frames p95 is
-        // the 190th slowest. Sorting a copy keeps the caller's insertion
-        // order intact, which nothing needs today but costs nothing to keep.
-        std::vector<double> sorted = per_frame_ms_;
-        std::ranges::sort(sorted);
-        const auto rank =
-            static_cast<std::size_t>(std::ceil(0.95 * static_cast<double>(frames)));
-        const auto p95_index = sorted.empty() ? 0 : std::min(sorted.size() - 1,
-                                                             rank == 0 ? 0 : rank - 1);
-        return {.name = std::move(name),
-                .frames = frames,
-                .total_ms = total,
-                .ms_per_frame = frames > 0 ? total / frames : 0.0,
-                .p95_ms_per_frame = sorted.empty() ? 0.0 : sorted[p95_index],
-                .max_ms_per_frame = sorted.empty() ? 0.0 : sorted.back()};
-    }
-
-private:
-    std::vector<double> per_frame_ms_;
-};
-
-// Frames run before the clock starts, on a THROWAWAY encoder of the same
-// configuration. The point is to warm the caches, the branch predictors and
-// the allocator's free lists - not the encoder, which is why the timed run
-// below still constructs its own fresh instance and still starts at frame 0.
-// Without this the first workload in program order pays every cold-start cost
-// in the process and the rest do not, which is a bias between series rather
-// than noise within one: it does not average out over repetitions, and it
-// silently moves if the workload order ever changes.
-constexpr int kWarmupFrames = 8;
-
-[[noreturn]] void fail(const char* workload, const char* what) {
-    std::fprintf(stderr, "%s: %s failed\n", workload, what);
-    std::exit(1);
-}
 
 // --- encoder construction --------------------------------------------------
 // Shared by the timed runs below and by the untimed setup pass that builds
@@ -468,9 +389,15 @@ int main(int argc, char** argv) {
     // other work, a short run that can be repeated many times is worth far
     // more than one long one.
     std::vector<std::string> only;
+    // --truehd-fixtures: also time the TrueHD and MLP streams committed under testdata/truehd, one
+    // decode row each and one encode row for each TrueHD stream's own material. CI never passes it:
+    // those rows are a table of configurations to read, not series to keep.
+    bool truehd_fixtures = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--json-out" && i + 1 < argc) {
+        if (arg == "--truehd-fixtures") {
+            truehd_fixtures = true;
+        } else if (arg == "--json-out" && i + 1 < argc) {
             json_out = argv[++i];
         } else if (arg == "--wav" && i + 1 < argc) {
             wav_path = argv[++i];
@@ -566,6 +493,8 @@ int main(int argc, char** argv) {
             "ac4_51_decode", perf::ac4_bench::encode_frames(
                                  ac4_five_one, perf::ac4_bench::five_one_config(), kFrames)));
     }
+
+    perf::bench::add_truehd_results(results, audio, only, truehd_fixtures);
     if (results.empty()) {
         std::fprintf(stderr, "iclforge-bench: --only matched no workload\n");
         return 1;
@@ -576,6 +505,22 @@ int main(int argc, char** argv) {
                     "(p95 %6.3f  max %6.3f)  (budget %.3f ms/frame)\n",
                     r.name.c_str(), r.frames, r.total_ms, r.ms_per_frame, r.p95_ms_per_frame,
                     r.max_ms_per_frame, r.budget_ms_per_frame);
+    }
+
+    // The TrueHD rows again, in the units the codec is quoted in: microseconds an access unit, and
+    // milliseconds of processing a second of audio (one over the real-time multiple).
+    bool heading = false;
+    for (const auto& r : results) {
+        if (!r.name.contains("truehd") && !r.name.starts_with("mlp_")) {
+            continue;
+        }
+        if (!heading) {
+            fmt::printf("\nTrueHD, per access unit and per second of audio\n");
+            heading = true;
+        }
+        fmt::printf("%-28s %9.2f us/unit  %9.2f ms/s of audio  %8.1fx real time\n", r.name.c_str(),
+                    1000.0 * r.ms_per_frame, 1000.0 * r.ms_per_frame / r.budget_ms_per_frame,
+                    r.budget_ms_per_frame / r.ms_per_frame);
     }
 
     if (!json_out.empty()) {

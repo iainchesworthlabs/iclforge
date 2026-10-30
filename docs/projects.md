@@ -25,9 +25,9 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `ac4` | `libs/ac4/` | The AC-4 decoder and encoder, with the sync frames, table of contents and presentations both work through. | `base`, `dsp`, `objects`, `render` | `app-media`, `baremetal`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `sink`, `tests` | core |
 | `adm` | `libs/adm/` | ADM and BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder and decoder. | `iab`, `objects` | `examples`, `forge` | core |
 | `audio` (internal) | `libs/audio/` | Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and the OSC object-position source: the OS-specific audio code of the project. Internal; never installed. | `base`, `render`, `containers`, `objects` | `crucible`, `demo-android`, `forge`, `hearth`, `hearth-android` | core |
-| `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `crypto-bench`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render` | core |
-| `capi` | `libs/capi/` | The C API over the AC-3 and AC-4 libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4`, `lyrics` | `examples`, `rust` | core |
-| `containers` | `libs/containers/` | The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing. | `base` | `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python`, `sink` | core |
+| `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the content-signature core (ECDSA P-256, X.509 chains, Thrift) that no codec owns, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `crypto-bench`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render`, `tests`, `truehd` | core |
+| `capi` | `libs/capi/` | The C API over the AC-3, AC-4 and TrueHD libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4`, `lyrics`, `truehd` | `examples`, `rust` | core |
+| `containers` | `libs/containers/` | The codec-blind carriage: IEC 61937 burst packing and detection (TrueHD's MAT included), the Matroska, MP4 and MPEG-TS writers and readers (TrueHD included), and IAMF reading and writing. | `base` | `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python`, `sink` | core |
 | `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `dsp` | `libs/dsp/` | The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier. | `base` | `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `hearth-sink`, `objects`, `tests` | core |
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
@@ -37,6 +37,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`, `sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-android`, `hearth-sink`, `sink` | core |
 | `sink` (internal) | `libs/sink/` | A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies: the pass-through output hands the coded bursts on, and the decoding output (AC-3, E-AC-3, AC-4) decodes and renders them and hands the samples to a PcmSink. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed. | `ac3`, `ac4`, `containers`, `lyrics`, `objects`, `render`, `sendspin` | `hearth`, `hearth-android` | core |
+| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values), the lossless decoder and the TrueHD encoder. | `base` | `capi`, `forge`, `hearth`, `tests` | core |
 
 ## Vendored code
 
@@ -62,8 +63,8 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `app-cdg-picture`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `lyrics`, `objects`, `pitch` | nothing | wasm |
-| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-text-encoding`, `app-theme` | nothing | windows, linux, macos |
-| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `sink`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4, and, in the command-line tool only, for decoding, analysis, wrapping and encoding of TrueHD. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `truehd`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-text-encoding`, `app-theme` | nothing | windows, linux, macos |
+| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `sink`, `truehd`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `hearth-android` | `apps/hearth/android/` | Hearth for Android: a Sendspin sink for Android TV, advertised on the network, paired with from Hearth and playing what it sends. A foreground service owns one iclforge::sink; the screens are platform Views over JNI (planning/hearth-android.md). | `audio`, `lyrics`, `sendspin`, `sink` | nothing | android |
 
 ## Bindings
@@ -99,7 +100,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `tests` | `tests/` | What every test binary is built with (iclforge::test_support) and the performance tests. | `ac3`, `ac4`, `dsp` | nothing | core |
+| `tests` | `tests/` | What every test binary is built with (iclforge::test_support) and the performance tests. | `ac3`, `ac4`, `base`, `dsp`, `truehd` | nothing | core |
 
 ## The libraries
 
@@ -122,6 +123,7 @@ flowchart LR
     sendspin(["sendspin"])
     sink(["sink"])
     time_filter["time-filter"]
+    truehd["truehd"]
     ac3 --> base
     ac3 --> dsp
     ac3 --> objects
@@ -139,6 +141,7 @@ flowchart LR
     capi --> ac3
     capi --> ac4
     capi --> lyrics
+    capi --> truehd
     containers --> base
     dsp --> base
     iab --> base
@@ -154,6 +157,7 @@ flowchart LR
     sink --> objects
     sink --> render
     sink --> sendspin
+    truehd --> base
 ```
 
 An arrow is *uses*; a rounded box is an internal library.

@@ -320,8 +320,17 @@ iclforge_add_library(base
         src/wav_format.cpp
         src/wav_stream_reader.cpp
         src/wav_stream_writer.cpp
+        src/crypto/sha1.cpp
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
+        src/crypto/ecdsa_p256.cpp
+        src/crypto/der.cpp
+        src/crypto/x509.cpp
+        src/crypto/pem.cpp
+        src/crypto/chain.cpp
+        src/crypto/credentials.cpp
+        src/crypto/thrift_binary.cpp
+        src/crypto/content_signature.cpp
         src/crypto/signing_key.cpp
         ${ICLFORGE_SHA256_HW_SOURCES}
     PRIVATE_INCLUDES
@@ -346,6 +355,7 @@ add_dependencies(iclforge_base_objects iclforge_version)
 # /wd4996 on the whole target.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(src/cpu_features.cpp src/crypto/signing_key.cpp
+        src/crypto/credentials.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 

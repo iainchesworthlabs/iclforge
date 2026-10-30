@@ -88,6 +88,7 @@ components=(
     "ICLFORGE_BUILD_IAB iabTargets iclforge-iab iclforge_iab iclforge/iab"
     "ICLFORGE_BUILD_IAMF containersTargets iclforge-containers - iclforge/containers/iamf"
     "ICLFORGE_BUILD_AC4 ac4Targets iclforge-ac4 iclforge_ac4 iclforge/ac4"
+    "ICLFORGE_BUILD_TRUEHD truehdTargets iclforge-truehd iclforge_truehd iclforge/truehd"
 )
 
 # Each optional library the tree $1 was configured with is in the prefix $2 with its export file

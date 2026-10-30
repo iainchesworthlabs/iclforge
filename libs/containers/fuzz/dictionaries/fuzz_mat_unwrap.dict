@@ -1,0 +1,26 @@
+# The fixed byte patterns of a MAT burst (IEC 61937, data type 22), for libFuzzer's -dict=. From
+# libs/containers/include/iclforge/containers/iec61937/mat.hpp and src/iec61937/mat.cpp (ERRATA.md
+# entries M1 to M6).
+
+# Pa and Pb (0xF872, 0x4E1F) in natural order and as 16-bit little-endian words, Pc (0x0016) and Pd
+# (0xEFF0) in both.
+preamble_natural="\xF8\x72\x4E\x1F\x00\x16\xEF\xF0"
+preamble_le_words="\x72\xF8\x1F\x4E\x16\x00\xF0\xEF"
+pa_pb_natural="\xF8\x72\x4E\x1F"
+pa_pb_le_words="\x72\xF8\x1F\x4E"
+pc_natural="\x00\x16"
+pc_le_words="\x16\x00"
+pd_natural="\xEF\xF0"
+pd_le_words="\xF0\xEF"
+
+# The 20-byte start code, the 12-byte middle code and the 16-byte end code, in the payload's own
+# byte order and with each pair of bytes swapped.
+start_code="\x07\x9E\x00\x03\x84\x01\x01\x01\x80\x00\x56\xA5\x3B\xF4\x81\x83\x49\x80\x77\xE0"
+start_code_swapped="\x9E\x07\x03\x00\x01\x84\x01\x01\x00\x80\xA5\x56\xF4\x3B\x83\x81\x80\x49\xE0\x77"
+middle_code="\xC3\xC1\x42\x49\x3B\xFA\x82\x83\x49\x80\x77\xE0"
+middle_code_swapped="\xC1\xC3\x49\x42\xFA\x3B\x83\x82\x80\x49\xE0\x77"
+end_code="\xC3\xC2\xC0\xC4\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x97\x11"
+end_code_swapped="\xC2\xC3\xC4\xC0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x97"
+
+# The TrueHD major sync an access unit in a slot opens with (the unit's 4-byte header comes first).
+major_sync_truehd="\xF8\x72\x6F\xBA"

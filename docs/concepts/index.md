@@ -55,21 +55,35 @@ TS 103 190, so an AC-3 or E-AC-3 decoder cannot read it. A stream can carry seve
 listening system set the output level, and it codes objects in two ways. The [AC-4](ac4.md) page
 covers what it is and how much of it ICL Forge implements.
 
+## A lossless codec: TrueHD and MLP
+
+**TrueHD** (Dolby's lossless format for Blu-ray) and **MLP** (the older form on DVD-Audio) are a
+third, unrelated family. They compress without loss: a decoder returns exactly the samples that went
+in, at a much higher bit rate than E-AC-3 or AC-4. They have no openly published standard. ICL Forge
+reads and writes TrueHD and reads MLP from a specification its owner supplied. The
+[TrueHD and MLP](truehd.md) page covers what they are and how much of them ICL Forge implements.
+
 !!! note "Trademarks and standards"
-    "Dolby", "Dolby Digital" and "Dolby Atmos" are trademarks of Dolby Laboratories. ICL Forge
-    implements the openly published standards behind them — ATSC A/52:2018 (of which E-AC-3
-    is normative Annex E), ETSI TS 102 366, ETSI TS 103 420, and ETSI TS 103 190 (AC-4) — using
-    the technical names AC-3, E-AC-3 and AC-4 throughout its code and docs. It is not
+    "Dolby", "Dolby Digital", "Dolby TrueHD" and "Dolby Atmos" are trademarks of Dolby Laboratories.
+    ICL Forge implements the openly published standards behind AC-3, E-AC-3, Atmos and AC-4 — ATSC
+    A/52:2018 (of which E-AC-3 is normative Annex E), ETSI TS 102 366, ETSI TS 103 420, and ETSI TS
+    103 190 (AC-4) — and TrueHD from a specification supplied by the project's owner, using the
+    technical names AC-3, E-AC-3, AC-4 and TrueHD throughout its code and docs. It is not
     affiliated with, endorsed by, or certified by Dolby Laboratories.
 
 ## Why this project exists
 
-ICL Forge is a clean-room implementation: it is built entirely from the published standards
-above, not by studying or reusing any existing codec's code. It links no other codec library —
+ICL Forge's AC-3, E-AC-3 and AC-4 codecs are a clean-room implementation: built entirely from the
+published standards above, not by studying or reusing any existing codec's code. TrueHD has no
+published standard, so that codec is written from the owner's specification instead, and the
+specification's disagreements with real streams are recorded rather than hidden
+([TrueHD and MLP](truehd.md#no-published-standard)). It links no other codec library —
 not even to decode. During development, FFmpeg is used only as an independent, external pair
 of eyes: AC-3 and E-AC-3 encoder output gets checked against FFmpeg's own decoder as a sanity
 check, but the project never depends on FFmpeg to build or run. FFmpeg has no AC-4 decoder, so
-AC-4 is checked by other means ([Validation: AC-4](../verification.md#ac-4)). The point is to
+AC-4 is checked by other means ([Validation: AC-4](../verification.md#ac-4)); FFmpeg's TrueHD
+encoder and decoder are the independent check for TrueHD
+([Validation: TrueHD](../verification.md#truehd-and-mlp)). The point is to
 understand these formats from first principles, by implementing the standards directly, rather
 than to wrap or extend existing tooling.
 
@@ -84,6 +98,8 @@ than to wrap or extend existing tooling.
   it on.
 - [AC-4](ac4.md) — a separate codec: frames and presentations, its coding tools, and what the
   library decodes and encodes.
+- [TrueHD and MLP](truehd.md) — a lossless codec: access units, restarts and substreams, how a
+  stream is carried, and what the library decodes and encodes.
 
 Once the formats make sense, [Capabilities](../library/capabilities.md) lists the implemented
 parts. [Forge](../forge/index.md), [Crucible](../crucible/index.md), and

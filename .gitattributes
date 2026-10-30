@@ -65,3 +65,8 @@ examples/karaoke/**/*.forgeproj text eol=lf
 # The update index fixtures (tools/hearth/testdata/update_index) are signed bytes: a signature covers
 # a file's exact bytes, so a Windows checkout's autocrlf must not touch them.
 tools/hearth/testdata/update_index/** -text
+
+# DEE's TrueHD fixtures (testdata/truehd-dee): streams and WAVs, and the logs and manifest whose
+# SHA-256s the manifest holds. A Windows checkout's autocrlf must change none of them.
+*.mlp -text
+testdata/truehd-dee/** -text

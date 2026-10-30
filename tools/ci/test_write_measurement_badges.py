@@ -333,10 +333,21 @@ class SpeedBadgeTest(unittest.TestCase):
                 perf("plain_51_fast_mdct", 4.0, leg="linux-gcc-arm64")]
         self.assertEqual(badges.slowest_per_codec(rows)["AC-3"]["config"], "plain_51")
 
+    def test_truehd_is_listed_once_the_series_holds_a_truehd_workload(self):
+        """The unit of a TrueHD row is an access unit, 0.8333 ms, and the row says so itself."""
+        row = perf("plain_51", 4.0)
+        without = badges.speed_badge([row])["message"]
+        self.assertNotIn("TrueHD", without)
+        truehd = perf("truehd_51_decode", 0.01)
+        truehd["real_time_budget_ms_per_frame"] = 0.8333
+        message = badges.speed_badge([row, truehd])["message"]
+        self.assertTrue(message.startswith(without), message)
+        self.assertTrue(message.endswith(" | TrueHD 5.1 decode: 83x"), message)
+
     def test_a_workload_the_table_does_not_list_is_refused(self):
         with self.assertRaises(badges.UnknownWorkload) as raised:
-            badges.speed_badge([perf("plain_51", 4.0), perf("truehd_51_encode", 4.0)])
-        self.assertIn("truehd_51_encode", str(raised.exception))
+            badges.speed_badge([perf("plain_51", 4.0), perf("dts_hd_51_encode", 4.0)])
+        self.assertIn("dts_hd_51_encode", str(raised.exception))
         self.assertIn("WORKLOADS", str(raised.exception))
 
 
@@ -404,18 +415,19 @@ class MemoryBadgeTest(unittest.TestCase):
 
 # The naming convention WORKLOADS documents: what a config's first word says about its codec.
 PREFIX_CODEC = {"ac3": "AC-3", "plain": "AC-3", "eac3": "E-AC-3", "ecpl": "E-AC-3",
-                "atmos": "E-AC-3", "ac4": "AC-4"}
+                "atmos": "E-AC-3", "ac4": "AC-4", "truehd": "TrueHD"}
 
 
 class WorkloadTableTest(unittest.TestCase):
     """The table that says which codec a `config` belongs to, and how to say it."""
 
     def test_names_follow_the_prefix_convention(self):
-        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4."""
+        """ac3_* and plain_* are AC-3, eac3_*, ecpl_* and atmos_* E-AC-3, ac4_* AC-4,
+        truehd_* TrueHD."""
         for config, (codec, _words) in badges.WORKLOADS.items():
             with self.subTest(config=config):
                 self.assertEqual(codec, PREFIX_CODEC[config.split("_")[0]])
-        self.assertEqual(set(PREFIX_CODEC.values()), set(badges.CODECS))
+        self.assertEqual(set(PREFIX_CODEC.values()), set(badges.CODECS) | {"TrueHD"})
 
     def test_every_description_says_which_direction_it_runs(self):
         """Encode and decode differ by an order of magnitude in time and allocation."""
@@ -651,6 +663,31 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("(ac4_51_encode) on linux-gcc: 3.830 ms/frame", whats["AC-4"])
         self.assertIn("a different CPU model from run to run",
                       self.render("--page")["Speed"]["note"])
+
+    def test_truehd_gets_a_line_where_it_has_a_series_and_not_on_the_accuracy_card(self):
+        """The cards and the tiles draw what the badges say: TrueHD joins the speed, allocation
+        and growth lines once the history holds a TrueHD row, and never the accuracy line, since
+        it is lossless and has no accuracy series."""
+        self.fixture()
+        without = self.render("--page")
+        for title in ("Speed", "Allocation per frame", "Live growth", "Decode accuracy"):
+            self.assertNotIn("TrueHD", self.figures(without[title]))
+        self.write("performance-main", [
+            perf("plain_51", 4.0), perf("truehd_51_decode", 0.01, 40 / 48.0)])
+        self.write("memory-main", [
+            mem("ac3_51_encode", 20110.6, growth=2048),
+            mem("truehd_51_encode", 3072.0, growth=512, allocs=2.0)])
+        made = self.badge_messages()
+        for flags in ((), ("--page",)):
+            cards = self.render(*flags)
+            with self.subTest(surface="page" if flags else "strip"):
+                self.assertEqual(self.figures(cards["Speed"])["TrueHD"], "83x")
+                self.assertEqual(self.figures(cards["Allocation per frame"])["TrueHD"], "3 KB")
+                self.assertEqual(self.figures(cards["Live growth"])["TrueHD"], "0.5 KiB")
+                self.assertNotIn("TrueHD", self.figures(cards["Decode accuracy"]))
+        for badge in ("speed", "memory", "growth"):
+            self.assertIn(" | TrueHD ", made[badge]["message"])
+        self.assertNotIn("TrueHD", made["accuracy"]["message"])
 
     def test_an_ac4_leg_name_is_read_as_the_layout_it_spells(self):
         """"ac4-514-music-768" is 5.1.4 music at 768 kbps, not "514 music"."""
@@ -913,13 +950,13 @@ class HistoryAndMainTest(unittest.TestCase):
         left in the checkout for the commit step to pick up.
         """
         rows = [{"commit": "x", "config": "plain_51", "ms_per_frame": 4.0},
-                {"commit": "x", "config": "truehd_51_encode", "ms_per_frame": 9.0}]
+                {"commit": "x", "config": "dts_hd_51_encode", "ms_per_frame": 9.0}]
         (self.dir / "performance-dev.jsonl").write_text(
             "".join(json.dumps(r) + "\n" for r in rows))
         code, out = self.run_main()
         self.assertEqual(code, 1)
         self.assertIn("::error", out)
-        self.assertIn("truehd_51_encode", out)
+        self.assertIn("dts_hd_51_encode", out)
         self.assertEqual(sorted((self.dir / "badges").iterdir()), [])
 
 

@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -10,7 +11,9 @@
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "iclforge/sendspin/json.hpp"
 #include "container_input.hpp"
+#include "item_source.hpp"
 #include "media_info.hpp"
+#include "truehd_test_support.hpp"
 
 // media_info_json()'s rarer members, from a MediaInfo filled in by hand rather than read from a
 // stream: the AC-3 time codes, Annex D's xbsi1 and xbsi2, every mixdef with its premix triple,
@@ -246,4 +249,78 @@ TEST_CASE("media info json: an MPEG-TS item's service descriptor, and the AC-4 c
     CHECK(root["container"]["mp4"].is_null());
     CHECK(root["probe"].is_null());  // no AC-4 sync frame was summarised
     CHECK(iclforge::hearth::codec_token(MediaCodec::kEac3) == "eac3");
+}
+
+// TrueHD and MLP (planning/truehd-parity-hearth-player.md, H3): read off real streams, since the
+// figures are the index's and a hand-filled MediaInfo would only repeat the writer.
+TEST_CASE("media info json: a TrueHD item states its stream in an additive member",
+          "[hearth][media-info][truehd]") {
+    using iclforge::hearth::LoadedItem;
+    using iclforge::hearth::MemoryByteSource;
+    namespace testing = iclforge::hearth::testing;
+    // 300 access units of stereo at 48 kHz, a restart header and a major sync every 16: units 0, 16
+    // and on to 288, 19 of them.
+    const auto bytes = testing::read_file(testing::truehd_dir() + "/truehd_st48_s24.thd");
+    const LoadedItem loaded{.source = std::make_shared<MemoryByteSource>(bytes), .truehd = true};
+    const MediaInfo info = iclforge::hearth::describe_media("st48.thd", loaded);
+    REQUIRE(info.error.empty());
+    REQUIRE(info.codec.has_value());
+    CHECK(*info.codec == MediaCodec::kTruehd);
+    CHECK(info.sample_rate == 48000);
+    CHECK(info.stream_samples == 12000);
+    REQUIRE(info.truehd.has_value());
+    CHECK(info.truehd->restarts.empty());  // the player's list, not the document's
+
+    const Parsed parsed{iclforge::hearth::media_info_json(info)};
+    const auto root = parsed.root();
+    CHECK(root["schema"].equals("iclforge.hearth.media/1"));
+    CHECK(root["codec"].equals("truehd"));
+    CHECK(root["probe"].is_null());
+    CHECK(root["programmes"].size() == 0);
+    CHECK(root["playback"]["stream_samples"].as_int() == 12000);
+    const auto stream = root["truehd"];
+    REQUIRE(stream.is_object());
+    CHECK(stream["codec"].equals("truehd"));
+    CHECK(stream["sample_rate"].as_int() == 48000);
+    CHECK(stream["access_units"].as_int() == 300);
+    CHECK(stream["samples_per_access_unit"].as_int() == 40);
+    CHECK(stream["padding_samples"].as_int() == 0);
+    CHECK(stream["major_syncs"].as_int() == 19);
+    CHECK(stream["restart_interval_units"].as_double().value() == Catch::Approx(300.0 / 19.0).margin(0.05));
+    CHECK(stream["skipped_bytes"].as_int() == 0);
+    CHECK(stream["object_substream"].as_bool() == false);
+    CHECK(stream["channels"].is_array());
+    CHECK(stream["channels"].at(0).as_int() == 2);
+    // 44,180 bytes in a quarter of a second.
+    CHECK(stream["bitrate_kbps"].as_double().value() == Catch::Approx(44180.0 * 8.0 / 1000.0 / 0.25).margin(0.01));
+
+    // MLP names itself, and a stream that ends off a unit says how many samples it pads.
+    const auto mlp_bytes = testing::read_file(testing::truehd_dir() + "/mlp_st44_s16.mlp");
+    const MediaInfo mlp = iclforge::hearth::describe_media(
+        "dvd.mlp", LoadedItem{.bytes = mlp_bytes, .truehd = true});
+    REQUIRE(mlp.codec.has_value());
+    CHECK(*mlp.codec == MediaCodec::kMlp);
+    CHECK(iclforge::hearth::codec_token(MediaCodec::kMlp) == "mlp");
+    const Parsed mlp_parsed{iclforge::hearth::media_info_json(mlp)};
+    CHECK(mlp_parsed.root()["truehd"]["codec"].equals("mlp"));
+    CHECK(mlp_parsed.root()["truehd"]["sample_rate"].as_int() == 44100);
+
+    const auto padded = testing::read_file(testing::truehd_dir() + "/truehd_st44_s24.thd");
+    const MediaInfo with_padding = iclforge::hearth::describe_media(
+        "padded.thd", LoadedItem{.bytes = padded, .truehd = true});
+    const Parsed padded_parsed{iclforge::hearth::media_info_json(with_padding)};
+    CHECK(padded_parsed.root()["truehd"]["padding_samples"].as_int() == 15);
+    CHECK(padded_parsed.root()["playback"]["stream_samples"].as_int() == 11025);
+
+    // Every other item says nothing in it: the member is present and null, as the others are.
+    MediaInfo other;
+    other.codec = MediaCodec::kAc3;
+    const Parsed other_parsed{iclforge::hearth::media_info_json(other)};
+    CHECK(other_parsed.root()["truehd"].is_null());
+
+    // And a file that is not a stream says why.
+    const MediaInfo noise = iclforge::hearth::describe_media(
+        "noise.thd", LoadedItem{.bytes = std::vector<std::byte>(2000, std::byte{0x5A}), .truehd = true});
+    CHECK_FALSE(noise.error.empty());
+    CHECK_FALSE(noise.codec.has_value());
 }

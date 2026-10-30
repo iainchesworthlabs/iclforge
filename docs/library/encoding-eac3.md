@@ -1,5 +1,8 @@
 # Encoding E-AC-3
 
+This page and [Encoding AC-3](encoding-ac3.md) cover the two AC-3 family encoders. AC-4's encoder is on [its page](ac4.md#encoding-a-stream)
+and TrueHD's, which is lossless and has no bit-rate or tool choices of this kind, on [TrueHD and MLP](truehd.md#encoding).
+
 ## E-AC-3: `iclforge::ac3::eac3::FrameEncoder`
 
 `iclforge/ac3/encoder/eac3_frame.hpp`. Same shape, different container. E-AC-3 is not an AC-3 variant:

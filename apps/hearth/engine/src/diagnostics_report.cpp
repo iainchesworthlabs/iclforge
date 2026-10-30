@@ -136,9 +136,20 @@ std::string render_report(const ReportFacts& facts, const EngineStatus& engine,
     }
     for (std::size_t k = first; k < played; ++k) {
         const PlayedItem& item = engine.history[k];
-        line(flat(fmt::format("{}: {} of {} frames, from frame {} of output open {}",
+        std::string counted;
+        if (item.truehd) {
+            // What a TrueHD decoder counted: a restart header is where it can join, a unit that
+            // waited gave no samples (and played as silence), and a lossless check that failed
+            // says samples of an interval were wrong.
+            counted = fmt::format(
+                ", TrueHD: {} restarts, {} units waited for a restart, {} lossless checks failed, "
+                "{} other checks failed",
+                item.truehd->restarts, item.truehd->units_waiting,
+                item.truehd->lossless_check_failures, item.truehd->check_failures);
+        }
+        line(flat(fmt::format("{}: {} of {} frames, from frame {} of output open {}{}",
                               describe_item(item.queue_index, item.title), item.frames,
-                              item.expected_frames, item.first_frame, item.output_opens)));
+                              item.expected_frames, item.first_frame, item.output_opens, counted)));
     }
 
     // A list the caller chose, with the rule applied again here, so a caller

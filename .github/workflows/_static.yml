@@ -111,6 +111,33 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 tools/checks/check_corpus.py
 
+      # The same two questions of the TrueHD and MLP streams of testdata/truehd. Every test, the
+      # gold-reference gate, the codec matrix and the interop script reach a stream through its
+      # directory's manifest, so a stream with no entry is held by none of them, and an entry
+      # whose stream moved is caught only by the legs that run an oracle: this reads both, with
+      # the SHA-256 of each stream, and takes under a second. The second step reads every stream
+      # with the Python transcription of the syntax and fails when a feature the decoder is
+      # meant to be tested on (a rate, a channel count, each filter order, each codebook, the
+      # output shift, the noise generator, the end-of-stream marker, and so on) is in none of
+      # them: a fixture regenerated into something plainer takes its coverage with it and no
+      # test fails. About half a minute, stdlib only, no build.
+      - name: Check committed TrueHD streams and their manifests agree
+        if: ${{ !cancelled() }}
+        run: python3 tools/checks/check_truehd_manifests.py
+
+      - name: Check the TrueHD fixture set still carries every feature
+        if: ${{ !cancelled() }}
+        run: python3 tools/checks/check_truehd_coverage.py
+
+      # A libFuzzer harness that is built and run by nothing finds nothing, and one with no seeds
+      # starts from bytes its parser rejects. This reads libs/*/fuzz, tools/fuzz/run.sh and
+      # fuzz.yml and fails on a harness that its CMake file does not register, that is in no run
+      # list (the differential ones in both jobs that run them), that has no seeds, or whose
+      # dictionary is not libFuzzer's syntax. Stdlib only, no build, under a second.
+      - name: Check every fuzz harness has seeds and a place in the run list
+        if: ${{ !cancelled() }}
+        run: python3 tools/checks/check_fuzz_harnesses.py
+
       # A venv rather than a bare `pip install`: the hosted image's system
       # Python is PEP 668 externally-managed, and --break-system-packages (what
       # the container jobs below use, safely, because their container is thrown

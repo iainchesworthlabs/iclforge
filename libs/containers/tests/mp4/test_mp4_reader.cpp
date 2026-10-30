@@ -1,9 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <fstream>
+#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -12,6 +15,7 @@
 
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mp4/reader.hpp"
+#include "multi_track_files.hpp"
 
 // Two halves, the same split the Matroska reader's tests make.
 //
@@ -159,6 +163,10 @@ struct MoovSpec {
     std::optional<Bytes> mvhd = std::nullopt;
     bool mvhd_last = false;
     std::optional<Bytes> edts = std::nullopt;
+    // A whole stsd, or a whole stsc, in place of the one build_stsd()/build_moov() make: the
+    // protected-entry tests need several sample entries and a chunk map that names them.
+    std::optional<Bytes> stsd = std::nullopt;
+    std::optional<Bytes> stsc = std::nullopt;
 };
 
 Bytes build_stsd(const MoovSpec& spec) {
@@ -184,7 +192,7 @@ Bytes build_stsd(const MoovSpec& spec) {
 
 Bytes build_moov(const MoovSpec& spec) {
     Bytes stbl;
-    put_bytes(stbl, build_stsd(spec));
+    put_bytes(stbl, spec.stsd ? *spec.stsd : build_stsd(spec));
 
     // stts: one run, every sample the same duration.
     Bytes stts;
@@ -193,12 +201,16 @@ Bytes build_moov(const MoovSpec& spec) {
     put_u32(stts, 1536);
     put_bytes(stbl, fullbox("stts", 0, 0, stts));
 
-    Bytes stsc;
-    put_u32(stsc, 1);  // entry_count
-    put_u32(stsc, 1);  // first_chunk
-    put_u32(stsc, spec.samples_per_chunk);
-    put_u32(stsc, 1);  // sample_description_index
-    put_bytes(stbl, fullbox("stsc", 0, 0, stsc));
+    if (spec.stsc) {
+        put_bytes(stbl, *spec.stsc);
+    } else {
+        Bytes stsc;
+        put_u32(stsc, 1);  // entry_count
+        put_u32(stsc, 1);  // first_chunk
+        put_u32(stsc, spec.samples_per_chunk);
+        put_u32(stsc, 1);  // sample_description_index
+        put_bytes(stbl, fullbox("stsc", 0, 0, stsc));
+    }
 
     if (spec.stz2) {
         Bytes stz2;
@@ -404,7 +416,7 @@ Bytes build_fragmented_moov(const MoovSpec& spec, std::uint32_t trex_track_id,
                             std::uint32_t trex_default_duration,
                             std::uint32_t trex_default_size) {
     Bytes stbl;
-    put_bytes(stbl, build_stsd(spec));
+    put_bytes(stbl, spec.stsd ? *spec.stsd : build_stsd(spec));
     Bytes empty_stsc;
     put_u32(empty_stsc, 0);
     put_bytes(stbl, fullbox("stsc", 0, 0, empty_stsc));
@@ -1316,7 +1328,8 @@ TEST_CASE("MP4 describe() names every demux error", "[mp4][reader]") {
                              iclforge::containers::mp4::DemuxError::kMalformed,
                              iclforge::containers::mp4::DemuxError::kNoAudioTrack,
                              iclforge::containers::mp4::DemuxError::kLimitExceeded,
-                             iclforge::containers::mp4::DemuxError::kMoovAfterMdat}) {
+                             iclforge::containers::mp4::DemuxError::kMoovAfterMdat,
+                             iclforge::containers::mp4::DemuxError::kProtectedTrack}) {
         CHECK_FALSE(iclforge::containers::mp4::describe(error).empty());
         CHECK(iclforge::containers::mp4::describe(error) != "unknown error");
     }
@@ -2153,5 +2166,731 @@ TEST_CASE("MP4 demux round-trips an 'ac-4' track", "[mp4][reader][ac4]") {
         CAPTURE(i);
         CHECK(std::equal(samples[i].begin(), samples[i].end(), out->samples[i].begin(),
                          out->samples[i].end()));
+    }
+}
+
+// --- protected tracks (Common Encryption) ---------------------------------------------------
+//
+// An 'enca' sample entry holds ciphertext. The reader names such a track and refuses it, and a
+// track with a clear entry beside a protected one is refused whole (reader.hpp, close_finished
+// in reader.cpp). These tests build the entries by hand, with the sinf layout GPAC, FFmpeg and
+// Shaka Packager write, and then read the seven small files tools/generators/
+// gen_cenc_reader_fixtures.py makes with the audit's generator. No key is read anywhere.
+
+namespace {
+
+using iclforge::containers::mp4::DemuxError;
+
+constexpr std::array<std::uint8_t, 16> kTestKid{0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x18,
+                                                0x29, 0x3a, 0x4b, 0x5c, 0x6d, 0x7e, 0x8f, 0x90};
+constexpr std::string_view kTestKidText = "a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90";
+
+struct HandProtection {
+    std::string scheme{"cenc"};
+    std::string original{"ec-3"};
+    std::uint8_t tenc_version = 0;
+    std::uint8_t iv_size = 8;
+    std::uint8_t crypt = 0;
+    std::uint8_t skip = 0;
+    bool with_frma = true;
+    bool with_schm = true;
+    bool with_tenc = true;
+};
+
+// 'tenc' as GPAC, FFmpeg and Shaka Packager write it: version and flags, a reserved byte, the
+// pattern byte (reserved in version 0), default_isProtected, the IV size, the KID, and for an IV
+// size of 0 a constant IV with its length.
+Bytes tenc_box(const HandProtection& p) {
+    Bytes body;
+    put_u8(body, 0);
+    put_u8(body, static_cast<std::uint8_t>((p.crypt << 4U) | p.skip));
+    put_u8(body, 1);
+    put_u8(body, p.iv_size);
+    for (const auto b : kTestKid) {
+        put_u8(body, b);
+    }
+    if (p.iv_size == 0) {
+        put_u8(body, 16);
+        for (std::uint8_t b = 0; b < 16; ++b) {
+            put_u8(body, b);
+        }
+    }
+    return fullbox("tenc", p.tenc_version, 0, body);
+}
+
+Bytes sinf_box(const HandProtection& p) {
+    Bytes inner;
+    if (p.with_frma) {
+        Bytes frma;
+        put_fourcc(frma, p.original);
+        put_bytes(inner, box("frma", frma));
+    }
+    if (p.with_schm) {
+        Bytes schm;
+        put_fourcc(schm, p.scheme);
+        put_u32(schm, 0x00010000);
+        put_bytes(inner, fullbox("schm", 0, 0, schm));
+    }
+    if (p.with_tenc) {
+        put_bytes(inner, box("schi", tenc_box(p)));
+    }
+    return box("sinf", inner);
+}
+
+// The 28 bytes an AudioSampleEntry carries before its child boxes.
+Bytes audio_entry_fields() {
+    Bytes out;
+    put_u32(out, 0);
+    put_u16(out, 0);  // SampleEntry reserved[6]
+    put_u16(out, 1);  // data_reference_index
+    put_u32(out, 0);
+    put_u32(out, 0);  // AudioSampleEntry reserved[2]
+    put_u16(out, 6);  // channelcount
+    put_u16(out, 16);
+    put_u16(out, 0);
+    put_u16(out, 0);
+    put_u32(out, 48000U << 16U);
+    return out;
+}
+
+Bytes config_box_for(std::string_view original) {
+    return box(original == "ac-3" ? "dac3" : original == "ac-4" ? "dac4" : "dec3", atmos_dec3());
+}
+
+// An 'enca' entry: the original configuration box kept, and the sinf after it (Dolby's layout) or
+// before it (which a parser must also take).
+Bytes enca_entry(const HandProtection& p, bool sinf_first = false) {
+    Bytes body = audio_entry_fields();
+    const Bytes config = config_box_for(p.original);
+    const Bytes sinf = sinf_box(p);
+    put_bytes(body, sinf_first ? sinf : config);
+    put_bytes(body, sinf_first ? config : sinf);
+    return box("enca", body);
+}
+
+Bytes clear_entry(std::string_view type = "ec-3") {
+    Bytes body = audio_entry_fields();
+    put_bytes(body, config_box_for(type));
+    return box(type, body);
+}
+
+Bytes stsd_of(const std::vector<Bytes>& entries) {
+    Bytes joined;
+    for (const auto& entry : entries) {
+        put_bytes(joined, entry);
+    }
+    return raw_stsd(static_cast<std::uint32_t>(entries.size()), joined);
+}
+
+// stsc from (first_chunk, samples_per_chunk, sample_description_index) runs.
+Bytes stsc_of(const std::vector<std::array<std::uint32_t, 3>>& runs) {
+    Bytes body;
+    put_u32(body, static_cast<std::uint32_t>(runs.size()));
+    for (const auto& run : runs) {
+        put_u32(body, run[0]);
+        put_u32(body, run[1]);
+        put_u32(body, run[2]);
+    }
+    return fullbox("stsc", 0, 0, body);
+}
+
+// ftyp, a moov built from `spec` and an mdat of `frames`, one sample each.
+Bytes plain_file(MoovSpec spec, const std::vector<Bytes>& frames) {
+    spec.sizes.clear();
+    Bytes payload;
+    for (const auto& frame : frames) {
+        spec.sizes.push_back(static_cast<std::uint32_t>(frame.size()));
+        put_bytes(payload, frame);
+    }
+    spec.mdat_data_offset = 0;
+    const auto measured = build_moov(spec);
+    spec.mdat_data_offset = ftyp().size() + measured.size() + 8;
+    Bytes file = ftyp();
+    put_bytes(file, build_moov(spec));
+    put_bytes(file, box("mdat", payload));
+    return file;
+}
+
+// A frame that starts with E-AC-3's sync word, as a clear sample does, and ones that do not, as
+// ciphertext does not.
+std::vector<Bytes> clear_then_cipher_frames() {
+    Bytes clear = frame_of(96, 0x11);
+    clear[0] = std::byte{0x0B};
+    clear[1] = std::byte{0x77};
+    return {clear, frame_of(96, 0xEE), frame_of(96, 0xEF)};
+}
+
+// The verdict every way in reads the same, and no sample comes out of any of them.
+void check_refused_everywhere(const Bytes& file, std::string_view expected_text,
+                              std::size_t refused_tracks = 1) {
+    using namespace iclforge::containers::mp4;
+    CAPTURE(expected_text);
+
+    const auto whole = demux(file);
+    REQUIRE_FALSE(whole.has_value());
+    CHECK(whole.error() == DemuxError::kProtectedTrack);
+
+    // Chunk edges land anywhere, including inside the sinf.
+    for (const std::size_t chunk : {std::size_t{1}, std::size_t{13}, file.size()}) {
+        CAPTURE(chunk);
+        Reader reader{};
+        std::size_t delivered = 0;
+        const auto sink = [&delivered](std::span<const std::byte>) { ++delivered; };
+        for (std::size_t offset = 0; offset < file.size(); offset += chunk) {
+            const auto take = std::min(chunk, file.size() - offset);
+            REQUIRE(reader.push(std::span<const std::byte>{file}.subspan(offset, take), sink)
+                        .has_value());
+        }
+        const auto done = reader.finish();
+        REQUIRE_FALSE(done.has_value());
+        CHECK(done.error() == DemuxError::kProtectedTrack);
+        CHECK(delivered == 0);
+        CHECK(reader.refused_tracks().size() == refused_tracks);
+        CHECK(describe_refusal(reader.refused_tracks()) == expected_text);
+    }
+
+    const auto sought = read_seekable(file);
+    REQUIRE_FALSE(sought.has_value());
+    CHECK(sought.error() == DemuxError::kProtectedTrack);
+
+    const auto listed = list_refused_tracks(file);
+    REQUIRE(listed.has_value());
+    CHECK(listed->size() == refused_tracks);
+    CHECK(describe_refusal(*listed) == expected_text);
+    CountingSource source{.bytes = file};
+    const auto listed_seekable = list_refused_tracks(source.reader(), file.size());
+    REQUIRE(listed_seekable.has_value());
+    CHECK(describe_refusal(*listed_seekable) == expected_text);
+}
+
+std::string plain_text(std::string_view scheme, std::string_view original = "ec-3") {
+    return "track 1 is protected (" + std::string{scheme} + ", original format " +
+           std::string{original} + ", default KID " + std::string{kTestKidText} +
+           "); decryption is not supported";
+}
+
+}  // namespace
+
+TEST_CASE("MP4 refuses a protected track and says which, with its scheme, format and KID",
+          "[mp4][reader][protected]") {
+    using namespace iclforge::containers::mp4;
+
+    SECTION("a track whose only sample entry is enca") {
+        const MoovSpec spec{.sizes = {}, .stsd = stsd_of({enca_entry({})})};
+        check_refused_everywhere(plain_file(spec, clear_then_cipher_frames()), plain_text("cenc"));
+    }
+
+    SECTION("the schemes and original formats are named as the file states them") {
+        for (const std::string_view scheme : {"cenc", "cbc1", "cens", "cbcs"}) {
+            for (const std::string_view original : {"ec-3", "ac-3", "ac-4"}) {
+                CAPTURE(scheme, original);
+                const MoovSpec spec{
+                    .sizes = {},
+                    .stsd = stsd_of({enca_entry(
+                        {.scheme = std::string{scheme}, .original = std::string{original}})})};
+                check_refused_everywhere(plain_file(spec, clear_then_cipher_frames()),
+                                         plain_text(scheme, original));
+            }
+        }
+    }
+
+    SECTION("a clear entry, then enca: the clear lead-in layout, refused whole") {
+        // Chunk 1 uses entry 1 (clear) and chunks 2 and 3 use entry 2 (protected). Read as clear,
+        // as it was, this file gave back all three samples, two of them ciphertext.
+        const MoovSpec spec{.sizes = {},
+                            .stsd = stsd_of({clear_entry(), enca_entry({})}),
+                            .stsc = stsc_of({{1, 1, 1}, {2, 1, 2}})};
+        check_refused_everywhere(
+            plain_file(spec, clear_then_cipher_frames()),
+            "track 1 mixes a clear sample entry with a protected one, entry 2 (cenc, original "
+            "format ec-3, default KID " +
+                std::string{kTestKidText} + "), and is refused whole; decryption is not supported");
+    }
+
+    SECTION("enca, then a clear entry: the order Shaka Packager writes") {
+        const MoovSpec spec{.sizes = {},
+                            .stsd = stsd_of({enca_entry({}), clear_entry()}),
+                            .stsc = stsc_of({{1, 1, 2}, {2, 1, 1}})};
+        check_refused_everywhere(
+            plain_file(spec, clear_then_cipher_frames()),
+            "track 1 mixes a clear sample entry with a protected one, entry 1 (cenc, original "
+            "format ec-3, default KID " +
+                std::string{kTestKidText} + "), and is refused whole; decryption is not supported");
+    }
+
+    SECTION("a protected entry that no chunk uses still refuses the track") {
+        // The strictest rule: any declared protected entry. The price is stated in reader.cpp.
+        const MoovSpec spec{.sizes = {}, .stsd = stsd_of({clear_entry(), enca_entry({})})};
+        const auto out = demux(plain_file(spec, clear_then_cipher_frames()));
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == DemuxError::kProtectedTrack);
+    }
+
+    SECTION("the sinf may come before the configuration box") {
+        const MoovSpec spec{.sizes = {}, .stsd = stsd_of({enca_entry({}, /*sinf_first=*/true)})};
+        check_refused_everywhere(plain_file(spec, clear_then_cipher_frames()), plain_text("cenc"));
+    }
+
+    SECTION("a damaged or missing sinf still refuses, and says what it could not read") {
+        const std::string tail = "; decryption is not supported";
+        {
+            const MoovSpec spec{.sizes = {}, .stsd = stsd_of({enca_entry({.with_tenc = false})})};
+            check_refused_everywhere(
+                plain_file(spec, clear_then_cipher_frames()),
+                "track 1 is protected (cenc, original format ec-3, no default KID stated)" + tail);
+        }
+        {
+            const MoovSpec spec{
+                .sizes = {},
+                .stsd = stsd_of({enca_entry({.with_frma = false, .with_schm = false})})};
+            check_refused_everywhere(plain_file(spec, clear_then_cipher_frames()),
+                                     "track 1 is protected (scheme not stated, original format not "
+                                     "stated, default KID " +
+                                         std::string{kTestKidText} + ")" + tail);
+        }
+        {
+            // No sinf at all: an enca entry that only carries the codec's configuration box.
+            Bytes body = audio_entry_fields();
+            put_bytes(body, config_box_for("ec-3"));
+            const MoovSpec spec{.sizes = {}, .stsd = stsd_of({box("enca", body)})};
+            check_refused_everywhere(
+                plain_file(spec, clear_then_cipher_frames()),
+                "track 1 is protected (scheme not stated, original format not stated, no default "
+                "KID stated)" +
+                    tail);
+        }
+        {
+            // A sinf whose child claims more bytes than the entry holds.
+            Bytes sinf;
+            put_u32(sinf, 4096);
+            put_fourcc(sinf, "frma");
+            Bytes body = audio_entry_fields();
+            put_bytes(body, box("sinf", sinf));
+            const MoovSpec spec{.sizes = {}, .stsd = stsd_of({box("enca", body)})};
+            check_refused_everywhere(
+                plain_file(spec, clear_then_cipher_frames()),
+                "track 1 is protected (scheme not stated, original format not stated, no default "
+                "KID stated)" +
+                    tail);
+        }
+    }
+
+    SECTION("tenc version 1 carries the pattern, and a constant IV has no per-sample size") {
+        const MoovSpec spec{
+            .sizes = {},
+            .stsd = stsd_of({enca_entry(
+                {.scheme = "cbcs", .tenc_version = 1, .iv_size = 0, .crypt = 1, .skip = 9})})};
+        const auto file = plain_file(spec, clear_then_cipher_frames());
+        const auto listed = list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        REQUIRE(listed->size() == 1);
+        REQUIRE((*listed)[0].protection.has_value());
+        const Protection& p = *(*listed)[0].protection;
+        CHECK(p.entry_type == "enca");
+        CHECK(p.scheme == "cbcs");
+        CHECK(p.scheme_version == 0x00010000);
+        CHECK(p.original_format == "ec-3");
+        CHECK(p.has_tenc);
+        CHECK(p.default_is_protected);
+        CHECK(p.default_iv_size == 0);
+        CHECK(p.crypt_byte_block == 1);
+        CHECK(p.skip_byte_block == 9);
+        CHECK(p.default_kid == kTestKid);
+        CHECK(p.entry_index == 1);
+        CHECK_FALSE(p.track_has_clear_entry);
+        CHECK(format_kid(p.default_kid) == kTestKidText);
+    }
+
+    SECTION("describe_refusal() with nothing to name gives the generic sentence") {
+        CHECK(describe_refusal({}) == describe(DemuxError::kProtectedTrack));
+        CHECK(describe(DemuxError::kProtectedTrack).find("protected") != std::string_view::npos);
+    }
+}
+
+TEST_CASE("MP4 keeps reading a track whose other sample entries are clear",
+          "[mp4][reader][protected]") {
+    // The boundary of the strict rule: only a PROTECTED entry refuses. A second, clear entry of
+    // another codec does not.
+    const MoovSpec spec{.sizes = {}, .stsd = stsd_of({clear_entry(), clear_entry("ac-3")})};
+    const auto out = iclforge::containers::mp4::demux(plain_file(spec, clear_then_cipher_frames()));
+    REQUIRE(out.has_value());
+    CHECK(out->samples.size() == 3);
+    CHECK(out->track.codec_id == "ec-3");
+}
+
+namespace {
+
+// A protected extra trak: `type` ("enca" or "encv") with a sinf naming `original`. Its sample
+// table is empty, as extra_trak's are.
+Bytes protected_extra_trak(std::uint32_t track_id, std::string_view handler, std::string_view type,
+                           std::string_view original) {
+    HandProtection p;
+    p.original = std::string{original};
+    Bytes entry_body = audio_entry_fields();
+    if (type == "encv") {
+        entry_body.assign(78, std::byte{0});  // SampleEntry (8) and VisualSampleEntry (70)
+        entry_body[7] = std::byte{1};         // data_reference_index
+    }
+    put_bytes(entry_body, sinf_box(p));
+    Bytes stsd_body;
+    put_u32(stsd_body, 1);
+    put_bytes(stsd_body, box(type, entry_body));
+
+    Bytes stbl;
+    put_bytes(stbl, fullbox("stsd", 0, 0, stsd_body));
+    Bytes minf;
+    put_bytes(minf, box("stbl", stbl));
+    Bytes hdlr;
+    put_u32(hdlr, 0);
+    put_fourcc(hdlr, handler);
+    for (int i = 0; i < 3; ++i) {
+        put_u32(hdlr, 0);
+    }
+    put_u8(hdlr, 0);
+    Bytes mdhd;
+    put_u32(mdhd, 0);
+    put_u32(mdhd, 0);
+    put_u32(mdhd, 1000);
+    put_u32(mdhd, 0);
+    put_u16(mdhd, 0x15C7);
+    put_u16(mdhd, 0);
+    Bytes mdia;
+    put_bytes(mdia, fullbox("mdhd", 0, 0, mdhd));
+    put_bytes(mdia, fullbox("hdlr", 0, 0, hdlr));
+    put_bytes(mdia, box("minf", minf));
+    Bytes tkhd;
+    put_u32(tkhd, 0);
+    put_u32(tkhd, 0);
+    put_u32(tkhd, track_id);
+    put_u32(tkhd, 0);
+    put_u32(tkhd, 0);
+    for (int i = 0; i < 15; ++i) {
+        put_u32(tkhd, 0);
+    }
+    Bytes trak;
+    put_bytes(trak, fullbox("tkhd", 0, 0x000007, tkhd));
+    put_bytes(trak, box("mdia", mdia));
+    return box("trak", trak);
+}
+
+// A file with a clear E-AC-3 track (id 1) and `extra` around it: before it when `before`.
+Bytes file_with_extra_trak(const Bytes& extra, bool before) {
+    MoovSpec spec{.sizes = {32}, .track_id = 1};
+    const auto wrap = [&](const Bytes& moov) {
+        const Bytes body(moov.begin() + 8, moov.end());
+        Bytes out;
+        if (before) {
+            put_bytes(out, extra);
+        }
+        put_bytes(out, body);
+        if (!before) {
+            put_bytes(out, extra);
+        }
+        return box("moov", out);
+    };
+    spec.mdat_data_offset = 0;
+    const auto measured = wrap(build_moov(spec));
+    spec.mdat_data_offset = ftyp().size() + measured.size() + 8;
+    Bytes file = ftyp();
+    put_bytes(file, wrap(build_moov(spec)));
+    put_bytes(file, box("mdat", frame_of(32, 0xAA)));
+    return file;
+}
+
+}  // namespace
+
+TEST_CASE("MP4 reads the clear track beside a protected one and lists the protected one",
+          "[mp4][reader][protected][skipped]") {
+    using namespace iclforge::containers::mp4;
+
+    for (const bool before : {true, false}) {
+        CAPTURE(before);
+        const auto file =
+            file_with_extra_trak(protected_extra_trak(2, "soun", "enca", "ec-3"), before);
+
+        const auto out = demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_id == 1);
+        CHECK(out->samples.size() == 1);
+        REQUIRE(out->skipped.size() == 1);
+        CHECK(out->skipped[0].track_id == 2);
+        CHECK(out->skipped[0].kind == TrackKind::kAudio);
+        CHECK(out->skipped[0].codec_id == "enca");
+        REQUIRE(out->skipped[0].protection.has_value());
+        CHECK(out->skipped[0].protection->scheme == "cenc");
+        CHECK(out->skipped[0].protection->original_format == "ec-3");
+        CHECK(out->skipped[0].protection->default_kid == kTestKid);
+
+        // Naming the protected track is a refusal; naming the clear one is not.
+        const auto named = demux(file, ReadOptions{.track_id = 2});
+        REQUIRE_FALSE(named.has_value());
+        CHECK(named.error() == DemuxError::kProtectedTrack);
+        const auto clear = demux(file, ReadOptions{.track_id = 1});
+        REQUIRE(clear.has_value());
+        CHECK(clear->samples.size() == 1);
+        // A track id the file does not have is still just absent.
+        const auto absent = demux(file, ReadOptions{.track_id = 9});
+        REQUIRE_FALSE(absent.has_value());
+        CHECK(absent.error() == DemuxError::kNoAudioTrack);
+
+        const auto listed = list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        REQUIRE(listed->size() == 1);
+        CHECK((*listed)[0].track_id == 2);
+    }
+
+    SECTION("a protected video track is listed with its protection and refuses nothing") {
+        const auto file =
+            file_with_extra_trak(protected_extra_trak(2, "vide", "encv", "avc1"), true);
+        const auto out = demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->samples.size() == 1);
+        REQUIRE(out->skipped.size() == 1);
+        CHECK(out->skipped[0].kind == TrackKind::kVideo);
+        REQUIRE(out->skipped[0].protection.has_value());
+        CHECK(out->skipped[0].protection->entry_type == "encv");
+        CHECK(out->skipped[0].protection->original_format == "avc1");
+        const auto listed = list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        CHECK(listed->empty());
+    }
+
+    SECTION("protected AAC is an ordinary track this reader does not take, not a refusal") {
+        Bytes file = ftyp();
+        put_bytes(file, box("moov", protected_extra_trak(1, "soun", "enca", "mp4a")));
+        const auto out = demux(file);
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == DemuxError::kNoAudioTrack);
+    }
+}
+
+namespace {
+
+Bytes read_seed(std::string_view name) {
+    std::ifstream in{std::string{ICLFORGE_MP4_SEED_DIR} + "/" + std::string{name},
+                     std::ios::binary};
+    REQUIRE(in.good());
+    const std::vector<char> raw{std::istreambuf_iterator<char>(in),
+                                std::istreambuf_iterator<char>()};
+    Bytes out(raw.size());
+    std::transform(raw.begin(), raw.end(), out.begin(),
+                   [](char c) { return static_cast<std::byte>(c); });
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("MP4 refuses the protected files the audit's generator writes",
+          "[mp4][reader][protected]") {
+    // Fragmented, default-base-is-moof, 6 access units of E-AC-3 in 3 fragments (see
+    // tools/generators/gen_cenc_reader_fixtures.py). The first is the layout that used to come
+    // out as ciphertext with exit code 0.
+    SECTION("cenc, a clear entry then enca, the first fragment clear") {
+        check_refused_everywhere(
+            read_seed("cenc-clear-entry-then-enca.mp4"),
+            "track 1 mixes a clear sample entry with a protected one, entry 2 (cenc, original "
+            "format ec-3, default KID " +
+                std::string{kTestKidText} + "), and is refused whole; decryption is not supported");
+    }
+    SECTION("cenc, enca only") {
+        check_refused_everywhere(read_seed("cenc-enca-only.mp4"), plain_text("cenc"));
+    }
+    SECTION("cbcs, enca only, with a constant IV") {
+        const auto file = read_seed("cbcs-enca-only.mp4");
+        check_refused_everywhere(file, plain_text("cbcs"));
+        const auto listed = iclforge::containers::mp4::list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        REQUIRE((*listed)[0].protection.has_value());
+        CHECK((*listed)[0].protection->default_iv_size == 0);
+    }
+}
+
+namespace {
+
+// The offset of the first four characters `type` at or after `from` (a box's type field, 4 bytes
+// into the box), or npos. A search for the characters, good enough for fixtures whose layout the
+// test also states.
+std::size_t find_type(const Bytes& file, std::string_view type, std::size_t from = 0) {
+    Bytes needle;
+    put_fourcc(needle, type);
+    const auto at = std::search(file.begin() + static_cast<std::ptrdiff_t>(from), file.end(),
+                                needle.begin(), needle.end());
+    return at == file.end() ? std::string_view::npos : static_cast<std::size_t>(at - file.begin());
+}
+
+// The bytes of `file` up to the end of its top-level 'moov' box: the init segment a packager
+// publishes as a file of its own, with the 'pssh' boxes and no fragment.
+Bytes init_segment_of(const Bytes& file) {
+    std::size_t at = 0;
+    while (at + 8 <= file.size()) {
+        std::size_t size = 0;
+        std::string type;
+        for (std::size_t i = 0; i < 4; ++i) {
+            size = (size << 8U) | std::to_integer<std::size_t>(file[at + i]);
+            type.push_back(static_cast<char>(std::to_integer<unsigned>(file[at + 4 + i])));
+        }
+        REQUIRE(size >= 8);
+        REQUIRE(at + size <= file.size());
+        at += size;
+        if (type == "moov") {
+            return Bytes(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(at));
+        }
+    }
+    FAIL("the file has no moov box");
+    return {};
+}
+
+}  // namespace
+
+TEST_CASE("MP4 refuses protected files laid out like Dolby's OTT reference audio",
+          "[mp4][reader][protected]") {
+    using namespace iclforge::containers::mp4;
+
+    // The protection layout of the audio in Dolby's public OTT streams (planning/
+    // cenc-conformance.md, M13), in four small files from tools/generators/
+    // gen_cenc_reader_fixtures.py --set dolby-ott. What the reader does not read, it must step
+    // over: a 'senc' with a subsample map or with no entries, a 'saiz' with a size table or a
+    // count of 0, the PIFF uuid copy of the 'senc', PlayReady and Widevine 'pssh' boxes in
+    // 'moov'. None of it changes the verdict or lets a sample out.
+    struct Layout {
+        std::string_view file;
+        std::string_view scheme;
+        std::string_view original;
+        std::uint8_t iv_size;
+        std::uint8_t crypt;
+        std::uint8_t skip;
+        bool piff;
+        std::uint8_t senc_flags;
+        std::uint8_t saiz_default;
+    };
+    constexpr std::array<Layout, 4> kLayouts{{
+        {"dolby-ddp-cenc-iv8-piff.mp4", "cenc", "ec-3", 8, 0, 0, true, 0x0, 8},
+        {"dolby-ddp-cbcs-const-iv-empty-senc.mp4", "cbcs", "ec-3", 0, 0, 0, false, 0x0, 0},
+        {"dolby-ac4-cenc-subsample-piff.mp4", "cenc", "ac-4", 8, 0, 0, true, 0x2, 0},
+        {"dolby-ac4-cbcs-1-9-subsample.mp4", "cbcs", "ac-4", 0, 1, 9, false, 0x2, 0},
+    }};
+
+    for (const auto& layout : kLayouts) {
+        CAPTURE(layout.file);
+        const auto file = read_seed(layout.file);
+
+        // The file is the layout it is named for, so a generator change cannot empty the test.
+        const auto senc = find_type(file, "senc");
+        const auto saiz = find_type(file, "saiz");
+        const auto moof = find_type(file, "moof");
+        REQUIRE(senc != std::string_view::npos);
+        REQUIRE(saiz != std::string_view::npos);
+        REQUIRE(moof != std::string_view::npos);
+        CHECK(std::to_integer<std::uint8_t>(file[senc + 4 + 3]) == layout.senc_flags);
+        CHECK(std::to_integer<std::uint8_t>(file[saiz + 4 + 4]) == layout.saiz_default);
+        CHECK((find_type(file, "uuid") != std::string_view::npos) == layout.piff);
+        const auto first_pssh = find_type(file, "pssh");
+        REQUIRE(first_pssh != std::string_view::npos);
+        CHECK(first_pssh < moof);
+        CHECK(find_type(file, "pssh", moof) == std::string_view::npos);
+
+        const auto expected = plain_text(layout.scheme, layout.original);
+        check_refused_everywhere(file, expected);
+
+        const auto listed = list_refused_tracks(file);
+        REQUIRE(listed.has_value());
+        REQUIRE(listed->size() == 1);
+        REQUIRE((*listed)[0].protection.has_value());
+        const Protection& p = *(*listed)[0].protection;
+        CHECK(p.entry_type == "enca");
+        CHECK(p.scheme == layout.scheme);
+        CHECK(p.original_format == layout.original);
+        CHECK(p.has_tenc);
+        CHECK(p.default_is_protected);
+        CHECK(p.default_iv_size == layout.iv_size);
+        CHECK(p.crypt_byte_block == layout.crypt);
+        CHECK(p.skip_byte_block == layout.skip);
+        CHECK(p.default_kid == kTestKid);
+        CHECK(p.entry_index == 1);
+        CHECK_FALSE(p.track_has_clear_entry);
+
+        // The init segment on its own, which is how Dolby's packager publishes it: the same
+        // verdict from the 'moov' alone.
+        const auto init = init_segment_of(file);
+        REQUIRE(init.size() < file.size());
+        check_refused_everywhere(init, expected);
+    }
+}
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// track of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("MP4 auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[mp4][reader][truehd]") {
+    using iclforge::containers::mp4::AutoSelect;
+    using iclforge::containers::mp4::ReadOptions;
+    namespace mt = iclforge::test::multi_track;
+    const Bytes truehd_a = frame_of(80, 0x31);
+    const Bytes truehd_b = frame_of(96, 0x33);
+    const Bytes eac3_a = frame_of(120, 0x32);
+    const Bytes eac3_b = frame_of(130, 0x34);
+    const std::array<mt::Track, 3> tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 8, .units = {truehd_a, truehd_b}},
+        mt::Track{.codec = mt::Codec::kEac3, .channels = 6, .units = {eac3_a, eac3_b}},
+        mt::Track{.codec = mt::Codec::kAc3, .channels = 6, .units = {eac3_b}}};
+    const Bytes file = mt::mp4_file(tracks);
+
+    SECTION("by default the first track is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::mp4::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_id == 1);
+        CHECK(out->track.codec_id == "mlpa");
+        CHECK(owned(out->samples) == std::vector<Bytes>{truehd_a, truehd_b});
+    }
+
+    SECTION("without TrueHD the next track is taken, and the other two are listed") {
+        const auto out = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_id == 2);
+        CHECK(out->track.codec_id == "ec-3");
+        CHECK(owned(out->samples) == std::vector<Bytes>{eac3_a, eac3_b});
+        REQUIRE(out->skipped.size() == 2);
+        CHECK(out->skipped[0].track_id == 1);
+        CHECK(out->skipped[0].codec_id == "mlpa");
+        CHECK(out->skipped[1].track_id == 3);
+        CHECK(out->skipped[1].codec_id == "ac-3");
+
+        // The streaming reader makes the same choice.
+        iclforge::containers::mp4::Reader reader{
+            ReadOptions{.auto_select = AutoSelect{.truehd = false}}};
+        std::vector<Bytes> got;
+        const auto sink = [&got](std::span<const std::byte> sample) {
+            got.emplace_back(sample.begin(), sample.end());
+        };
+        for (std::size_t offset = 0; offset < file.size(); offset += 11) {
+            REQUIRE(reader
+                        .push(std::span<const std::byte>{file}.subspan(
+                                  offset, std::min<std::size_t>(11, file.size() - offset)),
+                              sink)
+                        .has_value());
+        }
+        REQUIRE(reader.finish().has_value());
+        CHECK(got == std::vector<Bytes>{eac3_a, eac3_b});
+    }
+
+    SECTION("each codec can be left out in turn") {
+        const auto without_eac3 = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE(without_eac3.has_value());
+        CHECK(without_eac3->track.codec_id == "ac-3");
+        const auto nothing = iclforge::containers::mp4::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.ac3 = false,
+                                                        .eac3 = false,
+                                                        .ac4 = false,
+                                                        .truehd = false}});
+        REQUIRE_FALSE(nothing.has_value());
+        CHECK(nothing.error() == iclforge::containers::mp4::DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("naming a track_id is not narrowed by it") {
+        const auto out = iclforge::containers::mp4::demux(
+            file, ReadOptions{.track_id = 1, .auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.codec_id == "mlpa");
     }
 }

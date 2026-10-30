@@ -1,6 +1,6 @@
 # Hearth: a desktop reference player and Sendspin sinks
 
-!!! note "Status as of 2026-10-13: built, with three hardware exits open"
+!!! note "Status as of 2026-10-29: built, with three hardware exits open"
     Written and decided on 2026-09-15, in one session of questions and answers recorded under
     [Decisions](#decisions). The live status board is [ROADMAP.md](../ROADMAP.md); by chip, and
     each phase below carries its own status line:
@@ -28,6 +28,12 @@
       [`planning/ac4.md`](ac4.md), and Hearth plays AC-4 through the library decoder. An ESP32-P4
       or ESP32-S3 sink built with the decoder takes AC-4 in a Sendspin group (phase I6, #1446); the
       published firmware images have the decoder off, and a C6 is sent PCM.
+    - **TrueHD and MLP in Hearth.** Decoded here (2026-10-29, phases H1 to H3 of the TrueHD parity audit): the
+      engine opens `.thd`, `.mlp` and a container's TrueHD track, decodes through `iclforge::truehd`, plays
+      the PCM to local outputs and to a network group, seeks, joins items gaplessly and recovers from a
+      damaged unit at the next restart. Tested through the engine against the 25 FFmpeg-made fixtures and the
+      library's encoder; nothing has been played to a sound device. Not built: MAT to a receiver, coded
+      TrueHD to network sinks, Hearth for Android, the AC-3 fallback (the audit's H4 to H8).
     - **Hearth for Android**, a Sendspin sink for Android TV, has a plan of its own:
       [`hearth-android.md`](hearth-android.md).
 
@@ -116,6 +122,13 @@ installed or packaged.*
   readers return neither timestamps nor a track list, `mp4::Reader` needs `moov` before `mdat`,
   and MPEG-TS yields PES payloads that have to be re-split. WAV carrying IEC 61937 is readable
   through `BurstReader` but is not sniffed.
+- Which track of a file with several: the first, in file order, whose codec the caller says it can
+  use (`CodecSet` in `container_input.hpp`). Hearth says AC-3, E-AC-3 and AC-4, so a TrueHD track
+  is passed over for the AC-3 or E-AC-3 track after it (a Blu-ray remux has TrueHD first), and a
+  file whose audio is TrueHD alone is not playable: "TrueHD is not played by Hearth yet". Open:
+  whether a later round chooses by language, by the container's default flag, by what the output
+  takes (TrueHD where it takes MAT), or with a picker; until then the first track the player can
+  play is the rule.
 - AC-4 (`.ac4`, and AC-4 in MP4 or TS) is listed with its bitstream information from `libs/ac4`
   and marked as not playable until [chip D](#chip-d-the-ac-4-decoder) delivers a decoder.
   *As built, chip D delivered it and AC-4 plays.*

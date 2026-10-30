@@ -20,7 +20,11 @@ This page covers the AC-3 and E-AC-3 encoders. AC-4 is not in it: its encoder is
 against floors, decoded and compared with its own source (`tools/checks/score_ac4_encode.py`),
 and those scores are a series of their own, [AC-4 encode quality](quality-trend.md#ac-4-encode-quality).
 Its race against DEE's streams of the same sources runs on a maintainer's machine and keeps no
-history to show here ([Validation: AC-4](verification.md#the-encoder)).
+history to show here ([Validation: AC-4](verification.md#the-encoder)). TrueHD is not in it either. A lossless
+encoder has no quality to race, only size: `tools/checks/verify_truehd_encode_interop.py` records the TrueHD
+encoder's output beside FFmpeg's encoder's for the same input (0.95 times the size over the layouts FFmpeg writes,
+larger at 192 kHz, on full-scale squares and with the downmix presentations), and keeps no history. DEE's TrueHD
+streams are not raced ([Validation: TrueHD](verification.md#truehd-and-mlp)).
 
 <div id="landscape-app">
   <p class="landscape-status">Loading landscape data…</p>

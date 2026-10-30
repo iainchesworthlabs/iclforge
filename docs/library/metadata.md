@@ -4,7 +4,9 @@
 one from before the metadata layer existed. An AV receiver reads exactly these bits to set
 level, compress dynamics and fold down to fewer speakers than the stream carries.
 
-This page is the AC-3 and E-AC-3 metadata. AC-4 carries the same kinds of information in syntax of
+This page is the AC-3 and E-AC-3 metadata. TrueHD's dialogue normalisation, mix levels and DRC start-up gains are fields of its major sync
+(`iclforge/truehd/io/major_sync.hpp`); the library reads and writes them and nothing applies them, because a TrueHD decode is
+lossless and has no output stage, and `forge probe` does not report them. AC-4 carries the same kinds of information in syntax of
 its own: dialogue normalisation and further loudness values, DRC decoder modes, downmix values,
 dialogue enhancement and presentations. Its configuration types are in `iclforge::ac4::EncoderConfig` and
 its reading is `iclforge::ac4::Decoder::metadata()`: see [AC-4](ac4.md#what-the-decoder-reports) and

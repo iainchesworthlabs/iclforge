@@ -43,6 +43,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "../adm/atmos_adm.hpp"
 #include "../adm/atmos_iab.hpp"
+#include "content_signature.hpp"
 
 namespace forge_cli::commands {
 
@@ -372,7 +373,7 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
                    params.coding == iclforge::ac4::ObjectCoding::kAjoc ? "A-JOC" : "direct");
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace
@@ -1052,7 +1053,7 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
                           : std::string{crc ? "raw with CRC" : "raw without CRC"});
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace
@@ -1060,6 +1061,11 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
 int run_atmos_encode(std::string_view in_path, std::string_view out_path,
                      std::uint32_t bitrate, std::uint32_t objects,
                      const Options& meta, std::string_view paths_path) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // codec=ac4 takes the AC-4 objects path above, src=/map= and all.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_encode_ac4(in_path, out_path, bitrate, objects, meta, paths_path);
@@ -1291,6 +1297,11 @@ int run_atmos_encode(std::string_view in_path, std::string_view out_path,
 
 int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   const Options& meta, std::string_view programme_id) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // No fixed source layout to measure a pre-encode loudness figure against the way
     // atmos-encode's WAV input has (iclforge::ac3::io::ac3_layout_for) - an ADM document's channels
     // are an arbitrary mix of bed speaker feeds and dynamic objects, not one of the handful of
@@ -1443,6 +1454,11 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
 
 int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   const Options& meta) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // Same refusal, same reason as run_atmos_adm's own: an IAB file's Bed/Object channels are an
     // arbitrary mix, not one of iclforge::ac3::io::ac3_layout_for's fixed layouts - see that
     // function's own comment above.

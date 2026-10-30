@@ -58,9 +58,11 @@ struct PresentationContext {
     //
     // presentation_version 2 is not handled: V1.3.1 says only that a decoder
     // shall decode it. DEE's immersive-stereo encodes are version 2 with a
-    // channel_mode of 0b1111000 (7.0: 3/4/0), yet their metadata() and
-    // presentation substreams parse to the exact end of every frame only as
-    // stereo (ch_mode 1). Whether to map or refuse is the caller's decision.
+    // channel_mode of 0b1111000 (7.0: 3/4/0), and Dolby's AC-4 in MPEG-DASH
+    // specification gives 0b1111001 (7.1: 3/4/0.1) to immersive stereo made
+    // from Dolby Atmos content; their metadata() and presentation substreams
+    // parse to the exact end of every frame only as stereo (ch_mode 1).
+    // Whether to map or refuse is the caller's decision.
     int pres_ch_mode = -1;
 
     // Part 2 clause 6.3.3.1.28 Table 71 and Pseudocode 26, over the same

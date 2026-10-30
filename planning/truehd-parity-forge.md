@@ -1,0 +1,230 @@
+# TrueHD and DD+ parity: Forge (`forge`, `forge-gui`, shared media, tests and docs)
+
+As of 2026-10-29. An audit and a plan; nothing here is built. The owner wants TrueHD and DD+ (E-AC-3, with
+AC-3 and the JOC layer beside it) to be equal first-class codecs across the repository. This page covers the
+Forge applications; the other areas have their own `planning/truehd-parity-*.md` pages. TrueHD's own plan is
+[truehd.md](truehd.md); what the stream format leaves open is in [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md).
+
+## Basis
+
+- **Commit.** `integ` at `523cf5dc3a3d5996fa5d8d3f66df8c5e5b3b6989` (worktree branch `parity-forge`).
+- **Run.** The integrated `forge` built from that commit (`forge --version` prints `release: 523cf5dc`), on x86-64
+  Linux with GCC 13.3. About 220 command lines, each on a DD+ input and on the equivalent TrueHD input. Every matrix cell
+  that says an exit code and a message was produced by one of them. Nothing was built, and no test binary was run.
+- **Inputs.** `EC3` is `testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3` (5.1, 79 access units). `JOC` is
+  `testdata/object-fixture/dee_joc_514.ec3` (5.1.4 JOC). `AC3` is `testdata/external-baseline/ac3-51-448/dee.ac3`.
+  `THD` is `testdata/truehd/truehd_m51_s24.thd` (FFmpeg's encoder, 5.1, two substreams) and `MLP` is
+  `testdata/truehd/mlp_st48_s24.mlp`. `LONG` is a 2.53 s 5.1 TrueHD stream made with `forge truehd-encode` from `EC3`
+  decoded to a WAV (the fixtures are 0.25 s, too short for a loudness gate). The tree has no MP4, Matroska or
+  transport-stream TrueHD files, so `THD.mp4`, `THD.mkv` and `THD.ts` below are `forge mp4`, `mkv` and `ts` of `THD`; the same for `EC3`.
+  FFmpeg 6.1.1 and `ffprobe` were used as the oracle for the decoded samples and the container readings.
+- **Not run.** `record`, `live`, `play`, `monitor`, `spatial`, `identify`, `devices` and `outputs` stop at exit 4 in this
+  build (no capture, passthrough, monitor or spatial backend), before any argument is read. `atmos-adm` and `atmos-iab` are not in the build.
+  For these, and for every GUI row, the cell says **read only**: the code was read, nothing ran. Qt is not available here.
+- **Read.** `apps/forge/cli/src/main.cpp` (the command table), `usage.cpp`, `support.cpp` (option parsing), every command file that mentions
+  TrueHD, `apps/shared/media/src`, `apps/forge/gui` (sources, QML, packaging, tests), `docs/forge`,
+  `apps/forge/cli/tests`, and the TrueHD legs of `tools/ci/run_codec_matrix.sh`. FFmpeg's source was not read.
+- **The command set.** There is no `scan` command; `probe` is the scan. The command table has 49 rows.
+
+## What the audit found, in six lines
+
+1. The CLI reads and writes TrueHD where it was built to (`decode`, `probe`, `levels`, `loudness`, `truehd-encode`, `mkv`,
+   `mp4`, `ts`, `demux`, `remux`, `spdif`, `unspdif`), and those cells are sound: the decoded samples equal FFmpeg's strict decode (SHA-256 of the 5.1
+   fixture identical), and `mkv`, `mp4`, `ts` and `unspdif` give back the input stream byte for byte.
+2. `probe json=1` on TrueHD in MP4, Matroska or a transport stream writes invalid JSON (a duplicated `"container"` key), exit 0.
+3. Many options are accepted for TrueHD and dropped, exit 0, no word: fourteen on `decode` alone, and every metadata, layout and multi-source option on `truehd-encode`. The worst two: `decode ... verify-content` on TrueHD does not
+   verify anything and exits 0, where E-AC-3 refuses it; `truehd-encode ... src=other.wav` ignores the extra source.
+4. `cut`, `cat`, `metadata` and `normalize` do not know the codec: they stop with an AC-3 sync error (exit 2), where `qc`, `transcode` and `fmp4` refuse by name (exit 1).
+5. `qc`, `transcode`, `fmp4`, `play`, `monitor`, `record`, `live` and `forge project` have no TrueHD path.
+6. The GUI has none. It does not link `iclforge::truehd`, and no source, QML file, test or packaging file mentions TrueHD, MLP or `.thd`.
+
+## Reading the matrix
+
+**Gap** is `none`, `partial`, `missing`, or `n/a` with the reason. **Size** is the ROADMAP's: S an afternoon, M a day or two,
+L a focused week, XL several PRs; it is the size of closing the gap, not of the audit. **Blocked by** names an open question
+(Q1 to Q13, below), another row, or "nothing". **Evidence** is `command` -> exit code and the first line it printed, or a test
+name, or **read only**. "Silently dropped" means the run exits 0 and prints nothing about the option. Paths are under the repository root.
+
+### R: reading, inspecting and measuring
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **R1** `probe`, text report | Layout, bsmod, rate, block count, substreams, duration, bit rate and rate control, dialnorm, compr, dynrng, dmixmod, EMDF, objects, JOC, authenticity, CRC, tools (`apps/forge/cli/src/commands/probe.cpp`) | Codec, access-unit count, rate, substreams with channel counts, VBR flag, the raw peak-rate field, a parity and CRC count (`run_probe_truehd_stream`, `apps/forge/cli/src/commands/truehd.cpp`). No channel names, bit depth, duration, measured bit rate, restart interval, tools used, lossless-check result, or the major sync's dialnorm, mix level and DRC start-up gain (the fields are parsed: `libs/truehd/include/iclforge/truehd/io/major_sync.hpp`) | partial | M | nothing for the first set; showing the §14 fields reads values with no oracle (ERRATA 16, Q3) | `forge probe EC3` -> 0, 26 lines starting `file`. `forge probe THD` -> 0, 7 lines: `codec TrueHD`, `substreams 2 (2, 6 channel(s) in substream order)`, `rate variable, peak data rate field 3199` |
+| **R2** `probe json=1`, shape | Member `stream`, written by the shared `write_stream` (`apps/shared/media/src/probe_json.cpp`), `sample_rate_hz` | Member `truehd`, written inline in `truehd.cpp` (not shared), `sample_rate`; no channel names | partial | S | Q8 | `forge probe THD json=1` -> 0, valid JSON (python `json.load`), keys `schema generator file container truehd`. `forge probe EC3 json=1` -> 0, keys `... container stream` |
+| **R3** `probe json=1` of a file in a container | Valid, `container` member filled (`write_container`) | **Invalid JSON, exit 0.** `truehd.cpp:415` writes the key `container`, then the callback `write_container` (`probe_json.cpp:1039`) writes it again. Matroska, MP4 and TS all | partial (defect) | S | nothing | `forge probe THD.mp4 json=1` -> 0, first lines `"container": "container": {`; `json.load` fails `Expecting ',' delimiter: line 5 column 27`. Same for `.mkv`, `.ts`. `EC3.mp4`, `.mkv`, `.ts` and `JOC.mp4` load. No test: `test_cli_truehd.cpp` probes bare files only |
+| **R4** Container facts in `probe` | `dec3` and `dac3` fields decoded (`apps/shared/media/src/container_input.cpp`, `facts_of`) | `dmlp` is named and sized only; "the box is named here and nothing else" (`container_input.cpp:204`). **MLP in MP4 reports the wrong rate.** The cause was not traced. An MLP stream's `dmlp` word begins `2f0f0001` (ERRATA 16), and a leading nibble of 2 is 192 kHz in TrueHD's layout (`libs/containers/ERRATA.md` C3), which is the rate printed. The file's own `mlpa` entry says 48000 | partial | S | the rate fix is in `libs/containers` (another page) | `forge probe MLP.mp4` -> 0, `container MP4, track 1, 'mlpa', 300 samples, 192000 Hz, timescale 48000`; `forge demux MLP.mp4 x.mlp` -> 0, `(mlpa, 192000 Hz, 2 channels`; the entry's 32-bit rate field read with python is 0xBB80 = 48000; `ffprobe` says 48000. For `THD.mp4` the rate is right (48000) |
+| **R5** `probe` from stdin | `forge probe - < EC3` works | Fails: the TrueHD sniff reads the file by name (`probe.cpp:734`) and a pipe skips it | missing | S | nothing | `forge probe - < THD` -> 1, `error: lost sync: expected 0x0B77 at byte 0`; `forge probe - < EC3` -> 0, `codec E-AC-3 (bsid 16)`. `forge decode - x.wav < THD` -> 0 |
+| **R6** `probe detail=frames`, `detail=blocks` | Per access unit and per block dumps | Accepted and ignored: the output is identical to the plain report | missing | M | nothing | `cmp` of `forge probe THD` and `forge probe THD detail=blocks` -> identical. `forge probe EC3 detail=frames` -> 0, `access unit 0 @ 0 (1792 bytes, t=0.0000s)` |
+| **R7** `decode`: file, stdout, stdin, container input | WAV, any container | 24-bit extensible WAV with a mask when the order is the WAV's own; `-` both ways; MKV, MP4, TS | none | n/a | n/a | `forge decode THD x.wav` -> 0, `TrueHD 48000 Hz, 6 channel(s) (L R C LFE Ls Rs), substream 1`; the samples (shifted to 32 bits) have the same SHA-256 as `ffmpeg -err_detect crccheck+bitstream+buffer+explode -i THD -f s32le -`; `decode THD.mkv`, `.mp4`, `.ts` give a WAV identical to the bare decode (`cmp`) |
+| **R8** `decode`: choosing a presentation or programme, damage | `programme=N`, `conceal=repeat` or `mute` | `truehd-presentation=best`, `2ch`, `6ch`, `8ch`, `all`; `truehd-check=lenient` | none | n/a | n/a | `forge decode THD x.wav truehd-presentation=2ch` -> 0, `TrueHD 48000 Hz, 2 channel(s) (L R), substream 0`; `test_cli_truehd.cpp` `truehd-presentation= picks the substreams read`, `a damaged stream fails a strict decode and is counted by a lenient one` |
+| **R9** `decode`: output stage (`channels=`, `downmix=`, `ltrt-phase=`, `mix-lfe`) | Applied (`apps/forge/cli/src/commands/decode.cpp`) | No decoder-side downmix; the stream's own 2ch and 6ch substreams are the downmix (R8). The options are silently dropped (X1) | partial | M | Q5 (what a downmix of an 8 channel presentation should be) | `forge decode THD x.wav channels=2` -> 0, `TrueHD 48000 Hz, 6 channel(s)`: still 6 channels |
+| **R10** `decode`: DRC and dialnorm (`drc=`, `drcmode=`, `heavy`) | Applied; `dynrng`/`compr` reported | Not decoded: heavy DRC is an open entry in ERRATA, and the stream's dialnorm and DRC start-up gain are never read by `forge` | missing | M | ERRATA open question on heavy DRC (not this page's), Q3 | `forge decode THD x.wav drc=0.5` -> 0, no change and no word (X1); `forge decode EC3 x.wav` prints `dynrng +0.00 .. +0.00 dB, not applied` |
+| **R11** `decode`: objects_dir, adm_out, `bed-only` | JOC objects as `object_NN.wav`; ADM master | TrueHD Atmos is not built (Q1 of `truehd.md`); the arguments are dropped, no directory is made | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | `forge decode THD x.wav objdir` -> 0 and `objdir` is not created. `forge decode JOC x.wav objdir` -> 0, `decoded 63 E-AC-3 access units` |
+| **R12** `levels` | Per-channel peak and RMS (`apps/forge/cli/src/commands/analysis.cpp`) | Same report over the decode, `best` presentation only: `truehd-presentation=` is documented for it (`truehd.hpp`) and parse_options accepts it for `decode` alone | partial | S | nothing | `forge levels THD` -> 0, `THD: TrueHD/MLP, 6 channel(s), 48000 Hz, 0.25 s`; `forge levels THD truehd-presentation=2ch` -> 1, `error: unknown option 'truehd-presentation=2ch'` (`support.cpp:2333`). `levels THD.mp4`, `.mkv`, `.ts` -> 0 |
+| **R13** `loudness` | BS.1770-4, mapped to dialnorm and compared with the stream's own | BS.1770-5 Annex 3 weights from the channel names, LKFS and true peak; no comparison with the stream's dialnorm; no presentation choice | partial | S | the comparison: Q3 | `forge loudness LONG` -> 0, `integrated loudness -10.7 LKFS (BS.1770-5 Annex 3 weights)`, `true peak -5.2 dBTP`. `forge loudness EC3` -> 0, `dialogue level -10.68 LKFS -> dialnorm 11`, `the stream's dialnorm 31`. `forge loudness THD` -> 5 (nothing above the gate in 0.25 s) |
+| **R14** `qc` | Loudness against dialnorm and compr, presets, `layout=`, `objects=`; exit 6 on a failed gate | Refused by name (`refuse_truehd`, `analysis.cpp:1260`) | missing | M | Q2 | `forge qc THD` -> 1, `error: ... is TrueHD or MLP, which 'qc' does not read. decode, probe, levels, loudness, mkv, mp4, ts, spdif, unspdif and demux do`; `forge qc EC3 preset=all` -> 6 |
+| **R15** `spdif`, `unspdif` | IEC 61937 bursts into a WAV; back | MAT 1.0 (data type 22) into an 8-channel PCM16 WAV or raw bursts; back, byte-identical | none | n/a | n/a | `forge spdif THD x.wav` -> 0, `wrapped 300 TrueHD access units into 13 MAT burst(s)`; `forge unspdif x.wav y.thd` -> 0 and `cmp y.thd THD` identical; same for the raw form and for `MLP` |
+
+### P: producing streams
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **P1** Encode a WAV to a stream, bare or in a container | `encode`, `eac3-encode` (`apps/forge/cli/src/commands/encode.cpp`), then `mkv`, `mp4`, `ts` | `truehd-encode` (`truehd_encode.cpp`), bare or `.mkv`, `.mp4`, `.ts` in one step, `-` for the WAV and the stream, `verify` | none | n/a | n/a | `forge truehd-encode EC3.wav x.thd` -> 0, `encoded 121344 samples of 6 channel(s) at 48000 Hz: 3034 access units, 24 restart intervals, 1119310 bytes (51.2% of the 24-bit PCM)`; piped from stdin to stdout gives the same bytes; `test_cli_truehd.cpp` `truehd-encode options, containers and refusals` |
+| **P2** Encoder options and multiple sources | Metadata keys, `layout`, `vbr`, `tools`, `src=`, `map=`, `offset=`, `programmeN=`, `lyrics=`, `keep-partial` | Ten `truehd-*` options and `verify`. Every other option is accepted and dropped (X1), `src=` and `map=` among them | partial | S to refuse, M to support `src=`, `map=`, `offset=` | Q7 (refuse or warn), then nothing | `forge truehd-encode EC3.wav x.thd src=testdata/audio/reference_stereo.wav` -> 0 and the output is byte-identical to the run without it; likewise `dialnorm=27`, `drc=film-standard`, `map=0:0`, `layout=stereo`, `offset=0:5` |
+| **P3** Stream metadata at encode (dialnorm, mix level, DRC start-up gain) | `dialnorm=`, `drc=`, `bsmod=` and the rest of `docs/forge/cli/metadata-options.md` | The library takes them (`EncoderConfig::channel_meaning`, `libs/truehd/include/iclforge/truehd/encoder/encoder.hpp:131`); `forge` does not pass them. FFmpeg's streams have zeros, so no oracle | missing | M | Q3 | `forge truehd-encode EC3.wav x.thd dialnorm=27` -> 0, output identical to the default (X1) |
+| **P4** Generators for test streams | `silence`, `sine`, `orbit`, `eac3-silence`, `eac3-sine`, `atmos`, `atmos-path` need no input file (`synth.cpp`, `atmos.cpp`) | None. A TrueHD test stream needs a WAV first, and `forge` has no WAV generator | missing | S each | Q6 | `forge help` lists `silence`, `sine`, `orbit`, `eac3-silence`, `eac3-sine` and no TrueHD generator; `forge truehd-encode` has no synthetic mode |
+| **P5** `transcode` | AC-3, E-AC-3 and AC-4 in any direction, carrying dialnorm and downmix metadata (`stream_tools.cpp:1241`) | Refused by name in both directions (`TrueHD` in) and with a different message for `.thd` out | missing | M | Q5 | `forge transcode THD x.ac3` -> 1, `error: ... is TrueHD or MLP, which 'transcode' does not read`; `forge transcode EC3 x.thd` -> 1, `error: cannot tell which codec to write from 'x.thd' - name it .ac3, .ec3 or .ac4, or pass codec=` |
+| **P6** Object and bed-plus-object encoders (`atmos-encode`, `atmos-cbi`, `atmos-adm`, `atmos-iab`) | E-AC-3 JOC; AC-4 | TrueHD Atmos is not built | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | `forge atmos x.ec3 2 448 4 4 objects` -> 0 (DD+). No TrueHD counterpart exists |
+| **P7** `record`, `live` | Capture, encode, file, monitor, passthrough | `codec=truehd` is refused; the encoder ran at about 5 times real time for 5.1 here (`truehd-encode EC3.wav`, 0.46 s for 2.53 s of audio, on a shared 4-core machine, indicative only) | missing | M | Q10 | `forge record x.thd 1 codec=truehd` -> 1, `error: codec must be ac3, eac3 or ac4 (got 'codec=truehd')`. `forge record x.ec3 1` -> 4 (no capture backend here). **read only** for the rest |
+
+### T: tools on a finished stream
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **T1** `cut` | Access-unit boundaries, start and duration (`stream_tools.cpp`) | Not read: stops with the AC-3 sync error. A TrueHD cut can start only at a unit with a major sync (a restart interval, 128 units by default) | missing | M | Q4 | `forge cut THD x.thd 0.05 0.1` -> 2, `error: ...truehd_m51_s24.thd: lost sync: expected 0x0B77`. `forge cut EC3 x.ec3 0.5 1` -> 0, `cut 31 access units of 79` |
+| **T2** `cat` | Joins streams of the same shape | Same error | missing | M | T1, Q4 | `forge cat x.thd THD THD` -> 2, `lost sync: expected 0x0B77`. `forge cat x.ec3 EC3 EC3` -> 0, `joined 2 files, 158 E-AC-3 access units`. What the second input must satisfy at the seam (timing words, restart state) was not investigated |
+| **T3** `metadata` | Rewrites dialnorm, compr, bsmod, dsurmod and re-stamps CRCs | Same error. The major sync has per-presentation dialnorm and mix-level fields under a CRC | missing | M | Q3 | `forge metadata THD x.thd dialnorm=27` -> 2, `lost sync: expected 0x0B77`. `forge metadata EC3 x.ec3 dialnorm=27` -> 0, `rewrote 79 of 79 E-AC-3 syncframes -> x.ec3 (audio untouched)` |
+| **T4** `normalize` | Measures BS.1770 and writes the dialnorm | Same error | missing | S after T3 | T3, Q3 | `forge normalize LONG x.thd` -> 2, `lost sync: expected 0x0B77`. `forge normalize EC3 x.ec3` -> 0 |
+| **T5** `strip-objects` | Removes the JOC layer, leaving the bed | Refused by name | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | `forge strip-objects THD x.thd` -> 2, `error: not an E-AC-3 stream: only Annex E frames can carry an object layer`. (On `JOC` it also fails: `frame carries a skip field or object-audio marker in a bitstream shape this build cannot rewrite`, a DD+ limit) |
+| **T6** Refusal wording and exit code | Codec-specific tools refuse a stream they cannot read by naming it | `qc`, `transcode`, `fmp4`, `play`, `monitor` name TrueHD and exit 1; `cut`, `cat`, `metadata`, `normalize` fail with AC-3's message and exit 2 | partial | S | nothing | rows T1 to T4; the CI check in `tools/ci/run_codec_matrix.sh` ("truehd is refused by transcode, qc, fmp4 and the dvb ts profile") covers `transcode`, `qc`, `fmp4` and the DVB profile, and none of `play`, `monitor`, `cut`, `cat`, `metadata`, `normalize`. `refuse_truehd` lists the commands that read TrueHD and leaves out `remux` |
+
+### C: containers and transports
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **C1** `mkv` | `A_EAC3` | `A_TRUEHD`; an MLP stream is also written as `A_TRUEHD` (`libs/containers/ERRATA.md` C7) | none | n/a | n/a | `forge mkv THD x.mkv` -> 0, `wrote 300 TrueHD access units (48000 Hz, 6 channels, 134360 bytes)`; `ffprobe` -> `codec_name=truehd sample_rate=48000 channels=6`; `forge demux x.mkv` returns `THD` byte for byte |
+| **C2** `mp4` | `dec3` | `mlpa` with `dmlp` and an edit list | none | n/a | n/a | `forge mp4 THD x.mp4` -> 0, `... ('mlpa'/'dmlp')`; `ffprobe` as above; `demux` byte-identical. Row R4 for the container text |
+| **C3** `ts`, and `remux` to `.ts` | DVB and ATSC profiles | Blu-ray `stream_type` 0x83 only. `ts` defaults to it. `mainid=`, `asvc=` and `programme=` are dropped. **`remux` defaults to the DVB profile**, which refuses TrueHD with advice ("leave the profile out") that cannot work; the `remux` row lists `dvb` and `atsc` and not `bluray` | partial | S | nothing | `forge ts THD x.ts` -> 0, `(Blu-ray profile, 188-byte packets)`; `forge ts THD x.ts dvb` -> 1, `error: TrueHD in a transport stream is Blu-ray's ... leave the profile out or use bluray`; `forge remux THD.mkv x.ts` -> 1, the same message; `forge remux THD.mkv x.ts bluray` -> 0; `forge ts THD x.ts mainid=1` -> 0 (X1) |
+| **C4** `fmp4` (CMAF, HLS, DASH) | Init and media segments, `.m3u8`, `.mpd` | Refused: "no CMAF, HLS or DASH signalling is defined here". `libs/containers` can fragment the `mlpa` track | missing | L | Q9 | `forge fmp4 THD out` -> 1, `error: ... is TrueHD or MLP, for which no CMAF, HLS or DASH signalling is defined here`; `forge fmp4 EC3 out` -> 0, `as 2 fragment(s)` |
+| **C5** `demux`, `remux` (other pairs) | Any of the three | Any of the three, byte-identical streams | none | n/a | n/a | `forge remux THD.mp4 x.mkv`, `THD.ts x.mp4`, `THD.mkv x.mp4` -> 0 and each result demuxes to `THD` (`cmp`); `demux` of the `MLP` files likewise |
+| **C6** Container commands from stdin | `-` accepted | `mkv`, `mp4`, `ts`, `spdif` accept `-` for TrueHD; `demux -` of a bare stream is refused as for E-AC-3 | none | n/a | n/a | `forge mkv - x.mkv < THD` -> 0, `wrote 300 TrueHD access units` |
+
+### L: playing and live use
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **L1** `play`, IEC 61937 passthrough | Exclusive-mode bursts to a receiver (`audio_io.cpp`) | `refuse_truehd("play", ...)` at `audio_io.cpp:992`. `libs/audio`'s `BitstreamFormat` has no TrueHD value (`libs/audio/include/iclforge/audio/passthrough.hpp:71`); the MAT framing exists (`libs/containers/src/iec61937/mat.cpp`). Nothing has been played into a receiver (`libs/containers/ERRATA.md`) | missing | L | `libs/audio` (another page), Q11 | `forge play THD` -> 4 here (`no passthrough backend`), so the refusal is **read only** |
+| **L2** `monitor`, decode and play | Decoded to the default output | `refuse_truehd("monitor", ...)` at `live_audio.cpp:239`. The decoder exists; the playback layer (`apps/shared/media/src/stream_playback.cpp`) is AC-3, E-AC-3 and AC-4 only (see M2). Whether `iclforge::audio::MonitorSink` takes 8 channels of 24-bit audio at 192 kHz was not read | missing | M | M2 | `forge monitor THD` -> 4 here; **read only** |
+| **L3** `spatial` | Objects onto Windows Spatial Sound | n/a: needs objects | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | `forge spatial THD` -> 4 here |
+| **L4** `identify`, `devices`, `outputs` | Codec-blind, except that `outputs` reports AC-3 and E-AC-3 passthrough support | Passthrough support for MAT is not reported | n/a (follows L1) | n/a | L1 | **read only** |
+
+### X: option handling, help and project files
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **X1** An option the run does not use is refused | Codec-specific options are refused by name: `syntax-trace=`, `verify-content`, `codec-mode=`, `truehd-*` | Accepted and dropped, exit 0, no message: on `decode` of TrueHD `channels=2`, `downmix=loro`, `drc=0.5`, `drcmode=rf`, `karaoke`, `conceal=mute`, `mix-lfe`, `programme=3`, `bed-only`, `verify-objects`, `syntax-trace=`, `verify-content`, `check-content`, the objects directory and the ADM path; on `truehd-encode` every metadata, layout and multi-source option; on `ts`, `mkv`, `mp4`, `spdif` `mainid=`, `asvc=`, `programme=` | partial | S | Q7 | `forge decode EC3 x.wav verify-content` -> 1, `error: verify-content and check-content check an AC-4 content signature, and ... is AC-3 or E-AC-3`; `forge decode THD x.wav verify-content` -> 0 and a normal decode; `forge decode EC3 x.wav programme=3` -> 1, `no programme 3 in this stream (it carries 0)`; `forge decode THD x.wav programme=3` -> 0. A decode with `verify-content` that exits 0 is a fail-open for a flag whose purpose is to refuse |
+| **X2** Help, man page, banner | One row, the option blocks of the command's topics (`apps/forge/cli/src/usage.cpp`) | `forge help truehd-encode` prints the long row and no option block (its topic is `kStdio` only); `forge help decode` has no `truehd-presentation=` or `truehd-check=` (they are in the man page, the completions and `metadata-options.md`); `probe`'s row omits `.thd` and `.mlp`; the banner, the man page's NAME and `forge help exit-codes` name AC-3, E-AC-3 and AC-4 only | partial | S | nothing | `forge help truehd-encode` -> 0, one line then the `-` and common-option paragraphs; `forge help decode` mentions TrueHD on one line (the row); `forge help` first line `Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and AC-4 (ETSI TS 103 190) encoder/decoder` |
+| **X3** Shell completions | Four shells, generated from the table | `truehd-encode` and every `truehd-*` option are listed for bash, zsh, fish and PowerShell. No shell filters files by extension, for any codec | none | n/a | n/a | `forge completions bash` -> 0, 19 lines, 3 mentions of `truehd` |
+| **X4** `forge project` | `codec` is `ac3`, `eac3` or `ac4`; builds the command line the GUI shows (`apps/shared/project/src/project_command.cpp`) | `codec: truehd` is refused | missing | M | U1, Q1 | `forge project p.forgeproj out print` with `"codec": "truehd"` -> 1, `error: codec 'truehd' is not one of ac3, eac3, ac4`; the same project with `"eac3"` -> 0, prints a `forge eac3-encode` line |
+| **X5** Signing options | Keyed object signature: `atmos ... sign-objects signing-key=`, then `decode ... verify-objects` (E-AC-3, JOC); AC-4 content signature (`ac4-sign`, `ac4-verify`) | TrueHD signing is not built; its scope is unconfirmed (Q1 of `planning/truehd.md`). `sign-content` on `truehd-encode` is refused; `sign-objects`, `verify-objects`, `verify-content` are dropped (X1) | n/a until Q1 of `truehd.md`; the dropped options are X1 | n/a | `planning/truehd.md` | `forge atmos x.ec3 2 448 4 4 objects sign-objects signing-key=k` -> 0, `signed 63 frames' EMDF object container`; `forge decode x.ec3 y.wav verify-objects signing-key=k` -> 0, `object signature: 63 valid, 0 mismatched, 0 unsigned frame(s)`; `forge truehd-encode EC3.wav x.thd sign-content` -> 1, `sign-content ... sign AC-4 output` |
+
+### M: shared media (`apps/shared/media`)
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **M1** Probe result and JSON writer | `probe_json.cpp` (`write_stream`, `write_ac4_stream`, `write_container`), used by `forge` and by Hearth's `media_info.cpp` | None: the TrueHD report is in `forge`'s own `truehd.cpp`, so the other applications cannot call it. `apps/shared/media` does not link `truehd` (its README: uses `ac3`, `ac4`, `containers`, `objects`, `render`) | missing | M | Q8 | `grep -rn -i truehd apps/shared/media/src` finds `container_input.cpp` and `.hpp` only (a sniff and a signalling token) |
+| **M2** Stream playback, recording sinks, fMP4 folder writer, associated mixing | AC-3, E-AC-3, AC-4 (`stream_playback.cpp`, `recording_sink.cpp`, `fmp4_folder_writer.cpp`, `associated_mix.cpp`) | None | missing | M | Q1, Q10, Q11 | same grep. **read only** |
+| **M3** Container sniff | MP4, Matroska, TS, bare AC-3 family | Recognises a bare TrueHD or MLP stream by its major sync (`has_truehd_major_sync`) | none | n/a | n/a | `forge decode`, `levels`, `loudness`, `mkv` and the other readers accept `THD` without a name test |
+
+### U: the GUI (`forge-gui`; **read only** throughout)
+
+The GUI does not link `iclforge::truehd` (`apps/forge/gui/CMakeLists.txt` lines 373 to 404 list `ac3`, `audio`, `containers`,
+`ac4`, `lyrics`, `app_text_encoding`). `grep -r -i "truehd\|\.thd\|\.mlp\|mlpa" apps/forge/gui` finds nothing.
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **U1** Encoder workbench: codec choice, container choice, command bar | `EncoderController::codecNames` is AC-3, E-AC-3, AC-4 from `plan::Codec` (`libs/ac3/include/iclforge/ac3/encoder/plan.hpp:47`); containers are elementary, Matroska, S/PDIF, MP4, fragmented MP4, TS (`encoder_controller.cpp:1276`); `window.cliLine` in `Main.qml` builds the `forge` line shown at the bottom | Nothing. The source loader also refuses what TrueHD takes: `to_sample_rate_for_file` (`encoder_controller.cpp:6741`) rejects anything but 32, 44.1 and 48 kHz for the AC-3 codecs | missing | XL | Q1 | **read only**: `codecNames`, `containerNames`, `loadSourceFile` |
+| **U2** Open stream… (player) | Filters `*.ac3 *.ec3`, `*.ac4`, all (`assets/qml/StreamPlayerDialog.qml:44`); `decode_stream_to_memory` (`stream_player_controller.cpp:239`) sends AC-4 to its decoder, anything else to `stream_bsid`, which reads bits at 40 without testing the sync word; exports WAV and objects | A `.thd` is not offered by the filter. Picked anyway, it reaches `stream_bsid` and fails with an AC-3 or E-AC-3 message ("is not a valid E-AC-3 stream" or a frame-sync error), not a TrueHD one. The player holds the whole decoded programme in memory (`open-stream.md`): at 48 kHz, 8 channels, 32-bit float (`RawResult::channels`), a two-hour film is about 11 GB, and 192 kHz is four times that | missing | L | Q1, Q12 | **read only** |
+| **U3** QC a stream… | Filters as U2 plus containers (`QcDialog.qml:43`); `measure_ac3`, `measure_eac3`, AC-4 in `qc_controller.cpp`; the container is sniffed from bytes | Not offered; the dispatch is the same bsid test | missing | M | R14, Q2 | **read only** |
+| **U4** Inspect objects… | `objFileDialog` filters as QC; `ObjectDecodeController` | n/a: objects; no stream-structure view for TrueHD | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | **read only** |
+| **U5** Drag and drop, and `forge-gui <file>` | `Main.qml` `openDroppedFile` (line 1158): `.forgeproj` opens a project, `.ac3` and `.ec3` open the player, anything else becomes a source; `main.cpp` sends command-line files through the same function | A `.thd` or `.mlp` falls to `EncoderController.addSourceFile` and is read as a WAV (`loadSourceFile` calls `read_wav`), so it is refused as a bad source. `.ac4` is in the same position and `docs/forge/gui/index.md` says so | missing | S | U2 | **read only** |
+| **U6** Live session | Capture to AC-3 or E-AC-3, monitor, passthrough (`docs/forge/gui/live-session.md`) | None | missing | M | P7, Q10 | **read only** |
+| **U7** Karaoke flow | Annex C: AC-3 and E-AC-3 (`KaraokeFlow.qml` format choice) | n/a: Annex C is the AC-3 family's | n/a | n/a | n/a | **read only** |
+| **U8** Project files | `ProjectFile` (`apps/forge/gui/src/project_file.cpp`) and `apps/shared/project`: codec `ac3`, `eac3`, `ac4` | No codec value | missing | M | U1, X4 | **read only**; the CLI half is X4 |
+| **U9** Desktop integration and text | `forge-gui-mime.xml` declares `audio/ac3`, `audio/eac3`; the `.desktop` file has no `MimeType=` and Info.plist no document types (Hearth owns the associations); `GenericName=AC-3 / E-AC-3 / AC-4 Encoder and Decoder` | Nothing to claim; the description names three codecs | partial | S | nothing | **read only**: `apps/forge/gui/packaging` |
+| **U10** GUI tests and coverage record | 36 QML suites and 45 Qt-free cases; `apps/forge/gui/tests/FEATURE_COVERAGE.md` lists every feature against its test | None mentions TrueHD. The record says the AC-4 name filters are unexercised too (line 161) | missing | S (scaffolding) | nothing | `grep -r -i truehd apps/forge/gui/tests` -> no match |
+
+### D: documentation, tests and CI
+
+| Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
+|---|---|---|---|---|---|---|
+| **D1** `docs/forge` | All pages | `docs/forge/cli/commands.md` has a TrueHD section (lines 958 to 1000) and a table row; `metadata-options.md` has the two `decode` options. `docs/forge/index.md` and `docs/forge/cli/index.md` ("reads and writes AC-3, E-AC-3 ... and AC-4", "46 commands"; the table has 49) and every page under `docs/forge/gui` do not name it. The `truehd-encode` options are in `commands.md` and not in `metadata-options.md` | partial | S | nothing | `grep -n -i "truehd" docs/forge/index.md docs/forge/cli/index.md docs/forge/gui/*.md` -> no match |
+| **D2** CLI tests (`ctest`) | 424 cases over 28 files (`apps/forge/cli/tests`) | `test_cli_truehd.cpp`: 9 cases (decode of every fixture, the 5.1 layout names, presentations, a damaged stream, probe of a bare stream and of a damaged one, a decode-encode-decode round trip, the WAV channel mask, `truehd-encode` options, containers and refusals). **No case** for `mkv`, `mp4`, `ts`, `demux`, `remux`, `spdif`, `unspdif`, `levels`, `loudness` or the refusals of `qc`, `transcode`, `fmp4` | partial | M | nothing | `grep -l -i truehd apps/forge/cli/tests/*.cpp` -> `test_cli.cpp` (one option-parse line) and `test_cli_truehd.cpp`. These commands are checked in `tools/ci/run_codec_matrix.sh` (TrueHD section from line 1398), which needs FFmpeg; R3 passed because nothing parses a container probe's JSON |
+| **D3** CI oracles | FFmpeg and Dolby-tool legs for DD+ | FFmpeg strict decode in both directions: `run_codec_matrix.sh`, `verify_truehd_interop.py` (also `--handbuilt`), `verify_truehd_encode_interop.py`, `verify_truehd_containers.py` (`.github/workflows/_ci-core.yml:1101` to `1123`) | none | n/a | n/a | the decode SHA-256 equal to FFmpeg's, above (R7) |
+
+**Rows by gap and size.** 59 rows. `none` 11 (R7, R8, R15, P1, C1, C2, C5, C6, M3, X3, D3). `partial` 15 (R1, R2, R3, R4, R9,
+R12, R13, P2, T6, C3, X1, X2, U9, D1, D2): 12 are S and 3 are M. `missing` 25 (R5, R6, R10, R14, P3, P4, P5, P7, T1, T2, T3, T4, C4,
+L1, L2, X4, M1, M2, U1, U2, U3, U5, U6, U8, U10): 5 are S, 16 are M, 3 are L (C4, L1, U2) and 1 is XL (U1). `n/a` 8 (R11, P6,
+T5, L3, L4, U4, U7, X5): six wait for Atmos or signing, one is a different codec's annex, one follows L1. Where a size has two parts
+(P2: S to refuse the option, M to support it) the first is counted.
+
+## What TrueHD has that DD+ never needed, in this area
+
+- **MAT carriage (IEC 61937 data type 22).** `spdif` and `unspdif` do it (R15). Passing it to a receiver is L1. `outputs` has no way to say a receiver takes it.
+- **Lossless verification.** The decoder checks that each restart interval reproduces its lossless fold, and `decode` prints `lossless check: 36 interval(s) ok, 0 failed`. `truehd-encode verify` re-decodes every unit. `probe` does not report the check, `qc` does not exist for TrueHD, and no exit code but `decode`'s separates "damaged" from "fine". A first-class TrueHD QC is an integrity gate before it is a loudness gate (Q2).
+- **Much higher and variable rates.** The peak is 18 Mbit/s and the stream is variable. `probe` prints the raw field (`peak data rate field 3199`), not kilobits a second, and reports neither the measured rate nor the 75 ms window TH spec section 18 limits. `truehd-encode` enforces both (`truehd-rate-check=`), but nothing can check a finished stream.
+- **Restart-interval seek granularity.** A cut or a join, and any seek, can only start at a unit with a major sync. `probe` does not say how often they occur (19 of 300 units in `THD`). This is T1, T2 and Q4.
+- **Several presentations in one stream.** 2, 6 and 8 channels and the 16-channel substream. `decode` picks one; `levels`, `loudness`, `spdif` and `probe` cannot.
+- **32-bit and 192 kHz paths.** The decoder writes 24-bit WAVs of up to 16 channels; the GUI source loader refuses 88.2 kHz and above, and its player decodes into memory (U1, U2).
+- **Two stream kinds.** TrueHD (`0xF8726FBA`) and MLP (`0xF8726FBB`). `decode` of an MLP stream names no channels and writes mask 0 (a stereo MLP WAV has mask 0x0, a stereo TrueHD WAV 0x3), and MLP has no encoder.
+- **A channel mask that differs from the AC-3 family's.** A TrueHD 5.1 decodes to mask 0x60F (side surrounds) and the E-AC-3 5.1 to 0x3F (back surrounds). This is ERRATA question 16; Q13 asks only that it be settled for the whole CLI.
+
+## A proposed definition of "first class" for forge and its GUI
+
+For the owner to approve or change:
+
+1. A command that reads a coded stream either reads TrueHD or refuses it by name with exit 1. None fails with another codec's sync error.
+2. No option is accepted and dropped. An option a run does not apply is refused (or, if Q7 says so, warned about) and never silent, and a verification flag never succeeds without verifying.
+3. `probe` says of a TrueHD stream what it says of an E-AC-3 one in kind: channel names, bit depth, rate, duration, bit rate, the per-presentation metadata, the integrity result, and per-unit detail on request. Its JSON is valid for every container and uses the same names.
+4. Each DD+ tool has a TrueHD counterpart or a written reason it has none: cut, join, metadata, normalise, transcode, QC, record, generators.
+5. Every container and transport `forge` writes for DD+ it writes for TrueHD, or says why not, and reads them all back byte for byte.
+6. Each TrueHD command has a `ctest` case that needs no FFmpeg, and a leg against FFmpeg's strict decode where one exists.
+7. Every GUI file picker, drop target, player and report that takes DD+ takes TrueHD, or says in its own words why it does not. A TrueHD file never produces another codec's error.
+8. The documentation, the help, the man page, the completions and the banner name TrueHD wherever they name E-AC-3.
+9. The same sample-exact oracle holds: a decode equals FFmpeg's, and a stream `forge` writes decodes to its input.
+
+## Plan
+
+Phases are in dependency order. A phase marked "no decision" can start now; one marked "waits" cannot finish before the
+named questions are answered. Sizes are totals for the rows named.
+
+**Phase 1: make what is built honest (no decision; one item waits on Q7).** R3, R5, R12 (accept `truehd-presentation=` and `truehd-check=` on `levels` and `loudness`), T6 (refuse `cut`, `cat`, `metadata`, `normalize` by name), C3 (`remux` profile default and message, the `remux` row's text), X2, D1 (the TrueHD sentence wherever E-AC-3 is named), D2 (a `ctest` case for each command in the container, MAT, levels, loudness and refusal rows, built from `truehd-encode` output so no FFmpeg is needed, plus a JSON-parse case over every container), and the MLP rate in R4 (reported to the `libs/containers` page). X1 waits for Q7 for its wording, but the rule it applies is the one the AC-4 options already follow. Size M for the set (three PRs). Done when: a case that fails without each fix; `nlohmann::json::parse` over the probe of `THD.mp4`, `.mkv` and `.ts`; `run_codec_matrix.sh`'s refusal check lists every refusing command with its exit code; `forge help truehd-encode` prints its options.
+
+**Phase 2: inspect and measure TrueHD as DD+ is measured (R2, R4, R6, R1, M1, R13 part; mostly no decision).** Move the TrueHD report out of `commands/truehd.cpp` into `apps/shared/media` (M1) so Hearth and the GUI can call it, add the fields the library already parses (channel names, bit depth, duration, measured and peak rate against TH spec section 18, restart spacing, presentation list, lossless-check result, tools used, and the §14 fields read-only), and `detail=frames`. Q8 decides the JSON names; the other fields do not wait. Size M to L. Done when: golden JSON for every fixture and hand-built stream under `testdata/truehd`, compared with `tools/references/truehd_syntax.py` for the fields it reads; `probe` reports a non-zero lossless failure on the damaged-copy test.
+
+**Phase 3: tools on a finished stream (waits on Q3, Q4, Q2).** T1 and T2 after Q4; T3, T4, P3 and the stream-metadata half of R13 after Q3; R14 (`qc`) after Q2. Size M each. Done when: a cut stream decodes, with FFmpeg's strict decode, to the right slice of the source; a joined stream decodes to the two decodes in order; a rewritten dialnorm round-trips through `probe` and keeps every CRC; QC exits 6 on a damaged copy.
+
+**Phase 4: conversion and test-stream makers (waits on Q5, Q6, Q7).** P5 (`transcode` from TrueHD), R9 (a downmix to stereo and 5.1 that is the stream's own presentation by default), P4 (generators), P2's multi-source support. Size M to L. Done when: a `transcode` of `THD` to E-AC-3 decodes to within the encoder's usual SNR floor of `THD`'s own 6 channel decode; a generated stream equals the same signal passed through `truehd-encode`.
+
+**Phase 5: output devices (waits on Q10, Q11 and the `libs/audio` page).** L2 first (`monitor`: the decoder and the playback layer M2), then P7 (`record` to a file), then L1 (`play`, which needs the MAT format in `libs/audio` and a receiver). Size L to XL. Done when: `monitor` plays `THD` through the null or loopback sink in the existing live tests (`test_cli_live.cpp`); `play` has been run into a receiver that decodes TrueHD, which nobody has done yet.
+
+**Phase 6: the GUI (waits on Q1, Q12).** U10 first (link `iclforge::truehd`, add the TrueHD fixtures to `apps/forge/gui/tests/fixtures`, and add the rows to `FEATURE_COVERAGE.md`); then U2 and U5 (the player and the drop target, with a streaming decode if Q12 says so), U3 (QC, after R14); then U1, X4 and U8 (encoder, command bar, projects) and U6 (live). Size XL in all, L for the first three. Done when: a Qt Quick suite picks a `.thd` through the real picker and plays and exports it; the exported WAV equals `forge decode`; the command bar shows a line that `forge` runs to the same bytes.
+
+**Phase 7: Atmos and signing (on hold, outside this page's control).** R11, P6, T5, L3, U4, X5. Waits on Q1 of `planning/truehd.md` (the evolution payload); listed so the matrix has no unexplained cell.
+
+## Open questions for the owner
+
+Each has a recommendation. None is settled here.
+
+1. **Does the Forge GUI encode TrueHD, or only open, play and check it?** Encoding adds a codec to a plan type that belongs to `libs/ac3` (`plan::Codec`), the sample-rate and channel rules of the source loader, the command bar, the container choice and the project file (U1, X4, U8): XL. Opening, playing and QC are L and M. *Recommendation:* open, play and QC first (phase 6 without U1); decide encoding afterwards, and as its own tab, not as a fourth entry of `plan::Codec`.
+2. **What is QC for TrueHD?** It has no dialnorm to compare with (Q3). *Recommendation:* the existing loudness presets applied to the decode, plus an integrity gate (the lossless check, CRCs, the TH spec §18 rate window); exit 6 on either failing.
+3. **Do you want the stream's own metadata (TH spec §14: dialogue norm, mix level, DRC start-up gain, per presentation) shown, written and edited?** FFmpeg writes zeros, so there is no oracle (ERRATA 16), and the dialogue-norm field is 6 bits for 2 channels and 5 for 6 and 8 channels (`libs/truehd/include/iclforge/truehd/io/major_sync.hpp`). *Recommendation:* show it read-only in `probe` now; write or edit it (`metadata`, `normalize`, `truehd-encode`) only after you confirm the units and meaning or supply a stream that sets them.
+4. **How should `cut` and `cat` treat the restart interval?** A cut can start only at a unit with a major sync (every 128 units by default, about 107 ms). *Recommendation:* start at the first major sync at or after the requested time, print the time it used, and refuse a `cat` whose second input does not open with a major sync or differs in shape. Sample-exact cutting would need a re-encode of the interval.
+5. **What should `transcode` do with TrueHD, and what is a downmix of an 8-channel presentation?** *Recommendation:* TrueHD to AC-3 or E-AC-3 only, taking the `best` presentation, with `channels=` and `downmix=` as for DD+; no E-AC-3 to TrueHD (a lossless copy of a lossy decode).
+6. **How are TrueHD test streams generated?** Options: a `.thd` suffix on `sine` and `silence`, new `truehd-sine` and `truehd-silence` commands, or none (the tests use `truehd-encode` of a WAV). *Recommendation:* the suffix, because `transcode` already chooses its codec that way; low priority.
+7. **Refuse or warn about an option the run does not use?** The tree does both: `verify-content` and `syntax-trace=` on E-AC-3 are refused, `truehd-presentation=` on E-AC-3 is warned about. *Recommendation:* refuse, and warn only where the option cannot change the output, so a verification flag or a second source is never dropped.
+8. **The JSON shape for TrueHD in `iclforge.probe/1`.** Keep the `truehd` member and the keys it has, or move to `stream` with codec-specific content, with `sample_rate_hz`? Hearth's `media_info.cpp` reads this schema. *Recommendation:* keep the `truehd` member (additive, no version change), rename its keys to the `stream` member's (`sample_rate_hz`), and move the writer to `apps/shared/media`.
+9. **fMP4, HLS and DASH for TrueHD.** TH spec §21 names no MP4 or DASH signalling and `forge fmp4` refuses. Do you have a source for one? *Recommendation:* keep the refusal until one exists; the message is accurate.
+10. **Is TrueHD recording or live capture wanted?** The encoder ran about 5 times real time on 5.1 here, on a shared machine. *Recommendation:* `record` to a file with `codec=truehd` after phase 1; no live passthrough of a TrueHD encode.
+11. **Is there a TrueHD-capable receiver or capture device to test `play` against?** MAT over HDMI needs 8 channels at 192 kHz and nothing has been played into one. *Recommendation:* do `monitor` (decoded PCM) first; hold `play` until a receiver is available and the `libs/audio` page has added the format.
+12. **Should the GUI player stream the decode instead of holding it in memory?** A two-hour TrueHD film is about 11 GB decoded at 48 kHz in 8 channels. *Recommendation:* yes for the TrueHD path, with a bounded window; leave the AC-3 family's design alone.
+13. **One channel-mask convention for the CLI's WAVs.** TrueHD 5.1 writes side surrounds (0x60F), E-AC-3 5.1 writes back surrounds (0x3F). *Recommendation:* settle it with ERRATA question 16 and apply it in `decode`, `truehd-encode` and `levels` together.
+
+What blocks the most work: Q1 (phase 6 and X4), Q3 (T3, T4, P3, R13, R1's metadata), Q7 (X1 and everything that follows it), Q4 (T1, T2).
+
+## What was not determined
+
+- Whether `iclforge::audio::MonitorSink` takes 8 channels of 24-bit audio at 192 kHz (L2).
+- What a joined TrueHD stream needs at the seam: the access-unit timing words and the restart state were not examined (T2).
+- Every GUI cell and every live-audio cell: read only.
+- The speed figure for P7 is one run on a machine other jobs were using.

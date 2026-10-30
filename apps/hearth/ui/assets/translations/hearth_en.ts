@@ -2,9 +2,20 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="en">
 <context>
+    <name>DecoderTruehd</name>
+    <message numerus="yes">
+        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
+        <translation>
+            <numerusform>%1 · %2 kHz · %n substream of %3 channels</numerusform>
+            <numerusform>%1 · %2 kHz · %n substreams of %3 channels</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>Media</name>
     <message numerus="yes">
-        <location filename="../qml/Media.qml" line="346"/>
+        <location filename="../qml/Media.qml" line="351"/>
         <source>%n entries</source>
         <extracomment>How many edits an MP4 track&apos;s edit list holds, beside the label &apos;Edit list&apos;.</extracomment>
         <translation>
@@ -13,12 +24,28 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Media.qml" line="359"/>
+        <location filename="../qml/Media.qml" line="364"/>
         <source>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</source>
         <extracomment>The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.</extracomment>
         <translation>
             <numerusform>data rate %1 kbit/s · %n independent substream, %2 dependent · bsid %3 · %4%5</numerusform>
             <numerusform>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="571"/>
+        <source>%n substream(s), %1 channels</source>
+        <translation>
+            <numerusform>%n substream, %1 channels</numerusform>
+            <numerusform>%n substreams, %1 channels</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="627"/>
+        <source>%n byte(s) did not read as access units</source>
+        <translation>
+            <numerusform>%n byte did not read as an access unit</numerusform>
+            <numerusform>%n bytes did not read as access units</numerusform>
         </translation>
     </message>
 </context>
@@ -72,11 +99,27 @@
             <numerusform> bed + %n objects</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="706"/>
+        <source>%1 · %n channels</source>
+        <translation>
+            <numerusform>%1 · %n channel</numerusform>
+            <numerusform>%1 · %n channels</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>PlaySignalPathCard</name>
     <message numerus="yes">
-        <location filename="../qml/PlaySignalPathCard.qml" line="81"/>
+        <location filename="../qml/PlaySignalPathCard.qml" line="84"/>
+        <source>Substream %1, %n channels. Dialogue normalisation and dynamic range are read and not applied. Passthrough of TrueHD is not available, so it is decoded here.</source>
+        <translation>
+            <numerusform>Substream %1, %n channel. Dialogue normalisation and dynamic range are read and not applied. Passthrough of TrueHD is not available, so it is decoded here.</numerusform>
+            <numerusform>Substream %1, %n channels. Dialogue normalisation and dynamic range are read and not applied. Passthrough of TrueHD is not available, so it is decoded here.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlaySignalPathCard.qml" line="99"/>
         <source> · %n objects</source>
         <translation>
             <numerusform> · %n object</numerusform>

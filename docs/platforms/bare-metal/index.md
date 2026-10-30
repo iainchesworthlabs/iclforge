@@ -17,6 +17,11 @@ a decode does not fit a C6 beside WiFi, and on a board the play is refused.
 A Hearth sink built with the decoder takes AC-4 in a Sendspin group on the P4 and the S3
 ([Hearth](../../hearth/index.md#esp32-sinks)); the published P4 and S3 sink images have the decoder, the C6's has it off.
 
+TrueHD and MLP (`libs/truehd`) are in none of these builds: the component, the probes and the sinks do not
+compile the library, and nobody has measured what a decoder for its rates (up to 192 kHz) and channel counts (up to 8, or 16
+in the Atmos substream) would need from these parts. The variant table has the row, and the
+[roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) the work.
+
 The variant table keeps codec support, Hearth support, distribution and evidence separate.
 
 --8<-- "docs-snippets/generated/platform-bare-metal.md"

@@ -23,6 +23,9 @@ Item {
     readonly property var bitstream: root.media.bitstream ?? ({})
     readonly property var container: root.media.container ?? ({})
     readonly property var ac4: root.media.ac4
+    // A TrueHD or MLP item's stream (hearth_controller.cpp's media_truehd_to_map()), unset for the
+    // other codecs.
+    readonly property var truehd: root.media.truehd
     readonly property var ac4Metadata: root.ac4?.metadata ?? ({})
     readonly property int effectiveIndex: HearthController.inspectedIndex >= 0
                                           ? HearthController.inspectedIndex : HearthController.currentIndex
@@ -67,6 +70,8 @@ Item {
             case "eac3": return qsTr("E-AC-3");
             case "ac3+eac3": return qsTr("AC-3 core + E-AC-3");
             case "ac4": return qsTr("AC-4");
+            case "truehd": return qsTr("TrueHD");
+            case "mlp": return qsTr("MLP");
             default: return qsTr("unknown");
         }
     }
@@ -404,8 +409,8 @@ Item {
                         // item, which has its own "01 Stream" card in the
                         // right column instead - this one has nothing of its
                         // own to say for it (every field below reads
-                        // "unknown"/"none").
-                        visible: root.ac4 === undefined
+                        // "unknown"/"none"). A TrueHD item has its own "Stream" card.
+                        visible: root.ac4 === undefined && root.truehd === undefined
 
                         GridLayout {
                             columns: 2
@@ -470,7 +475,8 @@ Item {
                         ordinal: root.cardOrdinal(root.nBitstream)
                         title: qsTr("Bitstream information")
                         framed: true
-                        visible: root.ac4 === undefined && Object.keys(root.bitstream).length > 0
+                        visible: root.ac4 === undefined && root.truehd === undefined
+                                 && Object.keys(root.bitstream).length > 0
 
                         GridLayout {
                             columns: 2
@@ -529,6 +535,98 @@ Item {
                                       + (root.bitstream.original
                                          ? qsTr("original bitstream: yes") : qsTr("original bitstream: no"))
                                 color: Theme.text
+                            }
+                        }
+                    }
+                    Card {
+                        objectName: "truehdStreamCard"
+                        ordinal: root.cardOrdinal(1)
+                        title: qsTr("Stream")
+                        framed: true
+                        visible: root.truehd !== undefined
+
+                        GridLayout {
+                            columns: 2
+                            columnSpacing: Theme.gap
+                            rowSpacing: 4
+                            Layout.fillWidth: true
+
+                            Text { text: qsTr("Codec"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.truehd ? root.codecLabel(root.truehd.codec) : ""
+                                color: Theme.text
+                            }
+                            Text { text: qsTr("Sample rate"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.truehd ? qsTr("%1 kHz").arg(root.truehd.sampleRate / 1000) : ""
+                                color: Theme.text
+                            }
+                            Text { text: qsTr("Presentations"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                // The channels each substream decodes to: 2, 6 and 8 for a stream
+                                // with the three beds.
+                                text: root.truehd ? qsTr("%n substream(s), %1 channels", "", root.truehd.substreams)
+                                                        .arg(root.truehd.channels.join(" · ")) : ""
+                                color: Theme.text
+                                wrapMode: Text.WordWrap
+                            }
+                            Text { text: qsTr("Access units"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.truehd
+                                      ? qsTr("%1 · %2 samples each · %3")
+                                            .arg(Number(root.truehd.accessUnits).toLocaleString(Qt.locale(), "f", 0))
+                                            .arg(root.truehd.samplesPerAccessUnit)
+                                            .arg(root.formatDuration(root.media.durationSeconds))
+                                      : ""
+                                color: Theme.text
+                            }
+                            Text { text: qsTr("Bit rate"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.truehd?.bitrateKbps !== undefined
+                                      ? qsTr("%1 kbit/s, %2").arg(Math.round(root.truehd.bitrateKbps))
+                                            .arg(root.truehd.variableRate ? qsTr("variable") : qsTr("constant"))
+                                      : qsTr("unknown")
+                                color: Theme.text
+                            }
+                            Text { text: qsTr("Join points"); color: Theme.textMuted }
+                            Text {
+                                Layout.fillWidth: true
+                                // A decoder starts a TrueHD stream at a major sync only, so this is
+                                // how far a seek goes back to start decoding.
+                                text: root.truehd?.restartIntervalMs !== undefined
+                                      ? qsTr("%1 · one every %2 ms on average")
+                                            .arg(Number(root.truehd.majorSyncs).toLocaleString(Qt.locale(), "f", 0))
+                                            .arg(Math.round(root.truehd.restartIntervalMs))
+                                      : qsTr("none")
+                                color: Theme.text
+                                wrapMode: Text.WordWrap
+                            }
+                            Text {
+                                visible: root.truehd !== undefined && root.truehd.objectSubstream
+                                text: qsTr("Objects"); color: Theme.textMuted
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: root.truehd !== undefined && root.truehd.objectSubstream
+                                text: qsTr("An object layer is present and is not rendered; the bed plays.")
+                                color: Theme.text
+                                wrapMode: Text.WordWrap
+                            }
+                            Text {
+                                visible: root.truehd !== undefined && root.truehd.skippedBytes > 0
+                                text: qsTr("Skipped"); color: Theme.textMuted
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: root.truehd !== undefined && root.truehd.skippedBytes > 0
+                                text: root.truehd ? qsTr("%n byte(s) did not read as access units", "", root.truehd.skippedBytes) : ""
+                                color: Theme.text
+                                wrapMode: Text.WordWrap
                             }
                         }
                     }

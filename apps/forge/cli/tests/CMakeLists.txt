@@ -24,7 +24,9 @@ iclforge_add_test_binary(iclforge-forge-cli-tests PROJECT forge-cli SOURCES
     test_cli_options.cpp test_cli_synth.cpp test_cli_analysis.cpp
     test_cli_encode_paths.cpp test_cli_stream_edges.cpp
     test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp test_cli_karaoke_example.cpp
-    test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp)
+    test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp
+    test_cli_truehd.cpp test_cli_truehd_meta.cpp test_cli_decode_strict.cpp
+    test_cli_content_signature.cpp)
 # The same device-facing commands with a device to find: software ALSA
 # devices (tests/support/alsa_null_device.hpp), so only in the ALSA configuration.
 if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
@@ -46,6 +48,11 @@ target_compile_definitions(iclforge-forge-cli-tests PRIVATE
 # not. A path for the same reason ICLFORGE_EXTERNAL_BASELINE_DIR is one.
 target_compile_definitions(iclforge-forge-cli-tests PRIVATE
     "ICLFORGE_FUZZ_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/ac3/fuzz/seeds\"")
+# test_cli_containers.cpp refuses the protected MP4s that are also the MP4 fuzz harness's seeds
+# (tools/generators/gen_cenc_reader_fixtures.py makes them), read in place and named by path for the
+# same reason ICLFORGE_FUZZ_SEED_DIR is.
+target_compile_definitions(iclforge-forge-cli-tests PRIVATE
+    "ICLFORGE_MP4_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/containers/fuzz/seeds/fuzz_mp4_demux\"")
 # test_cli_karaoke_example.cpp probes the karaoke example's committed stream and encodes its
 # committed parts, which it reads from the example's own folder: the folder is what the example
 # ships, so it is read in place and not copied to testdata/.
@@ -83,4 +90,11 @@ target_link_libraries(iclforge-forge-cli-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::truehd
+        iclforge::objects
+        iclforge::json)
+# test_cli_truehd.cpp decodes and probes the FFmpeg fixtures of testdata/truehd, and holds the WAV to the
+# manifest's digests.
+target_compile_definitions(iclforge-forge-cli-tests PRIVATE
+    "ICLFORGE_TRUEHD_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/truehd\"")

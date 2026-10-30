@@ -12,8 +12,9 @@ own public API, CMake targets and binaries. When present, their own targets are 
     mp4       ->  iclforge::containers   (MP4/ISOBMFF, plus fMP4/CMAF + HLS/DASH)
     mpegts    ->  iclforge::containers   (MPEG-2 Transport Stream)
     iamf      ->  iclforge::containers   (IAMF writing)
-    capi      ->  iclforge::c            (C11 API over the codecs; AC-4 too with the ac4 feature)
+    capi      ->  iclforge::c            (C11 API over the codecs; AC-4 and TrueHD too with the ac4 and truehd features)
     ac4       ->  iclforge::ac4          (AC-4 decoding, encoding and reading)
+    truehd    ->  iclforge::truehd       (TrueHD and MLP reading, decoding and encoding)
     iab       ->  iclforge::iab          (SMPTE ST 2098-2 Immersive Audio Bitstream reading)
 
     target_link_libraries(main PRIVATE iclforge::containers)

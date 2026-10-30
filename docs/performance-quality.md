@@ -7,7 +7,7 @@ newest figures were measured on and says how old it is;
 [Where each number comes from](#where-each-number-comes-from) says which job
 measures each series and when.
 
-Each card has one line per codec (AC-3, E-AC-3, and AC-4). A figure is the worst case among that
+Each card has one line per codec (AC-3, E-AC-3, and AC-4), and the speed, allocation and live-growth cards add a TrueHD line once the series holds a TrueHD workload. A figure is the worst case among that
 codec's own workloads, except on the listening-quality card, which gives the range, and the
 workload it comes from is named beside it. The figures of two codecs come from different workloads
 and do not compare with each other. Each series is written by its own job, so a line recorded on
@@ -18,6 +18,13 @@ Atmos object layer. AC-4's decode quality is a series of its own on
 has no colour. The listening-quality card scores the encoders of all three codecs: AC-3 and E-AC-3
 from the [tool comparison](tool-comparison-trend.md), AC-4 from its own series,
 [AC-4 encode quality](quality-trend.md#ac-4-encode-quality).
+
+**TrueHD is in the speed, allocation and live-growth series, and in no quality series.** `iclforge-perf`,
+`iclforge-bench`, `iclforge-membench` and `iclforge-kernelbench` measure it
+([what is measured](performance-trend.md#what-is-measured-and-on-what)), and a lossless decoder has no quality
+figure to trend: its check is that FFmpeg's strict decode equals the source ([Validation: TrueHD](verification.md#truehd-and-mlp)).
+Its line appears on the cards once the trend history holds a TrueHD row. Instruction counts and image sizes on the small parts, and the
+per-platform pages, are on the [roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
 New to codec benchmarks: start with
 [How to read these numbers](#how-to-read-these-numbers).
@@ -317,6 +324,11 @@ ceiling) fails the build rather than merely being recorded.
   // traffic, which say nothing about each other.
   const CODECS = ["AC-3", "E-AC-3", "AC-4"];
 
+  // The codecs a speed or allocation line is drawn for: the three above, and TrueHD once the series
+  // holds a TrueHD workload. TrueHD is lossless, so it has no decode-accuracy or listening-quality
+  // line; the cards for those two keep CODECS.
+  const codecsOf = (picked) => (has(picked, "TrueHD") ? [...CODECS, "TrueHD"] : CODECS);
+
   // The `codec` field of a gold-reference record (main.jsonl) and of a tool-comparison one.
   const QUALITY_CODECS = { "ac3": "AC-3", "eac3": "E-AC-3" };
 
@@ -347,6 +359,10 @@ ceiling) fails the build rather than merely being recorded.
     "ac4_stereo_decode": ["AC-4", "stereo decode"],
     "ac4_51_encode": ["AC-4", "5.1 encode"],
     "ac4_51_decode": ["AC-4", "5.1 decode"],
+    "truehd_stereo_encode": ["TrueHD", "stereo encode"],
+    "truehd_stereo_decode": ["TrueHD", "stereo decode"],
+    "truehd_51_encode": ["TrueHD", "5.1 encode"],
+    "truehd_51_decode": ["TrueHD", "5.1 decode"],
   };
 
   const LAYOUTS = { "1": "mono", "2": "stereo", "6": "5.1", "8": "7.1" };
@@ -682,7 +698,7 @@ ceiling) fails the build rather than merely being recorded.
     const picked = slowestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Speed");
     const timed = rows.filter((r) => isNumber(r.ms_per_frame) && r.ms_per_frame > 0);
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       return e ? line(codec, formatMultiple(e.times) + "&times;", "",
         `${esc(e.words)} (${code(e.config)}) on ${code(e.leg)}${machineOf(rows, e)}: ${e.ms.toFixed(3)} ms/frame ` +
@@ -759,7 +775,7 @@ ceiling) fails the build rather than merely being recorded.
   function allocationCard(rows, noteFor = () => "") {
     const picked = heaviestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Allocation per frame");
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       return e ? line(codec, round0(e.value / 1024), "KB",
         `${esc(e.words)} (${code(e.config)})${isNumber(e.allocs) ? `: ${round0(e.allocs)} allocations a frame` : ""}.${noteFor(codec)}`) : noLine(codec);
@@ -775,7 +791,7 @@ ceiling) fails the build rather than merely being recorded.
     if (Object.keys(picked).length === 0) return emptyCard("Live growth");
     const windows = [...new Set(Object.values(picked).filter((e) => isNumber(e.frames)).map((e) => e.frames - 1))];
     const frames = windows.length === 1 ? String(windows[0]) : "about 200";
-    const lines = CODECS.map((codec) => {
+    const lines = codecsOf(picked).map((codec) => {
       const e = picked[codec];
       const over = e && e.value >= MEMORY_RETENTION_WARN_BYTES;
       return e ? line(codec, oneDecimal(e.value / 1024), "KiB",

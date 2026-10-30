@@ -52,8 +52,13 @@
 #include "tiered/mdct.hpp"
 #include "tiered/qmf.hpp"
 #include "real_audio.hpp"
+#include "kernel_bench.hpp"
 
 namespace {
+
+using perf::kernel_bench::g_sink;
+using perf::kernel_bench::KernelResult;
+using perf::kernel_bench::time_kernel;
 
 // The largest legal fbw mantissa count (chbwcod = 60: 37 + 3*(60+12) = 253 -
 // see exponents.cpp's own derivation). compute_bit_allocation/
@@ -61,41 +66,6 @@ namespace {
 // output are never coded, so every exponent/bit-allocation/mantissa kernel
 // below works on this many bins, not the full 256 mdct512_forward produces.
 constexpr std::size_t kEndmant = 253;
-
-// Sink every kernel's output value flows through before the run ends, so no
-// compiler can prove a benched call's result is unused and elide it.
-double g_sink = 0.0;
-
-struct KernelResult {
-    std::string name;
-    std::uint64_t iters = 0;
-    double ns_per_call = 0.0;
-};
-
-// Runs `fn` repeatedly until at least `min_ms` have elapsed (and at least 16
-// iterations, for kernels fast enough that 16 calls still beat min_ms) rather
-// than a hand-picked iteration count per kernel - the ~20x cost spread across
-// these kernels (a single quantize_mantissa call versus a full
-// ecpl_channel_spectrum) makes one fixed count either too slow for the cheap
-// kernels or too noisy for the expensive ones.
-template <typename Fn>
-KernelResult time_kernel(std::string name, Fn&& fn, double min_ms = 200.0) {
-    for (int i = 0; i < 3; ++i) {
-        fn();
-    }
-    std::uint64_t iters = 0;
-    const auto start = std::chrono::steady_clock::now();
-    double elapsed_ms = 0.0;
-    do {
-        fn();
-        ++iters;
-        elapsed_ms = std::chrono::duration<double, std::milli>(
-                         std::chrono::steady_clock::now() - start)
-                         .count();
-    } while (elapsed_ms < min_ms || iters < 16);
-    return {.name = std::move(name), .iters = iters,
-            .ns_per_call = elapsed_ms * 1.0e6 / static_cast<double>(iters)};
-}
 
 // One channel's real PCM, windowed and forward-transformed exactly like the
 // real encoder's per-block path (encoder.cpp / eac3_frame.cpp / atmos.cpp's
@@ -621,6 +591,8 @@ int main(int argc, char** argv) {
         }
         g_sink += static_cast<double>(iclforge::ac3::mantissa_bits_per_block(views));
     }));
+
+    perf::kernel_bench::add_truehd_kernels(results, audio.wav);
 
     for (const auto& r : results) {
         fmt::printf("%-28s %10llu iters  %10.1f ns/call\n", r.name.c_str(),

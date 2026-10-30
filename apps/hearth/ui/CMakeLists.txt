@@ -146,6 +146,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderPage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderEac3.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderAc4.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderTruehd.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/KaraokePage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LineMark.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricClock.qml"

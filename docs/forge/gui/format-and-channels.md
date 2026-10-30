@@ -22,7 +22,8 @@ anything is forcing it, the field reads *Codec — follows the channels* (or *fi
 mode*) and is disabled. With nothing forcing it — a plain bed, with or without its LFE — the
 choice is real (both codecs carry it, and VBR needs E-AC-3), so the field is live
 there. What never happens is a circular gate where extras are locked behind a codec the extras
-themselves change.
+themselves change. The codec is AC-3, E-AC-3 or AC-4 (AC-4 has its own tab); the window does not encode
+TrueHD or MLP, which `forge truehd-encode` does.
 
 The plan strip above the tabs updates live: `E-AC-3 · 7.1.4 · 192 kbps · .ec3` (or
 `quality 75 · ≥192 · ≤640` in VBR mode, bounds included), with a sub-line counting what differs

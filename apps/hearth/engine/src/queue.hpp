@@ -27,12 +27,21 @@
 
 namespace iclforge::hearth {
 
+// What an item is coded in, as far as the player is concerned with it: the output decision names a
+// codec the item cannot be sent as (TrueHD, whose passthrough is not available), and the window
+// names the codec of an item in its queue and Media page.
+enum class ItemCodec : std::uint8_t { kUnknown, kAc3, kEac3, kAc4, kTruehd, kMlp };
+
 // What a probe found out about one item. Every field is optional in effect:
 // an item that has not been probed yet has zeros, and the transport treats
 // that as "not known yet" rather than as a format.
 struct ItemFacts {
+    // What it is coded in; unknown until the item is opened.
+    ItemCodec codec = ItemCodec::kUnknown;
     // What it carries, and nullopt for anything IEC 61937 cannot wrap - a
-    // WAV. An AC-4 stream's is the burst type its largest frame needs
+    // WAV - or that this player does not send as it is: a TrueHD or MLP
+    // item's is always unset, because passthrough of TrueHD (MAT) is not
+    // available. An AC-4 stream's is the burst type its largest frame needs
     // (Session::open()).
     std::optional<audio::BitstreamFormat> stream = std::nullopt;
     std::uint32_t sample_rate = 0;
