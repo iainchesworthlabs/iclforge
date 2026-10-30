@@ -2424,9 +2424,21 @@ content and a delay of the first samples is allowed, because DEE's channel order
 
 The 13 streams in `testdata/truehd-dee` (0.25 s each: 2.0, 5.1 and 7.1 with three presentations, 48 and 96 kHz, 16, 20 and 24 bits, one DRC profile,
 an embedded timecode, and four lengths that are not a whole number of access units) are scored the same way with `--set testdata/truehd-dee`. On
-2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL. The full set of 2026-10-29 was scored
-before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128); its rescore and the last legs (group `truehd-last`) are in
-[planning/truehd-validation.md](../planning/truehd-validation.md), and the numbers go here when they are in.
+2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL.
+
+The full set was scored on 2026-10-29 before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128). **Rescored on 2026-10-31** with forge at `1e4ee5c3e` plus the alternative-reading
+switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day; [planning/truehd-validation.md](../planning/truehd-validation.md)): **87 PASS, 9 ALTER,
+46 UNEXPLAINED, 0 FAIL**, 34,600 lossless-check intervals ok and none failed; the three 300 s programmes (2.0, 5.1 and 7.1) 3 PASS (16,872 intervals ok, none failed). The five Atmos legs made
+from the owner's DAMF master (`obj-thd-atmos-sollevante`, `-dmx`, `-e12`, `-e14`, `-e16`) have no PCM source for the scorer and are test inputs for the decoder only (SKIP). The 46 UNEXPLAINED
+are 25 legs at 96 kHz and 21 stepped-tone legs at 48 kHz (a difference of one 24-bit step in 52,022 to 182,077 values whatever the DRC profile, the data-rate option or the loudness path), every
+one with its own lossless check ok on every interval and FFmpeg's decode not the source either; ERRATA question 50 has the figures and the diagnostic legs. The 9 ALTER are the legs whose DEE
+option alters the audio.
+
+**What the set scores of the provisional readings** (`forge decode truehd-reading=`, ERRATA question 101): the output shift and the lossless fold indexed by matrix channel are scored (with the
+shift by output position 32 of the 87 PASS legs stop being the source, 44 legs FAIL and 4,961 of 34,600 intervals fail; with the fold by position 13,320 intervals in 77 legs fail; with the
+library's reading none fails); noise generator 1's details are scored (the 76 legs the decoder stopped on on 2026-10-29 now decode with every interval ok, 49 of them the source); the 16-bit
+`seed_shr7` and the filter histories surviving a restart are **not** scored (no leg, short or 300 s, changes under the other reading: no DEE stream draws on generator 0's noise or filters from
+the first sample after a restart). To repeat it: `score_truehd_decode.py --decoder 'forge decode truehd-reading=zero-histories truehd-check=lenient'` and the like.
 
 The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
 `PROGRAM [ARGS] STREAM OUT.wav`. After the licence ends the script needs no DEE and reads the set as it is left. The

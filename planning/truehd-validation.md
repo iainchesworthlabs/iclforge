@@ -10,25 +10,31 @@ The rules are the work packages' (README, "Rules that apply to every package"). 
 compared with the PCM that went in; the owner's own discs may be probed with the repository's tools and the output pasted back; a mark is removed only
 with the evidence written into its ERRATA entry.
 
-## What is ready
+## State on 2026-10-31
 
-- A forge built from `github/main` at `1e4ee5c3e` (Release, no source changed): `D:/ac3bld/truehd-validation-build/bin/forge.exe`. To make another:
+Run on the owner's PC the same day, with the owner's answers (reading a DEE stream's channel-meaning fields on known inputs: yes; dialnorm 0 dropped; the reading switches: build them; TH-19 off on the
+discs; the Atmos master in Downloads: use it; the FFmpeg 6.1.1 check: yes):
 
-  ```powershell
-  $env:VCPKG_DOWNLOADS='C:/Repos/common/vcpkg-downloads'
-  $env:VCPKG_BINARY_SOURCES='clear;files,C:/Repos/common/vcpkg-cache,readwrite'
-  cmake --preset config-windows-msvc -B D:/ac3bld/truehd-validation-build -DICLFORGE_BUILD_HEARTH=OFF -DICLFORGE_BUILD_GUI=OFF -DVCPKG_MANIFEST_FEATURES= "-DVCPKG_INSTALLED_DIR=D:/ac3bld/truehd-validation-build/vcpkg_installed" "-DVCPKG_INSTALL_OPTIONS=--x-buildtrees-root=D:/ac3bld/truehd-validation-vcpkg/buildtrees;--x-packages-root=D:/ac3bld/truehd-validation-vcpkg/packages"
-  cmake --build D:/ac3bld/truehd-validation-build --target forge
-  ```
+- **Full rescore.** 142 legs (128 of 2026-10-29 and 14 `thd-last-*`): **87 PASS, 9 ALTER, 46 UNEXPLAINED, 0 FAIL**, 34,600 lossless-check intervals ok and none failed; the three 300 s programmes PASS.
+  Before the decoder fixes: 26 PASS, 5 ALTER, 97 FAIL of 128. The 46 UNEXPLAINED: 25 at 96 kHz and 21 stepped tones at 48 kHz (ERRATA 50). One scorer-side leg was wrong, not the decoder:
+  `thd-chn-70-8ch-48k24-wavlist` left the seventh source channel out of its slot list; corrected and remade (PASS).
+- **Atmos legs** from the DAMF master in Downloads (`sollevante`, 48 kHz): `obj-thd-atmos-sollevante`, `-dmx`, `-e12`, `-e14`, `-e16` made in the gold set (each 8 channels, 12,628,480 samples
+  decoded). No PCM source exists for the scorer, so they are test inputs for the decoder and the Atmos substream; another session's earlier DEE runs of the same master are in `D:/ac3bld/dee-atmos` and
+  were not touched or read.
+- **The reading switches** (`forge decode truehd-reading=`): scored over the set and the 300 s legs. TH-6 is scored (32 of 87 PASS legs fail with the shift by position; 77 legs fail the lossless check
+  with the fold by position). **TH-5 and TH-18 are not**: no leg changes under the other reading. ERRATA 5, 6, 18, 43 and 44 have the numbers.
+- **Channel meaning on known inputs** (ERRATA 51 to 55): the 6 and 8 channel dialogue norm is N, the 2 channel one is N + 6; mix level 35 and 29, source format 0, constant; DEE sets the 2 channel control bit only.
+- **Discs on D:** six Atmos streams of four discs probed with `detail=format` from the excerpts other sessions cut (`planning/truehd-disc-findings.md`, "The rest of the owner's discs"). TH-19 comes off on them.
+- **96 kHz and stepped tones:** the diagnostic legs (ERRATA 50): not a delay or a filter; a dense pattern at the source's amplitudes for an impulse source; nothing to change in forge.
 
-  It needs no `/wd4996` any more.
-- The checkout this page is in: `D:/ac3bld/iclforge-truehd-validation` (branch `feature/truehd-validation`). Do not edit it while `gen_dee_gold.py` runs.
-- Checked on 2026-10-31 with that forge: `python tools/checks/score_truehd_decode.py --set testdata/truehd-dee --forge <forge>` on the 13 committed DEE streams
-  gives 11 PASS, 2 UNEXPLAINED (`thd-fx-2ch-music-96k24`, `thd-fx-8ch-tones-96k24`), 0 FAIL, exit 0. The full set of 2026-10-29 has not been rescored with it.
-- Fourteen new legs in `tools/generators/gen_dee_gold.py`, group `truehd-last` (names `thd-last-*`), and the five sources they read; the sources were
-  generated into a scratch directory to check the code runs. No DEE leg has been made from them.
+**Still the owner's:**
+1. **A non-Atmos TrueHD disc, a 5.1 Atmos disc, and a Matroska or MP4 rip of an Atmos track** (section 3 below, commands unchanged; `F:` is a disc drive and has a disc in it, which the
+   session did not open). Without them ERRATA 15 and the container question stay open.
+2. **FFmpeg 6.1.1** for `verify_truehd_interop.py --handbuilt`: this PC has 8.0.1 only, which refuses 8 of the 29 hand-built checks. Getting 6.1.1 is a download (a Windows build of about 100 MB from
+   gyan.dev's archive, or the `ubuntu:24.04` image with `apt install ffmpeg`, about 80 MB through Docker Desktop): say which, or none.
+3. **Anything new to make with DEE by 2026-11-04.** Nothing is owed from the questions above; the next candidates are the Atmos master with `legacy_authoring=0` and a second Dolby-authored master.
 
-## 1. The full rescore (no DEE needed)
+## 1. The full rescore (done; to repeat, no DEE needed)
 
 The set of 2026-10-29 scored 26 PASS, 5 ALTER, 97 FAIL of 128 before the decoder fixes (`D:/ac3bld/dee-gold/REPORT.md`). Score it again with the forge above:
 
@@ -64,7 +70,7 @@ What it settles (WP6 item 1): the six and eight channel legs (the output shift b
 question 43; substreams that read their predecessor's rows, entry 34), the timecode legs (entry 50), the length legs (entry 14), the 300 second legs
 (question 18's restarts, 2,800 of them in the 2.0 programme), and which legs stay UNEXPLAINED (the 96 kHz ones, the stepped-tone DRC ones).
 
-## 2. The last DEE legs (before 2026-11-04; each takes seconds)
+## 2. The last DEE legs (done; each takes seconds)
 
 DEE 6.5.4 writes a dialnorm of **-31 to -1 only** (`--loudness-management skip:dialnorm=N`; its default, `measure_only`, writes the measured value), so a
 leg of "dialnorm 0" cannot be made. The legs already in the set carry -31, -24 and -1 on 2.0 and 7.1 and seven values on 5.1. What is added is a
@@ -100,7 +106,7 @@ owner said there is none, and this page assumes that.
 **Paste back**: the scorer's lines for `thd-last-` and its last line, the figures table of section 1 for the `truehd-scores-last.json`, and DEE's refusals
 if any (`grep refused` is not needed: the generator prints them).
 
-## 3. Disc probes (the owner's discs, the probe's output only)
+## 3. Disc probes (the owner's discs, the probe's output only; six streams done, see above)
 
 Three discs, chosen to cover what the two so far do not: **a non-Atmos TrueHD disc** (5.1 or 7.1: substreams without the 12 or 14 channel one, so
 whether the terminators, the heavy-DRC bit and the extra data are Atmos-only), **a 5.1 Atmos disc** (the stream whose `extended_substream_info`, substream
@@ -129,52 +135,39 @@ gives the CRC's coverage), 10 (the 16 bits after the lossless check, and where t
 other than 1), 46 (`extended_substream_info` 3), the width of `zero_samples` (a terminatorA on a disc that writes one), 15 (`substream_info` for
 one and three substreams), and second and third samples of `twoch_control_enabled`, `peak_data_rate` and the DRC start-up gain.
 
-## 4. The provisional marks: what removes each, and what exists
+## 4. The provisional marks: what removes each, and where it stands
 
-A mark comes off only when its ERRATA entry names the evidence (a score or a probe) with its numbers. The owner's rule for TH-5, TH-6, TH-18 and TH-19:
-they stay until the DEE set scores them. "A DEE leg scores a reading" needs the leg to depend on it, and the scorer cannot say that (it says the decode is
-the source, not that the leg exercises the feature). Question 5 proposes how to know without reading a stream.
+A mark comes off only when its ERRATA entry names the evidence with its numbers. Moved on 2026-10-31:
 
-| Mark (ERRATA) | What would remove it | Evidence now | Evidence due |
-|---|---|---|---|
-| Q5 / TH-5: `seed_shr7` 16 bits | a DEE stream with a generator 0 noise channel that decodes with the 16-bit reading and not the 32-bit one | v3.7 §17.2; FFmpeg on `hb_noise_generator_0` | the rescore, if a leg depends on it (question 5) |
-| Q6 / TH-6 and entries 12, 43, 45: lossless-check shift and `output_shift` by matrix channel | the 6 and 8 channel legs pass | v3.9 §7.3; two discs, 6 streams, every interval of the 2, 6 and 8 channel presentations ok; the committed 6 channel and 7.1 three-presentation streams pass | the rescore: the 6 and 8 channel legs, 36 of them with an 8 channel substream |
-| Q18 / TH-18 and entries 13, 42: filter histories survive a restart | a leg that fails when the histories are zeroed | v3.9 §9.6; FFmpeg; the disc streams do not use it (findings, Q 18) | the 2.0 300 s programme (2,800 restarts) passes; whether it depends on it is question 5 |
-| Q19 / TH-19 and entries 22, 19: extra-data length, check nibble | an Atmos or evolution stream that reads | v3.9 §16.2; 7,586 frames on two discs (every one: 64 bytes, length 31, parity right, nibble as the library has it now) | **none from DEE**: no Atmos master (question 3) |
-| Q43 / entry 44: noise generator 1's buffer, index, stride | the legs with a non-zero matrix noise shift pass | hand-built streams in FFmpeg and the Python reference; the disc streams do not shift noise | the rescore: 77 legs stopped on exactly this |
-| Entries 32, 33, 34, 48: 7.1 under 0x31EB, substream 1's row count, predecessor rows before matrices, the restart sync of substream 1 | the 8 channel legs pass | v3.9 §7.2 for 48; FFmpeg for the rest; the discs for 48 | the rescore |
-| Entry 14 / Q3: the end-of-stream marker and its count | the `thd-len-*` legs pass | v3.9 §3.5; the discs write none | the rescore: 4001, 12000, 12001 and 12039 samples passed on 2026-10-29 |
-| Entry 50 / Q49: bytes ahead of the first unit | the timecode legs pass | the committed `thd-fx-2ch-music-48k24-timecode` passes | the rescore: five timecode legs |
-| Entry 21: `block_data_bits` counts from the start of its field | a stream with `data_check_present` | FFmpeg on `hb_data_check` | a disc that sets it (section 3); DEE has no option for it |
-| Q9, Q10: the block data CRC, heavy DRC's place | a disc stream that sets them | none: both discs have `data_check_present` 0 and the 16 bits 0x0000/0x8000 | section 3 |
-| Q44, Q46: the extension's nibble, `extended_substream_info` 3 | a disc with another length, or the owner's answer | the discs: length 1, value 3 | section 3 |
-| Q51 to Q55: dialogue norm, mix level, source format, control bits, DRC start-up gain | known inputs read back; an answer from the owner | the discs' raw values | section 2 (dialnorm legs) if question 1 allows reading them |
-| Q50: the 96 kHz legs | an explanation of what DEE does to the input | the committed pair (every lossless check ok; FFmpeg equals forge; neither equals the source) | section 2 (impulse and band legs) |
-| Q16, Q17, Q21, Q56, entry 38's gains | the owner's decision | none | the owner |
-| Atmos reader F, entry 22's payload | an evolution frame from a stream whose bits are read | none | WP1 |
+| Mark (ERRATA) | State |
+|---|---|
+| Q6 / TH-6 and entries 12, 43: the lossless check's shift and `output_shift` by matrix channel | **Off.** v3.9 §7.3; four discs (six streams); the DEE set: 32 of 87 PASS legs fail with the shift by position, 13,320 intervals in 77 legs fail with the fold by position, none with the library's reading |
+| Q19 / TH-19: extra-data length and check nibble | **Off.** v3.9 §16.2; 11,376 regions on six streams of four discs; DEE cannot score it (the owner's decision) |
+| Q43 and entry 44: noise generator 1's buffer, index and stride | **Off (answered).** 76 legs stopped on it on 2026-10-29; 49 now PASS, 4 ALTER, 23 UNEXPLAINED, 26,236 of their intervals ok and none failed |
+| Q5 / TH-5: `seed_shr7` 16 bits | **Stays.** v3.7 §17.2. Not scored: no DEE leg changes with `seed-shr7-32` (142 short, 3 long). Needs a stream that draws on generator 0's noise |
+| Q18 / TH-18 and Q42: filter histories survive a restart | **Stays.** v3.9 §9.6. Not scored: no DEE leg changes with `zero-histories`. Needs a stream that filters from the first sample after a restart |
+| Q9, Q10: the block data CRC, heavy DRC's place | **Stay.** Six disc streams: `data_check_present` 0, the 16 bits 0x0000 or 0x8000 |
+| Q44, Q46, Q2: the extension's nibble, `extended_substream_info` 3 | **Stay** with more evidence: length 1 and value 3 on all six; a larger length is not seen |
+| Entry 14 / Q3, entry 50 / Q49, entries 32 to 34 and 48 | **Evidence exists, mark left for the owner:** the `thd-len-*` legs (41, 4,001, 12,000, 12,001, 12,039 samples) PASS; the five timecode legs PASS; the 6 and 8 channel legs PASS |
+| Q51 to Q55: channel meaning | **Measured** (ERRATA 51 to 55): 6/8 channel dialogue norm N, 2 channel N + 6; constants for the rest; units still the owner's |
+| Q50: the 96 kHz legs | **Open.** 25 legs; a dense pattern at the source's amplitudes for an impulse source (ERRATA 50) |
+| Q16, Q17, Q21, Q56, entry 38's gains | **The owner's decisions** |
+| Atmos reader F, entry 22's payload | **WP1** |
 
 ## Questions for the owner
 
-1. **May the metadata fields of a DEE stream be read to settle ERRATA 51 to 55?** WP6 item 6 and ERRATA 51 say to read the dialogue norm (and the other
-   fields) of the DEE legs with `forge probe`; README rule 4 and the decision of 2026-09-26 say a DEE stream is decoded and compared, never read for
-   format facts. The generator also stores `forge probe`'s output in the manifest for every leg, so the fields are already recorded. Until you say,
-   nothing here reads those fields. **Recommendation:** allow it for the dialogue norm, mix level, source format and control bits only, on legs
-   whose input value is known (the legs of section 2): a value you set and read back is a unit check, not a look at how DEE writes a stream.
-2. **Dialnorm 0 cannot be made** (DEE takes -31 to -1). The comparison "0 against another value" is therefore not available. **Recommendation:** use the
-   default (`measure_only`) leg of the same programme as the "unset" case if question 1 is yes, and give up the 0 case; the discs' fields show what a
-   Blu-ray encoder writes for it.
-3. **An Atmos master by 2026-11-04, or none.** On 2026-10-29 you said none; the Atmos substream, the evolution frame and Q19's score then have no DEE
-   evidence. **Recommendation:** none, and take Q19 off on the discs' 7,586 frames (question 6).
-4. **Which discs, and who pastes what** (section 3). **Recommendation:** the three kinds there, the probe text only, pasted by you or left on the PC for me.
-5. **A scoring test that needs no reading of a stream.** To know that a leg depends on the 16-bit `seed_shr7`, the filter histories or the
-   matrix-channel shift, decode it with the other reading and see it fail. That is a decode-and-compare, and it removes the mark with a number:
-   "passes with the library's reading, N values wrong with the other". It needs a switch in the decoder for each alternative (WP6 excludes decoder
-   changes that a mark's removal does not need; this one is needed). **Recommendation:** add the three switches, test-only, behind a `truehd-reading=`
-   option that `forge decode` refuses by name unless given, and score the set with each. Say yes and I build them before 2026-11-04.
-6. **TH-5, TH-6, TH-18 and TH-19 "until the DEE set scores them"**: TH-19 cannot be scored by DEE (question 3). **Recommendation:** TH-19 comes off
-   on the discs' evidence (entry 19 already has it); the other three wait for the rescore and question 5.
-7. **FFmpeg 8.0.1 refuses eight hand-built streams that 6.1.1 decodes.** `verify_truehd_interop.py --handbuilt --forge <forge>` on this PC (FFmpeg
-   8.0.1 from gyan.dev) reports 29 streams, 8 failing, all in FFmpeg: "No restart header present in substream 0" for `hb_filter_orders`, `hb_matrices`,
-   `hb_iir_state`, `hb_output_shift_permuted`, `hb_ch_assign_changes` and `hb_noise_generator_1` (48, 96 and 192 kHz). The script prints that the
-   outcomes were seen with 6.1.1. Not investigated. **Recommendation:** run the check against FFmpeg 6.1.1 (the oracle the ERRATA cites) and find
-   what 8.x checks that the streams do not meet, as a separate piece of work.
+Answered on 2026-10-31 (ERRATA 100 and 101 and sections above): reading the channel-meaning fields on known inputs, yes; dialnorm 0 dropped; an Atmos master exists (the DAMF in Downloads, used); the discs
+(those on D: probed; new ones are the owner's, section 3); the reading switches built; TH-19 off on the discs; the FFmpeg 6.1.1 check wanted.
+
+Open:
+
+1. **The 96 kHz and stepped-tone legs (46 UNEXPLAINED).** The 96 kHz impulse decodes to a dense pattern at the source's amplitudes, in forge and FFmpeg alike; the fold of the lossless check cannot tell a
+   misplaced sample from a right one. **Recommendation:** decode `D:/ac3bld/dee-gold/streams/thd-last-2ch-impulse-96k24/dee.mlp` with Dolby's own decoder or player if there is one, and tell me
+   what it gives; until then the legs stay UNEXPLAINED and forge does not change.
+2. **`normalize` for TrueHD.** DEE writes the 2 channel dialogue norm 6 above the multichannel one and sets only the 2 channel control bit. **Recommendation:** make `normalize` do the same (2 channel
+   field N + 6, at most 63, control bit on; 6 and 8 channel fields N). It is a change to a command the owner asked to leave as built; not done.
+3. **Which FFmpeg 6.1.1**, or none (State, item 2).
+4. **TH-5 and TH-18 have no DEE evidence and cannot get any** (DEE has no option for either). **Recommendation:** accept the hand-built streams in FFmpeg's decode and v3.7 and v3.9 as the evidence and
+   take both marks off, or leave them; I have left them.
+5. **Entries 14, 32 to 34, 48, 50 (evidence exists).** **Recommendation:** take the marks off with the numbers above; left for you because the rule you gave named only TH-5, 6, 18 and 19.
+6. **The 12 and 14 channel substream's `frac_bits` above 14** blocks a full lenient decode of every disc stream. Not a validation item; WP1.

@@ -56,9 +56,10 @@ the codec's name, as [layout.md](layout.md) decision 12 recommends. The ROADMAP'
   package; the Rust crate's build script lists no `libs/truehd` path. Each is a follow-up on the C API alone.
 - **A `.forgeproj` for TrueHD.** The project file's commands (`apps/shared/project`) do not name `truehd-encode`.
 - **MLP encoding.** The encoder writes TrueHD (`0xF8726FBA`); `forge truehd-encode` refuses an `.mlp` name.
-- **Scoring against DEE.** `tools/checks/score_truehd_decode.py` ran on the full set on 2026-10-29, before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of
-  128), and on the 13 committed streams on 2026-10-31 (11 PASS, 2 UNEXPLAINED). The full rescore has to be run on the owner's machine before 2026-11-06
-  ([planning/truehd-validation.md](truehd-validation.md); [Scoring DEE's TrueHD streams](../docs/verification.md#scoring-dees-truehd-streams)).
+- **Scoring against DEE.** Done on 2026-10-31 (it ran on 2026-10-29 first, before the decoder fixes: 26 PASS, 5 ALTER, 97 FAIL of 128): 142 legs, 87 PASS, 9 ALTER, 46 UNEXPLAINED
+  (25 at 96 kHz, 21 stepped tones at 48 kHz), 0 FAIL, 34,600 lossless-check intervals ok and none failed, and the three 300 s programmes PASS
+  ([Scoring DEE's TrueHD streams](../docs/verification.md#scoring-dees-truehd-streams); the owner's runbook and what each reading scored: [truehd-validation.md](truehd-validation.md)). The
+  UNEXPLAINED legs are open (ERRATA question 50).
 - **Readings that are this work's own** and wait for the owner: the WAV channel mask as TrueHD channels, the speakers the loudness
   weights are keyed on (`libs/truehd/ERRATA.md`, open questions 16 and 17), and the MAT carrier's rate and channel count in a WAV
   (`libs/containers/ERRATA.md`, open question 2).
