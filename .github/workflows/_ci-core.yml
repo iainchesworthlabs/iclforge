@@ -1117,6 +1117,12 @@ jobs:
       - name: TrueHD encoder against FFmpeg's strict decode (bit-exact)
         run: python3 tools/checks/verify_truehd_encode_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
 
+      # forge truehd-atmos: the object channels in substream 3 against the reference decoder and the
+      # WAV they came from, and the 7.1 bed against FFmpeg's strict decode, which leaves substream 3
+      # alone (libs/truehd/ERRATA.md entries 61 to 64).
+      - name: TrueHD Atmos encoder: objects against the reference, the bed against FFmpeg
+        run: python3 tools/checks/verify_truehd_atmos_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
+
       # The seeds that ever made the encoder write a stream a decoder disagreed with, replayed exactly
       # (REGRESSION_SEEDS in the script): deterministic and quick, so it gates. The unseeded search is
       # fuzz.yml's nightly job.

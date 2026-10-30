@@ -1292,6 +1292,8 @@ REFUSED = {}
 # What FFmpeg's strict decode does with a stream, where it is not "the signal it was built from,
 # whole", as seen with FFmpeg 6.1.1 (tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg
 # to this; with another major version only the "equal" outcomes are held):
+#   bed      - it decodes substreams 0 to 2 and leaves substream 3 alone: it returns the best
+#              presentation (`pcm_sha256` here is that presentation's), in its own order
 #   short    - it returns `returned` samples, the first `equal_samples` of them the signal's
 #   refused  - it fails
 #   decodes  - it decodes, and the library refuses the stream (REFUSED)
@@ -1343,17 +1345,24 @@ FFMPEG = {
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
     "hb_substream3_fine_matrices": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+        "outcome": "bed",
+        "columns": [0, 1, 2, 3, 6, 7, 4, 5],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "
+        "alone: it returns the 7.1 bed, the best presentation, in its own channel order "
+        "(ERRATA 33)",
     },
     "hb_atmos_objects": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+        "outcome": "bed",
+        "columns": [0, 1, 2, 3, 6, 7, 4, 5],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "
+        "alone: it returns the 7.1 bed, the best presentation, in its own channel order "
+        "(ERRATA 33)",
     },
 }
 ORACLE = {
     "equal": "ffmpeg",
     "short": "ffmpeg-short",
+    "bed": "ffmpeg-bed",
     "refused": "none",
     "decodes": "ffmpeg-only",
     "differs": "none",
@@ -1365,6 +1374,9 @@ def ffmpeg_outcome(name, rows, stream=None):
     outcome = dict(FFMPEG.get(name, {"outcome": "equal"}))
     if outcome["outcome"] == "short":
         outcome["pcm_sha256"] = hashlib.sha256(s32le(rows[: outcome["equal_samples"]])).hexdigest()
+    if outcome["outcome"] == "bed":  # FFmpeg returns the best presentation of the stream
+        best = expected(stream, "best")
+        outcome["pcm_sha256"] = hashlib.sha256(s32le(best)).hexdigest()
     if outcome["outcome"] == "differs":
         if name == "hb_mlp_word16":  # the bits below bit 8 cleared
             returned = [tuple(v >> 8 << 8 for v in row) for row in rows]
@@ -1446,7 +1458,8 @@ def generate(out):
         "was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). "
         "`ffmpeg` says what FFmpeg's strict decode of the stream does, as seen with "
         "ffmpeg_version (outcome equal: it returns that signal; the other outcomes are described "
-        "in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-only "
+        "in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-bed, "
+        "ffmpeg-only "
         "(FFmpeg decodes a stream the library refuses) or none. "
         "tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg and the library to it."
     )

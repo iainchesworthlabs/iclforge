@@ -1,5 +1,5 @@
 {
-  "_comment": "Made by tools/references/truehd_writer.py. pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). `ffmpeg` says what FFmpeg's strict decode of the stream does, as seen with ffmpeg_version (outcome equal: it returns that signal; the other outcomes are described in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-only (FFmpeg decodes a stream the library refuses) or none. tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg and the library to it.",
+  "_comment": "Made by tools/references/truehd_writer.py. pcm_sha256 is the SHA-256 of the signal each was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). `ffmpeg` says what FFmpeg's strict decode of the stream does, as seen with ffmpeg_version (outcome equal: it returns that signal; the other outcomes are described in their note), and `oracle` names the result: ffmpeg, ffmpeg-short, ffmpeg-bed, ffmpeg-only (FFmpeg decodes a stream the library refuses) or none. tools/checks/verify_truehd_interop.py --handbuilt holds FFmpeg and the library to it.",
   "ffmpeg_version": "6.1.1",
   "fixtures": [
     {
@@ -659,10 +659,21 @@
         "frac_bits_15",
         "matrices_6"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-bed",
       "ffmpeg": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
       },
       "codec": "truehd",
       "presentation": "all",
@@ -683,10 +694,21 @@
         "frac_bits_15",
         "matrices_6"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-bed",
       "ffmpeg": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -707,10 +729,21 @@
         "extra_data",
         "oamd"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-bed",
       "ffmpeg": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
       },
       "codec": "truehd",
       "presentation": "all",
@@ -732,10 +765,21 @@
         "extra_data",
         "oamd"
       ],
-      "oracle": "none",
+      "oracle": "ffmpeg-bed",
       "ffmpeg": {
-        "outcome": "refused",
-        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
       },
       "codec": "truehd",
       "presentation": "best",

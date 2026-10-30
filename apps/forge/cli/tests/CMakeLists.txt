@@ -78,7 +78,8 @@ target_include_directories(iclforge-forge-cli-tests PRIVATE
 # (apps/forge/cli/CMakeLists.txt's own ICLFORGE_BUILD_ADM guard).
 if(ICLFORGE_BUILD_ADM)
     target_sources(iclforge-forge-cli-tests PRIVATE test_cli_atmos_adm.cpp test_cli_atmos_iab.cpp
-                                                    test_cli_decode_adm.cpp test_cli_atmos_adm_ac4.cpp)
+                                                    test_cli_decode_adm.cpp test_cli_atmos_adm_ac4.cpp
+                                                    test_cli_truehd_adm.cpp)
     # These four build ADM and IAB fixtures with the libraries' own headers.
     target_link_libraries(iclforge-forge-cli-tests PRIVATE iclforge::adm)
     if(TARGET iclforge::iab)
