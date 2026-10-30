@@ -107,10 +107,9 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
         matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
         matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
         matrix.lsb_bypass = reader.read(1) != 0;
-        if (matrix.out_ch > context.max_matrix_chan) {
-            return std::unexpected(
-                Error{ErrorKind::kBadParameter, "matrix output channel above max_matrix_chan"});
-        }
+        // The field is 4 bits and a row buffer has 16 rows. The owner's discs send output channel 15
+        // in a 12 channel substream (max_matrix_chan 11), so the field is not held to
+        // max_matrix_chan (ERRATA.md entry 65).
         // frac_bits is 4 bits wide: every value is a width (frac_bits + 2); 15 is seen in substream 3
         // of the owner's discs, where the encoder sends finer coefficients (ERRATA.md entry 60).
         for (int c = 0; c < coefficients; ++c) {

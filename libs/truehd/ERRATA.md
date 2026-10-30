@@ -347,7 +347,9 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     between the restart header and the first block header. `tools/checks/truehd_substream3_search.py` tries every combination on the
     owner's excerpt and prints parameters and counts only. **Recommendation:** the owner runs it on one disc excerpt per disc; the reading
     that decodes the first restart intervals with every lossless check passing is built into the decoder and the Python reference,
-    and this question closes.
+    and this question closes. Status: the first disc excerpt shows (c) of entry 65 (the parse is off after the matrices); the script's first
+    run stopped on an empty segment, which it now skips, and it tries the output shifts and quantiser steps of the channels `min_chan` to
+    `max_chan` only and 16 coefficient presence bits as well.
 
 61. **Which channel is which object (TH spec §15.6, §15.16, §15.17; entry 61).** Entry 61 reads channel i of substream 3 as object i of the
     payload (beds, then ISF objects, then dynamic objects, TS 103 420 §5.6.4.8; a dynamic-object-only programme with an LFE has the LFE first).
@@ -811,6 +813,20 @@ payload codes them (so it equals `forge decode truehd-render=`'s output exactly)
 read as `atmos-adm` reads one: its LFE channels summed into channel 0 and every other channel, bed or object, a dynamic object on the path the
 master gives it (a bed channel pinned at its speaker's position; the stream's own beds, §15.6, are not written); the master's 24 bit samples
 survive. **Provisional, owner to confirm** (question 64).
+
+**65. What the owner's first disc shows of substream 3 (§7.2, §10.2, §15.3; entries 60 and 61).** One excerpt of one disc, 12 channels (the
+probe's and the search script's own output; nothing of the audio). (a) The restart header reads cleanly: sync 0x31EC (noise type 0),
+`min_chan` 8, `max_chan` 11, `max_matrix_chan` 11, a 12 entry `ch_assign` that is a permutation of 0 to 11, a restart header check. So
+substream 3 codes the channels 8 to 11 and its matrices read the 7.1 bed's rows 0 to 7 from substreams 0 to 2; it is not 12 independent
+channels, and the `ch_assign` order is the row order of the 12 outputs. (b) The first block header sends 13 primitive matrices with
+`frac_bits` 15, 11, 7, 13, 0, 12 and others, every coefficient the width `frac_bits + 2`, and a presence bit for each of the 12 matrix
+channels and the two noise channels; several matrices have output channel 15, above `max_matrix_chan`. The decoder refused that
+("matrix output channel above max_matrix_chan"); the field is 4 bits and a row buffer has 16 rows, so the limit is gone. (c) The fields after
+the matrices do not read: the output shifts and quantiser steps come out as 13, 14, 9, ... and the next filter has a 19 bit coefficient, so
+the parse is off by then, at a field before it or in the matrices past what was printed. (d) The evolution frames read as the EMDF container
+in 229 of 229 access units that carry extra data (payload id 11, 50 or 51 bytes), 227 of them a dynamic-object-only programme with an LFE,
+11 dynamic objects and one update block: the 12 channels are the LFE and 11 objects, as entry 61 reads them. The check nibble, framing and
+parity of all 229 pass. **Provisional**: (a), (b) and (d) are what the disc shows; (c) is the open part of question 60.
 
 ## Atmos, spec v3.6
 

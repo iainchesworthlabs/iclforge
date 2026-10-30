@@ -185,6 +185,33 @@ TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips",
     CHECK(read->matrices == matrices);
 }
 
+TEST_CASE("a matrix may write an output channel above max_matrix_chan", "[truehd][syntax]") {
+    // The 12 channel substream of the owner's discs has max_matrix_chan 11 and matrices whose output
+    // channel is 15 (ERRATA.md entry 65): the field is 4 bits and a row buffer has 16 rows.
+    BlockContext context;
+    context.min_chan = 0;
+    context.max_chan = 0;
+    context.max_matrix_chan = 1;
+    context.presence_flags = presence::kMatrix;
+
+    BlockHeaderSpec header;
+    MatrixSet matrices;
+    matrices.count = 1;
+    matrices.items[0].out_ch = 15;
+    matrices.items[0].frac_bits = 6;
+    matrices.items[0].present[0] = true;
+    matrices.items[0].coeff[0] = 40;
+    header.matrices = matrices;
+
+    iclforge::BitWriter writer;
+    write_block_header(writer, context, header);
+    const std::vector<std::byte> bytes = writer.take();
+    iclforge::BitReader reader(bytes);
+    auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    CHECK(read->matrices == matrices);
+}
+
 TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 0;

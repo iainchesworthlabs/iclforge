@@ -31,14 +31,16 @@ spec.loader.exec_module(ref)
 
 READINGS = {
     # how many coefficient-present bits a matrix sends
-    "coeffs": ("matrix+noise", "matrix", "chan+noise", "chan"),
+    # (the disc's substream 3 has min_chan 8, max_chan = max_matrix_chan = 11; "all" is the 16 rows)
+    "coeffs": ("matrix+noise", "matrix", "chan+noise", "chan", "all+noise", "all"),
     # when a matrix ends with a 4 bit noise shift
     "noise_shift": ("by_sync", "always", "never"),
     # the FIR filter's state flag (ERRATA 9) and the IIR filter's
     "fir_state_flag": (True, False),
     # how many output shifts and how many quantiser steps the header sends
-    "shift_count": ("matrix", "chan"),
-    "quant_count": ("chan", "matrix"),
+    # ("own" is the channels min_chan to max_chan only)
+    "shift_count": ("matrix", "chan", "own"),
+    "quant_count": ("chan", "matrix", "own"),
     # bits between the restart header's CRC and the first block header (0 in every other substream)
     "gap_bits": tuple(range(0, 33)),
 }
@@ -57,7 +59,10 @@ class Variant(ref.Substream):
 
     def matrix_count(self):
         kind = self.reading["coeffs"]
-        base = self.max_matrix_chan + 1 if kind.startswith("matrix") else self.max_chan + 1
+        if kind.startswith("all"):
+            base = 16
+        else:
+            base = self.max_matrix_chan + 1 if kind.startswith("matrix") else self.max_chan + 1
         return base + (ref.NOISE_CHANNELS if kind.endswith("+noise") else 0)
 
     def has_noise_shift(self):
@@ -112,14 +117,22 @@ class Variant(ref.Substream):
         if flags & 0x40 and bits.read(1):
             self.matrices = self.read_matrices(bits)
         if flags & 0x20 and bits.read(1):
-            count = (
-                self.max_matrix_chan if self.reading["shift_count"] == "matrix" else self.max_chan
-            )
-            self.output_shift = [bits.signed(4) for _ in range(count + 1)]
+            kind = self.reading["shift_count"]
+            count = {
+                "matrix": self.max_matrix_chan + 1,
+                "chan": self.max_chan + 1,
+                "own": self.max_chan - self.min_chan + 1,
+            }[kind]
+            self.output_shift = [bits.signed(4) for _ in range(count)]
             self.output_shift += [0] * (16 - len(self.output_shift))
         if flags & 0x10 and bits.read(1):
-            count = self.max_chan if self.reading["quant_count"] == "chan" else self.max_matrix_chan
-            self.quant = [bits.read(4) for _ in range(count + 1)]
+            kind = self.reading["quant_count"]
+            count = {
+                "chan": self.max_chan + 1,
+                "matrix": self.max_matrix_chan + 1,
+                "own": self.max_chan - self.min_chan + 1,
+            }[kind]
+            self.quant = [bits.read(4) for _ in range(count)]
             self.quant += [0] * (16 - len(self.quant))
         for ch in range(self.min_chan, self.max_chan + 1):
             if not bits.read(1):
@@ -214,6 +227,8 @@ def try_reading(data, reading, units):
             continue
         segments = list(segments_of(unit, entries, offset))
         entry, segment = segments[3]
+        if not segment:
+            continue
         has_restart = segment[0] & 0xC0 == 0xC0
         if not started and not has_restart:
             continue
@@ -239,7 +254,7 @@ def describe_restart(data, units):
             continue
         segments = list(segments_of(unit, entries, offset))
         entry, segment = segments[3]
-        if segment[0] & 0xC0 != 0xC0:
+        if not segment or segment[0] & 0xC0 != 0xC0:
             continue
         sub = ref.Substream(3)
         bits = ref.Bits(segment[:-2] if entry["crc_present"] else segment, 2)
@@ -271,7 +286,7 @@ def trace_first_block(data, units, reading, limit=800):
         if count < 4:
             continue
         entry, segment = list(segments_of(unit, entries, offset))[3]
-        if segment[0] & 0xC0 != 0xC0:
+        if not segment or segment[0] & 0xC0 != 0xC0:
             continue
         payload = segment[:-2] if entry["crc_present"] else segment
         bits = TracedBits(payload)
