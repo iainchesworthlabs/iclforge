@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
+  `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
+  Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
+  `apps/crucible/ui` and `apps/hearth/ui` with `tools/checks/coverage_report.sh -q`. Only Crucible had a floor before, and only on Windows.
+  The three floors are provisional until the job's first hosted run. `tools/dev/qt-sandbox-setup.sh PREFIX` does the same installation by hand
+  (aqtinstall at the pinned commit, the apt packages, and for Hearth a private prefix with mbedTLS, cpp-httplib with the repository's patch and
+  mdns.h, each download checked against a pinned SHA-256) and prints the configure line. `hearth_qmltests` now links the coverage target, so
+  the controllers it recompiles are instrumented like the other two windows' are.
+
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
