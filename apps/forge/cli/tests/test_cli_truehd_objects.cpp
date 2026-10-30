@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -11,6 +14,12 @@
 #include <vector>
 
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/render/layout.hpp"
+#include "iclforge/render/render.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/evolution.hpp"
 #include "platform/process.hpp"
 
 // `forge decode` on the object layer of a TrueHD Atmos stream (libs/truehd/ERRATA.md entry 61): the
@@ -157,4 +166,148 @@ TEST_CASE("decode objects_dir is refused where there are no objects to write",
                       " truehd-presentation=all",
                   log) == kExitInput);
     CHECK(read_text(log).find("no substream 3") != std::string::npos);
+}
+
+namespace {
+
+// The object audio metadata of a stream's evolution frames, as the library reads them, and the
+// first sample of the access unit each came in.
+struct OamdFrame {
+    std::uint64_t first_sample = 0;
+    iclforge::objects::oba::DecodedProgram program;
+};
+
+std::vector<OamdFrame> read_oamd_frames(const fs::path& file) {
+    std::ifstream in{file, std::ios::binary};
+    const std::vector<char> raw{std::istreambuf_iterator<char>{in},
+                                std::istreambuf_iterator<char>{}};
+    std::vector<std::byte> bytes(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        bytes[i] = static_cast<std::byte>(raw[i]);
+    }
+    namespace th = iclforge::truehd;
+    th::ElementaryReader reader(bytes);
+    std::vector<OamdFrame> frames;
+    std::uint64_t sample = 0;
+    int substreams = 0;
+    while (const auto unit = reader.next()) {
+        const auto parsed = th::parse_access_unit(*unit, substreams, true);
+        REQUIRE(parsed.has_value());
+        if (parsed->major_sync) {
+            substreams = parsed->major_sync->num_substreams;
+        }
+        if (parsed->extra_data) {
+            const auto evolution = th::read_evolution(*parsed->extra_data);
+            REQUIRE(evolution.container.has_value());
+            const auto program = iclforge::objects::oba::parse_payload(evolution.container->oamd());
+            REQUIRE(program.has_value());
+            frames.push_back({sample, *program});
+        }
+        sample += 40;
+    }
+    return frames;
+}
+
+}  // namespace
+
+TEST_CASE("truehd-render places the objects of substream 3 on the layout by their metadata",
+          "[forge-cli][truehd][atmos][render]") {
+    namespace oba = iclforge::objects::oba;
+    namespace render = iclforge::render;
+    const fs::path dir = scratch_dir();
+    const std::string layout_text = "L,R,C,LFE,Ls,Rs,Lrs,Rrs";
+    const fs::path raw_wav = dir / "render_raw.wav";
+    const fs::path fed_wav = dir / "render_fed.wav";
+    const fs::path log = dir / "render.log";
+    const std::string input = quoted(fixture("hb_atmos_objects.thd"));
+    REQUIRE(run_cli("decode " + input + " " + quoted(raw_wav) + " truehd-presentation=all", log) ==
+            0);
+    REQUIRE(run_cli("decode " + input + " " + quoted(fed_wav) + " truehd-presentation=all " +
+                        "truehd-render=" + layout_text,
+                    log) == 0);
+    CHECK(read_text(log).find("8 channel(s) (L R C LFE Ls Rs Lrs Rrs)") != std::string::npos);
+
+    const Pcm24 raw = read_pcm24(raw_wav);
+    const Pcm24 fed = read_pcm24(fed_wav);
+    REQUIRE(raw.channels == 12);
+    REQUIRE(fed.channels == 8);
+    const std::size_t frames = raw.samples.size() / 12;
+    REQUIRE(fed.samples.size() / 8 == frames);
+
+    const auto oamd = read_oamd_frames(fixture("hb_atmos_objects.thd"));
+    REQUIRE(oamd.size() == 2);
+    REQUIRE(oamd[1].first_sample == 640);
+
+    // The gains the layout renderer gives each object at each frame's positions, asked directly.
+    const auto layout = render::OutputLayout::parse(layout_text);
+    REQUIRE(layout.has_value());
+    render::LayoutRenderer panner(*layout, 48000);
+    const auto gains_of = [&](const oba::DynamicObject& state) {
+        oba::DisplayObject object;
+        object.position = state.position;
+        object.size = state.size;
+        object.gain_db = state.gain_db;
+        object.active = state.active;
+        panner.set_objects(std::span<const oba::DisplayObject>(&object, 1));
+        std::array<double, 8> gains{};
+        for (std::size_t slot = 0; slot < 8; ++slot) {
+            gains[slot] = static_cast<double>(panner.object_gain(0, slot));
+        }
+        return gains;
+    };
+    std::array<std::array<std::array<double, 8>, 11>, 2> gains{};
+    for (std::size_t f = 0; f < 2; ++f) {
+        REQUIRE(oamd[f].program.blocks.size() == 1);
+        REQUIRE(oamd[f].program.blocks[0].objects.size() == 11);
+        for (std::size_t i = 0; i < 11; ++i) {
+            gains[f][i] = gains_of(oamd[f].program.blocks[0].objects[i]);
+        }
+    }
+
+    // Channel 0 is the LFE and goes to the LFE feed, slot 3, at unity; channels 1 to 11 are the
+    // objects. Before sample 640 the first frame's positions hold (the first update takes effect at
+    // once); from 640 each speaker's gain moves to the second frame's over the update's 1536
+    // samples.
+    int worst = 0;
+    std::size_t worst_at = 0;
+    std::size_t worst_slot = 0;
+    for (std::size_t n = 0; n < frames; ++n) {
+        const double progress = n < 640 ? 0.0 : static_cast<double>(n - 640) / 1536.0;
+        for (std::size_t slot = 0; slot < 8; ++slot) {
+            double expected = slot == 3 ? static_cast<double>(raw.samples[n * 12]) : 0.0;
+            for (std::size_t i = 0; i < 11; ++i) {
+                const double gain =
+                    gains[0][i][slot] + (gains[1][i][slot] - gains[0][i][slot]) * progress;
+                expected += gain * static_cast<double>(raw.samples[n * 12 + 1 + i]);
+            }
+            const int diff = static_cast<int>(std::abs(
+                std::llround(expected) - static_cast<long long>(fed.samples[n * 8 + slot])));
+            if (diff > worst) {
+                worst = diff;
+                worst_at = n;
+                worst_slot = slot;
+            }
+        }
+    }
+    CAPTURE(worst_at, worst_slot);
+    CHECK(worst <= 1);
+    // The test means something only if the second frame moved the objects.
+    bool moved = false;
+    for (std::size_t i = 0; i < 11; ++i) {
+        moved = moved || gains[0][i] != gains[1][i];
+    }
+    CHECK(moved);
+}
+
+TEST_CASE("truehd-render is refused without the objects it places", "[forge-cli][truehd][atmos]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "render_refused.log";
+    const std::string input = quoted(fixture("hb_atmos_objects.thd"));
+    CHECK(run_cli("decode " + input + " " + quoted(dir / "r.wav") + " truehd-render=7.1", log) ==
+          kExitUsage);
+    CHECK(read_text(log).find("only truehd-presentation=all decodes") != std::string::npos);
+    CHECK(run_cli("decode " + input + " " + quoted(dir / "r.wav") +
+                      " truehd-presentation=all truehd-render=7.1.9.9",
+                  log) == kExitUsage);
+    CHECK(read_text(log).find("truehd-render is a speaker layout") != std::string::npos);
 }

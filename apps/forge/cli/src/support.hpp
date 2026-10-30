@@ -154,6 +154,9 @@ struct Options {
     // 'decode', 'levels' and 'loudness' of TrueHD and MLP only: the substreams to read (best, 2ch,
     // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
+    // decode of a TrueHD Atmos stream: the speaker layout to place the objects on instead of writing
+    // the channels of substream 3 (an iclforge::render::OutputLayout name or list); empty: none.
+    std::string truehd_render;
     bool truehd_lenient = false;
     // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
     // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without

@@ -2430,6 +2430,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_presentation = std::string{value};
             continue;
         }
+        if (command == "decode" && key == "truehd-render") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-render needs a speaker layout, such as 7.1 (got '{}')", token);
+                return false;
+            }
+            out.truehd_render = std::string{value};
+            continue;
+        }
         if (reads_truehd && key == "truehd-check") {
             if (value != "strict" && value != "lenient") {
                 fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);

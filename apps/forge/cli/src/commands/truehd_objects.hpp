@@ -3,7 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -11,6 +13,7 @@
 #include "../adm/decode_adm.hpp"
 #include "../support.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/render/layout.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 
 // The object layer of a TrueHD Atmos stream, read from substream 3 and the evolution frames
@@ -50,13 +53,23 @@ struct ObjectPlan {
 [[nodiscard]] ObjectPlan plan_object_channels(const iclforge::objects::oba::Program& program,
                                               int channels);
 
+class TrueHdObjectRenderer;
+
 // Takes the decoded access units of substream 3 in order and writes what `decode objects_dir=` and
 // `adm_out=` ask for: each channel as a mono WAV `object_NN.wav` (NN the channel, from 0), and a
 // Dolby Atmos Master ADM BW64 with the beds as DirectSpeakers and the dynamic objects as Objects
 // whose position blocks are the OAMD update blocks, timed from the access unit that carried them.
 class TrueHdObjectSink {
    public:
-    TrueHdObjectSink(std::string_view objects_dir, std::string_view adm_out);
+    // With a `layout` the objects are also placed on its speakers (rendered(),
+    // TrueHdObjectRenderer).
+    TrueHdObjectSink(std::string_view objects_dir, std::string_view adm_out,
+                     const std::optional<iclforge::render::OutputLayout>& layout = std::nullopt);
+    ~TrueHdObjectSink();
+    TrueHdObjectSink(TrueHdObjectSink&&) noexcept;
+    TrueHdObjectSink& operator=(TrueHdObjectSink&&) noexcept;
+    TrueHdObjectSink(const TrueHdObjectSink&) = delete;
+    TrueHdObjectSink& operator=(const TrueHdObjectSink&) = delete;
 
     // False when a file could not be written (the message is on stderr).
     [[nodiscard]] bool add(const iclforge::truehd::DecodedAccessUnit& unit);
@@ -65,6 +78,13 @@ class TrueHdObjectSink {
     // The exit code.
     [[nodiscard]] int finish(FILE* status);
     void abort();
+
+    // The unit last added, rendered to the layout's speakers: interleaved 24 bit values, the slots
+    // named by rendered_names(). Empty and 0 slots when no layout was given.
+    [[nodiscard]] bool rendering() const noexcept { return renderer_ != nullptr; }
+    [[nodiscard]] std::size_t rendered_slots() const noexcept;
+    [[nodiscard]] const std::string& rendered_names() const noexcept;
+    [[nodiscard]] std::span<const std::int32_t> rendered() const noexcept { return rendered_; }
 
     [[nodiscard]] std::uint64_t oamd_payloads() const noexcept { return oamd_payloads_; }
     [[nodiscard]] const ObjectPlan& plan() const noexcept { return plan_; }
@@ -86,6 +106,8 @@ class TrueHdObjectSink {
     std::uint64_t oamd_unread_ = 0;
     std::uint64_t program_changes_ = 0;
     AdmMasterInput adm_;
+    std::unique_ptr<TrueHdObjectRenderer> renderer_;
+    std::vector<std::int32_t> rendered_;
 };
 
 // The ADM master of a presentation's bed alone: each channel a DirectSpeakers channel at the room

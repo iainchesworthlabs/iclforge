@@ -26,6 +26,7 @@
 #include "../support.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
+#include "iclforge/render/layout.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
@@ -267,8 +268,8 @@ std::string_view key_of_spelling(std::string_view spelling) {
     return spelling.ends_with('=') ? spelling.substr(0, spelling.size() - 1) : spelling;
 }
 
-// Whether the spelling names one value of an option ("detail=evolution"), which applies that value and
-// no other, and not the option ("json=").
+// Whether the spelling names one value of an option ("detail=evolution"), which applies that value
+// and no other, and not the option ("json=").
 bool spells_a_value(std::string_view spelling) {
     const auto equals = spelling.find('=');
     return equals != std::string_view::npos && equals + 1 < spelling.size();
@@ -281,8 +282,8 @@ constexpr std::array<std::string_view, 3> kTransformChoices{"fast-mdct", "fast-i
 // Options that assert something about a stream (or record what was read of it). One that is not
 // applied would let the run pass without having checked anything.
 constexpr std::array<std::string_view, 9> kVerifications{
-    "verify-content", "check-content", "unanchored-ok", "trust-anchor", "pin",
-    "verify-time",    "verify-objects", "gate-objects", "syntax-trace"};
+    "verify-content", "check-content",  "unanchored-ok", "trust-anchor", "pin",
+    "verify-time",    "verify-objects", "gate-objects",  "syntax-trace"};
 
 // The tokens, `separator` between them.
 std::string join(std::span<const std::string_view> tokens, std::string_view separator) {
@@ -444,10 +445,27 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
         fmt::println(stderr, "error: {}", forge_cli::adm_capability().reason);
         return kExitInput;
     }
+    std::optional<iclforge::render::OutputLayout> render_layout;
+    if (!meta.truehd_render.empty()) {
+        if (!objects) {
+            fmt::println(stderr,
+                         "error: truehd-render= places the objects of substream 3, which only "
+                         "truehd-presentation=all decodes");
+            return kExitUsage;
+        }
+        render_layout = iclforge::render::OutputLayout::parse(meta.truehd_render);
+        if (!render_layout) {
+            fmt::println(stderr,
+                         "error: truehd-render is a speaker layout such as 7.1, 5.1.4 or "
+                         "L,R,C,LFE,Ls,Rs,Lrs,Rrs (got '{}')",
+                         meta.truehd_render);
+            return kExitUsage;
+        }
+    }
     std::optional<TrueHdObjectSink> object_sink;
     std::optional<TrueHdBedSink> bed_sink;
-    if (objects && (!objects_dir.empty() || !adm_out.empty())) {
-        object_sink.emplace(objects_dir, adm_out);
+    if (objects && (!objects_dir.empty() || !adm_out.empty() || render_layout)) {
+        object_sink.emplace(objects_dir, adm_out, render_layout);
     } else if (!adm_out.empty()) {
         bed_sink.emplace(adm_out);
     }
@@ -460,6 +478,7 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     Pcm24Wav wav;
 
     int channels = 0;
+    int written_channels = 0;  // the WAV's: the layout's speakers with truehd-render=
     std::uint32_t rate = 0;
     int substream = 0;
     std::uint64_t samples = 0;
@@ -517,28 +536,6 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             }
         } else if (*result) {
             const th::DecodedAccessUnit& decoded = **result;
-            if (channels == 0) {
-                const std::uint32_t mask = channel_mask(decoded.layout, decoded.channels);
-                if (!wav.open(out_path, decoded.channels, decoded.sample_rate, mask)) {
-                    fmt::println(stderr, "error: cannot write {}", out_path);
-                    return kExitOutput;
-                }
-                channels = decoded.channels;
-                rate = decoded.sample_rate;
-                substream = decoded.substream;
-                layout_text = channel_names(decoded.layout);
-            } else if (decoded.channels != channels || decoded.sample_rate != rate) {
-                fmt::println(
-                    stderr,
-                    "error: {}: access unit {}: the channel count or the sample rate changes",
-                    in_path, index);
-                failed = true;
-                break;
-            }
-            if (!wav.write(decoded.pcm)) {
-                fmt::println(stderr, "error: cannot write {}", out_path);
-                return kExitOutput;
-            }
             if (object_sink) {
                 if (decoded.substream != kObjectSubstream) {
                     fmt::println(stderr, "error: {}: the stream has no substream 3, so no objects",
@@ -552,6 +549,35 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
                 }
             } else if (bed_sink && !bed_sink->add(decoded)) {
                 return kExitUsage;
+            }
+            // truehd-render=: the speaker feeds of the objects are the output, not the channels.
+            const bool rendered = object_sink && object_sink->rendering();
+            const int out_channels =
+                rendered ? static_cast<int>(object_sink->rendered_slots()) : decoded.channels;
+            if (channels == 0) {
+                const std::uint32_t mask =
+                    rendered ? 0U : channel_mask(decoded.layout, decoded.channels);
+                if (!wav.open(out_path, out_channels, decoded.sample_rate, mask)) {
+                    fmt::println(stderr, "error: cannot write {}", out_path);
+                    return kExitOutput;
+                }
+                channels = decoded.channels;
+                rate = decoded.sample_rate;
+                substream = decoded.substream;
+                layout_text =
+                    rendered ? object_sink->rendered_names() : channel_names(decoded.layout);
+                written_channels = out_channels;
+            } else if (decoded.channels != channels || decoded.sample_rate != rate) {
+                fmt::println(
+                    stderr,
+                    "error: {}: access unit {}: the channel count or the sample rate changes",
+                    in_path, index);
+                failed = true;
+                break;
+            }
+            if (!wav.write(rendered ? object_sink->rendered() : decoded.pcm)) {
+                fmt::println(stderr, "error: cannot write {}", out_path);
+                return kExitOutput;
             }
             samples += static_cast<std::uint64_t>(decoded.samples);
             padding += static_cast<std::uint64_t>(decoded.padding_samples);
@@ -570,7 +596,7 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     const auto& counters = decoder.counters();
     const auto& major_sync = decoder.major_sync();
     status_println(status, "{} {} Hz, {} channel(s){}, substream {}",
-                   major_sync ? codec_name(*major_sync) : "TrueHD", rate, channels,
+                   major_sync ? codec_name(*major_sync) : "TrueHD", rate, written_channels,
                    layout_text.empty() ? "" : fmt::format(" ({})", layout_text), substream);
     status_println(status, "  {} access unit(s) read, {} decoded, {} sample(s) a channel{}", index,
                    counters.units_decoded, samples,
@@ -705,7 +731,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("schema", "iclforge.probe/1");
         json.member("generator", iclforge::ac3::version_full);
         json.member("file", in_path);
-        // container_json writes the member's key and value, as write_container does for AC-3 and AC-4.
+        // container_json writes the member's key and value, as write_container does for AC-3 and
+        // AC-4.
         if (container_json) {
             container_json(json);
         } else {

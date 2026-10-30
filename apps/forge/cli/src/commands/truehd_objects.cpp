@@ -16,6 +16,7 @@
 #include "../exit_codes.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
+#include "truehd_render.hpp"
 
 namespace forge_cli::commands {
 
@@ -72,8 +73,26 @@ ObjectPlan plan_object_channels(const oba::Program& program, int channels) {
     return plan;
 }
 
-TrueHdObjectSink::TrueHdObjectSink(std::string_view objects_dir, std::string_view adm_out)
-    : objects_dir_(objects_dir), adm_out_(adm_out) {}
+TrueHdObjectSink::TrueHdObjectSink(std::string_view objects_dir, std::string_view adm_out,
+                                   const std::optional<iclforge::render::OutputLayout>& layout)
+    : objects_dir_(objects_dir), adm_out_(adm_out) {
+    if (layout) {
+        renderer_ = std::make_unique<TrueHdObjectRenderer>(*layout, 48000);
+    }
+}
+
+TrueHdObjectSink::~TrueHdObjectSink() = default;
+TrueHdObjectSink::TrueHdObjectSink(TrueHdObjectSink&&) noexcept = default;
+TrueHdObjectSink& TrueHdObjectSink::operator=(TrueHdObjectSink&&) noexcept = default;
+
+std::size_t TrueHdObjectSink::rendered_slots() const noexcept {
+    return renderer_ ? renderer_->slots() : 0;
+}
+
+const std::string& TrueHdObjectSink::rendered_names() const noexcept {
+    static const std::string kNone;
+    return renderer_ ? renderer_->slot_names() : kNone;
+}
 
 bool TrueHdObjectSink::open_files(const th::DecodedAccessUnit& unit) {
     opened_ = true;
@@ -122,6 +141,9 @@ void TrueHdObjectSink::read_metadata(const th::DecodedAccessUnit& unit) {
     if (!program_) {
         program_ = decoded->program;
         plan_ = plan_object_channels(*program_, unit.channels);
+        if (renderer_) {
+            renderer_->set_plan(plan_);
+        }
     } else if (oba::object_count(decoded->program) != oba::object_count(*program_) ||
                decoded->program.bed != program_->bed ||
                decoded->program.dynamic_only != program_->dynamic_only) {
@@ -148,9 +170,15 @@ void TrueHdObjectSink::read_metadata(const th::DecodedAccessUnit& unit) {
                 channel.dynamic_index >= block.objects.size()) {
                 continue;
             }
-            adm_.channels[i].updates.push_back({.sample_offset = sample,
-                                                .ramp_duration_samples = block.ramp_duration,
-                                                .state = block.objects[channel.dynamic_index]});
+            if (renderer_) {
+                renderer_->add_update(i, sample, block.ramp_duration,
+                                      block.objects[channel.dynamic_index]);
+            }
+            if (!adm_out_.empty()) {
+                adm_.channels[i].updates.push_back({.sample_offset = sample,
+                                                    .ramp_duration_samples = block.ramp_duration,
+                                                    .state = block.objects[channel.dynamic_index]});
+            }
         }
     }
 }
@@ -170,6 +198,9 @@ bool TrueHdObjectSink::add(const th::DecodedAccessUnit& unit) {
 
     const auto channels = static_cast<std::size_t>(unit.channels);
     const auto samples = static_cast<std::size_t>(unit.samples);
+    if (renderer_) {
+        renderer_->render(unit.pcm, channels, samples, rendered_);
+    }
     std::vector<float> column(samples);
     for (std::size_t ch = 0; ch < channels; ++ch) {
         for (std::size_t i = 0; i < samples; ++i) {
