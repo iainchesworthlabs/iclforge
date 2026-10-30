@@ -58,6 +58,8 @@ PROGRAMMES = [
     ("music-20-96-24", ("flac", "programme_music_stereo.flac"), 96000, 2, 24, 10.0),
     ("ref-51-48-24", ("ref51",), 48000, 6, 24, 5.0),
     ("ref-51-96-24", ("ref51",), 96000, 6, 24, 5.0),
+    ("music-20-192-24", ("flac", "programme_music_stereo.flac"), 192000, 2, 24, 5.0),
+    ("ref-71-48-24", ("ref51",), 48000, 8, 24, 5.0),
 ]
 DAMAGE_STREAM = "ref-51-48-24"
 DAMAGE = (
