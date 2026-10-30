@@ -339,6 +339,21 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
     presentation whose control bit is set.
 
+90. **Substreams at 176.4 and 192 kHz with more than 2 channels (TH spec §9.6; entry 90).** The encoder writes one substream at these
+    rates, as §9.6 says, and FFmpeg 8.0.1's strict decode (the version `.github/workflows/_ci-core.yml` pins) refuses every such stream of
+    3 to 6 channels: `Assignment of matrix channel 0 to invalid output channel -22 is not implemented`, then `No restart header present in
+    substream 0`. The same decode takes the stereo streams, and takes the encoder's streams at 44.1, 48, 88.2 and 96 kHz. FFmpeg's own
+    encoder writes 192 kHz 3 and 6 channel streams as two substreams (2 and the rest, as it does at 48 kHz), which its decoder reads, and
+    forge written that way (a temporary one-line change to the layout, not kept) decodes in FFmpeg too: 3 channels 266,956 bytes against
+    FFmpeg's 270,482, 6 channels 648,754 against 565,828. The `fuzz_truehd_encoder_space.py` cases at 176.4 and 192 kHz with 3 or more
+    channels fail on this (10 of 110 in a 4 s run), as do `synth-6ch-192` of `verify_truehd_encode_interop.py --full` and the 192 kHz
+    5.1 row of `compare_truehd_encoders.py --programme`. DEE has no option for these rates, so no oracle but FFmpeg answers it. Does §9.6
+    forbid a second substream at 176.4 and 192 kHz, or does it only limit the filter order there? **Recommendation:** if §9.6 limits the
+    order only, write 2 + the rest as FFmpeg's encoder does, since the one reader that exists refuses the other; if it forbids a second
+    substream, keep one and have `truehd-encode` refuse 3 or more channels at these rates with a sentence, since the stream it writes
+    today plays nowhere the owner can test. Left as it is until answered; `compare_truehd_encoders.py` lists the rows as an FFmpeg
+    refusal, not a failure of forge.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -1091,3 +1106,16 @@ does not read, extract the TrueHD stream with any tool first and probe that.
 The tests of these fields are in `apps/forge/cli/tests/test_cli_truehd.cpp` (a stream with a Thrift payload in one frame and OAMD alone in the others, whose output is
 checked for not containing any of its values; the FFmpeg fixtures; the hand-built 16-channel and LSB bypass streams) and in
 `libs/truehd/tests/decoder/test_substream3.cpp` (the decoder's counters).
+
+## Encoder quality (WP5)
+
+**90. A channel's own output shift and quantiser step (TH spec §8.2).** The encoder sent one output shift and one quantiser step for
+all channels, the smallest the whole interval allowed. A 5.1 programme whose L, R, Ls and Rs are 16 bit material (7 or 8 clear low bits)
+and whose C and LFE use all 24 bits then sent the low 8 bits of four channels for nothing: `thd-fx-6ch-music-48k24` was 101,314 bytes
+against FFmpeg's 63,254 and DEE's 58,688. The block header carries a shift for each matrix channel and a step for each channel, the
+decoder keeps both per channel (`state.quant_step[ch]`, the matrix keeps the low bits its output channel's step clears), and FFmpeg's
+strict decode reads them: the encoder now finds each channel's clear low bits in the interval and sends them as that channel's shift
+(at most 7) and step (the rest, at most 15). A pair matrix is tried only between rows with the same shift and step (the fold is then the
+same arithmetic in both). The standard downmix folds channels into each other with one step, so a stream with it keeps the common one.
+The same 5.1 stream is 56,672 bytes. The size is the evidence and the strict decode the check; how another encoder chooses a channel's step
+is not looked at (README rule 4 of the work packages).

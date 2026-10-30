@@ -103,8 +103,8 @@ struct StageSpec {
 // than 6 channels (a channel above 5) only with noise_type set, whether or not the stream uses
 // noise (ERRATA.md entry 32), and §7.2 says substream 1 SHALL carry 0x31EB unless it is the last
 // substream of a 6 channel presentation, i.e. unless the stream has no third substream (ERRATA.md
-// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are zero
-// and no matrix draws on a noise channel.
+// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are
+// zero and no matrix draws on a noise channel.
 [[nodiscard]] bool noise_flag(const StageSpec& stage, std::size_t index,
                               std::size_t stage_count) noexcept {
     return stage.last_row > 5 || (index == 1 && stage_count > 2);
@@ -843,7 +843,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
     // asked for, so a caller that gives less than an interval a call (one access unit at a time, as
     // a live caller does) would copy the whole of the pending input 128 times an interval, which
     // measured 7.5 times the time of one call with the lot (tests/performance, truehd_51_encode).
-    if (const std::size_t needed = impl.pending.size() + pcm.size(); needed > impl.pending.capacity()) {
+    if (const std::size_t needed = impl.pending.size() + pcm.size();
+        needed > impl.pending.capacity()) {
         impl.pending.reserve(std::max(needed, 2 * impl.pending.capacity()));
     }
     for (const std::int32_t sample : pcm) {
@@ -917,13 +918,31 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     // has shift 7 and step 1.
     const int zero_bits =
         seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
-    const int output_shift = std::min(zero_bits, kMaxOutputShift);
-    const int quant = zero_bits - output_shift;
+    // Each channel has its own output shift and quantiser step (TH spec §8.2): a 5.1 programme
+    // whose front and surround channels come from 16 bit sources and whose centre and LFE do not
+    // sends the low 8 bits of four channels for nothing if one step serves all six. The downmix
+    // presentations fold channels into each other with one step, so they keep the common one.
+    std::vector<int> shifts(static_cast<std::size_t>(channels));
+    std::vector<int> quants(static_cast<std::size_t>(channels));
+    for (int c = 0; c < channels; ++c) {
+        int bits = zero_bits;
+        if (!downmix_plan.active) {
+            std::uint32_t used = 0;
+            for (const std::int32_t v : original[static_cast<std::size_t>(c)]) {
+                used |= static_cast<std::uint32_t>(v);
+            }
+            bits = used == 0 ? zero_bits
+                             : std::min(std::countr_zero(used), kMaxOutputShift + kMaxQuantStep);
+        }
+        shifts[static_cast<std::size_t>(c)] = std::min(bits, kMaxOutputShift);
+        quants[static_cast<std::size_t>(c)] = bits - shifts[static_cast<std::size_t>(c)];
+    }
+    const int output_shift = *std::max_element(shifts.begin(), shifts.end());
     std::vector<Plane> rows = original;
-    if (output_shift > 0) {
-        for (Plane& plane : rows) {
-            for (std::int32_t& v : plane) {
-                v >>= output_shift;
+    for (int c = 0; c < channels; ++c) {
+        if (shifts[static_cast<std::size_t>(c)] > 0) {
+            for (std::int32_t& v : rows[static_cast<std::size_t>(c)]) {
+                v >>= shifts[static_cast<std::size_t>(c)];
             }
         }
     }
@@ -940,7 +959,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     std::vector<Plane> coded_rows = rows;  // becomes the rows as they are coded, before matrices
     std::vector<MatrixSpec> fold_matrices;
     if (downmix_plan.active &&
-        fold_downmix(downmix_plan, quant, output_shift, coded_rows, fold_matrices)) {
+        fold_downmix(downmix_plan, quants[0], output_shift, coded_rows, fold_matrices)) {
         ++stats.downmix_reduced_intervals;
     }
     std::vector<MatrixSpec> pair_matrices;
@@ -949,9 +968,14 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             for (int a = stage.first_row; a < stage.last_row; ++a) {
                 if (static_cast<std::size_t>(a + 1) >= layout.size() ||
                     !is_pair(layout[static_cast<std::size_t>(a)],
-                             layout[static_cast<std::size_t>(a + 1)])) {
+                             layout[static_cast<std::size_t>(a + 1)]) ||
+                    shifts[static_cast<std::size_t>(a)] !=
+                        shifts[static_cast<std::size_t>(a + 1)] ||
+                    quants[static_cast<std::size_t>(a)] !=
+                        quants[static_cast<std::size_t>(a + 1)]) {
                     continue;
                 }
+                const int quant = quants[static_cast<std::size_t>(a)];
                 const double baseline =
                     prediction_cost(coded_rows[static_cast<std::size_t>(a)]) +
                     prediction_cost(coded_rows[static_cast<std::size_t>(a + 1)]);
@@ -997,7 +1021,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
         }
         for (const MatrixSpec& matrix : stage.matrices) {
-            apply_matrix(matrix, stage.outputs, quant);
+            apply_matrix(matrix, stage.outputs, quants[matrix.out_ch]);
         }
         stats.matrices_used += stage.matrices.size();
         stage.coded.assign(coded_rows.begin() + stage.spec.first_row,
@@ -1019,6 +1043,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         stage.fir.assign(coded, FilterSpec{});
         stage.residual.assign(coded, Plane());
         for (std::size_t k = 0; k < coded; ++k) {
+            const int quant = quants[static_cast<std::size_t>(stage.spec.first_row) + k];
             stage.fir[k] = choose_fir(stage.coded[k], quant, max_order, nominal);
             if (!compute_residual(stage.coded[k], stage.fir[k], quant, stage.residual[k])) {
                 stage.fir[k] = FilterSpec{};
@@ -1063,18 +1088,19 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         any = true;
                     }
                     if (output_shift != 0) {
-                        std::array<std::int8_t, kMaxChannels> shifts{};
+                        std::array<std::int8_t, kMaxChannels> sent{};
                         for (int c = 0; c < stage.spec.out_rows(); ++c) {
-                            shifts[static_cast<std::size_t>(c)] =
-                                static_cast<std::int8_t>(output_shift);
+                            sent[static_cast<std::size_t>(c)] =
+                                static_cast<std::int8_t>(shifts[static_cast<std::size_t>(c)]);
                         }
-                        header.output_shift = shifts;
+                        header.output_shift = sent;
                         any = true;
                     }
-                    if (quant != 0) {
+                    if (*std::max_element(quants.begin(), quants.end()) != 0) {
                         std::array<std::uint8_t, kMaxChannels> steps{};
                         for (int c = 0; c <= stage.spec.last_row; ++c) {
-                            steps[static_cast<std::size_t>(c)] = static_cast<std::uint8_t>(quant);
+                            steps[static_cast<std::size_t>(c)] =
+                                static_cast<std::uint8_t>(quants[static_cast<std::size_t>(c)]);
                         }
                         header.quant_step = steps;
                         any = true;
@@ -1087,6 +1113,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     const std::span<const std::int32_t> block =
                         std::span<const std::int32_t>(stage.residual[k])
                             .subspan(plan.start, static_cast<std::size_t>(plan.size));
+                    const int quant = quants[static_cast<std::size_t>(stage.spec.first_row) + k];
                     const detail::CodingChoice choice =
                         detail::choose_coding(block, quant, previous[k], fir_bits);
                     if (choice.data_bits >= detail::kInfeasible) {
@@ -1136,7 +1163,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             for (int k = 0; k < stage.spec.out_rows(); ++k) {
                 const auto value =
                     static_cast<std::uint32_t>(stage.outputs[static_cast<std::size_t>(k)][t])
-                    << output_shift;
+                    << shifts[static_cast<std::size_t>(k)];
                 fold = lossless_fold_step(fold, value, stage_ch_assign(k));
             }
         }
@@ -1203,9 +1230,9 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     w.put(restart_here ? 1U : 0U, 1);
                     if (restart_here) {
                         RestartHeader restart;
-                        restart.sync =
-                            noise_flag(stage.spec, s, stage_count) ? kRestartSyncNoise
-                                                                   : kRestartSyncStandard;
+                        restart.sync = noise_flag(stage.spec, s, stage_count)
+                                           ? kRestartSyncNoise
+                                           : kRestartSyncStandard;
                         restart.output_timing = static_cast<std::uint16_t>(first_sample & 0xFFFFU);
                         restart.min_chan = static_cast<std::uint8_t>(stage.spec.first_row);
                         restart.max_chan = static_cast<std::uint8_t>(stage.spec.last_row);
@@ -1239,7 +1266,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 for (int i = 0; i < plan.size; ++i) {
                     const std::size_t t = plan.start + static_cast<std::size_t>(i);
                     for (std::size_t k = 0; k < in_force.size(); ++k) {
-                        detail::put_residual(w, stage.residual[k][t], quant, in_force[k]);
+                        detail::put_residual(
+                            w, stage.residual[k][t],
+                            quants[static_cast<std::size_t>(stage.spec.first_row) + k],
+                            in_force[k]);
                     }
                 }
                 w.put(bi + 1 == block_count ? 1U : 0U, 1);

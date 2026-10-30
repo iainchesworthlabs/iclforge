@@ -4,9 +4,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
+#include <iterator>
 #include <numbers>
 #include <optional>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -542,4 +545,71 @@ TEST_CASE("silence costs almost nothing and a pair of equal channels costs one",
     config.channels = 1;
     const Encoded single = encode_all(config, mono);
     REQUIRE(paired.stats.bytes < single.stats.bytes + single.stats.bytes / 8);
+}
+
+namespace {
+
+// The 24 bit 5.1 music of testdata/truehd-dee/sources/fx_music_51.wav (0.25 s, a 44 byte header
+// and L R C LFE Ls Rs): the front and surround channels are 16 bit material with 7 or 8 clear low
+// bits and the centre and the LFE use all 24 bits.
+std::vector<std::int32_t> read_music_51() {
+    const std::string path =
+        std::string(ICLFORGE_GOLDEN_AUDIO_DIR) + "/../truehd-dee/sources/fx_music_51.wav";
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in.good());
+    const std::vector<char> file((std::istreambuf_iterator<char>(in)),
+                                 std::istreambuf_iterator<char>());
+    REQUIRE(file.size() > 44);
+    std::vector<std::int32_t> pcm;
+    for (std::size_t at = 44; at + 3 <= file.size(); at += 3) {
+        const auto b = [&](std::size_t k) {
+            return static_cast<std::uint32_t>(file[at + k]) & 0xFFU;
+        };
+        const std::uint32_t raw = b(0) | (b(1) << 8U) | (b(2) << 16U);
+        pcm.push_back(static_cast<std::int32_t>(raw << 8U) >> 8);
+    }
+    REQUIRE(pcm.size() % 6 == 0);
+    return pcm;
+}
+
+}  // namespace
+
+TEST_CASE("each channel sends its own clear low bits as its output shift and quantiser step",
+          "[truehd][encoder][stream]") {
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    config.verify = true;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(decode_all(encoded.units, 24, 6) == pcm);
+
+    // Substream 1 codes channels 2 to 5 and its block header sets the shift and step of all six.
+    auto parsed = parse_access_unit(encoded.units.front().bytes, 2, true);
+    REQUIRE(parsed.has_value());
+    const auto payload = parsed->segments[1];
+    iclforge::BitReader reader(payload);
+    REQUIRE(reader.read(1) == 1);  // block_header_exists
+    REQUIRE(reader.read(1) == 1);  // restart_header_exists
+    auto restart = read_restart_header(reader, payload, true);
+    REQUIRE(restart.has_value());
+    BlockContext context;
+    context.min_chan = restart->min_chan;
+    context.max_chan = restart->max_chan;
+    context.max_matrix_chan = restart->max_matrix_chan;
+    context.noise_type = restart->noise_type();
+    auto block = read_block_header(reader, context);
+    REQUIRE(block.has_value());
+    REQUIRE(block->output_shift);
+    REQUIRE(block->quant_step);
+    // L R Ls Rs: 8 clear bits (7 of them the shift) or 7 (the shift alone); C and LFE: none.
+    const std::array<int, 6> shift{7, 7, 0, 0, 7, 7};
+    const std::array<int, 6> step{1, 1, 0, 0, 0, 0};
+    for (std::size_t ch = 0; ch < 6; ++ch) {
+        CAPTURE(ch);
+        CHECK((*block->output_shift)[ch] == shift[ch]);
+        CHECK((*block->quant_step)[ch] == step[ch]);
+    }
+    // One step for all six sent the low 8 bits of four channels, 101,314 bytes in all; FFmpeg's
+    // encoder writes 63,254 and DEE's 58,688 for these samples.
+    CHECK(encoded.stats.bytes < 60'000);
 }
