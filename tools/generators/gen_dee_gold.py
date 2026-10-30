@@ -1181,7 +1181,7 @@ def thd_open_legs(thd):
                                 ("31", "6ch", (0, 1, 2, 3, None, None)),
                                 ("40", "6ch", (0, 1, None, None, 2, 3)),
                                 ("50", "6ch", (0, 1, 2, None, 3, 4)),
-                                ("70", "8ch", (0, 1, 2, None, 3, 4, 5, None))):
+                                ("70", "8ch", (0, 1, 2, None, 3, 4, 5, 6))):
         op(f"thd-chn-{layout}-{pres}-48k24-wavlist", [(pres, (f"tones_{layout}", slots))])
 
     # J: the fixtures, 0.25 s each.
@@ -1270,6 +1270,11 @@ def object_legs(masters, atmos_masters=None):
              "options": ["--presentation", "atmos", "-i", "{master}", "--presentation", "8ch",
                          "--presentation", "6ch", "--presentation", "2ch"]},
         ]
+        # The number of elements DEE codes the bed and objects in (its help lists 12, 14, 16).
+        for elements in (12, 14, 16):
+            legs.append({**common, "name": f"obj-thd-atmos-{name}-e{elements}",
+                         "options": ["--presentation", f"atmos:number_of_elements={elements}",
+                                     "-i", "{master}"]})
     return legs
 
 
