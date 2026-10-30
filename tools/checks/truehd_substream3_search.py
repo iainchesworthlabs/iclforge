@@ -6,7 +6,7 @@ It reads nothing but the stream given and prints parameters and counts: no sampl
 The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of the disc's `.m2ts`).
 
     truehd_substream3_search.py STREAM [--units N] [--trace] [--restart-index K] [--trace-only]
-                                     [--directory]
+                                     [--directory] [--agreement] [--common-prefix]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -363,6 +363,146 @@ def print_directory(data, units):
         print(f"{number:5d}  {flags:44s} {len(segment):8d}  {first}{sync}")
 
 
+def matrix_list(payload, start, gap, flags_count, shift_bits):
+    """The (output channel, frac_bits, lsb_bypass) of each matrix in the first block after a restart
+    header that ends at bit `start`, read with `gap` extra bits, `flags_count` presence bits per
+    matrix and `shift_bits` bits after each matrix. Whatever was read before an error."""
+    bits = ref.Bits(payload, start + gap)
+    found = []
+    try:
+        flags = bits.read(8) if bits.read(1) else 0xFF
+        if flags & 0x80 and bits.read(1):
+            bits.read(9)
+        if not (flags & 0x40 and bits.read(1)):
+            return found
+        for _ in range(bits.read(4)):
+            out, frac = bits.read(4), bits.read(4)
+            lsb = bits.read(1)
+            for _flag in range(flags_count):
+                if bits.read(1):
+                    bits.signed(frac + 2)
+            if shift_bits:
+                bits.read(shift_bits)
+            found.append((out, frac, lsb))
+    except (ref.StreamError, IndexError, ValueError):
+        pass
+    return found
+
+
+def print_agreement(data, units):
+    """Parse the first block of every restart of substream 3 under each layout of the matrix
+    section and score the layout by how many leading matrices (output channel, frac_bits, bypass)
+    repeat from the first restart to the others. An encoder that repeats its matrices makes the
+    right layout agree with itself and a wrong one not. Parameters only."""
+    restarts = []
+    for number, unit, entries, offset, count in units_of(data, units):
+        if count < 4:
+            continue
+        entry, segment = list(segments_of(unit, entries, offset))[3]
+        if not segment or segment[0] & 0xC0 != 0xC0:
+            continue
+        payload = segment[:-2] if entry["crc_present"] else segment
+        sub = ref.Substream(3)
+        bits = ref.Bits(payload, 2)
+        try:
+            sub.restart(bits, payload)
+        except (ref.StreamError, IndexError, ValueError):
+            continue
+        restarts.append((number, payload, bits.pos))
+    print(f"{len(restarts)} restarts of substream 3 in {units} units")
+    if len(restarts) < 2:
+        return
+    ranked = []
+    # Restarts whose matrix bits are the first restart's agree under every layout: not counted.
+    region = 64
+    first = restarts[0][1][restarts[0][2] // 8 :][:region]
+    distinct = [
+        index
+        for index, (_n, payload, start) in enumerate(restarts)
+        if index > 0 and payload[start // 8 :][:region] != first
+    ]
+    print(f"{len(distinct)} restarts differ from the first in their first {region} bytes")
+    for gap in range(0, 33):
+        for flags_count in range(10, 20):
+            for shift_bits in (0, 4):
+                lists = [
+                    matrix_list(payload, start, gap, flags_count, shift_bits)
+                    for _number, payload, start in restarts
+                ]
+                base = lists[0]
+                score = 0
+                for index in distinct:
+                    for a, b in zip(base, lists[index], strict=False):
+                        if a != b:
+                            break
+                        score += 1
+                ranked.append((score, gap, flags_count, shift_bits, lists))
+    ranked.sort(key=lambda item: -item[0])
+    print("score = matrices that repeat in order from the first restart, summed over the others")
+    for score, gap, flags_count, shift_bits, _lists in ranked[:8]:
+        print(
+            f"  score {score:5d}  gap {gap:2d}  presence bits {flags_count:2d}  shift {shift_bits}"
+        )
+    score, gap, flags_count, shift_bits, lists = ranked[0]
+    print(f"first restarts under the best layout (gap {gap}, {flags_count}, {shift_bits}):")
+    for (number, _payload, _start), found in list(zip(restarts, lists, strict=True))[:6]:
+        print(f"  unit {number:5d}: " + " ".join(f"{o}:{f}:{b}" for o, f, b in found))
+
+
+def common_prefix_bits(first, second):
+    """How many leading bits two byte strings share."""
+    for index, (a, b) in enumerate(zip(first, second, strict=False)):
+        if a != b:
+            return index * 8 + (8 - (a ^ b).bit_length())
+    return min(len(first), len(second)) * 8
+
+
+def print_common_prefix(data, units):
+    """For every restart of substream 3, how many bits after the restart header it shares with the
+    first restart and with the one before. A restart whose matrices and filters repeat shares them
+    up to where its sample data begins, which is the length of its block header. Counts only."""
+    restarts = []
+    for number, unit, entries, offset, count in units_of(data, units):
+        if count < 4:
+            continue
+        entry, segment = list(segments_of(unit, entries, offset))[3]
+        if not segment or segment[0] & 0xC0 != 0xC0:
+            continue
+        payload = segment[:-2] if entry["crc_present"] else segment
+        sub = ref.Substream(3)
+        bits = ref.Bits(payload, 2)
+        try:
+            sub.restart(bits, payload)
+        except (ref.StreamError, IndexError, ValueError):
+            continue
+        start = bits.pos
+        # Shift the payload so that the bits after the restart header begin on a byte boundary.
+        value = int.from_bytes(payload, "big")
+        total = len(payload) * 8
+        tail = value & ((1 << (total - start)) - 1)
+        length = (total - start + 7) // 8
+        tail <<= length * 8 - (total - start)
+        restarts.append((number, len(payload), tail.to_bytes(length, "big")))
+    print(
+        f"{len(restarts)} restarts of substream 3 in {units} units (bits after the restart header)"
+    )
+    if not restarts:
+        return
+    print("  unit  segment bytes  shared with the first  shared with the previous")
+    previous = restarts[0][2]
+    shown = []
+    for number, size, tail in restarts:
+        with_first = common_prefix_bits(restarts[0][2], tail)
+        with_previous = common_prefix_bits(previous, tail)
+        shown.append(with_first)
+        previous = tail
+        if len(shown) <= 24:
+            print(f"  {number:5d}  {size:12d}  {with_first:20d}  {with_previous:24d}")
+    others = shown[1:]
+    if others:
+        print(f"shared with the first, over the others: min {min(others)} max {max(others)}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("stream", type=pathlib.Path)
@@ -384,12 +524,28 @@ def main():
         help="print the substream directory and the first bits of substream 3's segment per unit",
     )
     parser.add_argument(
+        "--agreement",
+        action="store_true",
+        help="compare the matrices of the first block of every restart under each layout",
+    )
+    parser.add_argument(
+        "--common-prefix",
+        action="store_true",
+        help="count the bits each restart of substream 3 shares with the first after its header",
+    )
+    parser.add_argument(
         "--trace-only", action="store_true", help="print the trace and stop: no search"
     )
     args = parser.parse_args()
     data = args.stream.read_bytes()
     if args.directory:
         print_directory(data, min(args.units, 80))
+        return 0
+    if args.common_prefix:
+        print_common_prefix(data, args.units)
+        return 0
+    if args.agreement:
+        print_agreement(data, args.units)
         return 0
     found = describe_restart(data, args.units)
     if found is None:
