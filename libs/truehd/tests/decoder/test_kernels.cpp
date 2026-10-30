@@ -158,20 +158,40 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         base[static_cast<std::size_t>(i * kStride + 2)] = c[static_cast<std::size_t>(50 + i)];
     }
 
-    SECTION("the matrix is the sum of channel times coefficient, shifted by 14, with the step cleared") {
+    SECTION("the matrix is the sum of channel times coefficient, shifted by 15, with the step cleared") {
         auto rows = base;
         const std::array<std::uint8_t, 3> channel = {0, 1, 2};
-        const std::array<std::int32_t, 3> coeff = {16384, -8192, 3001};
+        const std::array<std::int32_t, 3> coeff = {32768, -16384, 6003};
         const std::array<std::uint16_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 3, channel.data(), coeff.data(), 5, 0xFFFFFFF8U, false, 0,
                               bypass.data(), rows.data(), kStride);
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
-            const std::int64_t sum = std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192 +
-                                     std::int64_t{base[row + 2]} * 3001;
-            REQUIRE(rows[row + 5] == static_cast<std::int32_t>(static_cast<std::uint32_t>(sum >> 14) &
+            const std::int64_t sum = std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384 +
+                                     std::int64_t{base[row + 2]} * 6003;
+            REQUIRE(rows[row + 5] == static_cast<std::int32_t>(static_cast<std::uint32_t>(sum >> 15) &
                                                               0xFFFFFFF8U));
         }
+    }
+
+    SECTION("a coefficient of frac_bits 15 keeps its last bit") {
+        // 2^-15 is the finest coefficient (ERRATA.md entry 60): a coefficient of 1 is one part in
+        // 32768, which a scale of 2^-14 could not hold.
+        auto rows = base;
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::int32_t, 2> coeff = {32768 + 1, -3};
+        const std::array<std::uint16_t, kBlock> bypass{};
+        kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), rows.data(), kStride);
+        bool differs_from_a_shift_of_14 = false;
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t sum =
+                std::int64_t{base[row]} * (32768 + 1) + std::int64_t{base[row + 1]} * -3;
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 15));
+            differs_from_a_shift_of_14 = differs_from_a_shift_of_14 || (sum >> 15) != (sum >> 14);
+        }
+        REQUIRE(differs_from_a_shift_of_14);
     }
 
     SECTION("the output takes the matrix channel it is given, shifts it by that matrix channel's shift, and folds it") {
@@ -209,7 +229,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         }
         auto rows = base;
         const std::array<std::uint8_t, 2> channel = {0, 1};
-        const std::array<std::int32_t, 2> coeff = {16384, -8192};
+        const std::array<std::int32_t, 2> coeff = {32768, -16384};
         const std::array<std::uint16_t, kBlock> bypass{};
         kernels::NoiseDraw noise;
         noise.buffer = buffer.data();
@@ -221,11 +241,12 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
                               bypass.data(), rows.data(), kStride, noise);
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
+            // The draw is defined against a sum at 2^-14: at 2^-15 it is twice as large.
             const std::int64_t draw =
-                std::int64_t{buffer[(2U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << 10);
+                std::int64_t{buffer[(2U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << 11);
             const std::int64_t sum =
-                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192 + draw;
-            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 14));
+                std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384 + draw;
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 15));
         }
         // No shift, no draw: the same matrix without noise gives the sum without it.
         auto plain = base;
@@ -235,8 +256,8 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
             const std::int64_t sum =
-                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192;
-            REQUIRE(plain[row + 4] == static_cast<std::int32_t>(sum >> 14));
+                std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384;
+            REQUIRE(plain[row + 4] == static_cast<std::int32_t>(sum >> 15));
         }
     }
 

@@ -29,7 +29,7 @@ constexpr int kMaxMlpMatrixChannel = 5;
 constexpr int kMaxHuffLsbs = 24;  // TH spec §8.3
 constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
-constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-14 (ERRATA.md)
+constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-15 (ERRATA.md entry 60)
 constexpr int kObjectSubstream = 3;
 // TH spec §3.5, §16.5: terminatorA, 0xD234E or 0x348D3, is followed by the 12-bit zero_samples
 // count (§16.5.4: a field, its width not isolated). DEE writes it after the segments of substreams

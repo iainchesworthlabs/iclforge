@@ -111,9 +111,8 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
             return std::unexpected(
                 Error{ErrorKind::kBadParameter, "matrix output channel above max_matrix_chan"});
         }
-        if (matrix.frac_bits > 14) {
-            return std::unexpected(Error{ErrorKind::kBadParameter, "matrix frac_bits above 14"});
-        }
+        // frac_bits is 4 bits wide: every value is a width (frac_bits + 2); 15 is seen in substream 3
+        // of the owner's discs, where the encoder sends finer coefficients (ERRATA.md entry 60).
         for (int c = 0; c < coefficients; ++c) {
             const auto index = static_cast<std::size_t>(c);
             matrix.present[index] = reader.read(1) != 0;

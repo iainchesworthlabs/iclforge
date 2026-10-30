@@ -822,6 +822,56 @@ def case_substream3_limits():
     )
 
 
+def case_substream3_fine_matrices():
+    """A twelve channel substream 3 (restart sync 0x31EC) whose matrices carry `frac_bits` 15, 14,
+    13 and 0, as the object substream of the owner's discs does (ERRATA 60): four channels of
+    objects predicted from the 7.1 bed and from each other, with coefficients that need the last
+    bit of the 17 bit field (an odd value at `frac_bits` 15) and one that reads two channels."""
+    n = 40 * 32
+    src = [tone(n, 90 + c, 2**21) for c in range(12)]
+    # (out, frac_bits, {channel: coefficient}); the unity coefficient of `out` is 2^frac_bits
+    plan = [
+        (8, 15, {1: 12345, 4: -20001}),
+        (9, 15, {8: 32767, 0: -1}),
+        (10, 14, {2: 8191, 9: -16383}),
+        (11, 13, {10: 4001, 7: -3333}),
+        (9, 0, {11: 1}),
+        (8, 15, {3: 65535, 5: -65536}),
+    ]
+    matrices = [(out, frac, False, {out: 1 << frac, **others}) for out, frac, others in plan]
+    coded = [list(column) for column in src]
+    for out, frac, others in reversed(plan):
+        coded[out] = [
+            o - ((sum(coded[c][i] * w for c, w in others.items())) >> frac)
+            for i, o in enumerate(coded[out])
+        ]
+
+    def sub_for(lo, hi, sync=0x31EA):
+        channels = {
+            c: Channel(fir=filt([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
+            for c in range(lo, hi + 1)
+        }
+        rows = [tuple(src[c][i] for c in range(hi + 1)) for i in range(n)]
+        return Substream(
+            lo, hi, hi, channels, rows, {c: src[c] for c in range(lo, hi + 1)}, sync=sync
+        )
+
+    wide = {
+        c: Channel(fir=filt([-1500], 8) if c == 8 else None, huff_type=c % 4) for c in range(8, 12)
+    }
+    rows = [tuple(src[c][i] for c in range(12)) for i in range(n)]
+    last = Substream(
+        8, 11, 11, wide, rows, {c: coded[c] for c in range(8, 12)}, matrices=matrices, sync=0x31EC
+    )
+    subs = [sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EB), last]
+    stream = Stream(subs, n, terminator_b=True)
+    return (
+        stream,
+        "a twelve channel substream 3 whose matrices have frac_bits 15, 14, 13 and 0",
+        ["substream_3", "twelve_channels", "frac_bits_15", "matrices_6"],
+    )
+
+
 def noise_sequences(count, interval, seed, shift):
     """Generator 0's two noise channels (TH spec 17.2); the state restarts with each interval."""
     first, second = [], []
@@ -1196,6 +1246,7 @@ CASES = {
     "hb_sixteen_channels_b_end": case_sixteen_terminator_end,
     "hb_eight_channels": case_eight_channels,
     "hb_substream3_limits": case_substream3_limits,
+    "hb_substream3_fine_matrices": case_substream3_fine_matrices,
 }
 
 
@@ -1253,6 +1304,10 @@ FFMPEG = {
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
     "hb_substream3_limits": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+    },
+    "hb_substream3_fine_matrices": {
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },

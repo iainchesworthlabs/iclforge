@@ -149,6 +149,41 @@ TEST_CASE("a block header round-trips with every group present", "[truehd][synta
     CHECK(*read == header);
 }
 
+TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips", "[truehd][syntax]") {
+    // The object substream of the owner's discs uses every frac_bits from 0 to 15 (ERRATA.md entry
+    // 60); the coefficient is frac_bits + 2 bits, so 15 is 17 bits, the widest.
+    BlockContext context;
+    context.min_chan = 0;
+    context.max_chan = 0;
+    context.max_matrix_chan = 1;
+    context.presence_flags = presence::kMatrix;
+
+    BlockHeaderSpec header;
+    MatrixSet matrices;
+    matrices.count = 2;
+    for (std::size_t m = 0; m < 2; ++m) {
+        matrices.items[m].out_ch = static_cast<std::uint8_t>(m);
+        matrices.items[m].frac_bits = 15;
+        matrices.items[m].present[0] = true;
+        matrices.items[m].coeff[0] = m == 0 ? 65535 : -65536;
+        matrices.items[m].present[1] = true;
+        matrices.items[m].coeff[1] = 32769;
+    }
+    header.matrices = matrices;
+
+    iclforge::BitWriter writer;
+    write_block_header(writer, context, header);
+    // new_guards 0, matrixing flag 1, count 4, then per matrix out_ch 4, frac_bits 4, bypass 1 and
+    // four presence bits for two matrix channels and two noise channels, two coefficients of 17
+    // bits. Only the matrix group is enabled, so the channel loop sends nothing.
+    CHECK(writer.bit_count() == 1 + 1 + 4 + 2 * (4 + 4 + 1 + 4 + 2 * 17));
+    const std::vector<std::byte> bytes = writer.take();
+    iclforge::BitReader reader(bytes);
+    auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    CHECK(read->matrices == matrices);
+}
+
 TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 0;

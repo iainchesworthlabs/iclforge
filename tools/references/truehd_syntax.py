@@ -26,7 +26,7 @@ RESTART_SYNCS = (0x31EA, 0x31EB, 0x31EC)
 END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
 TERMINATOR_A = (0xD234E, 0x348D3)  # TH spec 16.5.1: both are accepted
 NOISE_CHANNELS = 2
-MATRIX_SHIFT = 14
+MATRIX_SHIFT = 15  # coefficients are scaled to 2^-15 (ERRATA 60); frac_bits runs to 15
 
 # TH spec 17.4: generator 1's noise table, indexed by the seed's bits 15 to 22.
 NOISE_TABLE = (
@@ -448,7 +448,7 @@ def decode_block(sub, bits, rows, first):
                 total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
             if noise_shift:
                 slot = (left + (first + i) * (2 * left + 1)) % sub.noise_size
-                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7))
+                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7 + MATRIX_SHIFT - 14))
             row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
     # output shift of that matrix channel (TH spec 7.3, ERRATA 12): the shifts are listed by matrix

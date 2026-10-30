@@ -339,6 +339,16 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
     presentation whose control bit is set.
 
+60. **How the object substream's block header reads (§8.2, §9.2, §10.2, §15.3; entry 60).** Reported for the owner's discs: the 12 channel
+    substream (restart sync 0x31EC) has matrices with `frac_bits` from 0 to 15, and the block parse then fails at a filter order. A spread of
+    `frac_bits` over its whole range is also what a header read at the wrong offset looks like, so the first reading to settle is not the
+    arithmetic (entry 60) but where the fields sit: the number of coefficient presence bits of a matrix (`max_matrix_chan + 1` and the two
+    noise channels, `max_chan + 1`, ...), the matrix noise shift, the FIR state flag, the count of output shifts and quantiser steps, bits
+    between the restart header and the first block header. `tools/checks/truehd_substream3_search.py` tries every combination on the
+    owner's excerpt and prints parameters and counts only. **Recommendation:** the owner runs it on one disc excerpt per disc; the reading
+    that decodes the first restart intervals with every lossless check passing is built into the decoder and the Python reference,
+    and this question closes.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -721,6 +731,17 @@ pipe to tell what it is, where it looked at 4 KiB. A stream with an AC-3 core in
 the first has to read, and an AC-3 frame is not one. Held by `test_elementary.cpp` (the rule, with decoys, a single unit, the limit and
 noise) and `test_cli_truehd.cpp` (a fixture with 1, 28 and 4096 bytes of three fills in front: same PCM, a warning, exit 0). The
 timecode fixture scores PASS. **Provisional, owner to confirm** (question 49).
+
+**60. Matrix coefficients to `frac_bits` 15 (§10.2; entry 8).** §10.2 gives `frac_bits` as 4 bits and a coefficient of `frac_bits + 2`
+bits, so 15 is a legal value and a 17 bit coefficient, finer than the 2^-14 the decoder scaled every coefficient to (the decoder refused
+`frac_bits` above 14, and `1 << (14 - 15)` has no value). The decoder now scales the coefficients to 2^-15 and shifts the sum by 15; for any
+`frac_bits` up to 14 that is the same output sample for sample (the sum is twice as large and shifted one more), the matrix noise of
+§17.3 is scaled to match, and the limit is gone. The encoder still writes `frac_bits` 14 or less and is unchanged. The owner's discs are
+reported to carry `frac_bits` from 0 to 15 in the 12 channel substream (restart sync 0x31EC); whether those values are real or the sign of
+a block header read at the wrong width is not settled (question 60). Held by `test_kernels.cpp` (a coefficient with the last bit), `test_syntax.cpp`
+(17 bit coefficients round-trip), the hand-built `hb_substream3_fine_matrices` (twelve channels, `frac_bits` 15, 14, 13 and 0, decoded
+sample for sample and by the Python reference). **Correct for streams that use it (the arithmetic is exact); provisional for the disc
+until step 1 of WP1 passes every lossless-check interval.**
 
 ## Atmos, spec v3.6
 

@@ -14,7 +14,7 @@
 // them in the order below; libs/truehd's tests and tests/performance/kernel_bench.cpp call them on
 // their own. Every one is exact integer arithmetic: the products are 32 bit by 32 bit into 64 bits
 // (the filters' coefficients are at most 16 bits wide and their history 24, the matrices'
-// coefficients are scaled to 2^-14), the sums are 64 bit, and the shifts are by amounts the stream
+// coefficients are scaled to 2^-15), the sums are 64 bit, and the shifts are by amounts the stream
 // sends, so a kernel that gives other bits than these is wrong rather than approximate. A variant
 // of a kernel for a wider vector unit has to give the same samples for every input, which
 // libs/truehd/tests/decoder/test_kernels.cpp holds it to.
@@ -29,8 +29,13 @@ namespace iclforge::truehd::kernels {
 // first sample of its block (TH spec §9.3).
 inline constexpr int kHistoryPad = kMaxFirOrder;
 
-// The matrices' coefficients are scaled to 2^-14 (ERRATA.md): a sum is shifted down by this much.
-inline constexpr int kMatrixShift = 14;
+// The matrices' coefficients are scaled to 2^-15 (ERRATA.md entry 60): a sum is shifted down by this
+// much. frac_bits runs to 15 in substream 3, so 2^-14 cannot hold every coefficient; a coefficient
+// of frac_bits 14 or less, scaled to 2^-15 instead, gives the same samples (the sum is twice as
+// large and shifted one more).
+inline constexpr int kMatrixShift = 15;
+// The matrix noise of TH spec §17.3 was defined against a sum at 2^-14.
+inline constexpr int kNoiseScaleShift = 7 + (kMatrixShift - 14);
 
 // What one channel's residuals need, worked out once per block (TH spec §11.3, ERRATA.md).
 struct ResidualPlan {
@@ -129,8 +134,8 @@ inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift
 }
 
 // TH spec §17.3: what a matrix draws from generator 1's noise buffer. The matrix with a non-zero
-// `shift` adds buffer[index] * 2^(shift + 7) to its sum, for the sample at position i of the
-// block the index (first + i * stride) & mask (the stride and the first index are those of the
+// `shift` adds buffer[index] * 2^(shift + 7) to its sum at 2^-14 (twice that at 2^-15), for the
+// sample at position i of the block the index (first + i * stride) & mask (the stride and the first index are those of the
 // matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
 struct NoiseDraw {
     const std::int8_t* buffer = nullptr;
@@ -141,7 +146,7 @@ struct NoiseDraw {
 };
 
 // TH spec §10: one primitive matrix over one block. Row[out] becomes the sum over the `count`
-// channels it reads of channel times coefficient (the coefficients are scaled to 2^-14), plus the
+// channels it reads of channel times coefficient (the coefficients are scaled to 2^-15), plus the
 // matrix's noise (TH spec §17.3) if it draws any, shifted down by 14, with the quantiser step's low
 // bits cleared (`keep`); with LSB bypass the bit the stream sent for this matrix (`bypass`, bit
 // `matrix_index`) is added back.
@@ -149,7 +154,7 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
                          int matrix_index, const std::uint16_t* bypass, std::int32_t* rows,
                          std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
-    const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + 7);
+    const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + kNoiseScaleShift);
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         std::int64_t sum = 0;
