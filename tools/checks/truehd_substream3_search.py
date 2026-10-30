@@ -8,6 +8,7 @@ The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of 
     truehd_substream3_search.py STREAM [--units N] [--trace] [--restart-index K] [--trace-only]
                                      [--directory] [--agreement] [--common-prefix]
                                      [--dump-header]
+                                     [--first-unit N] [--last-unit N]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -458,12 +459,12 @@ def common_prefix_bits(first, second):
     return min(len(first), len(second)) * 8
 
 
-def restart_tails(data, units):
+def restart_tails(data, units, first_unit=0, last_unit=None):
     """(unit, segment bytes, the bits after the restart header, from a byte boundary) for every
-    restart of substream 3."""
+    restart of substream 3 from `first_unit` to `last_unit`."""
     restarts = []
     for number, unit, entries, offset, count in units_of(data, units):
-        if count < 4:
+        if count < 4 or number < first_unit or (last_unit is not None and number > last_unit):
             continue
         entry, segment = list(segments_of(unit, entries, offset))[3]
         if not segment or segment[0] & 0xC0 != 0xC0:
@@ -486,11 +487,11 @@ def restart_tails(data, units):
     return restarts
 
 
-def print_common_prefix(data, units):
+def print_common_prefix(data, units, first_unit=0, last_unit=None):
     """For every restart of substream 3, how many bits after the restart header it shares with the
     first restart and with the one before. A restart whose matrices and filters repeat shares them
     up to where its sample data begins, which is the length of its block header. Counts only."""
-    restarts = restart_tails(data, units)
+    restarts = restart_tails(data, units, first_unit, last_unit)
     print(
         f"{len(restarts)} restarts of substream 3 in {units} units (bits after the restart header)"
     )
@@ -510,11 +511,11 @@ def print_common_prefix(data, units):
         print(f"shared with the first, over the others: min {min(others)} max {max(others)}")
 
 
-def print_header_dump(data, units, skip=2, margin=8):
+def print_header_dump(data, units, skip=2, margin=8, first_unit=0, last_unit=None):
     """The bits after the restart header that every restart of substream 3 shares from the
     `skip`-th on, less a margin, as hex. Restarts seconds apart that agree on them cannot be
     carrying audio there: it is the block header of an encoder that repeats its parameters."""
-    restarts = restart_tails(data, units)[skip:]
+    restarts = restart_tails(data, units, first_unit, last_unit)[skip:]
     if len(restarts) < 3:
         print(f"only {len(restarts)} restarts after the first {skip}: nothing to compare")
         return
@@ -560,6 +561,8 @@ def main():
         action="store_true",
         help="compare the matrices of the first block of every restart under each layout",
     )
+    parser.add_argument("--first-unit", type=int, default=0, help="restarts from this unit on")
+    parser.add_argument("--last-unit", type=int, default=None, help="restarts up to this unit")
     parser.add_argument(
         "--dump-header",
         action="store_true",
@@ -579,10 +582,16 @@ def main():
         print_directory(data, min(args.units, 80))
         return 0
     if args.dump_header:
-        print_header_dump(data, args.units)
+        print_header_dump(
+            data,
+            args.units,
+            skip=0 if args.first_unit else 2,
+            first_unit=args.first_unit,
+            last_unit=args.last_unit,
+        )
         return 0
     if args.common_prefix:
-        print_common_prefix(data, args.units)
+        print_common_prefix(data, args.units, args.first_unit, args.last_unit)
         return 0
     if args.agreement:
         print_agreement(data, args.units)
