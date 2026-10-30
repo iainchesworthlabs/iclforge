@@ -176,6 +176,10 @@ struct Options {
         std::optional<std::array<double, 4>> downmix_gains;
     };
     TruehdEncode thdenc{};
+    // 'truehd-atmos' only: truehd-bed= (the 7.1 bed as a WAV; empty: rendered from the objects) and
+    // truehd-objects-lfe= (the first channel of the objects WAV is the LFE; the default).
+    std::string thd_bed_path;
+    bool thd_objects_lfe = true;
     // 'truehd-encode' and 'metadata' of TrueHD: the channel meaning of TH spec §14.1 the line names,
     // per presentation (2, 6 and 8 channels): dialogue norm, mix level, source format, the
     // control-enabled bit, and the two DRC start-up gains. Unset members are not touched.

@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/base/wav.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
@@ -310,4 +311,170 @@ TEST_CASE("truehd-render is refused without the objects it places", "[forge-cli]
                       " truehd-presentation=all truehd-render=7.1.9.9",
                   log) == kExitUsage);
     CHECK(read_text(log).find("truehd-render is a speaker layout") != std::string::npos);
+}
+
+namespace {
+
+// Twelve object channels from the DEE gold set's real audio, the LFE first: the six of
+// fx_music_51, the two of fx_music_20 and four channels of fx_tones_71 from a different place in
+// it.
+std::vector<std::vector<float>> twelve_object_channels() {
+    const fs::path sources =
+        fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / ".." / "truehd-dee" / "sources";
+    const auto music = iclforge::ac3::io::read_wav((sources / "fx_music_51.wav").string());
+    const auto stereo = iclforge::ac3::io::read_wav((sources / "fx_music_20.wav").string());
+    const auto tones = iclforge::ac3::io::read_wav((sources / "fx_tones_71.wav").string());
+    REQUIRE(music.has_value());
+    REQUIRE(stereo.has_value());
+    REQUIRE(tones.has_value());
+    const std::size_t frames =
+        std::min({music->frame_count(), stereo->frame_count(), tones->frame_count()});
+    std::vector<std::vector<float>> channels(12, std::vector<float>(frames));
+    for (std::size_t t = 0; t < frames; ++t) {
+        for (std::size_t c = 0; c < 12; ++c) {
+            if (c < 6) {
+                channels[c][t] = music->channels[c][t];
+            } else if (c < 8) {
+                channels[c][t] = stereo->channels[c - 6][t];
+            } else {
+                channels[c][t] = tones->channels[c - 8][(t + 7 * c) % frames];
+            }
+        }
+    }
+    return channels;
+}
+
+}  // namespace
+
+TEST_CASE("truehd-atmos writes a stream whose substream 3 is the WAV's channels, frame by frame",
+          "[forge-cli][truehd][atmos][truehd-atmos]") {
+    namespace oba = iclforge::objects::oba;
+    const fs::path dir = scratch_dir();
+    const auto channels = twelve_object_channels();
+    const fs::path wav = dir / "atmos_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, 48000).has_value());
+    // Object 0 (channel 1, after the LFE) sweeps across the room; the others keep the fan.
+    const fs::path paths = dir / "atmos_in_paths.txt";
+    {
+        std::ofstream out{paths};
+        out << "0 0.0  0.9 0.5 0.0  1.0 0.0\n0 0.25 0.1 0.5 0.0  1.0 0.0\n";
+    }
+    const fs::path stream = dir / "atmos_out.thd";
+    const fs::path log = dir / "atmos_out.log";
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(stream) + " " + quoted(paths) +
+                        " verify",
+                    log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("12 object channel(s)") != std::string::npos);
+    CHECK(text.find("4 substream(s)") != std::string::npos);
+    CHECK(text.find("verified: 300 access units") != std::string::npos);
+
+    // The object channels decode to the WAV, bit for bit, and the stream says what it is.
+    const fs::path objects = dir / "atmos_out_objects";
+    fs::remove_all(objects);
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(dir / "atmos_out_all.wav") + " " +
+                        quoted(objects) + " truehd-presentation=all",
+                    log) == 0);
+    CHECK(read_text(log).find("object audio metadata: 8 payload(s), 12 object(s)") !=
+          std::string::npos);
+    for (std::size_t c = 0; c < 12; ++c) {
+        char name[32];
+        std::snprintf(name, sizeof name, "object_%02zu.wav", c);
+        const auto decoded = iclforge::ac3::io::read_wav((objects / name).string());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->channels.size() == 1);
+        CHECK(decoded->channels[0] == channels[c]);
+    }
+
+    // Eight metadata frames, one every 1536 samples, each starting where it says: the access unit's
+    // first sample, the update's sample offset and 32 samples a unit of the block's offset factor.
+    const auto frames = read_oamd_frames(stream);
+    REQUIRE(frames.size() == 8);
+    for (std::size_t k = 0; k < frames.size(); ++k) {
+        const auto& program = frames[k].program;
+        CHECK(program.program.dynamic_only);
+        CHECK(program.program.lfe);
+        CHECK(program.program.dynamic_objects == 11);
+        REQUIRE(program.blocks.size() == 1);
+        const auto& block = program.blocks.front();
+        CHECK(frames[k].first_sample + static_cast<std::uint64_t>(block.sample_offset) +
+                  32U * static_cast<std::uint64_t>(block.block_offset_factor) ==
+              1536U * k);
+        CHECK(block.ramp_duration == 1536);
+        REQUIRE(block.objects.size() == 11);
+        // Object 0 follows the file, at the frame's end; the quantisation of a position is under
+        // 0.02. Object 1 is on the fan, where it was.
+        const double t = static_cast<double>(1536 * (k + 1)) / 48000.0;
+        const double expected_x = std::max(0.1, 0.9 - 0.8 * t / 0.25);
+        CHECK(std::abs(block.objects[0].position.x - expected_x) < 0.02);
+        CHECK(std::abs(block.objects[0].position.y - 0.5) < 0.02);
+        CHECK(std::abs(block.objects[1].position.x -
+                       frames[0].program.blocks[0].objects[1].position.x) < 1e-9);
+    }
+    CHECK(frames[0].first_sample == 0);
+}
+
+TEST_CASE(
+    "the bed of a truehd-atmos stream is the objects the renderer places, as the decode renders",
+    "[forge-cli][truehd][atmos][truehd-atmos][render]") {
+    const fs::path dir = scratch_dir();
+    const auto channels = twelve_object_channels();
+    const fs::path wav = dir / "atmos_bed_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, 48000).has_value());
+    const fs::path stream = dir / "atmos_bed.thd";
+    const fs::path log = dir / "atmos_bed.log";
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(stream), log) == 0);
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(dir / "atmos_bed_best.wav"), log) ==
+            0);
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(dir / "atmos_bed_fed.wav") +
+                        " truehd-presentation=all truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs",
+                    log) == 0);
+    // A decoder that plays the 7.1 bed and one that renders the objects play the same programme.
+    const Pcm24 best = read_pcm24(dir / "atmos_bed_best.wav");
+    const Pcm24 fed = read_pcm24(dir / "atmos_bed_fed.wav");
+    REQUIRE(best.channels == 8);
+    REQUIRE(fed.channels == 8);
+    CHECK(best.samples == fed.samples);
+    bool silent = true;
+    for (const std::int32_t v : best.samples) {
+        silent = silent && v == 0;
+    }
+    CHECK_FALSE(silent);
+
+    // A bed given as a WAV is the bed, whatever the objects are; one of the wrong shape is refused.
+    std::vector<std::vector<float>> bed(8, std::vector<float>(channels[0].size(), 0.25F));
+    const fs::path bed_wav = dir / "atmos_bed_given.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(bed_wav.string(), bed, 48000).has_value());
+    const fs::path with_bed = dir / "atmos_with_bed.thd";
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(with_bed) +
+                        " truehd-bed=" + quoted(bed_wav),
+                    log) == 0);
+    REQUIRE(run_cli("decode " + quoted(with_bed) + " " + quoted(dir / "atmos_with_bed.wav"), log) ==
+            0);
+    const Pcm24 given = read_pcm24(dir / "atmos_with_bed.wav");
+    REQUIRE(given.samples.size() == best.samples.size());
+    CHECK(given.samples.front() == 2097152);  // 0.25 of full scale, 24 bit
+    CHECK(given.samples != best.samples);
+    bed.pop_back();
+    REQUIRE(iclforge::ac3::io::write_wav_f32(bed_wav.string(), bed, 48000).has_value());
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(with_bed) +
+                      " truehd-bed=" + quoted(bed_wav),
+                  log) == kExitInput);
+    CHECK(read_text(log).find("the bed has to be 8 channels") != std::string::npos);
+}
+
+TEST_CASE("truehd-atmos refuses what substream 3 cannot carry",
+          "[forge-cli][truehd][atmos][truehd-atmos]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "atmos_refused.log";
+    std::vector<std::vector<float>> mono(1, std::vector<float>(4800, 0.1F));
+    const fs::path wav = dir / "atmos_one.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), mono, 48000).has_value());
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.thd"), log) == kExitInput);
+    CHECK(read_text(log).find("2 to 16") != std::string::npos);
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.wav"), log) == kExitUsage);
+    std::vector<std::vector<float>> twelve(12, std::vector<float>(4800, 0.1F));
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), twelve, 96000).has_value());
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.thd"), log) == kExitUsage);
+    CHECK(read_text(log).find("48 kHz only") != std::string::npos);
 }

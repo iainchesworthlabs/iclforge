@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 157> kOptionTokens{{
+constexpr std::array<OptionToken, 159> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -101,7 +101,7 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
     {"numblkscod=", "atmos* encode: 0-3 (default 3), §E2.3.1.4 short syncframes of 1/2/3/6 blocks"},
     {"search=", "AC-3 encode, and eac3-encode under CBR: bit-allocation search, off (default)"},
     {"fgaincod=", "encode: auto (default) or 0..7, §7.2.2.4 fast gain pinned for the whole encode"},
-    {"verify", "eac3-encode and truehd-encode: decode every access unit as it's encoded and diff against it"},
+    {"verify", "eac3-encode, truehd-encode and truehd-atmos: decode every access unit as it's encoded and diff against it"},
     {"channels=", "decode/monitor: 2 or 1 apply the §7.8 output stage; as-coded (default) is a no-op; "
                   "decode of AC-4: 5.1 folds a 7.X stream to 5.X"},
     {"ltrt-phase=", "decode/monitor: off skips §7.8.2's real 90° surround phase shift"},
@@ -112,6 +112,8 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
     {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all; qc: the presentation the preset gates judge, best, 2ch, 6ch or 8ch"},
     {"truehd-render=", "decode of a TrueHD Atmos stream with truehd-presentation=all: place the objects on this speaker layout (a name such as 7.1 or 7.1.4, or a list such as L,R,C,LFE,Ls,Rs,Lrs,Rrs) and write the speaker feeds as the output WAV instead of the channels of substream 3 (provisional)"},
+    {"truehd-bed=", "truehd-atmos: the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate); without it the bed is the objects placed on 7.1 by the renderer"},
+    {"truehd-objects-lfe=", "truehd-atmos: on (the default) takes the first channel of the objects WAV as the LFE, off makes every channel an object"},
     {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},

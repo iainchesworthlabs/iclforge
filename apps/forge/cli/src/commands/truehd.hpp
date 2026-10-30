@@ -187,6 +187,15 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path, c
 // (L R C LFE Ls Rs Lrs Rrs). "-" as the output is a bare stream on stdout.
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta);
 
+// `truehd-atmos`: the channels of a WAV as the objects of a TrueHD Atmos stream, in substream 3 with
+// the 7.1 bed in substreams 0 to 2 and the objects' metadata (`paths_path`, a scene file as
+// atmos-encode takes it, or a fan of static positions) in the evolution frames. The first channel is
+// the LFE unless truehd-objects-lfe=off; the bed is truehd-bed= or the objects rendered to 7.1. Bare
+// .thd, or wrapped as .mkv, .mp4 or .ts like truehd-encode. Provisional (libs/truehd/ERRATA.md
+// entries 61 to 64).
+int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
+                     std::string_view paths_path, const Options& meta);
+
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path,

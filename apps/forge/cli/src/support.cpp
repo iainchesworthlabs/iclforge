@@ -2448,7 +2448,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
         // finished TrueHD stream.
-        if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {
+        if ((command == "truehd-encode" || command == "truehd-atmos" || command == "metadata") &&
+            key.starts_with("truehd-")) {
             switch (parse_truehd_meaning_option(key.substr(7), value, token, out.thd_meaning)) {
                 case MetadataOptionResult::kOk:
                     continue;
@@ -2458,8 +2459,27 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     break;
             }
         }
-        // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
-        if (command == "truehd-encode" && key.starts_with("truehd-")) {
+        // TrueHD Atmos encoding: the bed and the LFE of the objects.
+        if (command == "truehd-atmos" && key == "truehd-bed") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-bed needs the path of a 7.1 WAV");
+                return false;
+            }
+            out.thd_bed_path = std::string{value};
+            continue;
+        }
+        if (command == "truehd-atmos" && key == "truehd-objects-lfe") {
+            if (value != "on" && value != "off") {
+                fmt::println(stderr, "error: truehd-objects-lfe is on or off (got '{}')", token);
+                return false;
+            }
+            out.thd_objects_lfe = value == "on";
+            continue;
+        }
+        // TrueHD encoding, which 'truehd-encode' and 'truehd-atmos' read
+        // (iclforge::truehd::EncoderConfig).
+        if ((command == "truehd-encode" || command == "truehd-atmos") &&
+            key.starts_with("truehd-")) {
             Options::TruehdEncode& enc = out.thdenc;
             const std::string_view name = key.substr(7);
             if (name == "downmix") {
