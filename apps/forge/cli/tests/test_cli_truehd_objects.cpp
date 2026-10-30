@@ -64,6 +64,23 @@ std::string quoted(const fs::path& path) {
     return "\"" + path.string() + "\"";
 }
 
+std::vector<unsigned char> read_bytes(const fs::path& path) {
+    std::ifstream in{path, std::ios::binary};
+    return std::vector<unsigned char>{std::istreambuf_iterator<char>{in},
+                                      std::istreambuf_iterator<char>{}};
+}
+
+std::uint32_t crc32_mpeg2(const std::vector<unsigned char>& data) {
+    std::uint32_t crc = 0xFFFFFFFFU;
+    for (const unsigned char b : data) {
+        crc ^= static_cast<std::uint32_t>(b) << 24U;
+        for (int i = 0; i < 8; ++i) {
+            crc = (crc & 0x80000000U) != 0 ? (crc << 1U) ^ 0x04C11DB7U : crc << 1U;
+        }
+    }
+    return crc;
+}
+
 // forge's 24-bit WAV (a 68-byte WAVE_FORMAT_EXTENSIBLE header): the channels and the samples
 // interleaved, sign-extended.
 struct Pcm24 {
@@ -496,4 +513,70 @@ TEST_CASE("truehd-atmos takes a RIFF file with an axml chunk for an ADM master a
     const std::string text = read_text(log);
     CHECK((text.find("ICLFORGE_BUILD_ADM") != std::string::npos ||
            text.find("not_a_master.wav") != std::string::npos));
+}
+
+TEST_CASE("demux to .thd takes the TrueHD track of a programme that lists an AC-3 track first",
+          "[forge-cli][truehd][demux]") {
+    // A Blu-ray programme map names its AC-3 and other audio tracks beside the TrueHD one. This one
+    // is the PMT forge ts writes with an AC-3 entry (stream_type 0x81, no packets) put before the
+    // TrueHD entry: the reader's first usable stream is the AC-3 one unless the output asks for
+    // TrueHD.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "two_tracks.log";
+    const fs::path plain = dir / "two_tracks_plain.ts";
+    REQUIRE(run_cli("ts " + quoted(fixture("hb_atmos_objects.thd")) + " " + quoted(plain), log) ==
+            0);
+    auto bytes = read_bytes(plain);
+    constexpr std::size_t kPacket = 188;
+    constexpr unsigned kPmtPid = 0x1000;
+    std::size_t patched = 0;
+    for (std::size_t at = 0; at + kPacket <= bytes.size(); at += kPacket) {
+        const unsigned pid = ((bytes[at + 1] & 0x1FU) << 8U) | bytes[at + 2];
+        if (pid != kPmtPid || (bytes[at + 1] & 0x40U) == 0) {
+            continue;
+        }
+        const std::size_t section = at + 5 + bytes[at + 4];
+        const std::size_t length = 3 + (((bytes[section + 1] & 0x0FU) << 8U) | bytes[section + 2]);
+        const std::size_t info = ((bytes[section + 10] & 0x0FU) << 8U) | bytes[section + 11];
+        std::vector<unsigned char> edited(
+            bytes.begin() + static_cast<std::ptrdiff_t>(section),
+            bytes.begin() + static_cast<std::ptrdiff_t>(section + 12 + info));
+        // stream_type 0x81, elementary_PID 0x0200, ES_info_length 0, then the TrueHD entries.
+        edited.insert(edited.end(), {0x81, 0xE2, 0x00, 0xF0, 0x00});
+        edited.insert(edited.end(),
+                      bytes.begin() + static_cast<std::ptrdiff_t>(section + 12 + info),
+                      bytes.begin() + static_cast<std::ptrdiff_t>(section + length - 4));
+        const std::size_t section_length = edited.size() - 3 + 4;
+        edited[1] =
+            static_cast<unsigned char>((edited[1] & 0xF0U) | ((section_length >> 8U) & 0x0FU));
+        edited[2] = static_cast<unsigned char>(section_length & 0xFFU);
+        const std::uint32_t crc = crc32_mpeg2(edited);
+        for (int shift = 24; shift >= 0; shift -= 8) {
+            edited.push_back(
+                static_cast<unsigned char>((crc >> static_cast<unsigned>(shift)) & 0xFFU));
+        }
+        REQUIRE(section + edited.size() <= at + kPacket);
+        std::fill(bytes.begin() + static_cast<std::ptrdiff_t>(section),
+                  bytes.begin() + static_cast<std::ptrdiff_t>(at + kPacket), 0xFF);
+        std::copy(edited.begin(), edited.end(),
+                  bytes.begin() + static_cast<std::ptrdiff_t>(section));
+        ++patched;
+    }
+    REQUIRE(patched > 0);
+    const fs::path two = dir / "two_tracks.ts";
+    {
+        std::ofstream out{two, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+    }
+
+    const fs::path thd = dir / "two_tracks.thd";
+    fs::remove(thd);
+    REQUIRE(run_cli("demux " + quoted(two) + " " + quoted(thd), log) == 0);
+    CHECK(read_text(log).find("TrueHD") != std::string::npos);
+    CHECK(read_bytes(thd) == read_bytes(fixture("hb_atmos_objects.thd")));
+
+    // Any other output name takes the first usable stream, here the AC-3 entry with no packets.
+    CHECK(run_cli("demux " + quoted(two) + " " + quoted(dir / "two_tracks.bin"), log) ==
+          kExitInput);
 }

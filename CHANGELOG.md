@@ -10,6 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Fixed: `forge demux` to `.thd` or `.mlp` takes the TrueHD track of a transport stream.** A Blu-ray programme lists AC-3 and other audio beside the TrueHD track, and the reader took the first it could use.
 - **Added: `forge truehd-atmos` and `EncoderConfig::object_channels` write a TrueHD Atmos stream (WP1 step 4; provisional).** The channels of a
   WAV (the first the LFE), or of an ADM master (its LFE first, then its beds and objects on the paths it gives them; ADM builds), are substream 3, with restart sync 0x31EC and the 16-channel extension in the major sync (32 bytes, as the
   owner's discs have it); the 7.1 bed is in substreams 0 to 2, from a WAV (`truehd-bed=`) or the objects placed on 7.1 by `libs/render` from

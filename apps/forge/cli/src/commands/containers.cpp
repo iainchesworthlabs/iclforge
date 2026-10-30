@@ -1322,7 +1322,15 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
             channels = reader.track().channels;
         }
     } else {
-        iclforge::containers::mpegts::Reader reader{};
+        // A Blu-ray transport stream lists its AC-3 and other tracks beside the TrueHD one, and
+        // the reader takes the first it can use: an output named .thd or .mlp asks for TrueHD.
+        const std::filesystem::path out_name{std::string{out_path}};
+        const bool wants_truehd = out_name.extension() == ".thd" || out_name.extension() == ".mlp";
+        iclforge::containers::mpegts::Reader reader{iclforge::containers::mpegts::ReadOptions{
+            .auto_select = {.ac3 = !wants_truehd,
+                            .eac3 = !wants_truehd,
+                            .ac4 = !wants_truehd,
+                            .truehd = true}}};
         drive(
             reader,
             [](iclforge::containers::mpegts::DemuxError e) {
