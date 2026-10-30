@@ -69,6 +69,10 @@ class ICLFORGE_TRUEHD_EXPORT ElementaryReader {
     // The part of skipped_bytes() that came before the first unit: not a loss of the stream.
     [[nodiscard]] std::size_t leading_bytes() const noexcept { return leading_; }
     [[nodiscard]] std::size_t units_read() const noexcept { return units_; }
+    // The AC-3 core frames set aside between the units (a Blu-ray track's), and their bytes: not a
+    // loss of the stream, and not in skipped_bytes().
+    [[nodiscard]] std::size_t core_frames() const noexcept { return core_frames_; }
+    [[nodiscard]] std::size_t core_bytes() const noexcept { return core_bytes_; }
     [[nodiscard]] std::size_t offset() const noexcept { return pos_; }
 
    private:
@@ -77,6 +81,8 @@ class ICLFORGE_TRUEHD_EXPORT ElementaryReader {
     std::size_t skipped_ = 0;
     std::size_t leading_ = 0;
     std::size_t units_ = 0;
+    std::size_t core_frames_ = 0;
+    std::size_t core_bytes_ = 0;
     int substreams_ = 0;
     bool started_ = false;
 };

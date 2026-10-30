@@ -828,6 +828,19 @@ in 229 of 229 access units that carry extra data (payload id 11, 50 or 51 bytes)
 11 dynamic objects and one update block: the 12 channels are the LFE and 11 objects, as entry 61 reads them. The check nibble, framing and
 parity of all 229 pass. **Provisional**: (a), (b) and (d) are what the disc shows; (c) is the open part of question 60.
 
+**66. AC-3 core frames between the access units of a Blu-ray track (§3.3, §21.2; planning/truehd-disc-findings.md).** A TrueHD track of a
+Blu-ray transport stream carries the programme's AC-3 core (here 448 kbit/s, 1792 bytes, one every 38 or 39 access units) between its
+access units. `forge decode` and `probe` set the frames aside when they read the transport stream itself, or a bare stream that begins with
+one, but not for the bare stream `forge demux` writes from it, which begins with a TrueHD unit. `ElementaryReader` then took the first frame
+for a unit that does not read and went on to the next major sync: of the owner's first 9 MB excerpt it read 5,476 units and skipped 7.4 MB,
+and `truehd_substream3_search.py` read the frames as units, so its search, its `--directory` table and its restart at unit 5 were of
+bytes that are not TrueHD. `ElementaryReader`, `probe_stream`, `find_stream_start` and `tools/references/truehd_syntax.py` now pass over a
+frame (the A/52 sync word, 48 kHz, a frame size code of the table, a bit stream id of 8 or less, and the frame inside the data) and count it in
+`core_frames()` and `core_bytes()`, not in `skipped_bytes()`. Held by `test_elementary.cpp` and a hand-built stream with a frame every five
+units, which decodes to the same samples as without. **Correct.** Not changed: the Hearth player's own index (`truehd_index.cpp`) still walks
+units by length alone. Of entry 65, only the restart header, the first block header (a unit with a major sync) and the object audio metadata
+stand; the rest of what it says of later units has to be read again on the full stream.
+
 ## Atmos, spec v3.6
 
 TH spec v3.6 (released 2026-10-29) rewrites §15 and leaves every other section as v3.5 has it. It now gives the bit-level syntax of the

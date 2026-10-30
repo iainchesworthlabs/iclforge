@@ -94,7 +94,8 @@ std::optional<std::size_t> find_stream_start(std::span<const std::byte> data,
             if (start == 0) {
                 return start;
             }
-            const std::size_t after = start + unit->length_bytes();
+            std::size_t after = start + unit->length_bytes();
+            after += ac3_core_frame_bytes(data.subspan(after));
             if (after == data.size()) {
                 return start;  // the stream is this one unit
             }
@@ -158,6 +159,10 @@ std::expected<StreamInfo, Error> probe_stream(std::span<const std::byte> data) {
     // The units after the first are counted by their length words alone.
     std::size_t offset = first;
     while (offset + 2 <= data.size()) {
+        if (const std::size_t core = ac3_core_frame_bytes(data.subspan(offset)); core != 0) {
+            offset += core;
+            continue;
+        }
         const std::size_t length = access_unit_length_bytes(data.subspan(offset));
         if (length < kAccessUnitHeaderBytes || offset + length > data.size()) {
             break;
@@ -185,6 +190,13 @@ std::optional<std::span<const std::byte>> ElementaryReader::next() {
     }
     while (pos_ + kAccessUnitHeaderBytes <= data_.size()) {
         const std::span<const std::byte> rest = data_.subspan(pos_);
+        // The AC-3 core a Blu-ray track carries between its units is not part of the stream.
+        if (const std::size_t core = ac3_core_frame_bytes(rest); core != 0) {
+            pos_ += core;
+            core_bytes_ += core;
+            ++core_frames_;
+            continue;
+        }
         const std::size_t length = access_unit_length_bytes(rest);
         if (length >= kAccessUnitHeaderBytes && pos_ + length > data_.size()) {
             // A unit that runs past the data is the end of the stream.

@@ -510,10 +510,31 @@ def decode_segment(sub, entry, segment, rows):
     return out, padding
 
 
+AC3_WORDS_48K = (64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896)
+AC3_WORDS_48K += (1024, 1152, 1280)
+
+
+def ac3_core_frame_bytes(data, offset):
+    """The length of the AC-3 frame at `offset`, or 0: a Blu-ray track carries the programme's AC-3
+    core (48 kHz, bit stream id 8 or less) between its access units."""
+    if data[offset : offset + 2] != b"\x0b\x77" or offset + 6 > len(data):
+        return 0
+    fscod, size_code = data[offset + 4] >> 6, data[offset + 4] & 0x3F
+    if fscod != 0 or size_code >= 2 * len(AC3_WORDS_48K) or data[offset + 5] >> 3 > 8:
+        return 0
+    size = AC3_WORDS_48K[size_code // 2] * 2
+    return size if offset + size <= len(data) else 0
+
+
 def access_units(data):
-    """Yield each access unit's bytes; its first two bytes give its length in words (3.3)."""
+    """Yield each access unit's bytes; its first two bytes give its length in words (3.3). AC-3
+    core frames between the units are passed over."""
     offset = 0
     while offset + 4 <= len(data):
+        core = ac3_core_frame_bytes(data, offset)
+        if core:
+            offset += core
+            continue
         length = (int.from_bytes(data[offset : offset + 2], "big") & 0xFFF) * 2
         if length < 4 or offset + length > len(data):
             return
