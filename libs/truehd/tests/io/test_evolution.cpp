@@ -325,7 +325,7 @@ TEST_CASE("a frame written out bit by bit reads as its fields",
     }
 }
 
-TEST_CASE("the two readings differ where §15.4 and the EMDF container do",
+TEST_CASE("the two readings differ where section 15.4 and the EMDF container do",
           "[truehd][io][evolution]") {
     // Payload id 31: the EMDF container escapes it to a longer id, the letter of §15.4 reads 31.
     const auto id31 = from_bits(

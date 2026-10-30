@@ -62,9 +62,20 @@ std::vector<std::byte> read_bytes(const fs::path& path) {
     return bytes;
 }
 
+// The log of a run, with each line end as LF: a run that writes stdout text on Windows writes CR LF,
+// and one that reads stdin writes LF (platform/windows/stdio_binary.cpp).
 std::string read_text(const fs::path& path) {
     std::ifstream in{path, std::ios::binary};
-    return {std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const std::string raw{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    std::string text;
+    text.reserve(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        if (raw[i] == '\r' && i + 1 < raw.size() && raw[i + 1] == '\n') {
+            continue;
+        }
+        text.push_back(raw[i]);
+    }
+    return text;
 }
 
 fs::path fixture(const std::string& file) {

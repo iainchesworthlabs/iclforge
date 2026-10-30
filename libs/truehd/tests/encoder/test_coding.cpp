@@ -102,7 +102,7 @@ Encoded encode_at(std::uint32_t rate, int max_fir_order, std::span<const std::in
 
 }  // namespace
 
-TEST_CASE("at 176.4 and 192 kHz the encoder's FIR order stops at 4 (TH spec §9.6)",
+TEST_CASE("at 176.4 and 192 kHz the encoder's FIR order stops at 4 (TH spec section 9.6)",
           "[truehd][encoder][coding]") {
     const std::vector<std::int32_t> pcm = tones(40000);
     // At 48 kHz the order matters for this signal: the stream differs between 4 and 8 ...
