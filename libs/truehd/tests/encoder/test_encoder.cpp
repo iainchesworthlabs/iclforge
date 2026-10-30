@@ -613,3 +613,33 @@ TEST_CASE("each channel sends its own clear low bits as its output shift and qua
     // encoder writes 63,254 and DEE's 58,688 for these samples.
     CHECK(encoded.stats.bytes < 60'000);
 }
+
+TEST_CASE(
+    "one bit flipped in the payload of any unit of a real stream is refused by a strict decode",
+    "[truehd][decoder][checks]") {
+    // FFmpeg's strict decode of the same streams warns of the failed parity, checksum and lossless
+    // check and writes the wrong audio with exit status 0 (tools/checks/compare_truehd_decoders.py,
+    // `flip-payload`); this decoder stops at the unit.
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(encoded.units.size() > 60);
+    std::size_t flips = 0;
+    for (const std::size_t victim : {std::size_t{5}, std::size_t{40}}) {
+        const std::size_t length = encoded.units[victim].bytes.size();
+        for (std::size_t step = 0; step < 24; ++step) {
+            std::vector<std::byte> damaged = encoded.units[victim].bytes;
+            const std::size_t at = length * 4 / 10 + step * (length * 5 / 10) / 24;
+            damaged[at] ^= std::byte{static_cast<unsigned char>(1U << (step % 8))};
+            Decoder decoder(DecoderConfig{});
+            for (std::size_t unit = 0; unit < victim; ++unit) {
+                auto clean = decoder.decode(encoded.units[unit].bytes);
+                REQUIRE(clean.has_value());
+            }
+            CHECK_FALSE(decoder.decode(damaged).has_value());
+            ++flips;
+        }
+    }
+    CHECK(flips == 48);
+}
