@@ -1522,7 +1522,7 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
         // flag, none of which a TrueHD decode reads. verify-content passing here would pass
         // without verifying anything.
         if (const int refused = check_options_applied(
-                requested, {"truehd-presentation=", "truehd-check=", "strict"});
+                requested, {"truehd-presentation=", "truehd-check=", "truehd-reading=", "strict"});
             refused != kExitOk) {
             return refused;
         }

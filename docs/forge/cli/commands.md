@@ -964,7 +964,7 @@ the major sync that follows its first access unit's header. `decode` writes a 24
 mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status line names the channels). A failed check
 (check nibble, CRC, parity, lossless check) or a byte the reader skipped stops the decode with exit status 2;
 `truehd-check=lenient` counts them (the status lines say how many) and goes on. `truehd-presentation=` picks the substreams read:
-`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `probe` describes the stream (`json=1` adds a `truehd`
+`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `decode` alone takes `truehd-reading=` for scoring a provisional reading (`seed-shr7-32`, `zero-histories`, `shift-by-position` or `fold-by-position`: the other reading of a point the specification leaves open, `libs/truehd/ERRATA.md` question 101); given, the decode is expected to differ from the source or to fail its lossless check wherever the stream depends on the reading. `probe` describes the stream (`json=1` adds a `truehd`
 member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
 
 `probe` also shows the stream's channel meaning (TH spec section 14.1), of a TrueHD stream (an MLP stream's bytes at that place are not
@@ -1075,7 +1075,7 @@ status 2 (the measurement is strict), and `normalize` takes no option but `quiet
 with no oracle until the DEE set (`libs/truehd/ERRATA.md`, question 51).
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
-`truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the
+`truehd-presentation=`, `truehd-check=` and `truehd-reading=` and refuses every other option by name with exit status 1 and no output: the
 output stage (`channels=`, `downmix=`, `mix-lfe`), `drc=` and `drcmode=`, `programme=`, the object outputs (`objects_dir`,
 `adm_out`, `bed-only`) and the verification flags (`verify-content`, `check-content`, `verify-objects`, `syntax-trace=`),
 which never succeed without checking something. `levels` and `loudness` take the same two options, `truehd-encode` its own

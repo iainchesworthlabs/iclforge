@@ -114,11 +114,13 @@ inline void inverse_filter(int block, int fir_order, const std::int32_t* fir_coe
 // shows gives a different sequence (ERRATA.md entry 23, open question 5; provisional). `rows`
 // points at the first row and `column` at the first noise channel in it.
 inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift,
-                           std::int32_t* rows, std::ptrdiff_t stride, int column) {
+                           std::int32_t* rows, std::ptrdiff_t stride, int column,
+                           bool shr7_32_bit = false) {
     std::uint32_t seed = seed_state;
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
-        const std::uint32_t shr7 = (seed >> 7U) & 0xFFFFU;
+        // shr7_32_bit is the alternative reading of AlternativeReadings, for scoring only.
+        const std::uint32_t shr7 = shr7_32_bit ? seed >> 7U : (seed >> 7U) & 0xFFFFU;
         row[column] =
             static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << noise_shift);
         row[column + 1] =
@@ -185,16 +187,21 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                                                  const std::uint8_t* source_channel,
                                                  const std::int8_t* output_shift,
                                                  const std::int32_t* rows, std::ptrdiff_t stride,
-                                                 std::int32_t* pcm, std::uint32_t fold) {
+                                                 std::int32_t* pcm, std::uint32_t fold,
+                                                 bool shift_by_position = false,
+                                                 bool fold_by_position = false) {
+    // shift_by_position and fold_by_position are the alternative readings of AlternativeReadings,
+    // for scoring only.
     for (int i = 0; i < block; ++i) {
         const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[source_channel[ch]];
-            const int shift = output_shift[source_channel[ch]];
+            const int shift = output_shift[shift_by_position ? ch : source_channel[ch]];
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
-            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), source_channel[ch]);
+            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output),
+                                      fold_by_position ? ch : source_channel[ch]);
             if (pcm != nullptr) {
                 pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
             }

@@ -2438,6 +2438,18 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_lenient = value == "lenient";
             continue;
         }
+        if (command == "decode" && key == "truehd-reading") {
+            if (value != "seed-shr7-32" && value != "zero-histories" &&
+                value != "shift-by-position" && value != "fold-by-position") {
+                fmt::println(stderr,
+                             "error: truehd-reading is seed-shr7-32, zero-histories, "
+                             "shift-by-position or fold-by-position (got '{}')",
+                             token);
+                return false;
+            }
+            out.truehd_reading = std::string{value};
+            continue;
+        }
         // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
         // finished TrueHD stream.
         if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {

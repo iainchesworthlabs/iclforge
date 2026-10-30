@@ -304,6 +304,46 @@ TEST_CASE("a damaged stream fails a strict decode and is counted by a lenient on
     CHECK(read_wav(out).channels == 2);
 }
 
+TEST_CASE("decode takes truehd-reading= by name and the other reading changes what depends on it",
+          "[forge-cli][truehd]") {
+    // ERRATA.md question 101. hb_filters filters from the first sample after each restart, so
+    // decoding it with the histories zeroed at a restart gives other samples; a stream that does not
+    // depend on the reading decodes to the same WAV.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "reading.log";
+    const fs::path filters = fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_filters.thd";
+    const fs::path base = dir / "reading_base.wav";
+    const fs::path zeroed = dir / "reading_zeroed.wav";
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + base.string() + "\"", log) == 0);
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                        "\" truehd-reading=zero-histories truehd-check=lenient",
+                    log) == 0);
+    CHECK(read_bytes(base) != read_bytes(zeroed));
+    // Strict, the zeroed decode stops at the lossless check that the unzeroed histories satisfy.
+    CHECK(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                      "\" truehd-reading=zero-histories",
+                  log) == kExitInput);
+
+    const fs::path plain = fixture("truehd_st48_s24.thd");
+    const fs::path plain_base = dir / "reading_plain_base.wav";
+    const fs::path plain_alt = dir / "reading_plain_alt.wav";
+    REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_base.string() + "\"", log) == 0);
+    for (const char* reading : {"seed-shr7-32", "zero-histories"}) {
+        CAPTURE(reading);
+        REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                            "\" truehd-reading=" + reading,
+                        log) == 0);
+        CHECK(read_bytes(plain_base) == read_bytes(plain_alt));
+    }
+
+    CHECK(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                      "\" truehd-reading=elsewhere",
+                  log) == kExitUsage);
+    // Only decode takes it.
+    CHECK(run_cli("levels \"" + plain.string() + "\" truehd-reading=zero-histories", log) ==
+          kExitUsage);
+}
+
 TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][truehd]") {
     const fs::path dir = scratch_dir();
     const fs::path log = dir / "probe.log";

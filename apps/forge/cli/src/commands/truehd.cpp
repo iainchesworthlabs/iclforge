@@ -431,6 +431,10 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     th::DecoderConfig config;
     config.presentation = *presentation;
     config.strictness = meta.truehd_lenient ? th::Strictness::kLenient : th::Strictness::kStrict;
+    config.readings.seed_shr7_32_bit = meta.truehd_reading == "seed-shr7-32";
+    config.readings.zero_histories_at_restart = meta.truehd_reading == "zero-histories";
+    config.readings.output_shift_by_position = meta.truehd_reading == "shift-by-position";
+    config.readings.fold_by_position = meta.truehd_reading == "fold-by-position";
     th::Decoder decoder(config);
     th::ElementaryReader reader(stream);
     Pcm24Wav wav;
