@@ -103,8 +103,8 @@ struct StageSpec {
 // than 6 channels (a channel above 5) only with noise_type set, whether or not the stream uses
 // noise (ERRATA.md entry 32), and §7.2 says substream 1 SHALL carry 0x31EB unless it is the last
 // substream of a 6 channel presentation, i.e. unless the stream has no third substream (ERRATA.md
-// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are zero
-// and no matrix draws on a noise channel.
+// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are
+// zero and no matrix draws on a noise channel.
 [[nodiscard]] bool noise_flag(const StageSpec& stage, std::size_t index,
                               std::size_t stage_count) noexcept {
     return stage.last_row > 5 || (index == 1 && stage_count > 2);
@@ -508,6 +508,13 @@ struct BlockPlan {
 
 struct StageWork {
     StageSpec spec;
+    // What the stage's program (the bed, or the object channels of substream 3) shares: the low
+    // bits its samples leave clear (TH spec §8.2), the restart sync and whether the matrices send a
+    // noise shift.
+    int output_shift = 0;
+    int quant = 0;
+    std::uint16_t sync = kRestartSyncStandard;
+    bool noise = false;
     std::vector<MatrixSpec> matrices;  // in the order the decoder applies them
     std::vector<Plane> coded;          // the rows this stage codes, before its matrices
     std::vector<Plane> outputs;        // the stage's output rows, in the 24 bit domain
@@ -599,11 +606,11 @@ struct Encoder::Impl {
           nominal(nominal_samples_per_access_unit(ratebits)),
           interval_units(configuration.restart_interval_units),
           stages(stage_layout(configuration.channels, ratebits, assignment)) {
-        previous_check.assign(stages.size(), 0);
+        previous_check.assign(stages.size() + (configuration.object_channels > 0 ? 1U : 0U), 0);
         // One restart interval of input is what the encoder holds before it writes anything: take
         // the room once, so that a caller giving it an access unit a call allocates nothing
         // after this and the buffer is not a figure that grows over a stream's first interval.
-        pending.reserve(interval_frames() * static_cast<std::size_t>(configuration.channels));
+        pending.reserve(interval_frames() * static_cast<std::size_t>(frame_width()));
         if (config.downmix == DownmixMode::kStandard && config.channels > 2) {
             downmix_plan = make_downmix_plan(layout, stages, config.downmix_gains);
         }
@@ -612,6 +619,10 @@ struct Encoder::Impl {
             decoder_config.presentation = Presentation::kBest;
             decoder_config.strictness = Strictness::kStrict;
             verifier = std::make_unique<Decoder>(decoder_config);
+            if (config.object_channels > 0) {
+                decoder_config.presentation = Presentation::kAll;
+                object_verifier = std::make_unique<Decoder>(decoder_config);
+            }
         }
     }
 
@@ -633,9 +644,14 @@ struct Encoder::Impl {
     std::int64_t last_arrival_end = 0;
     EncoderStats stats;
     std::unique_ptr<Decoder> verifier;
+    std::unique_ptr<Decoder> object_verifier;  // Presentation::kAll, for substream 3
 
+    // The values in a frame of the PCM the caller gives: the bed, then the object channels.
+    [[nodiscard]] int frame_width() const noexcept {
+        return config.channels + config.object_channels;
+    }
     [[nodiscard]] std::size_t pending_frames() const noexcept {
-        return (pending.size() - pending_start) / static_cast<std::size_t>(config.channels);
+        return (pending.size() - pending_start) / static_cast<std::size_t>(frame_width());
     }
     [[nodiscard]] std::size_t interval_frames() const noexcept {
         return static_cast<std::size_t>(interval_units) * static_cast<std::size_t>(nominal);
@@ -656,7 +672,22 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
         return "the sample rate is not 44.1, 48, 88.2, 96, 176.4 or 192 kHz (TH spec §1.4)";
     }
     if (config.channels < 1 || config.channels > 8) {
-        return "1 to 8 channels are written; 16 channel (Atmos) streams are phase T2b";
+        return "1 to 8 channels are written";
+    }
+    if (config.object_channels < 0 || config.object_channels > kMaxChannels) {
+        return "object_channels must be 0..16 (TH spec §15.3)";
+    }
+    if (config.object_channels > 0) {
+        if (config.channels != 8) {
+            return "an Atmos stream carries a 7.1 bed: channels must be 8 (TH spec §20.2)";
+        }
+        if (config.sample_rate != 48000) {
+            return "Atmos is 48 kHz only (TH spec §15.2)";
+        }
+        if (const std::string_view field = extra_channel_meaning_problem(config.object_meaning);
+            !field.empty()) {
+            return field;
+        }
     }
     if (config.bits != 16 && config.bits != 20 && config.bits != 24) {
         return "bits must be 16, 20 or 24 (TH spec §1.4)";
@@ -688,8 +719,7 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
         return field;
     }
     if (config.channel_meaning.extra_present) {
-        return "channel_meaning.extra_present: the sixteen-channel extension is not written (TH "
-               "spec §14.2)";
+        return "channel_meaning.extra_present is set by object_channels, not by the caller";
     }
     if (config.experimental.iir || config.experimental.lsb_bypass) {
         return "ExperimentalTools::iir and lsb_bypass are not written yet";
@@ -738,7 +768,7 @@ int Encoder::samples_per_access_unit() const noexcept {
 }
 
 int Encoder::substreams() const noexcept {
-    return static_cast<int>(impl_->stages.size());
+    return static_cast<int>(impl_->stages.size()) + (impl_->config.object_channels > 0 ? 1 : 0);
 }
 
 void Encoder::Impl::reset_stream() {
@@ -749,6 +779,9 @@ void Encoder::Impl::reset_stream() {
     last_arrival_end = 0;
     if (verifier) {
         verifier->reset();
+    }
+    if (object_verifier) {
+        object_verifier->reset();
     }
 }
 
@@ -790,6 +823,19 @@ MajorSync Encoder::Impl::make_major_sync() const {
     // value.
     sync.substream_info = stages.size() == 1 ? 0x14 : 0x3C;
     sync.channel_meaning = config.channel_meaning;
+    if (config.object_channels > 0) {
+        // The fourth substream (ERRATA.md entry 63). The owner's discs have 0xFC in substream_info
+        // for four substreams (entry 17) and 3 in extended_substream_info, which §4.5 lists as 0, 1
+        // and 2 (question 46); the extension is the 16-channel fields of §14.2.
+        sync.num_substreams = static_cast<std::uint8_t>(stages.size() + 1);
+        sync.extended_substream_info = 3;
+        sync.substream_info = 0xFC;
+        sync.channel_meaning.extra_present = true;
+        ExtraChannelMeaning extra = config.object_meaning;
+        extra.sixteench_channel_count = static_cast<std::uint8_t>(
+            config.object_channels - (extra.dyn_object_only && extra.lfe_present ? 1 : 0));
+        sync.extra = extra;
+    }
     sync.size_bytes = kMajorSyncBaseBytes;
     return sync;
 }
@@ -821,7 +867,7 @@ std::vector<std::byte> Encoder::Impl::frame_extra_data(std::span<const std::byte
 std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
     std::span<const std::int32_t> pcm) {
     Impl& impl = *impl_;
-    const auto channels = static_cast<std::size_t>(impl.config.channels);
+    const auto channels = static_cast<std::size_t>(impl.frame_width());
     if (pcm.size() % channels != 0) {
         return std::unexpected(
             make_error(EncodeErrorKind::kBadInput, "the PCM is not a whole number of frames"));
@@ -843,7 +889,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
     // asked for, so a caller that gives less than an interval a call (one access unit at a time, as
     // a live caller does) would copy the whole of the pending input 128 times an interval, which
     // measured 7.5 times the time of one call with the lot (tests/performance, truehd_51_encode).
-    if (const std::size_t needed = impl.pending.size() + pcm.size(); needed > impl.pending.capacity()) {
+    if (const std::size_t needed = impl.pending.size() + pcm.size();
+        needed > impl.pending.capacity()) {
         impl.pending.reserve(std::max(needed, 2 * impl.pending.capacity()));
     }
     for (const std::int32_t sample : pcm) {
@@ -894,6 +941,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::flush() {
 std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::process_interval(
     std::size_t valid_frames, int units) {
     const int channels = config.channels;
+    const int objects = config.object_channels;
+    const auto width = static_cast<std::size_t>(frame_width());
     IntervalShape shape;
     shape.units = units;
     shape.nominal = nominal;
@@ -901,113 +950,161 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     const int padding = static_cast<int>(n - valid_frames);
     const bool final_unit_padded = padding > 0;
 
-    // --- the rows, planar, with the output shift and quantiser step found -------------------
-    std::vector<Plane> original(static_cast<std::size_t>(channels), Plane(n, 0));
-    std::uint32_t seen = 0;
+    // The planes of the input, one per channel: the bed's first, then the objects' (TH spec §15).
+    std::vector<Plane> input(width, Plane(n, 0));
     for (std::size_t t = 0; t < valid_frames; ++t) {
-        for (int c = 0; c < channels; ++c) {
-            const std::int32_t v = pending[pending_start + t * static_cast<std::size_t>(channels) +
-                                           static_cast<std::size_t>(c)];
-            original[static_cast<std::size_t>(c)][t] = v;
-            seen |= static_cast<std::uint32_t>(v);
+        for (std::size_t c = 0; c < width; ++c) {
+            input[c][t] = pending[pending_start + t * width + c];
         }
     }
-    // The low bits every sample leaves clear are sent as the output shift (at most 7: the field is
-    // 4 bits signed) and the quantiser step (TH spec §8.2). FFmpeg's stream of a 16 bit source
-    // has shift 7 and step 1.
-    const int zero_bits =
-        seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
-    const int output_shift = std::min(zero_bits, kMaxOutputShift);
-    const int quant = zero_bits - output_shift;
-    std::vector<Plane> rows = original;
-    if (output_shift > 0) {
-        for (Plane& plane : rows) {
-            for (std::int32_t& v : plane) {
-                v >>= output_shift;
-            }
-        }
-    }
+    const std::size_t stage_count = stages.size() + (objects > 0 ? 1U : 0U);
+    std::vector<StageWork> work;
+    work.reserve(stage_count);
 
-    // --- matrices, then the rows each stage codes --------------------------------------------
-    // FFmpeg's decoder gives a later substream the rows an earlier one decoded as they were
-    // before that earlier substream's matrices (ERRATA.md entry 34): a matrix of
-    // substream 0 shapes substream 0's own output and is invisible to substream 1. So a pair
-    // decorrelated by a matrix has the matrix in every substream that decodes both its rows, and
-    // each substream's own decode (a 2 channel decode reads substream 0 alone) still gets the
-    // source channels.
-    const std::size_t stage_count = stages.size();
-    std::vector<StageWork> work(stage_count);
-    std::vector<Plane> coded_rows = rows;  // becomes the rows as they are coded, before matrices
-    std::vector<MatrixSpec> fold_matrices;
-    if (downmix_plan.active &&
-        fold_downmix(downmix_plan, quant, output_shift, coded_rows, fold_matrices)) {
-        ++stats.downmix_reduced_intervals;
-    }
-    std::vector<MatrixSpec> pair_matrices;
-    if (config.matrix_search) {
-        for (const StageSpec& stage : stages) {
-            for (int a = stage.first_row; a < stage.last_row; ++a) {
-                if (static_cast<std::size_t>(a + 1) >= layout.size() ||
-                    !is_pair(layout[static_cast<std::size_t>(a)],
-                             layout[static_cast<std::size_t>(a + 1)])) {
-                    continue;
-                }
-                const double baseline =
-                    prediction_cost(coded_rows[static_cast<std::size_t>(a)]) +
-                    prediction_cost(coded_rows[static_cast<std::size_t>(a + 1)]);
-                const auto forward = try_pair(coded_rows, a, a + 1, quant, baseline);
-                const auto backward = try_pair(coded_rows, a + 1, a, quant, baseline);
-                const std::optional<PairMatrix>* chosen = nullptr;
-                if (forward && (!backward || forward->saving >= backward->saving)) {
-                    chosen = &forward;
-                } else if (backward) {
-                    chosen = &backward;
-                }
-                if (chosen != nullptr) {
-                    invert_matrix((*chosen)->spec, coded_rows, quant);
-                    pair_matrices.push_back((*chosen)->spec);
+    // --- one program's rows: the output shift and quantiser step found, the matrices, the rows
+    // each stage codes. The bed is the program of substreams 0 to 2 and the object channels of an
+    // Atmos stream are the program of substream 3, which has the channels to itself (TH spec
+    // §15.3).
+    struct Program {
+        std::size_t first_channel = 0;
+        int channels = 0;
+        const std::vector<StageSpec>* stages = nullptr;
+        const std::vector<Channel>* layout = nullptr;
+        const DownmixPlan* downmix = nullptr;
+        bool pairs = false;
+        bool atmos = false;
+    };
+    const std::vector<StageSpec> object_stages{StageSpec{0, objects - 1}};
+    const std::vector<Channel> no_layout;
+    const DownmixPlan no_downmix;
+    const auto prepare = [&](const Program& program) -> std::expected<void, EncodeError> {
+        const auto count = static_cast<std::size_t>(program.channels);
+        // The rows, planar, with the output shift and quantiser step found. The low bits every
+        // sample leaves clear are sent as the output shift (at most 7: the field is 4 bits signed)
+        // and the quantiser step (TH spec §8.2). FFmpeg's stream of a 16 bit source has shift 7 and
+        // step 1.
+        std::vector<Plane> original(
+            input.begin() + static_cast<std::ptrdiff_t>(program.first_channel),
+            input.begin() + static_cast<std::ptrdiff_t>(program.first_channel + count));
+        std::uint32_t seen = 0;
+        for (const Plane& plane : original) {
+            for (const std::int32_t v : plane) {
+                seen |= static_cast<std::uint32_t>(v);
+            }
+        }
+        const int zero_bits =
+            seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
+        const int output_shift = std::min(zero_bits, kMaxOutputShift);
+        const int quant = zero_bits - output_shift;
+        std::vector<Plane> rows = original;
+        if (output_shift > 0) {
+            for (Plane& plane : rows) {
+                for (std::int32_t& v : plane) {
+                    v >>= output_shift;
                 }
             }
         }
-    }
-    for (std::size_t s = 0; s < stage_count; ++s) {
-        StageWork& stage = work[s];
-        stage.spec = stages[s];
-        stage.outputs.assign(coded_rows.begin(), coded_rows.begin() + stage.spec.out_rows());
-        // The decoder applies the pair matrices first, then the downmix (stereo steps, rear steps).
-        const auto inside = [&stage](const MatrixSpec& matrix) {
-            if (matrix.out_ch >= stage.spec.out_rows()) {
-                return false;
+
+        // Matrices, then the rows each stage codes. FFmpeg's decoder gives a later substream the
+        // rows an earlier one decoded as they were before that earlier substream's matrices
+        // (ERRATA.md entry 34): a matrix of substream 0 shapes substream 0's own output and is
+        // invisible to substream 1. So a pair decorrelated by a matrix has the matrix in every
+        // substream that decodes both its rows, and each substream's own decode (a 2 channel decode
+        // reads substream 0 alone) still gets the source channels.
+        std::vector<Plane> coded_rows =
+            rows;  // becomes the rows as they are coded, before matrices
+        std::vector<MatrixSpec> fold_matrices;
+        if (program.downmix->active &&
+            fold_downmix(*program.downmix, quant, output_shift, coded_rows, fold_matrices)) {
+            ++stats.downmix_reduced_intervals;
+        }
+        std::vector<MatrixSpec> pair_matrices;
+        const std::vector<Channel>& names = *program.layout;
+        if (config.matrix_search && program.pairs) {
+            for (const StageSpec& stage : *program.stages) {
+                for (int a = stage.first_row; a < stage.last_row; ++a) {
+                    if (static_cast<std::size_t>(a + 1) >= names.size() ||
+                        !is_pair(names[static_cast<std::size_t>(a)],
+                                 names[static_cast<std::size_t>(a + 1)])) {
+                        continue;
+                    }
+                    const double baseline =
+                        prediction_cost(coded_rows[static_cast<std::size_t>(a)]) +
+                        prediction_cost(coded_rows[static_cast<std::size_t>(a + 1)]);
+                    const auto forward = try_pair(coded_rows, a, a + 1, quant, baseline);
+                    const auto backward = try_pair(coded_rows, a + 1, a, quant, baseline);
+                    const std::optional<PairMatrix>* chosen = nullptr;
+                    if (forward && (!backward || forward->saving >= backward->saving)) {
+                        chosen = &forward;
+                    } else if (backward) {
+                        chosen = &backward;
+                    }
+                    if (chosen != nullptr) {
+                        invert_matrix((*chosen)->spec, coded_rows, quant);
+                        pair_matrices.push_back((*chosen)->spec);
+                    }
+                }
             }
-            for (int c = stage.spec.out_rows(); c < static_cast<int>(matrix.present.size()); ++c) {
-                if (matrix.present[static_cast<std::size_t>(c)]) {
+        }
+        for (std::size_t s = 0; s < program.stages->size(); ++s) {
+            work.emplace_back();
+            StageWork& stage = work.back();
+            stage.spec = (*program.stages)[s];
+            stage.output_shift = output_shift;
+            stage.quant = quant;
+            stage.noise = !program.atmos && noise_flag(stage.spec, s, program.stages->size());
+            stage.sync = program.atmos ? kRestartSyncAtmos
+                                       : (stage.noise ? kRestartSyncNoise : kRestartSyncStandard);
+            stage.outputs.assign(coded_rows.begin(), coded_rows.begin() + stage.spec.out_rows());
+            // The decoder applies the pair matrices first, then the downmix (stereo steps, rear
+            // steps).
+            const auto inside = [&stage](const MatrixSpec& matrix) {
+                if (matrix.out_ch >= stage.spec.out_rows()) {
                     return false;
                 }
+                for (int c = stage.spec.out_rows(); c < static_cast<int>(matrix.present.size());
+                     ++c) {
+                    if (matrix.present[static_cast<std::size_t>(c)]) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            for (const MatrixSpec& matrix : pair_matrices) {
+                if (inside(matrix)) {
+                    stage.matrices.push_back(matrix);
+                }
             }
-            return true;
-        };
-        for (const MatrixSpec& matrix : pair_matrices) {
-            if (inside(matrix)) {
-                stage.matrices.push_back(matrix);
+            for (const MatrixSpec& matrix : fold_matrices) {
+                if (inside(matrix)) {
+                    stage.matrices.push_back(matrix);
+                }
+            }
+            for (const MatrixSpec& matrix : stage.matrices) {
+                apply_matrix(matrix, stage.outputs, quant);
+            }
+            stats.matrices_used += stage.matrices.size();
+            stage.coded.assign(coded_rows.begin() + stage.spec.first_row,
+                               coded_rows.begin() + stage.spec.out_rows());
+        }
+        // The last substream's decode is the source, whatever the matrices before it did.
+        for (std::size_t k = 0; k < work.back().outputs.size(); ++k) {
+            if (work.back().outputs[k] != rows[k]) {
+                return std::unexpected(
+                    make_error(EncodeErrorKind::kInternal,
+                               "the matrices do not give back the source channels"));
             }
         }
-        for (const MatrixSpec& matrix : fold_matrices) {
-            if (inside(matrix)) {
-                stage.matrices.push_back(matrix);
-            }
-        }
-        for (const MatrixSpec& matrix : stage.matrices) {
-            apply_matrix(matrix, stage.outputs, quant);
-        }
-        stats.matrices_used += stage.matrices.size();
-        stage.coded.assign(coded_rows.begin() + stage.spec.first_row,
-                           coded_rows.begin() + stage.spec.out_rows());
+        return {};
+    };
+    if (auto bed = prepare({0, channels, &stages, &layout, &downmix_plan, true, false}); !bed) {
+        return std::unexpected(bed.error());
     }
-    // The last substream's decode is the source, whatever the matrices before it did.
-    for (std::size_t k = 0; k < work.back().outputs.size(); ++k) {
-        if (work.back().outputs[k] != rows[k]) {
-            return std::unexpected(make_error(EncodeErrorKind::kInternal,
-                                              "the matrices do not give back the source channels"));
+    if (objects > 0) {
+        if (auto atmos = prepare({static_cast<std::size_t>(channels), objects, &object_stages,
+                                  &no_layout, &no_downmix, false, true});
+            !atmos) {
+            return std::unexpected(atmos.error());
         }
     }
 
@@ -1019,10 +1116,11 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         stage.fir.assign(coded, FilterSpec{});
         stage.residual.assign(coded, Plane());
         for (std::size_t k = 0; k < coded; ++k) {
-            stage.fir[k] = choose_fir(stage.coded[k], quant, max_order, nominal);
-            if (!compute_residual(stage.coded[k], stage.fir[k], quant, stage.residual[k])) {
+            stage.fir[k] = choose_fir(stage.coded[k], stage.quant, max_order, nominal);
+            if (!compute_residual(stage.coded[k], stage.fir[k], stage.quant, stage.residual[k])) {
                 stage.fir[k] = FilterSpec{};
-                if (!compute_residual(stage.coded[k], stage.fir[k], quant, stage.residual[k])) {
+                if (!compute_residual(stage.coded[k], stage.fir[k], stage.quant,
+                                      stage.residual[k])) {
                     return std::unexpected(make_error(EncodeErrorKind::kInternal,
                                                       "a channel row does not fit 31 bits"));
                 }
@@ -1062,19 +1160,20 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         header.matrices = set;
                         any = true;
                     }
-                    if (output_shift != 0) {
+                    if (stage.output_shift != 0) {
                         std::array<std::int8_t, kMaxChannels> shifts{};
                         for (int c = 0; c < stage.spec.out_rows(); ++c) {
                             shifts[static_cast<std::size_t>(c)] =
-                                static_cast<std::int8_t>(output_shift);
+                                static_cast<std::int8_t>(stage.output_shift);
                         }
                         header.output_shift = shifts;
                         any = true;
                     }
-                    if (quant != 0) {
+                    if (stage.quant != 0) {
                         std::array<std::uint8_t, kMaxChannels> steps{};
                         for (int c = 0; c <= stage.spec.last_row; ++c) {
-                            steps[static_cast<std::size_t>(c)] = static_cast<std::uint8_t>(quant);
+                            steps[static_cast<std::size_t>(c)] =
+                                static_cast<std::uint8_t>(stage.quant);
                         }
                         header.quant_step = steps;
                         any = true;
@@ -1088,7 +1187,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         std::span<const std::int32_t>(stage.residual[k])
                             .subspan(plan.start, static_cast<std::size_t>(plan.size));
                     const detail::CodingChoice choice =
-                        detail::choose_coding(block, quant, previous[k], fir_bits);
+                        detail::choose_coding(block, stage.quant, previous[k], fir_bits);
                     if (choice.data_bits >= detail::kInfeasible) {
                         // The filter's residual does not fit any coding: drop the filter. A row
                         // that does not fit without one has nothing left to drop.
@@ -1097,7 +1196,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                                                               "a channel row fits no coding"));
                         }
                         stage.fir[k] = FilterSpec{};
-                        if (!compute_residual(stage.coded[k], stage.fir[k], quant,
+                        if (!compute_residual(stage.coded[k], stage.fir[k], stage.quant,
                                               stage.residual[k])) {
                             return std::unexpected(make_error(
                                 EncodeErrorKind::kInternal, "a channel row does not fit 31 bits"));
@@ -1136,7 +1235,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             for (int k = 0; k < stage.spec.out_rows(); ++k) {
                 const auto value =
                     static_cast<std::uint32_t>(stage.outputs[static_cast<std::size_t>(k)][t])
-                    << output_shift;
+                    << stage.output_shift;
                 fold = lossless_fold_step(fold, value, stage_ch_assign(k));
             }
         }
@@ -1175,7 +1274,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             context.min_chan = stage.spec.first_row;
             context.max_chan = stage.spec.last_row;
             context.max_matrix_chan = stage.spec.last_row;
-            context.noise_type = noise_flag(stage.spec, s, stage_count);
+            context.noise_type = stage.noise;
             context.presence_flags = presence::kAll;
 
             // The coding in force at the start of this access unit's first block is rebuilt by the
@@ -1203,14 +1302,12 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                     w.put(restart_here ? 1U : 0U, 1);
                     if (restart_here) {
                         RestartHeader restart;
-                        restart.sync =
-                            noise_flag(stage.spec, s, stage_count) ? kRestartSyncNoise
-                                                                   : kRestartSyncStandard;
+                        restart.sync = stage.sync;
                         restart.output_timing = static_cast<std::uint16_t>(first_sample & 0xFFFFU);
                         restart.min_chan = static_cast<std::uint8_t>(stage.spec.first_row);
                         restart.max_chan = static_cast<std::uint8_t>(stage.spec.last_row);
                         restart.max_matrix_chan = static_cast<std::uint8_t>(stage.spec.last_row);
-                        restart.max_shift = static_cast<std::uint8_t>(output_shift);
+                        restart.max_shift = static_cast<std::uint8_t>(stage.output_shift);
                         restart.max_lsbs = static_cast<std::uint8_t>(std::min(stage.max_lsbs, 31));
                         restart.max_bits = 24;
                         restart.max_bits_repeat = 24;
@@ -1239,7 +1336,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 for (int i = 0; i < plan.size; ++i) {
                     const std::size_t t = plan.start + static_cast<std::size_t>(i);
                     for (std::size_t k = 0; k < in_force.size(); ++k) {
-                        detail::put_residual(w, stage.residual[k][t], quant, in_force[k]);
+                        detail::put_residual(w, stage.residual[k][t], stage.quant, in_force[k]);
                     }
                 }
                 w.put(bi + 1 == block_count ? 1U : 0U, 1);
@@ -1281,8 +1378,16 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         }
         const std::optional<MajorSync> major_sync =
             first ? std::optional<MajorSync>(make_major_sync()) : std::nullopt;
-        const std::size_t prefix_bytes =
-            kFixedUnitBytes + (first ? kMajorSyncBaseBytes : 0U) + 2U * stage_count;
+        std::size_t sync_bytes = 0;
+        if (major_sync) {
+            const auto written = write_major_sync(*major_sync);
+            if (!written) {
+                return std::unexpected(
+                    make_error(EncodeErrorKind::kInternal, "the major sync does not write"));
+            }
+            sync_bytes = written->size();
+        }
+        const std::size_t prefix_bytes = kFixedUnitBytes + sync_bytes + 2U * stage_count;
         const std::size_t total = prefix_bytes + words * 2U + extra.size();
         if (total / 2U > static_cast<std::size_t>(kMaxUnitWords)) {
             return std::unexpected(make_error(EncodeErrorKind::kRateExceeded,
@@ -1351,10 +1456,26 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             const int expected_samples = nominal - unit.padding_samples;
             const std::size_t base =
                 static_cast<std::size_t>(au) * static_cast<std::size_t>(nominal);
-            if (const auto mismatch =
-                    detail::verify_mismatch(got, channels, expected_samples, original, base);
+            if (const auto mismatch = detail::verify_mismatch(
+                    got, channels, expected_samples,
+                    std::span<const Plane>(input).first(static_cast<std::size_t>(channels)), base);
                 !mismatch.empty()) {
                 return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed, mismatch));
+            }
+            if (object_verifier) {
+                auto object_decoded = object_verifier->decode(unit.bytes);
+                if (!object_decoded || !*object_decoded) {
+                    return std::unexpected(
+                        make_error(EncodeErrorKind::kVerifyFailed,
+                                   "the decoder refused the unit it was given (substream 3)"));
+                }
+                if (const auto mismatch = detail::verify_mismatch(
+                        **object_decoded, objects, expected_samples,
+                        std::span<const Plane>(input).subspan(static_cast<std::size_t>(channels)),
+                        base);
+                    !mismatch.empty()) {
+                    return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed, mismatch));
+                }
             }
             ++stats.verified_units;
         }

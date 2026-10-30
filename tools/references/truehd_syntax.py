@@ -528,6 +528,21 @@ def nibble_fold(data):
     return ((folded >> 4) ^ folded) & 0xF
 
 
+def major_sync_size(unit, offset):
+    """The major sync's length in bytes: 28, or more with the 16-channel extension of TH spec 14.2
+    (32 on the owner's discs). The extension's size is found by the CRC, which ends it, as the
+    library does (ERRATA 44): the sizes the extension's 4 bit length gives first, then every
+    even size."""
+    length_words = (unit[offset + 26] >> 4) + 1
+    for size in (28, 26 + 2 * length_words + 2, 26 + 2 * (length_words + 1) + 2, *range(28, 62, 2)):
+        if offset + size > len(unit):
+            continue
+        stored = int.from_bytes(unit[offset + size - 2 : offset + size], "big")
+        if crc16_major_sync(unit[offset : offset + size - 2]) == stored:
+            return size
+    raise StreamError("major sync CRC")
+
+
 def decode_stream(data, presentation="best"):
     """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
     substreams = [Substream(i) for i in range(4)]
@@ -537,16 +552,14 @@ def decode_stream(data, presentation="best"):
     for unit in access_units(data):
         offset = 4
         if unit[offset : offset + 3] == SYNC_WORD:
-            stored = int.from_bytes(unit[offset + 26 : offset + 28], "big")
-            if crc16_major_sync(unit[offset : offset + 26]) != stored:
-                raise StreamError("major sync CRC")
+            size = major_sync_size(unit, offset)
             format_info = int.from_bytes(unit[offset + 4 : offset + 8], "big")
             ratebits = format_info >> 28 if unit[offset + 3] == 0xBA else (format_info >> 20) & 0xF
             rate = (48000 << ratebits) if ratebits <= 2 else (44100 << (ratebits - 8))
             for substream in substreams:
                 substream.noise_size = 64 << (ratebits & 3)
             count = unit[offset + 16] >> 4
-            offset += 28
+            offset += size
         directory_start = offset
         entries = []
         for _ in range(count):

@@ -20,6 +20,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_coding.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
+    encoder/test_encoder_atmos.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 

@@ -151,16 +151,8 @@ def units_of(data, limit):
         offset = 4
         if unit[offset : offset + 3] == ref.SYNC_WORD:
             count = unit[offset + 16] >> 4
-            # The extension makes the major sync longer than 28 bytes: the CRC decides how long.
-            size = 28
-            for candidate in (28, 32, 36, 40):
-                if len(unit) >= offset + candidate:
-                    stored = int.from_bytes(
-                        unit[offset + candidate - 2 : offset + candidate], "big"
-                    )
-                    if ref.crc16_major_sync(unit[offset : offset + candidate]) == stored:
-                        size = candidate
-                        break
+            # The 16-channel extension makes the major sync longer than 28 bytes (32 on the discs).
+            size = ref.major_sync_size(unit, offset)
             offset += size
         entries = []
         for _ in range(count):

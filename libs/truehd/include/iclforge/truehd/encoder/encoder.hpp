@@ -38,8 +38,9 @@
 // substreams' matrices undo exactly.
 //
 // What it does not write: noise generation (the generator is not defined, ERRATA.md open
-// question 5), the Atmos substream and its evolution payload (phase T2b; this class only frames a
-// payload it is handed, see EncoderConfig::extra_data), and MLP (0xF8726FBB). The block data CRC
+// question 5), the evolution payload (this class only frames a payload it is handed, see
+// EncoderConfig::extra_data), and MLP (0xF8726FBB). The Atmos substream is written with
+// EncoderConfig::object_channels. The block data CRC
 // is not written either, because the specification does not say what it covers (ERRATA.md entry
 // 21).
 //
@@ -129,13 +130,30 @@ struct EncoderConfig {
     // The 2 channel mode of TH spec §5.4: 0 stereo, 1 Lt/Rt matrix encoded, 2 headphone.
     unsigned stereo_mode = 0;
     // TH spec §14: dialogue normalisation, mix levels, source formats, the control-enabled bits and
-    // the DRC start-up gains, per presentation (2, 6 and 8 channels), written into every major sync.
-    // All zero by default, as in FFmpeg's streams, so a configuration that does not set them writes
-    // the stream it always wrote. A field wider than its width (channel_meaning_problem()) or
-    // `extra_present` (the sixteen-channel extension is not written) is kInvalidConfig, the detail
-    // naming the field. Provisional, no oracle until the DEE set: what the values mean (units, which
-    // presentation applies when, what a control-enabled bit gates) is ERRATA.md questions 51 to 55.
+    // the DRC start-up gains, per presentation (2, 6 and 8 channels), written into every major
+    // sync. All zero by default, as in FFmpeg's streams, so a configuration that does not set them
+    // writes the stream it always wrote. A field wider than its width (channel_meaning_problem())
+    // or `extra_present` (the sixteen-channel extension is not written) is kInvalidConfig, the
+    // detail naming the field. Provisional, no oracle until the DEE set: what the values mean
+    // (units, which presentation applies when, what a control-enabled bit gates) is ERRATA.md
+    // questions 51 to 55.
     ChannelMeaning channel_meaning{};
+    // TrueHD Atmos (TH spec §15, v3.9): the channels of substream 3, 1 to 16 (the Atmos
+    // presentations are 12, 14 and 16, §15.17; the owner's discs have 12), written with restart
+    // sync 0x31EC and the 16-channel extension of the major sync (§14.2). 0 writes none. The PCM
+    // given to encode() then has `channels` + `object_channels` values a frame: the 7.1 bed first
+    // (`channels` must be 8, substreams 0 to 2, 48 kHz only, §15.2, §20.2), then the object
+    // channels, which are coded as substream 3 on their own, with no matrix or prediction from the
+    // bed. A decode of the best presentation gives the bed; Presentation::kAll gives the object
+    // channels. The programme they carry (which are beds, which objects) is the object audio
+    // metadata's, written by the caller in the extra data (`extra_data`); this only says in the
+    // major sync what `object_meaning` says. PROVISIONAL, no oracle but this library's decoder and
+    // the Python reference (ERRATA.md entry 63; questions 61 to 63).
+    int object_channels = 0;
+    // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
+    // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
+    // how the owner's discs count them. Used only with object_channels.
+    ExtraChannelMeaning object_meaning{};
     // The largest FIR order tried (TH spec §9.3: 8). 0 turns prediction off.
     int max_fir_order = 8;
     // Decorrelate the channel pairs with a primitive matrix when it makes the stream smaller.

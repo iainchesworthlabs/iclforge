@@ -365,6 +365,17 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** read the 1536 sample cadence as it is on the discs, and the writer (WP1 step 4) write frames at that cadence; the owner
     confirms with `forge probe DISC detail=format` (`evolution.cadence`).
 
+63. **What an Atmos stream this encoder writes is (TH spec §4.5, §7.2, §14.2, §15; entry 63).** The encoder codes the 7.1 bed in substreams 0 to
+    2 as for any 7.1 stream and the object channels in a fourth substream of their own, with restart sync 0x31EC, no matrix and a prediction filter
+    per channel. The owner's discs most likely express the bed and the objects in terms of each other (the matrices of substream 3 read the rows
+    of substreams 0 to 2, entry 34), which codes the channels the two share once; this does not, so its streams are larger than Dolby's for the
+    same programme. Whether the larger stream fits the 18 Mbps of a disc is the material's: the 12 channel real-audio test stream in
+    `test_encoder_atmos.cpp` peaks at 15.2 Mbps over a unit. Also open: the value of `extended_substream_info` (the discs have 3, §4.5 lists 0 to 2;
+    question 46), whether `sixteench_channel_count` counts the LFE (the discs read as 11 for 12 channels with an LFE; the encoder writes the channels
+    less an LFE of a dynamic-object-only programme), what `sixteench_dialogue_norm` and `sixteench_mix_level` mean (questions 51 and 52), and the
+    12, 14 and 16 channel presentations (question 61). **Recommendation:** write what is written, label the streams as not accepted by every licensed
+    decoder, and let the owner's first play of one settle the rest.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -771,6 +782,17 @@ presentation's bed alone (§15.20), each channel a DirectSpeakers channel at the
 stream decides the plan; a later payload that describes another programme is counted and not followed. Held by `test_cli_truehd_objects.cpp`
 (channel for channel against the multichannel decode, over `hb_atmos_objects`, whose payloads `build_payload` made). **Provisional, owner
 to confirm** (questions 61 and 62): only E-AC-3's reader (`libs/objects`) and the stream's own channel count check the metadata.
+
+**63. The Atmos stream the encoder writes (§4.5, §6.4, §7.2, §14.2, §15.3; entries 17, 46, 47, 60 and 61).** `EncoderConfig::object_channels`
+(1 to 16, with `channels` 8 and 48 kHz) adds a fourth substream: restart sync 0x31EC, `min_chan` 0, `max_chan` and `max_matrix_chan` the
+channel count less one, the identity `ch_assign`, no matrix, a FIR filter per channel as for the others, no terminatorB (the discs have none,
+entry 3). The major sync has four substreams, `substream_info` 0xFC, `extended_substream_info` 3, `extra_present` and the 16-channel extension
+(`object_meaning`): the 4 bit length is the number of 16-bit words the fields take less one, so a dynamic-object-only programme is the 32 byte
+major sync of the discs. `encode()` takes `channels` + `object_channels` values a frame, the bed first. The bed's substreams are the stream a
+7.1 encode of the bed alone writes, byte for byte (`test_encoder_atmos.cpp`), so a decoder that reads three substreams finds it. The decode of
+the stream by this library and by `tools/references/truehd_syntax.py` (which reads the longer major sync by its CRC, as the library does) is
+the bed and the object channels, sample for sample, for the real-audio programme of the test. `verify` decodes each unit with both presentations.
+**Provisional, owner to confirm** (question 63); no decoder outside this repository reads restart sync 0x31EC.
 
 ## Atmos, spec v3.6
 
