@@ -5,7 +5,8 @@ For the owner to run on a disc excerpt on the owner's machine (planning/work-pac
 It reads nothing but the stream given and prints parameters and counts: no sample, no residual bit.
 The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of the disc's `.m2ts`).
 
-    truehd_substream3_search.py STREAM [--units N] [--trace]
+    truehd_substream3_search.py STREAM [--units N] [--trace] [--restart-index K] [--trace-only]
+                                     [--directory]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -171,7 +172,12 @@ def units_of(data, limit):
         for _ in range(count):
             word = int.from_bytes(unit[offset : offset + 2], "big")
             entries.append(
-                {"extra": word >> 15, "crc_present": (word >> 13) & 1, "end": word & 0xFFF}
+                {
+                    "extra": word >> 15,
+                    "restart_nonexistent": (word >> 14) & 1,
+                    "crc_present": (word >> 13) & 1,
+                    "end": word & 0xFFF,
+                }
             )
             offset += 2 + (2 if word >> 15 else 0)
         yield number, unit, entries, offset, count
@@ -278,7 +284,7 @@ class TracedBits(ref.Bits):
         return value
 
 
-def trace_first_block(data, units, reading, limit=800):
+def trace_first_block(data, units, reading, limit=800, skip=0):
     """The reads of substream 3's restart header and first block header under one reading, up to
     where it stops: position, width, value and the function that read it. Parameters of the stream
     and nothing else: the block data is not read."""
@@ -287,6 +293,9 @@ def trace_first_block(data, units, reading, limit=800):
             continue
         entry, segment = list(segments_of(unit, entries, offset))[3]
         if not segment or segment[0] & 0xC0 != 0xC0:
+            continue
+        if skip:
+            skip -= 1
             continue
         payload = segment[:-2] if entry["crc_present"] else segment
         bits = TracedBits(payload)
@@ -302,6 +311,7 @@ def trace_first_block(data, units, reading, limit=800):
             f"  bit {start:5d}  width {width:2d}  value {value:<10d} {name}"
             for start, width, value, name in bits.trace[-limit:]
         ]
+        lines.insert(0, f"  (access unit {_number}, segment of {len(segment)} bytes)")
         return lines, error, bits.pos
     return [], "no restart header in substream 3", 0
 
@@ -333,6 +343,26 @@ def full_decode(data, reading, units):
     return results
 
 
+def print_directory(data, units):
+    """Per access unit: the directory entries of the substreams and the first bits of substream 3's
+    segment (its block-header flags or its restart header: parameters, not audio)."""
+    print(
+        "unit  directory (end/restart_nonexistent/crc/extra)"
+        "                      seg3 bytes  seg3 first 24 bits"
+    )
+    for number, unit, entries, offset, count in units_of(data, units):
+        if count < 4:
+            continue
+        segment = list(segments_of(unit, entries, offset))[3][1]
+        first = "".join(f"{byte:08b}" for byte in segment[:3])
+        flags = " ".join(
+            f"{e['end']}/{(e['restart_nonexistent'])}/{e['crc_present']}/{e['extra']}"
+            for e in entries
+        )
+        sync = " restart-like" if segment and segment[0] & 0xC0 == 0xC0 else ""
+        print(f"{number:5d}  {flags:44s} {len(segment):8d}  {first}{sync}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("stream", type=pathlib.Path)
@@ -342,8 +372,25 @@ def main():
         action="store_true",
         help="also print every field of the first block header under the library's reading",
     )
+    parser.add_argument(
+        "--restart-index",
+        type=int,
+        default=0,
+        help="trace the K-th restart header of substream 3 instead of the first",
+    )
+    parser.add_argument(
+        "--directory",
+        action="store_true",
+        help="print the substream directory and the first bits of substream 3's segment per unit",
+    )
+    parser.add_argument(
+        "--trace-only", action="store_true", help="print the trace and stop: no search"
+    )
     args = parser.parse_args()
     data = args.stream.read_bytes()
+    if args.directory:
+        print_directory(data, min(args.units, 80))
+        return 0
     found = describe_restart(data, args.units)
     if found is None:
         print("no restart header in substream 3 within the units read")
@@ -357,11 +404,15 @@ def main():
     )
     keys = list(READINGS)
     default = {key: values[0] for key, values in READINGS.items()}
-    if args.trace:
-        lines, error, position = trace_first_block(data, args.units, default)
+    if args.trace or args.trace_only:
+        lines, error, position = trace_first_block(
+            data, args.units, default, skip=args.restart_index
+        )
         print(f"first block header under the library's reading, to bit {position}:")
         print("\n".join(lines))
         print(f"  stopped: {error}" if error else "  parsed to its end")
+        if args.trace_only:
+            return 0
     scored = []
     for values in itertools.product(*(READINGS[key] for key in keys)):
         reading = dict(zip(keys, values, strict=True))
