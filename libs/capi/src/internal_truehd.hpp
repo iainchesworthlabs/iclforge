@@ -19,6 +19,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/scan.hpp"
 
 static_assert(static_cast<int>(iclforge::truehd::Presentation::kBest) ==
               ICLFORGE_TRUEHD_PRESENTATION_BEST);
@@ -75,6 +76,10 @@ struct iclforge_truehd_units {
     };
     std::vector<Unit> units;
     std::size_t skipped_bytes = 0;
+};
+
+struct iclforge_truehd_scanned_stream {
+    iclforge::truehd::ScannedStream scan;
 };
 
 namespace iclforge_c {

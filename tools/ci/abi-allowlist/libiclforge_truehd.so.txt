@@ -52,6 +52,7 @@ iclforge::truehd::read_evolution(iclforge::truehd::ExtraData const&, iclforge::t
 iclforge::truehd::read_extra_data(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::read_restart_header(iclforge::BitReader&, std::span<std::byte const, 18446744073709551615ul>, bool)
 iclforge::truehd::restart_header_crc(std::span<std::byte const, 18446744073709551615ul>, unsigned long, unsigned long)
+iclforge::truehd::scan_stream(std::span<std::byte const, 18446744073709551615ul>, iclforge::truehd::ScanOptions const&)
 iclforge::truehd::starts_with_major_sync(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::substream_crc(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::substream_parity(std::span<std::byte const, 18446744073709551615ul>)
