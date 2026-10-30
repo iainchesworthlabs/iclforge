@@ -350,6 +350,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     and this question closes. Status: the first disc excerpt shows (c) of entry 65 (the parse is off after the matrices); the script's first
     run stopped on an empty segment, which it now skips, and it tries the output shifts and quantiser steps of the channels `min_chan` to
     `max_chan` only and 16 coefficient presence bits as well.
+    Entry 68 is the latest state: the layout reads the first matrices and not the rest.
 
 61. **Which channel is which object (TH spec §15.6, §15.16, §15.17; entry 61).** Entry 61 reads channel i of substream 3 as object i of the
     payload (beds, then ISF objects, then dynamic objects, TS 103 420 §5.6.4.8; a dynamic-object-only programme with an LFE has the LFE first).
@@ -853,6 +854,21 @@ gives matrices whose coefficients stay near the unit range and a tail that is tw
 to 16, orders to 8 and 4). **Open (question 60).** What would settle it is a controlled input: an Atmos stream from the owner's encoder whose objects
 are silent but for one, and a second with that object moved, so that the bits that change are the matrix and filter fields that the one change
 touches. Held by `tools/checks/truehd_substream3_search.py` (`--common-prefix`, `--dump-header`).
+
+**68. What DEE's own encodes show of substream 3 (entries 65, 66, 67; question 60; TH spec v3.15 §15.17).** DEE 6.5.4 encodes TrueHD Atmos from the
+Dolby Sollevante master at 12, 14 and 16 elements (and with a 6 s silence pad): substream 3 has `min_chan` 8, `max_chan` and `max_matrix_chan` of
+elements - 1, restart sync 0x31EC, `extended_substream_info` 3, `substream_info` 0xFC. DEE's own log says the 8 channel bed is a dynamic downmix of the
+objects (its matrices come from a file it builds and deletes), the 6 channel and 2 channel presentations folds of that, so the matrices of substream 3
+are the inverse of an object-to-bed rendering and differ from restart to restart: the restarts of a DEE encode share 5 to 55 bits after the restart
+header, even over silence, where the disc's steady restarts shared 1,714. **Reads:** the matrix layout of entry 10.2 (4 bit output channel, 4 bit
+`frac_bits`, 1 bit bypass, 14 presence bits, `frac_bits` + 2 bit coefficients) reads the first matrices of a restart identically in restarts of the same
+state 1,100 units apart (a noise-only matrix, an integer matrix with `frac_bits` 0, and a matrix of nine equal coefficients at `frac_bits` 11, whose
+14 bit period is one flag and one coefficient). **Does not read:** the rest. No layout of 10 to 18 presence bits, with or without a 4 bit noise shift, and
+a coefficient width of `frac_bits` + 1 to 3, fits the count of 12 matrices into the two complete silent restarts (656 and 672 bits), so the matrices are
+coded more compactly than the standard form. **Corrections:** entry 65 (c) and entry 67 took repeated stretches for sample data; they are runs of equal
+coefficients, and the 1,714 bit steady header on the disc is probably the whole matrix and channel-parameter section of 14 matrices (the standard-form parse reaches
+bit 1,133 and then fails), so its length is not evidence of anything about the sample data. No reference exists in the repository: DEE deletes its matrix file, and its debug
+log has no per-restart counts. **Open (question 60), parked as WP1b.** What would settle it: a licensed decoder's parse log for one restart interval, or the matrix file.
 
 ## Atmos, spec v3.6
 

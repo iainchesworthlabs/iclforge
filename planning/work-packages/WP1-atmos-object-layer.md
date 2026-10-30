@@ -70,6 +70,16 @@ Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; st
   of the open fields (coefficient count, matrix noise shift, FIR state flag, output-shift and quantiser counts, bits after the restart header),
   prints parameters and counts only, and decodes the first restart intervals of all four substreams under each reading that parses. Paste
   its output back (ERRATA question 60). `forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient` is the lossless-check line.
+  Result (2026-10-30, ERRATA 65 to 68): **step 1 is not done.** The restart header of substream 3 reads (CRC passes, `min_chan` 8, `max_chan` =
+  `max_matrix_chan` = objects - 1), its continuation blocks read as TH spec §8.2 has them, the evolution frames read 757 of 757, and the
+  matrix layout (4 bit output channel, 4 bit `frac_bits`, bypass bit, 14 presence bits, `frac_bits` + 2 bit coefficients) reads the first
+  matrices of a restart identically from restart to restart, on the owner's disc and in DEE's own encodes. It does not read the rest: no layout in the
+  family tried fits the 12 matrices the count says into a silent DEE restart, so the matrices of substream 3 are coded more compactly than the
+  standard form in some way the repository cannot find without a reference. `forge decode` fails at every restart (filter order or
+  coefficient width), and nothing of substream 3 below the restart header decodes. What would end it: a parse log of a licensed decoder for
+  one restart, or the matrix file DEE builds and deletes (`matrix_info_mx.mx`). Park it as WP1b.
+  Found on the way and fixed (ERRATA 66): the AC-3 core frames between the units of a Blu-ray track, which lost 80% of an excerpt for the bare
+  stream `forge demux` writes, and a matrix output channel above `max_matrix_chan` (ERRATA 65).
 - Step 2: `forge decode truehd-presentation=all` writes the full channel set; `adm_out` with another presentation is the bed as DirectSpeakers.
 - Step 3: `objects_dir`, `adm_out` and `truehd-render=` (ERRATA 61, questions 61, 62). The render of a stream's objects equals its bed
   when the stream was written by `truehd-atmos`; on a disc the same comparison (`truehd-presentation=8ch` against `truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs`)
