@@ -1968,6 +1968,76 @@ for refused in "truehd-encode te_st48_s24.wav te_refused.mlp" "truehd-encode te_
     }
 done
 
+# --- TrueHD Atmos (forge truehd-atmos, libs/truehd/ERRATA.md entries 61 to 64) --------------------
+# 12 object channels (the LFE first) and a 7.1 bed, coded as substream 3 and substreams 0 to 2. FFmpeg
+# reads substreams 0 to 2 and leaves substream 3 alone, so its strict decode is the bed forge decodes
+# (best presentation), in its own channel order; forge's decode of all four substreams is the objects
+# it was given, byte for byte. No decoder outside this repository reads substream 3.
+thd_sines ta_objects.wav 48000 12 7.1.4 pcm_s24le
+thd_sines ta_bed.wav 48000 8 7.1 pcm_s24le
+printf '0 0.0  0.9 0.5 0.0  1.0 0.0\n0 1.0  0.1 0.5 0.0  1.0 0.0\n' >ta_paths.txt
+run_truehd_atmos_case() { # name [forge options...]
+    local name="ta_$1"
+    shift
+    run truehd-atmos ta_objects.wav "$name.thd" verify "$@"
+    run probe "$name.thd"
+    count=$((count + 1))
+    echo "[$count] truehd atmos $name: ffmpeg reads the 7.1 bed, forge reads the bed and the objects"
+    truehd_ffmpeg_pcm "$name.thd" -f truehd >"$name.ffmpeg.s32"
+    run decode "$name.thd" "$name.bed.wav"
+    truehd_reorder_pcm "$name.bed.wav" "0|1|2|3|6|7|4|5" >"$name.bed.s32"
+    cmp -s "$name.bed.s32" "$name.ffmpeg.s32" || {
+        echo "forge's decode of $name.thd's bed differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+    run decode "$name.thd" "$name.all.wav" truehd-presentation=all
+    ffmpeg -v error -y -i ta_objects.wav -f s32le "$name.objects.src.s32"
+    ffmpeg -v error -y -i "$name.all.wav" -f s32le "$name.objects.dec.s32"
+    cmp -s "$name.objects.src.s32" "$name.objects.dec.s32" || {
+        echo "forge's decode of $name.thd's objects differs from the WAV they came from" >&2
+        exit 1
+    }
+}
+run_truehd_atmos_case fan
+run_truehd_atmos_case path ta_paths.txt
+run_truehd_atmos_case bed truehd-bed=ta_bed.wav
+run_truehd_atmos_case all_objects truehd-objects-lfe=off truehd-restart=8
+
+# The objects of a stream: the channels as WAVs, placed on a layout, and the bed alone as an ADM master
+# where ADM is built.
+count=$((count + 1))
+echo "[$count] truehd atmos objects_dir and truehd-render= read substream 3's object layer"
+rm -rf ta_objects_dir
+run decode ta_fan.thd ta_fan.objects.wav ta_objects_dir truehd-presentation=all
+[[ -f ta_objects_dir/object_11.wav ]] || {
+    echo "decode did not write the object channels of ta_fan.thd" >&2
+    exit 1
+}
+run decode ta_fan.thd ta_fan.rendered.wav truehd-presentation=all truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs
+cmp -s ta_fan.bed.wav ta_fan.rendered.wav || {
+    echo "the render of ta_fan.thd's objects is not its bed" >&2
+    exit 1
+}
+
+# What substream 3 cannot carry is a usage or input error.
+count=$((count + 1))
+echo "[$count] truehd-atmos refuses one channel, another rate, a bed of the wrong shape and objects without substream 3"
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1" -c:a pcm_s24le ta_mono.wav
+for refused in "truehd-atmos ta_mono.wav ta_refused.thd" "truehd-atmos te_st48_s24.wav ta_refused.wav" \
+    "truehd-atmos ta_objects.wav ta_refused.thd truehd-bed=te_st48_s24.wav" \
+    "decode te_st48_s24.thd ta_refused.wav ta_refused_dir" \
+    "decode te_m71_48_s24.thd ta_refused.wav ta_refused_dir truehd-presentation=all"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    [[ "$refused_status" -eq 1 || "$refused_status" -eq 2 ]] || {
+        echo "forge $refused should exit 1 or 2, exited $refused_status" >&2
+        exit 1
+    }
+done
+
 # --- A Forge project file, run as the commands it stands for (apps/shared/project) --------------
 # `forge project` reads a .forgeproj and runs the line the Forge GUI's command bar shows for it, so
 # its own code is the file's reader and the translation, and everything after is the encoder this

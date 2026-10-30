@@ -2353,7 +2353,7 @@ only, and part of the second has no outside reader.
    block data check, terminators, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
-   it: for nineteen of the twenty-nine it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
+   it: for nineteen of the thirty-three it returns exactly that signal (and the bed of four more) (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
    `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` (also one that changes at each restart) and an output shift (also on a moved channel),
    noise generator 0, noise generator 1 at 48, 96 and 192 kHz, the block data
    length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other ten: with the marker in

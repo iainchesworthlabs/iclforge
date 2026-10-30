@@ -2275,16 +2275,16 @@
       ],
       [
         "TrueHD encode",
-        "Public API (C++ and C): 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits; MLP is not written",
-        "File: `truehd-encode` to a bare stream, MP4, Matroska or MPEG-TS (Blu-ray profile)",
+        "Public API (C++ and C): 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits; MLP is not written. C++: with 1 to 16 object channels, a 7.1 bed and an Atmos substream (provisional)",
+        "File: `truehd-encode` to a bare stream, MP4, Matroska or MPEG-TS (Blu-ray profile); `truehd-atmos` writes a 7.1 bed and up to 16 object channels with their metadata (provisional)",
         "No",
         "No",
         "No"
       ],
       [
         "TrueHD and MLP decode",
-        "Public API (C++ and C): substreams 0 to 2 and a 16-channel substream; the Atmos substream's objects are not read",
-        "File: `decode`, `probe`, `levels` and `loudness`, bare or from MP4, Matroska or MPEG-TS; `transcode`, `qc`, `monitor` and `play` refuse it",
+        "Public API (C++ and C): substreams 0 to 2 and a 16-channel substream; the objects' metadata is parsed by the caller (`forge`)",
+        "File: `decode`, `probe`, `levels` and `loudness`, bare or from MP4, Matroska or MPEG-TS; `decode` also writes an Atmos stream's objects, an ADM master of them and the objects placed on a speaker layout (provisional); `transcode`, `qc`, `monitor` and `play` refuse it",
         "No",
         "No",
         "No"

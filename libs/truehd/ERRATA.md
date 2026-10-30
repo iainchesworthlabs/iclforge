@@ -376,6 +376,13 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     12, 14 and 16 channel presentations (question 61). **Recommendation:** write what is written, label the streams as not accepted by every licensed
     decoder, and let the owner's first play of one settle the rest.
 
+64. **What `forge truehd-atmos` writes (entries 61 to 64).** One OAMD payload per 1536 samples (question 62), the first of the update blocks at the
+    frame's first sample, the objects' positions at the frame's end and their ramp the frame's length, as `atmos-encode` places an E-AC-3 frame; the
+    LFE is channel 0 (a dynamic-object-only programme with an LFE); the evolution frame is the EMDF reading with protection codes 32 and 8 bits of
+    zeros, as `iclforge::objects` writes E-AC-3's container. Whether a licensed decoder accepts frames at that cadence, with zero protection bytes
+    and no signature (question 37), is not known. **Recommendation:** none until the owner has played one; then the cadence follows what the discs
+    show and the protection follows the owner's decision on signing.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -793,6 +800,14 @@ major sync of the discs. `encode()` takes `channels` + `object_channels` values 
 the stream by this library and by `tools/references/truehd_syntax.py` (which reads the longer major sync by its CRC, as the library does) is
 the bed and the object channels, sample for sample, for the real-audio programme of the test. `verify` decodes each unit with both presentations.
 **Provisional, owner to confirm** (question 63); no decoder outside this repository reads restart sync 0x31EC.
+
+**64. The metadata `truehd-atmos` writes (§15.4, §15.5.3, §16.1; entries 61 to 63).** Frame k of the object audio metadata starts at sample
+1536 k. It is carried in the extra data of the access unit that holds that sample (40 samples a unit at 48 kHz), the update's own sample offset
+(0 to 31) and the block's offset factor (32 samples a unit) adding up to the sample's place in the unit, which is how the reader adds them back
+(`forge decode` and `ObjectScene` positions evaluated at the frame's end). The evolution frame is `iclforge::objects::emdf::build_container`
+without the 32 bits of sync and length that introduce it in E-AC-3's skip field; the payload configuration is Table 56's, the protection codes
+are 32 and 8 bits of zeros. The 7.1 bed is the objects placed on 7.1 speakers by `iclforge::render`'s layout renderer from the positions as the
+payload codes them (so it equals `forge decode truehd-render=`'s output exactly). **Provisional, owner to confirm** (question 64).
 
 ## Atmos, spec v3.6
 

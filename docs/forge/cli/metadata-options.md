@@ -1305,7 +1305,7 @@ Omitting `preset=` entirely leaves `qc` in measure-and-report mode — every num
 just no PASS/FAIL verdict and nothing to gate on. See [Commands → `qc`](commands.md#decoding-inspection) for the
 full report format and the exit-code convention this drives.
 
-## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`, `metadata`)
+## TrueHD and MLP options (`decode`, `levels`, `loudness`, `truehd-encode`, `truehd-atmos`, `metadata`)
 
 ```text
 decode, levels and loudness of TrueHD or MLP (after the positional arguments; ignored with a warning for other streams):
@@ -1314,6 +1314,11 @@ decode, levels and loudness of TrueHD or MLP (after the positional arguments; ig
   truehd-check=strict|lenient
                     strict (default) stops with exit status 2 at the first failed check;
                     lenient counts failed checks and decodes on
+decode of a TrueHD Atmos stream, with truehd-presentation=all (provisional):
+  truehd-render=LAYOUT
+                    place the objects of substream 3 on the layout (a name such as 7.1 or
+                    7.1.4, or a list such as L,R,C,LFE,Ls,Rs,Lrs,Rrs) and write the speaker
+                    feeds as the output WAV instead of the channels
 ```
 
 A TrueHD or MLP run refuses every other option it is given, by name, with exit status 1: `decode` applies these two,
@@ -1341,6 +1346,17 @@ truehd-encode (after the positional arguments):
   truehd-stereo-mode=stereo|ltrt|headphone
                     the 2 channel mode the stream declares (default stereo)
   verify            decode every access unit as it is coded and compare it with the input
+```
+
+`truehd-atmos` applies the same options, and:
+
+```text
+truehd-atmos (after the positional arguments; provisional):
+  truehd-bed=FILE   the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate);
+                    without it the bed is the objects placed on 7.1 by the renderer
+  truehd-objects-lfe=on|off
+                    on (default): the first channel of the objects WAV is the LFE;
+                    off: every channel is an object
 ```
 
 The channel meaning of TH spec section 14, written into every major sync (and set in a finished stream by `metadata`,

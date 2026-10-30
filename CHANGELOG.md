@@ -10,6 +10,24 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `forge truehd-atmos` and `EncoderConfig::object_channels` write a TrueHD Atmos stream (WP1 step 4; provisional).** The channels of a
+  WAV (the first the LFE) are substream 3, with restart sync 0x31EC and the 16-channel extension in the major sync (32 bytes, as the
+  owner's discs have it); the 7.1 bed is in substreams 0 to 2, from a WAV (`truehd-bed=`) or the objects placed on 7.1 by `libs/render` from
+  the metadata the stream carries; the objects' positions (a scene file as `atmos-path` takes it, or an even fan) are in the evolution
+  frames, one every 1536 samples. The bed's substreams are the 7.1 stream of the bed alone, byte for byte: FFmpeg's strict decode, which leaves
+  substream 3 alone, returns the bed; `forge decode` returns the objects bit for bit and the best presentation equals its own render of the
+  objects (`truehd-render=`). Held by `test_encoder_atmos.cpp`, `test_cli_truehd_objects.cpp`, the manifest outcome `bed` of the hand-built
+  streams and `tools/checks/verify_truehd_atmos_interop.py` (CI). Unsigned; nothing outside this repository reads substream 3 (`libs/truehd/ERRATA.md`
+  entries 63 and 64, question 63).
+- **Added: `forge decode` reads the object layer of a TrueHD Atmos stream (WP1 steps 2 and 3; provisional).** With `truehd-presentation=all`,
+  `objects_dir` writes each channel of substream 3 as a mono WAV and `adm_out` an ADM master (beds as DirectSpeakers, dynamic objects positioned by
+  the update blocks of the OAMD payloads in the evolution frames, timed from the access unit that carried them); `truehd-render=<layout>` places the
+  objects on a speaker layout with `libs/render` and writes the feeds as the WAV; `adm_out` with another presentation is that presentation's bed
+  alone. The channel-to-object mapping, the timing and the cadence are provisional (ERRATA entry 61, questions 61 and 62).
+- **Changed: the TrueHD decoder reads matrix coefficients to `frac_bits` 15 (WP1 step 1, in part).** Coefficients are scaled to 2^-15 and the
+  sum shifted by 15; the output of a stream with `frac_bits` of 14 or less is the same sample for sample. The owner's discs' 12-channel
+  substream does not decode yet: whether its block header has other fields is open (ERRATA question 60), and `tools/checks/truehd_substream3_search.py`
+  is the check the owner runs on a disc excerpt (it prints parameters and counts only). The Python reference reads the 32-byte major sync.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

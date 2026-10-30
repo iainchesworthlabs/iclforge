@@ -59,3 +59,21 @@ renderer for headphone or binaural elements (ids 3, 4 and 6 are reserved per the
 
 Tests that fail when the check is removed; the disc lossless-check results pasted back by the owner (they stay on the owner's machine); the DEE gold set cannot
 make Atmos legs (no input format), so there is no DEE oracle. The ERRATA numbers for this package are 60 to 79 (questions and entries).
+
+## Status (2026-10-30, branch `feature/truehd-atmos-bed`)
+
+Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; step 1 is not done, because it needs the owner's disc.
+
+- Step 1: the decoder scales matrix coefficients to 2^-15, so `frac_bits` 15 decodes (ERRATA 60). Whether the disc's 12 channel substream
+  then decodes is not known: a `frac_bits` spread over 0 to 15 is also what a block header read at the wrong offset looks like, so the first
+  check is the owner's, on one disc excerpt: `python3 tools/checks/truehd_substream3_search.py EXCERPT.thd --units 300`. It tries 3,168 readings
+  of the open fields (coefficient count, matrix noise shift, FIR state flag, output-shift and quantiser counts, bits after the restart header),
+  prints parameters and counts only, and decodes the first restart intervals of all four substreams under each reading that parses. Paste
+  its output back (ERRATA question 60). `forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient` is the lossless-check line.
+- Step 2: `forge decode truehd-presentation=all` writes the full channel set; `adm_out` with another presentation is the bed as DirectSpeakers.
+- Step 3: `objects_dir`, `adm_out` and `truehd-render=` (ERRATA 61, questions 61, 62). The render of a stream's objects equals its bed
+  when the stream was written by `truehd-atmos`; on a disc the same comparison (`truehd-presentation=8ch` against `truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs`)
+  is the check of the channel-to-object mapping that question 61 asks for.
+- Step 4 (the owner said yes to the write side on 2026-10-30): `EncoderConfig::object_channels`, `forge truehd-atmos` (ERRATA 63, 64). Left: ADM
+  and IAB input (decision 5), signing (decision 4), the project file and the GUI.
+

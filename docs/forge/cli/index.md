@@ -1,6 +1,6 @@
 # forge
 
-`forge` is the command-line front end over the ICL Forge library — 49 commands covering
+`forge` is the command-line front end over the ICL Forge library — 50 commands covering
 synthesis, file encoding/decoding, container wrapping, inspection, live capture/playback, and the
 tool's own self-description (`help`, `man`, `completions`). It reads and writes AC-3, E-AC-3 (with
 the Atmos object layer) and AC-4, and decodes, inspects, measures and wraps TrueHD and MLP and
@@ -62,7 +62,7 @@ between releases is not mistaken for the tagged one. `kernels:` is `generic`, `x
 `aarch64-neon`, the `arch-*` directory of `libs/base/variants/` the binary was built from. A tree with
 uncommitted changes adds a `state:   dirty (uncommitted changes)` line.
 
-`--version` (or its `-v` alias) is a flag, not one of the 49 commands — it's handled
+`--version` (or its `-v` alias) is a flag, not one of the 50 commands — it's handled
 before argument parsing and exits immediately. So are `--help` and `-h`, which print the named
 command's own help (or the full listing when no command was named).
 
@@ -139,7 +139,7 @@ command's own help (or the full listing when no command was named).
 
 ## Next
 
-- [Commands](commands.md) — all 49 commands, grouped and with the usage text they print
+- [Commands](commands.md) — all 50 commands, grouped and with the usage text they print
   (`atmos-adm` and `atmos-iab` only *run* with `-DICLFORGE_BUILD_ADM=ON`, but are listed either
   way), plus the exit-code table.
 - [Options & grammars](metadata-options.md) — the `drc=`/`heavy`/`dialnorm=`/… options grammar,

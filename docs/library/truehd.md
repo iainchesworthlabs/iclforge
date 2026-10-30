@@ -4,7 +4,8 @@
 `iclforge/truehd/io/`, all in the library `iclforge::truehd`. A reader, a lossless decoder and an encoder for Dolby
 TrueHD (`0xF8726FBA`, Blu-ray and HD DVD) and MLP (`0xF8726FBB`, DVD-Audio) elementary streams, written
 from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.9 ("TH spec" in the code). The library links
-`iclforge::base` and nothing else; the Atmos substream and the object metadata are phase T2b
+`iclforge::base` and nothing else. The Atmos substream is decoded and written (below, provisionally: nothing outside this
+repository reads it), and the object audio metadata is handled by `forge`, which links `iclforge::objects`
 ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)).
 
 The specification contradicts itself and the streams in places and is silent in others. Every such place is
@@ -72,8 +73,18 @@ this library links `iclforge::base` and nothing else. `forge probe` prints what 
 signature is nested in one of its payloads, so every payload is carried as bytes with its id and size and none but the object audio
 metadata is looked into here.
 
-The syntax is also written: `write_restart_header`, `write_block_header`, `write_major_sync` and
-`write_access_unit_prefix` are the readers' inverses, which the encoder is built on.
+The syntax is also written: `write_restart_header`, `write_block_header`, `write_major_sync` (with the 16-channel
+extension of TH spec §14.2, `MajorSync::extra`) and `write_access_unit_prefix` are the readers' inverses, which the encoder is
+built on.
+
+### Atmos: substream 3
+
+`Presentation::kAll` decodes substream 3 (restart sync `0x31EC`, up to 16 channels), whose channels are the objects of the
+stream's object audio metadata, channel i being object i (`libs/truehd/ERRATA.md` entry 61). The matrices' coefficients are
+scaled to 2^-15 so that `frac_bits` 15 reads (entry 60). What the owner's discs show of substream 3's block header is open
+(question 60): `tools/checks/truehd_substream3_search.py` is the check the owner runs on a disc excerpt. `forge decode
+... truehd-presentation=all` writes the channels (`objects_dir`, `adm_out` and `truehd-render=` read them as objects:
+[Forge](../forge/cli/commands.md#truehd-and-mlp)); the objects are parsed and placed by `forge` and `iclforge::render`, not by this library.
 
 ## Encoding
 
@@ -140,7 +151,13 @@ one a quicker random access.
 FFmpeg's strict decode of what it writes is the check, sample for sample
 (`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.95 times the size of
 FFmpeg's encoder's over the layouts it writes. It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
-them), no MLP, and no block data CRC; the Atmos substream and the evolution payload it only frames, from bytes it is given.
+them), no MLP, and no block data CRC; the evolution payload it only frames, from bytes it is given. With
+`EncoderConfig::object_channels` it also writes an Atmos stream: the 7.1 bed in substreams 0 to 2 and 1 to 16 object channels in
+substream 3 (restart sync `0x31EC`, no matrix, FIR prediction), with the 16-channel extension in the major sync. The bed's
+substreams are those of the 7.1 stream of the bed alone, byte for byte, so FFmpeg's strict decode (which leaves substream 3 alone)
+returns the bed. `forge truehd-atmos` is the command that supplies the metadata. Provisional (entry 63): the stream codes the bed
+and the objects separately, where the owner's discs most likely predict one from the other, and no decoder outside this repository
+reads substream 3.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;
 `iclforge-truehd-encode-tool` (WAV in, `.thd` out) is the test tool the interoperability checks use.
@@ -170,7 +187,7 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 | FFmpeg's strict decode of the streams this library's **encoder** writes (`tools/checks/verify_truehd_encode_interop.py`, with `--forge` it runs `forge truehd-encode`; the codec matrix's encode legs and the gold-reference gate also run it) | 43 cases: 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits, real music, speech and 5.1 programme material and synthetic signals chosen to be hard (full-scale squares, impulses, silence, DC, noise, level steps), the downmix presentations, restart intervals of 1, 8 and 128 units, lengths that are not whole units | FFmpeg: sample for sample, 43 of 43 |
 | `tools/ci/fuzz_truehd_encoder_space.py`, random legal configurations against adversarial PCM, and the libFuzzer harness `fuzz_truehd_encode` | the encoder's whole configuration space, FFmpeg's strict decode of each stream | FFmpeg: sample for sample |
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 25, and the hand-built streams | none beyond the two readings agreeing |
-| Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1 (at 48, 96 and 192 kHz), a negative output shift and an output shift on a moved channel, a 16 bit MLP stream, terminators of both kinds, several matrices with a permuted `ch_assign` (also one that changes at each restart), an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 19 of the 29; the manifest names what FFmpeg does with the other 10 (it refuses the 16-channel and limit streams and a stream with a terminator, applies no negative output shift, and clears the low bits of a 16 bit MLP stream). **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
+| Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1 (at 48, 96 and 192 kHz), a negative output shift and an output shift on a moved channel, a 16 bit MLP stream, terminators of both kinds, several matrices with a permuted `ch_assign` (also one that changes at each restart), an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 19 of the 33, and the bed of four more (it leaves their substream 3 alone); the manifest names what FFmpeg does with the other 10 (it refuses the 16-channel and limit streams and a stream with a terminator, applies no negative output shift, and clears the low bits of a 16 bit MLP stream). **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
 | DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent; 13 of them are in `testdata/truehd-dee` (11 pass, the two at 96 kHz differ from their sources in the encoder, none fail) | the sources |
 | The owner's Blu-ray (an Atmos 7.1 stream of four substreams), analysed on the owner's machine | `planning/truehd-disc-findings.md`: every lossless-check interval of the 2, 6 and 8 channel presentations, the 8 channel output against FFmpeg's | the disc's own lossless checks, and FFmpeg |
 
@@ -196,13 +213,15 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
   FFmpeg's strict decode of them equals this library's.
 - Heavy DRC in the restart header (TH spec 12.2): where its bits sit cannot be told from the streams.
 - The block data CRC is not checked, only the length it follows.
-- The evolution frame is read (provisionally) and the object audio metadata in it is handed out as bytes; nothing
-  decodes from either, and the signature and protection bytes are not verified.
+- The evolution frame is read (provisionally) and the object audio metadata in it is handed out as bytes, which `forge` parses
+  to read and to write the objects; the signature and protection bytes are not verified, and a written frame has zero
+  protection bytes.
 - The encoder does not write an IIR filter, LSB bypass, a negative output shift, heavy DRC, noise or MLP
-  (`ExperimentalTools::iir` and `lsb_bypass` are refused with a reason), nor the Atmos substream. Against FFmpeg's
+  (`ExperimentalTools::iir` and `lsb_bypass` are refused with a reason). Against FFmpeg's
   encoder the streams are smaller on most material and larger at 192 kHz (the specification's order 4 against
   FFmpeg's 7), on full-scale square waves, with a restart interval of 1 and with the downmix presentations.
-- The object renderer and the Atmos substream are phase T2b. Python, JavaScript and Rust bindings over the C API
+- Substream 3 of the owner's discs does not decode yet (the block header's fields, question 60), and the object layer is
+  provisional (entries 61 to 64). Python, JavaScript and Rust bindings over the C API
   (`iclforge_truehd_*` in [the C API](c-api.md#truehd-and-mlp)) are not written.
 - Content signing: nothing signs or checks a TrueHD stream, and an evolution payload is carried, not read. The owner's
   specification describes it as the container [AC-4's content signature](signing.md#ac-4-content-signing) uses; see

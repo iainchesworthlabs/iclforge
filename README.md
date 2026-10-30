@@ -217,7 +217,7 @@ forge decode out.ac4 out.wav
 ```
 
 `forge`'s commands cover encoding, decoding, muxing, inspection, QC and live capture, for AC-3,
-E-AC-3 and AC-4, and decoding, inspection, muxing and encoding for TrueHD (`forge truehd-encode`);
+E-AC-3 and AC-4, and decoding, inspection, muxing and encoding for TrueHD (`forge truehd-encode`, and `truehd-atmos` for a provisional Atmos stream);
 run it with no arguments for the full listing.
 `forge-gui` is a Qt Quick front end over the same library: file and live-capture encoding, a plan
 view for placing objects, channel-level metering, QC, a stream player, an object inspector, a

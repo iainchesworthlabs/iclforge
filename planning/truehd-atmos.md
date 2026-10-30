@@ -1,8 +1,27 @@
 # TrueHD Atmos: the write side
 
-As of 2026-10-29. A plan; nothing in it is built. [truehd.md](truehd.md) is the plan for the codec as a whole (phase T2b is this page);
+As of 2026-10-30. The first part is built, provisionally (WP1, `planning/work-packages/WP1-atmos-object-layer.md`: the status
+section below); the rest is the plan of 2026-10-29. [truehd.md](truehd.md) is the plan for the codec as a whole (phase T2b is this page);
 [libs/truehd/ERRATA.md](../libs/truehd/ERRATA.md), "Atmos, spec v3.6", has the questions this page waits on (22 to 39) and the comparison of
 the owner's specification with ETSI TS 103 420 that they come from.
+
+## Status, 2026-10-30 (WP1)
+
+| Phase | State |
+|---|---|
+| W0 | the owner's disc probes: `tools/checks/truehd_substream3_search.py` is the check for the block header of the 12 channel substream (ERRATA question 60); `forge probe DISC detail=format` answers 22 to 24 and 33 |
+| W1 | built in `forge`: the evolution frame is `iclforge::objects::emdf::build_container` without its sync and length (`truehd_atmos_encode.cpp`); no writer in `libs/truehd` |
+| W2 | built: one OAMD payload per 1536 samples, the cadence of the discs (ERRATA question 62, entry 64) |
+| W3 | built: `EncoderConfig::object_channels`, substream 3 with restart sync 0x31EC, the 16-channel extension in the major sync (entry 63) |
+| W4 | built, both ways: the caller's 7.1 bed (`truehd-bed=`) or the objects placed on 7.1 by `libs/render` (decision 6: the owner's call; both are there) |
+| W5 | not measured beyond the real-audio test (15 Mbps over a unit for 7.1 + 12 channels); no rate model change |
+| W6 | not built: signing |
+| W7 | built: `forge truehd-atmos`, `forge decode` with `objects_dir`, `adm_out` and `truehd-render=`; not the project file or the GUI |
+| W8 | built: `test_encoder_atmos.cpp`, `test_cli_truehd_objects.cpp`, `test_cli_truehd_adm.cpp`, the hand-built streams `hb_substream3_fine_matrices` and `hb_atmos_objects`, `verify_truehd_atmos_interop.py`; FFmpeg reads the bed of a written stream |
+
+The decoder reads matrix coefficients to `frac_bits` 15 (entry 60). What is not done is the first thing WP1 asked: the owner's 12 channel
+substream does not decode, because the fields of its block header are not known. The input an encode takes is a WAV of object channels with
+a scene file, not yet ADM or IAB (decision 5).
 
 ## Where this stands
 
