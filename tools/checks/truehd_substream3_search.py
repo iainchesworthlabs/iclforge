@@ -9,6 +9,7 @@ The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of 
                                      [--directory] [--agreement] [--common-prefix]
                                      [--dump-header]
                                      [--first-unit N] [--last-unit N]
+                                     [--dump-bits N]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -536,6 +537,21 @@ def print_header_dump(data, units, skip=2, margin=8, first_unit=0, last_unit=Non
         print(text[at : at + 64])
 
 
+def print_restart_bits(data, units, count, first_unit=0, last_unit=None, limit=5):
+    """The first `count` bits after the restart header of the first few restarts of substream 3 in
+    the unit range, as binary, 64 to a line. For a stream of one's own test signal (silence): the
+    bits are the encoder's parameters and nothing of a programme."""
+    restarts = restart_tails(data, units, first_unit, last_unit)[:limit]
+    if not restarts:
+        print("no restart of substream 3 in that range")
+        return
+    for number, size, tail in restarts:
+        text = "".join(f"{byte:08b}" for byte in tail)[:count]
+        print(f"unit {number}: segment {size} bytes, {len(tail) * 8} bits after the restart header")
+        for at in range(0, len(text), 64):
+            print(f"{at:5d} {text[at : at + 64]}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("stream", type=pathlib.Path)
@@ -564,6 +580,13 @@ def main():
     parser.add_argument("--first-unit", type=int, default=0, help="restarts from this unit on")
     parser.add_argument("--last-unit", type=int, default=None, help="restarts up to this unit")
     parser.add_argument(
+        "--dump-bits",
+        type=int,
+        default=0,
+        metavar="N",
+        help="print N bits after the restart header of the first restarts in the unit range",
+    )
+    parser.add_argument(
         "--dump-header",
         action="store_true",
         help="print the bits after the restart header that the steady-state restarts all share",
@@ -580,6 +603,9 @@ def main():
     data = args.stream.read_bytes()
     if args.directory:
         print_directory(data, min(args.units, 80))
+        return 0
+    if args.dump_bits:
+        print_restart_bits(data, args.units, args.dump_bits, args.first_unit, args.last_unit)
         return 0
     if args.dump_header:
         print_header_dump(
