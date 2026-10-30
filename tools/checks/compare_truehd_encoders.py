@@ -234,6 +234,23 @@ def row_for(args, scratch, name, wav, dee_stream, note):
     return row
 
 
+def refused_by_ffmpeg(row):
+    """True for the one refusal that is recorded, not a failure of forge: FFmpeg 8.0.1's strict
+    decode of the single-substream layout TH spec 9.6 gives at 176.4 and 192 kHz with 3 or more
+    channels (libs/truehd/ERRATA.md, question 90). forge's own decode is still required."""
+    return (
+        row["rate"] >= 176400
+        and row["channels"] > 2
+        and row["forge_decode_exact"] is True
+        and isinstance(row["ffmpeg_decode_exact"], str)
+        and row["ffmpeg_decode_exact"].startswith("ffmpeg strict decode failed")
+    )
+
+
+def ffmpeg_agrees(row):
+    return row["ffmpeg_decode_exact"] in (True, None) or refused_by_ffmpeg(row)
+
+
 def ratio(a, b):
     return round(a / b, 3) if a and b else None
 
@@ -273,11 +290,10 @@ def markdown(rows, versions, args):
         return f"{value:,}" if exact in (True, None) else f"{value:,} *"
 
     for r in rows:
-        exact = (
-            "yes"
-            if r["forge_decode_exact"] is True and r["ffmpeg_decode_exact"] in (True, None)
-            else "NO"
-        )
+        if refused_by_ffmpeg(r):
+            exact = "forge yes, FFmpeg refuses (Q90)"
+        else:
+            exact = "yes" if r["forge_decode_exact"] is True and ffmpeg_agrees(r) else "NO"
         label = r["name"] + (f" ({r['note']})" if r["note"] else "")
         lines.append(
             f"| {label} | {r['rate']} | {r['channels']} | {r['bits']} | {r['seconds']:g} | "
@@ -380,9 +396,7 @@ def main():
         args.markdown.write_text(text + "\n", encoding="utf-8")
 
     inexact = [
-        r["name"]
-        for r in rows
-        if r["forge_decode_exact"] is not True or r["ffmpeg_decode_exact"] not in (True, None)
+        r["name"] for r in rows if r["forge_decode_exact"] is not True or not ffmpeg_agrees(r)
     ]
     if inexact:
         print("not bit-exact: " + ", ".join(inexact), file=sys.stderr)

@@ -141,6 +141,20 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(C.totals(rows, "ffmpeg_bytes")["ratio"], 2.0)
         self.assertIsNone(C.totals(rows, "dee_bytes"))
 
+    def test_ffmpegs_refusal_at_192_khz_is_recorded_and_no_other_refusal_is(self):
+        row = {
+            "rate": 192000,
+            "channels": 6,
+            "forge_decode_exact": True,
+            "ffmpeg_decode_exact": "ffmpeg strict decode failed: no restart header",
+        }
+        self.assertTrue(C.refused_by_ffmpeg(row))
+        self.assertTrue(C.ffmpeg_agrees(row))
+        self.assertFalse(C.refused_by_ffmpeg({**row, "rate": 96000}))
+        self.assertFalse(C.refused_by_ffmpeg({**row, "channels": 2}))
+        self.assertFalse(C.refused_by_ffmpeg({**row, "forge_decode_exact": "differs"}))
+        self.assertFalse(C.ffmpeg_agrees({**row, "ffmpeg_decode_exact": "differs from the source"}))
+
     def test_no_set_reads_no_dee_stream(self):
         status, report, _ = run_main(900, 1000, ["--set", "none"])
         self.assertEqual((status, report["rows"]), (0, []))
