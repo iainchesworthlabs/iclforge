@@ -1,5 +1,12 @@
 #include "iclforge/truehd/io/scan.hpp"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
+
+#include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
