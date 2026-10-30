@@ -5,7 +5,7 @@ For the owner to run on a disc excerpt on the owner's machine (planning/work-pac
 It reads nothing but the stream given and prints parameters and counts: no sample, no residual bit.
 The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of the disc's `.m2ts`).
 
-    truehd_substream3_search.py STREAM [--units N]
+    truehd_substream3_search.py STREAM [--units N] [--trace]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -248,6 +248,49 @@ def describe_restart(data, units):
     return None
 
 
+class TracedBits(ref.Bits):
+    """Bits that remember every read: where, how wide, what value, and which function asked."""
+
+    def __init__(self, data, pos=0):
+        super().__init__(data, pos)
+        self.trace = []
+
+    def read(self, n):
+        start = self.pos
+        value = super().read(n)
+        if n:
+            self.trace.append((start, n, value, sys._getframe(1).f_code.co_name))
+        return value
+
+
+def trace_first_block(data, units, reading, limit=800):
+    """The reads of substream 3's restart header and first block header under one reading, up to
+    where it stops: position, width, value and the function that read it. Parameters of the stream
+    and nothing else: the block data is not read."""
+    for _number, unit, entries, offset, count in units_of(data, units):
+        if count < 4:
+            continue
+        entry, segment = list(segments_of(unit, entries, offset))[3]
+        if segment[0] & 0xC0 != 0xC0:
+            continue
+        payload = segment[:-2] if entry["crc_present"] else segment
+        bits = TracedBits(payload)
+        sub = Variant(3, reading)
+        error = None
+        try:
+            bits.read(2)
+            sub.restart(bits, payload)
+            sub.block_header(bits)
+        except (ref.StreamError, IndexError, ValueError) as caught:
+            error = f"{type(caught).__name__}: {caught}"
+        lines = [
+            f"  bit {start:5d}  width {width:2d}  value {value:<10d} {name}"
+            for start, width, value, name in bits.trace[-limit:]
+        ]
+        return lines, error, bits.pos
+    return [], "no restart header in substream 3", 0
+
+
 def full_decode(data, reading, units):
     """Decode all four substreams for the first restart interval of substream 3."""
     subs = [ref.Substream(i) for i in range(3)] + [Variant(3, reading)]
@@ -279,6 +322,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("stream", type=pathlib.Path)
     parser.add_argument("--units", type=int, default=300, help="access units to read")
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="also print every field of the first block header under the library's reading",
+    )
     args = parser.parse_args()
     data = args.stream.read_bytes()
     found = describe_restart(data, args.units)
@@ -293,6 +341,12 @@ def main():
         f"ch_assign {sub.ch_assign}"
     )
     keys = list(READINGS)
+    default = {key: values[0] for key, values in READINGS.items()}
+    if args.trace:
+        lines, error, position = trace_first_block(data, args.units, default)
+        print(f"first block header under the library's reading, to bit {position}:")
+        print("\n".join(lines))
+        print(f"  stopped: {error}" if error else "  parsed to its end")
     scored = []
     for values in itertools.product(*(READINGS[key] for key in keys)):
         reading = dict(zip(keys, values, strict=True))
@@ -307,6 +361,11 @@ def main():
     if best_ok == 0:
         print("no reading parses a whole segment; header bits after the restart header follow")
         print("  " + "".join(str(bits.bits(bits.pos + i, 1)) for i in range(min(480, bits.left()))))
+        if not args.trace:
+            lines, error, position = trace_first_block(data, args.units, default)
+            print(f"first block header under the library's reading, to bit {position}:")
+            print("\n".join(lines))
+            print(f"  stopped: {error}" if error else "  parsed to its end")
         return 2
     # Segments that parse to their end do not tell a reading from a shifted one when the stream is
     # regular: the lossless check of a whole restart interval does.
