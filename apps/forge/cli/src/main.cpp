@@ -443,7 +443,10 @@ constexpr std::array<Command, 49> kCommands{{
      "for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): "
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
-     "pinned to their speaker, dynamic objects positioned by their own timeline. strict: exit 2, "
+     "pinned to their speaker, dynamic objects positioned by their own timeline. For TrueHD, "
+     "truehd-presentation=all gives objects_dir each channel of substream 3 and adm_out its beds "
+     "and objects (provisional, libs/truehd/ERRATA.md entry 61), and another presentation gives "
+     "adm_out its bed alone. strict: exit 2, "
      "after writing what could be decoded, when any frame or unit was lost after the first one "
      "decoded (an AC-4 frame waiting for an I-frame, a concealed frame, a TrueHD unit a lenient "
      "decode dropped); without it such a decode exits 0 and warns",

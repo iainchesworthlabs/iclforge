@@ -149,7 +149,8 @@ TEST_CASE("a block header round-trips with every group present", "[truehd][synta
     CHECK(*read == header);
 }
 
-TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips", "[truehd][syntax]") {
+TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips",
+          "[truehd][syntax]") {
     // The object substream of the owner's discs uses every frac_bits from 0 to 15 (ERRATA.md entry
     // 60); the coefficient is frac_bits + 2 bits, so 15 is 17 bits, the widest.
     BlockContext context;

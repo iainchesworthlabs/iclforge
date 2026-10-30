@@ -33,6 +33,7 @@ import struct
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import truehd_evolution as evolution
 import truehd_syntax as ref
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -467,8 +468,8 @@ def build_stream(stream):
                 directory += ((gain << 7) | ((unit % 8) << 4)).to_bytes(2, "big")
         body = b"".join(segments)
         extra = b""
-        if stream.extra_data:
-            payload = stream.extra_data(unit)
+        payload = stream.extra_data(unit) if stream.extra_data else None
+        if payload is not None:  # a unit with no payload has no extra data region
             frame = bytearray(b"\x00\x00") + len(payload).to_bytes(2, "big") + payload
             if len(frame) % 2 == 0:
                 frame += b"\x00"
@@ -822,7 +823,7 @@ def case_substream3_limits():
     )
 
 
-def case_substream3_fine_matrices():
+def case_substream3_fine_matrices(extra_data=None):
     """A twelve channel substream 3 (restart sync 0x31EC) whose matrices carry `frac_bits` 15, 14,
     13 and 0, as the object substream of the owner's discs does (ERRATA 60): four channels of
     objects predicted from the 7.1 bed and from each other, with coefficients that need the last
@@ -864,11 +865,44 @@ def case_substream3_fine_matrices():
         8, 11, 11, wide, rows, {c: coded[c] for c in range(8, 12)}, matrices=matrices, sync=0x31EC
     )
     subs = [sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EB), last]
-    stream = Stream(subs, n, terminator_b=True)
+    stream = Stream(subs, n, terminator_b=True, extra_data=extra_data)
     return (
         stream,
         "a twelve channel substream 3 whose matrices have frac_bits 15, 14, 13 and 0",
         ["substream_3", "twelve_channels", "frac_bits_15", "matrices_6"],
+    )
+
+
+# Two object audio metadata payloads (TS 103 420 clause 5.5, payload id 11), made by
+# iclforge::objects::oba::build_payload for a dynamic-object-only programme with an LFE and 11
+# dynamic objects (12 objects: the 12 channels of the substream), one update block, ramp 1536. The
+# objects of the second are the first's moved 0.1 to the right. test_cli_truehd_objects.cpp reads
+# both back.
+OAMD_A = bytes.fromhex(
+    "17844a0000a210c6804091925d020138fc04091a89c0201658a04091bee60201"
+    "960804091d52d0201c29c04091eb6c0201ef2a0400"
+)
+OAMD_B = bytes.fromhex(
+    "17844a0000a212468040919e5d020150fc04091b49c0201818a04091cae60201"
+    "ae0804091e12d0201da9c04091f96c0201fb2a0400"
+)
+
+
+def atmos_extra_data(unit):
+    """An evolution frame (the EMDF reading) holding the object audio metadata, in units 0 and 16:
+    the first at the start of the stream and the second 640 samples on."""
+    payload = {0: OAMD_A, 16: OAMD_B}.get(unit)
+    if payload is None:
+        return None
+    return evolution.build_evo_frame("emdf", payloads=[(11, evolution.default_config(), payload)])
+
+
+def case_atmos_objects():
+    stream, _description, _features = case_substream3_fine_matrices(atmos_extra_data)
+    return (
+        stream,
+        "a twelve channel substream 3 with object audio metadata in two evolution frames",
+        ["substream_3", "twelve_channels", "extra_data", "oamd"],
     )
 
 
@@ -1247,6 +1281,7 @@ CASES = {
     "hb_eight_channels": case_eight_channels,
     "hb_substream3_limits": case_substream3_limits,
     "hb_substream3_fine_matrices": case_substream3_fine_matrices,
+    "hb_atmos_objects": case_atmos_objects,
 }
 
 
@@ -1308,6 +1343,10 @@ FFMPEG = {
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
     "hb_substream3_fine_matrices": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
+    },
+    "hb_atmos_objects": {
         "outcome": "refused",
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },

@@ -19,6 +19,7 @@
 #include <string_view>
 #include <vector>
 
+#include "../adm/atmos_adm.hpp"
 #include "../exit_codes.hpp"
 #include "../json.hpp"
 #include "../platform/stdio_binary.hpp"
@@ -34,6 +35,7 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "truehd_evolution.hpp"
 #include "truehd_meaning.hpp"
+#include "truehd_objects.hpp"
 #include "truehd_structure.hpp"
 
 namespace forge_cli::commands {
@@ -43,6 +45,7 @@ namespace {
 namespace th = iclforge::truehd;
 
 constexpr int kBitsPerSample = 24;
+constexpr int kObjectSubstream = 3;
 constexpr std::size_t kWavHeaderBytes = 68;
 
 std::optional<th::Presentation> parse_presentation(std::string_view text) {
@@ -420,12 +423,33 @@ bool starts_with_ac3_core_then_truehd(std::span<const std::byte> stream) {
 }
 
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta, DecodeLoss& loss) {
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss,
+                      std::string_view objects_dir, std::string_view adm_out) {
     const auto presentation = parse_presentation(meta.truehd_presentation);
     if (!presentation) {
         fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')",
                      meta.truehd_presentation);
         return kExitUsage;
+    }
+    // The objects are the channels of substream 3, which only truehd-presentation=all decodes. An
+    // ADM master without it is the presentation's bed alone (TH spec §15.20).
+    const bool objects = *presentation == th::Presentation::kAll;
+    if (!objects_dir.empty() && !objects) {
+        fmt::println(stderr,
+                     "error: objects_dir= writes the channels of substream 3, which only "
+                     "truehd-presentation=all decodes");
+        return kExitUsage;
+    }
+    if (!adm_out.empty() && !forge_cli::adm_capability().available) {
+        fmt::println(stderr, "error: {}", forge_cli::adm_capability().reason);
+        return kExitInput;
+    }
+    std::optional<TrueHdObjectSink> object_sink;
+    std::optional<TrueHdBedSink> bed_sink;
+    if (objects && (!objects_dir.empty() || !adm_out.empty())) {
+        object_sink.emplace(objects_dir, adm_out);
+    } else if (!adm_out.empty()) {
+        bed_sink.emplace(adm_out);
     }
     const auto status = status_stream(out_path);
     th::DecoderConfig config;
@@ -515,6 +539,20 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
                 fmt::println(stderr, "error: cannot write {}", out_path);
                 return kExitOutput;
             }
+            if (object_sink) {
+                if (decoded.substream != kObjectSubstream) {
+                    fmt::println(stderr, "error: {}: the stream has no substream 3, so no objects",
+                                 in_path);
+                    object_sink->abort();
+                    return kExitInput;
+                }
+                if (!object_sink->add(decoded)) {
+                    object_sink->abort();
+                    return kExitOutput;
+                }
+            } else if (bed_sink && !bed_sink->add(decoded)) {
+                return kExitUsage;
+            }
             samples += static_cast<std::uint64_t>(decoded.samples);
             padding += static_cast<std::uint64_t>(decoded.padding_samples);
         }
@@ -546,7 +584,16 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
         status_println(status, "  {} unit(s) waited for a restart header", counters.units_waiting);
     }
     if (failed || (!meta.truehd_lenient && errors != 0)) {
+        if (object_sink) {
+            object_sink->abort();
+        }
         return kExitInput;
+    }
+    if (object_sink) {
+        return object_sink->finish(status);
+    }
+    if (bed_sink) {
+        return bed_sink->finish(status);
     }
     return kExitOk;
 }

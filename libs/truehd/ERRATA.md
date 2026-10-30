@@ -349,6 +349,22 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     that decodes the first restart intervals with every lossless check passing is built into the decoder and the Python reference,
     and this question closes.
 
+61. **Which channel is which object (TH spec §15.6, §15.16, §15.17; entry 61).** Entry 61 reads channel i of substream 3 as object i of the
+    payload (beds, then ISF objects, then dynamic objects, TS 103 420 §5.6.4.8; a dynamic-object-only programme with an LFE has the LFE first).
+    §15.17 lists 12, 14 and 16 as "Max Channel Count" and §14.2 has `sixteench_channel_count` (5 bits); whether a programme with fewer objects
+    is padded with silent channels up to 12, 14 or 16 (so `object_count` is smaller than the channel count) is not said, and the decode
+    refuses to name channels when the two differ. How the 7.1 bed of substreams 0 to 2 relates to the channels of substream 3 (the same
+    mix, a downmix of it, or independent) is not said either. **Recommendation:** the owner runs `forge decode DISC.thd out.wav objects/ truehd-presentation=all`
+    on one disc excerpt and pastes the "object audio metadata" line and the warning, if any, and, where an object sits at a bed position, the
+    rendered feed (`truehd-render=`, when built) against the 8 channel decode.
+62. **The cadence of the object audio metadata (TH spec §15.5.3; entry 61).** §15.5.3 says one OAMD evolution frame per access unit, with
+    timing re-based to the 40 sample unit. The owner's two discs carry one extra-data frame of 64 bytes for every 1536 samples (gaps of 38 and
+    39 units, planning/truehd-disc-findings.md, question 19), which is E-AC-3's frame length, and the standard's block offset factor runs in
+    32 sample steps to 2016. The reader takes whatever cadence it finds: a payload applies from the first sample of its access unit plus the
+    payload's `smploffst`, its update blocks from there plus their offsets, and an object keeps its last position until the next block.
+    **Recommendation:** read the 1536 sample cadence as it is on the discs, and the writer (WP1 step 4) write frames at that cadence; the owner
+    confirms with `forge probe DISC detail=format` (`evolution.cadence`).
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -742,6 +758,19 @@ a block header read at the wrong width is not settled (question 60). Held by `te
 (17 bit coefficients round-trip), the hand-built `hb_substream3_fine_matrices` (twelve channels, `frac_bits` 15, 14, 13 and 0, decoded
 sample for sample and by the Python reference). **Correct for streams that use it (the arithmetic is exact); provisional for the disc
 until step 1 of WP1 passes every lossless-check interval.**
+
+**61. Substream 3 as objects (§15.6, §15.16; TS 103 420 §5.5, §5.6.4.8).** `forge decode truehd-presentation=all` gives the channels of
+substream 3 (12 to 16) in the order the stream carries them, and `objects_dir=` and `adm_out=` read them as objects: channel i is object i
+of the object audio metadata in the stream's evolution frames (payload id 11, the EMDF reading), a dynamic-object-only programme with an
+LFE having the LFE as object 0, and a bed programme the Table 12 labels in payload order. Channel i's audio is `object_NN.wav`; the ADM master
+has the beds as DirectSpeakers and the dynamic objects as Objects, each update block timed from the first sample of the access unit whose
+extra data held it, plus the payload's `smploffst`, plus the update's sample offset, plus 32 samples a unit of the block's offset factor
+(TS 103 420 §5.5.7). Nothing is written when the programme and the channel count disagree, or the programme uses intermediate spatial
+format, several bed instances or a non-standard bed assignment (the warning says which). `forge decode ... adm_out` without `all` is the
+presentation's bed alone (§15.20), each channel a DirectSpeakers channel at the room position of its label. The first programme in the
+stream decides the plan; a later payload that describes another programme is counted and not followed. Held by `test_cli_truehd_objects.cpp`
+(channel for channel against the multichannel decode, over `hb_atmos_objects`, whose payloads `build_payload` made). **Provisional, owner
+to confirm** (questions 61 and 62): only E-AC-3's reader (`libs/objects`) and the stream's own channel count check the metadata.
 
 ## Atmos, spec v3.6
 

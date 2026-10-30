@@ -696,6 +696,56 @@
       "pcm_samples": 1280,
       "stream_sha256": "5840320bde784ac32f908ba139b10734186bbe95885afa6a6840bec6223a3be3",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
+    },
+    {
+      "name": "hb_atmos_objects_all",
+      "file": "hb_atmos_objects.thd",
+      "description": "a twelve channel substream 3 with object audio metadata in two evolution frames",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "extra_data",
+        "oamd"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "codec": "truehd",
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 12,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "5601941c0153670142b3a329f74a2ca1e594699ce8715f9e7636f904011f6bdd",
+      "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34",
+      "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
+    },
+    {
+      "name": "hb_atmos_objects_best",
+      "file": "hb_atmos_objects.thd",
+      "description": "a twelve channel substream 3 with object audio metadata in two evolution frames",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "extra_data",
+        "oamd"
+      ],
+      "oracle": "none",
+      "ffmpeg": {
+        "outcome": "refused",
+        "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "5601941c0153670142b3a329f74a2ca1e594699ce8715f9e7636f904011f6bdd",
+      "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0",
+      "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     }
   ],
   "refused": []

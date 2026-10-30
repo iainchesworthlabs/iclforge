@@ -57,8 +57,14 @@ struct CoreStrip {
 // counts them and goes on). `loss` takes the units a lenient decode lost after the first one
 // decoded: bytes the reader skipped (the decoder is told, lost_data()), units it could not read,
 // and units that waited for a restart header (`decode strict` makes them an input fault).
+//
+// `objects_dir` and `adm_out` (TH spec v3.9 §15; provisional, libs/truehd/ERRATA.md entry 61): with
+// truehd-presentation=all, `objects_dir` takes each channel of substream 3 as a mono WAV and
+// `adm_out` an ADM master with the beds and the dynamic objects of the stream's object audio
+// metadata; with another presentation `adm_out` is that presentation's bed alone.
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta, DecodeLoss& loss);
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss,
+                      std::string_view objects_dir = {}, std::string_view adm_out = {});
 
 // Describes the stream in `in_path` and checks every access unit's header, directory, parity and
 // CRC bytes. Exit 1 when any of them fails.
