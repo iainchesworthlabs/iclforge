@@ -5,8 +5,8 @@ What runs here is what needs no network and no compiler: the script reads its Qt
 aqtinstall commit from .github/toolchain-versions.json (so a bump there is the only edit), refuses
 a prefix inside the repository, prints a configure line that names what the three windows need, and
 writes the package files Hearth's configure reads. The last of those downloads three files unless
-ICLFORGE_QT_SANDBOX_MIRROR names a directory that holds them (the script's --mirror), so it runs only
-then; the coverage-qt job runs the whole script, downloads and mbedTLS build included.
+ICLFORGE_QT_SANDBOX_MIRROR names a directory that holds them (the script's --mirror), so it
+runs only then; the coverage-qt job runs the whole script, downloads and mbedTLS build included.
 """
 
 from __future__ import annotations
@@ -29,7 +29,9 @@ def bash() -> str | None:
     for candidate in (shutil.which("bash"), r"C:\Program Files\Git\bin\bash.exe"):
         if not candidate:
             continue
-        probe = subprocess.run([candidate, "-c", "echo ok"], capture_output=True, text=True)
+        probe = subprocess.run(
+            [candidate, "-c", "echo ok"], capture_output=True, text=True, check=False
+        )
         if probe.returncode == 0 and probe.stdout.strip() == "ok":
             return candidate
     return None
@@ -43,7 +45,10 @@ def python3_works() -> bool:
     the one on PATH can be the Store's stub)."""
     if not BASH:
         return False
-    return subprocess.run([BASH, "-c", "python3 -c pass"], capture_output=True).returncode == 0
+    return (
+        subprocess.run([BASH, "-c", "python3 -c pass"], capture_output=True, check=False).returncode
+        == 0
+    )
 
 
 @unittest.skipUnless(BASH and python3_works(), "needs bash and a python3 that runs")
@@ -54,7 +59,7 @@ class QtSandboxSetup(unittest.TestCase):
         )
 
     def test_the_script_parses(self):
-        self.assertEqual(subprocess.run([BASH, "-n", str(SCRIPT)]).returncode, 0)
+        self.assertEqual(subprocess.run([BASH, "-n", str(SCRIPT)], check=False).returncode, 0)
 
     def test_the_qt_version_comes_from_the_pin_file(self):
         pins = json.loads((ROOT / ".github" / "toolchain-versions.json").read_text("utf-8"))
@@ -88,22 +93,24 @@ class QtSandboxSetup(unittest.TestCase):
         self.assertNotIn("CMAKE_PREFIX_PATH", line)
 
     def test_a_prefix_inside_the_repository_is_refused(self):
-        out = self.run_script("--print-only", str(ROOT / "build" / "qt-prefix-that-should-not-exist"))
+        out = self.run_script(
+            "--print-only", str(ROOT / "build" / "qt-prefix-that-should-not-exist")
+        )
         self.assertEqual(out.returncode, 2)
         self.assertIn("outside the repository", out.stderr)
         self.assertFalse((ROOT / "build" / "qt-prefix-that-should-not-exist").exists())
 
     def test_the_repository_patch_the_script_applies_is_there(self):
         self.assertTrue(
-            (ROOT / "cmake" / "vcpkg" / "ports" / "cpp-httplib" / "wait-inside-a-frame.patch").is_file()
+            (
+                ROOT / "cmake" / "vcpkg" / "ports" / "cpp-httplib" / "wait-inside-a-frame.patch"
+            ).is_file()
         )
 
     @unittest.skipUnless(MIRROR, "set ICLFORGE_QT_SANDBOX_MIRROR to a directory with the downloads")
     def test_the_hearth_prefix_holds_what_the_configure_reads(self):
         with tempfile.TemporaryDirectory() as prefix:
-            out = self.run_script(
-                "--no-apt", "--no-qt", "--no-mbedtls", "--mirror", MIRROR, prefix
-            )
+            out = self.run_script("--no-apt", "--no-qt", "--no-mbedtls", "--mirror", MIRROR, prefix)
             self.assertEqual(out.returncode, 0, out.stderr)
             hearth = Path(prefix) / "hearth"
             for relative in (

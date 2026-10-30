@@ -25,7 +25,13 @@ QT_TREES = ("apps/forge/gui/src", "apps/crucible/ui/src", "apps/hearth/ui/src")
 
 def bash() -> str | None:
     for candidate in (shutil.which("bash"), r"C:\Program Files\Git\bin\bash.exe"):
-        if candidate and subprocess.run([candidate, "-c", "true"], capture_output=True).returncode == 0:
+        if (
+            candidate
+            and subprocess.run(
+                [candidate, "-c", "true"], capture_output=True, check=False
+            ).returncode
+            == 0
+        ):
             return candidate
     return None
 
@@ -63,7 +69,9 @@ class PresetsAndLabels(unittest.TestCase):
         self.assertEqual(test["environment"]["PIPEWIRE_DEBUG"], "0")
 
     def test_the_test_preset_selects_the_labels_the_window_suites_carry(self):
-        regex = re.compile(preset("testPresets", "test-linux-gcc-coverage-qt")["filter"]["include"]["label"])
+        regex = re.compile(
+            preset("testPresets", "test-linux-gcc-coverage-qt")["filter"]["include"]["label"]
+        )
         declared = {
             "apps/forge/gui/tests/qml.cmake": "gui",
             "apps/crucible/ui/tests/CMakeLists.txt": "crucible-ui",
@@ -115,9 +123,7 @@ class QtOnlyMode(unittest.TestCase):
         fake.mkdir()
         gcovr = fake / "gcovr"
         gcovr.write_text(
-            "#!/usr/bin/env bash\n"
-            'printf "%s\\n" "$*" >> "' + log.as_posix() + '"\n'
-            "exit 0\n",
+            '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "' + log.as_posix() + '"\nexit 0\n',
             encoding="utf-8",
         )
         gcovr.chmod(gcovr.stat().st_mode | stat.S_IEXEC)
@@ -144,7 +150,9 @@ class QtOnlyMode(unittest.TestCase):
             with self.subTest(library=library):
                 self.assertNotIn(library, extraction)
         self.assertNotIn("per command", out.stdout)
-        self.assertEqual(len([c for c in calls.splitlines() if "--fail-under-line" in c]), len(QT_TREES))
+        self.assertEqual(
+            len([c for c in calls.splitlines() if "--fail-under-line" in c]), len(QT_TREES)
+        )
 
     def test_a_tree_with_no_data_fails_the_run(self):
         out, _ = self.run_report(list(QT_TREES[:2]), "-q")
@@ -154,7 +162,11 @@ class QtOnlyMode(unittest.TestCase):
     def test_the_plain_run_does_not_gate_the_qt_trees(self):
         paths = [
             line.split()[0]
-            for line in re.search(r'(?s)\ncomponents="\n(.*?)"\n', text("tools/checks/coverage_report.sh")).group(1).splitlines()
+            for line in re.search(
+                r'(?s)\ncomponents="\n(.*?)"\n', text("tools/checks/coverage_report.sh")
+            )
+            .group(1)
+            .splitlines()
             if line.strip()
         ]
         self.assertTrue(paths)
