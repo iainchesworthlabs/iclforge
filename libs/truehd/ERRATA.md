@@ -841,6 +841,19 @@ units, which decodes to the same samples as without. **Correct.** Not changed: t
 units by length alone. Of entry 65, only the restart header, the first block header (a unit with a major sync) and the object audio metadata
 stand; the rest of what it says of later units has to be read again on the full stream.
 
+**67. The first block of a restart of substream 3, from the owner's excerpt (§8.2, §10.2; entries 60 and 65).** On the full stream (28,993
+units, 33 restarts of substream 3): units 0 and 1 are start-up restarts whose first blocks differ from each other and from the rest; from unit 79
+on the 31 restarts, 128 units apart, agree bit for bit on the 1,714 bits after the restart header (the first bit sent is 0, so no new
+presence flags and no block size, then a matrix group with a count of 14), after which the sample data differs. The continuation blocks of the
+substream read as §8.2 has them for channels 8 to 11 (units 2 and 3: new block size 40; a channel with only `huff_type` 0 and `huff_lsbs` 8). So
+what is not read is inside the first block's matrices, or between them and the sample data. Not the layout: no combination of 0 to 63 bits ahead of
+the block, 8 to 23 presence bits a matrix, 0 or 4 bits of noise shift, a 1 to 4 bit coefficient width over `frac_bits`, a 4 or 5 bit count, a 4 or 5
+bit output channel, the output shift and quantiser step counts of 4, 8, 12, 14 or 16, 4, 12 or 16 channels, and with or without the FIR state flag,
+gives matrices whose coefficients stay near the unit range and a tail that is two zero flags and valid filters (coefficient shift 8 or more, widths
+to 16, orders to 8 and 4). **Open (question 60).** What would settle it is a controlled input: an Atmos stream from the owner's encoder whose objects
+are silent but for one, and a second with that object moved, so that the bits that change are the matrix and filter fields that the one change
+touches. Held by `tools/checks/truehd_substream3_search.py` (`--common-prefix`, `--dump-header`).
+
 ## Atmos, spec v3.6
 
 TH spec v3.6 (released 2026-10-29) rewrites §15 and leaves every other section as v3.5 has it. It now gives the bit-level syntax of the
