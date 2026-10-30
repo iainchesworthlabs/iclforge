@@ -217,6 +217,29 @@ TEST_CASE("the bed of an Atmos stream is the stream a 7.1 encode of the bed alon
     }
 }
 
+TEST_CASE(
+    "an Atmos stream with the standard downmix presentations still gives back bed and objects",
+    "[truehd][encoder][atmos]") {
+    // The downmix folds the bed's channels into the 2 and 6 channel presentations and the later
+    // substreams undo it; substream 3 has the channels to itself and is not part of it.
+    const Programme programme = make_programme();
+    EncoderConfig config = atmos_config();
+    config.downmix = DownmixMode::kStandard;
+    config.verify = true;
+    const Encoded encoded = encode_all(config, programme.pcm);
+    CHECK(decode_all(encoded.units, 24, kBedChannels) == programme.bed);
+    CHECK(decode_all(encoded.units, 24, kObjects, Presentation::kAll) == programme.objects);
+    // The 2 channel presentation is a downmix, not the first two channels of the bed.
+    const auto stereo = decode_all(encoded.units, 24, 2, Presentation::k2ch);
+    REQUIRE(stereo.size() == static_cast<std::size_t>(programme.frames) * 2);
+    bool differs = false;
+    for (std::size_t t = 0; t < static_cast<std::size_t>(programme.frames) && !differs; ++t) {
+        differs =
+            stereo[t * 2] != programme.bed[t * 8] || stereo[t * 2 + 1] != programme.bed[t * 8 + 1];
+    }
+    CHECK(differs);
+}
+
 TEST_CASE("an Atmos configuration the stream cannot carry is refused", "[truehd][encoder][atmos]") {
     const auto refusal = [](EncoderConfig config) {
         return std::string(Encoder::refusal_reason(config));

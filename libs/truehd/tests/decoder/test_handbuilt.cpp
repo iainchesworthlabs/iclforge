@@ -108,8 +108,8 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
             // The manifest names what FFmpeg's strict decode of the stream does; the python leg
             // holds FFmpeg to it. Here the library is held to the signal.
             const std::string outcome = fixture["ffmpeg"]["outcome"];
-            CHECK((outcome == "equal" || outcome == "short" || outcome == "refused" ||
-                   outcome == "differs"));
+            CHECK((outcome == "equal" || outcome == "short" || outcome == "bed" ||
+                   outcome == "refused" || outcome == "differs"));
             const std::vector<std::byte> stream =
                 read_file(dir() + "/" + std::string(fixture["file"]));
             CHECK(hex(iclforge::base::crypto::sha256(stream)) ==
