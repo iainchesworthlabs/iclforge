@@ -339,6 +339,20 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
     presentation whose control bit is set.
 
+100. **May the metadata fields of a DEE stream be read to settle questions 51 to 55?** Question 51's recommendation is to encode a programme with two
+    dialogue norms and read the field back; the rule for DEE's streams (the decision of 2026-09-26, `planning/work-packages/README.md` rule 4) is that they
+    are decoded and compared with their sources and not read for format facts. `gen_dee_gold.py` also stores `forge probe`'s output for every leg in the
+    manifest, so the fields are recorded whether or not anyone reads them. DEE writes a dialnorm of -31 to -1 only (`--loudness-management
+    skip:dialnorm=N`; the default measures it), so "dialnorm 0 against another value" cannot be made. Nothing reads the fields until this is answered.
+    **Recommendation:** allow it for the dialogue norm, mix level, source format and control bits, on the legs whose input value is known
+    (`thd-last-8ch-music-48k24-dmx6-dmx2-dialnorm-27` and `-5`, `thd-dialnorm-*`): a value set and read back is a check of a unit, not a look at how DEE
+    writes a stream; use the `measure_only` leg of the same programme as the "unset" case. Evidence for the legs: `planning/truehd-validation.md`.
+101. **A way to score a reading without reading a stream.** The scorer says a decode is the source, not that the leg depends on the reading under test
+    (the 16-bit `seed_shr7`, question 5; the filter histories across a restart, question 18; the shift by matrix channel, question 6). Decoding the leg with the other
+    reading and finding it differs from the source is a decode-and-compare that removes a mark with a number. It needs a switch in the decoder for each
+    alternative. **Recommendation:** three test-only switches that `forge decode` refuses by name unless given, and a scored set for each; without them the
+    marks of questions 5, 6 and 18 stay until the owner says what the rescore alone is to count as.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
