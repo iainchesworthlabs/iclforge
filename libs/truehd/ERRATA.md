@@ -373,7 +373,16 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     `new_states` or a zero history. **The specification gives no stability criterion** for the quantised recursion, only these ranges and
     "a conformant encoder SHALL detect filter overload", so the instability of my prototype is the case it leaves to the encoder. It says
     nothing that ties IIR to resampled or band-limited material, and no decoder but FFmpeg's is known to exercise it (whether DEE writes
-    one is not looked at). The recommendation stands.
+    one is not looked at). The recommendation stands. **Measured on real material (2026-10-31, `tools/checks/estimate_truehd_iir_gain.py`):**
+    over 13 files of two channels, 24 segments of 5,120 samples each, with the coefficients quantised as the format asks, the recursion run in
+    integers, filter B's roots checked and the bits of each 80-sample block estimated from its mean absolute value, FIR order 8 plus IIR
+    order 4 is 99.9 to 100.4 per cent of order 8's bits on every real recording (a concert at 48, 96 and 192 kHz, film at 48 and 96 kHz
+    including the 96 kHz track that is band-limited, a 192 kHz film 5.1) and 99.7 to 100.0 per cent choosing the better of the two for each
+    segment: nothing. It reaches 96.3 per cent (best of the two) on the repository's music resampled up to 96 kHz by FFmpeg and 88.9 per
+    cent at 192 kHz, where substream 0 may not carry an IIR (§9.7) and so a stereo stream could not use it. In 1 to 3 of 24 segments of the
+    film material the fit was unstable or out of range and had to be dropped. FIR order 4 against 8 costs 0.3 to 8 per cent of the residual
+    bits (4.9 on the concert at 192 kHz), which is what the order-4 limit costs (question 96). The earlier estimate of about 11 per cent
+    belonged to the resampled test signal. **Recommendation: do not write the IIR filter**, now with a measurement behind it.
 92. **The corpus for the encoder comparison.** The repository has no 24-bit programme material: `testdata/audio` is 16 bit (a Mendelssohn
     recording, a spoken-word recording, a 2.5 s 5.1 reference), so the 24-bit rows of `compare_truehd_encoders.py --programme` are 16-bit samples
     in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. The reference session holds no source material of
@@ -1218,3 +1227,14 @@ FIR order 4 as the specification says (the "in substream 0" limits of §9.7 of t
 decoder reads it. **Recommendation:** keep the specification's limit: the loss is small, the specification does not say why the limit is there (a hardware
 decoder's filter cycles is a guess), and the one reader that shows order 7 is accepted is not a Blu-ray player. If the owner wants to
 trade the limit for size, an option `fir-order-over-spec` could lift it for authoring to software players, off by default. Left as is.
+
+**97. The restart sync of substream 1 in a stream of two substreams (TH spec §7.2; entry 48; question 90).** The retail 192 kHz and 48 kHz
+5.1 TrueHD tracks of one of the owner's UHD Blu-rays, an animated feature (read with `forge probe detail=structure`, structure only) are two substreams of 2 and
+6 channels with `substream_info` 0x3C and `extended_substream_info` 0, which is the layout forge now writes at 192 kHz, and their substream 1
+carries restart sync **0x31EB** (substream 0 0x31EA), where forge and FFmpeg's encoder write 0x31EA there because the reference
+specification exempts the last substream of a presentation of at most 6 channels. The owner's 7.1 Blu-rays carry 0x31EB in substreams 1 and 2
+(entry 48), so every retail stream seen has 0x31EB in substream 1. FFmpeg's strict decode takes either: forge's 192 kHz and 48 kHz 5.1
+streams written with 0x31EB in substream 1 (a temporary change, not kept) decode to their source sample for sample. **Recommendation:** write
+0x31EB in substream 1 of every stream of two or more substreams, as retail discs do, since a Blu-ray player has been shown to accept it
+and the exemption is only a reading of the specification; the change is one condition in `noise_flag` (`encoder.cpp`) and moves the
+golden bytes of the 3 to 6 channel tests. Left as it is until the owner decides.

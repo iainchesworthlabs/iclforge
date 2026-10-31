@@ -104,6 +104,10 @@ and in FFmpeg's strict decode, sample for sample.
 | concert 7.1 48 kHz b | 8 | 40 | 20,944,280 * | 19,535,482 | - | 42.4% |
 | concert stereo 96 kHz a | 2 | 40 | 16,336,062 | 15,901,132 | 0.973 | 69.0% |
 | concert stereo 96 kHz b | 2 | 40 | 16,381,882 | 15,936,542 | 0.973 | 69.2% |
+| animated film 5.1 192 kHz a | 6 | 30 | 31,039,412 | 30,960,312 | 0.997 | 29.9% |
+| animated film 5.1 192 kHz b | 6 | 30 | 33,532,106 | 33,852,302 | 1.010 | 32.7% |
+| animated film 5.1 48 kHz a | 6 | 30 | 5,985,704 | 5,439,014 | 0.909 | 21.0% |
+| animated film 5.1 48 kHz b | 6 | 30 | 6,657,122 | 6,009,284 | 0.903 | 23.2% |
 
 On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. **On the concert, real full-band music, forge is 0.93 to 0.95 of FFmpeg's size at 48 kHz
 (stereo, 5.1), 0.97 at 96 kHz and 1.02 and 1.04 at 192 kHz**: the concert is louder, full-band music where the programme rows are the repository's own recordings, and the 192 kHz loss is the specification's order-4 limit (below, ERRATA question 96). FFmpeg's 7.1 streams do not decode to the source, so they
@@ -138,8 +142,17 @@ which writes the mask's order, does not show.
 - **FFmpeg's 8-channel streams are not the source either** (`*` on the 7.1 and 8-channel rows), so FFmpeg has no 7.1 size to compare with.
 - **What was tried and is not in the encoder.** A least-squares (covariance) FIR candidate beside the windowed autocorrelation one
   changed the 96 kHz music by 0.04 per cent and was dropped. On that source a long filter (order 32) needs about 11 per cent fewer
-  bits than order 8 by an estimate with exact coefficients, and the format's IIR filter is the tool that would reach for it; it is
-  not written, and 48 kHz material gains under 3 per cent from any order above 8 ([ERRATA question 91](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
+  bits than order 8 by an estimate with exact coefficients, which is the case of music resampled up by FFmpeg. Measured on real
+  recordings, with the coefficients quantised as the format asks and the recursion run in integers
+  (`tools/checks/estimate_truehd_iir_gain.py`, 13 files), the format's IIR filter next to a FIR of order 8 is 99.9 to 100.4 per cent of
+  order 8's residual bits, and 99.7 to 100.0 per cent if the better of the two is taken for each segment; it saves 3.7 per cent at 96 kHz
+  and 11 per cent at 192 kHz only on the resampled test signal. It is not written ([ERRATA question 91](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
+- **Against a retail encoder's stream of the same audio.** The 192 kHz and 48 kHz 5.1 TrueHD tracks of an animated film's UHD Blu-ray
+  were decoded and re-encoded by forge: a unit of forge's stream is 0.990 of the retail unit's size at 192 kHz and 0.995 at 48 kHz (bytes
+  per access unit, the two excerpts covering slightly different spans), exact in forge's decoder and in FFmpeg's strict decode; on 30 s
+  excerpts forge is 0.997 and 1.010 of FFmpeg's encoder's size at 192 kHz and 0.90 at 48 kHz. Both retail tracks have the layout forge
+  writes at these rates, two substreams of 2 and 6 channels; their substream 1 carries restart sync 0x31EB where forge writes 0x31EA
+  ([ERRATA question 97](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
 
 ## Decoder speed
 
