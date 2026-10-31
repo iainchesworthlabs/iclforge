@@ -7,6 +7,7 @@ iclforge_add_test_binary(iclforge-sink-tests PROJECT sink SOURCES
     test_lyric_frame_golden.cpp
     test_passthrough.cpp
     test_decoding_output.cpp
+    test_decoding_output_truehd.cpp
     test_end_to_end.cpp)
 
 target_link_libraries(iclforge-sink-tests PRIVATE iclforge::sink iclforge::sink_passthrough iclforge::sink_decode iclforge::sink_harness

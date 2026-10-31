@@ -208,6 +208,49 @@ ac3::eac3::chanmap::Layout ac4_bed(std::span<const iclforge::ac4::Speaker> speak
     return bed;
 }
 
+std::optional<ac3::eac3::chanmap::Layout> truehd_bed(
+    std::span<const iclforge::truehd::Channel> channels) {
+    using ac3::eac3::chanmap::Location;
+    namespace th = iclforge::truehd;
+    if (channels.empty() || channels.size() > render::LayoutRenderer::kMaxCoded) {
+        return std::nullopt;
+    }
+    ac3::eac3::chanmap::Layout bed;
+    for (const th::Channel channel : channels) {
+        Location location = Location::kLeft;
+        // clang-format off
+        switch (channel) {
+            case th::Channel::kL: location = Location::kLeft; break;
+            case th::Channel::kR: location = Location::kRight; break;
+            case th::Channel::kC: location = Location::kCentre; break;
+            case th::Channel::kLfe: location = Location::kLfe; break;
+            case th::Channel::kLs: location = Location::kLeftSurround; break;
+            case th::Channel::kRs: location = Location::kRightSurround; break;
+            case th::Channel::kLvh: location = Location::kVhl; break;
+            case th::Channel::kRvh: location = Location::kVhr; break;
+            case th::Channel::kLc: location = Location::kLc; break;
+            case th::Channel::kRc: location = Location::kRc; break;
+            case th::Channel::kLrs: location = Location::kLrs; break;
+            case th::Channel::kRrs: location = Location::kRrs; break;
+            case th::Channel::kCs: location = Location::kCs; break;
+            case th::Channel::kTs: location = Location::kTs; break;
+            case th::Channel::kLsd: location = Location::kLsd; break;
+            case th::Channel::kRsd: location = Location::kRsd; break;
+            case th::Channel::kLw: location = Location::kLw; break;
+            case th::Channel::kRw: location = Location::kRw; break;
+            case th::Channel::kCvh: location = Location::kVhc; break;
+            case th::Channel::kLfe2: location = Location::kLfe2; break;
+        }
+        // clang-format on
+        if (bed.index_of(location) >= 0) {
+            // A channel named twice has no place of its own for the renderer to put it.
+            return std::nullopt;
+        }
+        bed.items[static_cast<std::size_t>(bed.count++)] = location;
+    }
+    return bed;
+}
+
 bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers) {
     const auto unplaced = [](iclforge::ac4::Speaker speaker) {
         switch (speaker) {
@@ -278,6 +321,7 @@ void DecodingBurstOutput::end() {
 }
 
 void DecodingBurstOutput::reset_decoding() {
+    truehd_decoder_.reset();
     ac3_decoder_.reset();
     eac3_decoder_.reset();
     ac4_decoder_.reset();
@@ -294,6 +338,10 @@ void DecodingBurstOutput::write(const sendspin::BurstChunk& chunk, std::int64_t 
     }
     if (stream_->data_type == ac::DataType::kAc4) {
         write_ac4(chunk, local_time);
+        return;
+    }
+    if (stream_->data_type == ac::DataType::kTruehd) {
+        write_truehd(chunk, local_time);
         return;
     }
     pcm_->burst(local_time, stream_frames_, kSamplesPerBurst);
@@ -516,6 +564,139 @@ void DecodingBurstOutput::render_ac4(const iclforge::ac4::DecodedFrame& frame) {
             .objects = 0,
             .objects_placed = false,
             .dialnorm = 0.0};
+    }
+}
+
+void DecodingBurstOutput::emit_silence(std::size_t samples) {
+    const std::size_t slots = layout_.slots();
+    for (std::size_t done = 0; done < samples;) {
+        const std::size_t n = std::min(block_[0].size(), samples - done);
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            std::fill_n(block_[slot].begin(), n, 0.0F);
+        }
+        emit(n);
+        done += n;
+    }
+}
+
+void DecodingBurstOutput::write_truehd(const sendspin::BurstChunk& chunk, std::int64_t local_time) {
+    const std::span<const std::byte> payload = std::as_bytes(chunk.chunk.data);
+    // A unit has 40 samples at 48 and 44.1 kHz, and 80 and 160 at their doubles (TH spec section
+    // 13): the same 0.83 ms at every rate.
+    const auto rate = static_cast<std::uint32_t>(stream_->sample_rate);
+    const std::uint32_t base = rate % 44100U == 0 ? 44100U : 48000U;
+    const std::size_t unit_samples = rate >= base ? 40U * (rate / base) : 40U;
+    const std::optional<std::size_t> units = sendspin::count_truehd_units(chunk.chunk.data);
+    if (!units) {
+        // parse_burst_chunk() refuses these, so this is a caller that did not ask it.
+        ++undecodable_;
+        pcm_->burst(local_time, stream_frames_, 0);
+        return;
+    }
+    pcm_->burst(local_time, stream_frames_, *units * unit_samples);
+    stream_frames_ += *units * unit_samples;
+    std::size_t at = 0;
+    for (std::size_t unit = 0; unit < *units; ++unit) {
+        const std::size_t words =
+            (static_cast<std::size_t>(std::to_integer<unsigned>(payload[at]) & 0x0FU) << 8U) |
+            std::to_integer<unsigned>(payload[at + 1]);
+        decode_truehd_unit(payload.subspan(at, words * 2), unit_samples);
+        at += words * 2;
+    }
+}
+
+void DecodingBurstOutput::decode_truehd_unit(std::span<const std::byte> unit, std::size_t samples) {
+    if (!truehd_decoder_) {
+        truehd_decoder_.emplace(iclforge::truehd::DecoderConfig{});
+    }
+    const auto decoded = truehd_decoder_->decode(unit);
+    if (!decoded) {
+        // The decoder lets go of the substream that failed and waits for its next restart header;
+        // the unit's time passes in silence.
+        ++undecodable_;
+        emit_silence(samples);
+        return;
+    }
+    if (!*decoded) {
+        // No restart header has come since the stream was joined or a unit was lost.
+        emit_silence(samples);
+        return;
+    }
+    place_truehd(**decoded);
+}
+
+void DecodingBurstOutput::place_truehd(const iclforge::truehd::DecodedAccessUnit& decoded) {
+    const auto channels = static_cast<std::size_t>(decoded.channels);
+    const auto total = static_cast<std::size_t>(decoded.samples);
+    if (channels == 0 || total == 0) {
+        return;
+    }
+    // 24-bit integers to floats: a power of two and a value float holds exactly.
+    constexpr float kScale = 1.0F / 8388608.0F;
+    truehd_planar_.resize(channels * total);
+    for (std::size_t sample = 0; sample < total; ++sample) {
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+            truehd_planar_[(channel * total) + sample] =
+                static_cast<float>(decoded.pcm[(sample * channels) + channel]) * kScale;
+        }
+    }
+    const std::optional<ac3::eac3::chanmap::Layout> bed = truehd_bed(decoded.layout);
+    const bool named = bed && bed->count == static_cast<int>(channels);
+    if (named && (!renderer_bed_ || !same_layout(*renderer_bed_, *bed))) {
+        renderer_.set_bed(*bed);
+        renderer_bed_ = *bed;
+    }
+    const std::size_t slots = layout_.slots();
+    truehd_spans_.resize(channels);
+    for (std::size_t offset = 0; offset < total; offset += block_[0].size()) {
+        const std::size_t n = std::min(block_[0].size(), total - offset);
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+            truehd_spans_[channel] =
+                std::span<const float>(truehd_planar_).subspan((channel * total) + offset, n);
+        }
+        std::array<std::span<float>, render::OutputLayout::kMaxSlots> spans{};
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            spans[slot] = std::span<float>(block_[slot]).first(n);
+        }
+        const std::span<const std::span<float>> out(spans.data(), slots);
+        const ac3::PcmBlock placed{.index = 0,
+                                   .blocks = 1,
+                                   .channels = std::span<const std::span<const float>>(truehd_spans_),
+                                   .objects = {},
+                                   .object_indices = {},
+                                   .object_metadata = nullptr};
+        if (named) {
+            renderer_.render(placed, false, 1.0F, out);
+        } else {
+            // Channels the stream does not name go to the layout's speakers in order.
+            renderer_.render_folded(placed, 1.0F, out);
+        }
+        emit(n);
+    }
+    if (!decoder_) {
+        const bool lfe = named && bed->index_of(ac3::eac3::chanmap::Location::kLfe) >= 0;
+        const auto has = [&](ac3::eac3::chanmap::Location location) {
+            return named && bed->index_of(location) >= 0;
+        };
+        using L = ac3::eac3::chanmap::Location;
+        std::int32_t acmod = channels == 1 ? 1 : 2;
+        if (named) {
+            const bool surround = has(L::kLeftSurround) || has(L::kRightSurround);
+            if (!has(L::kRight)) {
+                acmod = 1;
+            } else if (surround) {
+                acmod = has(L::kCentre) ? 7 : 6;
+            } else {
+                acmod = has(L::kCentre) ? 3 : 2;
+            }
+        }
+        decoder_ = ac::DecoderReport{.data_type = ac::DataType::kTruehd,
+                                     .acmod = acmod,
+                                     .lfe = lfe,
+                                     .substreams = decoded.substream + 1,
+                                     .objects = 0,
+                                     .objects_placed = false,
+                                     .dialnorm = 0.0};
     }
 }
 
