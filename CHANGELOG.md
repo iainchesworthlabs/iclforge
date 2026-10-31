@@ -21,6 +21,11 @@ See [README.md](README.md) for the project overview and
   The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
   forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
   says where forge is larger: 1.06 and 1.15 times FFmpeg's size at 192 kHz.
+- **Changed: the TrueHD encoder writes restart sync 0x31EB in substream 1 of every stream of two or more substreams.** It wrote 0x31EA there
+  for 3 to 6 channels, following the reference specification's exemption for the last substream of a presentation of at most 6 channels; every
+  retail stream seen carries 0x31EB there (the owner's 7.1 discs, and the 48 and 192 kHz 5.1 tracks of a UHD disc, which are the two-substream
+  layout of 2 and 6 channels the encoder now writes at 176.4 and 192 kHz). FFmpeg's strict decode takes either (`libs/truehd/ERRATA.md`
+  entry 97).
 - **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
   `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. The encoder
   now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks

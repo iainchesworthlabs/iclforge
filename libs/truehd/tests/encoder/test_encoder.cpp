@@ -183,22 +183,22 @@ TEST_CASE("a major sync and a restart header open every restart interval and no 
     }
 }
 
-TEST_CASE(
-    "the restart sync of a substream follows TH spec 7.2: 0x31EB unless it is the last of a "
-    "presentation",
-    "[truehd][encoder][stream]") {
+TEST_CASE("substream 1 of a stream of several substreams carries restart sync 0x31EB",
+          "[truehd][encoder][stream]") {
     // TH spec §7.2 (v3.9): a non-Atmos substream carries 0x31EA or 0x31EB whatever its index, and
-    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation,
-    // which is to say unless the stream has a third; the third (8 channel) substream carries 0x31EB
-    // (the owner's Blu-ray has 0x31EA in substream 0 and 0x31EB in 1 and 2). 0x31EC is the Atmos
-    // substream's and the encoder writes none.
+    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation.
+    // Every retail stream seen has 0x31EB in substream 1 whatever follows (the owner's Blu-rays:
+    // 0x31EA in substream 0 and 0x31EB in 1 and 2 of 7.1; the 48 and 192 kHz 5.1 tracks of a UHD
+    // Blu-ray: 0x31EB in 1 of 2), so the encoder writes it there (ERRATA.md entry 97); the third (8
+    // channel) substream carries it too. 0x31EC is the Atmos substream's and the encoder writes
+    // none.
     struct Case {
         int channels;
         std::vector<std::uint16_t> syncs;
     };
     const std::vector<Case> cases{
         {2, {kRestartSyncStandard}},
-        {6, {kRestartSyncStandard, kRestartSyncStandard}},
+        {6, {kRestartSyncStandard, kRestartSyncNoise}},
         {7, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
         {8, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
     };

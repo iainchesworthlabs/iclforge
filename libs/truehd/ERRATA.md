@@ -779,7 +779,7 @@ the byte. **Confirmed by the Blu-ray; the meaning of 3 is open (question 46).**
 presentation (the third, 8 channel substream of a non-Atmos 7.1 stream carries 0x31EB too). The owner's Blu-ray agrees: 0x31EA in
 substream 0, 0x31EB in 1 and 2, 0x31EC in 3. The encoder wrote 0x31EB only for a substream with a channel above 5 (entry 32); it now
 writes it for substream 1 of every stream that has a third substream (7 and 8 channels, with or without the downmix presentations) and
-0x31EA for the last substream of a 5.1 or stereo stream. The matrices of such a substream carry the 4-bit noise shift, zero, and no noise
+0x31EA for the last substream of a 5.1 stream (**changed by entry 97: now 0x31EB in substream 1 of every stream of several substreams**). The matrices of such a substream carry the 4-bit noise shift, zero, and no noise
 channel coefficients (entry 32); FFmpeg's strict decode of those streams is exact (`verify_truehd_encode_interop.py`, the 7 and 8 channel
 cases), and `test_encoder.cpp` reads the syncs. The decoder takes 0x31EA, 0x31EB and 0x31EC in any substream and ties nothing but the
 `huff_lsbs` limit (31) to 0x31EC; v3.9 says only that 0x31EC marks the Atmos substream, so it does not refuse it elsewhere. §2.3, §20.1
@@ -1206,8 +1206,8 @@ decodes exactly in FFmpeg's strict decode (1,953,458 bytes, 1.149 of FFmpeg's 1,
 failing, where 10 of 110 failed with one substream; a library test decodes 2, 3 and 6 channels at both rates with the encoder's own check
 on. Not known: whether a Dolby decoder (a Blu-ray player) accepts the stream: there is no reference 192 kHz multichannel stream, and DEE has
 no option for these rates, so no oracle but FFmpeg answers it. Checked against FFmpeg's own 192 kHz 5.1 stream with `forge probe detail=structure`: forge's has the same structure
-(substream 0 and substream 1 both restart sync 0x31EA, since substream 1 is the last substream of a presentation of at most 6 channels
-(§7.2); `substream_info` 0x3C; `extended_substream_info` 0; channels 2 and 6); the peak data rate differs on purpose (18 Mbit/s declared
+(substream 0 and substream 1 both restart sync 0x31EA at the time, since substream 1 is the last substream of a presentation of at most
+6 channels (§7.2); entry 97 then moved substream 1 to 0x31EB; `substream_info` 0x3C; `extended_substream_info` 0; channels 2 and 6); the peak data rate differs on purpose (18 Mbit/s declared
 by default against FFmpeg's 9.588). The reference specification's own text now agrees (the "second substream" clause was read as wrong
 for 3 or more channels and rewritten in the reference copy, v3.24, §9.7 and §5.3); FIR order in substream 1 may go to 8 there, and
 stays capped at 4 here. **Question for the owner (95), the owner's lean is to keep two substreams:** is a stream written against the
@@ -1231,7 +1231,7 @@ decoder reads it. **Recommendation:** keep the specification's limit: the loss i
 decoder's filter cycles is a guess), and the one reader that shows order 7 is accepted is not a Blu-ray player. If the owner wants to
 trade the limit for size, an option `fir-order-over-spec` could lift it for authoring to software players, off by default. Left as is.
 
-**97. The restart sync of substream 1 in a stream of two substreams (TH spec §7.2; entry 48; question 90).** The retail 192 kHz and 48 kHz
+**97. The restart sync of substream 1 in a stream of two substreams (TH spec §7.2; entry 48; question 90). Done, owner agreed 2026-10-31.** The retail 192 kHz and 48 kHz
 5.1 TrueHD tracks of one of the owner's UHD Blu-rays, an animated feature (read with `forge probe detail=structure`, structure only) are two substreams of 2 and
 6 channels with `substream_info` 0x3C and `extended_substream_info` 0, which is the layout forge now writes at 192 kHz, and their substream 1
 carries restart sync **0x31EB** (substream 0 0x31EA), where forge and FFmpeg's encoder write 0x31EA there because the reference
@@ -1240,4 +1240,8 @@ specification exempts the last substream of a presentation of at most 6 channels
 streams written with 0x31EB in substream 1 (a temporary change, not kept) decode to their source sample for sample. **Recommendation:** write
 0x31EB in substream 1 of every stream of two or more substreams, as retail discs do, since a Blu-ray player has been shown to accept it
 and the exemption is only a reading of the specification; the change is one condition in `noise_flag` (`encoder.cpp`) and moves the
-golden bytes of the 3 to 6 channel tests. Left as it is until the owner decides.
+golden bytes of the 3 to 6 channel tests. **Done:** `noise_flag` now returns true for substream 1 of any stream of two or more substreams;
+`test_encoder.cpp` reads 0x31EA, 0x31EB for 6 channels; the 43-case interop matrix is 43 cases with none failing, the fuzzer ran 1,674 cases and
+the regression seeds with none failing, and the 158 TrueHD and forge tests pass (one skipped here). Both retail layouts (two substreams of 2
+and 6 channels at 48 and 192 kHz) are now what forge writes, which answers question 90's last doubt about a Dolby decoder: the retail
+discs are what such decoders play.

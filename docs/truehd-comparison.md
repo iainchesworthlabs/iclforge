@@ -160,8 +160,8 @@ which writes the mask's order, does not show.
   were decoded and re-encoded by forge: a unit of forge's stream is 0.990 of the retail unit's size at 192 kHz and 0.995 at 48 kHz (bytes
   per access unit, the two excerpts covering slightly different spans), exact in forge's decoder and in FFmpeg's strict decode; on 30 s
   excerpts forge is 0.997 and 1.010 of FFmpeg's encoder's size at 192 kHz and 0.90 at 48 kHz. Both retail tracks have the layout forge
-  writes at these rates, two substreams of 2 and 6 channels; their substream 1 carries restart sync 0x31EB where forge writes 0x31EA
-  ([ERRATA question 97](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
+  writes at these rates, two substreams of 2 and 6 channels; their substream 1 carries restart sync 0x31EB, which forge now writes too
+  ([ERRATA entry 97](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
 
 ## Decoder speed
 

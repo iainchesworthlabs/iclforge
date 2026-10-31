@@ -101,16 +101,17 @@ struct StageSpec {
     return {StageSpec{0, 1}, StageSpec{2, six - 1}, StageSpec{six, channels - 1}};
 }
 
-// The restart sync of a substream (TH spec §7.2, v3.9): 0x31EA, or 0x31EB (noise_type set) where
-// the substream is not the last one of its presentation. FFmpeg's decoder takes a substream of more
-// than 6 channels (a channel above 5) only with noise_type set, whether or not the stream uses
-// noise (ERRATA.md entry 32), and §7.2 says substream 1 SHALL carry 0x31EB unless it is the last
-// substream of a 6 channel presentation, i.e. unless the stream has no third substream (ERRATA.md
-// entry 48; the owner's Blu-ray has 0x31EB in substreams 1 and 2). The noise shift and seed are
-// zero and no matrix draws on a noise channel.
+// The restart sync of a substream (TH spec §7.2, v3.9): 0x31EA, or 0x31EB (noise_type set).
+// FFmpeg's decoder takes a substream of more than 6 channels (a channel above 5) only with
+// noise_type set, whether or not the stream uses noise (ERRATA.md entry 32). §7.2 says substream 1
+// SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation, but every retail
+// stream seen has it in substream 1 whatever follows (the owner's 7.1 Blu-rays in substreams 1 and
+// 2, the 48 and 192 kHz 5.1 tracks of a UHD Blu-ray in substream 1 of two), and FFmpeg's strict
+// decode takes either, so substream 1 of any stream of several substreams carries it (ERRATA.md
+// entries 48 and 97). The noise shift and seed are zero and no matrix draws on a noise channel.
 [[nodiscard]] bool noise_flag(const StageSpec& stage, std::size_t index,
                               std::size_t stage_count) noexcept {
-    return stage.last_row > 5 || (index == 1 && stage_count > 2);
+    return stage.last_row > 5 || (index == 1 && stage_count > 1);
 }
 
 [[nodiscard]] bool is_pair(Channel left, Channel right) noexcept {
