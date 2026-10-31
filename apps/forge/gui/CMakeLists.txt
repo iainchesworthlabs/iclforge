@@ -30,6 +30,9 @@ qt_add_executable(forge-gui
     src/object_decode_controller.hpp
     src/stream_player_controller.cpp
     src/truehd_pcm_source.cpp
+    src/truehd_encode_controller.cpp
+    src/truehd_encode_controller.hpp
+    ../../shared/media/src/truehd_encode_core.cpp
     ../../shared/media/src/probe_truehd.cpp
     src/stream_player_controller.hpp
     src/background_jobs.hpp
@@ -165,7 +168,8 @@ set(ICLFORGE_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcGateMeter.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ObjectInspectorDialog.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/StreamPlayerDialog.qml")
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/StreamPlayerDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/TruehdEncodeDialog.qml")
 
 # GUI localisation: one .ts per shipped language, French/German/Spanish/Arabic/
 # Hebrew/Yiddish - the same set and order LanguageManager's kLanguages uses

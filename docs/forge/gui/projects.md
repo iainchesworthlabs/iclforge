@@ -46,7 +46,7 @@ The `encode` object holds these, each by the command line's own word for it:
 
 | Key | Values |
 |---|---|
-| `codec` | `"ac3"`, `"eac3"`, `"ac4"` (`"truehd"` is not a value: neither the window nor `forge project` encodes TrueHD) |
+| `codec` | `"ac3"`, `"eac3"`, `"ac4"` (`"truehd"` is not a value: `forge project` does not encode TrueHD, and the window's [Encode TrueHD](truehd-encode.md) dialog is not saved in a project) |
 | `container` | `"elementary"`, `"matroska"`, `"spdif"`, `"mp4"`, `"fmp4"`, `"mpegts"` |
 | `bitrateKbps` | A rate the codec offers, such as `384` |
 | `tools` | The coding tools, as the token `eac3-encode` takes: `"cpl+spx"`, `"auto"`, `"aht:0"`. Absent for none. |

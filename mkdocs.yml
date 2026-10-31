@@ -148,6 +148,7 @@ nav:
           - QC a stream: forge/gui/qc.md
           - Inspect objects: forge/gui/inspect-objects.md
           - Open stream: forge/gui/open-stream.md
+          - Encode TrueHD: forge/gui/truehd-encode.md
           - Localisation: forge/gui/localisation.md
           - Keyboard & text size: forge/gui/accessibility.md
   - Crucible:

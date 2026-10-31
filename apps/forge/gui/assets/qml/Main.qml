@@ -1670,6 +1670,10 @@ ApplicationWindow {
     StreamPlayerDialog {
         id: streamPlayerDialog
     }
+    // The TrueHD encode: a WAV to a bare .thd stream, the twin of `forge truehd-encode`.
+    TruehdEncodeDialog {
+        id: truehdEncodeDialog
+    }
 
     // Reached from the header's About, and from Settings' About Forge….
     // Licences… chains to the dialog below, which stacks over this one.
@@ -2035,6 +2039,11 @@ ApplicationWindow {
                 objectName: "streamPlayerOpenButton"
                 text: qsTr("Open stream…")
                 onClicked: streamPlayerDialog.open()
+            }
+            Button {
+                objectName: "truehdEncodeOpenButton"
+                text: qsTr("Encode TrueHD…")
+                onClicked: truehdEncodeDialog.open()
             }
             Button {
                 objectName: "prefsOpenButton"

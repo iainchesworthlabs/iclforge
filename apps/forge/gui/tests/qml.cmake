@@ -30,6 +30,9 @@ qt_add_executable(forge_gui_qmltests
     src/object_decode_controller.hpp
     src/stream_player_controller.cpp
     src/truehd_pcm_source.cpp
+    src/truehd_encode_controller.cpp
+    src/truehd_encode_controller.hpp
+    ../../shared/media/src/truehd_encode_core.cpp
     ../../shared/media/src/probe_truehd.cpp
     src/stream_player_controller.hpp
     src/background_jobs.hpp

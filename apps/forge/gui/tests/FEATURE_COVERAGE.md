@@ -3,7 +3,7 @@
 What every user-facing feature of the Forge GUI (`apps/forge/gui/assets/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
-hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (37 suites, 232
+hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (38 suites, 238
 test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (six files, 51
 cases, tagged `[gui]` and built into `iclforge-forge-gui-tests`). All the QML suites run the
 real controllers, not mocks.
@@ -211,7 +211,7 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | The dialog shows the measurement: the summary line and one programme card | logic | logic | QcPanel::test_dialogRendersTheRealMeasurement |
 | Gate meter pass/fail visuals and accessibility | logic | logic | QcPanel::test_gateMeter*, Accessibility::test_qcGateMeter* |
 
-## TrueHD and MLP (player and QC)
+## TrueHD and MLP (player, QC and encode)
 
 The player reads these files a window at a time (`src/truehd_pcm_source.hpp`), never a whole decode:
 a two-hour film at 48 kHz and eight channels is about 11 GB. The Qt-free cases hold the samples to
@@ -234,6 +234,10 @@ controllers and the dialogs. Nothing is pressed in these rows: the tests call th
 | QC: the integrity gate passes a good stream and fails two streams joined end to end | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate, test_qcOfAStreamJoinedEndToEndFailsTheIntegrityGate |
 | QC of an AC-3 stream has no integrity row | new | logic | TrueHd::test_qcOfAnAc3StreamHasNoIntegrityGate |
 | `forge-gui --smoke-open <stream>` opens a TrueHD file in the player | new | CI step | `forge-gui --smoke-open apps/forge/gui/tests/fixtures/truehd_m51_s24.thd shot.png` (run by hand for this change: exit 0) |
+| "Encode TrueHD…" → Choose WAV → Encode: a bare `.thd` that opens in the player as TrueHD of the WAV's length and passes QC | new | logic | TruehdEncode::test_aWavIsCodedVerifiedAndTheStreamOpensInThePlayerAndPassesQc |
+| The command line the dialog is the twin of names the files and the options ticked; an output is made `.thd` | new | logic | TruehdEncode::test_theCommandLineNamesTheFilesAndTheOptionsChosen, test_chooseSourceProposesAnOutputBesideItAndOutputsAreMadeThd |
+| A file that is not a WAV is refused with a sentence and nothing is written | new | logic | TruehdEncode::test_aFileThatIsNotAWavIsRefusedAndNothingIsWritten |
+| The WAV and output pickers of the encode dialog, the Stop button | new | none | No case: the tests set the source and the output through the controller, and the run is short. |
 
 ## Objects (authoring) and object inspector
 
