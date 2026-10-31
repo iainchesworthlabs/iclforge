@@ -77,6 +77,7 @@ public:
      // The rate the members are sent PCM at, when it is not the stream's: the audio is converted
      // to it here.
      std::uint32_t group_rate = format.sample_rate;
+     int coded_substreams = 0;
      if (plan_) {
          const GroupPlan group_plan =
              plan_({.group_name = group_name,
@@ -87,12 +88,14 @@ public:
                     .objects_alone = format.objects_alone,
                     .frame_rate = format.frame_rate,
                     .peak_kbps = format.peak_kbps,
+                    .presentations = format.presentations,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
          const std::vector<render::OutputLayout>& planned = group_plan.variants;
          if (group_plan.pcm_rate != 0) {
              group_rate = group_plan.pcm_rate;
          }
+         coded_substreams = group_plan.coded_substreams;
          for (const render::OutputLayout& layout : planned) {
              // One variant per width: a player lists a width, not a layout,
              // and the group refuses two of one.
@@ -130,6 +133,7 @@ public:
      channels_ = static_cast<std::size_t>(channels);
      sample_rate_ = format.sample_rate;
      group_rate_ = group_rate;
+     coded_substreams_ = coded_substreams;
      converters_.clear();
      pending_.clear();
      pending_frames_ = 0;
@@ -221,6 +225,7 @@ public:
     }
 
     [[nodiscard]] std::vector<render::OutputLayout> variants() const override { return variants_; }
+    [[nodiscard]] int coded_substreams() const override { return coded_substreams_; }
 
     std::size_t submit_pcm(std::span<const std::span<const float>> slots, std::size_t frames) override {
         if (!group_) {
@@ -454,6 +459,7 @@ private:
     // (GroupPlan::pcm_rate), with a converter for each layout, the player's first, and what each
     // has made that the group has not yet taken, interleaved, and its frames.
     std::uint32_t group_rate_ = 0;
+    int coded_substreams_ = 0;
     std::vector<dsp::StreamResampler> converters_;
     mutable std::vector<std::vector<std::int32_t>> pending_;
     mutable std::size_t pending_frames_ = 0;

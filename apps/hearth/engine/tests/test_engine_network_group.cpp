@@ -41,6 +41,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
 #include "iclforge/sendspin/messages.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/sendspin/noise.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
@@ -2943,4 +2944,100 @@ TEST_CASE("engine: a TrueHD item over a sink's stated data rate is sent that sin
         said = said || (line.find("limited: This sink takes TrueHD up to 1000 kbit/s") != std::string::npos);
     }
     CHECK(said);
+}
+
+// Phase 5 of the ESP32 sinks' plan, on the host: a TrueHD stream no sink in the group takes whole is
+// sent coded, cut to the highest presentation some sink takes, to the sinks that take it, and as PCM
+// to the rest. Here a 5.1 stream with a stereo downmix in substream 0, a sink that states it decodes
+// 2 channels, and one that does not decode TrueHD. The sink plays what the library's own decoder
+// makes of the stream at its 2 channel presentation, and the chunks it was sent are the cut stream's.
+TEST_CASE("engine: a TrueHD item no sink takes whole is cut to the presentation one does",
+          "[hearth][group][websocket][iclforge][truehd][coded][presentation]") {
+    namespace th = iclforge::hearth::testing;
+    constexpr std::uint64_t kItemFrames = 48000;  // 1 s: 1,200 units, 50 chunks
+    const th::MadeStream made = th::make_stream(6, kItemFrames, 48000, 128, 7, -1, /*downmix=*/true);
+    auto rig = make_truehd_group("truehd_cut", {
+        {"two_channel", [](testsink::SinkOptions& options) { options.max_coded_channels = 2; }},
+        {"plays_pcm", [](testsink::SinkOptions& options) {
+             options.data_types = {iclforge::sendspin::player::DataType::kAc3,
+                                   iclforge::sendspin::player::DataType::kEac3};
+         }}});
+
+    // The 6 channel master: the group's PCM members are sent the whole stream decoded here.
+    const ItemLoader loader =
+        [&made](const std::string& path) -> std::expected<LoadedItem, std::string> {
+        if (path != "item") {
+            return std::unexpected("no such file: " + path);
+        }
+        return LoadedItem{.source = std::make_shared<iclforge::hearth::MemoryByteSource>(made.bytes),
+                          .truehd = true};
+    };
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(master.has_value());
+    EngineOutputs outputs{.group = iclforge::hearth::make_group_sink(
+                              [group = rig->group](const std::string&) { return group; },
+                              [&sinks = *rig->sinks](const iclforge::hearth::GroupPlanRequest& request) {
+                                  return sinks.plan_group(request);
+                              })};
+    Engine engine(std::move(outputs), loader, *master, iclforge::hearth::DecoderSettings{},
+                  EngineTiming{.period = 5ms, .budget = 4800});
+    engine.set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                    .follow_sink = true,
+                                                    .group_name = rig->group_id,
+                                                    .group_ready = true});
+    engine.add({QueueItem{.path = "item", .title = "5.1"}});
+    engine.play();
+    REQUIRE(eventually([&] {
+        const EngineStatus status = engine.status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+    const EngineStatus finished = engine.status();
+    INFO("output_reason: " << finished.output_reason << " / error: " << finished.error);
+    REQUIRE(finished.history.size() == 1);
+
+    testsink::Sink& two = rig->sink("two_channel");
+    REQUIRE(eventually([&] { return two.totals().bursts >= 50; }));
+    CHECK(two.totals().bursts == 50);
+    CHECK(two.totals().frames == 0);
+    bool said = false;
+    for (const std::string& line : rig->sinks->take_log()) {
+        said = said || (line.find("two_channel: Sending the first 1 of TrueHD's 2 substreams") != std::string::npos);
+    }
+    CHECK(said);
+
+    // The sink decoded the cut stream: the library's 2 channel decode of the whole stream.
+    iclforge::truehd::DecoderConfig config;
+    config.presentation = iclforge::truehd::Presentation::k2ch;
+    iclforge::truehd::Decoder reference{config};
+    std::vector<float> want;
+    for (std::size_t unit = 0; unit < made.unit_offsets.size(); ++unit) {
+        const std::size_t from = static_cast<std::size_t>(made.unit_offsets[unit]);
+        const std::size_t to = unit + 1 < made.unit_offsets.size()
+                                   ? static_cast<std::size_t>(made.unit_offsets[unit + 1])
+                                   : made.bytes.size();
+        const auto decoded = reference.decode(std::span<const std::byte>(made.bytes).subspan(from, to - from));
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        for (const std::int32_t sample : (**decoded).pcm) {
+            want.push_back(static_cast<float>(sample) / 8388608.0F);
+        }
+    }
+    REQUIRE(want.size() == kItemFrames * 2);
+    const auto wav = read_wav_holding(
+        only_file(rig->scratch / "two_channel" / "out", "bursts-", ".wav").string(), kItemFrames);
+    REQUIRE(wav.has_value());
+    REQUIRE(wav->channels.size() == 2);
+    REQUIRE(wav->frame_count() == kItemFrames);
+    double worst = 0.0;
+    double energy = 0.0;
+    for (std::size_t channel = 0; channel < 2; ++channel) {
+        for (std::size_t frame = 0; frame < kItemFrames; ++frame) {
+            const double got = static_cast<double>(wav->channels[channel][frame]);
+            const double expect = static_cast<double>(want[(frame * 2) + channel]);
+            worst = std::max(worst, std::abs(got - expect));
+            energy += expect * expect;
+        }
+    }
+    CHECK(worst < 2.0 / 32768.0);
+    CHECK(energy > 1.0);
 }

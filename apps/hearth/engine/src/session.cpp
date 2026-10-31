@@ -417,6 +417,13 @@ std::expected<void, std::string> Session::open_truehd(const std::string& path, L
         index_->channels_of(iclforge::truehd::Presentation::kBest));
     facts_.frame_rate = static_cast<double>(index_->sample_rate) /
                         static_cast<double>(index_->samples_per_unit);
+    facts_.presentations.clear();
+    for (int substream = 0; substream < std::min(index_->substreams, 3); ++substream) {
+        if (index_->channels[static_cast<std::size_t>(substream)] > 0) {
+            facts_.presentations.push_back(
+                static_cast<std::uint16_t>(index_->channels[static_cast<std::size_t>(substream)]));
+        }
+    }
     facts_.peak_kbps = static_cast<std::uint32_t>(
         (static_cast<std::uint64_t>(index_->peak_data_rate) * index_->sample_rate + 8U) / 16U / 1000U);
     if (index_->skipped_bytes > 0) {

@@ -851,6 +851,7 @@ GroupPlan NetworkSinks::plan_group(const GroupPlanRequest& request) {
                             .objects_alone = request.objects_alone,
                             .frame_rate = request.frame_rate,
                             .peak_kbps = request.peak_kbps,
+                            .presentations = request.presentations,
                             .karaoke = request.karaoke};
     const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
 
@@ -901,7 +902,9 @@ GroupPlan NetworkSinks::plan_group(const GroupPlanRequest& request) {
             publish_locked();
         }
     }
-    return GroupPlan{plan.variants, plan.pcm_rate};
+    GroupPlan answer{plan.variants, plan.pcm_rate};
+    answer.coded_substreams = plan.coded_substreams;
+    return answer;
 }
 
 bool NetworkSinks::tell_karaoke(const std::string& sink_id, const SinkFacts& facts,

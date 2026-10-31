@@ -1,6 +1,7 @@
 #include "player.hpp"
 
 #include "iclforge/sendspin/chunks.hpp"
+#include "iclforge/truehd/io/presentation_cut.hpp"
 
 #include <fmt/format.h>
 
@@ -543,8 +544,24 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
     group_payload_.clear();
 }
 
-void Player::send_truehd_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
+void Player::send_truehd_unit_to_group(std::span<const std::byte> whole_unit, std::uint32_t samples,
                                        std::uint64_t start) {
+    // The coded members of a group none of whose sinks take the stream's best presentation are sent
+    // the first substreams alone (GroupFormPlan::coded_substreams). A unit that cannot be cut goes
+    // as it is, and the sink decodes what it can.
+    std::vector<std::byte> cut;
+    std::span<const std::byte> unit = whole_unit;
+    if (group_coded_substreams_ > 0 && group_coded_substreams_ < group_stream_substreams_) {
+        auto kept = iclforge::truehd::keep_substreams(whole_unit, group_coded_substreams_,
+                                                      group_stream_substreams_);
+        if (kept) {
+            cut = std::move(*kept);
+            unit = cut;
+        } else {
+            note_unit_error(fmt::format("a TrueHD unit could not be cut to {} substreams: {}",
+                                        group_coded_substreams_, iclforge::truehd::to_string(kept.error().kind)));
+        }
+    }
     // A chunk is whole access units, at most 24 and at most what one encrypted message holds; the
     // unit that would pass either starts the next. Where on the group's timeline it falls comes from
     // the session, as for AC-4: the decoder's blocks run short of what it holds back.
@@ -1600,6 +1617,7 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                                                                               sendspin::kTruehdUnitsPerChunk)
                                                                         : facts.frame_rate,
                                                       .peak_kbps = facts.peak_kbps,
+                                                      .presentations = facts.presentations,
                                                       .karaoke = karaoke_choice(facts, settings_)});
     } else {
         opened = sink_->open(
@@ -1619,6 +1637,9 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     // What a network group's members were planned PCM at, beyond layout_.
     group_variants_ = mode_ == OutputMode::kNetworkGroup ? group_->variants()
                                                          : std::vector<render::OutputLayout>{};
+    group_coded_substreams_ = mode_ == OutputMode::kNetworkGroup ? group_->coded_substreams() : 0;
+    group_stream_substreams_ =
+        session_->truehd_index() != nullptr ? session_->truehd_index()->substreams : 0;
     attach_variants();
     if (transcode) {
         note(fmt::format("output opened: {} ({} transcoded), {} Hz (open {})",
@@ -1687,6 +1708,7 @@ void Player::close_output() {
     }
     mode_ = OutputMode::kNone;
     group_variants_.clear();
+    group_coded_substreams_ = 0;
     attach_variants();
     refollow_pending_ = false;
     transport_.clear_open_format();

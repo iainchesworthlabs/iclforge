@@ -89,6 +89,8 @@ public:
         double frame_rate = 0.0;
         // ItemFacts::peak_kbps; 0 when not known.
         std::uint32_t peak_kbps = 0;
+        // ItemFacts::presentations; empty when not known or not TrueHD.
+        std::vector<std::uint16_t> presentations{};
         // The karaoke reproduction the item is to be heard in, when it is a karaoke stream and
         // one is wanted (StreamNeeds::karaoke).
         std::optional<KaraokeChoice> karaoke{};
@@ -100,6 +102,9 @@ public:
     // submit_pcm_variants() in this order. Empty for a group that plays one
     // layout, or before open().
     [[nodiscard]] virtual std::vector<render::OutputLayout> variants() const { return {}; }
+    // The first substreams of a TrueHD stream the group's coded members are sent, when the plan cut
+    // it to a lower presentation; 0 for the whole stream.
+    [[nodiscard]] virtual int coded_substreams() const { return 0; }
 
     // Opens `group_name` - resolved against whatever this sink was built
     // with (make_group_sink()'s `resolve`), not a fixed group chosen once at
@@ -224,6 +229,7 @@ struct GroupPlanRequest {
     bool objects_alone = false;
     double frame_rate = 0.0;
     std::uint32_t peak_kbps = 0;
+    std::vector<std::uint16_t> presentations{};
     // As NetworkGroupSink::Format::karaoke.
     std::optional<KaraokeChoice> karaoke{};
     // The layout the player renders to, which a member that wants it is sent.
@@ -236,6 +242,9 @@ struct GroupPlanRequest {
 struct GroupPlan {
     std::vector<render::OutputLayout> variants{};
     std::uint32_t pcm_rate = 0;
+    // GroupFormPlan::coded_substreams: the first substreams of a TrueHD stream the members sent it
+    // coded get, when not all of them.
+    int coded_substreams = 0;
 
     GroupPlan() = default;
     // NOLINTNEXTLINE(google-explicit-constructor): a planner that has no rate to change answers a list.

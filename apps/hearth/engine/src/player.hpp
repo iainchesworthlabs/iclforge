@@ -666,6 +666,10 @@ private:
     // A TrueHD chunk in progress in group_payload_: its access units, and the samples they code
     // (send_truehd_unit_to_group()).
     std::uint32_t group_truehd_units_ = 0;
+    // The first substreams of a TrueHD item the group's coded members take (0: all), from the plan
+    // the group opened with, and how many the stream has.
+    int group_coded_substreams_ = 0;
+    int group_stream_substreams_ = 0;
     std::uint64_t group_truehd_samples_ = 0;
     // Bursts complete and waiting for room in the group, and how far into
     // the PCM ring's head block drain_group() has got (Pending's own

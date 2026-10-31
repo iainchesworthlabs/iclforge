@@ -527,6 +527,43 @@ GroupFormPlan plan_group_forms(const StreamNeeds& stream, const render::OutputLa
     for (const SinkFacts& sink : sinks) {
         first.push_back(choose_sink_form(needs, sink, form_policy(sink)));
     }
+    // A TrueHD stream no sink takes whole may still be taken in a lower presentation (TH spec section
+    // 2.2): substream 0 is the 2 channel one, 1 adds 6, 2 adds 8. The highest presentation some
+    // sink takes is the one sent, cut from the stream; a sink that takes more than the cut would
+    // have been a member sent the whole, so none does here.
+    const bool none_coded = std::ranges::none_of(
+        first, [](const SinkChoice& choice) { return choice.form == SinkForm::kCoded; });
+    if (needs.stream == audio::BitstreamFormat::kMat && needs.presentations.size() > 1 && none_coded) {
+        for (std::size_t substreams = needs.presentations.size() - 1; substreams >= 1; --substreams) {
+            StreamNeeds trial = needs;
+            trial.coded_channels = needs.presentations[substreams - 1];
+            std::vector<SinkChoice> second;
+            second.reserve(sinks.size());
+            for (const SinkFacts& sink : sinks) {
+                second.push_back(choose_sink_form(trial, sink, form_policy(sink)));
+            }
+            if (std::ranges::any_of(second, [](const SinkChoice& choice) {
+                    return choice.form == SinkForm::kCoded;
+                })) {
+                for (SinkChoice& choice : second) {
+                    if (choice.form == SinkForm::kCoded) {
+                        choice.reason = fmt::format(
+                            "Sending the first {} of TrueHD's {} substreams, the {} channel "
+                            "presentation, as it is: the sink decodes up to {} channels and the "
+                            "stream has {}.",
+                            substreams, needs.presentations.size(), trial.coded_channels,
+                            trial.coded_channels, needs.coded_channels);
+                    }
+                }
+                first = std::move(second);
+                plan.coded_substreams = static_cast<int>(substreams);
+                break;
+            }
+            if (substreams == 1) {
+                break;
+            }
+        }
+    }
     const std::uint32_t stream_rate = needs.sample_rate;
     const auto rate_of = [&](const SinkChoice& choice) {
         return choice.sample_rate != 0 ? choice.sample_rate : stream_rate;
