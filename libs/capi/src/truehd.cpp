@@ -105,6 +105,103 @@ size_t iclforge_truehd_units_skipped_bytes(const iclforge_truehd_units_t* units)
     return units == nullptr ? 0 : units->skipped_bytes;
 }
 
+iclforge_status_t iclforge_truehd_scanned_stream_create(
+    const uint8_t* data, size_t size, uint64_t restart_spacing,
+    iclforge_truehd_scanned_stream_t** out_stream) {
+    if (data == nullptr || out_stream == nullptr) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    return guard([&]() -> iclforge_status_t {
+        auto scan = iclforge::truehd::scan_stream(
+            bytes_of(data, size), iclforge::truehd::ScanOptions{.restart_spacing = restart_spacing});
+        if (!scan.has_value()) {
+            return from_cpp(scan.error().kind);
+        }
+        auto owned = std::make_unique<iclforge_truehd_scanned_stream>();
+        owned->scan = std::move(*scan);
+        *out_stream = owned.release();
+        return ICLFORGE_OK;
+    });
+}
+
+void iclforge_truehd_scanned_stream_destroy(iclforge_truehd_scanned_stream_t* stream) {
+    delete stream;
+}
+
+uint32_t iclforge_truehd_scanned_stream_sample_rate(const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.sample_rate;
+}
+
+int iclforge_truehd_scanned_stream_samples_per_unit(const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : static_cast<int>(stream->scan.samples_per_unit);
+}
+
+uint64_t iclforge_truehd_scanned_stream_units(const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.units;
+}
+
+uint64_t iclforge_truehd_scanned_stream_samples(const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.samples();
+}
+
+int iclforge_truehd_scanned_stream_padding_samples(const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : static_cast<int>(stream->scan.padding_samples);
+}
+
+double iclforge_truehd_scanned_stream_duration_seconds(
+    const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0.0 : stream->scan.duration_seconds();
+}
+
+uint64_t iclforge_truehd_scanned_stream_skipped_bytes(
+    const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.skipped_bytes;
+}
+
+uint64_t iclforge_truehd_scanned_stream_leading_bytes(
+    const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.leading_bytes;
+}
+
+size_t iclforge_truehd_scanned_stream_restart_count(
+    const iclforge_truehd_scanned_stream_t* stream) {
+    return stream == nullptr ? 0 : stream->scan.restarts.size();
+}
+
+uint64_t iclforge_truehd_scanned_stream_restart_unit(const iclforge_truehd_scanned_stream_t* stream,
+                                                     size_t index) {
+    return stream == nullptr || index >= stream->scan.restarts.size()
+               ? 0
+               : stream->scan.restarts[index].unit;
+}
+
+uint64_t iclforge_truehd_scanned_stream_restart_offset(
+    const iclforge_truehd_scanned_stream_t* stream, size_t index) {
+    return stream == nullptr || index >= stream->scan.restarts.size()
+               ? 0
+               : stream->scan.restarts[index].offset;
+}
+
+uint64_t iclforge_truehd_scanned_stream_sample_at_seconds(
+    const iclforge_truehd_scanned_stream_t* stream, double seconds) {
+    return stream == nullptr ? 0 : stream->scan.sample_at_seconds(seconds);
+}
+
+iclforge_status_t iclforge_truehd_scanned_stream_restart_for_sample(
+    const iclforge_truehd_scanned_stream_t* stream, uint64_t sample, uint64_t* out_unit,
+    uint64_t* out_offset) {
+    if (stream == nullptr || out_unit == nullptr || out_offset == nullptr) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    const auto restart = stream->scan.restart_for_sample(sample);
+    if (!restart) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    *out_unit = restart->unit;
+    *out_offset = restart->offset;
+    return ICLFORGE_OK;
+}
+
 iclforge_status_t iclforge_truehd_decoder_create(const iclforge_truehd_decoder_config_t* config,
                                                  iclforge_truehd_decoder_t** out_decoder) {
     if (config == nullptr || out_decoder == nullptr) {

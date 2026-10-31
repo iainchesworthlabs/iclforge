@@ -31,6 +31,19 @@ See [README.md](README.md) for the project overview and
   now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks
   for and FFmpeg 8.0.1's strict decode refuses; FFmpeg's own encoder writes two, and its decode of forge's 192 kHz 5.1 programme is exact
   (`libs/truehd/ERRATA.md` entry 90, provisional). The encoder fuzzer's 192 kHz cases, 10 of 110 failing before, pass (2,815 cases).
+
+- **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
+  A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
+  end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
+  where a decoder can start, thinned to one every `restart_spacing` units. `restart_for_sample()` and the C call of the same name give the unit
+  and the byte offset to decode from to reach a sample; decoding from there gives the samples an unbroken decode gives, checked on every
+  fixture. Hearth's player has had an index of this shape over a file it reads in windows; this is the in-memory form for the library, `forge`
+  and the bindings. Nothing else is changed.
+
+- **Fixed: a shared build of the library did not link `forge` or the TrueHD tests.** `EvolutionFrame::find` and `oamd` were defined in the library
+  and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
+  an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
+  tests and `forge` links, and the evolution tests pass against it.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
