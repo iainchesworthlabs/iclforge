@@ -216,6 +216,21 @@ int main(int argc, char** argv) {
     DecoderLab shift = base;
     shift.inverse_f_shift = true;
     settings.push_back({"inverse f_shift", shift});
+    // Every combination of the four arithmetic switches (now that the matrices draw their noise).
+    static std::vector<std::string> combination_names;
+    combination_names.reserve(16);
+    for (int bits = 1; bits < 16; ++bits) {
+        DecoderLab combined = base;
+        combined.lower_rows_after_matrices = (bits & 1) != 0;
+        combined.no_quantiser_mask = (bits & 2) != 0;
+        combined.reverse_matrices = (bits & 4) != 0;
+        combined.inverse_f_shift = (bits & 8) != 0;
+        combination_names.push_back(std::string("combo:") + ((bits & 1) != 0 ? " lower-after" : "") +
+                                    ((bits & 2) != 0 ? " no-mask" : "") +
+                                    ((bits & 4) != 0 ? " reversed" : "") +
+                                    ((bits & 8) != 0 ? " inverse-fshift" : ""));
+        settings.push_back({combination_names.back().c_str(), combined});
+    }
     static const char* const kScopeNames[] = {
         "",
         "fold: coded channels, shift by matrix channel",
