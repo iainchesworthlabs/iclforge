@@ -10,6 +10,19 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: Crucible has a pinned TrueHD 5.1 mode, tested bit for bit over scripted devices; no audio backend carries it to a receiver yet.**
+  `OutputMode::kTrueHd51` takes the encoder's 5.1 bed, as the DD 5.1 mode does, rounds it to 24-bit integers (to nearest, ties to even,
+  clamped), encodes it with `iclforge::truehd` and packs the access units 24 to a MAT burst for the burst sink; a fresh encoder starts
+  with the mode, so the first burst after a switch opens with a major sync. It is chosen only by pinning (`crucible-run --pin truehd`, the
+  Signal path page's Pin list, the tray), carries no objects whatever key is loaded, is never opened exclusively on the default endpoint,
+  and shows a TRUEHD column in the endpoint table; Latency and Bitrate say they do not apply to it. The tests unwrap what reaches the sink and
+  decode it with this library to the rounded input, sample for sample, over the repository's 5.1 programme material at both of the engine's
+  frame sizes, over rounding ties, clamps, NaN and infinities among the music, and across switches into the mode and back;
+  `tools/checks/verify_crucible_truehd_leg.py` holds the same bursts to FFmpeg's strict decode in the core lane. `BurstSink::start` takes a
+  format instead of a flag and `DeviceFacts` and `EndpointFacts` gain `accepts_truehd`; the real probe answers false until a backend
+  carries MAT (phase 1 of `planning/truehd-parity-crucible.md`), so on a real machine no endpoint offers the mode and a pin falls back with
+  the reason line saying so. Not measured: any receiver, the throughput on the Raspberry Pi 4B and the Windows machine, and the latency
+  end to end. The restart interval is the encoder's 128 access units (about 107 ms) until a receiver confirms 8.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

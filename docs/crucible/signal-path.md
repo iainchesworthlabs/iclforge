@@ -79,11 +79,12 @@ Station 3's line names the mode Crucible chose and why:
 | **Atmos** (E-AC-3 JOC) | an endpoint takes E-AC-3 exclusively **and** a signing key is loaded | objects, intact |
 | **DD+ 5.1** | as above, but no signing key | panned onto the bed |
 | **DD 5.1** (AC-3) | an endpoint takes AC-3 but not E-AC-3 | panned onto the bed |
+| **TrueHD 5.1** | only when you pin it, and an endpoint takes TrueHD as a bitstream | panned onto the bed, lossless from 24-bit values, no objects |
 | **PCM surround** | an endpoint offers 6 or 8 channels and no bitstream format | encoded, then decoded and rendered |
 | **Headphones** | the endpoint has a spatial format enabled and a signing key is loaded | objects handed to the OS renderer |
 | **Stereo** | nothing above applies | encoded, then decoded, folded down |
 
-Two of these need saying plainly.
+Three of these need saying plainly.
 
 **Without a signing key you get DD+ 5.1, not Atmos.** Placements still pan, but height does
 nothing. That is deliberate: a decoder that validates the tag can refuse an unsigned object
@@ -94,8 +95,20 @@ exposes one a third party can hand Atmos objects to. On those platforms the head
 decodes and folds instead. It also needs a signing key, because the decoder rebuilds objects only
 from a signed stream; without one the stream is a 5.1 bed and stereo is the fold.
 
+**TrueHD 5.1 is chosen by pinning it, and nothing offers it yet.** The automatic choice never
+picks it, because no receiver has read a TrueHD stream from Crucible. It sends the same 5.1 bed as
+DD+ 5.1, encoded losslessly and carried as MAT bursts, and it carries no objects whatever key is
+loaded. Lossless starts at 24-bit integers: Crucible's mix is floating point, it is rounded to the
+nearest 24-bit value (a tie goes to the even one), and the stream decodes to exactly those values
+and no further back. The mode also needs an audio backend that can carry MAT, which is eight
+channels at 192 kHz, and none can yet. So no endpoint reads as taking TrueHD, and a pin on it falls
+back to the automatic choice with the reason line saying so. The engine side is tested over
+scripted devices, bit for bit, and has never reached a receiver.
+Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
+
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
-can carry. It writes E-AC-3 and AC-3 only, and has no AC-4 or TrueHD mode.
+can carry; TrueHD 5.1 is left out of that order and is only ever pinned. Crucible writes E-AC-3
+and AC-3, and TrueHD when pinned. It has no AC-4 mode.
 
 You can **pin** a mode to stop Crucible changing its mind, and **choose the endpoint** you hear
 it on rather than letting the policy pick. An impossible pin leaves the automatic choice standing
@@ -112,8 +125,8 @@ The page has five blocks.
 | Block | What it holds |
 |---|---|
 | **01 SIGNAL PATH** | the two-device idea in one paragraph |
-| **02 WHAT YOU HEAR IT AS** | the mode and why it was chosen, and the **Pin** list: Automatic, Atmos, Dolby Digital Plus 5.1, Dolby Digital 5.1, PCM surround, Headphones (where an OS renderer exists) and Stereo |
-| **03 ENDPOINTS** | what the last probe found on each render endpoint: whether it takes E-AC-3 and AC-3 as a bitstream, how many PCM channels, whether spatial sound is on. **Hear it here** chooses that endpoint and **Automatic** hands the choice back. **Send applications here** makes it the default output |
+| **02 WHAT YOU HEAR IT AS** | the mode and why it was chosen, and the **Pin** list: Automatic, Atmos, Dolby Digital Plus 5.1, Dolby Digital 5.1, TrueHD 5.1, PCM surround, Headphones (where an OS renderer exists) and Stereo |
+| **03 ENDPOINTS** | what the last probe found on each render endpoint: whether it takes E-AC-3, AC-3 and TrueHD as a bitstream, how many PCM channels, whether spatial sound is on. **Hear it here** chooses that endpoint and **Automatic** hands the choice back. **Send applications here** makes it the default output |
 | **04 WHERE APPLICATIONS PLAY** | the current default output, the button that moves it to the silent device or restores it, **Open Sound settings**, and **Re-probe** |
 | **05 CODEC PATH** | **Bypass the codec on headphones and PCM**. Off, headphones, PCM and stereo play a decode of the E-AC-3 stream, so what you hear went through the codec. On, headphones render the engine's own objects, and PCM and stereo take its 5.1 bed |
 

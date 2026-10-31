@@ -371,17 +371,17 @@
         "windows": [
           "source",
           "ci",
-          "library, C API and forge"
+          "library, C API, forge and Crucible's pinned mode"
         ],
         "linux": [
           "source",
           "ci",
-          "library, C API and forge; FFmpeg checks run here"
+          "library, C API, forge and Crucible's pinned mode; FFmpeg checks run here"
         ],
         "macos": [
           "source",
           "ci",
-          "library, C API and forge"
+          "library, C API, forge and Crucible's pinned mode"
         ],
         "browser": [
           "unavailable",
@@ -2278,7 +2278,7 @@
         "Public API (C++ and C): 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits; MLP is not written",
         "File: `truehd-encode` to a bare stream, MP4, Matroska or MPEG-TS (Blu-ray profile)",
         "No",
-        "No",
+        "Pinned mode: the 5.1 bed rounded to 24 bits, tested over scripted devices only",
         "No"
       ],
       [
@@ -2294,7 +2294,7 @@
         "Public API: `MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream`",
         "`spdif` to a WAV or raw bursts and `unspdif` back; no device output",
         "No",
-        "No",
+        "Pinned mode builds the bursts; no audio backend carries them to a device yet",
         "No"
       ],
       [
@@ -2366,7 +2366,7 @@
         "Internal audio layer",
         "Yes",
         "Yes",
-        "Output policy",
+        "Output policy; TrueHD only when pinned, and no endpoint is offered it yet",
         "Desktop player, to a receiver chosen in the output picker; the Android TV sink"
       ],
       [

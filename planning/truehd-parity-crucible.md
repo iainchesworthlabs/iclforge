@@ -8,6 +8,16 @@
     Atmos in TrueHD is on hold until the owner confirms the evolution payload layout; every row that needs it is
     marked blocked and is not in the plan.
 
+!!! note "Update of 2026-10-31 (work package 4): phases 0, 2 and 3 are built; phases 1 and 4 need the owner"
+    Built on `feature/truehd-crucible`: the seams (`BurstFormat`, `accepts_truehd`), the pin-only mode `kTrueHd51`
+    with the equality oracle, the window, runner, diagnostics, translations and pages. The answers taken from the
+    recommendations below, since the owner has not replied: question 1 yes, pin-only; 2 a 5.1 bed; 3 pin-only; 4
+    plain rounding; 5 48 kHz; 8 the restart interval stays at the encoder's 128 until a receiver confirms 8; 9
+    the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Not
+    built: the audio backends (phase 1, question 6), so the real probe answers false and no endpoint offers the
+    mode; the hardware reading and the throughput (phase 4). What this round asks is in
+    [Questions from the build](#questions-from-the-build), at the end.
+
 ## Basis
 
 The tree is `integ` at `523cf5dc` (worktree branch `parity-crucible`).
@@ -322,3 +332,27 @@ Phase 4 needs the owner's hardware.
 11. **Deferred until the evolution payload is confirmed:** one signing setting for both codecs or two (the ROADMAP says the
     TrueHD check must not go through `iclforge::ac3::signing`), and whether Crucible's "objects need a key" rule holds for
     TrueHD. Recorded here so that it is asked then and not settled in code. *Recommendation:* decide when C6 unblocks.
+
+## Questions from the build
+
+Raised on 2026-10-31 by the session that built phases 0, 2 and 3. Each has a recommendation and each is built the way the
+recommendation says, provisionally.
+
+12. **Should the TrueHD entry be offered in the Pin list and the tray while no backend can carry it?** The real probe
+    answers false for TrueHD, so a pin on it always falls back, with the reason line saying why. The headphones entry is
+    dropped where no renderer exists, on the argument that a list should offer what can be chosen. *Recommendation:*
+    keep it, because the hardware phase needs the pin and the reason line is honest; revisit when phase 1 lands and the probe can
+    answer, and hide it on a platform whose backend will never carry MAT.
+13. **What should the mode do when the TrueHD encoder or the MAT packer stops?** It stops the output, adds the reason and
+    leaves the mode at "none" until the next probe, as the spatial sink does. It could instead fall back to DD+ 5.1 at once.
+    *Recommendation:* as built; a lossless stream that silently becomes a lossy one is the thing to avoid. The only way the
+    encoder fails with a whole bed is a peak rate set too low (the setting is
+    `OutputStageConfig::truehd_peak_data_rate_bps`, 18 Mbit/s, which the bed's raw 6.9 Mbit/s cannot approach).
+14. **The LFE channel is silent in the live path.** The mode sends the encoder's bed, whose LFE is whatever the objects send
+    there, which in Crucible is nothing: a tap's LFE is dropped, as for DD+ 5.1 (`bed_mixer.cpp`), and `encode_frame` has an
+    overload that takes a source's own LFE that the engine does not call. *Recommendation:* feed it, for both modes, in one
+    change of its own; a lossless 5.1 stream with an empty LFE is the first thing a listener with a subwoofer will notice.
+15. **How is the first reading to be taken?** Phase 4 needs, on the Pi 4B over PipeWire, a build with phase 1 (question 6,
+    unanswered), the restart interval at 128 and then at 8 (question 8), and the front-panel word. *Recommendation:* the owner
+    answers question 6 first; the carrier is then one backend and one reading, and every other question here waits for that
+    reading.
