@@ -396,7 +396,10 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     decoders. That audio is band-limited (74 to 82 dB below the total above 24 kHz), the kind of source question 91's IIR estimate
     was about, so the estimate could be run on it. A concert release the owner pointed to (a Blu-ray rip on the server: TrueHD plus Atmos 7.1 at 48 kHz, FLAC stereo at 96 and 192
     kHz, all 24 bit, real full-band music) gave ten more 40 s excerpts, the 24-bit music asked for: forge is 0.93 to 0.95 of FFmpeg's size at
-    48 kHz, 0.97 at 96 and 1.02 to 1.04 at 192 kHz, every stream exact in both decoders. Still open, the owner's: speech at 24 bit. **Recommendation:** 5 to 10
+    48 kHz, 0.97 at 96 and 1.02 to 1.04 at 192 kHz, every stream exact in both decoders. A film of a 1980s concert-driven drama (the owner's UHD Blu-ray remux) added four 40 s music excerpts at 48 kHz, 24 bit (its DTS-HD MA
+    5.1 and its FLAC stereo, from two loud passages: 0.94 to 0.95 of FFmpeg's size) and two of speech from its commentary track, which is a lossy
+    AC-3 decode (0.84 to 0.86); all exact in both decoders. **Question 92 is answered** for 24-bit music at 48, 96 and 192 kHz, film at 5.1 and
+    7.1, and speech as a signal; a 24-bit speech recording is the one thing the corpus lacks. **Recommendation:** 5 to 10
     excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
     music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
 93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,

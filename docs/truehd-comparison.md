@@ -68,9 +68,12 @@ Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.73
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
 
-**Film and concert excerpts, run locally.** The owner's three Blu-ray discs gave fourteen excerpts of film audio, and a concert
+**Film, concert and speech excerpts, run locally.** The owner's three Blu-ray discs gave fourteen excerpts of film audio, and a concert
 release (a Blu-ray rip on the owner's server, 2025) ten of music (two 40 s excerpts each of its TrueHD 7.1 track, also as 5.1 and as stereo
-by picking channels, and of its 96 and 192 kHz FLAC stereo tracks), all 24 bit. The film excerpts: six of 45 s at 48 kHz
+by picking channels, and of its 96 and 192 kHz FLAC stereo tracks), all 24 bit. A film of a 1980s concert-driven drama (a UHD Blu-ray
+remux on the owner's server) gave four of music at 48 kHz, its lossless DTS-HD MA 5.1 track and its 24-bit FLAC stereo track, from two
+loud passages, and two of speech from its director's commentary, which is a lossy AC-3 track decoded to 24 bit and so a test signal, not a
+24-bit speech recording. The film excerpts: six of 45 s at 48 kHz
 (5.1 from the lossless DTS-HD MA track of one disc, and 7.1 from the TrueHD tracks of two, the 7.1 presentation of a TrueHD plus Atmos
 track) and eight of 40 s at 96 kHz (7.1 from the 96 kHz TrueHD track of the third disc, from its main feature and from a short clip, with
 the same audio as stereo and as 5.1 by picking channels, not mixing). All were decoded by FFmpeg. The 96 kHz audio is band-limited: its
@@ -108,6 +111,12 @@ and in FFmpeg's strict decode, sample for sample.
 | animated film 5.1 192 kHz b | 6 | 30 | 33,532,106 | 33,852,302 | 1.010 | 32.7% |
 | animated film 5.1 48 kHz a | 6 | 30 | 5,985,704 | 5,439,014 | 0.909 | 21.0% |
 | animated film 5.1 48 kHz b | 6 | 30 | 6,657,122 | 6,009,284 | 0.903 | 23.2% |
+| concert film music stereo a | 2 | 40 | 9,481,444 | 8,911,356 | 0.940 | 77.4% |
+| concert film music stereo b | 2 | 40 | 8,756,348 | 8,195,840 | 0.936 | 71.1% |
+| concert film music 5.1 a | 6 | 40 | 23,602,014 | 22,430,872 | 0.950 | 64.9% |
+| concert film music 5.1 b | 6 | 40 | 21,438,178 | 20,327,922 | 0.948 | 58.8% |
+| interview speech stereo (lossy source) a | 2 | 40 | 7,163,690 | 6,153,936 | 0.859 | 53.4% |
+| interview speech stereo (lossy source) b | 2 | 40 | 6,879,108 | 5,751,694 | 0.836 | 49.9% |
 
 On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. **On the concert, real full-band music, forge is 0.93 to 0.95 of FFmpeg's size at 48 kHz
 (stereo, 5.1), 0.97 at 96 kHz and 1.02 and 1.04 at 192 kHz**: the concert is louder, full-band music where the programme rows are the repository's own recordings, and the 192 kHz loss is the specification's order-4 limit (below, ERRATA question 96). FFmpeg's 7.1 streams do not decode to the source, so they
