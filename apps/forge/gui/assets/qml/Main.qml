@@ -1705,7 +1705,11 @@ ApplicationWindow {
     // header comment.
     StreamPlayerDialog {
         id: streamPlayerDialog
+        // The player's own Encode TrueHD… button: the encode is a dialog of its own, and the header
+        // has no room for a fourth entry beside it (the Guided wizard's cards are laid out against it).
+        onEncodeTruehdRequested: truehdEncodeDialog.open()
     }
+
     // The TrueHD encode: a WAV to a bare .thd stream, the twin of `forge truehd-encode`.
     TruehdEncodeDialog {
         id: truehdEncodeDialog
@@ -2075,11 +2079,6 @@ ApplicationWindow {
                 objectName: "streamPlayerOpenButton"
                 text: qsTr("Open stream…")
                 onClicked: streamPlayerDialog.open()
-            }
-            Button {
-                objectName: "truehdEncodeOpenButton"
-                text: qsTr("Encode TrueHD…")
-                onClicked: truehdEncodeDialog.open()
             }
             Button {
                 objectName: "prefsOpenButton"

@@ -37,6 +37,22 @@ TestCase {
         tryCompare(TruehdEncodeController, "busy", false, 60000);
     }
 
+    // The way in: a button of the Open stream dialog, which closes it and opens the encode dialog.
+    function test_theOpenStreamDialogOffersTheEncodeDialog() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        win.streamPlayerDialogRef.open();
+        const button = findChild(win.contentItem, "spEncodeTruehdButton");
+        verify(button !== null);
+        const encodeDialog = findChild(win.contentItem, "truehdEncodeDialog");
+        verify(encodeDialog !== null);
+        compare(encodeDialog.visible, false);
+        button.clicked();
+        tryCompare(encodeDialog, "visible", true, 5000);
+        compare(win.streamPlayerDialogRef.visible, false);
+        encodeDialog.close();
+    }
+
     // The command line a run is the twin of: the paths, then the options the boxes set.
     function test_theCommandLineNamesTheFilesAndTheOptionsChosen() {
         TruehdEncodeController.chooseSource(speakers51Url);

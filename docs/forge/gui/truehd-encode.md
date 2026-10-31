@@ -1,6 +1,6 @@
 # Encode TrueHD
 
-**Encode TrueHD…**, in the header beside **Open stream…**, codes a WAV file losslessly as TrueHD: the stream decodes to
+**Encode TrueHD…**, a button of the **Open stream…** dialog (the header has no room for a fourth entry), codes a WAV file losslessly as TrueHD: the stream decodes to
 exactly the samples that went in. It is the window's twin of `forge truehd-encode`, and the command that does what the dialog
 would is shown at its foot.
 

@@ -22,6 +22,9 @@ Dialog {
     id: root
     objectName: "streamPlayerDialog"
 
+    // Asked for by the Encode TrueHD… button: the window opens the encode dialog (Main.qml).
+    signal encodeTruehdRequested()
+
     modal: true
     anchors.centerIn: parent
     width: Math.min(820, parent ? parent.width - 60 : 820)
@@ -90,6 +93,14 @@ Dialog {
                 font.weight: Font.ExtraBold
                 font.family: Theme.headingFamily
                 color: Theme.text
+            }
+            Button {
+                objectName: "spEncodeTruehdButton"
+                text: qsTr("Encode TrueHD…")
+                onClicked: {
+                    root.close();
+                    root.encodeTruehdRequested();
+                }
             }
             Button {
                 objectName: "spCloseButton"
