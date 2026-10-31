@@ -152,6 +152,7 @@ struct DecoderCounters {
         std::uint8_t field_2b = 0;
         std::uint8_t field_m4 = 0;
         std::uint16_t mask = 0;
+        std::array<std::int32_t, kMaxChannels> coeff{};  // as sent (raw)
     };
     std::vector<ObjectMatrixHeader> object_first_matrices;
     std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};

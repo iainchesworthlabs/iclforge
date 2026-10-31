@@ -160,6 +160,12 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             for (int ch = 0; ch < 12; ++ch) {
                 std::printf("%c", ((m.mask >> ch) & 1U) != 0 ? '1' : '.');
             }
+            std::printf("\n        raw coefficients:");
+            for (int ch = 0; ch < 12; ++ch) {
+                if (((m.mask >> ch) & 1U) != 0) {
+                    std::printf(" %d:%d", ch, m.coeff[static_cast<std::size_t>(ch)]);
+                }
+            }
             std::printf("\n");
         }
         print_subsets(c);

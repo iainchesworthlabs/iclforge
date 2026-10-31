@@ -821,6 +821,8 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                         row.field_2b = spec.field_2b;
                         row.field_m4 = spec.field_m4;
                         for (int c = 0; c < kMaxChannels; ++c) {
+                            row.coeff[static_cast<std::size_t>(c)] =
+                                spec.coeff[static_cast<std::size_t>(c)];
                             if (spec.present[static_cast<std::size_t>(c)]) {
                                 row.mask |= static_cast<std::uint16_t>(1U << c);
                             }
