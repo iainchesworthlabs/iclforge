@@ -25,14 +25,16 @@ discs; the Atmos master in Downloads: use it; the FFmpeg 6.1.1 check: yes):
   with the fold by position). **TH-5 and TH-18 are not**: no leg changes under the other reading. ERRATA 5, 6, 18, 43 and 44 have the numbers.
 - **Channel meaning on known inputs** (ERRATA 51 to 55): the 6 and 8 channel dialogue norm is N, the 2 channel one is N + 6; mix level 35 and 29, source format 0, constant; DEE sets the 2 channel control bit only.
 - **Discs on D:** six Atmos streams of four discs probed with `detail=format` from the excerpts other sessions cut (`planning/truehd-disc-findings.md`, "The rest of the owner's discs"). TH-19 comes off on them.
+- **FFmpeg 6.1.1** (section 5 below; the owner chose the Docker image): `verify_truehd_interop.py --require-ffmpeg` gives **25 fixtures, 0 failing**, and `--handbuilt --require-ffmpeg` gives
+  **29 hand-built streams, 0 failing**, every stream at the outcome its manifest names. The 8 hand-built streams that FFmpeg 8.0.1 refuses are therefore 8.0.1's behaviour, not a fault in the
+  manifest or the streams (why 8.0.1 refuses them is not investigated). Six DEE legs (`thd-last-2ch-impulse-96k24`, `thd-2ch-tones-48k24`, and the 96 kHz tones, music, noise and sweep legs)
+  decode sample for sample the same in forge and in FFmpeg 6.1.1 (0 of 768,000 to 1,920,000 samples differ), so the 96 kHz and stepped-tone findings do not depend on FFmpeg's version.
 - **96 kHz and stepped tones:** the diagnostic legs (ERRATA 50): not a delay or a filter; a dense pattern at the source's amplitudes for an impulse source; nothing to change in forge.
 
 **Still the owner's:**
 1. **A non-Atmos TrueHD disc, a 5.1 Atmos disc, and a Matroska or MP4 rip of an Atmos track** (section 3 below, commands unchanged; `F:` is a disc drive and has a disc in it, which the
    session did not open). Without them ERRATA 15 and the container question stay open.
-2. **FFmpeg 6.1.1** for `verify_truehd_interop.py --handbuilt`: this PC has 8.0.1 only, which refuses 8 of the 29 hand-built checks. Getting 6.1.1 is a download (a Windows build of about 100 MB from
-   gyan.dev's archive, or the `ubuntu:24.04` image with `apt install ffmpeg`, about 80 MB through Docker Desktop): say which, or none.
-3. **Anything new to make with DEE by 2026-11-04.** Nothing is owed from the questions above; the next candidates are the Atmos master with `legacy_authoring=0` and a second Dolby-authored master.
+2. **Anything new to make with DEE by 2026-11-04.** Nothing is owed from the questions above; the next candidates are the Atmos master with `legacy_authoring=0` and a second Dolby-authored master.
 
 ## 1. The full rescore (done; to repeat, no DEE needed)
 
@@ -157,7 +159,7 @@ A mark comes off only when its ERRATA entry names the evidence with its numbers.
 ## Questions for the owner
 
 Answered on 2026-10-31 (ERRATA 100 and 101 and sections above): reading the channel-meaning fields on known inputs, yes; dialnorm 0 dropped; an Atmos master exists (the DAMF in Downloads, used); the discs
-(those on D: probed; new ones are the owner's, section 3); the reading switches built; TH-19 off on the discs; the FFmpeg 6.1.1 check wanted.
+(those on D: probed; new ones are the owner's, section 3); the reading switches built; TH-19 off on the discs; the FFmpeg 6.1.1 check run (State).
 
 Open:
 
@@ -166,8 +168,23 @@ Open:
    what it gives; until then the legs stay UNEXPLAINED and forge does not change.
 2. **`normalize` for TrueHD.** DEE writes the 2 channel dialogue norm 6 above the multichannel one and sets only the 2 channel control bit. **Recommendation:** make `normalize` do the same (2 channel
    field N + 6, at most 63, control bit on; 6 and 8 channel fields N). It is a change to a command the owner asked to leave as built; not done.
-3. **Which FFmpeg 6.1.1**, or none (State, item 2).
-4. **TH-5 and TH-18 have no DEE evidence and cannot get any** (DEE has no option for either). **Recommendation:** accept the hand-built streams in FFmpeg's decode and v3.7 and v3.9 as the evidence and
+3. **TH-5 and TH-18 have no DEE evidence and cannot get any** (DEE has no option for either). **Recommendation:** accept the hand-built streams in FFmpeg's decode and v3.7 and v3.9 as the evidence and
    take both marks off, or leave them; I have left them.
-5. **Entries 14, 32 to 34, 48, 50 (evidence exists).** **Recommendation:** take the marks off with the numbers above; left for you because the rule you gave named only TH-5, 6, 18 and 19.
-6. **The 12 and 14 channel substream's `frac_bits` above 14** blocks a full lenient decode of every disc stream. Not a validation item; WP1.
+4. **Entries 14, 32 to 34, 48, 50 (evidence exists).** **Recommendation:** take the marks off with the numbers above; left for you because the rule you gave named only TH-5, 6, 18 and 19.
+5. **The 12 and 14 channel substream's `frac_bits` above 14** blocks a full lenient decode of every disc stream. Not a validation item; WP1.
+
+## 5. FFmpeg 6.1.1 for the interop check (done; to repeat)
+
+The `ubuntu:24.04` image carries FFmpeg 6.1.1 (`6.1.1-3ubuntu5`), the version the hand-built manifest names. With Docker Desktop running (about 200 MB of image):
+
+```bash
+mkdir -p D:/ac3bld/ffmpeg-611 && cd D:/ac3bld/ffmpeg-611
+cat > Dockerfile <<'EOF'
+FROM ubuntu:24.04
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends ffmpeg python3 && rm -rf /var/lib/apt/lists/*
+EOF
+docker build -q -t iclforge-ffmpeg611 .
+MSYS_NO_PATHCONV=1 docker run --rm -v "<repo checkout>:/repo:ro" iclforge-ffmpeg611 sh -c 'python3 -I /repo/tools/checks/verify_truehd_interop.py --require-ffmpeg; python3 -I /repo/tools/checks/verify_truehd_interop.py --handbuilt --require-ffmpeg'
+```
+
+Without `--forge` it holds FFmpeg alone to the manifests (forge's own decode of the same streams is the library tests' job). Result on 2026-10-31: 25 fixtures and 29 hand-built streams, 0 failing.
