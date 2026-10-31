@@ -239,6 +239,9 @@ int main(int argc, char** argv) {
                                     ((bits & 8) != 0 ? " inverse-fshift" : ""));
         settings.push_back({combination_names.back().c_str(), combined});
     }
+    DecoderLab cleared = base;
+    cleared.object_restart_clears = true;
+    settings.push_back({"object restart clears histories", cleared});
     static const char* const kIndexNames[] = {"", "noise index: from the block", "noise index: matrices from the first",
                                               "noise index: from the block, matrices from the first"};
     for (int mode = 1; mode <= 3; ++mode) {

@@ -375,7 +375,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
     const auto previous = state.channels;
-    const bool carry_history = state.running;
+    const bool carry_history =
+        state.running && !(header->sync == kRestartSyncAtmos && config.lab.object_restart_clears);
     state = SubstreamState{};
     if (carry_history) {
         for (std::size_t c = 0; c < kMaxChannels; ++c) {

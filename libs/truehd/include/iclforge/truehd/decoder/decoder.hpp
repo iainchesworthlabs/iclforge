@@ -81,6 +81,7 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
+    bool object_restart_clears = false;  // an object restart clears the filter histories
     // The object matrices' noise index: bit 0 counts the samples from the start of the block, not
     // of the access unit; bit 1 numbers the matrices from the first, not from the last.
     int object_noise_index = 0;
