@@ -164,6 +164,7 @@ std::expected<Report, th::Error> build_report(std::span<const std::byte> stream,
                 report.meanings.push_back(parsed->major_sync->channel_meaning);
             }
         }
+        bool unit_ok = true;
         for (int i = 0; i < parsed->num_substreams; ++i) {
             const auto& entry = parsed->entries[static_cast<std::size_t>(i)];
             const auto segment = parsed->segments[static_cast<std::size_t>(i)];
@@ -177,7 +178,24 @@ std::expected<Report, th::Error> build_report(std::span<const std::byte> stream,
                 th::substream_crc(payload) !=
                     std::to_integer<std::uint8_t>(segment[segment.size() - 1])) {
                 ++report.segment_failures;
+                unit_ok = false;
             }
+        }
+        if (options.frames) {
+            FrameInfo frame;
+            frame.index = index;
+            frame.offset = static_cast<std::size_t>(unit->data() - stream.data());
+            frame.bytes = unit->size();
+            frame.time_seconds = info->sample_rate == 0 ? 0.0 : static_cast<double>(index) * info->samples_per_access_unit / static_cast<double>(info->sample_rate);
+            frame.major_sync = parsed->major_sync.has_value();
+            frame.input_timing = parsed->input_timing;
+            frame.substreams = parsed->num_substreams;
+            for (int i = 0; i < parsed->num_substreams && i < th::kMaxSubstreams; ++i) {
+                frame.substream_bytes[static_cast<std::size_t>(i)] = parsed->segments[static_cast<std::size_t>(i)].size();
+            }
+            frame.checks_ok = unit_ok;
+            frame.extra_data = parsed->extra_data.has_value();
+            report.frames.push_back(frame);
         }
         ++index;
     }
@@ -300,6 +318,31 @@ void write_json(JsonSink& json, const Report& report, std::size_t ac3_core_frame
     json.member("min_units", report.restart_min_units);
     json.member("max_units", report.restart_max_units);
     json.end_object();
+    if (!report.frames.empty()) {
+        json.key("frames");
+        json.begin_array();
+        for (const FrameInfo& frame : report.frames) {
+            json.begin_object();
+            json.member("index", frame.index);
+            json.member("offset", static_cast<std::uint64_t>(frame.offset));
+            json.member("bytes", static_cast<std::uint64_t>(frame.bytes));
+            json.key("time_seconds");
+            json.value(frame.time_seconds, 6);
+            json.member("major_sync", frame.major_sync);
+            json.member("input_timing", static_cast<std::uint64_t>(frame.input_timing));
+            json.key("substream_bytes");
+            json.begin_array();
+            for (int i = 0; i < frame.substreams && i < th::kMaxSubstreams; ++i) {
+                json.value(
+                    static_cast<std::uint64_t>(frame.substream_bytes[static_cast<std::size_t>(i)]));
+            }
+            json.end_array();
+            json.member("checks_ok", frame.checks_ok);
+            json.member("extra_data", frame.extra_data);
+            json.end_object();
+        }
+        json.end_array();
+    }
     json.member("extra_data_units", report.extra_data_units);
     json.member("ac3_core_frames", static_cast<std::uint64_t>(ac3_core_frames));
     json.member("major_syncs", report.major_syncs);
@@ -396,6 +439,23 @@ std::vector<TextLine> text_tail(const Report& report, std::size_t ac3_core_frame
                                                        report.lossless->intervals_failed,
                                                        report.lossless->other_check_failures,
                                                        report.lossless->units_waiting)});
+    }
+    return lines;
+}
+
+std::vector<std::string> frame_lines(const Report& report) {
+    std::vector<std::string> lines;
+    lines.reserve(report.frames.size());
+    for (const FrameInfo& frame : report.frames) {
+        std::string sizes;
+        for (int i = 0; i < frame.substreams && i < th::kMaxSubstreams; ++i) {
+            sizes += fmt::format("{}{}", i == 0 ? "" : ", ", frame.substream_bytes[static_cast<std::size_t>(i)]);
+        }
+        lines.push_back(fmt::format(
+            "access unit {} @ {} ({} bytes, t={:.4f}s){}, input timing {}, {} substream(s) [{} bytes]{}{}",
+            frame.index, frame.offset, frame.bytes, frame.time_seconds,
+            frame.major_sync ? ", major sync" : "", frame.input_timing, frame.substreams, sizes,
+            frame.extra_data ? ", extra data" : "", frame.checks_ok ? "" : ", CHECK FAILED"));
     }
     return lines;
 }

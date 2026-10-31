@@ -781,8 +781,9 @@ void print_probe_topic() {
     fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the duration,");
     fmt::println("       the rate and the bit rate it measures (TH spec section 18), the restart spacing,");
     fmt::println("       the substreams and their channels, and how many segments pass their");
-    fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
-    fmt::println("       it has no such dump, and detail=evolution, structure, format and checks are its own.");
+    fmt::println("       parity and CRC; detail=blocks is refused for it, since it has no blocks to");
+    fmt::println("       dump, detail=frames lists every access unit, and detail=evolution, structure,");
+    fmt::println("       format and checks are its own.");
 }
 
 void print_mkv_topic() {

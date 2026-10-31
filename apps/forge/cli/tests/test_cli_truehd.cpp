@@ -1419,8 +1419,8 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
         }
     }
     SECTION("probe") {
-        CHECK(run_cli("probe " + in + "detail=frames", log) == kExitUsage);
-        CHECK(read_text(log).find("probe does not apply detail=frames") != std::string::npos);
+        CHECK(run_cli("probe " + in + "detail=blocks", log) == kExitUsage);
+        CHECK(read_text(log).find("probe does not apply detail=blocks") != std::string::npos);
         CHECK(run_cli("probe " + in + "json=1", log) == 0);
     }
 }

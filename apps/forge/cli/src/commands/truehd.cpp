@@ -570,7 +570,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     // refused; detail=evolution, structure, format and checks are its own.
     if (const int refused = check_options_applied(
             meta,
-            {"json=", "detail=evolution", "detail=structure", "detail=format", "detail=checks"});
+            {"json=", "detail=frames", "detail=evolution", "detail=structure", "detail=format",
+             "detail=checks"});
         refused != kExitOk) {
         return refused;
     }
@@ -583,10 +584,12 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     const bool want_structure =
         meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
     const bool want_lossless = meta.detail.has_value() && *meta.detail == "checks";
+    const bool want_frames = meta.detail.has_value() && *meta.detail == "frames";
     EvolutionSurvey evolution(want_evolution);
     StructureSurvey structure;
     tp::ReportOptions options;
     options.lossless = want_lossless;
+    options.frames = want_frames;
     options.on_unit = [&](std::uint64_t index, const th::AccessUnit& unit) {
         evolution.add(index, unit);
         if (want_structure) {
@@ -650,6 +653,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                                        report->meanings.size());
         }
         print(tp::text_tail(*report, ac3_core_frames));
+        for (const std::string& line : tp::frame_lines(*report)) {
+            fmt::println("{}", line);
+        }
         if (report->leading_bytes != 0) {
             fmt::println(stderr,
                          "warning: {}: {} byte(s) ahead of the first access unit are not part of "

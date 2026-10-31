@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -78,6 +79,20 @@ struct LosslessResult {
     std::uint64_t decode_errors = 0;         // units the decoder could not read
 };
 
+// One access unit, for detail=frames.
+struct FrameInfo {
+    std::uint64_t index = 0;
+    std::size_t offset = 0;  // in the stream given
+    std::size_t bytes = 0;
+    double time_seconds = 0.0;  // of its first sample
+    bool major_sync = false;
+    std::uint16_t input_timing = 0;  // TH spec §3.4
+    int substreams = 0;
+    std::array<std::size_t, truehd::kMaxSubstreams> substream_bytes{};  // each segment
+    bool checks_ok = true;     // every segment with a parity and CRC byte passes
+    bool extra_data = false;
+};
+
 struct Report {
     truehd::StreamInfo info;
     std::uint64_t units = 0;           // access units that read
@@ -104,6 +119,7 @@ struct Report {
     std::optional<int> group1_bits;
     std::optional<int> group2_bits;
     std::optional<LosslessResult> lossless;
+    std::vector<FrameInfo> frames;  // only with ReportOptions::frames
     [[nodiscard]] bool damaged() const noexcept {
         return segment_failures != 0 || unreadable_units != 0 || skipped_bytes != 0 ||
                (lossless && (lossless->intervals_failed != 0 || lossless->decode_errors != 0));
@@ -114,6 +130,8 @@ struct ReportOptions {
     // Decode every substream (lenient, the samples discarded) for the lossless check. The cost is
     // that of a decode of the stream.
     bool lossless = false;
+    // Keep one FrameInfo per unit that reads (a long stream has many).
+    bool frames = false;
     // Called with each unit that reads, in order and with its index: a caller that surveys more
     // than the report does (forge's detail=evolution and structure) adds to it here.
     std::function<void(std::uint64_t, const truehd::AccessUnit&)> on_unit;
@@ -154,5 +172,7 @@ struct TextLine {
 };
 [[nodiscard]] std::vector<TextLine> text_head(const Report& report);
 [[nodiscard]] std::vector<TextLine> text_tail(const Report& report, std::size_t ac3_core_frames);
+// detail=frames: one line per access unit.
+[[nodiscard]] std::vector<std::string> frame_lines(const Report& report);
 
 }  // namespace iclforge::apps::truehd_probe

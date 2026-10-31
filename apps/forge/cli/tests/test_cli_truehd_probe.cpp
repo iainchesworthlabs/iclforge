@@ -182,3 +182,59 @@ TEST_CASE("probe detail=checks decodes for the lossless check, and exits 1 when 
         CHECK(read_file(log).find("describes TrueHD and MLP streams") != std::string::npos);
     }
 }
+
+TEST_CASE("probe detail=frames lists every access unit", "[forge-cli][truehd][probe]") {
+    const fs::path dir = scratch_dir();
+    const fs::path stream = fixture("truehd_m51_s24.thd");
+    SECTION("json") {
+        const auto document = probe_json(stream, dir, "detail=frames");
+        const auto& truehd = document.at("truehd");
+        const auto& frames = truehd.at("frames");
+        REQUIRE(frames.size() == 300);
+        std::uint64_t bytes = 0;
+        int major_syncs = 0;
+        for (std::size_t i = 0; i < frames.size(); ++i) {
+            CHECK(frames[i].at("index") == i);
+            CHECK(frames[i].at("checks_ok") == true);
+            bytes += frames[i].at("bytes").get<std::uint64_t>();
+            major_syncs += frames[i].at("major_sync").get<bool>() ? 1 : 0;
+        }
+        CHECK(bytes == truehd.at("bytes").get<std::uint64_t>());
+        CHECK(major_syncs == truehd.at("restart_spacing").at("major_syncs").get<int>());
+        // Each unit starts where the one before it ended.
+        CHECK(frames[0].at("offset") == 0);
+        CHECK(frames[1].at("offset") == frames[0].at("bytes"));
+        CHECK(frames[299].at("time_seconds").get<double>() > 0.24);
+    }
+    SECTION("without it, no frames member") {
+        CHECK_FALSE(probe_json(stream, dir).at("truehd").contains("frames"));
+    }
+    SECTION("text") {
+        const fs::path log = dir / "frames.log";
+        REQUIRE(run_cli("probe " + arg(stream) + "detail=frames", log) == 0);
+        const std::string text = read_file(log);
+        CHECK(text.find("access unit 0 @ 0 (") != std::string::npos);
+        CHECK(text.find("access unit 299 @ ") != std::string::npos);
+        CHECK(text.find(", major sync, input timing") != std::string::npos);
+    }
+    SECTION("a damaged unit says so") {
+        std::string bytes = read_file(stream);
+        // Unit 10's payload, as the damaged-copy test of test_cli_truehd.cpp flips it.
+        std::size_t offset = 0;
+        for (int unit = 0; unit < 10; ++unit) {
+            offset += ((static_cast<std::size_t>(static_cast<unsigned char>(bytes[offset]) & 0xFU) << 8U) |
+                       static_cast<unsigned char>(bytes[offset + 1])) *
+                      2;
+        }
+        bytes[offset + 60] = static_cast<char>(bytes[offset + 60] ^ 0x04);
+        const fs::path damaged = dir / "damaged_frames.thd";
+        {
+            std::ofstream out{damaged, std::ios::binary};
+            out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        }
+        const fs::path log = dir / "damaged.log";
+        CHECK(run_cli("probe " + arg(damaged) + "detail=frames", log) == kExitDamaged);
+        CHECK(read_file(log).find("access unit 10 @ ") != std::string::npos);
+        CHECK(read_file(log).find("CHECK FAILED") != std::string::npos);
+    }
+}
