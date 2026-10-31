@@ -16,9 +16,10 @@
 # `Any`, so R8 cannot trace that, and `open` and `submit` are never called from Kotlin at all. Without
 # these rules R8 may rename or strip them, which fails silently: GetMethodID returns null, the bridge
 # stays unregistered, and the app runs, with a screen that looks right, and no sound reaches the
-# receiver. The last five are optional on the native side, which looks each one up and carries on
+# receiver. The last seven are optional on the native side, which looks each one up and carries on
 # without it, so a rule that missed one would not stop the bridge registering: that track's position,
-# pause, flush or underrun count would simply never work in a release build.
+# pause, flush or underrun count would simply never work in a release build, and a missed
+# isLinkSupported or openLink would leave TrueHD unavailable on the route without a word.
 -keep class com.iclforge.hearth.PassthroughBridge {
     boolean isDirectPlaybackSupported(int, boolean);
     boolean isPcmSupported(int);
@@ -30,4 +31,6 @@
     boolean pause();
     boolean resume();
     boolean flush();
+    boolean isLinkSupported(int, int);
+    boolean openLink(int, int);
 }
