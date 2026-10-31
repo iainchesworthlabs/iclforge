@@ -560,6 +560,44 @@ what each field's code can hold, with its own tone and a metadata update at the 
 sample comes out; the limits, the I-frame lists and the experimental flags); `test_ac4_errors.py`
 (the hierarchy, the exports, and each exception's `.error`).
 
+## TrueHD and MLP
+
+`iclforge.truehd` is the lossless TrueHD and MLP decoder (`iclforge::truehd`), with a stream's length, timing
+and seek points. The codec is lossless, so PCM is integers: an `int32` array of shape `(samples, channels)`,
+each value 24 bits wide and sign-extended (a 16-bit stream's values are multiples of 256), in the stream's
+own channel order, which `speakers` names when the major sync does.
+
+```python
+import iclforge as ac3
+
+stream = open("film.thd", "rb").read()
+
+info = ac3.truehd.probe(stream)                 # kind, sample_rate, substreams, channels per substream, ...
+decoded = ac3.truehd.decode(stream)             # the whole stream: .pcm, .sample_rate, .channels, .speakers
+scan = ac3.truehd.scan(stream)                  # .samples, .duration_seconds, .restarts, ...
+
+# Seek: the restart is the granule. Decode from the last one at or before the sample you want.
+restart = scan.restart_for_sample(scan.sample_at_seconds(90.0))
+joined = ac3.truehd.decode(stream[restart.offset:])
+frame = joined.pcm[scan.sample_at_seconds(90.0) - scan.unit_start_sample(restart.unit)]
+```
+
+`decode(data, presentation=Presentation.kBest, lenient=False)` reads a whole bare stream; with the default
+strict checks a unit that fails one (check nibble, a CRC, parity, the lossless check) raises
+`TruehdError`, and with `lenient=True` the failure is counted and the unit decoded as far as it reads.
+`Presentation` picks the substreams: `kBest` (the highest of 0 to 2, the default), `k2ch`, `k6ch`, `k8ch`
+or `kAll`. For units already cut out of a container, `truehd.Decoder` takes one whole access unit at a
+time and returns `None` until a restart header has come (a stream joined partway); `lost_data()` makes it
+wait again after input was dropped. `access_units(data)` cuts a bare stream into its units.
+
+`scan(data, restart_spacing=256)` reads the stream once. The units that carry a major sync are the places
+a decoder can start; the scan keeps them at least `restart_spacing` units apart (0 or 1 keeps every one),
+and `restart_for_sample()` gives the last at or before a sample's unit. `samples` leaves out the padding
+the last unit's end-of-stream marker counts, so it is exact.
+
+Failures raise `TruehdError`, a `ValueError`, with the library's error kind as `.kind`
+(`truehd.ErrorKind`). The TrueHD encoder, the Atmos object layer and the metadata edits are not bound yet.
+
 ## What isn't exposed
 
 **TrueHD and MLP.** `iclforge::truehd` has no Python binding yet: the decoder, the encoder and MAT carriage are in the C++
