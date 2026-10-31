@@ -42,7 +42,7 @@ mkdir -p "$OUT/fuzz_truehd_parse" "$OUT/fuzz_truehd_encode" "$OUT/fuzz_mat_unwra
          "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
          "$OUT/fuzz_signing_verify" "$OUT/fuzz_iec61937_unwrap" \
          "$OUT/fuzz_ac4_parse" "$OUT/fuzz_iab_parse" "$OUT/fuzz_content_signature" \
-         "$OUT/fuzz_ac4_content_signature"
+         "$OUT/fuzz_ac4_content_signature" "$OUT/fuzz_iamf_parse"
 
 run() { "$ICLFORGE_CLI" "$@" >/dev/null; }
 
@@ -344,6 +344,25 @@ python3 "$SCRIPT_DIR/truehd-seeds.py" streams "$OUT/fuzz_truehd_parse"
 python3 "$SCRIPT_DIR/truehd-seeds.py" encoder "$OUT/fuzz_truehd_encode"
 python3 "$SCRIPT_DIR/truehd-seeds.py" mat "$OUT/fuzz_mat_unwrap" --forge "$ICLFORGE_CLI"
 python3 "$SCRIPT_DIR/truehd-seeds.py" containers "$OUT" --forge "$ICLFORGE_CLI"
+
+# IAMF: iclforge-iamf-seed-tool (libs/containers/tests/iamf/) writes each programme as a raw OBU
+# stream and as an ISO-BMFF file with the module's own writers, so it must be built beside forge
+# (any configuration with ICLFORGE_BUILD_TESTS on and IAMF on; it is a dependency of iclforge-tests).
+# ICLFORGE_IAMF_SEED_TOOL names it when it is somewhere else.
+echo "==> IAMF: PCM, object and coded programmes, as OBU streams, files and fragments"
+iamf_tool="${ICLFORGE_IAMF_SEED_TOOL:-}"
+if [[ -z "$iamf_tool" ]]; then
+    for candidate in "$(dirname "$ICLFORGE_CLI")/iclforge-iamf-seed-tool" \
+                     "$(dirname "$ICLFORGE_CLI")/iclforge-iamf-seed-tool.exe"; do
+        [[ -f "$candidate" ]] && iamf_tool="$candidate" && break
+    done
+fi
+if [[ -n "$iamf_tool" ]] && [[ -f "$iamf_tool" ]]; then
+    "$iamf_tool" "$OUT/fuzz_iamf_parse"
+else
+    echo "    iclforge-iamf-seed-tool not found beside forge: the IAMF seeds are left as committed"
+    rmdir "$OUT/fuzz_iamf_parse"
+fi
 
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do
