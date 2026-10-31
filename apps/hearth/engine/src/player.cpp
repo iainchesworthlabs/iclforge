@@ -711,9 +711,10 @@ void Player::set_decoder_settings(const DecoderSettings& settings) {
     }
     const bool presentation_changed =
         !same_choice(presentation_choice(settings), presentation_choice(settings_));
-    if (settings.programme != settings_.programme || presentation_changed) {
-        // A prepared session holds the old programme's units, or describes
-        // the old presentation.
+    if (settings.programme != settings_.programme || presentation_changed ||
+        settings.track != settings_.track) {
+        // A prepared session holds the old programme's units, describes the old presentation,
+        // or is the track the old choice took.
         drop_prepared();
     }
     const DecoderSettings previous = std::exchange(settings_, settings);

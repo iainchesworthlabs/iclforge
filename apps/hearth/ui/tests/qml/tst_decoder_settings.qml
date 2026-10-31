@@ -194,4 +194,23 @@ TestCase {
         clickSegment(page, "best");
         tryVerify(function() { return HearthController.decoderSettings.truehdPresentation === "best"; }, 15000);
     }
+
+    // The track choice on the same tab (DecoderTruehd.qml): automatic until it is chosen, written
+    // through the same controller call as the rest.
+    function test_trackChoiceRoundTripsThroughTheTruehdTab() {
+        const page = createTemporaryObject(decoderPageComponent, testCase.parent);
+        verify(page !== null);
+        page.format = "truehd";
+        waitForRendering(page);
+        verify(findChild(page, "truehdTrack") !== null, "the TrueHD tab's track card is not on the page");
+        compare(HearthController.decoderSettings.track, "automatic");
+
+        const compressed = clickSegment(page, "compressed");
+        tryVerify(function() { return HearthController.decoderSettings.track === "compressed"; }, 15000);
+        compare(compressed.Accessible.checked, true);
+        clickSegment(page, "truehd");
+        tryVerify(function() { return HearthController.decoderSettings.track === "truehd"; }, 15000);
+        clickSegment(page, "automatic");
+        tryVerify(function() { return HearthController.decoderSettings.track === "automatic"; }, 15000);
+    }
 }
