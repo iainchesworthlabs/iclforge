@@ -469,6 +469,8 @@ jobs:
       runner: ${{ needs.check-runner.outputs.runner }}
       vcpkg_commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
       llvm_version: ${{ needs.toolchain-versions.outputs.llvm_version }}
+      qt_version: ${{ needs.toolchain-versions.outputs.qt_version }}
+      aqt_source: ${{ needs.toolchain-versions.outputs.aqt_source }}
       tier: ${{ needs.changes.outputs.tier }}
       record_trend: ${{ needs.changes.outputs.record_trend == 'true' }}
 
@@ -1111,6 +1113,7 @@ jobs:
           # back empty, which the loop's failure/cancelled check already
           # treats as a pass.
           R_COVERAGE: ${{ needs.core.outputs.coverage_result }}
+          R_COVERAGE_QT: ${{ needs.core.outputs.coverage_qt_result }}
           R_ADM: ${{ needs.core.outputs.adm_result }}
           R_HEARTH: ${{ needs.core.outputs.hearth_result }}
           R_BUILD: ${{ needs.build-and-test.result }}
@@ -1151,6 +1154,7 @@ jobs:
           fi
           for pair in "changes:$R_CHANGES" \
                       "coverage:$R_COVERAGE" \
+                      "coverage-qt:$R_COVERAGE_QT" \
                       "adm-validate:$R_ADM" \
                       "hearth-validate:$R_HEARTH" \
                       "build-and-test:$R_BUILD" "ffmpeg-validate:$R_FFMPEG" \
