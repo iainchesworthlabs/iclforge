@@ -2454,3 +2454,57 @@ TEST_CASE("decode channels=2 is the stream's own 2 channel presentation", "[forg
         CHECK(read_text(log).find("the stream stores no dialogue norm") != std::string::npos);
     }
 }
+
+TEST_CASE("silence and sine with a .thd output make TrueHD streams", "[forge-cli][truehd][generators]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "generators.log";
+    const fs::path stream = tone.dir / "generated.thd";
+    const fs::path wav = tone.dir / "generated.wav";
+
+    SECTION("sine is the signal the formula gives, sample for sample") {
+        // 1 s, 1000 Hz at 50%, stereo: a tone in each channel, the second a quarter higher.
+        REQUIRE(run_cli("sine " + cli_arg(stream) + "1 192 1000 50 stereo", log) == 0);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 2);
+        CHECK(decoded.rate == 48000);
+        REQUIRE(decoded.s32le.size() == 48000U * 2U * 4U);
+        for (const std::size_t n : {std::size_t{0}, std::size_t{1}, std::size_t{12}, std::size_t{4801}, std::size_t{47999}}) {
+            for (std::size_t c = 0; c < 2; ++c) {
+                const double hz = 1000.0 * (1.0 + 0.25 * static_cast<double>(c));
+                const float sample = static_cast<float>(
+                    0.5 * std::sin(2.0 * 3.14159265358979323846 * hz * static_cast<double>(n) / 48000.0));
+                const auto expected = static_cast<std::int32_t>(
+                    std::clamp(std::nearbyint(static_cast<double>(sample) * 8388608.0), -8388608.0, 8388607.0));
+                const std::size_t at = (n * 2 + c) * 4;
+                const auto got = static_cast<std::int32_t>(
+                    le(std::vector<std::byte>(decoded.s32le.begin() + static_cast<std::ptrdiff_t>(at),
+                                              decoded.s32le.begin() + static_cast<std::ptrdiff_t>(at + 4)),
+                       0, 4)) >> 8;
+                CHECK(got == expected);
+            }
+        }
+    }
+    SECTION("silence decodes to zeros, and is small") {
+        REQUIRE(run_cli("silence " + cli_arg(stream) + "1", log) == 0);
+        CHECK(fs::file_size(stream) < 20000);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 2);
+        CHECK(std::ranges::all_of(decoded.s32le, [](std::byte b) { return b == std::byte{0}; }));
+    }
+    SECTION("a 5.1 layout names its speakers as decode writes them") {
+        REQUIRE(run_cli("sine " + cli_arg(stream) + "1 192 440 25 51", log) == 0);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 6);
+        CHECK(decoded.mask == 0x60F);
+    }
+    SECTION("what a lossless generator does not have is refused") {
+        CHECK(run_cli("sine " + cli_arg(stream) + "1 192 440 25 5.0c", log) == kExitUsage);
+        CHECK(read_text(log).find("mono, stereo, 51 or 71") != std::string::npos);
+        CHECK(run_cli("sine " + cli_arg(stream) + "1 192 440 25 stereo dialnorm=27", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+    }
+}

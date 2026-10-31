@@ -199,6 +199,13 @@ int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_
 [[nodiscard]] std::optional<int> stored_dialnorm(std::span<const std::byte> stream,
                                                  std::string_view presentation);
 
+// `silence` and `sine` with a .thd output (truehd_synth.cpp): a generated signal coded by the
+// lossless encoder. `layout` is mono, stereo, 51 or 71 (stereo when empty); the AC-3 bit rate and
+// metadata options are refused.
+int run_truehd_synth(std::string_view out_path, std::uint32_t seconds, bool sine,
+                     std::uint32_t freq_hz, std::uint32_t amplitude_pct, std::string_view layout,
+                     const Options& meta);
+
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path,

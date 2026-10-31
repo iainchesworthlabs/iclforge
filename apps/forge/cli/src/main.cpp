@@ -221,13 +221,13 @@ int run_words(const std::vector<std::string>& words) {
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
 constexpr std::array<Command, 49> kCommands{{
-    {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
+    {"silence", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
          const auto seconds = x.whole_seconds(2, 5);
          return seconds ? run_silence(x.str(1), *seconds, x.u32(3, 192)) : kExitUsage;
      }},
-    {"sine", 2, "<out.ac3> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
+    {"sine", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
      topic::kLayout | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) {

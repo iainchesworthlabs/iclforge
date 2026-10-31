@@ -12,8 +12,8 @@ Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and 
 Usage:
   forge --version    print version and git provenance, then exit
   forge help [<command>|exit-codes]   this list, or one command's own help
-  forge silence       <out.ac3> [seconds] [bitrate_kbps]
-  forge sine          <out.ac3> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]
+  forge silence       <out.ac3|out.thd> [seconds] [bitrate_kbps]
+  forge sine          <out.ac3|out.thd> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]
   forge orbit         <out.ac3> [seconds] [bitrate_kbps] [orbit_seconds]
   forge atmos         <out.ec3> [seconds] [bitrate_kbps] [objects] [orbit_seconds] [mode]
   forge atmos-path    <out.ec3> <paths.txt> [seconds] [bitrate_kbps] [objects] (objects driven by an authored scene file instead of the built-in orbit)
@@ -72,8 +72,8 @@ anything first.
 
 | Command | What it writes |
 |---|---|
-| `silence` | Silent AC-3 |
-| `sine` | A tone, one per speaker, AC-3. Append `c` to `[layout]` (e.g. `stereoc`) to turn on channel coupling. |
+| `silence` | Silent AC-3; with a `.thd` output, silent TrueHD (stereo) |
+| `sine` | A tone, one per speaker, AC-3. Append `c` to `[layout]` (e.g. `stereoc`) to turn on channel coupling. With a `.thd` output it is TrueHD, coded losslessly: the layout is mono, stereo, 51 or 71, the first channel carries `freq_hz` and each later one a quarter higher, and the bit rate and the metadata options have no meaning and are refused by name. |
 | `orbit` | AC-3 with a synthetic panned source circling the room (exercises the [spatial layer](../../library/spatial-and-atmos.md) — plain bed panning, no object metadata) |
 | `atmos` | E-AC-3 with synthetic orbiting Atmos objects — a 5.1 bed plus JOC + OAMD side data (TS 103 420) |
 | `atmos-path` | Same, but object motion comes from an authored scene file (keyframe columns or JSON) instead of the built-in orbit |
