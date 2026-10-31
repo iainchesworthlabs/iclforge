@@ -356,12 +356,12 @@ class Substream:
             out = bits.read(4)
             frac_bits = bits.read(4)
             f_shift = bits.read(3) - 1
-            bypass_bits = bits.read(2)  # bit 0 is the matrix's LSB bypass (ERRATA 69, provisional)
+            bypass_bits = bits.read(2)  # not 0: the LSB bypass (ERRATA 69, provisional)
             noise_shift = bits.read(4)
             mask = bits.read(channels)
             if frac_bits - f_shift > MATRIX_SHIFT:
                 raise StreamError("matrix coefficients finer than 2^-15")
-            headers.append((out, frac_bits, f_shift, mask, noise_shift, bypass_bits & 1))
+            headers.append((out, frac_bits, f_shift, mask, noise_shift, 1 if bypass_bits else 0))
         matrices = []
         for out, frac_bits, f_shift, mask, noise_shift, bypass in headers:
             coeffs = [0] * (channels + NOISE_CHANNELS)

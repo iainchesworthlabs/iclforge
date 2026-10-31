@@ -932,6 +932,9 @@ the decoder does it. (2) `field_2b` does not enter the coefficient divisor: with
 (a delta is therefore half a place at most); the decoder applies them, and the finer part stands with the matrices until they are replaced. With the finer parts soll_e12 passes 11 of 296 checks (from 9) and soll_sil6 18 of 357 (from 15); a scale of
 2^-width gives 10 and 15. Provisional: no hand-built stream holds the scale, only `test_kernels.cpp` holds the arithmetic. The failing intervals of ctl_c and EX_00002a are not helped (their objects hardly move; the deltas are near 0).
 Still open: the next parse break of soll_e12 (unit 11319, "block header") and of soll_sil6 (unit 19277), and the bulk of the failing checks in files without any extension (ctl_d, EX_00002b).
+**Correction to the bypass (2026-10-31).** Not bit 0 of `field_2b` but any non-zero value gives the matrix an LSB bypass. soll_e12 unit 11319 has a matrix with `field_2b` = 2: with one bypass bit a sample (40 bits in a block of 40) the block data
+ends at bit 4,427 of the 4,448-bit payload, then the last-block flag, a 16-bit terminator and the padding to a byte end the segment at exactly 4,448; without it the decoder stopped 61 bits short, took the leftover bits for another block and failed in its header.
+What the value 1, 2 or 3 means beyond that (an own coefficient of 2.0 was seen with 1) is open. The object matrix section may also hold 16 matrices (the count is 4 bits plus one); soll_e16 stopped at unit 9216 on the old limit of 15.
 **Limits of the finer part (robustness).** A delta is held at 2^-15 of the coefficient's place and in 32 bits: a matrix whose delta (16 bits at most) times its place (2^(15 - frac_bits + f_shift), up to 2^21) needs more is refused with `kBadParameter`
 (a delta of 1024 or more at `frac_bits` 0 and `f_shift` +6 is one). The sums of rows times deltas wrap at 64 bits and do not overflow. Held by `test_object_robustness.cpp` and `test_kernels.cpp`.
 

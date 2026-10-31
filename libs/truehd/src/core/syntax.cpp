@@ -119,8 +119,9 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
                 matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
                 matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
                 matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
-                // Provisional (ERRATA.md entry 69): bit 0 of the two bits is the matrix's LSB bypass.
-                matrix.lsb_bypass = (matrix.field_2b & 1U) != 0;
+                // Provisional (ERRATA.md entry 69): a matrix whose two bits are not 0 has the LSB
+                // bypass, one bit a sample in the block data (1 and 2 seen).
+                matrix.lsb_bypass = matrix.field_2b != 0;
                 const std::uint32_t mask = reader.read(channels);
                 for (int c = 0; c < channels; ++c) {
                     matrix.present[static_cast<std::size_t>(c)] = ((mask >> c) & 1U) != 0;

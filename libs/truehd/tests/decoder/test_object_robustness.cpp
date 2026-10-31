@@ -668,7 +668,7 @@ Case draw_case(Sequence& sequence) {
         }
         int bypass = 0;
         for (const Header& header : in_force) {
-            bypass += (header.field_2b & 1U) != 0 ? 1 : 0;
+            bypass += header.field_2b != 0 ? 1 : 0;
         }
         drawn.bypass.push_back(bypass);
         drawn.blocks.push_back(std::move(d));
