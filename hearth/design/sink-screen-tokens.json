@@ -1,0 +1,57 @@
+{
+  "comment": "The one place the Hearth sink screen's tokens are written (planning/hearth-sink-screen.md, Tokens and Layout; planning/hearth-android.md, D13). The Android app's Tokens.kt is generated from this file, and the checks hold the desktop's Signal palette (apps/shared/theme/assets/qml/Theme.qml) and the P4X panel's screen (firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp) to it. Change a value here, run tools/checks/sink_screen_tokens.py --write, and read what the check says of the others.",
+  "palette": "signal, dark: a sink is a thing in a dim room and always draws dark, whatever the OS theme is",
+  "colours": {
+    "bg": "151313",
+    "surface": "1d1a1a",
+    "surface_up": "272423",
+    "text": "ece7e5",
+    "accent": "ff5c40",
+    "muted": "8b8583",
+    "faint": "4b4645",
+    "rule": "353130"
+  },
+  "sung_opacity_percent": 70,
+  "canvas": {
+    "width": 1024,
+    "height": 600
+  },
+  "layout": {
+    "margin": 32,
+    "header": 64,
+    "footer": 64,
+    "past": 36,
+    "next": 40,
+    "small": 24,
+    "row_gap": 12,
+    "hairline": 2,
+    "tracking_tenths": 12,
+    "duet_indent_percent": 18,
+    "overscan_percent": 5,
+    "dot": 24,
+    "dot_gap": 20,
+    "min_target": 72
+  },
+  "current_line": {
+    "sizes": [72, 64, 56, 48, 40, 34],
+    "max_characters": [18, 36, 44, 54],
+    "max_rows": 2
+  },
+  "delay": {
+    "step_ms": 50,
+    "max_ms": 1000
+  },
+  "timing": {
+    "no_lyrics_grace_ms": 1000,
+    "sheet_hide_ms": 8000,
+    "idle_quiet_ms": 120000,
+    "idle_step_ms": 60000,
+    "idle_dimmed_percent": 40,
+    "idle_step_u": 6
+  },
+  "frames_per_second": {
+    "singing": 30,
+    "line": 5,
+    "idle": 1
+  }
+}

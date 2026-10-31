@@ -1,0 +1,6821 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library and a TrueHD / MLP codec in C++23, the Forge CLI and GUI over them, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks">
+      
+      
+      
+        <link rel="canonical" href="https://iainchesworthlabs.github.io/iclforge/platforms/bare-metal/build-profiles/">
+      
+      
+        <link rel="prev" href="../memory-layout/">
+      
+      
+        <link rel="next" href="../board-bench/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ESP32 build profiles - ICL Forge</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"IBM Plex Sans";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/new.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#esp32-build-profiles" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="ICL Forge" class="md-header__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ICL Forge
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ESP32 build profiles
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+  
+
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../quickstart/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../library/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Library
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../karaoke/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Karaoke
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../verification/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Validation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../performance-quality/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Performance & quality
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../forge/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Forge
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../crucible/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Crucible
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../hearth/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hearth
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Platforms
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="ICL Forge" class="md-nav__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ICL Forge
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/ac3-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-3 & E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/atmos-joc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atmos & JOC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/object-signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD & MLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building from source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../library/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Library
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The projects of the tree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/development-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/application-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the library
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example programs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/encoding-ac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/encoding-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/spatial-and-atmos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial & Atmos objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/station-broadcast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example — station broadcast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/channel-plans-and-routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel plans & routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/muxing-and-sinks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Muxing & sinks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/file-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/iab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAB (SMPTE ST 2098-2) reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/adm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM / BW64 reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/adm-bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM → Atmos bridging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/iamf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAMF reading and writing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4 decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD and MLP decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measuring quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/header-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Header map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/api-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bindings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/c-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../library/rust-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../karaoke/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Karaoke
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../karaoke/forced-alignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing with a forced aligner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How output is checked
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../conformance-vectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformance vectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance & quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance & quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../performance-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../performance-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tool-comparison-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool comparison trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../object-quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../landscape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Landscape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../forge/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forge
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forge
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../forge/cli/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/cli/commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/cli/metadata-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options & grammars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../forge/gui/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GUI guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/loading-a-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading a source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/format-and-channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format & channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/objects-and-motion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects & motion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/live-session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live capture & session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/source-assignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-source & assignment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/karaoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/coding-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QC a stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/inspect-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/open-stream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Localisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../forge/gui/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & text size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../crucible/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crucible
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Crucible
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & first run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/room/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The room
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/signal-path/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The signal path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & screen readers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Languages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design record
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../crucible/design/promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Promotion plan and record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../windows-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Windows demo it grew from
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../hearth/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hearth
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/desktop-player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the desktop player
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth Player for Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth for Android
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-S3 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-C6 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-P4 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-speakers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Speaker levels and the test tone
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sink firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-installer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install from the browser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/sink-layouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing the speaker layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../hearth/design/player-appliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platforms
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platforms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../raspberry-pi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raspberry Pi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android (Shield demo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_10_7" id="__nav_10_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    WebAssembly
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../wasm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../wasm-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../wasm-encode-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bare metal
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10_8" id="__nav_10_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bare metal
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cortex-m3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cortex-M3 (QEMU reference)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-P4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esp32-c3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esphome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESPHome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 memory layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 build profiles
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 build profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-profile-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a profile is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-there-is-one-per-board-and-codec-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why there is one per board and codec set
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-boards-a-profile-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The boards a profile names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-fragments-and-their-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The fragments and their order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-locked-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What locked holds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What locked holds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-profiles-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The profile's hash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watch-and-free" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        watch and free
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overlays-and-other-fragment-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays and other fragment lists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budgets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-ci-enforces-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How CI enforces a profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How CI enforces a profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-build-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The build jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-new-kconfig-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A new Kconfig key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-profile-a-running-board-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which profile a running board is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-a-board-from-its-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a board from its profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Building a board from its profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-wsl-or-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In WSL or on Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-the-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After the build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing a profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing a profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../board-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing and benchmarking the boards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../windows-driver-acx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows null-sink driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../renamed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renamed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ci-self-hosted-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-hosted CI runners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ci-lanes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI lane partitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ci-agentic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI for many agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-profile-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a profile is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-there-is-one-per-board-and-codec-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why there is one per board and codec set
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-boards-a-profile-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The boards a profile names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-fragments-and-their-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The fragments and their order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-locked-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What locked holds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What locked holds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-profiles-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The profile's hash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watch-and-free" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        watch and free
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overlays-and-other-fragment-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays and other fragment lists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budgets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-ci-enforces-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How CI enforces a profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How CI enforces a profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-build-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The build jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-new-kconfig-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A new Kconfig key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-profile-a-running-board-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which profile a running board is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-a-board-from-its-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a board from its profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Building a board from its profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-wsl-or-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In WSL or on Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-the-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After the build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing a profile
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing a profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="esp32-build-profiles">ESP32 build profiles<a class="headerlink" href="#esp32-build-profiles" title="Permanent link">&para;</a></h1>
+<p><code>hearth_sink</code>, in <code>firmware/hearth-sink</code>, is the firmware an ESP32 dev kit runs as a
+<a href="../../../hearth/#esp32-sinks">Hearth sink</a>. Every board it is built for has one <strong>build
+profile</strong>: a named ESP-IDF configuration, written down in one file, that CI holds every build of
+that board to. This page covers what a profile holds, how CI enforces it, how to build a board from
+its profile, and how to change one.</p>
+<p>The other pages of this section use "profile" for the minimum-footprint build of the codec. A build
+profile is the configuration of one board's firmware image.</p>
+<h2 id="what-a-profile-is">What a profile is<a class="headerlink" href="#what-a-profile-is" title="Permanent link">&para;</a></h2>
+<p>ESP-IDF configures a build from Kconfig keys (<code>CONFIG_...</code>). A project sets keys in <code>sdkconfig</code>
+fragment files and gives the build an ordered list of them in <code>SDKCONFIG_DEFAULTS</code>. A key that no
+fragment sets takes the default its Kconfig file declares. The result is the <code>sdkconfig</code> file in
+the build directory.</p>
+<p>A profile fixes three things for one board:</p>
+<ul>
+<li>the fragments and their order;</li>
+<li>the values of the keys that decide where memory goes and what is built in (the <strong>locked</strong> keys):
+  each task stack and ring buffer with its size and whether it is in internal RAM or PSRAM, the
+  caches, the flash and PSRAM modes, and the features;</li>
+<li>the <strong>budgets</strong> the built image is held to.</li>
+</ul>
+<p>All profiles are in <code>firmware/hearth-sink/profiles.json</code>. <code>tools/hearth/sink_profile.py</code> is the
+only reader: CI, the packager, the bench tools and the profile table in the firmware's README all
+go through it. The file's top-level keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>format</code></td>
+<td>The file's format number, 1. The reader refuses any other</td>
+</tr>
+<tr>
+<td><code>note</code></td>
+<td>What the file is, for someone reading the JSON</td>
+</tr>
+<tr>
+<td><code>watch</code></td>
+<td>25 name patterns. A key in a build's configuration that matches one has to be locked or free (<a href="#watch-and-free">below</a>)</td>
+</tr>
+<tr>
+<td><code>free</code></td>
+<td>Four patterns for keys that match <code>watch</code> and are left to the build, each with its reason</td>
+</tr>
+<tr>
+<td><code>overlays</code></td>
+<td>Three named additions a build may take over a profile, each with the keys it may move (<a href="#overlays-and-other-fragment-lists">below</a>)</td>
+</tr>
+<tr>
+<td><code>other_stacks</code></td>
+<td>Eight fragment lists the tree spells that are no board's image, each with what it is</td>
+</tr>
+<tr>
+<td><code>profiles</code></td>
+<td>The seven profiles</td>
+</tr>
+</tbody>
+</table>
+<p>Each profile has seven fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>target</code></td>
+<td>The ESP-IDF target: <code>esp32s3</code>, <code>esp32c6</code> or <code>esp32p4</code></td>
+</tr>
+<tr>
+<td><code>board</code></td>
+<td>The board, in words</td>
+</tr>
+<tr>
+<td><code>fragments</code></td>
+<td>The fragments after <code>sdkconfig.defaults</code>, in order, without the <code>sdkconfig.</code> prefix</td>
+</tr>
+<tr>
+<td><code>boards</code></td>
+<td>The bench boards that run this profile, by name (<a href="#the-boards-a-profile-names">below</a>)</td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td>The release image built from the profile and the rule it is published under (name, flash size, PSRAM, chip revisions), or <code>null</code> when no release publishes it</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td>Upper limits for the app image, the bootloader and static internal RAM</td>
+</tr>
+<tr>
+<td><code>locked</code></td>
+<td>The values the build's <code>sdkconfig</code> must have</td>
+</tr>
+</tbody>
+</table>
+<h2 id="why-there-is-one-per-board-and-codec-set">Why there is one per board and codec set<a class="headerlink" href="#why-there-is-one-per-board-and-codec-set" title="Permanent link">&para;</a></h2>
+<p>On 2026-10-12 an HTTP play (<code>POST /play</code>) failed on both ESP32-S3 boards and on the ESP32-C6. The
+boards ran <code>main</code> (<code>v0.10.0-beta.1-4065</code>), and CI was green. Sendspin streams played on the same
+boards. The S3's console said:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>heap: heap_caps_malloc could not allocate 32768 bytes (caps 0x804); internal free ..., largest 31744
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>player: could not start the decode task
+</code></pre></div>
+<p>The cause was a Kconfig default. <code>ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM</code> places the 32,768-byte
+stack of the task that decodes an HTTP play. Its default put the stack in PSRAM only on an S3 image
+that also had the AC-4 decoder. The S3 release image has no AC-4 decoder, so its stack was in
+internal RAM, where no free block is over 31,744 bytes once Wi-Fi and the Sendspin player are
+running. No fragment had changed. The C6 has no PSRAM, and its ring and stack did not fit beside
+Wi-Fi either.</p>
+<p>CI did not see it because no job ran the configuration the boards ship. The HTTP play under QEMU
+used <code>sdkconfig.ci-http</code>, which has a 24,576-byte stack and no PSRAM, and the board images were
+built and never played.</p>
+<p>A profile is per board and per codec set for three reasons:</p>
+<ul>
+<li>The same fragment list can resolve to different placements when a default depends on another
+  feature. AC-4 builds were profiles of their own where the decoder moved a placement (<code>s3-n16r8-ac4</code>, <code>p4-rev1-ac4</code>); since 2026-10-29
+  the decoder is in the S3 and both P4 release profiles, its values locked where the AC-4 profiles held them (on the S3 with
+  the release profile's 4 KB allocation limit kept).
+  <code>sdkconfig.ac4</code> raises both decode stacks to 40,960 bytes, and on the S3 <code>sdkconfig.s3-dcache</code>
+  takes 32 KB of heap for a 64 KB data cache.</li>
+<li>A board's flash size and partition table cannot change over the network, so a C6 with 4 MB of
+  flash and one with 16 MB are two profiles and two release images.</li>
+<li>An ESP32-P4 of chip revision v1.x and one of v3.x refuse each other's images at boot, so each
+  revision has a profile.</li>
+</ul>
+<p>The S3's default was fixed in
+<a href="https://github.com/iainchesworthlabs/iclforge/pull/1387">#1387</a>, and <code>sdkconfig.psram</code> now sets
+the key as well. The C6 refuses an HTTP play it has no room for and says <code>memory</code> as the reason
+(<a href="https://github.com/iainchesworthlabs/iclforge/pull/1395">#1395</a>). The profiles came in the pull
+requests after those: the file, its reader and the guard
+(<a href="https://github.com/iainchesworthlabs/iclforge/pull/1403">#1403</a>), CI building from the file
+(<a href="https://github.com/iainchesworthlabs/iclforge/pull/1406">#1406</a>), the profile id in the image and
+the boot budget line (<a href="https://github.com/iainchesworthlabs/iclforge/pull/1412">#1412</a>) and the v3.x
+P4 profile (<a href="https://github.com/iainchesworthlabs/iclforge/pull/1452">#1452</a>). The design record is
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md"><code>planning/esp32-platform-profiles.md</code></a>
+(<a href="https://github.com/iainchesworthlabs/iclforge/pull/1369">#1369</a>); it also has the board suite and
+its figures, which this page leaves out.</p>
+<h2 id="the-profiles">The profiles<a class="headerlink" href="#the-profiles" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Target</th>
+<th>Board</th>
+<th>Release image</th>
+<th>Bench boards</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s3-n16r8</code></td>
+<td><code>esp32s3</code></td>
+<td>ESP32-S3-DevKitC-1 N16R8: 16 MB of flash, 8 MB of octal PSRAM, with the AC-4 decoder</td>
+<td><code>hearth-sink-esp32s3</code></td>
+<td>S3a, S3b</td>
+</tr>
+<tr>
+<td><code>c6-16mb</code></td>
+<td><code>esp32c6</code></td>
+<td>An ESP32-C6 with 16 MB of flash, no PSRAM</td>
+<td><code>hearth-sink-esp32c6-16mb</code></td>
+<td>C6</td>
+</tr>
+<tr>
+<td><code>c6-4mb</code></td>
+<td><code>esp32c6</code></td>
+<td>Any ESP32-C6 module: 4 MB of flash</td>
+<td><code>hearth-sink-esp32c6</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>p4-rev1</code></td>
+<td><code>esp32p4</code></td>
+<td>An ESP32-P4 of chip revision v1.x, such as the FireBeetle 2, with the AC-4 decoder</td>
+<td><code>hearth-sink-esp32p4-rev1</code></td>
+<td>P4a, P4b</td>
+</tr>
+<tr>
+<td><code>p4-rev3</code></td>
+<td><code>esp32p4</code></td>
+<td>An ESP32-P4 of chip revision v3.x with the lyric screen and the AC-4 decoder: the ESP32-P4X-Function-EV-Board and its 7-inch MIPI DSI panel</td>
+<td><code>hearth-sink-esp32p4-rev3</code></td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>There is no AC-4 profile for the C6: the decoder does not fit beside Wi-Fi on that part
+(<a href="../../../hearth/sink-esp32-c6/">An ESP32-C6 sink</a>). Every other release image has the AC-4 decoder (since 2026-10-29); the C6's has it off.
+<code>p4-rev3</code> runs on the P4X kit (P4X).</p>
+<p><code>python tools/hearth/sink_profile.py list</code> prints the same list from the file, with each profile's
+full <code>SDKCONFIG_DEFAULTS</code> string.</p>
+<p>What each board plays and how fast is on the board pages:
+<a href="../../../hearth/sink-esp32-s3/">An ESP32-S3 sink</a>, <a href="../../../hearth/sink-esp32-c6/">An ESP32-C6 sink</a>
+and <a href="../../../hearth/sink-esp32-p4/">An ESP32-P4 sink</a> for the sink, and <a href="../esp32-s3/">ESP32-S3</a>,
+<a href="../esp32-c6/">ESP32-C6</a> and <a href="../esp32-p4/">ESP32-P4</a> for the measurements.
+<a href="../../../hearth/sink-firmware/#which-image">Sink firmware</a> has which release image goes on which
+board.</p>
+<h3 id="the-boards-a-profile-names">The boards a profile names<a class="headerlink" href="#the-boards-a-profile-names" title="Permanent link">&para;</a></h3>
+<p><code>boards</code> lists the dev kits on the project's bench that run the profile, by the names
+<code>tools/hearth/bench.json</code> gives them: two ESP32-S3 boards (S3a, S3b), one ESP32-C6 (C6) and two
+ESP32-P4 boards (P4a, P4b). A test holds every name to a row of that file with the profile's
+chip. One profile names no board: <code>c6-4mb</code>, whose build differs from <code>c6-16mb</code> in the flash size
+and the partition table alone.</p>
+<p>A board runs one profile at a time, and <a href="#which-profile-a-running-board-is">which one</a> is read from the board.</p>
+<h2 id="the-fragments-and-their-order">The fragments and their order<a class="headerlink" href="#the-fragments-and-their-order" title="Permanent link">&para;</a></h2>
+<p>Every profile starts with <code>sdkconfig.defaults</code> and adds its <code>fragments</code> after it:</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Fragments after <code>sdkconfig.defaults</code>, in order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s3-n16r8</code></td>
+<td><code>hw</code>, <code>psram</code>, <code>psram-4k</code>, <code>sendspin</code>, <code>ac4</code>, <code>s3-fast</code>, <code>s3-dcache</code></td>
+</tr>
+<tr>
+<td><code>c6-16mb</code></td>
+<td><code>hw</code>, <code>sendspin</code>, <code>c6</code>, <code>sendspin-c6</code>, <code>flash16mb</code></td>
+</tr>
+<tr>
+<td><code>c6-4mb</code></td>
+<td><code>hw</code>, <code>sendspin</code>, <code>c6</code>, <code>sendspin-c6</code></td>
+</tr>
+<tr>
+<td><code>p4-rev1</code></td>
+<td><code>hw</code>, <code>p4</code>, <code>sendspin</code>, <code>ac4</code></td>
+</tr>
+<tr>
+<td><code>p4-rev3</code></td>
+<td><code>hw</code>, <code>p4</code>, <code>p4-rev3</code>, <code>sendspin</code>, <code>ac4</code>, <code>panel</code>, <code>panel-dsi</code></td>
+</tr>
+</tbody>
+</table>
+<p>ESP-IDF reads the files left to right, and a later file's value replaces an earlier one's. The
+order decides values in several places:</p>
+<ul>
+<li><code>sdkconfig.sendspin</code> pins the decode task to core 1, and <code>sdkconfig.c6</code> after it removes the
+  pin, because the C6 has one core.</li>
+<li><code>sdkconfig.c6</code> chooses 4 MB of flash and <code>partitions_c6.csv</code>, and <code>sdkconfig.flash16mb</code> after it
+  chooses 16 MB and <code>partitions.csv</code>.</li>
+<li><code>sdkconfig.p4</code> admits chip revisions v1.x at 360 MHz, and <code>sdkconfig.p4-rev3</code> after it admits
+  v3.01 to v3.99 at 400 MHz.</li>
+</ul>
+<p>The guard compares the list exactly, so a build given the right files in another order fails,
+whether or not the two files share a key.</p>
+<table>
+<thead>
+<tr>
+<th>Fragment</th>
+<th>In</th>
+<th>What it sets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sdkconfig.defaults</code></td>
+<td>every profile</td>
+<td>Optimisation for size, an 8,192-byte main task stack, 16 MB of flash, the <code>partitions.csv</code> table with two application slots, bootloader rollback, 240 MHz</td>
+</tr>
+<tr>
+<td><code>sdkconfig.hw</code></td>
+<td>every profile</td>
+<td>The console on the chip's USB-Serial-JTAG port</td>
+</tr>
+<tr>
+<td><code>sdkconfig.psram</code></td>
+<td>S3</td>
+<td>Octal PSRAM at 80 MHz, usable by <code>malloc</code>, with allocations of 16 KB and over tried there first; the I2S DMA queue; a 32 KB instruction cache; the HTTP play's decode stack in PSRAM; no core dump</td>
+</tr>
+<tr>
+<td><code>sdkconfig.sendspin</code></td>
+<td>every profile</td>
+<td>The Sendspin player, Wi-Fi, the HTTP source and the control surface on port 80, nothing played at boot, 16 sockets, the decode task on core 1 and lwIP on core 0</td>
+</tr>
+<tr>
+<td><code>sdkconfig.s3-fast</code></td>
+<td>S3</td>
+<td>QIO flash, 64-byte data-cache lines, code and constants run from PSRAM</td>
+</tr>
+<tr>
+<td><code>sdkconfig.s3-dcache</code></td>
+<td><code>s3-n16r8</code></td>
+<td>A 64 KB data cache</td>
+</tr>
+<tr>
+<td><code>sdkconfig.ac4</code></td>
+<td>the S3 and P4 profiles</td>
+<td>The AC-4 decoder, both decode stacks at 40,960 bytes, a frame's per-channel stages on both cores</td>
+</tr>
+<tr>
+<td><code>sdkconfig.c6</code></td>
+<td>C6</td>
+<td>The target, 160 MHz, QIO flash, 4 MB of flash with <code>partitions_c6.csv</code>, no core pinning</td>
+</tr>
+<tr>
+<td><code>sdkconfig.sendspin-c6</code></td>
+<td>C6</td>
+<td>The player sized for a part with no PSRAM: a 49,152-byte Sendspin ring, 4,096-byte chunks, a 24,576-byte Sendspin decode stack, no lyrics and no delay lines, two coded channels at most, 16-bit I2S slots, the floor under which an HTTP play is refused, Opus, and Wi-Fi's code kept out of IRAM</td>
+</tr>
+<tr>
+<td><code>sdkconfig.flash16mb</code></td>
+<td><code>c6-16mb</code></td>
+<td>16 MB of flash with <code>partitions.csv</code></td>
+</tr>
+<tr>
+<td><code>sdkconfig.p4</code></td>
+<td>P4</td>
+<td>The target, chip revisions v1.x, 360 MHz, QIO flash, the wide I2S sink and its pins, PSRAM usable by <code>malloc</code>, code run from PSRAM, the hosted Wi-Fi buffers in PSRAM, the low-power SRAM kept out of the heap</td>
+</tr>
+<tr>
+<td><code>sdkconfig.p4-rev3</code></td>
+<td><code>p4-rev3</code></td>
+<td>Chip revisions v3.01 to v3.99, 400 MHz, the bootloader's log level at Warn so that it fits its window</td>
+</tr>
+<tr>
+<td><code>sdkconfig.panel</code></td>
+<td><code>p4-rev3</code></td>
+<td>LVGL with its heap in PSRAM, TrueType fonts and their caches, right-to-left text</td>
+</tr>
+<tr>
+<td><code>sdkconfig.panel-dsi</code></td>
+<td><code>p4-rev3</code></td>
+<td>The MIPI DSI panel, and a read-back route on port 8081</td>
+</tr>
+</tbody>
+</table>
+<p>Each fragment's own header comment has the reason and the measurement behind every line.</p>
+<h2 id="what-locked-holds">What <code>locked</code> holds<a class="headerlink" href="#what-locked-holds" title="Permanent link">&para;</a></h2>
+<p><code>locked</code> maps a key to the value the build's <code>sdkconfig</code> must have. On 2026-10-13 the profiles
+lock 95 keys (the two C6 profiles) to 136 (<code>p4-rev3</code>); 80 keys are locked in every profile.</p>
+<p><code>sink_profile.py snapshot</code> writes the map from a configured build. It takes two sets of keys:</p>
+<ul>
+<li>every key one of the profile's fragments sets, 38 to 50 of them;</li>
+<li>every key in the resolved configuration that matches a <code>watch</code> pattern and is on or has a value.</li>
+</ul>
+<p>So most locked values are ones no fragment sets. They are defaults of ESP-IDF and of the project's
+own Kconfig, recorded so that a default that changes is seen. That is the case of 2026-10-12.</p>
+<p>The classes of key, with examples (names without <code>CONFIG_</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chip, flash and partition table</td>
+<td><code>IDF_TARGET</code>, <code>ESPTOOLPY_FLASHSIZE</code>, <code>ESPTOOLPY_FLASHMODE_QIO</code>, <code>PARTITION_TABLE_CUSTOM_FILENAME</code>, <code>ESP_DEFAULT_CPU_FREQ_MHZ_240</code>, <code>ESP32P4_REV_MIN_FULL</code>, <code>BOOTLOADER_APP_ROLLBACK_ENABLE</code></td>
+</tr>
+<tr>
+<td>PSRAM and heap policy</td>
+<td><code>SPIRAM</code>, <code>SPIRAM_MODE_OCT</code>, <code>SPIRAM_USE_MALLOC</code>, <code>SPIRAM_MALLOC_ALWAYSINTERNAL</code>, <code>SPIRAM_FETCH_INSTRUCTIONS</code>, <code>ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP</code>, <code>ESP_HOSTED_MEMPOOL_PREFER_SPIRAM</code>, <code>ESP_COREDUMP_ENABLE_TO_NONE</code></td>
+</tr>
+<tr>
+<td>Caches</td>
+<td><code>ESP32S3_DATA_CACHE_SIZE</code>, <code>ESP32S3_DATA_CACHE_LINE_64B</code>, <code>ESP32S3_INSTRUCTION_CACHE_32KB</code></td>
+</tr>
+<tr>
+<td>Code kept in IRAM</td>
+<td><code>ESP_WIFI_IRAM_OPT</code>, <code>ESP_WIFI_RX_IRAM_OPT</code>, <code>ESP_PHY_IRAM_OPT</code></td>
+</tr>
+<tr>
+<td>Task stacks, size and placement</td>
+<td><code>ESP_MAIN_TASK_STACK_SIZE</code>, <code>ICLFORGE_EXAMPLE_DECODE_STACK_BYTES</code>, <code>ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM</code>, <code>ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES</code>, <code>ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES</code>, and ESP-IDF's own (<code>ESP_TIMER_TASK_STACK_SIZE</code>, <code>LWIP_TCPIP_TASK_STACK_SIZE</code>, <code>MDNS_TASK_STACK_SIZE</code>)</td>
+</tr>
+<tr>
+<td>Rings, queues and buffers</td>
+<td><code>ICLFORGE_EXAMPLE_RING_BYTES</code>, <code>ICLFORGE_EXAMPLE_RING_IN_PSRAM</code>, <code>ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES</code>, <code>ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES</code>, <code>ICLFORGE_EXAMPLE_I2S_DMA_DESCRIPTORS</code>, <code>LWIP_MAX_SOCKETS</code></td>
+</tr>
+<tr>
+<td>Cores</td>
+<td><code>ICLFORGE_EXAMPLE_DECODE_CORE</code>, <code>ICLFORGE_EXAMPLE_FETCH_CORE</code>, <code>ICLFORGE_EXAMPLE_DECODE_LANE</code>, <code>LWIP_TCPIP_TASK_AFFINITY_CPU0</code></td>
+</tr>
+<tr>
+<td>Features</td>
+<td><code>ICLFORGE_SENDSPIN</code>, <code>ICLFORGE_AC4</code>, <code>ICLFORGE_SENDSPIN_OPUS</code>, <code>ICLFORGE_EXAMPLE_SENDSPIN_AC4</code>, <code>ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES</code></td>
+</tr>
+</tbody>
+</table>
+<p>The keys behind the 2026-10-12 failure, as the file locks them on 2026-10-13 (names after
+<code>ICLFORGE_EXAMPLE_</code>; the file is the authority):</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th><code>s3-n16r8</code></th>
+<th><code>c6-16mb</code>, <code>c6-4mb</code></th>
+<th><code>p4-rev1</code></th>
+<th><code>p4-rev3</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DECODE_STACK_BYTES</code></td>
+<td>40960</td>
+<td>32768</td>
+<td>40960</td>
+<td>40960</td>
+</tr>
+<tr>
+<td><code>DECODE_STACK_IN_PSRAM</code></td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>SENDSPIN_DECODE_STACK_BYTES</code></td>
+<td>40960</td>
+<td>24576</td>
+<td>40960</td>
+<td>40960</td>
+</tr>
+<tr>
+<td><code>SENDSPIN_DECODE_STACK_IN_PSRAM</code></td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>SENDSPIN_RING_BYTES</code></td>
+<td>262144</td>
+<td>49152</td>
+<td>262144</td>
+<td>262144</td>
+</tr>
+<tr>
+<td><code>PLAY_MIN_FREE_BYTES</code></td>
+<td>0</td>
+<td>160796</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>Two values need a word:</p>
+<ul>
+<li><code>n</code> locks a key off. A key that is missing from the configuration also satisfies it.</li>
+<li><code>&lt;absent&gt;</code> means the key must not be in the configuration at all. <code>snapshot</code> writes it when a
+  fragment asks for a key and Kconfig drops it, as <code>p4-rev3</code> does for <code>ESP32P4_REV_MIN_100</code>:
+  <code>sdkconfig.p4</code> asks for it and <code>sdkconfig.p4-rev3</code> chooses another revision.</li>
+</ul>
+<h3 id="the-profiles-hash">The profile's hash<a class="headerlink" href="#the-profiles-hash" title="Permanent link">&para;</a></h3>
+<p><code>sink_profile.py identity &lt;profile&gt;</code> prints the id and a 12-digit hash: the first 12 hex digits of
+a SHA-256 over the profile's <code>fragments</code> and <code>locked</code>. Any edit to either changes it. The budgets,
+the board names and the image rule are not part of it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ python tools/hearth/sink_profile.py identity s3-n16r8
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>s3-n16r8 156f7310e8d0
+</code></pre></div>
+<p>With <code>--cmake</code> the command prints <code>-DICLFORGE_PROFILE=&lt;id&gt; -DICLFORGE_PROFILE_HASH=&lt;hash&gt;</code>. A
+build configured with those two options compiles them into the image, and the board reports them
+(<a href="#which-profile-a-running-board-is">below</a>).</p>
+<h2 id="watch-and-free"><code>watch</code> and <code>free</code><a class="headerlink" href="#watch-and-free" title="Permanent link">&para;</a></h2>
+<p><code>watch</code> is a list of shell-style patterns, matched against a key's name without <code>CONFIG_</code>. They
+name the kinds of key that place or size something:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Patterns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stacks and placement</td>
+<td><code>*STACK*</code>, <code>*IN_PSRAM*</code></td>
+</tr>
+<tr>
+<td>The player's rings, queues and cores</td>
+<td><code>ICLFORGE_EXAMPLE_*RING*</code>, <code>ICLFORGE_EXAMPLE_I2S_DMA_*</code>, <code>ICLFORGE_EXAMPLE_*_CORE</code>, <code>ICLFORGE_EXAMPLE_DECODE_LANE</code>, <code>ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT</code>, <code>ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES</code></td>
+</tr>
+<tr>
+<td>Sendspin and AC-4</td>
+<td><code>ICLFORGE_EXAMPLE_SENDSPIN_*</code>, <code>ICLFORGE_SENDSPIN*</code>, <code>ICLFORGE_EXAMPLE_AC4_*</code>, <code>ICLFORGE_AC4*</code></td>
+</tr>
+<tr>
+<td>PSRAM, caches and IRAM</td>
+<td><code>SPIRAM*</code>, <code>ESP32S3_*CACHE*</code>, <code>*IRAM_OPT*</code>, <code>ESP_HOSTED_MEMPOOL_PREFER_SPIRAM</code>, <code>ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP</code></td>
+</tr>
+<tr>
+<td>Flash, table and chip</td>
+<td><code>ESPTOOLPY_FLASHSIZE*</code>, <code>ESPTOOLPY_FLASHMODE*</code>, <code>PARTITION_TABLE_CUSTOM_FILENAME</code>, <code>ESP32P4_*REV*</code>, <code>ESP_DEFAULT_CPU_FREQ_MHZ_*</code></td>
+</tr>
+<tr>
+<td>Bootloader and core dump</td>
+<td><code>BOOTLOADER_APP_ROLLBACK_ENABLE</code>, <code>BOOTLOADER_LOG_LEVEL_*</code>, <code>ESP_COREDUMP_ENABLE_TO_*</code></td>
+</tr>
+</tbody>
+</table>
+<p>A key in a build's configuration that matches a pattern, and is on or has a value, has to be in
+the profile's <code>locked</code> or match a <code>free</code> pattern. Otherwise the guard reports it as <code>[unplaced]</code>.
+A new stack or buffer option then cannot reach a board without someone deciding its value for that
+board.</p>
+<p><code>free</code> holds the exceptions, each with its reason in the file:</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Why it is free</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ICLFORGE_EXAMPLE_WIFI_*</code></td>
+<td>A board's network is its own and is kept in NVS. A published image has none built in</td>
+</tr>
+<tr>
+<td><code>ICLFORGE_EXAMPLE_HTTP_URL</code></td>
+<td>The stream a build plays at boot: empty on a board, a test server's address in a CI build</td>
+</tr>
+<tr>
+<td><code>ICLFORGE_EXAMPLE_PANEL_STACK_BYTES</code></td>
+<td>The screen task's stack. It is declared for every target and does nothing in a profile with no screen. <code>p4-rev3</code> locks it by hand</td>
+</tr>
+<tr>
+<td><code>LV_SPAN_SNIPPET_STACK_SIZE</code></td>
+<td>An LVGL count of text snippets, which matches <code>*STACK*</code> and is no task's stack</td>
+</tr>
+</tbody>
+</table>
+<p>A key that is both free and locked is held to the locked value. <code>snapshot</code> skips free keys, so a
+lock like <code>p4-rev3</code>'s is added by hand after a snapshot.</p>
+<h2 id="overlays-and-other-fragment-lists">Overlays and other fragment lists<a class="headerlink" href="#overlays-and-other-fragment-lists" title="Permanent link">&para;</a></h2>
+<p>An <strong>overlay</strong> is a declared addition to a profile's build. It lists the key patterns it may move
+(<code>touches</code>) and may name one more fragment, which goes after the profile's own. A build made with
+an overlay is verified with the same <code>--overlay</code> name, and the guard then skips the keys the
+overlay touches.</p>
+<table>
+<thead>
+<tr>
+<th>Overlay</th>
+<th>Fragment</th>
+<th>What it is for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wifi-credentials</code></td>
+<td>a file of the board's network, given last (<code>defaults --wifi FILE</code>)</td>
+<td>A build for a bench board. The packager refuses to publish an image with a network built in</td>
+</tr>
+<tr>
+<td><code>measure</code></td>
+<td><code>sdkconfig.measure</code></td>
+<td>Turns on the PCM hash an AC-4 play prints, so a board's output can be compared with the host's</td>
+</tr>
+<tr>
+<td><code>panel-capture</code></td>
+<td><code>sdkconfig.panel-capture</code></td>
+<td>The P4 profile with a screen, with its read-back and touch server on 8081 (no authentication), for a bench; a release image has it off and the packager refuses one with it on</td>
+</tr>
+<tr>
+<td><code>qemu-net</code></td>
+<td><code>sdkconfig.qemu-net</code></td>
+<td>The S3 release profile under QEMU: Ethernet for Wi-Fi, the capture sink for I2S, quad PSRAM for octal, the console on UART0</td>
+</tr>
+</tbody>
+</table>
+<p><code>other_stacks</code> lists fragment lists that appear in the documentation and in fragment headers and
+are no board's image: the bare-metal probes' builds, the lists a fragment's header gives as its
+own example, and the P4 build that draws the screen into a frame buffer with no panel.
+<code>sink_profile.py check-docs</code> reads the firmware's README and fragments, the Hearth pages, the
+ESP32 platform pages and the ESP32 planning notes, and fails on a <code>sdkconfig.defaults;sdkconfig...</code>
+list that is neither a profile's, nor listed here, nor a CI test configuration (<code>sdkconfig.ci*</code>).
+The same command with <code>--write</code> regenerates the profile table in the firmware's README.</p>
+<h2 id="budgets">Budgets<a class="headerlink" href="#budgets" title="Permanent link">&para;</a></h2>
+<p><code>budget</code> has three upper limits in bytes. <code>null</code> means the figure is not held.</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th><code>app_bytes_max</code></th>
+<th><code>bootloader_bytes_max</code></th>
+<th><code>internal_static_bytes_max</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s3-n16r8</code></td>
+<td>2,750,000</td>
+<td>32,768</td>
+<td>185,000</td>
+</tr>
+<tr>
+<td><code>c6-16mb</code></td>
+<td>2,000,000</td>
+<td>32,768</td>
+<td>117,000</td>
+</tr>
+<tr>
+<td><code>c6-4mb</code></td>
+<td>1,966,080</td>
+<td>32,768</td>
+<td>117,000</td>
+</tr>
+<tr>
+<td><code>p4-rev1</code></td>
+<td>3,400,000</td>
+<td>24,576</td>
+<td>not held</td>
+</tr>
+<tr>
+<td><code>p4-rev3</code></td>
+<td>3,950,000</td>
+<td>24,576</td>
+<td>175,000</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>The app image</strong> is <code>iclforge_hearth_sink.bin</code> in the build directory. <code>c6-4mb</code>'s limit is the
+  size of an application slot in <code>partitions_c6.csv</code>.</li>
+<li><strong>The bootloader</strong> is <code>bootloader/bootloader.bin</code>. On the P4 it starts at <code>0x2000</code> and the
+  partition table is at <code>0x8000</code>, which leaves it 24,576 bytes.</li>
+<li><strong>Static internal RAM</strong> is the <code>DIRAM</code> figure of <code>idf.py size --format json2</code>. Every byte of it is
+  a byte the heap does not have at run time, on any board. The guard judges it only when it is
+  given the size report (<code>--size-json</code>).</li>
+</ul>
+<p>The budgets need a compiled build. A configured build is checked for everything else.</p>
+<h2 id="the-guard">The guard<a class="headerlink" href="#the-guard" title="Permanent link">&para;</a></h2>
+<p><code>sink_profile.py verify &lt;profile&gt; --build-dir &lt;dir&gt;</code> holds a build directory to its profile. It
+works on a directory that has been configured (<code>idf.py reconfigure</code>) or built. Each finding is one
+line, <code>&lt;profile&gt;: [rule] message</code>, and the command exits 1. With none it prints
+<code>&lt;profile&gt;: the build holds to its profile</code> and exits 0.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Reported when</th>
+<th>The message, for example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fragments</code></td>
+<td>The <code>SDKCONFIG_DEFAULTS</code> in the build's <code>CMakeCache.txt</code> is not the profile's list, in order, with the fragments of the overlays named; or it has a file that no named overlay declares</td>
+<td><code>the build was given sdkconfig.defaults;sdkconfig.hw;... and the profile's are ...</code></td>
+</tr>
+<tr>
+<td><code>identity</code></td>
+<td>The build carries no profile id, another profile's, or a hash from another definition of this one</td>
+<td><code>the build carries hash 9ed6f4eb5c70 and profile s3-n16r8 is 156f7310e8d0: it was configured from another definition</code></td>
+</tr>
+<tr>
+<td><code>locked</code></td>
+<td>A locked key has another value in <code>sdkconfig</code></td>
+<td><code>CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM is 0, the profile locks 1</code></td>
+</tr>
+<tr>
+<td><code>unplaced</code></td>
+<td>A watched key is on or has a value, and the profile neither locks nor frees it</td>
+<td><code>CONFIG_ICLFORGE_EXAMPLE_NEW_STACK_BYTES=4096 matches a watch pattern and the profile neither locks nor frees it</code></td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td>The app image, the bootloader or static internal RAM is over its limit</td>
+<td><code>static internal RAM (DIRAM) is 190,112 bytes, over the profile's 185,000</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>--github</code> prints the findings as GitHub annotations. <code>--warn-only</code> reports them as warnings and
+exits 0.</p>
+<h2 id="how-ci-enforces-a-profile">How CI enforces a profile<a class="headerlink" href="#how-ci-enforces-a-profile" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>When</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR Gate, the static checks (<code>_static.yml</code>)</td>
+<td>Every pull request and merge-queue entry</td>
+<td><code>check-docs</code>; the tools' own tests, which hold <code>profiles.json</code> to the workflow's build steps, to the release rules in <code>tools/ci/check_firmware_package.py</code> and to the baselines; and <code>check-change</code> for the Kconfig (<a href="#a-new-kconfig-key">below</a>)</td>
+</tr>
+<tr>
+<td>PR Gate, the <code>ESP32 profiles</code> job (<code>_profiles.yml</code>)</td>
+<td>A pull request that changes <code>firmware/hearth-sink/</code>, <code>firmware/esp-idf/</code> or the two profile tools; every merge-queue entry and push to <code>main</code></td>
+<td>Every profile configured with <code>idf.py reconfigure</code> in the <code>espressif/idf:v6.1</code> container and passed to <code>verify</code>: the fragments, the identity, the locked values and the unplaced keys. Nothing is compiled, so no budget is judged</td>
+</tr>
+<tr>
+<td>The build jobs of <code>_build.yml</code>, called by <code>ci.yml</code></td>
+<td>After a merge to <code>main</code> whose changes reach the ESP builds, in the nightly run and in a dispatched run</td>
+<td>Each profile built, measured with <code>idf.py size</code> and passed to <code>verify</code> with the budgets; the release images packaged</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>ESP32 profiles</code> job is where a pull request that changes a fragment's value or the default of
+a locked key fails before it merges, with the guard's own <code>[locked]</code> or <code>[unplaced]</code> line
+(<a href="https://github.com/iainchesworthlabs/iclforge/pull/1506">#1506</a>). It also checks merge-queue
+entries, which is where two changes that each pass alone first meet.</p>
+<h3 id="the-build-jobs">The build jobs<a class="headerlink" href="#the-build-jobs" title="Permanent link">&para;</a></h3>
+<p>Each board build in <code>_build.yml</code> is the same five commands with the profile's id:</p>
+<ol>
+<li><code>sink_profile.py defaults &lt;profile&gt;</code> gives the <code>SDKCONFIG_DEFAULTS</code> string.</li>
+<li><code>sink_profile.py identity &lt;profile&gt; --cmake</code> gives the two <code>-D</code> options that put the id and the
+   hash in the image.</li>
+<li><code>idf.py ... build</code> builds into a directory of its own, with its own <code>sdkconfig</code>.</li>
+<li><code>idf.py size --format json2</code> writes the size report.</li>
+<li><code>sink_profile.py verify &lt;profile&gt; --size-json ...</code> holds the build to the profile, and a
+   finding fails the step.</li>
+</ol>
+<p>A profile with a release image then goes to
+<code>tools/hearth/package_firmware.py package --profile &lt;profile&gt;</code>, which runs the guard again and
+refuses a build that is not the profile, or a profile whose image has another name.</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Job in <code>_build.yml</code></th>
+<th>What CI does with it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s3-n16r8</code></td>
+<td><code>build-esp32s3</code></td>
+<td>Built, verified, packaged as <code>hearth-sink-esp32s3</code>. Built a second time with the <code>qemu-net</code> overlay and run under QEMU</td>
+</tr>
+<tr>
+<td><code>c6-4mb</code></td>
+<td><code>build-esp32c3</code></td>
+<td>Built, verified, packaged as <code>hearth-sink-esp32c6</code></td>
+</tr>
+<tr>
+<td><code>c6-16mb</code></td>
+<td><code>build-esp32c3</code></td>
+<td>Built, verified, packaged as <code>hearth-sink-esp32c6-16mb</code></td>
+</tr>
+<tr>
+<td><code>p4-rev1</code></td>
+<td><code>build-esp32c3</code></td>
+<td>Built, verified, packaged as <code>hearth-sink-esp32p4-rev1</code></td>
+</tr>
+<tr>
+<td><code>p4-rev3</code></td>
+<td><code>build-esp32c3</code></td>
+<td>Built, verified, packaged as <code>hearth-sink-esp32p4-rev3</code></td>
+</tr>
+<tr>
+<td><code>p4-rev1</code> (again)</td>
+<td><code>build-esp32c3</code></td>
+<td>Built with the stage timers on, and verified</td>
+</tr>
+</tbody>
+</table>
+<p>The QEMU run of <code>s3-n16r8</code> is the one place CI plays a board's release configuration. It checks
+that <code>GET /hardware</code> reports the profile's id and hash, plays an AC-3 and two E-AC-3 streams over
+<code>POST /play</code>, and looks on the console for the lines that say the rings and stacks are where the
+profile locks them (<code>sink_profile.py expect-console s3-n16r8</code> prints those lines). QEMU has no
+Wi-Fi, so it says nothing about the heap a board has left. The C6 and the P4 have no emulator and
+are built without being run.</p>
+<p>The job <code>package-esp32-firmware</code> then writes the manifest and runs
+<code>tools/ci/check_firmware_package.py</code> over every image: chip, revisions, flash size, PSRAM and no
+network built in. A test holds those rules to each profile's <code>image</code>.</p>
+<p>Two details of the jobs:</p>
+<ul>
+<li>Every guard step has <code>if: !cancelled()</code>, so it runs when an earlier step of its job has failed
+  (<a href="https://github.com/iainchesworthlabs/iclforge/pull/1491">#1491</a>,
+  <a href="https://github.com/iainchesworthlabs/iclforge/pull/1499">#1499</a>). The sink builds share their
+  jobs with the minimum-footprint probes. While a probe was failing on <code>main</code>, the steps after it
+  were skipped, and a wrong static-RAM budget on the C6 went unreported until a run on a board
+  showed it.</li>
+<li>The repository variable <code>ESP32_PROFILE_GUARD=warn</code> turns the guard's findings into warnings in
+  all of these jobs. It is not set.</li>
+</ul>
+<h3 id="a-new-kconfig-key">A new Kconfig key<a class="headerlink" href="#a-new-kconfig-key" title="Permanent link">&para;</a></h3>
+<p>A pull request that adds a Kconfig key the guard watches has to place it in the profiles in the
+same pull request (<a href="https://github.com/iainchesworthlabs/iclforge/pull/1504">#1504</a>). The static
+checks run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>tools/hearth/sink_profile.py<span class="w"> </span>check-change<span class="w"> </span>--base<span class="w"> </span>&lt;base<span class="w"> </span>commit&gt;
+</code></pre></div>
+<p>It needs no ESP-IDF. <code>tools/hearth/kconfig_scan.py</code> reads the two Kconfig files a <code>hearth_sink</code>
+build configures, <code>firmware/hearth-sink/main/Kconfig.projbuild</code> and
+<code>firmware/esp-idf/iclforge/Kconfig</code>, at the head and at the base. The command reports two things:</p>
+<ul>
+<li><strong>A key the change adds</strong> that matches a <code>watch</code> pattern, is not <code>free</code>, and is in the
+  configuration of a profile that does not lock it. Whether a key is in a profile's configuration
+  is worked out from its <code>depends on</code> lines and the <code>if</code> blocks around it, against the profile's
+  target and locked values. A bool counts only when it has a plain <code>default y</code>.</li>
+<li><strong>A lock on a key no Kconfig declares</strong>: a <code>CONFIG_ICLFORGE_*</code> key locked to something other than
+  <code>n</code>. That is a key that was removed, or a misspelt lock.</li>
+</ul>
+<p>The message names the file, the key and the profiles. For a new <code>int</code> key with a default, on one
+line:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kconfig: [kconfig] firmware/hearth-sink/main/Kconfig.projbuild: CONFIG_ICLFORGE_EXAMPLE_NEW_STACK_BYTES
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>is new and the guard watches it, and it is in c6-16mb, c6-4mb, p4-rev1, p4-rev3,
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>s3-n16r8, which neither lock nor free it: lock its value in profiles.json (the hash
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>moves: baselines are re-recorded or accepted, planning/esp32-platform-profiles.md &#39;Changing a
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>profile&#39;), or name it in `free`
+</code></pre></div>
+<p>The fix is one of two edits to <code>profiles.json</code>: lock the key in every profile named, at the value
+that profile's build resolves, or add it to <code>free</code> with the reason. Locking a key changes the
+profile's hash, so the baselines need a decision too (<a href="#baselines">below</a>).</p>
+<p>Where the scan cannot tell whether a key is in a profile (a condition on a symbol the profile does
+not lock), it reports nothing, and the <code>ESP32 profiles</code> job decides from the configured build.
+<code>check-change --all</code> treats every key as new, which checks the whole tree.</p>
+<h2 id="which-profile-a-running-board-is">Which profile a running board is<a class="headerlink" href="#which-profile-a-running-board-is" title="Permanent link">&para;</a></h2>
+<p><code>GET /hardware</code> answers it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>http://&lt;board&gt;/hardware
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field of the reply</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>profile</code></td>
+<td>The profile's id, such as <code>s3-n16r8</code></td>
+</tr>
+<tr>
+<td><code>profile_hash</code></td>
+<td>The hash of the definition the image was built from</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>The image's version: a release's tag, or <code>git describe</code> of the checkout it was built from</td>
+</tr>
+<tr>
+<td><code>target</code>, <code>chip</code>, <code>revision</code>, <code>psram_bytes</code></td>
+<td>The chip, its revision and its PSRAM</td>
+</tr>
+</tbody>
+</table>
+<p>Compare <code>profile</code> and <code>profile_hash</code> with <code>sink_profile.py identity &lt;profile&gt;</code> in your checkout:</p>
+<table>
+<thead>
+<tr>
+<th><code>/hardware</code> says</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The id and the same hash</td>
+<td>The image was built from the profile as your checkout defines it</td>
+</tr>
+<tr>
+<td>The id and another hash</td>
+<td>The image was built from another definition of the profile: an older or a newer <code>profiles.json</code></td>
+</tr>
+<tr>
+<td>Two empty strings</td>
+<td>The image was built without the identity options, for example with the plain <code>idf.py</code> commands on the board pages</td>
+</tr>
+</tbody>
+</table>
+<p>Two more places help:</p>
+<ul>
+<li>
+<p><strong>The boot line.</strong> At boot, once the Sendspin player has started, the board prints one
+  <code>budget:</code> line on its console, which <code>GET /log</code> also returns, and another if a network comes up
+  later. It does not name the profile. It shows what the profile's placement asks of internal RAM
+  on this boot. The line has this form:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>budget: when=boot net=1 internal_free=90931 largest=31744 ask_ring=0 ask_decode_stack=0 ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 headroom=23552 floor=0 verdict=ok
+</code></pre></div>
+<p><code>ask_ring</code> and <code>ask_decode_stack</code> are 0 when the profile puts the HTTP play's ring and stack in
+PSRAM. <code>floor</code> is the profile's <code>ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES</code>. <code>verdict</code> is <code>ok</code>,
+<code>short-block</code> (no free block as large as the biggest ask), <code>short-total</code> (not that much free in
+all) or <code>below-floor</code> (an HTTP play would be refused, which is what the C6 profiles say). The
+line is a lower bound: the decoder's own allocations come after it.</p>
+</li>
+<li>
+<p><strong><code>GET /firmware</code>.</strong> It reports the image in each of the two application slots (<code>running</code> and
+  <code>other</code>, each with its <code>version</code> and <code>state</code>), the flash size and the partition table. It has no
+  profile id. It tells a 4 MB C6 from a 16 MB one, and shows which build is in each slot.</p>
+</li>
+</ul>
+<h2 id="building-a-board-from-its-profile">Building a board from its profile<a class="headerlink" href="#building-a-board-from-its-profile" title="Permanent link">&para;</a></h2>
+<p>These are CI's commands. They need ESP-IDF v6.1 and a checkout of the repository. Give each
+profile its own build directory and its own <code>sdkconfig</code> in it, as below: ESP-IDF otherwise keeps
+one <code>sdkconfig</code> in the project directory, and a second profile's build inherits the first's.
+Build one profile at a time from one checkout, because the component manager downloads into the
+project directory.</p>
+<p>The target is the profile's, from <a href="#the-profiles">the table</a>.</p>
+<h3 id="in-wsl-or-on-linux">In WSL or on Linux<a class="headerlink" href="#in-wsl-or-on-linux" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>.<span class="w"> </span><span class="nv">$IDF_PATH</span>/export.sh
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>firmware/hearth-sink
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nv">id</span><span class="o">=</span>s3-n16r8
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="nv">target</span><span class="o">=</span>esp32s3
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="nv">dir</span><span class="o">=</span><span class="nv">$HOME</span>/build/hearth-<span class="nv">$id</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nv">defaults</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>python3<span class="w"> </span>../../tools/hearth/sink_profile.py<span class="w"> </span>defaults<span class="w"> </span><span class="nv">$id</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>-a<span class="w"> </span>identity<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>python3<span class="w"> </span>../../tools/hearth/sink_profile.py<span class="w"> </span>identity<span class="w"> </span><span class="nv">$id</span><span class="w"> </span>--cmake<span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>idf.py<span class="w"> </span>-B<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">&quot;</span><span class="w"> </span>-DSDKCONFIG<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">/sdkconfig&quot;</span><span class="w"> </span>-DIDF_TARGET<span class="o">=</span><span class="nv">$target</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="s2">&quot;-DSDKCONFIG_DEFAULTS=</span><span class="nv">$defaults</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">identity</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>build
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>idf.py<span class="w"> </span>-B<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">&quot;</span><span class="w"> </span>size<span class="w"> </span>--format<span class="w"> </span>json2<span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">/size.json&quot;</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>python3<span class="w"> </span>../../tools/hearth/sink_profile.py<span class="w"> </span>verify<span class="w"> </span><span class="nv">$id</span><span class="w"> </span>--build-dir<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">&quot;</span><span class="w"> </span>--size-json<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dir</span><span class="s2">/size.json&quot;</span>
+</code></pre></div>
+<h3 id="on-windows">On Windows<a class="headerlink" href="#on-windows" title="Permanent link">&para;</a></h3>
+<p>Use PowerShell 7 (<code>pwsh</code>). ESP-IDF refuses Git Bash and other MSYS shells
+(<code>MSys/Mingw is not supported</code>), and the size report has to be written as UTF-8, which
+PowerShell 7's <code>&gt;</code> does.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">.</span> <span class="nv">$env:IDF_PATH</span><span class="p">\</span><span class="n">export</span><span class="p">.</span><span class="n">ps1</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd </span><span class="n">firmware</span><span class="p">\</span><span class="n">hearth-sink</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nv">$id</span> <span class="p">=</span> <span class="s2">&quot;s3-n16r8&quot;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nv">$target</span> <span class="p">=</span> <span class="s2">&quot;esp32s3&quot;</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nv">$dir</span> <span class="p">=</span> <span class="s2">&quot;D:\build\hearth-$id&quot;</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="nv">$defaults</span> <span class="p">=</span> <span class="n">python</span> <span class="p">..\..\</span><span class="n">tools</span><span class="p">\</span><span class="n">hearth</span><span class="p">\</span><span class="n">sink_profile</span><span class="p">.</span><span class="n">py</span> <span class="n">defaults</span> <span class="nv">$id</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="nv">$identity</span> <span class="p">=</span> <span class="n">-split</span> <span class="p">(</span><span class="n">python</span> <span class="p">..\..\</span><span class="n">tools</span><span class="p">\</span><span class="n">hearth</span><span class="p">\</span><span class="n">sink_profile</span><span class="p">.</span><span class="n">py</span> <span class="n">identity</span> <span class="nv">$id</span> <span class="p">-</span><span class="n">-cmake</span><span class="p">)</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">idf</span><span class="p">.</span><span class="n">py</span> <span class="n">-B</span> <span class="nv">$dir</span> <span class="s2">&quot;-DSDKCONFIG=$dir\sdkconfig&quot;</span> <span class="s2">&quot;-DIDF_TARGET=$target&quot;</span> <span class="s2">&quot;-DSDKCONFIG_DEFAULTS=$defaults&quot;</span> <span class="nv">@identity</span> <span class="n">build</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">idf</span><span class="p">.</span><span class="n">py</span> <span class="n">-B</span> <span class="nv">$dir</span> <span class="n">size</span> <span class="p">-</span><span class="n">-format</span> <span class="n">json2</span> <span class="p">&gt;</span> <span class="s2">&quot;$dir\size.json&quot;</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="n">python</span> <span class="p">..\..\</span><span class="n">tools</span><span class="p">\</span><span class="n">hearth</span><span class="p">\</span><span class="n">sink_profile</span><span class="p">.</span><span class="n">py</span> <span class="n">verify</span> <span class="nv">$id</span> <span class="p">-</span><span class="n">-build-dir</span> <span class="nv">$dir</span> <span class="p">-</span><span class="n">-size-json</span> <span class="s2">&quot;$dir\size.json&quot;</span>
+</code></pre></div>
+<h3 id="after-the-build">After the build<a class="headerlink" href="#after-the-build" title="Permanent link">&para;</a></h3>
+<p><code>verify</code> should print <code>&lt;profile&gt;: the build holds to its profile</code>. To check the configuration
+without compiling, replace <code>build</code> with <code>reconfigure</code> and run <code>verify</code> without <code>--size-json</code>. That
+is what the <code>ESP32 profiles</code> job does, and it judges everything but the budgets.</p>
+<p>Flash the build with <code>idf.py -B &lt;dir&gt; -p &lt;PORT&gt; flash monitor</code>. The board pages cover the port, the
+reset after a flash, joining a network and pairing: <a href="../../../hearth/sink-esp32-s3/#build-and-flash">An ESP32-S3 sink</a>,
+<a href="../../../hearth/sink-esp32-c6/#build-and-flash">An ESP32-C6 sink</a> and
+<a href="../../../hearth/sink-esp32-p4/#build-and-flash">An ESP32-P4 sink</a>. A profile build has no network
+built in. A board keeps the network it has stored through a flash, and a new board is given one
+as those pages describe.</p>
+<p>The plain <code>idf.py</code> commands on those pages build from the same fragment lists. The image they make
+reports no profile, and <code>verify</code> fails it under <code>identity</code>.</p>
+<p><code>python tools/hearth/bench_flash.py build &lt;profile&gt; --tag &lt;tag&gt;</code> runs the same steps and can be
+started from any shell, Git Bash included. It reads the ESP-IDF location and the build root from
+<code>tools/hearth/bench.json</code>, which describes the project's own bench; the environment variable
+<code>ICLFORGE_BENCH</code> names another file of the same form for another machine.
+<a href="../board-bench/#the-bench-tools">Testing and benchmarking the ESP32 boards</a> covers that tool and
+the rest of the bench.</p>
+<h2 id="changing-a-profile">Changing a profile<a class="headerlink" href="#changing-a-profile" title="Permanent link">&para;</a></h2>
+<p>A change to a profile is one pull request that carries the fragment or Kconfig change and the
+matching edit to <code>profiles.json</code>. That covers a new value in a fragment, a fragment added to or
+moved in a list, a new default for a locked key, and a new key.</p>
+<ol>
+<li><strong>Make the change and configure each affected profile</strong>, with the commands above and
+   <code>reconfigure</code>. A change to <code>sdkconfig.sendspin</code> or to a Kconfig default can reach every
+   profile.</li>
+<li>
+<p><strong>Read what the guard reports.</strong> Each line is a decision to make:</p>
+<table>
+<thead>
+<tr>
+<th>The guard says</th>
+<th>What changed</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[locked] CONFIG_X is A, the profile locks B</code></td>
+<td>The value a board gets</td>
+<td>Lock the new value if it is meant; otherwise fix the fragment or the default</td>
+</tr>
+<tr>
+<td><code>[unplaced] CONFIG_X=A matches a watch pattern ...</code></td>
+<td>A new key that places or sizes something</td>
+<td>Lock it in the profile, or name it in <code>free</code> with the reason</td>
+</tr>
+<tr>
+<td><code>[fragments] the build was given ... and the profile's are ...</code></td>
+<td>The list or its order</td>
+<td>Edit the profile's <code>fragments</code>, and the build step if a file was added</td>
+</tr>
+<tr>
+<td><code>[budget] ... over the profile's ...</code></td>
+<td>The image grew</td>
+<td>Reduce it, or raise the budget in the same pull request and say why</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li>
+<p><strong>Update <code>profiles.json</code></strong>, by hand or with
+   <code>sink_profile.py snapshot &lt;profile&gt; --build-dir &lt;dir&gt; --write</code>, which rewrites that profile's
+   <code>locked</code> from the configured build. It prints a <code>note:</code> for every key a fragment asks for that
+   the build resolved differently. Review the diff: a snapshot drops a hand-made lock on a free
+   key.</p>
+</li>
+<li><strong>Configure again.</strong> The hash has changed, so the first build directory now fails under
+   <code>identity</code>. A fresh <code>identity --cmake</code> and <code>reconfigure</code> should hold.</li>
+<li><strong>Regenerate the README's table</strong> when the fragments, the image or the boards changed:
+   <code>python tools/hearth/sink_profile.py check-docs --write</code>.</li>
+<li><strong>Run the tools' tests</strong>: <code>python -m unittest discover --start-directory tools/hearth --pattern 'test_*.py'</code>.
+   They hold the file to the workflow, the release rules and the baselines.</li>
+</ol>
+<h3 id="baselines">Baselines<a class="headerlink" href="#baselines" title="Permanent link">&para;</a></h3>
+<p><code>firmware/hearth-sink/baselines/</code> has one file for each profile a bench board runs: <code>s3-n16r8</code>,
+<code>c6-16mb</code>, <code>p4-rev1</code> and <code>p4-rev3</code>. A baseline is a recorded run of the board
+suite (<code>tools/hearth/board_suite.py</code>): the figures of a fixed list of plays on that profile's
+image, and the board's boot line. <code>c6-4mb</code> has none, because no bench board runs
+it. <a href="../board-bench/#the-play-suite">Testing and benchmarking the ESP32 boards</a> describes the
+suite, its tolerances and how a baseline is recorded.</p>
+<p>Each baseline carries the hash of the profile it was recorded under, and an edit to the profile
+changes the hash. A test fails the pull request until it does one of two things for every
+baseline whose hash no longer matches:</p>
+<table>
+<thead>
+<tr>
+<th>The edit</th>
+<th>What the pull request carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A locked value changed</td>
+<td>The baseline recorded again on a board, from an image built under the new hash (<code>board_suite.py run ... --record</code>)</td>
+</tr>
+<tr>
+<td>A key was added at the value it already had, so no figure can have moved</td>
+<td>An entry <code>profiles.&lt;profile&gt;.baseline_accepted</code> in <code>firmware/hearth-sink/suite.json</code> with the profile's new hash and the reason</td>
+</tr>
+</tbody>
+</table>
+<p>An acceptance names one hash. The next edit to the profile changes the hash again and the test
+asks again. When a baseline is later re-recorded, its acceptance is removed; the test fails on one
+that is left behind.</p>
+<p>The suite refuses to run on a board whose <code>/hardware</code> reports another profile or another hash, so
+a baseline is always recorded from the definition in the checkout.</p>
+<h3 id="adding-a-profile">Adding a profile<a class="headerlink" href="#adding-a-profile" title="Permanent link">&para;</a></h3>
+<p>Add the entry with an empty <code>locked</code>, configure it, and run <code>snapshot --write</code> to fill it; <code>verify</code>
+says <code>locks no key: run snapshot</code> until then. Add its build step to <code>_build.yml</code> in the form of
+the others, and its id to the list in <code>tools/hearth/test_sink_profile.py</code> that holds the workflow
+to the file. The <code>ESP32 profiles</code> job picks the new profile up from <code>sink_profile.py list</code>.</p>
+<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md"><code>planning/esp32-platform-profiles.md</code></a>
+  is the design record, with the board suite, its tolerances and each baseline's figures.</li>
+<li><a href="https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#build-profiles">The firmware's README</a>
+  has the generated profile table and everything else about <code>hearth_sink</code>.</li>
+<li><a href="../board-bench/">Testing and benchmarking the ESP32 boards</a> covers what is tested where, the
+  play suite, the baselines and the bench tools.</li>
+<li><a href="../../../hearth/sink-firmware/">Sink firmware</a> covers installing a release image and updating a
+  board over its network.</li>
+<li><a href="../">Bare metal</a> is the overview of the parts.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../../javascripts/enhancements.js"></script>
+      
+        <script src="../../../javascripts/hero-stats.js"></script>
+      
+    
+  </body>
+</html>
