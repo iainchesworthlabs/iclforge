@@ -94,7 +94,7 @@ void feed(OutputStage& stage, const Clip& clip, std::size_t first, std::size_t l
         for (std::size_t ch = 0; ch < kChannels; ++ch) {
             views[ch] = std::span<const float>(clip.bed[ch]).subspan(at, n);
         }
-        stage.submit({}, RawFrame{.bed = views});
+        stage.submit({}, RawFrame{.objects = {}, .placements = {}, .bed = views});
     }
 }
 
@@ -332,9 +332,11 @@ TEST_CASE("truehd leg: a frame whose channels disagree in length is skipped, not
     for (std::size_t ch = 0; ch < kChannels; ++ch) {
         views[ch] = std::span<const float>(clip.bed[ch]).subspan(0, ch == 3 ? 1000 : 1536);
     }
-    stage.submit({}, RawFrame{.bed = views});
+    stage.submit({}, RawFrame{.objects = {}, .placements = {}, .bed = views});
     // A bed of five channels is not a 5.1 bed either.
-    stage.submit({}, RawFrame{.bed = std::span<const std::span<const float>>(views.data(), 5)});
+    stage.submit({}, RawFrame{.objects = {},
+                              .placements = {},
+                              .bed = std::span<const std::span<const float>>(views.data(), 5)});
 
     // The stream that follows is whole and decodes from its first unit.
     feed(stage, clip, 0, clip.frames(), 1536);
