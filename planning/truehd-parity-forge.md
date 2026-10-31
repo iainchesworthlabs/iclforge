@@ -104,7 +104,7 @@ name, or **read only**. "Silently dropped" means the run exits 0 and prints noth
 | Row and capability | DD+ (E-AC-3) | TrueHD | Gap | Size | Blocked by | Evidence |
 |---|---|---|---|---|---|---|
 | **L1** `play`, IEC 61937 passthrough | Exclusive-mode bursts to a receiver (`audio_io.cpp`) | `refuse_truehd("play", ...)` at `audio_io.cpp:992`. `libs/audio`'s `BitstreamFormat` has no TrueHD value (`libs/audio/include/iclforge/audio/passthrough.hpp:71`); the MAT framing exists (`libs/containers/src/iec61937/mat.cpp`). Nothing has been played into a receiver (`libs/containers/ERRATA.md`) | missing | L | `libs/audio` (another page), Q11 | `forge play THD` -> 4 here (`no passthrough backend`), so the refusal is **read only** |
-| **L2** `monitor`, decode and play | Decoded to the default output | `refuse_truehd("monitor", ...)` at `live_audio.cpp:239`. The decoder exists; the playback layer (`apps/shared/media/src/stream_playback.cpp`) is AC-3, E-AC-3 and AC-4 only (see M2). Whether `iclforge::audio::MonitorSink` takes 8 channels of 24-bit audio at 192 kHz was not read | missing | M | M2 | `forge monitor THD` -> 4 here; **read only** |
+| **L2** `monitor`, decode and play | Decoded to the default output | `refuse_truehd("monitor", ...)` at `live_audio.cpp:239`. The decoder exists; the playback layer (`apps/shared/media/src/stream_playback.cpp`) is AC-3, E-AC-3 and AC-4 only (see M2). Whether `iclforge::audio::MonitorSink` takes 8 channels of 24-bit audio at 192 kHz was not read | partial | S | M2 | Landed in part (2026-11-01): `monitor` plays a TrueHD or MLP stream through `MonitorSink` (shared mode, float32), the presentation chosen by `truehd-presentation=`; run here on a 5.1 fixture, 300 units, exit 0. Not run: eight channels, and 96 or 192 kHz, which a shared-mode device may refuse (the run then says so, exit 4). As audited: `forge monitor THD` -> 4 here; **read only** |
 | **L3** `spatial` | Objects onto Windows Spatial Sound | n/a: needs objects | n/a until Atmos | n/a | `planning/truehd.md` phase T2b | `forge spatial THD` -> 4 here |
 | **L4** `identify`, `devices`, `outputs` | Codec-blind, except that `outputs` reports AC-3 and E-AC-3 passthrough support | Passthrough support for MAT is not reported | n/a (follows L1) | n/a | L1 | **read only** |
 
@@ -159,8 +159,8 @@ A landed row says so in front of the audit's own words ("Landed ..., As audited:
 `apps/forge` after it, and phase 1, most of phase 3's metadata half and `qc` are among them.
 
 **Rows by gap and size, now.** 59 rows. `none` 38 (R1, R3, R4, R5, R6, R7, R8, R12, R13, R14, R15, P1, P3, P4, P5, T1, T2, T3, T4, T6, C1, C2, C3, C5, C6, X1, X2, X3, M1, M3, U2, U3, U5, U8, U10, X4, D2, D3;
-P3, T3 and T4 are provisional until the DEE set, P5 until question 15, and R1, R6, M1, P5, T1 and T2 landed on `feature/truehd-forge-cli`, and U2, U3, U5 and U10 on `feature/truehd-forge-gui`). `partial` 7 (R2, R9, R10, P2, U1, U9, D1): 4 are S and 3 are M.
-`missing` 5 (P7, L1, L2, M2, U6): 4 are M and 1 is L (L1).
+P3, T3 and T4 are provisional until the DEE set, P5 until question 15, and R1, R6, M1, P5, T1 and T2 landed on `feature/truehd-forge-cli`, and U2, U3, U5 and U10 on `feature/truehd-forge-gui`). `partial` 8 (R2, R9, R10, P2, L2, U1, U9, D1): 5 are S and 3 are M.
+`missing` 4 (P7, L1, M2, U6): 3 are M and 1 is L (L1).
 `n/a` 9 (R11, P6, T5, L3, L4, X5, U4, U7 and now C4, which the owner put out of scope until a source for CMAF, HLS or DASH signalling exists).
 Against the audit's 11 `none`, 15 `partial`, 25 `missing` and 8 `n/a`: 27 rows moved to `none` and one to `n/a`, so the missing and partial rows together went from 40 to 12 (U1 is now a partial row: the encode dialog is in, the project file is not).
 
