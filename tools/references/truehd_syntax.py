@@ -356,21 +356,21 @@ class Substream:
             out = bits.read(4)
             frac_bits = bits.read(4)
             f_shift = bits.read(3) - 1
-            bits.read(2)
+            bypass_bits = bits.read(2)  # bit 0 is the matrix's LSB bypass (ERRATA 69, provisional)
             noise_shift = bits.read(4)
             mask = bits.read(channels)
             if frac_bits - f_shift > MATRIX_SHIFT:
                 raise StreamError("matrix coefficients finer than 2^-15")
-            headers.append((out, frac_bits, f_shift, mask, noise_shift))
+            headers.append((out, frac_bits, f_shift, mask, noise_shift, bypass_bits & 1))
         matrices = []
-        for out, frac_bits, f_shift, mask, noise_shift in headers:
+        for out, frac_bits, f_shift, mask, noise_shift, bypass in headers:
             coeffs = [0] * (channels + NOISE_CHANNELS)
             for channel in range(channels):
                 if mask >> channel & 1:
                     coeffs[channel] = bits.signed(frac_bits + 2) << (
                         MATRIX_SHIFT - frac_bits + f_shift
                     )
-            matrices.append((out, coeffs, 0, noise_shift))
+            matrices.append((out, coeffs, bypass, noise_shift))
         if bits.read(1):
             raise StreamError("matrix extension (never written by DEE)")
         return matrices

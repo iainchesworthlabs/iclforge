@@ -915,6 +915,12 @@ the filter histories at an object restart (no difference at all); every fold of 
 `EX_00002a.thd` and `EX_00002b.thd` carry one matrix section in every interval. One block per access unit in all the owner's files, so a block-position effect is out too. In soll_e12 and EX_00002a the
 passes stop where the matrix count and the sample sizes jump (intervals 32 and 34), at the parse breaks of units 4072 and 4175, where the structure after the coefficients is not read. Open, and
 probably needing a controlled encode (DEE's licence ends 2026-11-06): one object with a tone and every other silent; two objects; silence; a constant on one object.
+**The controlled encodes (2026-10-31, the owner's DEE synthetic masters `ctl_a` to `ctl_d`; one master of 92 channels clustered to 12 elements).** Silence (`ctl_a`, 93 of 93 intervals, every stored byte 00) and one 1 kHz
+object (`ctl_b`, 93 of 93) pass. A constant on one object (`ctl_d`) passes 27 of 93, each failure off by a few low bits (XOR 03 to 07), with an output shift of 4 on every row. Two objects
+(`ctl_c`) fail at unit 0: "substreams differ in their sample counts". Its first restart parses to the end of the header (ten matrices, output shift 4, no quantiser step, four coded channels), and
+one matrix (output 2) has `field_2b` 1 and a coefficient of 2.0 on its own output, where every other matrix has 1.0. **Reading, provisional:** bit 0 of `field_2b` is the matrix's LSB bypass,
+one bit a sample in the block data, as in the standard matrix section (the doubled coefficient loses the low bit the bypass restores). The decoder, the Python reference and the writer apply it;
+`hb_substream3_object_bypass` holds it (it fails without it). To confirm: `ctl_c` decodes and its checks pass.
 
 ## Atmos, spec v3.6
 

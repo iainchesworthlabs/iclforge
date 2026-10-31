@@ -119,6 +119,8 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
                 matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
                 matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
                 matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
+                // Provisional (ERRATA.md entry 69): bit 0 of the two bits is the matrix's LSB bypass.
+                matrix.lsb_bypass = (matrix.field_2b & 1U) != 0;
                 const std::uint32_t mask = reader.read(channels);
                 for (int c = 0; c < channels; ++c) {
                     matrix.present[static_cast<std::size_t>(c)] = ((mask >> c) & 1U) != 0;
@@ -252,7 +254,7 @@ void write_object_matrices(BitWriter& writer, const BlockContext& context, const
         put_field(writer, matrix.out_ch, 4);
         put_field(writer, matrix.frac_bits, 4);
         put_field(writer, static_cast<unsigned>(matrix.f_shift + 1), 3);
-        put_field(writer, matrix.field_2b, 2);
+        put_field(writer, matrix.field_2b | (matrix.lsb_bypass ? 1U : 0U), 2);
         put_field(writer, matrix.field_m4, 4);
         put_field(writer, mask, channels);
     }
