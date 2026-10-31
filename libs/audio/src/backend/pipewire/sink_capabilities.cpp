@@ -36,6 +36,7 @@ std::expected<SinkAudioCapabilities, EdidError> read_sink_capabilities(
         capabilities.pcm = iclforge::pipewire::codec_listed(sink.codecs, "PCM");
         capabilities.ac3 = iclforge::pipewire::codec_listed(sink.codecs, "AC3");
         capabilities.eac3 = iclforge::pipewire::codec_listed(sink.codecs, "EAC3");
+        capabilities.mat = iclforge::pipewire::codec_enabled(sink.codecs, BitstreamFormat::kMat);
         return capabilities;
     }
     return std::unexpected(EdidError::kDeviceNotFound);

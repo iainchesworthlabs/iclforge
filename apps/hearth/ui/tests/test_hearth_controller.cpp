@@ -765,10 +765,11 @@ TEST_CASE("output_format_to_map: a bitstream link names what it carries, and no 
 
 namespace {
 
-QVariantMap picker_row(const char* id, bool ac3, bool eac3) {
+QVariantMap picker_row(const char* id, bool ac3, bool eac3, bool mat = false) {
     return {{QStringLiteral("id"), QString::fromLatin1(id)},
             {QStringLiteral("supportsAc3"), ac3},
-            {QStringLiteral("supportsEac3"), eac3}};
+            {QStringLiteral("supportsEac3"), eac3},
+            {QStringLiteral("supportsMat"), mat}};
 }
 
 bool takes(const QVariantList& rows, int index, const char* key) {
@@ -809,6 +810,23 @@ TEST_CASE("keep_held_link_marks: the endpoint a bitstream is open on stays liste
                              {{QStringLiteral("mode"), QStringLiteral("bitstreamAsAc3")},
                               {QStringLiteral("stream"), QStringLiteral("AC-3")}});
         CHECK(takes(rows, 1, "supportsAc3"));
+        CHECK_FALSE(takes(rows, 1, "supportsEac3"));
+    }
+
+    SECTION("a TrueHD link keeps its mark too, listed before or proved by the link it carries") {
+        const QVariantList before{picker_row("speakers", false, false),
+                                  picker_row("hdmi", true, true, true)};
+        QVariantList rows = probed;
+        keep_held_link_marks(rows, before, QStringLiteral("hdmi"), sending);
+        CHECK(takes(rows, 1, "supportsMat"));
+        CHECK_FALSE(takes(rows, 0, "supportsMat"));
+
+        rows = probed;
+        keep_held_link_marks(rows, {}, QStringLiteral("hdmi"),
+                             {{QStringLiteral("mode"), QStringLiteral("bitstream")},
+                              {QStringLiteral("stream"), QStringLiteral("TrueHD (MAT)")}});
+        CHECK(takes(rows, 1, "supportsMat"));
+        CHECK_FALSE(takes(rows, 1, "supportsAc3"));
         CHECK_FALSE(takes(rows, 1, "supportsEac3"));
     }
 
@@ -893,6 +911,15 @@ TEST_CASE("output_device_row: id/name/channels/speakers/rates/passthrough flags 
     CHECK(rates.at(1).toUInt() == 96000u);
     CHECK(row.value(QStringLiteral("supportsAc3")).toBool());
     CHECK_FALSE(row.value(QStringLiteral("supportsEac3")).toBool());
+    // Not a TrueHD output, and no platform has a run behind it.
+    CHECK_FALSE(row.value(QStringLiteral("supportsMat")).toBool());
+    CHECK_FALSE(row.value(QStringLiteral("matRun")).toBool());
+
+    device.supports_mat_passthrough = true;
+    const QVariantMap mat_row = iclforge::hearth::ui::output_device_row(device);
+    CHECK(mat_row.value(QStringLiteral("supportsMat")).toBool());
+    // Opening the link is not a run: the row stays "not run" until mat_status() says otherwise.
+    CHECK_FALSE(mat_row.value(QStringLiteral("matRun")).toBool());
 }
 
 // --- media_info_to_map() (the composite) -----------------------------------

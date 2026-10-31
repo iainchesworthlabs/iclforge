@@ -57,6 +57,7 @@
 #include "diagnostics_server.hpp"
 #include "engine_thread.hpp"
 #include "item_loader.hpp"
+#include "mat_status.hpp"
 #include "media_inspector.hpp"
 #include "network_output_status.hpp"
 #include "output_decision.hpp"
@@ -1497,6 +1498,14 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     row[QStringLiteral("sampleRates")] = rates;
     row[QStringLiteral("supportsAc3")] = device.supports_ac3_passthrough;
     row[QStringLiteral("supportsEac3")] = device.supports_eac3_passthrough;
+    // TrueHD as MAT: the endpoint opens the eight-channel link. `matRun` is whether a run on a
+    // receiver has shown this platform's MAT output to work, which none has (mat_status.hpp): the
+    // picker says "not run" beside the mark until one has, because an open is not a lit TrueHD
+    // indicator on the receiver.
+    row[QStringLiteral("supportsMat")] = device.supports_mat_passthrough;
+    row[QStringLiteral("matRun")] =
+        iclforge::hearth::mat_status(iclforge::audio::passthrough_backend()).run ==
+        iclforge::hearth::MatRun::kRun;
     return row;
 }
 
@@ -1528,12 +1537,15 @@ void keep_held_link_marks(QVariantList& rows, const QVariantList& before, const 
         const QVariantMap listed = was->toMap();
         row[QStringLiteral("supportsAc3")] = listed.value(QStringLiteral("supportsAc3")).toBool();
         row[QStringLiteral("supportsEac3")] = listed.value(QStringLiteral("supportsEac3")).toBool();
+        row[QStringLiteral("supportsMat")] = listed.value(QStringLiteral("supportsMat")).toBool();
     }
     const QString stream = output_format.value(QStringLiteral("stream")).toString();
     if (stream == QLatin1String("AC-3")) {
         row[QStringLiteral("supportsAc3")] = true;
     } else if (stream == QLatin1String("E-AC-3")) {
         row[QStringLiteral("supportsEac3")] = true;
+    } else if (stream == QLatin1String("TrueHD (MAT)")) {
+        row[QStringLiteral("supportsMat")] = true;
     }
     *held = row;
 }
