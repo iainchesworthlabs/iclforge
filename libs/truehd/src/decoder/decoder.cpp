@@ -649,6 +649,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     // before its matrices, as FFmpeg's decoder gives them (ERRATA.md entry 34).
     std::int32_t* const matrix_base =
         matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
+    if (config.lab.lower_rows_after_matrices && index == kObjectSubstream) {
+        // Lab: the object matrices read the bed as the substream before output it, after that
+        // substream's matrices, which still lie in `matrix_base` for these positions.
+        for (int i = 0; i < block; ++i) {
+            const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
+            std::copy_n(matrix_base + at, state.context.min_chan, rows_base + at);
+        }
+    }
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_matrices");
@@ -699,9 +707,6 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
             ++stats.samples;
         }
-    }
-    if (config.lab.lower_rows_after_matrices && index < kObjectSubstream) {
-        std::copy_n(matrix_base, static_cast<std::size_t>(block) * kRowStride, rows_base);
     }
 
     // The output: each channel from the matrix channel ch_assign assigns to it, shifted, and folded

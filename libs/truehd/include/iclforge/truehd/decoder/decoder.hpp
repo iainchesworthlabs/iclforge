@@ -70,7 +70,8 @@ enum class Strictness : std::uint8_t {
 // only with one on says what the point is; nothing else should set them.
 struct DecoderLab {
     int extension_variant = 0;  // BlockContext::object_extension_variant
-    // The object substream reads the lower substreams' rows after their matrices, not before.
+    // The object substream reads the bed rows as the substream before it output them, after that
+    // substream's matrices, not before.
     bool lower_rows_after_matrices = false;
     bool no_quantiser_mask = false;  // the object matrices do not mask their output's low bits
     bool reverse_matrices = false;   // the object matrices run last to first
