@@ -811,6 +811,23 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             if (header->matrices && state.context.object_matrices) {
                 state.object_last = *header->matrices;
                 state.object_have = header->matrices->count > 0;
+                if (header->matrices->count > 0 && counters.object_first_matrices.empty()) {
+                    for (unsigned m = 0; m < header->matrices->count; ++m) {
+                        const MatrixSpec& spec = header->matrices->items[m];
+                        DecoderCounters::ObjectMatrixHeader row;
+                        row.out = spec.out_ch;
+                        row.frac_bits = spec.frac_bits;
+                        row.f_shift = spec.f_shift;
+                        row.field_2b = spec.field_2b;
+                        row.field_m4 = spec.field_m4;
+                        for (int c = 0; c < kMaxChannels; ++c) {
+                            if (spec.present[static_cast<std::size_t>(c)]) {
+                                row.mask |= static_cast<std::uint16_t>(1U << c);
+                            }
+                        }
+                        counters.object_first_matrices.push_back(row);
+                    }
+                }
             }
             if (auto applied = apply_block_header(state, *header); !applied) {
                 state.running = false;

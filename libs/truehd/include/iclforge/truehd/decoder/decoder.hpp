@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -143,6 +144,16 @@ struct DecoderCounters {
     // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
     // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
     static constexpr std::size_t kObjectColumns = 24;
+    // The headers of the first matrix set the object substream sent (no coefficient).
+    struct ObjectMatrixHeader {
+        std::uint8_t out = 0;
+        std::uint8_t frac_bits = 0;
+        std::int8_t f_shift = 0;
+        std::uint8_t field_2b = 0;
+        std::uint8_t field_m4 = 0;
+        std::uint16_t mask = 0;
+    };
+    std::vector<ObjectMatrixHeader> object_first_matrices;
     std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
     // The first three intervals of the object substream, by matrix channel: the smallest and the
     // largest value and the number of samples that differ from the one before, in the rows as

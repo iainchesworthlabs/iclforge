@@ -153,6 +153,15 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
     std::printf("\n");
     if (stats) {
         print_stats(c, 12);
+        std::printf("    first object matrices (out frac f_shift 2b m4 mask-by-channel-0-first):\n");
+        for (const auto& m : c.object_first_matrices) {
+            std::printf("      out %2u frac %2u f_shift %2d 2b %u m4 %2u mask ", m.out, m.frac_bits,
+                        m.f_shift, m.field_2b, m.field_m4);
+            for (int ch = 0; ch < 12; ++ch) {
+                std::printf("%c", ((m.mask >> ch) & 1U) != 0 ? '1' : '.');
+            }
+            std::printf("\n");
+        }
         print_subsets(c);
     }
 }
