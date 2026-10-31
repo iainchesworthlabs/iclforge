@@ -69,7 +69,8 @@ elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "windows")
     # Like macos above, this branch runs on a desktop-hosted test binary for real:
     # libs/audio/CMakeLists.txt selects windows/ unconditionally under WIN32,
     # so every Windows CI leg's test build compiles and runs this file.
-    target_sources(iclforge-audio-tests PRIVATE backend/windows/test_windows_support.cpp)
+    target_sources(iclforge-audio-tests PRIVATE backend/windows/test_windows_support.cpp
+                                                backend/windows/test_windows_formats.cpp)
     target_include_directories(iclforge-audio-tests PRIVATE "${ICLFORGE_AUDIO_BACKEND_DIR}")
 endif()
 
