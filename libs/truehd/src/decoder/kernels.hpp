@@ -192,11 +192,13 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
         }
         int shift = kMatrixShift;
         if (fine.bits != 0) {
-            std::int64_t finer = 0;
+            // Rows of 32 bits and deltas of 32 bits can leave 64 bits in a sum of products: the
+            // sum is kept as unsigned, which wraps.
+            std::uint64_t finer = 0;
             for (int k = 0; k < count; ++k) {
-                finer += std::int64_t{row[channel[k]]} * fine.delta[k];
+                finer += static_cast<std::uint64_t>(std::int64_t{row[channel[k]]} * fine.delta[k]);
             }
-            sum = (sum << fine.bits) + finer;
+            sum = static_cast<std::int64_t>((static_cast<std::uint64_t>(sum) << fine.bits) + finer);
             shift += fine.bits;
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> shift) & keep;

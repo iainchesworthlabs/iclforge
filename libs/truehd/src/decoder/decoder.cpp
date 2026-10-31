@@ -497,7 +497,15 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                           ? kMatrixShift - spec.frac_bits - spec.f_shift
                                           : kMatrixShift - spec.frac_bits + spec.f_shift;
                     plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
-                    plan.fine[slot] = use_fine ? spec.ext_value[index] * (1 << std::max(scale, 0)) : 0;
+                    // A 16 bit delta at a coefficient place of 2^21 needs 37 bits.
+                    const std::int64_t fine =
+                        use_fine ? std::int64_t{spec.ext_value[index]} << std::max(scale, 0) : 0;
+                    if (fine != std::int64_t{static_cast<std::int32_t>(fine)}) {
+                        return std::unexpected(make_error(
+                            ErrorKind::kBadParameter,
+                            "an extension delta beyond 32 bits at its coefficient's scale"));
+                    }
+                    plan.fine[slot] = static_cast<std::int32_t>(fine);
                 }
             }
         }

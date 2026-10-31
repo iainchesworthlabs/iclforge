@@ -217,6 +217,33 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         REQUIRE(differs_from_none);
     }
 
+    SECTION("a finer part whose sum leaves 64 bits wraps, and is not an overflow") {
+        // Three rows of -2^31 and three deltas of -2^31 are three products of 2^62: the sum is
+        // 3 * 2^62 and does not fit a signed 64 bit register. A stream can make rows this large (huff_lsbs
+        // up to 31 under restart sync 0x31EC), so the kernel adds the products as unsigned and the
+        // samples are those of the sum modulo 2^64.
+        std::array<std::int32_t, kBlock * kStride> rows{};
+        for (int i = 0; i < kBlock; ++i) {
+            for (int k = 0; k < 3; ++k) {
+                rows[static_cast<std::size_t>(i * kStride + k)] = INT32_MIN;
+            }
+        }
+        const std::array<std::uint8_t, 3> channel = {0, 1, 2};
+        const std::array<std::int32_t, 3> coeff = {1, 1, 1};
+        const std::array<std::int32_t, 3> delta = {INT32_MIN, INT32_MIN, INT32_MIN};
+        const std::array<std::uint16_t, kBlock> bypass{};
+        kernels::apply_matrix(kBlock, 3, channel.data(), coeff.data(), 5, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), rows.data(), kStride, {},
+                              kernels::FineTerms{delta.data(), 16});
+        const std::uint64_t main = static_cast<std::uint64_t>(std::int64_t{INT32_MIN} * 3);
+        const std::uint64_t finer = 3U * (std::uint64_t{1} << 62U);
+        const auto total = static_cast<std::int64_t>((main << 16U) + finer);
+        for (int i = 0; i < kBlock; ++i) {
+            REQUIRE(rows[static_cast<std::size_t>(i * kStride + 5)] ==
+                    static_cast<std::int32_t>(static_cast<std::uint32_t>(total >> 31)));
+        }
+    }
+
     SECTION("the output takes the matrix channel it is given, shifts it by that matrix channel's shift, and folds it") {
         const std::array<std::uint8_t, 3> assign = {2, 0, 1};
         const std::array<std::int8_t, 3> shift = {0, 2, -3};  // by matrix channel

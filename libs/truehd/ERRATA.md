@@ -932,6 +932,8 @@ the decoder does it. (2) `field_2b` does not enter the coefficient divisor: with
 (a delta is therefore half a place at most); the decoder applies them, and the finer part stands with the matrices until they are replaced. With the finer parts soll_e12 passes 11 of 296 checks (from 9) and soll_sil6 18 of 357 (from 15); a scale of
 2^-width gives 10 and 15. Provisional: no hand-built stream holds the scale, only `test_kernels.cpp` holds the arithmetic. The failing intervals of ctl_c and EX_00002a are not helped (their objects hardly move; the deltas are near 0).
 Still open: the next parse break of soll_e12 (unit 11319, "block header") and of soll_sil6 (unit 19277), and the bulk of the failing checks in files without any extension (ctl_d, EX_00002b).
+**Limits of the finer part (robustness).** A delta is held at 2^-15 of the coefficient's place and in 32 bits: a matrix whose delta (16 bits at most) times its place (2^(15 - frac_bits + f_shift), up to 2^21) needs more is refused with `kBadParameter`
+(a delta of 1024 or more at `frac_bits` 0 and `f_shift` +6 is one). The sums of rows times deltas wrap at 64 bits and do not overflow. Held by `test_object_robustness.cpp` and `test_kernels.cpp`.
 
 **70. The object substream the encoder writes with matrices (`EncoderConfig::object_layout` `kBedMatrices`; entries 60, 63, 65, 68 and 69).** The structure the owner's discs and DEE's
 encodes have, as far as entries 65 to 69 establish it: substream 3 has `min_chan` 8 and `max_chan` = `max_matrix_chan` = objects - 1, codes only the channels 8 and up, and its matrices

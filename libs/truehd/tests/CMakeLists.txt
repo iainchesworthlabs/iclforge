@@ -15,6 +15,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_fixture_features.cpp
     decoder/test_handbuilt.cpp
     decoder/test_kernels.cpp
+    decoder/test_object_robustness.cpp
     encoder/test_coded_bits_simd.cpp
     decoder/test_substream3.cpp
     encoder/test_coding.cpp
