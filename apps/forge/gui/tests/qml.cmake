@@ -29,6 +29,8 @@ qt_add_executable(forge_gui_qmltests
     src/object_decode_controller.cpp
     src/object_decode_controller.hpp
     src/stream_player_controller.cpp
+    src/truehd_pcm_source.cpp
+    ../../shared/media/src/probe_truehd.cpp
     src/stream_player_controller.hpp
     src/background_jobs.hpp
     src/channel_geometry.cpp
@@ -199,6 +201,8 @@ target_link_libraries(forge_gui_qmltests
         iclforge::audio
         iclforge::containers
         iclforge::ac4
+        # TrueHD and MLP: the player, the QC and the encode tab (src/truehd_pcm_source.hpp).
+        iclforge::truehd
         # karaoke_authoring.cpp, recompiled here, writes a lyrics file beside a stream
         # through it, as forge-gui does (../CMakeLists.txt), and reads a file in a code page the
         # author chose with apps/shared/text-encoding's conversion.

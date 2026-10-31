@@ -1159,7 +1159,8 @@ ApplicationWindow {
         const path = url.toString().toLowerCase();
         if (path.endsWith("." + ProjectFile.suffix)) {
             window.openProjectFile(url);
-        } else if (path.endsWith(".ac3") || path.endsWith(".ec3")) {
+        } else if (path.endsWith(".ac3") || path.endsWith(".ec3") || path.endsWith(".thd") ||
+                   path.endsWith(".mlp")) {
             streamPlayerDialog.open();
             StreamPlayerController.openFile(url);
         } else {

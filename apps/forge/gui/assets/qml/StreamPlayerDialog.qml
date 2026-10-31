@@ -40,8 +40,9 @@ Dialog {
     FileDialog {
         id: spFileDialog
         objectName: "spFileDialog"
-        title: qsTr("Choose an AC-3 / E-AC-3 stream")
+        title: qsTr("Choose an AC-3, E-AC-3, AC-4 or TrueHD stream")
         nameFilters: [qsTr("AC-3 / E-AC-3 (*.ac3 *.ec3)"), qsTr("AC-4 (*.ac4)"),
+                      qsTr("TrueHD / MLP (*.thd *.mlp)"),
                       qsTr("All files (*)")]
         onAccepted: StreamPlayerController.openFile(selectedFile)
     }
@@ -99,7 +100,7 @@ Dialog {
         Text {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Decodes an already-encoded AC-3/E-AC-3 file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.")
+            text: qsTr("Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.")
             font.pixelSize: Theme.fontSmall
             color: Theme.neutral700
         }

@@ -29,6 +29,8 @@ qt_add_executable(forge-gui
     src/object_decode_controller.cpp
     src/object_decode_controller.hpp
     src/stream_player_controller.cpp
+    src/truehd_pcm_source.cpp
+    ../../shared/media/src/probe_truehd.cpp
     src/stream_player_controller.hpp
     src/background_jobs.hpp
     src/channel_geometry.cpp
@@ -380,6 +382,8 @@ target_link_libraries(forge-gui
         # AC-4 in the codec list, the QC, the player and the object page, through
         # the decoder's and the encoder's public APIs.
         iclforge::ac4
+        # TrueHD and MLP: the player, the QC and the encode tab (src/truehd_pcm_source.hpp).
+        iclforge::truehd
         # The Karaoke flow's lyrics: any of .lrc, .srt, .ass and .kar is read and written beside the
         # stream as the stream's own UTF-8 .lrc (the same place_lyrics_beside `forge encode lyrics=`
         # uses).
