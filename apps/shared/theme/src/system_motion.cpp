@@ -11,7 +11,8 @@ SystemMotion::SystemMotion(QObject* parent)
     // run with a core one, which qGuiApp would hand back as a QGuiApplication all the same.
     if (auto* app = qobject_cast<QGuiApplication*>(QCoreApplication::instance()); app != nullptr) {
         connect(app, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
-            if (state == Qt::ApplicationActive) {
+            // Qt::ApplicationState is a set of bits (Active is 0x4), so MSVC wants the bit tested (C26813).
+            if ((state & Qt::ApplicationActive) != 0) {
                 refresh();
             }
         });

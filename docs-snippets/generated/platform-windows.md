@@ -12,6 +12,8 @@
 | Live capture and PCM monitor | **Source**<br>confirmed on hardware<br>WASAPI | **Source**<br>experimental CI<br>compiled with the CLI |
 | IEC 61937 output | **Source**<br>confirmed on hardware<br>AC-3, E-AC-3 and signed Atmos | **Source**<br>experimental CI<br>no receiver run |
 | AC-4 decode and encode | **Next release**<br>built and tested in CI<br>forge and forge-gui decode and encode, Hearth decodes; decoded AC-4 plays through the PCM monitor | **Next release**<br>experimental CI<br>forge only |
+| TrueHD and MLP decode and encode | **Source**<br>built and tested in CI<br>library, C API and forge; not in forge-gui | **Source**<br>built and tested in CI<br>library, C API and forge; not in forge-gui |
 | AC-4 IEC 61937 output | **Unavailable**<br>WASAPI has no AC-4 subformat | **Unavailable**<br>WASAPI has no AC-4 subformat |
+| TrueHD IEC 61937 (MAT) output | **Limited**<br>built and tested in CI<br>MAT bursts to and from a file; no device output | **Limited**<br>built and tested in CI<br>MAT bursts to and from a file; no device output |
 | Per-application capture | **Source**<br>confirmed on hardware<br>Windows process loopback | **Source**<br>experimental CI<br>compiled; runtime untested |
 | Atmos spatial rendering | **Source**<br>confirmed on hardware<br>Windows Sonic accepted the stream | **Source**<br>experimental CI<br>compiled; runtime untested |

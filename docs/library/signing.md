@@ -6,7 +6,8 @@ optional step a front end applies to already-encoded frames: no encoder or decod
 signer, and the minimum-footprint archives leave it out. See [Object signing](../concepts/object-signing.md) for
 what this is *for* — a licensed decoder treats the EMDF container's `emdf_protection` field as a
 commitment to object decoding and refuses the whole stream if the tag does not check out; this
-computes the keyed tag that satisfies it.
+computes the keyed tag that satisfies it. The tag is an authenticity check, not content
+protection: it encrypts nothing and has no relation to Common Encryption or DRM.
 
 ```cpp
 const iclforge::base::crypto::SigningKey key{key_bytes};   // the operator's own, at runtime
@@ -118,9 +119,150 @@ either, and a frame is good under any of the keys; `sign-objects` takes one. The
 cannot be combined. `forge probe` reports whether an authenticity tag is present, with no key.
 There is no CLI command that signs an existing stream after encoding.
 
-Signing is E-AC-3 only: it protects the EMDF container of a DD+ JOC stream. AC-4 objects are not
-signed, and both `sign-objects` with `codec=ac4` and `verify-objects` on an AC-4 stream are usage
-errors.
+Signing here is E-AC-3 only: it protects the EMDF container of a DD+ JOC stream. AC-4 objects are not
+signed this way, and both `sign-objects` with `codec=ac4` and `verify-objects` on an AC-4 stream are
+usage errors. An AC-4 stream has its own, different signature: [AC-4 content signing](#ac-4-content-signing).
+
+## AC-4 content signing
+
+AC-4 has no EMDF tag to sign. Its signature is a different thing: **one** ECDSA P-256 signature over
+the whole stream, made with the operator's own private key and X.509 certificate chain and written
+after the last sync frame of a raw `.ac4` file. Nothing in the encoder or the decoder calls it. It
+is two layers: `iclforge/base/crypto/content_signature.hpp` (`iclforge::base`, which knows no codec:
+the signer information, signed information and chain in Thrift binary, and the signing and
+checking of them) and `iclforge/ac4/io/content_signature.hpp` (`iclforge::ac4`: where the blob sits
+and which bytes the digest covers). The sync frames are not touched, so a signed file decodes as the
+unsigned one.
+
+```cpp
+namespace crypto = iclforge::base::crypto;
+
+auto key = crypto::load_content_key(key_path);                  // the operator's own, PEM or DER
+auto credentials = crypto::make_credentials(std::move(*key), std::move(*chain));  // key matches leaf?
+crypto::SignOptions options;
+options.signed_date = crypto::format_iso8601_utc(now);          // "YYYY-MM-DDTHH:MM:SS", UTC, the time of signing
+options.chain_policy.valid_at = now;                            // refuse an expired chain now
+options.metadata.publisher_uuid = "3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84";   // your publisher account's UUID
+options.metadata.publisher_name = "Example Publisher";          // CS spec v2.6 section 5.3
+auto signed_stream = iclforge::ac4::sign_stream(stream, *credentials, options);
+
+crypto::VerifyPolicy policy;
+policy.trust_anchors = anchors;                                 // and/or policy.pins
+policy.now = now;
+const crypto::VerifyReport report = iclforge::ac4::verify_stream(*signed_stream, policy);
+// report.verdict: kValid, kChecksChainUnanchored or kInvalid; report.checks says which check
+```
+
+Full program: [`examples/ac4_content_signature.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/ac4_content_signature.cpp)
+— reads a stream's signature, and with a key and a chain signs and checks it. No key or chain is
+committed, so `ctest` runs it on a committed stream, which carries none, and what runs is the report
+path.
+
+**Keys and chains are the operator's.** `load_content_key` and `load_content_chain` read PEM
+(PKCS#8, SEC 1, certificates), DER or base64 of either, from a path or from
+`ICLFORGE_CONTENT_KEY_FILE` / `ICLFORGE_CONTENT_KEY` and `ICLFORGE_CONTENT_CHAIN_FILE`. The key
+is never written into an error or a log. The library carries no key, certificate or fingerprint of
+any issuer, so a verdict of valid needs the caller to name what it trusts.
+
+*What is wiped, and what is not.* `P256PrivateKey` zeroizes on destruction. Loading reads a key file
+straight into the buffer that is wiped afterwards (no stack copy; reserved at the file's size so
+it is not regrown), decodes base64 into a buffer reserved at its full size, and wipes the decoded
+bytes, the library's copy of `ICLFORGE_CONTENT_KEY`, and the intermediate values of each signature
+(the nonce and its inverse, and the key in the form the arithmetic uses). Signing does not branch
+on, or index by, the key. Not wiped, because the library does not own it: the process's
+environment block that `getenv` points into (what `ps` and `/proc` show; prefer a key *file*), the
+page cache and storage the file came from, swap and core dumps, any copy the caller makes, and a
+key read from a source of unknown size such as a pipe, which can be copied as it grows.
+
+**Three verdicts, and one is not "valid".** `verify_stream` always returns a report: every check, in
+order (structure, versions and methods, curve, chain parsed, chain valid, signed date, signature,
+signer information digest, content digest), and a verdict. The signature comes before the digests it
+holds because they carry weight only once it has verified (CS spec v2.6 §6.1, "verification order
+matters"); when it has not, the digest checks still run and say that they rest on a signature that
+did not verify, and the first fault is the signature's. `kValid` means every check passed *and*
+the chain leads to a `trust_anchors` certificate or a `pins` fingerprint the caller gave.
+`kChecksChainUnanchored` means every check passed and nothing the caller trusts vouches for the
+chain: the file agrees with its own signature, which says nothing about who made it.
+`kInvalid` carries the first fault (`DigestMismatch`, `SignatureInvalid`,
+`BadCredentialsForSigningContent`, `CertNotPrivilegedToSignContent`, ...) with a sentence naming it.
+A stream with no signature, or that is not AC-4, is an invalid report too (`BadOrMissingSignature`), so
+a caller that refuses and one that only reports share one path.
+
+**Who signed (CS spec v2.6 §5.3).** `SignOptions::metadata` carries the publisher (type, UUID, name),
+the product, the platform and the application, all of which the signature binds. The signature's
+nonce is 128 bytes drawn for each signature from `std::random_device` (a nonce of another length in
+`SignOptions::nonce` is refused), and `signed_date` is the time of signing, which the caller reads from
+its clock. A `publisher_uuid` that is not a UUID is refused when signing. The UUID is the PACE publisher
+account's, carried out of band and copied into the signer information; it is not in the signing
+certificate (the owner's sample names one that none of its four certificates carries), so it is never
+compared with the certificate and a verifier must not require it there. `check_publisher_uuid` compares
+it with the accounts the caller expects (`VerifyPolicy::expected_publisher_uuids`), which is all a
+verifier may do. The report carries what the signature says (`publisher`, `product`, `platform`,
+`application`, escaped, and trusted no further than the signer) and, in `notes`, the findings on the
+nonce and the UUID. `VerifyPolicy::operator_metadata` chooses what they do: `kReport` (the default)
+leaves the verdict alone; `kRequire` makes a nonce that is not 128 bytes, a UUID that is missing or
+malformed, or (when expected accounts are given) one that is none of them, an invalid report.
+
+**Time.** `TimeBasis::kNow` (the default, and CS spec §6.1 steps 3 and 4) judges every certificate valid at
+`policy.now`; `kSignedDate` judges them at the date the signature records, which is only as
+trustworthy as its signer; `kInstant` at a time the caller gives; `kIgnore` not at all. The report
+says which. A path is validated from its anchor down, so an expired certificate *above* an anchor does
+not matter. The sample the owner supplied has a CA certificate that expired before its signature was
+dated, which `kNow` correctly refuses; see `libs/ac4/ERRATA.md`.
+
+**High-s signatures are accepted.** ECDSA allows both `s` and `n - s` for the same message, and the
+specification asks for neither; so one valid signature can be rewritten as another valid one. The
+content digest, not the signature's bytes, is what identifies what was signed, and nothing here uses
+the signature bytes as an identifier. A caller that does should normalise `s` itself.
+
+**Where the signature is.** The trailer is found by walking the sync frames by their sizes (a size
+written with the 0xFFFF escape to 24 bits included), and the bytes after the last one are a
+trailer only if they begin as a content signature does. A damaged frame, an ID3v2 tag between
+frames (HLS packed audio) or any other byte run that is not a sync frame is not mistaken for one:
+`TrailerLocation::stray` counts those bytes, `verify_stream` names the byte where the frames stop,
+and signing, stripping and hashing refuse the stream.
+
+**What it does not do.** Raw `.ac4` only: CS spec v2.6 §8.3.2 puts signing an MP4 out of scope (it
+names no box that carries a signature), and `sign_stream` refuses a stream that opens with an MP4 box
+by name (`StreamSignatureErrorKind::kContainerNotSupported`). A blob with more than one signature
+entry is refused, as is a chain of more than eight certificates. No revocation. SHA-256 and P-256 only. The
+open questions on each are the first thing in `libs/ac4/ERRATA.md`.
+
+### In the CLI
+
+```bash
+forge ac4-encode in.wav out.ac4 192 sign-content content-key=signer.key content-chain=chain.pem
+forge ac4-sign in.ac4 signed.ac4 content-key=signer.key content-chain=chain.pem publisher-uuid=<your publisher UUID>
+forge ac4-verify signed.ac4 trust-anchor=root.pem                  # exit 6 unless valid and anchored
+forge decode signed.ac4 out.wav verify-content trust-anchor=root.pem   # refuses before it decodes
+```
+
+`ac4-encode`, `atmos-encode`, `atmos-adm` and `atmos-iab` (with `codec=ac4`) take `sign-content`; it
+signs the file once written, after checking the key against its chain with a throwaway digest so that
+a bad key or a `signed-date=` outside the certificates' validity fails before the encode, not after.
+`decode` and `ac4-verify` take `verify-content` (exit non-zero unless valid and anchored, and the
+signer information as §5.3 asks), `check-content` (print what the checks find and carry on),
+`unanchored-ok`, `trust-anchor=` and `pin=` (a SHA-1 or SHA-256 fingerprint, repeatable),
+`verify-time=now|signed|ignore|<instant>` and `leaf-title=` (default `Code/Content Signer`, or
+`any`). Left out, `verify-time=` is `now` for `ac4-verify` and `verify-content` (CS spec §6.1 steps 3
+and 4) and the signed date for `check-content`; the report says which. `ac4-sign` and `sign-content`
+take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`,
+`os-name=`, `os-version=` and `os-description=`, and warn when `publisher-uuid=` is missing or
+`signed-date=` is not near the clock; `ac4-verify` and `decode` take `expect-publisher-uuid=` (repeat
+it) for the publisher accounts to accept. `forge probe` shows the trailer without a key
+(`stream.content_signature` in the JSON, `verified` always false). An option that says how to sign
+or check, without the command that signs or checks, is refused, and so is `sign-content` for an MP4
+(out of scope in CS spec v2.6 §8.3.2; sign the raw `.ac4` stream) or for E-AC-3 output.
+
+### The seam for other codecs
+
+The core in `iclforge::base::crypto` is codec-neutral on purpose. The TrueHD specification supplied for this project describes its
+Evolution frame payload as the same `ContentSignature` container under the same scheme, and lists the container's field IDs and the
+digest scope as unconfirmed. If real streams agree, a TrueHD front end needs only its own carriage (where the blob sits, which bytes
+the digest covers), the way `iclforge::ac4` has. **Nothing for TrueHD is built:** `forge` has no TrueHD signing or verifying command,
+and the TrueHD decoder reads none of the evolution frame. See
+[Object signing](../concepts/object-signing.md#sibling-truehd-evolution) and, for the open question,
+[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
 
 ## Provenance
 

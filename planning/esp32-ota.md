@@ -6,7 +6,11 @@ them. O1 merged as #1019 and #1026 on 2026-09-25. #1034, #1035, #1038 and #1056 
 on the two-slot layout and passed O2's checks on 2026-09-25. O6, the P4's co-processor
 firmware, is a study: nothing that updates the co-processor exists. O7, signed images, is not
 built, by the user's decision. The exits of O8 and O9 wait for a release that carries sink
-firmware, and none has been cut since v0.10.0-beta.1 on 2026-09-01 ([Phases](#phases)).
+firmware, and none has been cut since v0.10.0-beta.1 on 2026-09-01 ([Phases](#phases)). O10, updates
+pulled from GitHub releases with O7's signing brought into it, is designed (2026-10-25) and waits for the
+owner's decisions ([Updates from GitHub releases](#updates-from-github-releases-o10)). The owner took
+some of them on 2026-10-25 and changed the signing: the board verifies a signed index when it pulls, and a
+pushed image needs no signature.
 
 This plan was written on 2026-09-24, when every `hearth_sink` layout on `main` (`b49a966c`) was a
 single `factory` app and nothing in the tree called `esp_ota_*`. The ESP-IDF facts below were read
@@ -172,6 +176,13 @@ The C6 image was 86% of a 1.75 MiB slot on 2026-09-24, and 91% on 2026-09-25 wit
 code in it ([Diagnostics](#diagnostics-without-a-cable-o4)). When it outgrows that, 4 MB C6
 modules need something else: a smaller image, or no `audio`/`storage` partitions in the C6's
 Sendspin build. The limit is written here so that it does not arrive as a surprise.
+
+**Taken 2026-10-21: no `audio` and no `storage` in `partitions_c6.csv`.** The image reached 99.9% of
+the slot on 2026-10-20 and the next three changes to code every board carries put it 38,784 bytes
+over. The slots are now `0x1E0000` (1.875 MiB) at `0x20000` and `0x200000`, `coredump` follows at
+`0x3E0000`, and the 64 KiB after it is unused (an application partition starts on a 64 KiB
+boundary, so the slots cannot take it). The project's CMake flashes `audio` and `storage` only on a
+table that has them. A board moves to this table over USB, as it did to the one before.
 
 **Moving a board to the new layout** is one USB flash of the usual `write-flash @flash_args`. The
 build's `flash_args` then writes:
@@ -479,6 +490,14 @@ ends in a restart), as they can stop it today.
 `CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT`, the tree holds no signing key and no key-path guard,
 and the CI job has no throwaway key. The user put signing off until the boards leave development.
 What follows is the design, and its ESP-IDF facts were read from the v6.1 tree on 2026-09-24.
+
+**2026-10-25: this design is not the one that will be built.** [O10](#updates-from-github-releases-o10)
+replaces it, on the owner's direction. ESP-IDF's signed apps check every image written through `esp_ota_*`,
+take their trust from the image that is running and have no setting to relax, and an image that has the
+check and no signature block can take no update. That would end `PUT /firmware` of an unsigned development
+build, which the owner will not give up ("I don't want to lock myself out"). O10 signs the update index
+instead, checks it only when a board pulls, holds the anchor in the build where a person can replace it, and
+leaves a push alone.
 
 When the boards move out of development, signed images are a phase of their own (O7). Everything
 it needs is in ESP-IDF v6.1:
@@ -915,9 +934,10 @@ machine before upload. O7 decides which.
 - `build-esp32s3` packages the S3 board's image and `build-esp32c3` the other three; the 16 MB C6
   is one more build there. `package-esp32-firmware` merges and checks them, and uploads
   `esp32-firmware` (14 days) and, on a release, `packages-esp32-firmware`.
-- `build-esp32c3` builds one more P4 image, with the AC-4 decoder (`sdkconfig.ac4`, phase D14b of
-  [`ac4.md`](ac4.md)) and the stage timers on, to hold that it compiles. It is not packaged: the
-  release images have the AC-4 decoder off, so they decode AC-3 and E-AC-3 only.
+- `build-esp32c3` builds one more P4 image, the release profile with the stage timers on, to hold that the
+  zone markers compile. It is not packaged. Since 2026-10-29 the P4 (v1.x and v3.x) and S3 release images carry the AC-4 decoder
+  (`sdkconfig.ac4`, phase D14b of [`ac4.md`](ac4.md); [`ac4-in-release-images.md`](ac4-in-release-images.md)), so they
+  decode AC-3, E-AC-3 and AC-4; the C6's still decodes AC-3 and E-AC-3 only.
 - `release.yml` lists the four factory images and the manifest in its completeness check. It adds
   `*.bin` and the manifest to the files it checksums, signs and attests, whose lists name
   extensions and had no `.bin`.
@@ -1218,6 +1238,722 @@ the network, the upload would pass through the chip being rewritten.
 - whether esp-serial-flasher's SDIO mode works with a v1.3 P4;
 - which `esp_hosted` patch the running P4 image has.
 
+## Updates from GitHub releases (O10)
+
+**Status, 2026-10-25: designed, nothing built.** The owner decided most of it the same day:
+[decisions 23 to 30, 33, 34 and 35](#decisions) are taken (24, 25 and 28 as the owner reshaped them), and
+36's leaf lifetime and 37; 31, 32 and the rest of 36 wait. This section takes up the two things the plan put
+off: **pull** ([decision 3](#decisions): "pull can come later, for updates from a release server") and
+**signing**, which it makes a *process* around a certificate the owner already has, in place of the
+mechanism O7 designed ([Signing, later](#signing-later)). O8 and O9 are the published images and the guide,
+both built, so this is O10. It was written after the rename, so Kconfig names are `ICLFORGE_*` and the
+repository is `iainchesworthlabs/iclforge`; the rest of this file keeps the names of its time.
+
+The owner, 2026-10-25: "There is probably a check-for-firmware option in the preferences ... We have to
+extend our existing firmware thing to go look at GitHub for the latest release, and if there's a later
+release, upload it from GitHub and make sure it's signed." It has to work for every board variant, the
+boards with no screen included (through the device web page and the REST routes). Then, on the design:
+"I don't want to lock myself out. I don't want to make this really difficult to do dev. I want to be able to
+upload dev firmware from my local development onto my dev kits. But if it's being pulled from an image on
+GitHub, you probably want it signed." "We make it quite complicated if we mandate signing, and I'm not sure
+we do that at the moment." The signature may come from the owner's own code-signing certificate and local
+CA, the firmware carries that CA as its trust anchor, and a person must be able to replace the anchor with
+their own and to upload their own unsigned firmware: "We've got to have a whole process around this."
+
+### Principles
+
+1. **Never lock a person out.** A board can always take an image pushed to it from the machine in front of
+   it, signed or not, and USB always recovers it. No eFuse is burned, and nothing here is a one-way switch.
+   A policy that could shut a person out is a setting, and the way back from it is at the board.
+2. **Development stays easy.** `PUT /firmware` and `ota.py push` of an unsigned build go on working exactly
+   as built, on every board, with no key on the desk and no step added.
+3. **What a board fetches for itself must verify.** An image that arrives by the board's own pull, from a
+   place that is not in the room, is installed only after the board has checked a signature that chains to
+   a trust anchor it holds. No flag in the data it fetched can turn that off.
+4. **The anchor is the owner's to replace.** The firmware ships an anchor, a person can replace it with
+   their own CA or key, and a third party can run a release channel of their own with no help from this
+   project.
+5. **No revocation list, no clock we cannot trust.** Keys are rolled over by an update and by floors that a
+   signed index raises, and a board with a wrong clock fails closed and says so.
+
+**Who this protects, said plainly.** A machine on the board's network can push an unsigned image today,
+by the owner's choice (the network is the boundary, as [Integrity](#integrity) says), and that stays. So
+signing here defends the *pull*: GitHub's side, the CDN and the path between them and the board. It does
+not defend a board against its own LAN. The setting that would ([policy `all`](#later-hardening)) is built
+later, if the owner wants it, and is off.
+
+**What does not change.** The A/B slots, flash mode, the trial, rollback, the integrity chain and
+`PUT /firmware` stay as built. A pull is a second *source* for the same upload core: from the first byte of
+the image on, a board that pulls does what a board that is pushed to does. What is new is where the bytes
+come from (an HTTPS client), how the board learns there are new ones (a signed index), and what it demands
+of them (that the index verifies).
+
+### What was checked on 2026-10-25
+
+| Fact | How it was checked | What follows |
+|---|---|---|
+| The repository is public | `gh repo view iainchesworthlabs/iclforge`: `PUBLIC` | A board can read releases with no token, and none has to be stored on it |
+| Every release is a Pre-release | `gh api repos/.../releases`: 10 releases, v0.2.0-beta.1 to v0.10.0-beta.1 (2026-09-01), all `prerelease: true` | `.../releases/latest` and `.../releases/latest/download/<file>` both answer `404` (tried unauthenticated). "Latest" cannot be how a board finds the newest release until a stable one exists |
+| The API allows 60 calls an hour | `X-RateLimit-Limit: 60` on an unauthenticated call; 13 were already spent by others on this address at the first call | The six boards and every laptop in the house share one address |
+| The API's answer is too big for a board | `releases?per_page=1` is 263,050 bytes (v0.10.0-beta.1 has 127 assets) | A board cannot hold it, and it would need a streaming parser to find five file names |
+| A download is a redirect to another host | `.../releases/download/<tag>/<file>` answers `302` with a 901-byte `Location` (a signed query string) to `release-assets.githubusercontent.com`; the target answers `200` with `Content-Length` and `Accept-Ranges: bytes`. The `302` itself is `Cache-Control: no-cache` | The board makes two TLS connections, to two hosts. Its HTTP client's header buffer must hold more than 1 KB; `esp_http_client`'s default is 512 bytes, which cannot |
+| Two certificate authorities, and leaves that rotate | `openssl s_client`. `github.com`: Sectigo E36, under Sectigo E46, under USERTrust ECC (an ECDSA leaf, valid to 2026-11-29). `release-assets.githubusercontent.com`, `raw.githubusercontent.com` and `*.github.io` all presented one Let's Encrypt certificate: an RSA-2048 leaf from "YR1", under "ISRG Root YR", which is cross-signed by ISRG Root X1; issued 2026-09-30, valid 90 days | Trust roots, never leaves. Today a board needs USERTrust ECC and ISRG Root X1. GitHub changes a host's authority without notice, so the bundle carries a spare |
+| GitHub Pages is on | `gh api repos/.../pages`: `gh-pages` branch, `https://iainchesworthlabs.github.io/iclforge/` | An alternative home for the index ([decision 23](#decisions)) |
+| No board speaks TLS today | A search of `firmware/`: no certificate bundle, no `esp_tls`, no `esp_https_ota`. `esp_http_client` is used for the plain-HTTP stream source only (`main/source/http/byte_source.cpp`); mbedTLS is linked for SHA-256 | TLS is new code, flash and RAM on every board. Its X.509 and RSA/ECDSA code is the same code a certificate check on the signature needs |
+| A board keeps the time with SNTP | `main/clock/sntp/wall_clock.cpp`: `wall_clock_read()` gives no time until a server has answered, and none before 2026. QEMU builds `clock/none` | A certificate has dates (the CDN's leaf starts 2026-09-30), so a board with no time cannot check one. A QEMU build cannot take a TLS test |
+| The P4's TCP/IP stack is on the P4 | `sdkconfig.p4`: lwIP is configured on the P4; the C6 co-processor carries 802.11 frames over SDIO (`esp_wifi_remote`, `esp_hosted`) | TLS ends on the P4, which has PSRAM. The co-processor sees ciphertext and gets no TLS code and no new RAM cost |
+| The host tool already reads GitHub | `ota.py --release` reads `releases?per_page=30` with the standard library | It works from a laptop. It is not a model for a board |
+
+So "TLS memory on the C6" (decision 3's wording) is true of the C6 board, which has its own radio
+and 512 KB with no PSRAM, and is not true of the P4's C6, whose image stays as it is
+([The P4's co-processor](#the-p4s-co-processor-o6)).
+
+### What the board reads, and where it is
+
+The board never reads GitHub's API. For its channel it reads two small files, the **update index** and the
+**signature** over it: `hearth-update-<channel>.json` and `hearth-update-<channel>.sig.json`. They are assets of one
+long-lived release, tagged `firmware-channels` and flagged Pre-release so that it can never be "latest" and
+never confuses `ota.py --release latest` or `installer_site.py`, which pick a release by the manifest it
+carries (a check in slice O10c). The board's URL for the index is
+`https://github.com/iainchesworthlabs/iclforge/releases/download/firmware-channels/hearth-update-beta.json`.
+The images stay where O8 puts them, as assets of the release's own tag. Two channels exist and both are
+published, `stable` (the newest release that is not a Pre-release) and `beta` (the newest of any kind).
+
+```
+{
+  "format": 1,
+  "channel": "beta",
+  "sequence": 1793000000,                  unix seconds when CI signed it; a board keeps the highest
+  "version": "v0.11.0-beta.1",             the release's tag, which is also the images' version
+  "released": "2026-11-05",
+  "images": [
+    { "name": "hearth-sink-esp32s3",
+      "file": "hearth-sink-esp32s3-v0.11.0-beta.1.bin",
+      "size": 1583104, "sha256": "<64 hex>",
+      "project": "<esp_app_desc_t project>", "chip_id": 9,
+      "min_rev_full": 0, "max_rev_full": 99, "flash_size": "16MB", "psram": true,
+      "secure_version": 0 },
+    ...  one entry for each image the release publishes: five today
+  ]
+}
+```
+
+```
+{                                           hearth-update-beta.sig.json
+  "format": 1,
+  "alg": "ecdsa-p256-sha256",              or "rsa-pkcs1-sha256", "rsa-pss-sha256"
+  "sha256": "<64 hex of the index file, for a person comparing by eye>",
+  "chain": ["<base64 DER of the leaf>", "<base64 DER of the sub-CA>"],   the root is never sent
+  "signature": "<base64 of the signature over the index file's exact bytes>"
+}
+```
+
+The index is about 330 bytes an image and 2 KB in all; the signature file 1.5 to 4 KB, depending on the key type
+and the chain. The board reads at most 4 KiB of index and 8 KiB of signature.
+
+- **Files, not URLs.** The board builds `<releases base>/<tag>/<file>` from its own Kconfig
+  (`ICLFORGE_FIRMWARE_UPDATE_BASE_URL`), so nothing in the index can send it to another host, and a third
+  party's firmware points at its own repository ([decision 32](#decisions)). The release notes link is
+  `<repository>/releases/tag/<tag>`, built the same way. A `file` outside `[A-Za-z0-9._+-]` is refused.
+- **The board picks its image by facts, not by name.** The same facts `refuse_image` checks
+  (`firmware_image.hpp`): project, chip, flash size and a revision inside the range, then PSRAM. A new board
+  variant appears in the index by being in a release; no board's firmware changes to be offered it, and a
+  board with no entry says "this release has no image for this board". The image's own head is checked
+  again after the first 288 bytes arrive, before anything is erased, exactly as for a push.
+- **The index is signed, and so is each image through it.** The signature covers the index file's exact bytes,
+  and the index carries each image's size and SHA-256, so an image that arrives is installed only if it is the
+  one a verified index named. The images themselves carry no signature of their own (a push needs none).
+- **Order of publication.** The images are published and checked first, then the index, then its signature,
+  and a board that sees an index without its signature, or one that does not match it, treats the pair as
+  absent. `gh release upload --clobber` replaces an asset by deleting it and uploading it again, so for a
+  moment either file may answer `404`; the board says "could not reach the update list" and a retry works.
+
+### Trust and signing
+
+**Two paths in, two rules.**
+
+| | Arrives how | Signature | Version rules |
+|---|---|---|---|
+| **Pushed** | A client sends the image to the board: `PUT /firmware`, `ota.py push`, the page, ac3hearth | **None required, always accepted** (unless the owner later turns on policy `all`, [Later hardening](#later-hardening)) | None |
+| **Pulled** | The board fetches it: `PUT /firmware/from-release` | **Required**: the index verifies, as below; the image's SHA-256 is the index's | Strictly newer than the running version; `secure_version` and `sequence` no lower; see [What an update may do](#what-an-update-may-do) |
+| Rolled back | `PUT /firmware/rollback` | Not checked: the image already ran here | None |
+
+**What the board checks on a pull, in order. Any failure installs nothing and says which.**
+
+1. Both files arrive over TLS that validated ([TLS on the board](#tls-on-the-board)).
+2. The signature file's SHA-256 field equals the index file's SHA-256 (a mismatch means the pair was caught
+   half-replaced).
+3. The chain (at most three certificates: leaf, optionally an intermediate, ending at the anchor) verifies
+   with mbedTLS against the **trust anchors in the build**, with its default profile (SHA-256 or better,
+   RSA 2048 or better, P-256 or better). The anchor's own dates are not looked at; the others' are, against
+   the board's clock when it is set ([Expiry and the clock](#expiry-and-the-clock)).
+4. The leaf is for code signing (extended key usage `id-kp-codeSigning`, key usage `digitalSignature`) and
+   its subject common name is the **name pinned for this channel** in the build
+   (`ICLFORGE_FIRMWARE_LEAF_STABLE`, `ICLFORGE_FIRMWARE_LEAF_BETA`), unless the pin is empty. The pin is what
+   keeps another certificate from the same CA (one made for Windows binaries, one made for another project)
+   from signing firmware, and a beta leaf from signing the stable channel.
+5. The signature is a valid signature over the index file's bytes by the leaf's key.
+6. Then the index itself: `format` is understood, `channel` is the one this board follows, `sequence` is no lower
+   than the highest this board has accepted, the board has an entry, the entry's version is newer, and its
+   `secure_version` is no lower.
+
+Only then does the install begin, and the image has to match the entry's size and SHA-256 as it streams.
+
+**The four key options, against these principles.**
+
+| | What signs, what the board holds | Fits | Does not fit |
+|---|---|---|---|
+| **A. A dedicated key** | A raw key pair made for firmware. The board holds the public key, or a self-signed certificate of it | The least code: no chain, no clock. Fine for a third party with no CA | No expiry, no chain, so a rollover is an update that carries two keys; the owner's CA is not used |
+| **B. A leaf from the owner's local CA, the CA in the board** *(recommended; taken by the owner)* | Two new code-signing leaves, `stable` and `beta`, from the local EJBCA. The board holds a firmware sub-CA (or the CA) as its anchor | Uses the CA the owner has. A leaf can be reissued with no firmware change; beta and stable separate; expiry and a chain are real; a self-signed certificate as the anchor degenerates to option A with the same code, so a third party needs no CA | Needs X.509 on the board (already there for TLS) and a CA ceremony for the owner. Two leaf keys to keep, as secrets of two GitHub environments |
+| **C. The Windows code-signing certificate, reused** | The leaf already in the organisation secrets `WIN_TESTSIGN_PFX_*`, signed with in CI the way `sign-windows` does | Nothing new to make, and CI already has the pattern | One key signs Windows binaries and firmware, so a leak of either is both; the secrets are organisation-wide, readable by the other repositories they are shared with; one leaf for both channels; its renewal follows the Windows leaf's (365 days at most). If the anchor is the CA's root, **every** certificate that CA ever made for code signing becomes a firmware key unless the leaf name is pinned. The design accepts it for stable if the owner chooses, by pinning its subject name |
+| **D. Keyless Sigstore** | GitHub's workflow identity gets a ten-minute certificate from Fulcio and the signature goes in the Rekor log | No key to keep. The release already makes these attestations for people (`gh attestation verify`) | A board would need Fulcio's roots, Rekor's keys and a TUF-distributed trust root that rotates; the certificate is valid for minutes, so the board must verify a log timestamp and an identity extension; a JSON-and-protobuf bundle to parse. Far more code and RAM than A, B or C, and a dependency on a public service being up. Right for people, wrong for a board |
+
+**Recommend B.** One mechanism covers everything from a lone developer's self-signed certificate to the
+owner's CA, with the code A needs anyway. **C is B with an existing leaf**: nothing in the design stops the
+owner using it for stable to begin with, and it costs nothing to change later because a leaf is not in the
+firmware, only its pinned name is.
+
+**What the signature protects, and what it does not.**
+
+| Threat | Result |
+|---|---|
+| A stolen or swapped release asset or index (a hijacked GitHub account, the CDN) | **Refused**: the index does not verify, or an image does not match it |
+| TLS broken on the way | **Refused** the same way |
+| A page or a machine on the board's LAN pushing an image | **Not stopped**, by the owner's choice: pushes are unsigned. The `Host` check ([decision 13](#decisions)) still keeps a web page from doing it |
+| An old signed index replayed | **Refused** on a board that has seen a newer one (`sequence`), and an older version is never offered |
+| A board kept on an old index (a freeze) | **Not stopped**: an attacker who can keep serving the last good index can keep a board where it is. An `expires` field would bound it ([Later hardening](#later-hardening)) |
+| A leaked beta key | Beta boards can be given a hostile image; **stable boards cannot**, since they accept only the stable leaf |
+| A leaked stable key or CA key | Boards that pull from the stable channel, or trust that CA, can be; the answer is a rollover |
+| Hostile code built in CI and then signed | **Not stopped.** A signature says who approved an index, not what is in it |
+| Someone with a USB cable, or with the board | **Not stopped**, by design |
+
+### The process
+
+The steps a person takes, in the order they come up. Nothing in a session touches key material: the
+owner makes the keys, and sessions only write the tools and the documents.
+
+#### Making the keys
+
+The owner, once, with [the EJBCA guide](hearth-firmware-signing-ejbca.md):
+
+1. A **firmware sub-CA** under the local root, "Iain Chesworth Labs Firmware CA" (RSA 3072, path length 0, key
+   usage `keyCertSign` and `cRLSign`), so that nothing else the root ever issued, the Windows signing
+   certificate included, can sign firmware. If the root's key is not in EJBCA the guide's external route makes
+   the same sub-CA; if even that is more than is wanted today, the root as the anchor with the leaf names
+   pinned does the same job and the board is unchanged.
+2. **Two profiles** copied from the Windows pair (`code signer`, `local code signing`) and narrowed to this one
+   sub-CA, RSA 3072 only, two years, `CA:FALSE`, key usage `digitalSignature` only, extended key usage
+   `codeSigning` only (basic constraints and key usage critical, the extended key usage as the Windows profile has
+   it: the board and the tool check that code signing is present, never its criticality), with no CRL, AIA, OCSP or
+   alternative name (the board checks none).
+3. **Two leaves**, `Hearth Firmware Stable` and `Hearth Firmware Beta` (the names are the pins), each from a key
+   and a certificate request made on the owner's machine, so a private key never reaches EJBCA. RSA 3072 with
+   SHA-256 is what the existing profile issues, a board already carries RSA for TLS, and ECDSA P-256 would save
+   about 2 KB per signature file, so it is chosen only if a profile that allows it already exists.
+4. The public certificate of the sub-CA goes into the repository as `firmware/keys/trust.pem` (a build setting,
+   `ICLFORGE_FIRMWARE_TRUST_ANCHORS`). Each leaf's key and certificate go into a PFX that is saved as the two
+   secrets of its GitHub environment ([CI signing](#ci-signing)); the owner keeps the key files and their
+   passphrases offline in two places, which is the only recovery for a lost leaf key (a new leaf is issued, and no
+   board changes).
+
+Nothing in a session touches key material: sessions write the tools and the documents, and check the public
+certificates and the screenshots the owner sends back.
+
+#### Publishing a release
+
+CI does it ([CI signing](#ci-signing)). A release run builds and packages the images (O8) and publishes the
+release. Then the `firmware-channels` workflow, which starts when the Release run has finished, builds each
+channel's index from the release's manifest
+(`package_firmware.py index`), signs it in that channel's GitHub environment (`sign_index.py sign`), uploads the
+pair to the `firmware-channels` release with the images already up and the index last, and downloads it back
+and verifies it as a board would. **The stable job waits for the owner's approval**; the beta job does not. A
+`workflow_dispatch` of the same workflow signs any release again, which is how a leaf renewal reaches the
+channels. A person with a leaf key on their machine can do the same by hand with the
+same two commands, which is how a third party without CI publishes ([A third party's own channel](#a-third-partys-own-channel)).
+
+#### Replacing the anchor
+
+Since a pushed image is never refused, a person can always replace what a board
+trusts by pushing a build that trusts something else. Three surfaces, in the order they are built:
+
+| Surface | What it does | When |
+|---|---|---|
+| **A build and a push** | The anchor, the leaf names and the base URL are build settings. A person builds with their own, or takes a third party's image, and pushes it (`ota.py push`, the page, or USB). Nothing to add to the board | First slice |
+| **At the board** | A setting in NVS that overrides the build's anchor. It is changed only while the board is in a *presence window*: opened by a button on its screen ("Allow changing the update key for 5 minutes", which also shows the certificate's fingerprint for a yes or no), or, on a board with no screen, in the first two minutes after a power-on reset (a software restart, which anyone on the LAN can ask for, does not open it). One more action puts the build's anchor back | Later; wanted when policy `all` exists, since then a push can no longer replace it |
+| **USB** | Erase NVS, or flash a build with other anchors: the board's own and everything it kept is gone, and the factory trust is back | Always |
+
+There is no unauthenticated route that changes the anchor: the board has no accounts, and the presence
+window is the authentication.
+
+#### Recovery
+
+What can go wrong, and what a person does. None needs a cable unless it says so.
+
+| What happened | What the board does | What the person does |
+|---|---|---|
+| The anchor in a build is wrong | Pulls fail with "the update list is not trusted"; pushes work | Push a corrected build |
+| A leaf key is lost | Pulls stay as they were; nothing new can be signed | Issue a new leaf from the sub-CA, same name, replace the two secrets of its environment, and run the signing workflow again for the current release. No firmware change |
+| A leaf key leaks | An attacker holding it and the transport can feed boards | Issue a new leaf; publish an index that raises the leaf floor ([Rollover](#rollover-floors-and-revocation)) |
+| The CA key is lost | Existing boards keep trusting a CA that can sign no more | Push (or USB) builds with a new anchor, each board once. A pull cannot do it |
+| The CA key leaks | As above, for every channel it signed | The same, at once |
+| A board's NVS override (later) is wrong | Pulls fail | Reset it at the screen, or erase NVS over USB |
+| Policy `all` (later) is on and the signing key is lost | Pushes of unsigned builds refused | Switch it off at the screen; or erase NVS over USB |
+| Everything | | USB, which no setting can disable: the ROM's download mode is not touched |
+
+#### Rollover, floors and revocation
+
+There is no revocation list. What stands in for one:
+
+- **`sequence`** is in every index and a board keeps the highest it has accepted for its channel. An older
+  index is refused. It is one `uint32` per channel in NVS (`fw_seq_s` and `fw_seq_b`), so that following the
+  other channel for a while does not move the floor of this one.
+- **A leaf rollover** is a new leaf with the same name, made before the old one expires, and signs the next
+  index. Nothing in any board changes.
+- **An anchor rollover** ships an image whose anchor file holds both the old and the new certificate (it
+  verifies under the old one), then a later image drops the old.
+- **The leaf floor** ([Later hardening](#later-hardening)): an index may carry `min_leaf_issued`, a date; a
+  board that has seen one refuses any leaf whose `notBefore` is earlier. A leaked leaf is then dead on every
+  board that has fetched one index signed by the new leaf, with no CRL and no clock: the board compares two
+  dates that are both in signed data. (`notBefore` and not the certificate serial, because a CA's serials need
+  not rise.)
+
+#### Expiry and the clock
+
+TLS to GitHub already needs a board whose clock is right (the CDN's leaf starts on
+2026-09-30), so a pull is not attempted without one. For the chain: the leaf's and the intermediate's dates are
+checked against that clock, and the anchor's own are not (it is trusted by being in the build, and a root made
+for 20 years should not be a reason to refuse a pull). A leaf that has expired fails with "the update
+certificate has expired, or this board's date is wrong", the cue to sign with a fresh leaf. A clock that is
+wrong in the future makes a good leaf look expired and the board fails closed, which the message names. A
+clock set wrong *to the past* cannot help an attacker, because `sequence` has already moved. A QEMU test
+build that has no clock passes `now` as nothing and the dates are not judged, which is the only place that
+happens.
+
+#### A third party's own channel
+
+Someone who runs their own releases: makes a CA, or only a self-signed
+certificate, which is then both the anchor and the leaf; issues a leaf for each channel; builds with their
+anchor file, leaf names and base URL; runs `package_firmware.py index` and `sign_index` over their images; and
+installs their first build by USB, the browser installer or a push. Their boards pull from them and trust
+nothing of this project's, and a person with stock images who wants to follow them pushes their build once.
+The component ships no anchor of the owner's in a place an integrator cannot replace.
+
+#### Chain size and RAM
+
+The signature file is 1.5 to 4 KB (an ECDSA leaf and intermediate in base64 are about
+1.4 KB, an RSA-2048 pair about 3.2 KB, and the signature 0.1 to 0.35 KB). The board reads the two small files
+and closes the TLS session before it verifies, so the check does not sit on top of the session: a buffer of up
+to 12 KiB, and the parsed chain, a few KB, freed after. These are estimates, to be measured in slice O10b. The
+cost to the image is X.509 chain verification and the signature algorithms, which TLS to GitHub already pulls in
+(an ECDSA chain from `github.com`, an RSA one from the CDN).
+
+### CI signing
+
+**What exists (read from the workflows and docs on 2026-10-25).** iclforge signs no Windows binary today: the
+documents say "no code-signing certificate yet", and nothing in `.github` signs a Windows file. The pattern the
+owner means is the shared repository `icl-common-infra`'s `sign-windows` action, which arinc-data-loader's
+release workflow uses:
+
+- a repository variable `SIGN_WINDOWS` that is `false` (the default; nothing signed), `test` or `production`
+  (reserved, fails until a service is chosen);
+- in `test` mode a leaf PFX in **organisation** secrets `WIN_TESTSIGN_PFX_BASE64` and `WIN_TESTSIGN_PFX_PASSWORD`
+  (visible to selected repositories), written to a temporary file on a Windows runner, `signtool sign /fd SHA256`
+  with an RFC 3161 timestamp, the file removed, the signature checked afterwards;
+- the leaf is `CA:FALSE`, key usage `digitalSignature`, extended key usage `codeSigning`, RSA 3072, SHA-256, at
+  most 365 days; the CA key is offline and never in CI, only the leaf reaches it.
+
+**This corrects what an earlier version of this section said**, that the Windows certificate "cannot be in CI". A
+PFX in a secret is exactly how it is. What the firmware keeps from the pattern: the mode variable that makes a
+merged workflow harmless until it is switched on, the leaf PFX in a secret and nothing else, and the check after
+signing. What it does not reuse: the Windows leaf itself (its secrets are organisation-wide, so any repository
+with access could read a firmware key, and one key would do two jobs and both channels), and `signtool`, which is
+Authenticode and has nothing to do with an index file.
+
+**The workflow.** A new `firmware-channels.yml` that starts on `workflow_run` (the `Release` workflow has
+completed) and on `workflow_dispatch` (`version_tag` and `dry_run`, default true, so it can be tried against any
+release that exists). `release.yml` is not edited. A `workflow_run` workflow always runs the copy of the file on
+`main`, however the release run started (a tag push, or `release.yml`'s own `workflow_dispatch`, which pushes its
+tag only at the end), so `github.ref` is `refs/heads/main` in every run of it:
+
+| Job | Runs on | Needs the secret | Does |
+|---|---|---|---|
+| `index` | `ubuntu-latest`, `contents: read` | no | Runs only when the Release run succeeded. Finds the release: the `v*` tag that points at the Release run's commit (none, as after a dry run of Release: it stops with a notice; two: it stops with an error naming them). Downloads the release's `hearth-sink-manifest.json`; `package_firmware.py index` writes the unsigned `beta` index, and the `stable` one when the release is not a Pre-release; refuses an index older than the published one (a re-run of an old tag cannot move a channel back). Writes a summary to the run's page: the tag, the versions, the `sequence` and the SHA-256 of each index |
+| `sign-beta` | `ubuntu-latest`, `contents: read`, **`environment: firmware-beta`** | `FIRMWARE_SIGN_PFX_BASE64`, `FIRMWARE_SIGN_PFX_PASSWORD` | `sign_index.py sign` reads the PFX from the environment into memory (no file), signs, checks the leaf is a code-signing leaf with the pinned name and at least 60 days left (a warning under 60, a failure when expired), and verifies the result against the committed `firmware/keys/trust.pem` |
+| `sign-stable` | the same, **`environment: firmware-stable`** | the same names, the stable leaf's values | the same, for the `stable` index; skipped for a Pre-release |
+| `publish` | `ubuntu-latest`, `contents: write` | no | Makes the `firmware-channels` Pre-release if it is missing; uploads each pair with `--clobber`; downloads the pair back from the public URL with no token and runs `sign_index.py verify`; checks that every file the index names is downloadable. With `dry_run` it stops before the upload |
+
+- **`dry_run` signs with a throwaway CA made in the job**, so every dry run exercises the whole pipeline and no
+  environment secret is read; the pair is verified against that throwaway anchor, and nothing is published.
+- **A switch.** The repository variable `PUBLISH_FIRMWARE_CHANNELS` (`false` by default) gates the real jobs, as
+  `SIGN_WINDOWS` does. This matters: a workflow job that names an environment that does not exist *creates it*
+  with no reviewer, so merging the workflow before the owner has set the environments up would run the stable
+  job unguarded. With the variable `false` nothing runs; the owner sets it to `true` last. (The owner set it on
+  2026-10-25, before the workflow exists: the first Release after the workflow reaches `main` signs for real, beta
+  unattended and stable after an approval. A `dry_run` dispatch needs no variable, so it can be tried first.)
+- **It cannot hurt the release.** It starts after the Release run has finished and is a run of its own, so it
+  cannot delay or fail the release, and the stable job waiting for an approval holds nothing up.
+- **The signing jobs stay small.** Python and `cryptography`, installed from a hash-locked requirements file,
+  and `actions/checkout` and the artifact actions pinned by SHA as in every workflow here; no other third-party
+  action sees the key. The tools run from `main`, not from the tag, so an old tag can be signed again with
+  today's tool, and nothing from the tag runs: its manifest and images are read as data.
+- **Why a workflow of its own started by `workflow_run`:** (1) `release.yml` is not edited at all, so there is
+  nothing to conflict with #1621 and no job the release has to wait for; (2) the ref is always `main`, so the
+  environments can allow `main` only and what can read a key is a workflow file that has been merged; (3) it
+  works for both ways a release starts. A `workflow_call` job in `release.yml` (the pattern of
+  `manifest-bump.yml`) would have run with the release's own ref, a tag or, in a dispatch-started release,
+  `main`, and so would have needed tags allowed.
+
+**What the owner creates** (a session never runs `gh secret set`; these are in the GitHub web pages):
+
+| Where | What | Value |
+|---|---|---|
+| Settings, Environments | `firmware-beta` | Deployment branches and tags: **`main` only**. **No reviewer: it signs on its own.** Secrets `FIRMWARE_SIGN_PFX_BASE64` and `FIRMWARE_SIGN_PFX_PASSWORD` for the **beta** leaf |
+| Settings, Environments | `firmware-stable` | Deployment branches and tags: **`main` only**. **Required reviewers: the owner, so every signing run waits for their approval.** *Prevent self-review* off (the owner starts the release, and is also the one who approves its signing); *Allow administrators to bypass configured protection rules* off, if the page offers it, so that nobody skips the approval. The same two secret names, for the **stable** leaf |
+| Settings, Secrets and variables, Actions, Variables | `PUBLISH_FIRMWARE_CHANNELS` | `true`, **last**, once the two environments exist |
+| Not these | `WIN_TESTSIGN_PFX_*` | Never reused for firmware |
+
+**Decided by the owner, 2026-10-25: a stable signing run needs the owner's approval every time; a beta run signs
+on its own.** The beta leaf signs only what beta boards read (the owner's development kits, which take unsigned
+pushes anyway), so a run that signs it is not worth a click. The stable leaf is the one a person who is not
+the owner would rely on, and the approval shows the owner which release is about to be signed: the gate "a
+human at every release" asked for, at the cost of one approval at each stable release (the job waits; the
+release is already out).
+
+- **Both environments allow `main` only, and there is no tag ruleset.** A run on `main` uses the workflow file as it
+  was merged, through the repository's own review; a tag can point at any commit that anyone with write access
+  pushes, with any workflow file in it, and an environment's secrets are readable by every ref it allows. So with
+  `main` only, what can read a key is what has been merged. (The first version of this section, PR #1652, limited
+  stable to `v*` tags and asked for a tag ruleset. The keys session found on 2026-10-25 that `release.yml` makes
+  that unworkable: its `workflow_dispatch` path pushes the release tag itself with `GITHUB_TOKEN`, which a ruleset
+  that restricts creating `v*` tags blocks, and a job it calls runs with `github.ref` = `main`, which a tags-only
+  environment refuses.)
+- **What the owner checks when they approve:** the `index` job has already written its summary (the release
+  tag, the versions, the `sequence`, the SHA-256 of the index) to the run's page, before the stable job waits.
+  They read it, then approve the pending deployment in the run, and only for a release they cut. An approval
+  nobody gives expires after 30 days and the run fails; signing again is a dispatch.
+- **Both settings above matter.** With *Prevent self-review* on, the owner, who started the release, may not be
+  allowed to approve its signing run and would lock themselves out; with administrators allowed to bypass,
+  the approval is optional for anyone with that role.
+
+**What would conflict with PR #1621 (the release prep), read on 2026-10-25.** #1621 changes `release.yml` in the
+`resolve-version` job (an added `REPO` variable and a `render_release_notes.py --check` call near line 97 to 150),
+`_static.yml`, `CHANGELOG.md`, `firmware/esp-idf/iclforge/idf_component.yml` and `tools/release`. The firmware
+workflow is a new file started by `workflow_run`, so `release.yml` is not edited, and its tool files are under
+`tools/hearth`: no textual overlap, so no conflict while they merge in either order. The one real interaction is
+`CHANGELOG.md`: #1621 turns `[Unreleased]` into the 0.11.0-beta.1 section, and its own notes say to merge it last,
+since anything added to `[Unreleased]` before then becomes part of that release's notes (already 541k characters
+against a 125k limit). So the firmware slices keep their CHANGELOG lines out of `[Unreleased]` until #1621 has
+landed, or the owner decides they belong in 0.11.0-beta.1. Also: the channel index is only published for a
+release that carries sink firmware, which the first one to do so is whichever the owner cuts after the signing
+slice lands.
+
+### What an update may do
+
+| Source | Version |
+|---|---|
+| Pull (`PUT /firmware/from-release`) | Strictly newer than the running version, `secure_version` at least the running image's, and the index's `sequence` at least the highest the board has accepted |
+| Push (`PUT /firmware`) | None: a person developing may push anything |
+| `PUT /firmware/rollback` | None |
+
+- **`secure_version`** is the 32-bit field ESP-IDF keeps in `esp_app_desc_t`
+  (`CONFIG_BOOTLOADER_APP_SECURE_VERSION`). It is a floor our code enforces on a pull, not ESP-IDF's
+  anti-rollback, which burns eFuses and which `check_esp_efuse_free.py` forbids. A release that fixes a
+  security flaw raises it by hand. The index carries it for each image, and since the index is signed and
+  names the image's SHA-256, so does the image. The default stays 0.
+- **Comparing versions.** `v0.11.0-beta.1` is newer than `v0.10.0-beta.1-2039-gf5aded471` (a build 2,039
+  commits past a tag sorts after that tag and before the next one); `-beta.N` sorts before the same number
+  without it. A version the parser does not understand is never "newer": it fails closed, and the reply
+  says so. The rule lives in `libs/device`, with a table of cases in its test. The version a board stores is
+  31 characters, so the comparison is on as many.
+- **Channels.** A board has a `channel` setting in NVS. Its default is Kconfig's, `beta` (the owner's
+  decision: every release is a Pre-release today), flipped to `stable` by the first stable release if the
+  owner wants. Changing channel never installs anything, and never goes back to an older version.
+- **A version that failed here is not offered again.** An update that rolled back, or failed its checks,
+  stores its version in NVS (`fw_skip`); `GET /firmware/available` says "v0.11.0-beta.1 is available, but it
+  went back on this board on 2026-11-06" and the install button asks for a second confirmation. A newer
+  release clears it.
+
+### TLS on the board
+
+- **Trust.** `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE` and `CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE`
+  with a path: a bundle of USERTrust ECC, ISRG Root X1 and one spare, chosen in slice O10b from what the
+  three hosts present that week. A few KB in all. The full default bundle is tens of KB on every board for
+  hosts that are never contacted. Validation is on and has no fallback: a connection the board cannot
+  verify is not made. This bundle is GitHub's, and is **separate from the firmware trust anchors**: a CA
+  that vouches for a host never vouches for a firmware index, and the reverse. A root rotation GitHub makes
+  before a board's bundle covers it leaves that board unable to pull until it is pushed to (`ota.py push
+  --release`, from a laptop, does not depend on the board's bundle).
+- **The clock.** The handshake needs the date. A board with no time, or with time sync off
+  (`PUT /time-sync off`), answers "needs the time" and does not try. The check does not guess a date.
+- **Redirects.** `esp_http_client` follows `302`s, at most three, to `https` only, with a header buffer of
+  at least 2 KiB. The first connection is closed before the second opens, so there is never more than one
+  session in memory.
+- **RAM.** Estimates, to be measured on each chip in slice O10b; the sums below use the figures this plan
+  measured for the upload (the table in [Diagnostics](#diagnostics-without-a-cable-o4)).
+  - ESP-IDF's default record buffers are 16 KiB in and 4 KiB out; its help text says the asymmetric
+    setting saves 12 KB a connection over a symmetric 16/16. A client session with a certificate chain to
+    parse commonly peaks at 40 to 60 KB. `CONFIG_MBEDTLS_DYNAMIC_BUFFER` takes some of that back.
+  - **S3 board and P4:** the session goes to PSRAM (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). Internal RAM
+    pays only for the download task's stack, which has to be internal because it writes flash: about 12 KiB,
+    against the upload task's 8. The S3 has a 31,744-byte largest block as flash mode starts.
+  - **C6, no PSRAM:** the session is internal. It had 114,308 bytes free at its lowest during an upload, in
+    flash mode. A session and a stack of about 70 KB fit there, if the estimate holds. They would not fit
+    beside a playing stream, so on the C6 a check as well as an install needs the stream stopped.
+  - **A check never enters flash mode.** It runs when the board can hold a session beside what it is
+    doing, and otherwise answers `503` "stop what is playing to check" (the C6 while it plays; an S3 while a
+    JOC stream plays). An install always enters flash mode, after a confirm.
+- **Flash.** TLS, the HTTP client's redirects, the bundle and the chain check add code to every build that
+  pulls. The size is measured in O10b, not guessed; a typical ESP-IDF HTTPS client is of the order of 100 KB.
+
+### Which builds can pull
+
+Pull is a build option, `ICLFORGE_FIRMWARE_PULL`, and the board reports whether it has it. Three
+reasons a board cannot, each shown with its reason, not hidden:
+
+- **The 4 MB C6** (`hearth-sink-esp32c6`): its slot is `0x1E0000` (1,966,080 bytes) and its profile's
+  budget is the same number ([Flash layout](#flash-layout), 2026-10-21). TLS does not fit. It takes pushes
+  and not pulls: "This board's firmware has no room for a secure connection" ([decision 33](#decisions)).
+- **A build with no trust anchor** (an empty `ICLFORGE_FIRMWARE_TRUST_ANCHORS`): "This firmware carries no
+  update key". A pull is *never* made without an anchor to check it against.
+- **A QEMU build** (`clock/none`, no TLS test): reports no clock.
+
+### The flow on the board
+
+```
+ screen or page                  board                                        GitHub
+ ──────────────                  ─────                                        ──────
+ Check for updates ───────────►  POST /firmware/check  (202)
+                                   needs: network, time, an anchor, memory, not on trial,
+                                          not in flash mode
+                                   read hearth-update-<channel>.json + .sig.json  ───►  index, signature (302, CDN)
+                                   verify the pair (steps 1 to 6 of Trust and signing)
+ poll GET /firmware/available ◄─   up_to_date | available (version, size, date) | failed (why)
+ Install v0.11.0-beta.1 … ─ confirm
+                      ─────────►  PUT /firmware/from-release  "v0.11.0-beta.1"
+                                   enter flash mode: playback, Sendspin, sink stopped
+                                   GET <base>/<tag>/<file> ──────────────────►  image (302, CDN)
+                                   first 288 bytes: refuse_image, version = the index's,
+                                       newer, secure_version      (nothing erased until these pass)
+                                   erase-as-you-go + write; running SHA-256 = the verified index's
+                                   esp_ota_end: image checks; read-back hash
+                                   boot ota_N next, restart
+ poll GET /firmware           ◄─   trial: 30 s hold within 5 min  (as for a push)
+ "Updated to …" / "Went back to …, because …"   from last_update, which the trial already writes
+```
+
+What the board does to what is playing: the install stops it. A play started with `POST /play` ends; a
+Sendspin server gets `client/goodbye` with reason `restart`; the sink closes; the board's mDNS service is
+withdrawn. After the restart the server reconnects by itself within about a minute; the song does not resume. A push
+to the C6 took 67 s start to accepted on 2026-09-25, so "about two minutes" is the figure the dialog gives.
+
+**The states a person sees** (the screen and the page show the same set, from `GET /firmware/available`):
+
+| State | Words | Buttons |
+|---|---|---|
+| Idle | "Version v0.10.0-beta.1-2039-gf5aded471. Channel: beta" | Check for updates |
+| Checking | "Checking for updates..." | none |
+| Up to date | "You have the newest version. Checked 14:02" | Check again |
+| Available | "Version v0.11.0-beta.1 is available (1.6 MB, 5 Nov). Release notes: github.com/iainchesworthlabs/iclforge/releases/tag/v0.11.0-beta.1" | Install v0.11.0-beta.1 |
+| Confirm | "Install v0.11.0-beta.1? The player stops playing, downloads it (about two minutes), and restarts. If the new version does not start properly, the player goes back to this one." | Install, Cancel |
+| Installing | "Downloading 62%", then "Checking the download", then "Restarting" | none |
+| Done | "Updated to v0.11.0-beta.1" or "Went back to v0.10.0-beta.1: the player did not find a network in time" | OK |
+| Failed | The reason, in words ("The player does not know the date yet", "Could not reach GitHub", "The update list is not trusted: nothing was changed", "The update certificate has expired, or this player's date is wrong", "This version has no image for this board", "Stop what is playing and try again", "The download did not match its checksum: nothing was changed") | Try again |
+| Not available | A greyed row with its reason, for good: "This board has no network", "This board has one app slot; an update over the network needs a USB flash first", "This firmware carries no update key", "This firmware has no room for a secure connection" | none |
+| Not now | A greyed row with its reason, for the moment: "The player has no network address yet", "The player does not know the date yet", "Time sync is off", "This version is still being tried; wait 4 minutes, or go back to the previous one", "An update is already running", "Stop what is playing and try again" | none |
+
+The words come from one place, `firmware_update.hpp` in `libs/device` (below), so the screen, the page,
+`ota.py` and ac3hearth cannot drift; the panel code only draws them. An install's progress is
+`GET /firmware`'s `upload` object with `stage: "downloading"`, so `ota.py status`, the page and ac3hearth's
+Firmware tab show it with no change.
+
+### Routes
+
+| Route | What it does | Replies |
+|---|---|---|
+| `GET /firmware/available` | The update flow: `supported` and `why` (what is true of this board for good, so a greyed row has its reason), `blocked` (what stops a check or an install now, or null), `state` (`idle`, `checking`, `up_to_date`, `available`, `installing`, `failed`), `channel`, `running`, `checked` (seconds, or null), `latest` (version, released, size, notes link, image name, or null), `trust` (the number of anchors, whether they are the build's or the board's own, and each one's SHA-256 fingerprint, short), `signed_by` (the leaf's name from the last verified index, or null), `error` (code and text, or null), `skipped` (a version that went back, or null). Every key is always present | `200`, JSON |
+| `POST /firmware/check` | Starts a check and returns; the result is on `GET /firmware/available` | `202`; `409` flash mode, on trial, an update running; `503` no memory beside what is playing |
+| `PUT /firmware/from-release` | Body: the version, as text, which must equal what the last check offered. Enters flash mode, downloads, checks, writes, restarts | `202` then a restart; `403` the `Host` is not the board's; `409` nothing offered (check again), on trial or already running; `412` no anchor, no clock or no pull in this build; `503` no memory |
+| `PUT /firmware/channel` | Body: `stable` or `beta`; stored | `200`; `400` |
+
+The error codes in `error.code` are `no_network`, `no_clock`, `tls`, `unreachable`, `bad_index`,
+`bad_sig_file`, `hash_mismatch` (the signature file is for another index), `untrusted`, `leaf_usage`,
+`weak_key`, `bad_signature`, `leaf_name` (steps 2 to 5 of the check, one code each), `cert_expired`,
+`cert_not_yet_valid`, `replayed` (a `sequence` below the board's), `no_image`, `no_memory`, `bad_image`,
+`bad_hash`, `unknown_version`, `older_security`, `write_failed`, `no_slot`, `on_trial`, `busy`,
+`nothing_offered`, `offer_stale` and `not_supported`. Each has a sentence in `firmware_update.hpp`.
+
+The board's routes are for a board whose network is its own (see [Routes](#routes)). `PUT` is used for the
+install, as for `PUT /firmware`, so that a page on another site cannot send it without a preflight, and
+it carries the same `Host` check; `POST /firmware/check` needs none, since it changes nothing but a few HTTPS
+requests. A build without pull answers the first route with `supported: false` and the others
+with `404`, as it does for any route it lacks. The routes the later hardening adds (`PUT` and `DELETE
+/firmware/trust`, `PUT /firmware/policy`) are not in the first slices.
+
+**The route word list is in four places** and a new route has to be in all of them or the
+device-UI contract test fails: `control.cpp`'s `GET /api` text (near line 489) and its `400` text, and the
+two copies in `apps/demos/wasm/tests/device-ui/stub.js` (near lines 60 and 191). The stub also needs the new
+replies (`/firmware/available` for each state).
+
+### The screen and the page
+
+- **Preferences (the screen).** Added **after prefs-core's PR merges**; nothing in `lyric_screen.cpp`
+  before. Its contract is `board_caps.hpp`, `board_variants.hpp` and `preferences.hpp` (branch
+  `feature/hearth-preferences-core`, 6c47ca278): an entry is a `Pref` in `kRegistry`, whose availability is a
+  function of `BoardCaps` and whose `inert` is a function of `Backend`, and a value is a word. Four entries in
+  group Updates, and no bespoke button:
+
+  | id | Kind, apply, route | Shows or does |
+  |---|---|---|
+  | `update-status` | `kText`, live | Read-only: the sentence `firmware_update.hpp` renders for the state: "Version v0.10.0-beta.1-2039-gf5aded471. You have the newest version. Checked 14:02", "Version v0.11.0-beta.1 is available (1.6 MB, 5 Nov)", "Downloading 62%", or the failure in words |
+  | `update-channel` | `kChoice` (stable, beta), live, `/firmware/channel` | The channel |
+  | `update-check` | `kAction`, live, `/firmware/check` | Check for updates |
+  | `update-install` | `kAction`, restart, `/firmware/from-release` | Install the offered version; its label takes the version, and it needs a confirm |
+
+  **Greyed for good** is `availability(caps)`, each a sentence about the board: no `caps.network.any()`;
+  no `caps.wall_clock` ("keeps no time, and a secure connection needs the date"); no `caps.firmware_slots`;
+  no `caps.update.pull`; `caps.update.trust_anchors == 0`. **Greyed for now** is `inert(backend)`, the text of
+  `UpdateStatus::blocked`, which `firmware_update.hpp` works out from the board's facts at that moment (an
+  address held, the clock set, time sync on, not on trial, not in flash mode, no update running, room for a
+  session); `update-install` is also inert with "Check for updates first" until a check has offered a version.
+  `GET /firmware/available`'s `supported`/`why` and `blocked` are the same two things for the page.
+
+  **What this asks of the contract** (for prefs-core, through the coordinator), nothing else:
+  1. `BoardCaps::update`, an `UpdateCaps` of two build facts, filled once at boot in `board_caps.cpp`:
+     `bool pull` (the image has the HTTPS client, the bundle and the routes: `ICLFORGE_FIRMWARE_PULL`) and
+     `int trust_anchors` (the certificates in the build's anchor file; 0 for a build with none, which cannot
+     verify a pull). The variants in `board_variants.hpp` get them: `pull` and one anchor on the shipping boards,
+     none on the frame buffer bench build, and a new `c6-4mb` variant with `pull` false, so the greyed
+     reason is tested. The other facts it needs are already there: `network`, `wall_clock`, `firmware_slots`.
+  2. `Backend` gains `update_status()` (an `UpdateStatus` from `firmware_update.hpp`, so O10a lands before
+     O10d), `start_update_check()`, `start_update_install()` and the channel's getter and setter.
+  3. A `confirm` text on a `kAction` `Pref`, shown before `set` runs: the install's ("The player stops
+     playing, downloads it (about two minutes), and restarts..."), and the same field serves the restart and
+     the resets another session is building.
+  4. While a check or an install runs the screen resolves the Updates group once a second, so that
+     `update-status` follows the progress; no editor of its own is needed.
+
+  The panel reaches the pull through a seam like `panel.hpp`, with a null implementation in a build with
+  no screen (`panel/none` links no LVGL). The trust rows ("Update key: built in", "Use the built-in key",
+  "Allow changing the update key") are [Later hardening](#later-hardening) and are registry entries too.
+- **The device page.** A section under Firmware, beside Update firmware: the version, **Check for updates**,
+  the result line, an **Install** button that opens a dialog like Restart's, the release-notes link
+  (`target="_blank" rel="noopener"`), the channel choice, and the same progress. The page budget
+  ([The web page (O3)](#the-web-page-o3): 57,344 bytes, 55,454 used) has 1,890 bytes left; the section
+  needs more, so the budget is derived again, as each redesign did. The Playwright suite gets a stub
+  reply for each state.
+- **Boards with no screen** lose nothing: the page and the routes are the whole interface, and `ota.py` can
+  call the same routes (`ota.py update --host H` is the check and install on one board).
+- **ac3hearth** can show the same state on its Firmware tab later; it is not in these slices.
+
+### Packaging and CI
+
+What the build and the release must emit. Workflow edits are allowed now, each in a PR of its own and told to the
+coordinator first; they are listed under [CI signing](#ci-signing), and `wheels.yml` (which publishes to PyPI on a
+tag push) and the release prep (PR #1621) are not touched by them.
+
+1. `package_firmware.py index` (a new command): writes `hearth-update-<channel>.json` from the merged
+   `hearth-sink-manifest.json` of a release, for the channel it is given. The images need nothing new: they
+   carry no signature, so there is no `sdkconfig.sign`, no 4 KiB, no change to `check_esp_efuse_free.py` and
+   no ESP-IDF setting to prove.
+2. `sign_index.py` (a new tool beside `ota.py`): `sign` signs an index with a leaf from a PFX in the environment
+   or a key file and writes the signature file; `verify` checks a pair against an anchor file the way a board
+   does, and is what a person uses to look at a channel before they trust it; `selftest` makes a throwaway CA and
+   two leaves, for tests and for the workflow's dry run. It needs `cryptography`, installed from a hash-locked
+   requirements file; the rest is the standard library. A PowerShell form that signs through a key in the Windows
+   certificate store (`SignData`, so the key never leaves it) is a manual fallback only: CI cannot use a
+   non-exportable key. Each is tested against an independent verifier.
+3. `check_firmware_package.py`: the index agrees with the manifest (sizes, SHA-256, no image missing for
+   a profile that publishes one), and every file name in it is one the release has.
+4. The `firmware-channels.yml` workflow, started by `workflow_run` ([CI signing](#ci-signing)); `release.yml`
+   is not edited.
+5. Docs: `docs/hearth/sink-firmware.md` (updating from the screen and the page), `docs/releasing.md` (the key
+   ceremony, the environments, rollover, the recovery table), CHANGELOG (after #1621 has landed).
+
+Nightly and pull-request runs build and package images as today and publish no index.
+
+### Slices
+
+**The smallest first slice that gives value** is O10a, O10b and O10c together, merged one after the other: CI
+signs an index, a board checks GitHub, verifies it and installs the image it names, and nothing about pushing
+changes. What it leaves out is everything that is machinery rather than value: an anchor stored on the board,
+a policy setting, a leaf floor. Each slice is a PR of its own, and none touches a board until the
+coordinator gives a window.
+
+| Slice | What | Tested by | Needs a board window |
+|---|---|---|---|
+| **O10a, the index, the signature and a host-tested library** | `firmware_update.hpp` in `libs/device` (version compare, index and signature parse, image selection, the policy table, the state's JSON and words; no ESP-IDF); `package_firmware.py index`; `sign_index.py` (`sign`, `verify`, `selftest`) and a PowerShell fallback for a Windows-store key; `check_firmware_package.py`; `ota.py` untouched | Host: Catch2 cases for every rule and a version table, with a verifier result passed in. Python: a pair signed by `sign_index.py` with a throwaway CA and leaves made in the test (`selftest`) is checked by an independent verifier, for RSA 3072 and for ECDSA | No |
+| **O10b, the board's pull** | `firmware_pull.cpp` in the component beside `firmware.cpp` (the upload core takes chunks from either source), the chain and signature check with mbedTLS against the build's anchors, the four routes, Kconfig (`ICLFORGE_FIRMWARE_PULL`, `_UPDATE_BASE_URL`, `_UPDATE_CHANNEL`, `_TRUST_ANCHORS`, `_LEAF_STABLE`, `_LEAF_BETA`), the certificate bundle, the NVS keys, the four-place route word list, `stub.js` | Host: the policy and JSON from O10a. **QEMU:** a loopback HTTP server serves an index, its signature and an image, signed by the fixture CA; the base URL accepts `http://` only in `sdkconfig.ci-ota`, and the signature rules are not relaxed; a wrong anchor, a wrong leaf name, a tampered index, an old `sequence`, an expired leaf and a wrong image hash are each refused; a **push of an unsigned image still works**. TLS is not tested here (no clock) | Yes: the TLS handshake with the three real hosts, RAM and flash measured, on the S3, the C6 (16 MB) and the P4 or the kit; a real pull from a throwaway channel release signed by the owner's leaf |
+| **O10c, the workflow and the process** | `firmware-channels.yml`, started by `workflow_run` (`release.yml` is not edited; [CI signing](#ci-signing)), in a PR of its own; `docs/releasing.md`: the key ceremony, the environments, rollover, recovery. The owner's EJBCA work, the environments and the public anchor in `firmware/keys/` | The linters the workflows already pass (actionlint, zizmor); a `dry_run` dispatch, which signs with a throwaway CA and publishes nothing; `ota.py --release latest` and `installer_site.py` ignore the channel release | No (the owner makes the keys, the environments and the variable) |
+| **O10d, Preferences and the page** | The four registry entries, `BoardCaps::update` and its variants, the `Backend` methods; the page's section; `ota.py update`; docs | The preview tool at several sizes with the null display; the Playwright suite with the stub | Yes: the kit's screen, once (including what the screen does while flash mode writes) |
+
+#### O10b as built
+
+What the board's code does that the table above did not say, or says another way:
+
+- **The sequence floor is per channel** (`fw_seq_s`, `fw_seq_b`), and the channel is `fw_chan`.
+- **The skipped-version note is derived**, from the last update `Firmware` reports (a version that went back
+  after its trial), not stored: there is no NVS key for it.
+- **A pull that fails after it began leaves the board in flash mode**, as a push that fails does: a restart
+  leaves it (`PUT /firmware/mode normal`). A check never enters flash mode, and one that cannot run says why in
+  `blocked`.
+- **The trust anchors belong to the application, not the component.** `hearth_sink` embeds a PEM file as
+  `trust_anchors.pem`, from `ICLFORGE_EXAMPLE_TRUST_ANCHORS` or, for CI's throwaway CA, the CMake
+  variable `ICLFORGE_TRUST_ANCHORS_FILE`, and names its start symbol undefined at link time: the
+  code refers to the symbols weakly, so that a build without them links, and a weak reference does not take
+  an object out of an archive.
+- **The QEMU test** is `tools/checks/run_pull_qemu.py`, on a build with `sdkconfig.pull` and
+  `sdkconfig.ci-pull` (`ICLFORGE_FIRMWARE_PULL_TEST_HTTP`: an `http://` address and no date
+  judged; never for a board). It covers the refusals, the offer, a replay, a damaged and a wrong image, the
+  install and its trial, an up-to-date check, the unsigned push, both channels with an RSA, an ECDSA and a
+  PSS signature, and the `Host` check. An expired leaf and TLS itself are not tested there (QEMU's board
+  has no clock and the server is plain HTTP): they wait for a board. A non-self-signed sub-CA works as the
+  anchor, as the plan said it should.
+- **The PowerShell form that signs through the Windows store was not built**: CI cannot use a non-exportable
+  key, and the owner's keys are made on their own machine ([the process](#the-process)).
+- **Measured under QEMU** (an ESP32-S3, no PSRAM): the image grows by 31,968 bytes; the install task had
+  8,496 bytes of its 12 KiB stack spare; the least free internal heap while pulling was 148,396 bytes. None of
+  it is a board's number: the C6, the memory beside a playing stream and the time an RSA-3072 chain takes
+  are owed to a board window.
+
+### Later hardening
+
+Each is its own slice, built only if the owner wants it, in this order of value:
+
+- **The leaf floor and `expires`**: `min_leaf_issued` and an optional `expires` in the index, raised and checked
+  from signed data; the answer to a leaked leaf and to a freeze.
+- **The anchor at the board**: the NVS override, the presence window (a button on the screen, or a power-on
+  reset), "Use the built-in key", and their registry entries and routes (`PUT` and `DELETE /firmware/trust`).
+- **Policy `all`**: an opt-in setting under which a push must also carry a signature (a detached signature over
+  the image's SHA-256 by a leaf that chains to the anchor, which `ota.py push --sign` makes). Off by default;
+  switched on and off only at the board or over USB, never by a route alone, so it can never lock a person
+  out; it is the setting that makes the anchor replacement at the board necessary.
+- **`ota.py --release` verifies the index** the way a board does, and can use Sigstore's attestation for the
+  images on the host, where its size does not matter.
+- **An opt-in daily check** that only changes the screen to "available" ([decision 30](#decisions)).
+
+**Exit of the first slice:** a board on the desk checks, installs a release whose index CI signed with the
+owner's leaf from GitHub, passes its trial, and reports "Updated to ...", while the same board still takes an unsigned build by
+`PUT /firmware`, and refuses an index signed by another CA. The exit waits for the owner's CA certificate
+and a signed channel release (O10c).
+
+**Open, to prove rather than assume:**
+
+- that mbedTLS takes an intermediate, and a self-signed leaf, as a trust anchor, and accepts a chain whose
+  anchor's dates it is told to ignore (a verify callback), on the build's mbedTLS (O10b, QEMU);
+- that `mbedtls_x509_crt_check_extended_key_usage` and the key-usage check are in the build and judge a
+  certificate the way the CA's template made it (O10b);
+- that a signature made by .NET's `SignData` on a store key (PKCS#1 v1.5 or PSS; ECDSA's raw `r||s`) verifies
+  under mbedTLS and the independent verifier (O10a);
+- that `esp_http_client` follows the 901-byte redirect with a 2 KiB header buffer and a custom bundle (O10b);
+- whether ISRG Root X1 alone validates the CDN's chain, which ends in "Root YR" cross-signed by X1 (O10b);
+- the session's real peak on the C6 beside a stopped stream, the chain check's RAM and the code size on each
+  chip (O10b);
+- that the kit's screen survives flash mode's cache stalls well enough to show progress (O10d);
+- that `ota.py --release latest` and `installer_site.py` ignore the `firmware-channels` release (O10c).
+
+The P4's co-processor firmware is not part of this: a release updates the P4's application, and the C6
+beside it stays as it is ([O6](#the-p4s-co-processor-o6)).
+
 ## Tests
 
 **On the host.** The logic that needs no ESP-IDF goes in `libs/device/include/iclforge/firmware_image.hpp`,
@@ -1357,6 +2093,14 @@ boards leave development, and if that is before O8, O8's images are published si
   blank board to one that plays, then updates it over the network to a newer release.
   [Built](#the-user-guide); its exit waits for a release that publishes sink firmware.
   **Status: built and merged** as #1041.
+- **O10, updates from GitHub releases.** [Updates from GitHub releases](#updates-from-github-releases-o10):
+  a board checks for a newer release, shows it, and installs it, from a signed index. Four slices, each its
+  own PR: O10a the index, the signature and a host-tested library; O10b the board's pull and its routes;
+  O10c the process (the keys, the first signed channel release); O10d the Preferences entry and the page.
+  Later hardening is listed, not scheduled. **Status: designed 2026-10-25;** the owner took decisions 23 to 30,
+  33, 34, 35 and 37; 31, 32 and most of 36 wait. **Exit:** a board on the desk checks,
+  installs a release signed by the owner's leaf from GitHub, passes its trial, and still takes an unsigned
+  build sent by `PUT /firmware`.
 
 ## Robustness (2026-09-26)
 
@@ -1464,7 +2208,7 @@ Outcomes, 2026-09-30. Decisions 1, 3 to 8 and 10 to 21 were built as recommended
 (a) each time; decision 6 is a decision not to build something, and it stands. Decision 2 was
 taken as (c) while the boards are in development, and its (a) is O7, which is not built.
 Decision 9 was taken as (a), and the study is all of it that exists. Decision 22 is open: nothing
-pins `esp_hosted`.
+pins `esp_hosted`. Decisions 23 to 37 are those of O10 (2026-10-25): the owner took 23 to 30, 33, 34, 35, 36's lifetime and 37, and the rest are proposals.
 
 1. **Update scheme.** (a) **two slots and a rollback bootloader**; (b) a small factory recovery
    app plus one update slot; (c) one slot and a staging area. **Recommend (a).** It is the only
@@ -1589,3 +2333,118 @@ pins `esp_hosted`.
     host and the co-processor differ, and a new release on either side should be a choice, not
     what a clean build happened to fetch. Cost: each new release is taken by hand, and once O6
     ships, a new `esp_hosted` means a co-processor update as well.
+
+Taken by the owner on 2026-10-25: 23 (b), 26, 27, 29, 30 and 33 as recommended (26 for a pull only), 24 (a) and
+25 (a) with the owner's own CA (EJBCA), 28 (a), 34 (a) and 35 (a) (CI signs), 36's lifetime and 37 (a) (the owner
+approves every stable signing run; beta signs on its own). 31, 32 and the rest of 36 are proposals.
+
+23. **Where a board learns what the newest release is.** (a) GitHub's REST API; (b) **an update index, one
+    small JSON file for each channel with a signature file beside it, published as assets of a long-lived
+    `firmware-channels` Pre-release**; (c) the same index on GitHub Pages; (d) no pull: a machine on the LAN
+    (ac3hearth, `ota.py`, the page) reads GitHub and pushes. **Recommend (b).** (a) is 60 calls an hour for
+    the whole household, `.../releases/latest` answers `404` while every release is a Pre-release, and one
+    release's listing is 263 KB. (c) has one host, no redirect and CORS, but the index changes only when
+    the docs build runs (a failed docs build delays an update), and a Pages address does not follow a
+    repository rename where release addresses do. (d) needs no TLS on any board and is the way for a board
+    that cannot hold it, but it is not the board looking at GitHub, and it needs a machine awake. Cost of
+    (b): a mutable release whose assets are replaced, a redirect to a second host (two TLS sessions, two
+    roots). **Taken 2026-10-25: (b).**
+24. **How a board proves a pulled image is the owner's.** (a) **a signed index: a detached signature over the
+    index file, with a certificate chain that ends at a trust anchor in the build, checked by the board on
+    the pull path only; the images carry no signature and a push needs none**; (b) ESP-IDF's signed apps
+    (RSA-3072, the running image's keys as the anchor, the O7 design); (c) a raw dedicated key; (d) keyless
+    Sigstore; (e) none, TLS only. **Recommend (a).** It is the one that meets the owner's words: it
+    enforces on a pull and on nothing else, its anchor is in the build and can be replaced, and an unsigned
+    push never stops working. (b) enforces on every path through `esp_ota_*`, takes its trust from the image
+    that is running, has no setting to relax, and an image with the check and no signature block can take no
+    update at all, so it makes development hard and can lock a person out. (c) is (a) with the least code
+    and no chain, and (a) degenerates to it when the anchor is a self-signed certificate. (d) is too large
+    for a board. (e) leaves every board's code in the hands of whoever holds the GitHub account. Cost of
+    (a): X.509 chain verification and a signature algorithm on the board (the code TLS needs anyway), two
+    small files fetched beside the index, and a signing tool; it does not defend a board against its own
+    LAN. **Replaces the earlier (a), which the owner's principles rule out. Taken 2026-10-25: (a).**
+25. **Whose certificate signs.** (a) **two new code-signing leaves, `stable` and `beta`, from the owner's local
+    CA (EJBCA), a firmware sub-CA under it as the anchor in the board, the leaf names pinned in the build**; (b) the Windows code-signing certificate reused, as the stable leaf or both; (c) a raw
+    dedicated key or a self-signed certificate; (d) keyless Sigstore. **Recommend (a).** Beta and stable have
+    keys that cannot stand in for each other; a leaf is replaced with no firmware change; the Windows key
+    signs Windows binaries only. (b) costs nothing now and is allowed by the design (pin its subject name),
+    at the price of one key doing two jobs, an organisation-wide secret, and one leaf for both channels. The owner supplies:
+    the CA's public certificate, whether it can make an intermediate, the key type it offers, and whether a
+    leaf's key can be exported. Cost of (a): a ceremony at the CA ([the EJBCA guide](hearth-firmware-signing-ejbca.md)),
+    two keys to keep, a rollover about every two years. See [Trust and signing](#trust-and-signing).
+    **Taken 2026-10-25: (a).**
+26. **What an update may do to the version.** (a) **a pull installs only a strictly newer version, with
+    `secure_version` and the index's `sequence` no lower than the board's; a push and a rollback are
+    unchecked**; (b) any signed image. **Recommend (a).** A signature says who approved an index, not that
+    it is the newest, and a replayed old release with a known flaw is the downgrade attack. Cost: a release
+    that fixes a security flaw has `secure_version` raised by hand; a version the parser does not understand
+    is never offered; a board that has seen a newer index refuses an older one until it is pushed to.
+    **Taken 2026-10-25: (a).**
+27. **Channels.** (a) **two channels, `stable` and `beta`, both published; a per-board setting with Kconfig's
+    default `beta` until the owner flips it**; (b) stable only; (c) beta only. **Recommend (a).** Every
+    release so far is a Pre-release, so (b) would say "up to date" for ever. Cost: one more row in
+    Preferences. **Taken 2026-10-25: (a).**
+28. **A board and an unsigned `PUT /firmware`.** (a) **always accepted**, on every board, whatever it
+    trusts; signature enforcement for pushes is an opt-in setting built later, switched on or off only at
+    the board or over USB; (b) refused once the board has a key (the earlier recommendation). **Recommend
+    (a),** the owner's: "I want to be able to upload dev firmware from my local development onto my dev
+    kits." Cost: the signature protects the pull and not the LAN, which [Principles](#principles) says
+    plainly. **Taken 2026-10-25: (a); (b) is withdrawn.**
+29. **What a check and an install do to what is playing.** (a) **a check never stops anything and is
+    refused where memory does not allow it; an install stops playback, after a confirm that says so**; (b)
+    both stop playback; (c) an install waits until the stream ends. **Recommend (a).** Cost: on the C6 a
+    check also needs the stream stopped and says so; (c) can wait for ever on a player that plays all day.
+    **Taken 2026-10-25: (a).**
+30. **Automatic checks.** (a) **none to begin with: a person presses Check; later, an opt-in daily check that
+    only changes the screen to "available" and never installs**; (b) a daily check on by default; (c) an
+    install by itself. **Recommend (a).** Cost: a board nobody checks stays old. (c) restarts a player in
+    the middle of an evening. **Taken 2026-10-25: (a).**
+31. **Trust for the connection.** (a) **a small custom bundle (USERTrust ECC, ISRG Root X1 and one spare),
+    validation on, the date required, no fallback**; (b) ESP-IDF's full default bundle; (c) no validation,
+    because the index is signed. **Recommend (a).** Cost: if GitHub changes a host's root before the bundle
+    covers it, boards cannot pull until pushed to; (b) is tens of KB on every board for hosts it never
+    contacts; (c) leaves the index and the image readable by anyone on the path, with the signed index as
+    the only guard, and gives up the privacy of what a person runs.
+32. **Whose repository and anchor.** (a) **the base URL, the anchor file and the leaf names are an
+    integrator's build settings; the component ships none of the owner's in a place that cannot be
+    replaced, and the example's defaults name this repository**; (b) compiled into the component.
+    **Recommend (a).** The product is a generic base ([decision 12](#decisions)). Cost: an integrator sets
+    three things and runs their own signing.
+33. **The 4 MB C6.** (a) **push only, no pull**; (b) trim the build until TLS fits its slot (1,966,080
+    bytes, the profile's budget to the byte); (c) give its slots back the room `audio` and `storage` took
+    on 2026-10-21. **Recommend (a).** Its profile has no board on the desk, and (b) and (c) are work for a
+    board nobody runs. Cost: `hearth-sink-esp32c6` is updated from a laptop or the page.
+    **Taken 2026-10-25: (a).**
+34. **How a person replaces the trust anchor.** (a) **first, by building (or taking) an image with the anchor
+    they want and pushing it, which needs nothing on the board; later, an override in NVS set in a presence
+    window (a button on the screen, or a power-on reset on a board with no screen) with a reset to the
+    build's anchor, and USB always**; (b) the NVS override from the first slice; (c) never. **Recommend
+    (a).** A push is never refused, so the first way is complete; the override matters only once a policy
+    can refuse a push. Cost of (a): until the override exists a person who cannot build must be given an
+    image. Cost of (b): a surface that can be set wrong (pulls fail until it is reset) and a presence
+    design to get right before it earns anything. **Taken 2026-10-25: (a).**
+35. **Who signs, and when.** (a) **CI, after the release run, each channel's leaf as a secret of a GitHub
+    environment of its own, in a workflow of its own that starts when the Release run has finished
+    (`workflow_run`, so it always runs from `main`; first drafted as a job `release.yml` calls, the pattern
+    of `manifest-bump.yml`), behind a repository variable that keeps it off until the owner has set the
+    environments up**; (b) the owner, by hand, on their machine; (c) CI for beta and the owner for stable.
+    **Recommend (a),** the owner's: "just let CI do the signing. We already do that for Windows signing."
+    The Windows pattern is a PFX in a secret and `signtool`; this is the same shape with a different leaf and
+    no `signtool`. Cost: a key in GitHub's secret store (two, one for each channel, apart from the Windows
+    one), so who can run a workflow on an allowed ref is who can read it (environments that allow `main` only
+    and a reviewer on stable narrow that); (b) is a click and a laptop at every release. **Taken 2026-10-25: (a).**
+36. **Revocation, expiry and the clock.** (a) **no revocation list: `sequence` now; a leaf floor
+    (`min_leaf_issued`) and an optional `expires`, from signed data, later; the anchor's dates ignored, the
+    leaf's and the intermediate's judged against the clock when it is set, failing closed with a message;
+    leaves last two years and CI warns 60 days before one ends**; (b) a CRL or OCSP; (c) dates ignored
+    altogether. **Recommend (a).** A board with no clock cannot pull in any case (TLS needs it), and a floor is
+    two dates in signed data. Cost: a leaked leaf stays good on a board that has not fetched a newer index;
+    (b) is machinery a board should not carry; (c) lets an expired leaf, or one made before a CA was rebuilt,
+    sign for ever. **Lifetime taken 2026-10-25: one to two years is fine; the rest is a proposal.**
+37. **Who approves a signing run.** (a) **a required reviewer on `firmware-stable` (the owner), none on
+    `firmware-beta`**; (b) none on either; (c) a reviewer on both. **Recommend (a); taken 2026-10-25: (a),
+    with both environments limited to `main`** ([CI signing](#ci-signing)). The beta leaf signs only
+    what beta boards read, which are development kits that take unsigned pushes anyway; the stable leaf is the
+    one someone who is not the owner relies on, and the click shows the owner which release is about to be
+    signed. Cost: one approval at each stable release, with the release already out meanwhile. (b) signs
+    unattended, and a hostile workflow on an allowed ref could read the stable key without a human seeing it.

@@ -736,6 +736,71 @@ TEST_CASE(
           0.0F);
 }
 
+// The place of the 7-bit channel_mode of a frame's first channel-coded substream: the bit offset
+// at which the code 0b1111000 stands and which, with its last bit set, makes the frame's table of
+// contents read channel_mode 0b1111001 and nothing else different. The width is the same, so the
+// frame keeps every size it carries.
+std::optional<std::size_t> channel_mode_bit_offset(const std::vector<std::byte>& frame) {
+    const auto bit_at = [&frame](std::size_t at) {
+        return (std::to_integer<unsigned>(frame[at / 8]) >> (7U - at % 8U)) & 1U;
+    };
+    const auto reference = iclforge::ac4::parse_raw_frame(frame);
+    REQUIRE(reference.has_value());
+    for (std::size_t at = 0; at + 7 <= 8 * std::min<std::size_t>(frame.size(), 64); ++at) {
+        unsigned code = 0;
+        for (std::size_t k = 0; k < 7; ++k) {
+            code = (code << 1U) | bit_at(at + k);
+        }
+        if (code != 0b1111000U) {
+            continue;
+        }
+        std::vector<std::byte> altered = frame;
+        altered[(at + 6) / 8] ^= static_cast<std::byte>(0x80U >> ((at + 6) % 8));
+        const auto parsed = iclforge::ac4::parse_raw_frame(altered);
+        if (parsed.has_value() &&
+            parsed->toc.substream_groups.at(0).substreams.at(0).chan->channel_mode == 0b1111001 &&
+            parsed->toc.n_substreams == reference->toc.n_substreams &&
+            parsed->toc.substream_sizes == reference->toc.substream_sizes) {
+            return at;
+        }
+    }
+    return std::nullopt;
+}
+
+TEST_CASE(
+    "immersive stereo made from Dolby Atmos content (channel_mode 0b1111001) decodes as the same "
+    "stereo as 0b1111000",
+    "[ac4][decoder][pcm]") {
+    // Dolby's AC-4 in MPEG-DASH specification, "Signaling immersive stereo content": a
+    // presentation_version 2 presentation signals immersive stereo with channel_mode 0b1111000 for
+    // any content or 0b1111001 for content made from Dolby Atmos, ch_mode 1 either way
+    // (libs/ac4/ERRATA.md). DEE's stream is the 0b1111000 kind; the same stream with the last bit of
+    // each frame's channel_mode set is the other, and must decode to the same samples. Read as the
+    // 7.1 (3/4/0.1) Table 56 names, its metadata() and audio fail in the first frames.
+    const auto frames = raw_frames(read_stream("ac4-ims-music-64-2997"));
+    REQUIRE(frames.size() > 40);
+    const auto at = channel_mode_bit_offset(frames.front());
+    REQUIRE(at.has_value());
+    auto atmos = frames;
+    for (std::vector<std::byte>& frame : atmos) {
+        const std::size_t last = *at + 6;
+        frame[last / 8] ^= static_cast<std::byte>(0x80U >> (last % 8));
+        const auto parsed = iclforge::ac4::parse_raw_frame(frame);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->toc.substream_groups.at(0).substreams.at(0).chan->channel_mode == 0b1111001);
+    }
+    iclforge::ac4::Decoder plain;
+    iclforge::ac4::Decoder altered;
+    const Decoded expected = decode_frames(plain, std::span(frames).first(40));
+    const Decoded actual = decode_frames(altered, std::span(atmos).first(40));
+    REQUIRE(expected.lengths.size() == 40);
+    REQUIRE(actual.lengths == expected.lengths);
+    CHECK(actual.nothing == 0);
+    REQUIRE(actual.channels.size() == 2);
+    CHECK(peak_difference(actual.channels, 0, expected.channels, 0, expected.channels.front().size()) ==
+          0.0F);
+}
+
 TEST_CASE("the converter's output counts stay locked to sequence_counter across a splice",
           "[ac4][decoder][pcm][src]") {
     // Part 2 Table 47 at 29.97 fps, by phi_t.

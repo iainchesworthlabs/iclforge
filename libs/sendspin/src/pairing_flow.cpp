@@ -103,8 +103,18 @@ Step ClientPairing::start(const m::PairingActivation& activation, std::uint32_t 
             }
             attempt_started_ = now;
             state_ = State::kFinalize;
-            return {.after = After::kContinue,
-                    .messages = {pm::write_client_pair_finalize({.long_term_psk = long_term_psk_, .wrapped_psk = std::nullopt})}};
+            {
+                // The specification has the client send client/pair-init and then client/pair-finalize
+                // without waiting (pairing.md); the 9.1.1 dialect has the finalize alone (C40).
+                Step step{.after = After::kContinue, .messages = {}};
+                if (config_.dialect == Dialect::kSpecification) {
+                    step.messages.push_back(
+                        pm::write_client_pair_init({.pairing_index = pairing_index_, .commit_b = std::nullopt}));
+                }
+                step.messages.push_back(
+                    pm::write_client_pair_finalize({.long_term_psk = long_term_psk_, .wrapped_psk = std::nullopt}));
+                return step;
+            }
 
         case m::PairMethod::kDynamicCode:
             if (config_.dialect == Dialect::kSpecification) {
@@ -477,6 +487,15 @@ Step ServerPairing::receive(std::string_view type, json::Value payload) {
                 return {};
             }
             if (method_ == m::PairMethod::kPairingPsk) {
+                if (type == "client/pair-init" && dialect == Dialect::kSpecification) {
+                    // The specification has the client send client/pair-init, then client/pair-finalize
+                    // (pairing.md); a player of the 9.1.1 era or Hearth's own sends the finalize alone.
+                    const auto init = pm::read_client_pair_init(payload);
+                    if (!init || init->pairing_index != pairing_index_ || init->commit_b) {
+                        return protocol_error();
+                    }
+                    return {};
+                }
                 if (type != "client/pair-finalize") {
                     return protocol_error();
                 }

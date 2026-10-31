@@ -53,8 +53,9 @@ lv_display_t* g_disp = nullptr;
 void* g_frame = nullptr;
 bool g_backlight_ready = false;
 
-// The copy into the frame buffer is done: the render buffer can be drawn into again. Called from the
-// DSI driver's interrupt; lv_display_flush_ready() is the call LVGL makes safe for that.
+// The copy into the frame buffer is done: the render buffer can be drawn into again. Called from
+// the 2D-DMA's interrupt, or from flush() itself when the CPU does the copy;
+// lv_display_flush_ready() is the call LVGL makes safe for either.
 bool IRAM_ATTR on_color_trans_done(esp_lcd_panel_handle_t /*panel*/,
                                    esp_lcd_dpi_panel_event_data_t* /*edata*/, void* /*ctx*/) {
     if (g_disp != nullptr) {
@@ -283,6 +284,14 @@ bool display_open(Display& out) {
         std::printf("panel: could not hear when a copy into the frame buffer is done\n");
         return false;
     }
+    if constexpr (CONFIG_ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH != 0) {
+        // The copy by the 2D-DMA, not the CPU (esp_lcd_panel_dpi.c's draw bitmap hook): without it
+        // the copy runs inside flush(), PSRAM to PSRAM, and the callback above is called before it
+        // returns.
+        const esp_err_t dma = esp_lcd_dpi_panel_enable_dma2d(g_panel);
+        std::printf("panel: frame buffer copy by %s\n",
+                    dma == ESP_OK ? "2D-DMA" : "the CPU (the 2D-DMA would not start)");
+    }
 
     const bool touch = open_touch();
     lv_indev_t* const pointer = lv_indev_create();
@@ -291,13 +300,14 @@ bool display_open(Display& out) {
     lv_indev_set_display(pointer, g_disp);
 
     open_backlight();
-    display_set_backlight(kBacklightNormalPercent);
+    display_set_backlight(backlight_lit_percent());
 
     out.lv = g_disp;
     out.width = kWidth;
     out.height = kHeight;
     out.frame = static_cast<const std::uint16_t*>(g_frame);
     out.touch = touch;
+    out.backlight = g_backlight_ready;
     out.kind = "dsi";
     std::printf("panel: EK79007 %d by %d on MIPI DSI, touch %s\n", kWidth, kHeight,
                 touch ? "on" : "off");

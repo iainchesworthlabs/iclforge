@@ -7,13 +7,12 @@
 // read, and at once after an action. The clock is Playwright's, held still
 // and moved by hand, so each interval is exact.
 
-const { test, expect } = require('./fixtures');
+const { test, expect, holdClockAt } = require('./fixtures');
 
 const START = new Date('2026-09-11T12:00:00Z');
 
 test.beforeEach(async ({ page, stub }) => {
-    await page.clock.install({ time: START });
-    await page.clock.pauseAt(START);
+    await holdClockAt(page, START);
     await page.goto(stub.url);
     await expect(page.locator('#link')).toHaveText('Status read at 12:00:00.');
 });

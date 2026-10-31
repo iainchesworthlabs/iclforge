@@ -238,16 +238,19 @@ TEST_CASE("title card: a long text is cut at a character, not in the middle of o
         long_title += "\xE6\x97\xA5";
     }
     REQUIRE(long_title.size() == 300);
+    // The update holds views, so the texts it points at are named: a temporary would be gone by apply().
+    const std::string long_artist(500, 'a');
     nv::TitleUpdate update;
     update.title = set(long_title);
-    update.artist = set(std::string(500, 'a'));
+    update.artist = set(long_artist);
     store.apply(update);
     CHECK(store.title().size() == 255);
     CHECK(store.title() == long_title.substr(0, 255));
     CHECK(store.artist().size() == nv::TitleStore::kArtistBytes);
 
     // A text that fits is kept as it is, up to the byte.
-    update.title = set(std::string(nv::TitleStore::kTitleBytes, 'b'));
+    const std::string fits(nv::TitleStore::kTitleBytes, 'b');
+    update.title = set(fits);
     store.apply(update);
     CHECK(store.title().size() == nv::TitleStore::kTitleBytes);
 }
@@ -261,10 +264,13 @@ TEST_CASE("title card: the strings keep their capacity, so applying an update al
     CHECK(store.artist().capacity() >= nv::TitleStore::kArtistBytes);
     CHECK(store.album().capacity() >= nv::TitleStore::kAlbumBytes);
 
+    const std::string long_title(1000, 't');
+    const std::string long_artist(1000, 'a');
+    const std::string long_album(1000, 'l');
     nv::TitleUpdate update;
-    update.title = set(std::string(1000, 't'));
-    update.artist = set(std::string(1000, 'a'));
-    update.album = set(std::string(1000, 'l'));
+    update.title = set(long_title);
+    update.artist = set(long_artist);
+    update.album = set(long_album);
     store.apply(update);
     update.title = {.say = Say::kClear};
     store.apply(update);

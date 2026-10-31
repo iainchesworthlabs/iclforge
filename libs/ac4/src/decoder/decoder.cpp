@@ -24,6 +24,7 @@
 #include "iclforge/base/bitreader.hpp"
 #include "pcm/downmix.hpp"
 #include "pcm/drc.hpp"
+#include "pcm/renderer.hpp"
 #include "oba/isf.hpp"
 #include "oba/objects.hpp"
 #include "pcm/routing.hpp"
@@ -197,13 +198,21 @@ using detail::role_from_classifier;
 using detail::role_v1;
 using detail::SubstreamContext;
 
-// DEE's immersive stereo: presentation_version 2, which Part 2 V1.3.1 names
-// without defining, over a channel-coded substream carrying the channel_mode
-// code Table 56 gives to 7.0 (3/4/0). Every such stream parses to the exact
-// end of every substream only when that substream is read as stereo wherever
-// its channel mode is used: its channel element, its metadata() and the
-// presentation's pres_ch_mode. The Python transcription found the same. It is
-// an observation of one encoder, not the text; the errata register records it.
+// Immersive stereo: presentation_version 2, which Part 2 V1.3.1 names without
+// defining, over a channel-coded substream carrying a channel_mode code that
+// Table 56 gives to a 7.X mode: 0b1111000 (7.0: 3/4/0), which every DEE
+// immersive-stereo encode uses, or 0b1111001 (7.1: 3/4/0.1), which Dolby's
+// AC-4 in MPEG-DASH specification ("Signaling immersive stereo content") gives
+// to immersive stereo made from Dolby Atmos content, both with ch_mode 1. Every
+// such stream parses to the exact end of every substream only when that
+// substream is read as stereo wherever its channel mode is used: its channel
+// element, its metadata() and the presentation's pres_ch_mode. The Python
+// transcription found the same. The first code is an observation of one
+// encoder, the second a statement of a supplementary specification, neither the
+// text of Part 2; the errata register records both.
+constexpr int kImsAnyContentChannelMode = 0b1111000;
+constexpr int kImsAtmosChannelMode = 0b1111001;
+
 void apply_observed_stereo_rule(Toc& toc) {
     // Each group is patched once however many presentations name it, and
     // however many times one names it: a presentation may repeat a group
@@ -224,7 +233,9 @@ void apply_observed_stereo_rule(Toc& toc) {
             continue;
         }
         for (GroupSubstream& sub : toc.substream_groups[group_index].substreams) {
-            if (sub.kind == GroupSubstream::Kind::kChan && sub.chan && sub.chan->channel_mode == 0b1111000) {
+            if (sub.kind == GroupSubstream::Kind::kChan && sub.chan &&
+                (sub.chan->channel_mode == kImsAnyContentChannelMode ||
+                 sub.chan->channel_mode == kImsAtmosChannelMode)) {
                 sub.chan->ch_mode = detail::ch_mode::kStereo;
             }
         }
@@ -1114,13 +1125,25 @@ void report_downmix(const detail::StereoDmxCoeff& coeff, DownmixInfo& out) {
         static_cast<DownmixInfo::Preferred>(std::clamp(coeff.preferred_dmx_method, 0, 3));
 }
 
-// The channels a member's channel mode has, where decode() renders it.
-void speakers_into(int ch_mode, std::vector<Speaker>& out) {
+// The channels a member's channel mode has, where decode() renders it. An immersive mode's are the
+// ones its source layout had (b_4_back_channels_present and top_channels_present), as decode()
+// writes them as coded: a 5.1.4 stream is sent as 7.1.4 and has no Lb and Rb.
+void speakers_into(int ch_mode, bool backs, int tops, std::vector<Speaker>& out) {
     out.clear();
-    if (ch_mode >= 0) {
-        const std::span<const Speaker> speakers = detail::speakers_of(ch_mode);
-        out.assign(speakers.begin(), speakers.end());
+    if (ch_mode < 0) {
+        return;
     }
+    if (detail::is_immersive(ch_mode)) {
+        const detail::ImmersiveLayout layout{
+            .backs = backs,
+            .tops = tops,
+            .lfe = ch_mode == detail::ch_mode::k7_1_4 || ch_mode == detail::ch_mode::k9_1_4,
+            .screen = detail::has_fronts(ch_mode)};
+        out = detail::render_plan(layout, DownmixTarget::kAsCoded).speakers;
+        return;
+    }
+    const std::span<const Speaker> speakers = detail::speakers_of(ch_mode);
+    out.assign(speakers.begin(), speakers.end());
 }
 
 // decode_by_block()'s blocks: the samples a frame leaves over, held for the
@@ -2073,11 +2096,13 @@ void Decoder::Impl::report_presentations(const Toc& toc, int level) {
                                         ? std::optional<int>{from.content_classifier}
                                         : std::nullopt;
             to.language = from.language;
-            speakers_into(from.ch_mode, to.speakers);
+            speakers_into(from.ch_mode, from.backs, from.tops, to.speakers);
             to.sample_rate_hz = toc.sample_rate_hz * from.rate_multiplier;
         }
         const std::optional<std::size_t> anchor = detail::anchor_member(plan);
-        speakers_into(anchor ? plan.members[*anchor].ch_mode : -1, info.speakers);
+        speakers_into(anchor ? plan.members[*anchor].ch_mode : -1,
+                      anchor ? plan.members[*anchor].backs : true,
+                      anchor ? plan.members[*anchor].tops : 3, info.speakers);
         info.sample_rate_hz =
             anchor ? toc.sample_rate_hz * plan.members[*anchor].rate_multiplier : 0;
         info.decodable = plan.decodable;

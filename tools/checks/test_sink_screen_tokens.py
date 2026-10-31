@@ -50,7 +50,9 @@ class Tokens(unittest.TestCase):
         self.kotlin_path.write_text(tokens_module.kotlin(moved), encoding="utf-8")
         found = self.problems()
         self.assertEqual(len(found), 1, found)
-        self.assertIn("kHeaderHeight is 64, the tokens say 72", found[0])
+        # The panel's header is the display's now (screen_metrics.hpp), held to the tokens for
+        # the kit's canvas.
+        self.assertIn("the canvas's header is 64, the tokens say 72", found[0])
 
     def test_the_length_rules_steps_and_the_sung_opacity_are_in_the_generated_code(self):
         text = tokens_module.kotlin(self.tokens)

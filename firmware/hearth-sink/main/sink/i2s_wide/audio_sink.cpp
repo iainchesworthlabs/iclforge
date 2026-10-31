@@ -76,12 +76,14 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/dac_queue_model.hpp"
+#include "iclforge/hardware_info.hpp"
 #include "iclforge/interleave.hpp"
 #include "iclforge/playout.hpp"
 #include "iclforge/sink_plan.hpp"
 #include "driver/i2s_std.h"
 #include "driver/i2s_tdm.h"
 #include "esp_attr.h"
+#include "esp_chip_info.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -110,11 +112,26 @@ constexpr iclforge::SinkFrame kFrame = CONFIG_ICLFORGE_EXAMPLE_I2S_FIXED_FRAME !
     return g_slot_bits == 32 ? I2S_DATA_BIT_WIDTH_32BIT : I2S_DATA_BIT_WIDTH_16BIT;
 }
 
-// This line's own ceiling at the width in force - what sink_slots() reports.
-// No second line, ever: see the top-of-file comment.
-[[nodiscard]] std::size_t ceiling() {
-    return iclforge::sink_ceiling(g_slot_bits, /*second_line=*/false, I2S_LL_SLOT_FRAME_BIT_MAX);
+// Whether this chip can open a TDM frame: not an ESP32-P4 below v3.0 (see the top-of-file comment). The revision is
+// the silicon's own, read once.
+[[nodiscard]] bool tdm_usable() {
+    static const bool usable = [] {
+        esp_chip_info_t chip{};
+        esp_chip_info(&chip);
+        return chip.revision >= iclforge::kEsp32p4TdmClockRevision;
+    }();
+    return usable;
 }
+
+// What the sink carries at a slot width: this line's own ceiling, held to the two slots of standard I2S on a chip
+// that cannot clock a TDM frame. No second line, ever: see the top-of-file comment.
+[[nodiscard]] std::size_t ceiling_at(int slot_bits) {
+    const std::size_t frame = iclforge::sink_ceiling(slot_bits, /*second_line=*/false, I2S_LL_SLOT_FRAME_BIT_MAX);
+    return tdm_usable() ? frame : std::min<std::size_t>(frame, 2);
+}
+
+// ... at the width in force - what sink_slots() reports.
+[[nodiscard]] std::size_t ceiling() { return ceiling_at(g_slot_bits); }
 
 // One line's hardware state - see sink/i2s/audio_sink.cpp's copy.
 struct Line {
@@ -468,26 +485,26 @@ const char* sink_name() { return "i2s_wide"; }
 
 int sink_slots() { return static_cast<int>(ceiling()); }
 
-int sink_max_slots() {
-    return static_cast<int>(std::max(
-        iclforge::sink_ceiling(16, /*second_line=*/false, I2S_LL_SLOT_FRAME_BIT_MAX),
-        iclforge::sink_ceiling(32, /*second_line=*/false, I2S_LL_SLOT_FRAME_BIT_MAX)));
-}
+int sink_max_slots() { return static_cast<int>(std::max(ceiling_at(16), ceiling_at(32))); }
 
 // sink_ceiling()'s own arithmetic (sink_plan.hpp: slots = frame_bit_max /
 // slot_bits) means the max above always comes from the narrower width - see
-// sink/i2s's own copy of this comment. Not the whole story on this exact
-// part below chip revision v3.0 though: see iclforge::HardwareFacts's
-// revision_hard_limit_below (control.cpp) for why the wide line cannot
-// reach ANY TDM channel count above 2 there regardless of what this number
-// says, a fact this sink has no way to know from here (it has no chip
-// revision to read).
+// sink/i2s's own copy of this comment. On this exact part below chip revision
+// v3.0 the wide line reaches no TDM channel count above 2 (see
+// iclforge::HardwareFacts's revision_hard_limit_below, control.cpp), and
+// sink_max_slots() above says two for it: the sink reads the revision itself
+// (tdm_usable), so GET /hardware, /status, PUT /layout and the Sendspin hello
+// all report what the chip reaches and not the frame's thirty-two.
 int sink_max_slots_bit_width() { return 16; }
 
 // Never a second line on this sink - see the top-of-file comment on why
 // I2S_LL_INST_NUM alone (3 on the ESP32-P4) is not a safe proxy here, unlike
 // sink/i2s's kSecondController.
 bool sink_second_line_possible() { return false; }
+
+int sink_frame_bit_max() { return I2S_LL_SLOT_FRAME_BIT_MAX; }
+
+bool sink_tdm_usable() { return tdm_usable(); }
 
 int sink_slot_bits() { return g_slot_bits; }
 

@@ -146,6 +146,56 @@ config ICLFORGE_FIRMWARE_FLASH_MODE_IDLE_S
     default 600
     range 30 86400
 
+# UPDATES FROM GITHUB RELEASES - include/iclforge/firmware_pull.hpp and
+# planning/esp32-ota.md (O10): a board reads a small signed index of its channel from a
+# GitHub release, and installs the image it names when there is a newer one. A pushed
+# image (PUT /firmware) is untouched by all of it. Off by default: it carries an HTTPS
+# client and a certificate bundle.
+config ICLFORGE_FIRMWARE_PULL
+    bool "Updates pulled from GitHub releases"
+    default n
+    select ESP_HTTP_CLIENT_ENABLE_HTTPS
+    select MBEDTLS_CERTIFICATE_BUNDLE
+    help
+        Adds GET /firmware/available, POST /firmware/check, PUT
+        /firmware/from-release and PUT /firmware/channel. A pull is
+        installed only if the update index it came from carries a
+        signature that chains to a trust anchor built into this image
+        (the project's, ICLFORGE_EXAMPLE_TRUST_ANCHORS for the Hearth sink):
+        a build with no anchor says so and pulls nothing. The images
+        themselves carry no signature, and neither does one that is pushed.
+
+config ICLFORGE_FIRMWARE_UPDATE_BASE_URL
+    string "Where release assets are: the releases/download address of a repository"
+    default "https://github.com/iainchesworthlabs/iclforge/releases/download"
+    help
+        The index of a channel is <this>/firmware-channels/hearth-update-<channel>.json and
+        an image <this>/<release tag>/<file>. A firmware that runs its own releases
+        points this at its own repository, with its own trust anchor.
+
+config ICLFORGE_FIRMWARE_UPDATE_CHANNEL
+    string "The channel a board follows until a person chooses one: stable or beta"
+    default "beta"
+
+config ICLFORGE_FIRMWARE_LEAF_STABLE
+    string "Common name the stable channel's signing certificate must have"
+    default "Hearth Firmware Stable"
+    help
+        Empty accepts any code-signing certificate the trust anchors vouch for.
+
+config ICLFORGE_FIRMWARE_LEAF_BETA
+    string "Common name the beta channel's signing certificate must have"
+    default "Hearth Firmware Beta"
+
+# An int, like the settings above, so that it reaches C++ as a plain constant.
+config ICLFORGE_FIRMWARE_PULL_TEST_HTTP
+    int "CI only: the update address may be http:// (1), and no date is judged"
+    default 0
+    range 0 1
+    help
+        For the QEMU test, which serves the index and an image from a loopback server and has
+        no clock. The signature is checked exactly as on a board. Never set for a board.
+
 # DIAGNOSTICS WITHOUT A CABLE - include/iclforge/log.hpp and
 # planning/esp32-ota.md (O4).
 config ICLFORGE_LOG_BYTES

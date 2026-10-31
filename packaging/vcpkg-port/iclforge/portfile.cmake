@@ -1,6 +1,7 @@
 # vcpkg port for iclforge - installs the library only (iclforge::ac3 and iclforge::containers, plus
-# the containers' Matroska, MP4, MPEG-TS and IAMF parts, iclforge::c, the AC-4 library and
-# iclforge::iab as opt-in features, off unless asked for, since each adds public API), never the CLI, GUI,
+# the containers' Matroska, MP4, MPEG-TS and IAMF parts, iclforge::c, the AC-4 library, the TrueHD
+# library and iclforge::iab as opt-in features, off unless asked for, since each adds public API),
+# never the CLI, GUI,
 # Hearth, tests, examples or fuzz harnesses - upstream's own ICLFORGE_BUILD_CLI/GUI/HEARTH/TESTS/
 # EXAMPLES/FUZZERS options make that a plain OFF each, no patching needed. iclforge::adm (the
 # ADM/BW64 reader and its bridge) has no feature here: it needs Boost and, even though it is now
@@ -17,7 +18,7 @@ vcpkg_from_github(
 )
 
 # One vcpkg feature <-> one ICLFORGE_BUILD_<NAME> CMake option, OFF where the feature is not
-# asked for: upstream defaults ICLFORGE_BUILD_AC4/IAB/IAMF (and the container writers) ON.
+# asked for: upstream defaults ICLFORGE_BUILD_AC4/TRUEHD/IAB/IAMF (and the container writers) ON.
 vcpkg_check_features(
     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
@@ -26,6 +27,7 @@ vcpkg_check_features(
         mpegts   ICLFORGE_BUILD_MPEGTS
         capi     ICLFORGE_BUILD_CAPI
         ac4      ICLFORGE_BUILD_AC4
+        truehd   ICLFORGE_BUILD_TRUEHD
         iab      ICLFORGE_BUILD_IAB
         iamf     ICLFORGE_BUILD_IAMF
 )

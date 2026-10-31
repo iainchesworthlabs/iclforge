@@ -37,6 +37,14 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         (void)complexity;
     }
 
+    // A protected track's sinf is attacker-controlled as well: its boxes nest inside a sample
+    // entry whose own length is the file's say-so, and the words describe_refusal() builds from
+    // them (the seeds are protected files, so this reaches the sinf/tenc parse).
+    if (const auto refused = iclforge::containers::mp4::list_refused_tracks(bytes)) {
+        volatile std::size_t words = iclforge::containers::mp4::describe_refusal(*refused).size();
+        (void)words;
+    }
+
     const auto sink = [](std::span<const std::byte> sample) {
         volatile std::byte last{};
         for (const auto b : sample) {
@@ -72,5 +80,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         }
     }
     (void)reader.finish();
+    volatile std::size_t refused = reader.refused_tracks().size();
+    (void)refused;
     return 0;
 }

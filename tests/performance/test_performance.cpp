@@ -16,6 +16,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
+#include "test_performance.hpp"
 
 // Real-time throughput regression guard.
 //
@@ -29,7 +30,9 @@
 // caught a regression like that - this file exists specifically to fail
 // loudly if the codec ever stops being faster than real time again.
 //
-// It covers both directions of both generations plus the object path: the
+// It covers both directions of both generations plus the object path (and, since TrueHD joined,
+// both directions of TrueHD at stereo and 5.1, a frame there being an access unit, in
+// test_performance_truehd.cpp): the
 // AC-3 and Atmos/JOC encoders it was written for, and - since encoder/decode benchmarks -
 // the E-AC-3 encoder and all three decoders, which had no real-time gate of
 // any kind - and AC-4's encoder and decoder, at stereo and 5.1. A decoder
@@ -63,9 +66,11 @@
 
 namespace {
 
+using perf::gate::fixture;
+using perf::gate::kSlackFactor;
+
 constexpr int kFrames = 100;
 constexpr double kSampleRate = 48000.0;
-constexpr double kSlackFactor = 2.0;
 
 // Enough frames for a decode case to have something to read, without
 // spending the whole encode budget building it.
@@ -75,12 +80,6 @@ constexpr int kObjects = 4;
 
 double real_time_budget_seconds(int frames) {
     return static_cast<double>(frames) * iclforge::ac3::kSamplesPerFrame / kSampleRate;
-}
-
-const iclforge::ac3::io::WavData& fixture() {
-    static const iclforge::ac3::io::WavData audio = perf::load_real_audio(
-        perf::kReference51Wav, 6, static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame));
-    return audio;
 }
 
 std::vector<iclforge::objects::oba::ObjectPlacement> object_placement(int objects) {

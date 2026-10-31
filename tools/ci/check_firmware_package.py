@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Open every published hearth_sink image before it is uploaded (planning/esp32-ota.md, O8).
 
-    python tools/ci/check_firmware_package.py DIR [--allow-missing]
+    python tools/ci/check_firmware_package.py DIR [--allow-missing] [--index FILE ...]
 
 DIR is what tools/hearth/package_firmware.py wrote for each board image, with
 hearth-sink-manifest.json beside the files. An image published under a board's
@@ -23,6 +23,14 @@ had built in. So each image is opened and held to its name:
 - no Wi-Fi network is built into it;
 - every file is there, with the size and SHA-256 the manifest gives.
 
+An update index (hearth-update-<channel>.json, --index, repeatable: O10) is held
+to the manifest it was written from: the same release, one entry for each image,
+and for each the file, size, SHA-256, chip, revisions, flash size, PSRAM and
+secure version the manifest gives, every file name one a board will fetch, and
+the file there in DIR with that size and SHA-256. A board installs what the
+signed index says, so an index that disagrees with the files is a release that
+does not install.
+
 Every image IMAGES names must be there, unless --allow-missing (for a local
 run over a subset). An image IMAGES does not name is refused: a new board's
 image needs its rule first.
@@ -38,6 +46,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 import struct
 import sys
 import zipfile
@@ -249,11 +258,104 @@ def check_parts(
     return problems
 
 
+INDEX_FIELDS = (
+    "file",
+    "size",
+    "sha256",
+    "project",
+    "chip_id",
+    "min_rev_full",
+    "max_rev_full",
+    "flash_size",
+    "psram",
+    "secure_version",
+)
+INDEX_FILE_NAME = re.compile(r"^[A-Za-z0-9_+-][A-Za-z0-9._+-]{0,95}$")
+
+
+def check_index(directory: Path, manifest: dict[str, Any], index_path: Path) -> list[str]:
+    """Every way the update index at `index_path` disagrees with the manifest and the files."""
+    label = index_path.name
+    try:
+        data = index_path.read_bytes()
+        index = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError) as error:
+        return [f"{label} cannot be read: {error}"]
+    problems: list[str] = []
+    if len(data) > 4096:
+        problems.append(f"{label} is {len(data)} bytes; a board reads 4096")
+    if not isinstance(index, dict) or index.get("format") != 1:
+        return [*problems, f"{label} is not format 1"]
+    if index.get("channel") not in ("stable", "beta"):
+        problems.append(f"{label}: the channel is {index.get('channel')!r}")
+    if index.get("version") != manifest.get("version"):
+        problems.append(
+            f"{label}: the version is {index.get('version')!r}, "
+            f"the manifest's {manifest.get('version')!r}"
+        )
+    sequence = index.get("sequence")
+    if not isinstance(sequence, int) or isinstance(sequence, bool) or not 1 <= sequence < 2**32:
+        problems.append(f"{label}: the sequence {sequence!r} is not a positive 32-bit number")
+    entries = index.get("images") or []
+    listed = {str(entry.get("name")): entry for entry in entries}
+    if len(listed) != len(entries):
+        problems.append(f"{label}: an image is listed more than once")
+    wanted = {str(image.get("name")): image for image in manifest.get("images") or []}
+    for name in sorted(set(wanted) - set(listed)):
+        problems.append(f"{label}: {name} is in the manifest and not in the index")
+    for name in sorted(set(listed) - set(wanted)):
+        problems.append(f"{label}: {name} is in the index and not in the manifest")
+    for name in sorted(set(listed) & set(wanted)):
+        entry, image = listed[name], wanted[name]
+        app = (image.get("files") or {}).get("app") or {}
+        expect = {
+            "file": app.get("name"),
+            "size": app.get("size"),
+            "sha256": app.get("sha256"),
+            "project": image.get("project"),
+            "chip_id": image.get("chip_id"),
+            "min_rev_full": image.get("min_rev_full"),
+            "max_rev_full": image.get("max_rev_full"),
+            "flash_size": image.get("flash_size"),
+            "psram": image.get("psram"),
+            "secure_version": image.get("secure_version", 0),
+        }
+        for field in INDEX_FIELDS:
+            if entry.get(field) != expect[field]:
+                problems.append(
+                    f"{label}: {name}'s {field} is {entry.get(field)!r}, "
+                    f"the manifest's {expect[field]!r}"
+                )
+        file_name = str(entry.get("file", ""))
+        if not INDEX_FILE_NAME.match(file_name):
+            problems.append(
+                f"{label}: {name}'s file name {file_name!r} is not one a board will fetch"
+            )
+            continue
+        path = directory / file_name
+        if not path.is_file():
+            problems.append(f"{label}: {file_name} is not there")
+            continue
+        body = path.read_bytes()
+        if len(body) != entry.get("size") or hashlib.sha256(body).hexdigest() != entry.get(
+            "sha256"
+        ):
+            problems.append(f"{label}: {file_name} is not the size and SHA-256 the index gives")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("directory", type=Path)
     parser.add_argument(
         "--allow-missing", action="store_true", help="check only the images that are there"
+    )
+    parser.add_argument(
+        "--index",
+        type=Path,
+        action="append",
+        default=[],
+        help="an update index to hold to the manifest",
     )
     args = parser.parse_args(argv)
     path = args.directory / MANIFEST_NAME
@@ -284,6 +386,14 @@ def main(argv: list[str] | None = None) -> int:
                 f"{image['files']['app']['size']:,}-byte app, "
                 f"{len(image.get('parts') or [])} regions"
             )
+    for index_path in args.index:
+        problems = check_index(args.directory, manifest, index_path)
+        if problems:
+            failed = True
+            for problem in problems:
+                print(f"::error::{problem}")
+        else:
+            print(f"OK  {index_path.name}: agrees with the manifest and the files")
     return 1 if failed else 0
 
 

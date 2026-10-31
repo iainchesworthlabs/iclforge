@@ -10,8 +10,11 @@
 #include <fstream>
 #include <iterator>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -413,4 +416,285 @@ TEST_CASE("decode writes a channel-based-immersive bed programme as DirectSpeake
     }
     CHECK(bridged->is_lfe[9]);
     CHECK(tone_magnitude(bridged->pcm[9], 55.0, kSampleRate) > 0.05);
+}
+
+namespace {
+
+// The 55 Hz of the LFE tone every bed below puts in its LFE channel, and how loud it has to be in a
+// master to count as carried: the tone is 0.3 of full scale, so 0.15 once measured, and a silent
+// channel measures 0. Well clear of both.
+constexpr double kLfeHz = 55.0;
+constexpr double kLfeAudible = 0.05;
+
+// What a channel-based-immersive bed comes to after forge reads it back out of an ADM master:
+//
+//   bed.wav --atmos-cbi--> .ec3 --decode--> ADM master --atmos-adm--> .ec3 --decode--> ADM master
+//
+// which is how a bed gets into atmos-adm at all (issue 1627). The LFE is the fourth channel (index 3)
+// of every layout (Table 12: L R C LFE ...); `frequencies` is one tone a channel, that one's 55 Hz.
+struct LfeRoundTrip {
+    std::string encode_text;        // what atmos-adm printed
+    int encode_rc = -1;
+    double lfe_before = 0.0;        // the LFE tone in the first master: what the bed carried
+    double lfe_after = 0.0;         // ... in the second, after atmos-adm: what the stream carries
+    std::size_t lfe_channels = 0;   // how many channels the second master marks as the LFE
+};
+
+constexpr std::uint32_t kLfeSampleRate = 48000;
+
+// The first two hops, which are the reporter's: a bed of `frequencies.size()` channels, one tone
+// each, encoded with atmos-cbi and decoded back to an ADM master. Returns the master.
+fs::path decoded_bed_master(const fs::path& dir, std::string_view layout,
+                            std::span<const double> frequencies) {
+    constexpr std::uint32_t kSampleRate = kLfeSampleRate;
+    const auto frames = static_cast<std::size_t>(8 * iclforge::ac3::kSamplesPerFrame);
+    const std::string tag{layout};
+
+    std::vector<std::vector<float>> channels(frequencies.size(), std::vector<float>(frames));
+    for (std::size_t c = 0; c < frequencies.size(); ++c) {
+        for (std::size_t n = 0; n < frames; ++n) {
+            channels[c][n] = static_cast<float>(
+                0.3 * std::sin(2.0 * std::numbers::pi * frequencies[c] * static_cast<double>(n) /
+                               static_cast<double>(kSampleRate)));
+        }
+    }
+    const auto wav = dir / ("lfe_rt_" + tag + ".wav");
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, kSampleRate).has_value());
+
+    const auto cbi = dir / ("lfe_rt_" + tag + ".ec3");
+    const auto master = dir / ("lfe_rt_" + tag + "_master.wav");
+    REQUIRE(run_cli("atmos-cbi " + quoted(wav) + " " + quoted(cbi) + " 768 " + tag,
+                    dir / ("lfe_rt_" + tag + "_cbi.log")) == 0);
+    REQUIRE(run_cli("decode " + quoted(cbi) + " " + quoted(dir / ("lfe_rt_" + tag + "_out.wav")) +
+                        " \"\" " + quoted(master),
+                    dir / ("lfe_rt_" + tag + "_decode.log")) == 0);
+    return master;
+}
+
+LfeRoundTrip lfe_round_trip(const fs::path& dir, std::string_view layout,
+                            std::span<const double> frequencies) {
+    constexpr std::uint32_t kSampleRate = kLfeSampleRate;
+    const std::string tag{layout};
+    const auto master = decoded_bed_master(dir, layout, frequencies);
+
+    LfeRoundTrip out;
+    const auto find_lfe = [](const iclforge::adm::BridgeResult& bridged)
+        -> std::optional<std::size_t> {
+        for (std::size_t i = 0; i < bridged.channel_count(); ++i) {
+            if (bridged.is_lfe[i]) {
+                return i;
+            }
+        }
+        return std::nullopt;
+    };
+    {
+        const auto parsed = iclforge::adm::parse_bw64(master.string());
+        REQUIRE(parsed.has_value());
+        const auto bridged = iclforge::adm::build(*parsed);
+        REQUIRE(bridged.has_value());
+        const auto lfe = find_lfe(*bridged);
+        REQUIRE(lfe.has_value());
+        out.lfe_before = tone_magnitude(bridged->pcm[*lfe], kLfeHz, kSampleRate);
+    }
+
+    // The hop issue 1627 is about: the master back into an Atmos stream, and that stream decoded.
+    const auto again = dir / ("lfe_rt_" + tag + "_again.ec3");
+    const auto encode_log = dir / ("lfe_rt_" + tag + "_encode.log");
+    out.encode_rc =
+        run_cli("atmos-adm " + quoted(master) + " " + quoted(again) + " 768", encode_log);
+    out.encode_text = read_log(encode_log);
+    if (out.encode_rc != 0) {
+        return out;
+    }
+    const auto master_again = dir / ("lfe_rt_" + tag + "_master_again.wav");
+    REQUIRE(run_cli("decode " + quoted(again) + " " +
+                        quoted(dir / ("lfe_rt_" + tag + "_out_again.wav")) + " \"\" " +
+                        quoted(master_again),
+                    dir / ("lfe_rt_" + tag + "_decode_again.log")) == 0);
+    const auto parsed = iclforge::adm::parse_bw64(master_again.string());
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::adm::build(*parsed);
+    REQUIRE(bridged.has_value());
+    out.lfe_channels = bridged->lfe_count();
+    if (const auto lfe = find_lfe(*bridged)) {
+        out.lfe_after = tone_magnitude(bridged->pcm[*lfe], kLfeHz, kSampleRate);
+    }
+    return out;
+}
+
+}  // namespace
+
+// Issue 1627, first repro. A 5.1.4 bed read out of its own ADM master used to come back with a
+// silent LFE (the bridge gave it gain 0, and an object reaches the LFE as lfe_send * gain) and a
+// status line counting the LFE twice: ten channels and "the bed's LFE" made eleven objects.
+TEST_CASE("atmos-adm carries a bed's LFE through, and counts it once", "[cli][atmos-adm][lfe]") {
+    const auto dir = scratch_dir();
+    const auto result = lfe_round_trip(dir, "5.1.4", std::array<double, 10>{
+                                                         220.0, 277.2, 330.0, kLfeHz, 554.4, 660.0,
+                                                         740.0, 831.6, 880.0, 1108.8});
+    INFO(result.encode_text);
+    REQUIRE(result.encode_rc == 0);
+
+    // Nine speaker feeds and the bed's LFE are ten objects: the LFE is the implicit one, not a channel
+    // that also needs a slot.
+    CHECK(contains(result.encode_text,
+                   "9 bed speaker feed(s) + 0 dynamic object(s) + the bed's LFE = 10 objects"));
+
+    // And it is still there, at the level it went in: the first master's LFE tone was audible, and the
+    // stream atmos-adm made from it carries it too (-120 dBFS before, which is silence).
+    CHECK(result.lfe_before > kLfeAudible);
+    CHECK(result.lfe_channels == 1);
+    CHECK(result.lfe_after > kLfeAudible);
+    CHECK(result.lfe_after > 0.5 * result.lfe_before);
+}
+
+// Issue 1627, second repro. A 9.1.6 bed is fifteen speaker feeds and the LFE, which is what
+// TS 103 420 8.3.2.2's sixteen are; atmos-adm refused it ("more channels than AtmosEncoder
+// supports") because it counted the LFE against the fifteen as well.
+TEST_CASE("atmos-adm takes a 9.1.6 bed: fifteen speaker feeds and the LFE", "[cli][atmos-adm][lfe]") {
+    const auto dir = scratch_dir();
+    const auto result = lfe_round_trip(
+        dir, "9.1.6",
+        std::array<double, 16>{220.0, 277.2, 330.0, kLfeHz, 554.4, 660.0, 740.0, 831.6, 880.0,
+                               1108.8, 1245.0, 1318.5, 1480.0, 1661.2, 1864.7, 2093.0});
+    INFO(result.encode_text);
+    REQUIRE(result.encode_rc == 0);
+    CHECK(contains(result.encode_text,
+                   "15 bed speaker feed(s) + 0 dynamic object(s) + the bed's LFE = 16 objects"));
+    CHECK(result.lfe_channels == 1);
+    CHECK(result.lfe_after > kLfeAudible);
+}
+
+// The same master into AC-4 (codec=ac4). Its objects have a stream LFE object of their own, which
+// the writer marks and the decoder renders to the LFE; the bridge's LFE channel used to go in as an
+// ordinary object at gain 0, which AC-4 writes as -infinity dB.
+TEST_CASE("atmos-adm codec=ac4 writes a bed's LFE as the stream's LFE object",
+          "[cli][atmos-adm][lfe][ac4]") {
+    const auto dir = scratch_dir();
+    const auto master = decoded_bed_master(
+        dir, "5.1.4",
+        std::array<double, 10>{220.0, 277.2, 330.0, kLfeHz, 554.4, 660.0, 740.0, 831.6, 880.0,
+                               1108.8});
+
+    const auto ac4 = dir / "lfe_rt_ac4.ac4";
+    const auto encode_log = dir / "lfe_rt_ac4_encode.log";
+    const auto encode_rc =
+        run_cli("atmos-adm " + quoted(master) + " " + quoted(ac4) + " 384 \"\" codec=ac4", encode_log);
+    const auto encode_text = read_log(encode_log);
+    INFO(encode_text);
+    REQUIRE(encode_rc == 0);
+    // Nine objects and the LFE object: the status says which is which.
+    CHECK(contains(encode_text, "9 bed speaker feed(s) + 0 dynamic object(s) + the LFE object"));
+
+    const auto rendered = dir / "lfe_rt_ac4_rendered.wav";
+    REQUIRE(run_cli("decode " + quoted(ac4) + " " + quoted(rendered),
+                    dir / "lfe_rt_ac4_decode.log") == 0);
+    const auto wav = iclforge::ac3::io::read_wav(rendered.string());
+    REQUIRE(wav.has_value());
+    double loudest = 0.0;
+    for (std::size_t c = 0; c < wav->channels.size(); ++c) {
+        const auto magnitude = tone_magnitude(wav->channels[c], kLfeHz, wav->sample_rate);
+        CAPTURE(c, magnitude);
+        loudest = std::max(loudest, magnitude);
+    }
+    // The LFE tone is in what was rendered, in some channel: it was 0 (silence) when it went in as
+    // a gain-0 object.
+    CHECK(loudest > kLfeAudible);
+}
+
+namespace {
+
+using iclforge::objects::oba::BedLabel;
+
+// An ADM master of bed channels alone, one tone each, written the way forge's decode writes one
+// (iclforge::adm::write, then write_bw64): `beds` is each channel's label and its tone's frequency.
+fs::path write_bed_master(const fs::path& path,
+                          std::span<const std::pair<BedLabel, double>> beds) {
+    const auto frames = static_cast<std::size_t>(8 * iclforge::ac3::kSamplesPerFrame);
+    std::vector<std::vector<float>> pcm(beds.size(), std::vector<float>(frames));
+    std::vector<std::string> names;
+    for (std::size_t c = 0; c < beds.size(); ++c) {
+        names.emplace_back(iclforge::objects::oba::describe(beds[c].first));
+        for (std::size_t n = 0; n < frames; ++n) {
+            pcm[c][n] = static_cast<float>(
+                0.3 * std::sin(2.0 * std::numbers::pi * beds[c].second * static_cast<double>(n) /
+                               static_cast<double>(kLfeSampleRate)));
+        }
+    }
+    iclforge::adm::WriteInput input;
+    input.sample_rate = kLfeSampleRate;
+    for (std::size_t c = 0; c < beds.size(); ++c) {
+        input.channels.push_back(
+            {.name = names[c], .pcm = pcm[c], .bed_label = beds[c].first, .updates = {}});
+    }
+    const auto document = iclforge::adm::write(input);
+    REQUIRE(document.has_value());
+    REQUIRE(iclforge::adm::write_bw64(path.string(), *document).has_value());
+    return path;
+}
+
+}  // namespace
+
+// A stream has one LFE and a dual-LFE master (LFE and LFE2) has two. Neither takes an object slot;
+// both are added into the one, and the run says so rather than leaving a second LFE unaccounted for.
+TEST_CASE("atmos-adm adds a second LFE into the stream's one, and says so",
+          "[cli][atmos-adm][lfe]") {
+    const auto dir = scratch_dir();
+    constexpr double kSecondLfeHz = 70.0;
+    const std::array<std::pair<BedLabel, double>, 5> beds{{{BedLabel::kL, 220.0},
+                                                           {BedLabel::kR, 277.2},
+                                                           {BedLabel::kC, 330.0},
+                                                           {BedLabel::kLfe, kLfeHz},
+                                                           {BedLabel::kLfe2, kSecondLfeHz}}};
+    const auto master = write_bed_master(dir / "two_lfe_master.wav", beds);
+
+    const auto out = dir / "two_lfe.ec3";
+    const auto log = dir / "two_lfe_encode.log";
+    const auto rc = run_cli("atmos-adm " + quoted(master) + " " + quoted(out) + " 768", log);
+    const auto text = read_log(log);
+    INFO(text);
+    REQUIRE(rc == 0);
+    CHECK(contains(text, "warning: " + master.string() +
+                             ": 2 LFE channels are summed into the stream's one LFE"));
+    // Three speaker feeds and the one LFE: the second LFE is not a fifth object.
+    CHECK(contains(text, "3 bed speaker feed(s) + 0 dynamic object(s) + the bed's LFE = 4 objects"));
+
+    // Both of them are in the stream's LFE.
+    const auto decoded_master = dir / "two_lfe_decoded_master.wav";
+    REQUIRE(run_cli("decode " + quoted(out) + " " + quoted(dir / "two_lfe_decoded.wav") + " \"\" " +
+                        quoted(decoded_master),
+                    dir / "two_lfe_decode.log") == 0);
+    const auto parsed = iclforge::adm::parse_bw64(decoded_master.string());
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::adm::build(*parsed);
+    REQUIRE(bridged.has_value());
+    REQUIRE(bridged->lfe_count() == 1);
+    std::size_t lfe = 0;
+    while (!bridged->is_lfe[lfe]) {
+        ++lfe;
+    }
+    CHECK(tone_magnitude(bridged->pcm[lfe], kLfeHz, kLfeSampleRate) > kLfeAudible);
+    CHECK(tone_magnitude(bridged->pcm[lfe], kSecondLfeHz, kLfeSampleRate) > kLfeAudible);
+}
+
+// JOC reconstructs objects from a 5.1 downmix of them, and the LFE is not one, so a master of nothing
+// but its LFE has nothing to build a stream on. Refused as the input it is, for both codecs, before
+// anything is written.
+TEST_CASE("atmos-adm refuses a master of nothing but its LFE", "[cli][atmos-adm][lfe]") {
+    const auto dir = scratch_dir();
+    const std::array<std::pair<BedLabel, double>, 1> beds{{{BedLabel::kLfe, kLfeHz}}};
+    const auto master = write_bed_master(dir / "lfe_only_master.wav", beds);
+
+    for (const bool ac4 : {false, true}) {
+        const auto out = dir / (ac4 ? "lfe_only.ac4" : "lfe_only.ec3");
+        const auto log = dir / (ac4 ? "lfe_only_ac4.log" : "lfe_only_ec3.log");
+        const auto rc = run_cli("atmos-adm " + quoted(master) + " " + quoted(out) +
+                                    (ac4 ? " 384 \"\" codec=ac4" : " 768"),
+                                log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 2);  // exit_codes.hpp's kExitInput
+        CHECK(contains(text, "names only LFE channel(s)"));
+        CHECK_FALSE(fs::exists(out));
+    }
 }

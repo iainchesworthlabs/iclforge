@@ -38,11 +38,11 @@ The terms:
 
 The baselines the tables cite, with the image each was recorded on (the dates are UTC):
 
-- `s3-n16r8`: board S3a, `v0.10.0-beta.1-4565-gc3878ebaa`, 2026-10-12.
-- `s3-n16r8-ac4`: board S3a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
+- `s3-n16r8`: board S3a, `v0.10.0-beta.1-5587-g2a14b2b96`, 2026-10-29, with the AC-4 decoder and the 64 KB data cache (until then the
+  release image had neither, recorded 2026-10-12 at `v0.10.0-beta.1-4565-gc3878ebaa`, and `s3-n16r8-ac4` was its own profile, S3a,
+  `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12: the figures below marked `s3-n16r8-ac4` are that profile's).
 - `c6-16mb`: the C6 board, `v0.10.0-beta.1-4738-g357812dae`, 2026-10-12.
-- `p4-rev1`: board P4a, `v0.10.0-beta.1-4565-gc3878ebaa`, 2026-10-12.
-- `p4-rev1-ac4`: board P4a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
+- `p4-rev1` (until 2026-10-29 `p4-rev1-ac4`): board P4a, `v0.10.0-beta.1-4723-ge3da66cb3`, 2026-10-12.
 
 `c6-4mb` and `p4-rev3` have no bench board and no baseline. The `p4-rev3` image has not run on a
 v3.x chip or on a panel: its figures are a build's, and the screen's cost was measured on a v1.3
@@ -52,12 +52,12 @@ board with no panel.
 
 | | ESP32-S3 (N16R8) | ESP32-C6 | ESP32-P4 |
 |---|---|---|---|
-| Profiles, and the release image of each | `s3-n16r8` (`hearth-sink-esp32s3`); `s3-n16r8-ac4` | `c6-4mb` (`hearth-sink-esp32c6`); `c6-16mb` (`hearth-sink-esp32c6-16mb`) | `p4-rev1` (`hearth-sink-esp32p4-rev1`); `p4-rev1-ac4`; `p4-rev3` (`hearth-sink-esp32p4-rev3`, with the panel) |
+| Profiles, and the release image of each | `s3-n16r8` (`hearth-sink-esp32s3`) | `c6-4mb` (`hearth-sink-esp32c6`); `c6-16mb` (`hearth-sink-esp32c6-16mb`) | `p4-rev1` (`hearth-sink-esp32p4-rev1`); `p4-rev3` (`hearth-sink-esp32p4-rev3`, with the panel) |
 | Cores and decode arithmetic | two Xtensa LX7 at 240 MHz with a single-precision FPU; `float` | one RISC-V at 160 MHz with no FPU; fixed point | two RISC-V at 360 MHz (v1.x) or 400 MHz (v3.x) with a single-precision FPU; `float` |
 | Internal RAM | 512 KB | 512 KB, shared with the radio | 768 KB, and 32 KB of low-power SRAM that the profiles keep out of the heap |
 | PSRAM | 8 MB, octal, 80 MHz | none | 32 MB, hex, 200 MHz |
 | Flash | 16 MB, QIO | 4 MB or 16 MB, QIO | 16 MB, QIO at 80 MHz |
-| Partition table and application slots | `partitions.csv`, two of 4 MiB | `partitions_c6.csv`, two of 1.75 MiB (4 MB); `partitions.csv` (16 MB) | `partitions.csv`, two of 4 MiB |
+| Partition table and application slots | `partitions.csv`, two of 4 MiB | `partitions_c6.csv`, two of 1.875 MiB (4 MB); `partitions.csv` (16 MB) | `partitions.csv`, two of 4 MiB |
 | Bootloader's window | 32,768 bytes from 0x0 | 32,768 bytes from 0x0 | 24,576 bytes from 0x2000 |
 | Where the code runs | PSRAM, copied there at start: 2.3 MB of the 8 | flash, through the cache | PSRAM, copied there at start |
 | Caches | instruction 32 KB; data 32 KB in 64-byte lines, 64 KB with the AC-4 decoder | 16 KB for code and data together, in 32-byte lines | 16 KB instruction cache and a 128 KB L2 cache in 64-byte lines |
@@ -101,11 +101,9 @@ partitions_c6.csv: 4 MB of flash (any C6 module)
 nvs       data  0x009000  0x006000    24 KiB
 phy_init  data  0x00F000  0x001000     4 KiB
 otadata   data  0x010000  0x002000     8 KiB
-ota_0     app   0x020000  0x1C0000  1.75 MiB
-ota_1     app   0x1E0000  0x1C0000  1.75 MiB
-coredump  data  0x3A0000  0x010000    64 KiB
-audio     data  0x3B0000  0x010000    64 KiB
-storage   fat   0x3C0000  0x040000   256 KiB   the table ends at 0x400000
+ota_0     app   0x020000  0x1E0000  1.875 MiB
+ota_1     app   0x200000  0x1E0000  1.875 MiB
+coredump  data  0x3E0000  0x010000    64 KiB   the table ends at 0x3F0000; no audio, no storage
 ```
 
 The two files are
@@ -174,13 +172,13 @@ share it, and with Wi-Fi up no free block is over 31,744 bytes.
 
 | | Figure | Build and date |
 |---|---|---|
-| Flash | 16 MB in QIO mode (`sdkconfig.s3-fast`). `partitions.csv`, 4 MiB slots. Budgets: application 1,600,000 bytes, bootloader 32,768 | `profiles.json`. QIO is worth 8 to 15% of an AC-4 frame and 11 to 19% of an AC-3 or E-AC-3 one: `hearth-eb2c64`, 2026-10-10 ([Playback speed](esp32-s3.md#playback-speed)) |
+| Flash | 16 MB in QIO mode (`sdkconfig.s3-fast`). `partitions.csv`, 4 MiB slots. Budgets: application 1,750,000 bytes (raised from 1,600,000 on 2026-10-25), bootloader 32,768 | `profiles.json`. QIO is worth 8 to 15% of an AC-4 frame and 11 to 19% of an AC-3 or E-AC-3 one: `hearth-eb2c64`, 2026-10-10 ([Playback speed](esp32-s3.md#playback-speed)) |
 | Internal RAM | 524,288 bytes. 32,768 at 0x40370000 are on the instruction bus only: the instruction cache at its 16 KB minimum, and 16 KB of IRAM. 491,520 are addressable as data, and the data cache comes off the top of them | [Memory](esp32-s3.md#memory) |
-| Caches | Instruction cache 32 KB (`sdkconfig.psram`), 16 KB over ESP-IDF's minimum and 16 KB of internal RAM. Data cache 32 KB in 64-byte lines (`sdkconfig.s3-fast`). `s3-n16r8-ac4` has a 64 KB data cache (`sdkconfig.s3-dcache`), which is 32 KB of the heap | With the 64 KB cache an AC-4 play started with 62 KB free in place of 95: `hearth-eb2c64`, 2026-10-11 ([Playback speed](esp32-s3.md#playback-speed)) |
+| Caches | Instruction cache 32 KB (`sdkconfig.psram`), 16 KB over ESP-IDF's minimum and 16 KB of internal RAM. Data cache 64 KB in 64-byte lines (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), which is 32 KB of the heap (the release image had 32 KB until 2026-10-29) | With the 64 KB cache an AC-4 play started with 62 KB free in place of 95: `hearth-eb2c64`, 2026-10-11 ([Playback speed](esp32-s3.md#playback-speed)) |
 | Code and constants | Run from PSRAM (`CONFIG_SPIRAM_FETCH_INSTRUCTIONS`, `CONFIG_SPIRAM_RODATA`): 2.3 MB of the 8 MB. The fragment's three settings cost about 1 KB of internal RAM between them | `sdkconfig.s3-fast`, in the release image since 2026-10-11 |
 | Static internal RAM | 176,854 bytes for `s3-n16r8`, budget 185,000. No source splits this image into `.data` and `.bss`. The default shape with no network is 88,563 bytes, 46,232 of it `.bss` | `idf.py size`, 2026-10-12 ([the profiles plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md#1-at-build-time-every-pr-no-board)). The default shape: [the README's cost table](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#what-it-costs), which gives no date |
 | Heap with no network | 304,680 bytes free, largest block 241,664, in the footprint probe, which has a 16 KB instruction cache and a 32 KB data cache. IRAM is 16,384 of 16,384 used, so none of it is donated to the heap | QEMU leg, 2026-09-29; a board read 316,196 free on 2026-09-11 ([Memory](esp32-s3.md#memory), [Contiguity](esp32-s3.md#contiguity)) |
-| Heap at boot, Wi-Fi and the Sendspin player up | `s3-n16r8`: 85,667 to 102,503 bytes free. `s3-n16r8-ac4`: 66,159 to 82,771 | Baselines `s3-n16r8` and `s3-n16r8-ac4` |
+| Heap at boot, Wi-Fi and the Sendspin player up | `s3-n16r8`: 75,503 bytes free at the worst of eight boots (2026-10-29, with the decoder and the 64 KB cache; before it 85,667 to 102,503, and the old `s3-n16r8-ac4` 66,159 to 82,771) | Baseline `s3-n16r8` |
 | Largest free block, Wi-Fi up | 31,744 bytes on all sixteen boots of the two baselines. A 32,768-byte stack in internal RAM cannot be made: such an image answered every `POST /play` with `could not allocate 32768 bytes` | Baselines; the failure on both boards, `main` `3d6b2aa0a`, 2026-10-12 (`sdkconfig.psram`) |
 | What is in PSRAM | The code and constants. Both rings: 32,768 bytes for an HTTP play, 262,144 for Sendspin with its buffers. The decode task's stack for an HTTP play and for a Sendspin stream: 32,768 bytes, 40,960 with AC-4. The decode lane's stack (16,384) and its enhanced-coupling scratch (23 KB), and with AC-4 the second core's worker stack (32,768). Allocations of 16 KB and over. Wi-Fi's and lwIP's buffers, which try PSRAM first. The console's last 16 KiB. A lyric document of up to 2,048 bytes of text | `profiles.json`; [The decode stack goes in PSRAM](esp32-s3.md#the-decode-stack-goes-in-psram): the stack in PSRAM costs 4 to 5% of a 2.0 A-SPX frame and returns 28 KB of internal RAM, `hearth-eb2c64`, 2026-10-10 ([#1233](https://github.com/iainchesworthlabs/iclforge/pull/1233)) |
 | The 512-byte rule | For the length of an AC-4 play the limit under which `malloc` tries internal RAM first is `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on this part. The player puts 16,384 back when the play ends. The decoder then keeps 3 to 14 KB in internal RAM and 0.42 to 1.83 MB in PSRAM. A limit of 4,096 bought 1 to 2% of a frame for 23 to 42 KB of internal RAM, and 8,192 or more left the part 0.4 to 5 KB | The split: the AC-4 probe under QEMU, with the decoder as it was before its peaks were cut ([Where its memory goes](esp32-s3.md#where-its-memory-goes)). The sweep: `hearth-eb2c64`, 2026-10-10 ([The 512-byte limit stays](esp32-s3.md#the-512-byte-limit-stays)) |
@@ -190,7 +188,7 @@ share it, and with Wi-Fi up no free block is over 31,744 bytes.
 | AC-3 5.1 | Decoder peak 56,597 bytes. Over Sendspin the least internal heap free was 21 to 79 KB | Peak: the probe in `float`, on a P4 board, 2026-09-23 ([What the part carries](esp32-p4.md#what-the-part-carries)). Sendspin: S3b on `main` `ce0e099db`, 2026-10-12, and the build before it ([AC-3 and E-AC-3 in the Hearth player](esp32-s3.md#ac-3-and-e-ac-3-in-the-hearth-player)) |
 | E-AC-3 5.1 | Decoder peak 102,342 bytes with AHT, spectral extension and coupling; 129,657 with enhanced coupling. Over Sendspin the least free was 0.8 to 14 KB | As the row above |
 | E-AC-3 7.1.4 | Decoder peak 167,386 bytes as coded, 173,794 folded to stereo, 195,025 with objects placed onto 7.1.4. Over Sendspin the least free was 23 to 1,100 bytes | Peak: QEMU leg, 2026-09-29, equal to the P4 board's. Sendspin: as above |
-| AC-4 2.0 | Decoder peak 286,365 to 418,110 bytes. An HTTP play took 0.40 to 0.43 MB of PSRAM and left 77 to 80 KB of internal RAM at the least; with the 64 KB cache the plays of every layout left 31 to 49 KB. A Sendspin stream on `s3-n16r8-ac4` left 83 to 89 KB | Peak: the probe ([Where its memory goes](esp32-s3.md#where-its-memory-goes)). Plays: `hearth-eb2c64`, 2026-10-10 and 2026-10-11 ([On the board](esp32-s3.md#on-the-board)). Sendspin: S3b, 2026-10-12 ([AC-4 from a server](esp32-s3.md#ac-4-from-a-server)) |
+| AC-4 2.0 | Decoder peak 286,365 to 418,110 bytes. An HTTP play took 0.40 to 0.43 MB of PSRAM and left 77 to 80 KB of internal RAM at the least; with the 64 KB cache the plays of every layout left 31 to 49 KB. A Sendspin stream on the old `s3-n16r8-ac4` left 83 to 89 KB (on `s3-n16r8` since the fold, 47 to 74 KB at the least, 2026-10-29) | Peak: the probe ([Where its memory goes](esp32-s3.md#where-its-memory-goes)). Plays: `hearth-eb2c64`, 2026-10-10 and 2026-10-11 ([On the board](esp32-s3.md#on-the-board)). Sendspin: S3b, 2026-10-12 ([AC-4 from a server](esp32-s3.md#ac-4-from-a-server)) |
 | AC-4 5.1 | Decoder peak 696,375 to 859,616 bytes. An HTTP play to 5.1 took 0.78 to 1.06 MB of PSRAM and left 72 to 78 KB; the decode stack reached 32,560 bytes in A-CPL mode 3. Over Sendspin the image states 2 channels and a server sends PCM | As the row above |
 | AC-4 5.1.4 | Decoder peak 1,494,319 bytes. An HTTP play to 5.1.4 took 1.71 to 1.82 MB of PSRAM and left 62 to 75 KB. It fits and takes more than twice real time | As the row above; the time is on [Playback speed](esp32-s3.md#playback-speed) |
 
@@ -211,7 +209,7 @@ up to two coded channels ([An ESP32-C6 sink](../../hearth/sink-esp32-c6.md)).
 
 | | Figure | Build and date |
 |---|---|---|
-| Flash | QIO mode (`sdkconfig.c6`). `c6-4mb`: `partitions_c6.csv`, 1.75 MiB slots, application budget 1,835,008 bytes, which is the slot. `c6-16mb`: `partitions.csv` through `sdkconfig.flash16mb`, 4 MiB slots, application budget 1,880,000. Bootloader budget 32,768 | `profiles.json`. The image was 1,665,856 bytes on 2026-09-25, 91% of a 1.75 MiB slot ([the OTA plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)). QIO left about 8% of the part idle where DIO left 1%: AC-3 2.0 over Wi-Fi, 2026-09-17 (`sdkconfig.c6`) |
+| Flash | QIO mode (`sdkconfig.c6`). `c6-4mb`: `partitions_c6.csv`, 1.875 MiB slots, application budget 1,966,080 bytes, which is the slot. `c6-16mb`: `partitions.csv` through `sdkconfig.flash16mb`, 4 MiB slots, application budget 2,000,000 (raised from 1,880,000 on 2026-10-25). Bootloader budget 32,768 | `profiles.json`. The image was 1,665,856 bytes on 2026-09-25, 91% of a 1.75 MiB slot ([the OTA plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)). QIO left about 8% of the part idle where DIO left 1%: AC-3 2.0 over Wi-Fi, 2026-09-17 (`sdkconfig.c6`) |
 | Cache | 16 KB for code and data together, in 32-byte lines. The fixed-point transform's tables are initialised data (`.data`) for that reason: as constants in flash they cost 15 thousandths of a burst (AC-3 656 to 671, E-AC-3 751 to 766) | The cache: ESP-IDF's ROM header for the part. The timing: the C6 board, `c6-16mb` ([#1511](https://github.com/iainchesworthlabs/iclforge/pull/1511), merged 2026-10-13) |
 | Wi-Fi's code | In flash: `CONFIG_ESP_WIFI_IRAM_OPT`, `_EXTRA_IRAM_OPT`, `_RX_IRAM_OPT`, `_SLP_IRAM_OPT` and `CONFIG_ESP_PHY_IRAM_OPT` are off (`sdkconfig.sendspin-c6`). In the probe's Wi-Fi build that took the code in RAM from 93,190 to 44,804 bytes and the heap free at boot from 295,104 to 343,968, and AC-3 5.1 from 0.82 to 1.09 of real time | The probe, 2026-09-15 ([WiFi's code kept in flash](esp32-c6.md#wifis-code-kept-in-flash)) |
 | Static internal RAM | 111,823 bytes for both images, budget 117,000: `.bss` 43,664, `.data` 21,655, and the rest code placed in RAM. It was 144,139 (`.bss` 81,736) before 27,776 bytes of the decoder's tables came out, and 116,307 (`.bss` 53,904) after | `idf.py size`, 2026-10-12 and 2026-10-13 ([#1474](https://github.com/iainchesworthlabs/iclforge/pull/1474), [#1511](https://github.com/iainchesworthlabs/iclforge/pull/1511), [the profiles plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md#the-c6s-static-ram-budget-was-wrong-pr-14)) |
@@ -245,14 +243,14 @@ here is from a DFRobot FireBeetle 2, chip revision v1.3.
 
 | | Figure | Build and date |
 |---|---|---|
-| Chip revision | `p4-rev1` and `p4-rev1-ac4`: revisions v1.0 to v1.99, 360 MHz. `p4-rev3`: v3.1 to v3.99, 400 MHz, the lyric panel | `profiles.json`; `p4-rev3` has not run on a board ([The chip revision](esp32-p4.md#the-chip-revision-and-what-it-blocks)) |
-| Flash | 16 MB in QIO mode at 80 MHz (`sdkconfig.p4`). `partitions.csv`, 4 MiB slots. `p4-rev3`'s application budget is 2,600,000 bytes; 473 KB of that image is fonts | QIO took 14 to 25% off an AC-4 frame and 4 to 8% off AC-3 and E-AC-3: 2026-10-02 ([Flash mode](esp32-p4.md#flash-mode)). The `p4-rev3` build was 2,469,920 bytes on 2026-10-12 |
+| Chip revision | `p4-rev1`: revisions v1.0 to v1.99, 360 MHz. `p4-rev3`: v3.1 to v3.99, 400 MHz, the lyric panel | `profiles.json`; `p4-rev3` has not run on a board ([The chip revision](esp32-p4.md#the-chip-revision-and-what-it-blocks)) |
+| Flash | 16 MB in QIO mode at 80 MHz (`sdkconfig.p4`). `partitions.csv`, 4 MiB slots. `p4-rev3`'s application budget is 2,900,000 bytes (raised from 2,600,000 on 2026-10-25); 473 KB of that image is fonts | QIO took 14 to 25% off an AC-4 frame and 4 to 8% off AC-3 and E-AC-3: 2026-10-02 ([Flash mode](esp32-p4.md#flash-mode)). The `p4-rev3` build was 2,469,920 bytes on 2026-10-12 |
 | Bootloader | In the 24,576 bytes from 0x2000 to the partition table. v1.x at the Info log level with QIO: 24,368 bytes, 208 to spare. v3.x is 25,152 at Info, so `p4-rev3` builds it at the Warn level: 22,448 | `sdkconfig.p4`; `sdkconfig.p4-rev3`, a build of 2026-10-12 |
 | Internal RAM | 768 KB. The footprint probe, with no network and no PSRAM, had 514,820 bytes free at boot and a largest block of 385,024 | The probe on a board, 2026-09-23 ([Memory](esp32-p4.md#memory)) |
 | The low-power SRAM | 32 KB at 0x50108000, reached with no cache: 174 to 195 cycles an access against 6 to 7 for main RAM. `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n` keeps it out of the heap, which is 32,640 bytes smaller. With it in, the 29.97 fps converter took 93.8 ms a frame; with it out, 12.0 | 2026-10-01 and 2026-10-02 ([The low-power SRAM](esp32-p4.md#the-low-power-sram), [#1176](https://github.com/iainchesworthlabs/iclforge/pull/1176)). The 8 KB of tightly coupled memory at 0x30100000 is still in the heap and was not measured |
 | Caches | A 16 KB instruction cache and a 128 KB L2 cache in 64-byte lines. The firmware is copied into PSRAM at start and runs from there (`CONFIG_SPIRAM_XIP_FROM_PSRAM`): 1.4 MB of code and 0.8 MB of constants in the AC-4 image, 14 KB more image and no internal RAM | 14 to 36% less time a frame on one core: 2026-10-11 ([The firmware in PSRAM and the second core](esp32-p4.md#the-firmware-in-psram-and-the-second-core)) |
 | Static internal RAM | 166,948 bytes for `p4-rev3`, budget 175,000. The v1.x profiles have no budget and no source gives their figure or a `.data` and `.bss` split | `idf.py size` on a build of 2026-10-12 ([the profiles plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md#profiles)) |
-| Heap at boot, Wi-Fi and the Sendspin player up | `p4-rev1`: 291,783 to 291,803 bytes free, largest block 217,088 to 221,184. `p4-rev1-ac4`: 295,671 to 312,299 free, largest 208,896 to 212,992 | Baselines `p4-rev1` and `p4-rev1-ac4` |
+| Heap at boot, Wi-Fi and the Sendspin player up | `p4-rev1`, with the AC-4 decoder since 2026-10-29: 295,671 to 312,299 free, largest 208,896 to 212,992 (without it, as the profile was before: 291,783 to 291,803 free, largest 217,088 to 221,184) | The `p4-rev1` baseline, which is the old `p4-rev1-ac4`'s |
 | What is in PSRAM | The firmware. Both rings: 32,768 and 262,144 bytes. Allocations of 16 KB and over. The SDIO link's buffers, about 31 blocks of 1,536 bytes (`CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`). The decode lane's stack (16,384). The console's last 16 KiB. A lyric document of up to 16,384 bytes of text | `profiles.json`, `sdkconfig.p4` |
 | What stays internal | The decode task's stack: 32,768 bytes, 40,960 with AC-4, of which the decoder uses 19 to 30 KB. The I2S queue: 12 descriptors of 256 frames, 24 KB at 2.0; a sixteen-slot TDM frame would be 196 KB. With AC-4, the second core's worker stack for an HTTP play: 24,576 bytes. A core dump is kept, for 3,652 bytes of static RAM | Stack use: 2026-10-02 ([What the decoder holds](esp32-p4.md#what-the-decoder-holds)). The worker's stack: `firmware/esp-idf/iclforge/src/player.cpp`. Core dump: `idf.py size`, 2026-09-25 |
 | Allocation policy | ESP-IDF's: under 16,384 bytes internal RAM first, and `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW` is 16,384 here. A 512-byte limit left 281 to 298 KB of internal RAM free and took 1.08 to 1.24 times as long a frame | The twenty plays, 2026-10-02 ([Allocation policy](esp32-p4.md#allocation-policy)) |

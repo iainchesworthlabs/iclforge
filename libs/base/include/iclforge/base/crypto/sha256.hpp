@@ -28,7 +28,9 @@ public:
     void finish(std::span<std::byte, 32> out);
 
 private:
-    void process_block(const std::uint8_t* block);
+    // Runs `blocks` consecutive 64-byte blocks through the compression function: the CPU's SHA
+    // instructions where it has them, portable C++ otherwise (iclforge/base/detail/sha256_impl.hpp).
+    void process_blocks(const std::uint8_t* data, std::size_t blocks);
 
     std::array<std::uint32_t, 8> h_{};
     std::uint64_t total_bytes_ = 0;

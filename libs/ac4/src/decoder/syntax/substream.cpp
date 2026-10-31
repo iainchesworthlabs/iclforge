@@ -211,7 +211,17 @@ ParseResult parse_audio_substream(BitReader& r, const SubstreamContext& ctx,
 
     // fill_bits and byte_align up to audio_size, then metadata().
     r.seek(metadata_start);
-    if (auto ok = parse_metadata(r, ctx, state.metadata, out.metadata, objects); !ok) {
+    // audio_data_objs() assigns the channel_mode that metadata() then takes (Part 2 6.2.3.2 and
+    // 6.2.2.2): the one objs_to_channel_mode() gives the substream's object count, so two objects
+    // are read by metadata() as stereo. A count it gives none, or no objects, leaves it undefined
+    // (libs/ac4/ERRATA.md, "The channel_mode of a direct-coded substream's metadata").
+    if (ctx.coding == AudioCoding::kObjects && out.element.objs_channel_mode) {
+        SubstreamContext metadata_ctx = ctx;
+        metadata_ctx.ch_mode = *out.element.objs_channel_mode;
+        if (auto ok = parse_metadata(r, metadata_ctx, state.metadata, out.metadata, objects); !ok) {
+            return ok;
+        }
+    } else if (auto ok = parse_metadata(r, ctx, state.metadata, out.metadata, objects); !ok) {
         return ok;
     }
     r.align();

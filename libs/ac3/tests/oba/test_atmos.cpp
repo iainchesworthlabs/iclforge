@@ -401,6 +401,131 @@ TEST_CASE("an Atmos frame is a plain 5.1 frame with metadata bolted on", "[atmos
 
 namespace {
 
+// The largest sample-by-sample gap between two equal-length signals.
+double max_difference(std::span<const float> a, std::span<const float> b) {
+    REQUIRE(a.size() == b.size());
+    double worst = 0.0;
+    for (std::size_t n = 0; n < a.size(); ++n) {
+        worst = std::max(worst, std::abs(static_cast<double>(a[n]) - static_cast<double>(b[n])));
+    }
+    return worst;
+}
+
+}  // namespace
+
+// A source's own LFE channel (an ADM or IAB bed's, a 5.1 WAV's) has nowhere to go as an object:
+// an object reaches the LFE as lfe_send * gain, and the same gain pans it into the speakers, so
+// the one that sends to the LFE alone is silent - which is what the bridges' gain 0 made of it.
+// encode_frame's `lfe` span is the bed's own LFE, as encode_bed_frame's is for a CBI bed.
+TEST_CASE("an LFE feed reaches the bed's LFE at unity and no speaker", "[atmos][lfe]") {
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
+    iclforge::ac3::oba::AtmosEncoder reference{{.bitrate_kbps = 448}, 1};
+    // At the front, sending nothing to the LFE.
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
+        {{.position = {.x = 0.5, .y = 0.0, .z = 0.0}}}};
+    const auto essence = tone(440.0, 0.3, 0.0, 0);
+    const auto lfe = tone(55.0, 0.4, 0.0, 0);
+    const std::array<std::span<const float>, 1> views{essence};
+
+    REQUIRE(encoder.encode_frame(views, placement, lfe).has_value());
+    REQUIRE(reference.encode_frame(views, placement).has_value());
+
+    // The LFE channel is the feed, sample for sample: the object sent it nothing.
+    CHECK(max_difference(encoder.bed()[5], lfe) < 1e-6);
+    // And none of it is in a speaker: the five of them are exactly what they are without the feed.
+    for (std::size_t channel = 0; channel < 5; ++channel) {
+        CHECK(max_difference(encoder.bed()[channel], reference.bed()[channel]) == 0.0);
+    }
+    // The feed was not the only thing in the bed to begin with - the object is in there.
+    CHECK(max_difference(reference.bed()[5], std::vector<float>(essence.size(), 0.0F)) == 0.0);
+    double speaker_energy = 0.0;
+    for (const float sample : reference.bed()[1]) {
+        speaker_energy += static_cast<double>(sample) * static_cast<double>(sample);
+    }
+    CHECK(speaker_energy > 0.0);
+}
+
+TEST_CASE("an LFE feed adds to what the objects send to the LFE", "[atmos][lfe]") {
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
+        {{.position = {.x = 0.5, .y = 0.0, .z = 0.0}, .lfe_send = 0.5}}};
+    const auto essence = tone(440.0, 0.3, 0.0, 0);
+    const auto lfe = tone(55.0, 0.4, 0.0, 0);
+    const std::array<std::span<const float>, 1> views{essence};
+
+    REQUIRE(encoder.encode_frame(views, placement, lfe).has_value());
+
+    // Half the object, plus the feed: neither displaces the other.
+    std::vector<float> expected(essence.size());
+    for (std::size_t n = 0; n < expected.size(); ++n) {
+        expected[n] = 0.5F * essence[n] + lfe[n];
+    }
+    CHECK(max_difference(encoder.bed()[5], expected) < 1e-5);
+}
+
+TEST_CASE("no LFE feed is the encode_frame that has none", "[atmos][lfe]") {
+    iclforge::ac3::oba::AtmosEncoder without{{.bitrate_kbps = 448}, 2};
+    iclforge::ac3::oba::AtmosEncoder empty{{.bitrate_kbps = 448}, 2};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 2> placement{{
+        {.position = {.x = 0.1, .y = 0.2, .z = 0.0}},
+        {.position = {.x = 0.9, .y = 0.2, .z = 0.0}, .lfe_send = 0.3},
+    }};
+    const auto first = tone(440.0, 0.3, 0.0, 0);
+    const auto second = tone(880.0, 0.3, 0.5, 0);
+    const std::array<std::span<const float>, 2> views{first, second};
+
+    const auto a = without.encode_frame(views, placement);
+    const auto b = empty.encode_frame(views, placement, std::span<const float>{});
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    CHECK(a->bytes == b->bytes);
+}
+
+TEST_CASE("an LFE feed that is not one whole frame is refused", "[atmos][lfe]") {
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
+        {{.position = {.x = 0.5, .y = 0.0, .z = 0.0}}}};
+    const auto essence = tone(440.0, 0.3, 0.0, 0);
+    const std::array<std::span<const float>, 1> views{essence};
+
+    const std::vector<float> short_feed(static_cast<std::size_t>(kFrame) - 1, 0.1F);
+    const std::vector<float> long_feed(static_cast<std::size_t>(kFrame) + 1, 0.1F);
+    for (const auto* feed : {&short_feed, &long_feed}) {
+        const auto refused = encoder.encode_frame(views, placement, *feed);
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error() == iclforge::ac3::FrameError::kInvalidObjectAudio);
+    }
+
+    // The refusal left the encoder as it was: a whole frame still encodes.
+    const auto lfe = tone(55.0, 0.4, 0.0, 0);
+    CHECK(encoder.encode_frame(views, placement, lfe).has_value());
+}
+
+TEST_CASE("the LFE feed is one short syncframe long under a short numblkscod", "[atmos][lfe]") {
+    // numblkscod 1 is two blocks: 512 samples a frame.
+    constexpr std::size_t kShort = 512;
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448, .numblkscod = 1}, 1};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
+        {{.position = {.x = 0.5, .y = 0.0, .z = 0.0}}}};
+    std::vector<float> essence(kShort);
+    std::vector<float> lfe(kShort);
+    for (std::size_t n = 0; n < kShort; ++n) {
+        const double t = static_cast<double>(n) / 48000.0;
+        essence[n] = static_cast<float>(0.3 * std::sin(2.0 * std::numbers::pi * 440.0 * t));
+        lfe[n] = static_cast<float>(0.4 * std::sin(2.0 * std::numbers::pi * 55.0 * t));
+    }
+    const std::array<std::span<const float>, 1> views{essence};
+
+    // A full-length frame is the wrong length here.
+    const std::vector<float> whole(static_cast<std::size_t>(kFrame), 0.1F);
+    CHECK_FALSE(encoder.encode_frame(views, placement, whole).has_value());
+
+    REQUIRE(encoder.encode_frame(views, placement, lfe).has_value());
+    CHECK(max_difference(encoder.bed()[5], lfe) < 1e-6);
+}
+
+namespace {
+
 // Scans `frame` for the EMDF sync word and returns the OAMD/JOC payload
 // bytes found there, or nullopt if either is missing/malformed. Mirrors
 // exactly what Eac3Decoder's own skip-field handling does internally

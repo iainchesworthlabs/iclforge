@@ -1,5 +1,5 @@
 //! Safe, idiomatic Rust bindings for [`iclforge_c`](https://docs.rs/iclforge-sys), iclforge's C
-//! API — AC-3, E-AC-3 and AC-4 encode and decode, Annex C karaoke reproduction and timed lyrics.
+//! API — AC-3, E-AC-3 and AC-4 encode and decode, TrueHD and MLP decode, Annex C karaoke reproduction and timed lyrics.
 //! See `bindings/rust/README.md` for build prerequisites, what
 //! this crate covers versus what's explicitly deferred, and the real header defects found while
 //! building it.
@@ -30,6 +30,7 @@ mod error;
 pub mod lyrics;
 pub mod meter;
 pub mod stream;
+pub mod truehd;
 pub mod types;
 mod version;
 

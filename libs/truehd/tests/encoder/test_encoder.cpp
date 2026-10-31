@@ -1,0 +1,690 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <fstream>
+#include <iterator>
+#include <numbers>
+#include <optional>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "encoder/encoder_support.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
+
+// The encoder (planning/truehd.md, phase T2a), held to this library's decoder: the codec is
+// lossless, so whatever goes in comes back sample for sample. The check against FFmpeg's strict
+// decode is tools/checks/verify_truehd_encode_interop.py; these are the cases that do not need it.
+
+using namespace iclforge::truehd;
+using namespace iclforge::truehd::testing;
+
+TEST_CASE("every rate, channel count and width comes back sample for sample",
+          "[truehd][encoder][roundtrip]") {
+    struct Case {
+        std::uint32_t rate;
+        int channels;
+        int bits;
+    };
+    const std::array<Case, 14> cases{{
+        {48000, 1, 24},
+        {48000, 2, 24},
+        {48000, 2, 16},
+        {48000, 2, 20},
+        {44100, 2, 24},
+        {96000, 2, 24},
+        {88200, 2, 16},
+        {192000, 2, 24},
+        {176400, 2, 24},
+        {48000, 3, 24},
+        {48000, 6, 24},
+        {96000, 6, 16},
+        {48000, 7, 24},
+        {48000, 8, 24},
+    }};
+    for (const Case& c : cases) {
+        CAPTURE(c.rate, c.channels, c.bits);
+        EncoderConfig config;
+        config.sample_rate = c.rate;
+        config.channels = c.channels;
+        config.bits = c.bits;
+        config.restart_interval_units = 8;  // several restart intervals in a short stream
+        config.verify = true;
+        const int frames = static_cast<int>(c.rate / 8);  // 125 ms: a dozen intervals or more
+        const auto pcm = make_pcm(c.channels, frames, c.bits,
+                                  static_cast<std::uint32_t>(c.channels * 7 + c.bits));
+        const Encoded encoded = encode_all(config, pcm);
+        REQUIRE(encoded.stats.access_units == encoded.units.size());
+        REQUIRE(encoded.stats.restart_intervals >= 3);
+        REQUIRE(encoded.stats.verified_units == encoded.units.size());
+        int padding = 0;
+        auto decoded = decode_all(encoded.units, c.bits, c.channels, Presentation::kBest, &padding);
+        REQUIRE(padding >= 0);
+        REQUIRE(decoded.size() == pcm.size());
+        REQUIRE(decoded == pcm);
+    }
+}
+
+TEST_CASE("at 176.4 and 192 kHz three or more channels are two substreams",
+          "[truehd][encoder][roundtrip]") {
+    // TH spec section 9.6's text forbids a second substream there; FFmpeg 8.0.1's strict decode
+    // refuses one substream of 3 or more channels and reads 2 + the rest (ERRATA.md entry 90).
+    for (const std::uint32_t rate : {176400U, 192000U}) {
+        for (const int channels : {2, 3, 6}) {
+            CAPTURE(rate, channels);
+            EncoderConfig config;
+            config.sample_rate = rate;
+            config.channels = channels;
+            config.restart_interval_units = 8;
+            config.verify = true;
+            auto encoder = Encoder::create(config);
+            REQUIRE(encoder.has_value());
+            CHECK(encoder->substreams() == (channels > 2 ? 2 : 1));
+            const auto pcm = make_pcm(channels, static_cast<int>(rate / 16), 24,
+                                      static_cast<std::uint32_t>(channels + 5));
+            const Encoded encoded = encode_all(config, pcm);
+            REQUIRE(encoded.stats.verified_units == encoded.units.size());
+            const auto decoded = decode_all(encoded.units, 24, channels, Presentation::kBest);
+            REQUIRE(decoded == pcm);
+            // Substream 0 is held to FIR order 4 (section 9.6); here both substreams are, so a
+            // request for order 8 writes the bytes order 4 does, and order 2 does not.
+            EncoderConfig four = config;
+            four.max_fir_order = 4;
+            EncoderConfig eight = config;
+            eight.max_fir_order = 8;
+            EncoderConfig two = config;
+            two.max_fir_order = 2;
+            const Encoded at_four = encode_all(four, pcm);
+            const Encoded at_eight = encode_all(eight, pcm);
+            REQUIRE(at_four.units.size() == at_eight.units.size());
+            for (std::size_t i = 0; i < at_four.units.size(); ++i) {
+                REQUIRE(at_four.units[i].bytes == at_eight.units[i].bytes);
+            }
+            std::size_t differing = 0;
+            const Encoded at_two = encode_all(two, pcm);
+            for (std::size_t i = 0; i < std::min(at_two.units.size(), at_four.units.size()); ++i) {
+                differing += at_two.units[i].bytes != at_four.units[i].bytes ? 1U : 0U;
+            }
+            CHECK(differing > 0);
+        }
+    }
+}
+
+TEST_CASE("the output does not depend on how the input is chunked",
+          "[truehd][encoder][roundtrip]") {
+    EncoderConfig config;
+    config.channels = 6;
+    config.restart_interval_units = 8;
+    const auto pcm = make_pcm(6, 4000, 24, 3);
+    const Encoded whole = encode_all(config, pcm);
+    for (const std::size_t chunk : {1UL, 7UL, 333UL, 1000UL}) {
+        const Encoded chunked = encode_all(config, pcm, chunk);
+        REQUIRE(chunked.units.size() == whole.units.size());
+        for (std::size_t i = 0; i < whole.units.size(); ++i) {
+            REQUIRE(chunked.units[i].bytes == whole.units[i].bytes);
+        }
+    }
+}
+
+TEST_CASE("a stream that does not end on a unit boundary ends with the marker and loses no sample",
+          "[truehd][encoder][roundtrip]") {
+    for (const int frames : {1, 39, 41, 1000, 4001}) {
+        CAPTURE(frames);
+        EncoderConfig config;
+        config.restart_interval_units = 8;
+        const auto pcm = make_pcm(2, frames, 24, 11);
+        const Encoded encoded = encode_all(config, pcm);
+        REQUIRE(!encoded.units.empty());
+        const int nominal = 40;
+        const int units = (frames + nominal - 1) / nominal;
+        REQUIRE(static_cast<int>(encoded.units.size()) == units);
+        REQUIRE(encoded.units.back().padding_samples == units * nominal - frames);
+        int padding = 0;
+        const auto decoded = decode_all(encoded.units, 24, 2, Presentation::kBest, &padding);
+        REQUIRE(padding == units * nominal - frames);
+        REQUIRE(decoded.size() == pcm.size());
+        REQUIRE(decoded == pcm);
+    }
+}
+
+TEST_CASE("a major sync and a restart header open every restart interval and no other unit",
+          "[truehd][encoder][stream]") {
+    for (const int interval : {1, 8, 9, 50}) {
+        CAPTURE(interval);
+        EncoderConfig config;
+        config.channels = 6;
+        config.restart_interval_units = interval;
+        const auto pcm = make_pcm(6, 40 * 130, 24, 5);
+        const Encoded encoded = encode_all(config, pcm);
+        REQUIRE(encoded.units.size() == 130);
+        for (std::size_t i = 0; i < encoded.units.size(); ++i) {
+            const bool expected = i % static_cast<std::size_t>(interval) == 0;
+            REQUIRE(encoded.units[i].has_major_sync == expected);
+            auto parsed = parse_access_unit(encoded.units[i].bytes, 2, true);
+            REQUIRE(parsed.has_value());
+            REQUIRE(parsed->major_sync.has_value() == expected);
+            // TH spec §6.1, ERRATA.md entry 18: a unit with a major sync restarts every substream.
+            for (int s = 0; s < parsed->num_substreams; ++s) {
+                REQUIRE(parsed->entries[static_cast<std::size_t>(s)].restart_nonexistent ==
+                        !expected);
+                REQUIRE(parsed->entries[static_cast<std::size_t>(s)].crc_present);
+            }
+        }
+    }
+}
+
+TEST_CASE("substream 1 of a stream of several substreams carries restart sync 0x31EB",
+          "[truehd][encoder][stream]") {
+    // TH spec §7.2 (v3.9): a non-Atmos substream carries 0x31EA or 0x31EB whatever its index, and
+    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation.
+    // Every retail stream seen has 0x31EB in substream 1 whatever follows (the owner's Blu-rays:
+    // 0x31EA in substream 0 and 0x31EB in 1 and 2 of 7.1; the 48 and 192 kHz 5.1 tracks of a UHD
+    // Blu-ray: 0x31EB in 1 of 2), so the encoder writes it there (ERRATA.md entry 97); the third (8
+    // channel) substream carries it too. 0x31EC is the Atmos substream's and the encoder writes
+    // none.
+    struct Case {
+        int channels;
+        std::vector<std::uint16_t> syncs;
+    };
+    const std::vector<Case> cases{
+        {2, {kRestartSyncStandard}},
+        {6, {kRestartSyncStandard, kRestartSyncNoise}},
+        {7, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
+        {8, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
+    };
+    for (const Case& c : cases) {
+        for (const bool downmix : {false, true}) {
+            if (downmix && c.channels < 6) {
+                continue;
+            }
+            CAPTURE(c.channels, downmix);
+            EncoderConfig config;
+            config.channels = c.channels;
+            config.restart_interval_units = 8;
+            if (downmix) {
+                config.downmix = DownmixMode::kStandard;
+            }
+            const Encoded encoded = encode_all(config, make_pcm(c.channels, 40 * 20, 24, 6));
+            REQUIRE_FALSE(encoded.units.empty());
+            auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+            REQUIRE(parsed.has_value());
+            REQUIRE(static_cast<std::size_t>(parsed->num_substreams) == c.syncs.size());
+            for (std::size_t index = 0; index < c.syncs.size(); ++index) {
+                iclforge::BitReader bits(parsed->segments[index]);
+                REQUIRE(bits.read(1) == 1);
+                REQUIRE(bits.read(1) == 1);
+                auto restart = read_restart_header(bits, parsed->segments[index], true);
+                REQUIRE(restart.has_value());
+                CAPTURE(index);
+                CHECK(restart->sync == c.syncs[index]);
+            }
+            // Every restart header of the stream, not only the first.
+            Decoder decoder;
+            for (const EncodedAccessUnit& unit : encoded.units) {
+                auto decoded = decoder.decode(unit.bytes);
+                REQUIRE(decoded.has_value());
+            }
+            CHECK(decoder.counters().lossless_check_failures == 0);
+        }
+    }
+}
+
+TEST_CASE("a restart gap of 2 to 7 units is refused", "[truehd][encoder][config]") {
+    for (const int gap : {0, 2, 3, 7, -1}) {
+        EncoderConfig config;
+        config.restart_interval_units = gap;
+        REQUIRE(!Encoder::create(config).has_value());
+    }
+    for (const int gap : {1, 8, 128}) {
+        EncoderConfig config;
+        config.restart_interval_units = gap;
+        REQUIRE(Encoder::create(config).has_value());
+    }
+}
+
+TEST_CASE("configurations the encoder does not write are refused with a reason",
+          "[truehd][encoder][config]") {
+    const auto refused = [](auto change) {
+        EncoderConfig config;
+        change(config);
+        auto encoder = Encoder::create(config);
+        REQUIRE(!encoder.has_value());
+        REQUIRE(!encoder.error().detail.empty());
+        REQUIRE(!Encoder::refusal_reason(config).empty());
+    };
+    refused([](EncoderConfig& c) { c.channels = 0; });
+    refused([](EncoderConfig& c) { c.channels = 9; });
+    refused([](EncoderConfig& c) { c.sample_rate = 32000; });
+    refused([](EncoderConfig& c) { c.bits = 18; });
+    refused([](EncoderConfig& c) { c.kind = StreamKind::kMlp; });
+    refused([](EncoderConfig& c) {
+        c.channels = 7;
+        c.sample_rate = 192000;
+    });
+    refused([](EncoderConfig& c) {
+        c.channels = 2;
+        c.channel_assignment = 0xF;
+    });
+    refused([](EncoderConfig& c) { c.max_fir_order = 9; });
+    refused([](EncoderConfig& c) { c.peak_data_rate_bps = 10; });
+}
+
+TEST_CASE("PCM outside the declared width or not whole frames is refused",
+          "[truehd][encoder][config]") {
+    EncoderConfig config;
+    config.bits = 16;
+    auto encoder = Encoder::create(config);
+    REQUIRE(encoder.has_value());
+    const std::array<std::int32_t, 2> wide{40000, 0};
+    REQUIRE(!encoder->encode(wide).has_value());
+    const std::array<std::int32_t, 3> odd{1, 2, 3};
+    REQUIRE(!encoder->encode(odd).has_value());
+}
+
+TEST_CASE("the low bits every sample leaves clear are sent as the output shift and quantiser step",
+          "[truehd][encoder][stream]") {
+    struct Case {
+        int bits;
+        int shift;
+        int quant;
+    };
+    for (const Case c : {Case{16, 7, 1}, Case{20, 4, 0}, Case{24, 0, 0}}) {
+        CAPTURE(c.bits);
+        EncoderConfig config;
+        config.bits = c.bits;
+        config.restart_interval_units = 8;
+        // Full-scale noise so that no more than the declared width's low bits are clear.
+        std::vector<std::int32_t> pcm(2 * 800);
+        std::uint32_t state = 99;
+        for (auto& v : pcm) {
+            state = state * 1664525U + 1013904223U;
+            v = (static_cast<std::int32_t>(state >> 8U) - (1 << 23)) >> (24 - c.bits);
+        }
+        const Encoded encoded = encode_all(config, pcm);
+        auto parsed = parse_access_unit(encoded.units.front().bytes, 1, true);
+        REQUIRE(parsed.has_value());
+        const auto payload = parsed->segments[0];
+        iclforge::BitReader reader(payload);
+        REQUIRE(reader.read(1) == 1);  // block_header_exists
+        REQUIRE(reader.read(1) == 1);  // restart_header_exists
+        auto restart = read_restart_header(reader, payload, true);
+        REQUIRE(restart.has_value());
+        REQUIRE(restart->max_shift == c.shift);
+        BlockContext context;
+        context.max_chan = restart->max_chan;
+        context.max_matrix_chan = restart->max_matrix_chan;
+        context.noise_type = restart->noise_type();
+        auto block = read_block_header(reader, context);
+        REQUIRE(block.has_value());
+        for (int ch = 0; ch < 2; ++ch) {
+            const auto at = static_cast<std::size_t>(ch);
+            const int shift = block->output_shift ? (*block->output_shift)[at] : 0;
+            const int quant = block->quant_step ? (*block->quant_step)[at] : 0;
+            REQUIRE(shift == c.shift);
+            REQUIRE(quant == c.quant);
+        }
+    }
+}
+
+TEST_CASE("a restart header carries the lossless check of the interval before it",
+          "[truehd][encoder][stream]") {
+    EncoderConfig config;
+    config.restart_interval_units = 8;
+    const auto pcm = make_pcm(2, 40 * 40, 24, 21);
+    Encoded encoded = encode_all(config, pcm);
+
+    // Change the samples a unit decodes to while keeping its parity and CRC valid, so that only the
+    // lossless check can notice: add one to the first residual of a block in the second interval's
+    // middle. The next restart header's check no longer matches.
+    DecoderConfig strict;
+    strict.strictness = Strictness::kStrict;
+    {
+        Decoder decoder(strict);
+        for (const auto& unit : encoded.units) {
+            REQUIRE(decoder.decode(unit.bytes).has_value());
+        }
+        REQUIRE(decoder.counters().lossless_checks_ok >= 3);
+        REQUIRE(decoder.counters().lossless_check_failures == 0);
+    }
+    // Flip a bit in the data of unit 12 (interval 1) and fix the checks.
+    std::vector<std::byte>& bytes = encoded.units[12].bytes;
+    auto parsed = parse_access_unit(bytes, 1, true);
+    REQUIRE(parsed.has_value());
+    const std::size_t segment_at =
+        static_cast<std::size_t>(parsed->segments[0].data() - bytes.data());
+    const std::size_t payload_size = parsed->segments[0].size() - 2;
+    bytes[segment_at + payload_size / 2] ^= std::byte{0x04};
+    const auto payload = std::span<const std::byte>(bytes).subspan(segment_at, payload_size);
+    bytes[segment_at + payload_size] = static_cast<std::byte>(substream_parity(payload));
+    bytes[segment_at + payload_size + 1] = static_cast<std::byte>(substream_crc(payload));
+
+    Decoder decoder(strict);
+    bool failed = false;
+    for (const auto& unit : encoded.units) {
+        auto decoded = decoder.decode(unit.bytes);
+        if (!decoded) {
+            failed = true;
+            break;
+        }
+    }
+    // A flipped residual bit either breaks the block data or changes the samples; either way the
+    // strict decoder must not accept the stream.
+    REQUIRE(failed);
+}
+
+TEST_CASE("the declared peak data rate is kept or the encoder says it cannot",
+          "[truehd][encoder][rate]") {
+    // White noise at 192 kHz in 6 channels needs about 27 Mbps, more than 18; the lag behind real
+    // time passes the 75 ms of TH spec §18 after about 150 ms of it.
+    EncoderConfig config;
+    config.sample_rate = 192000;
+    config.channels = 6;
+    config.restart_interval_units = 8;
+    std::vector<std::int32_t> pcm(6 * 57600);
+    std::uint32_t state = 17;
+    for (auto& v : pcm) {
+        state = state * 1664525U + 1013904223U;
+        v = static_cast<std::int32_t>(state >> 8U) - (1 << 23);
+    }
+    {
+        auto encoder = Encoder::create(config);
+        REQUIRE(encoder.has_value());
+        std::optional<EncodeErrorKind> failure;
+        if (auto units = encoder->encode(pcm); !units.has_value()) {
+            failure = units.error().kind;
+        } else if (auto tail = encoder->flush(); !tail.has_value()) {
+            failure = tail.error().kind;
+        }
+        REQUIRE(failure.has_value());
+        REQUIRE(*failure == EncodeErrorKind::kRateExceeded);
+    }
+    config.allow_rate_violations = true;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(encoded.stats.rate_violations > 0);
+
+    // Quiet material fits, and `input_timing` then advances by one unit per unit (TH spec §3.4,
+    // ERRATA.md entry 37).
+    EncoderConfig quiet;
+    quiet.restart_interval_units = 8;
+    const Encoded steady = encode_all(quiet, make_pcm(2, 40 * 60, 24, 4));
+    REQUIRE(steady.stats.rate_violations == 0);
+    std::uint16_t previous = 0;
+    for (std::size_t i = 0; i < steady.units.size(); ++i) {
+        auto parsed = parse_access_unit(steady.units[i].bytes, 1, true);
+        REQUIRE(parsed.has_value());
+        if (i > 0) {
+            REQUIRE(static_cast<std::uint16_t>(parsed->input_timing - previous) == 40);
+        }
+        previous = parsed->input_timing;
+    }
+}
+
+TEST_CASE("the peak data rate field is the declared rate in the unit of TH spec 4.4",
+          "[truehd][encoder][rate]") {
+    // (raw * group 1 sample rate + 8) >> 4 bits per second (TH spec §4.4, v3.9): raw 6000 at 48 kHz
+    // is Blu-ray's 18 Mbit/s. The encoder writes the largest raw value that does not exceed the
+    // declared rate, so the rate a reader derives is within one raw step below it.
+    for (const std::uint32_t rate : {44100U, 48000U, 88200U, 96000U, 176400U, 192000U}) {
+        for (const std::uint32_t declared : {18'000'000U, 9'600'000U, 12'345'678U, 1'000'000U}) {
+            EncoderConfig config;
+            config.sample_rate = rate;
+            config.channels = 2;
+            config.peak_data_rate_bps = declared;
+            config.allow_rate_violations = true;
+            const Encoded encoded = encode_all(config, make_pcm(2, 40 * 12, 24, 3));
+            REQUIRE_FALSE(encoded.units.empty());
+            auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+            REQUIRE(parsed.has_value());
+            REQUIRE(parsed->major_sync.has_value());
+            const std::uint64_t derived = parsed->major_sync->peak_data_rate_bps();
+            CAPTURE(rate, declared, parsed->major_sync->peak_data_rate);
+            CHECK(derived <= declared);
+            CHECK(derived + rate / 16U + 1U > declared);
+        }
+    }
+    EncoderConfig bluray;
+    auto encoded = encode_all(bluray, make_pcm(2, 40 * 12, 24, 3));
+    auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->major_sync.has_value());
+    CHECK(parsed->major_sync->peak_data_rate == 6000);
+    CHECK(parsed->major_sync->peak_data_rate_bps() == 18'000'000);
+}
+
+TEST_CASE("the peak data rate of a major sync is read in bits per second", "[truehd][io]") {
+    // The figures TH spec §4.4 gives (raw 6000 at 48 kHz is 18 Mbit/s, 3200 is 9.6 Mbit/s) and
+    // the fields of the FFmpeg-made fixtures (3199 at 48 kHz, 3482 at 44.1, 1599 at 96, 799 at
+    // 192).
+    const auto rate_of = [](std::uint16_t raw, std::uint32_t format_info) {
+        MajorSync sync;
+        sync.format_info = format_info;
+        sync.peak_data_rate = raw;
+        return sync.peak_data_rate_bps();
+    };
+    CHECK(rate_of(6000, 0x00000001) == 18'000'000);
+    CHECK(rate_of(3200, 0x00000001) == 9'600'000);
+    CHECK(rate_of(3199, 0x00000001) == 9'597'000);
+    CHECK(rate_of(3482, 0x80000001) == 9'597'263);  // 44.1 kHz: (3482 * 44100 + 8) >> 4
+    CHECK(rate_of(1599, 0x10000001) == 9'594'000);  // 96 kHz
+    CHECK(rate_of(799, 0x20000001) == 9'588'000);   // 192 kHz
+    CHECK(rate_of(0, 0x00000001) == 0);
+    CHECK(rate_of(0x7FFF, 0x20000001) == (std::uint64_t{0x7FFF} * 192000U + 8U) / 16U);
+}
+
+TEST_CASE("a payload handed to the encoder is framed as extra data and comes back",
+          "[truehd][encoder][extra]") {
+    EncoderConfig config;
+    config.restart_interval_units = 8;
+    std::vector<std::vector<std::byte>> payloads(20);
+    config.extra_data = [&payloads](std::uint64_t index) {
+        if (index % 3 == 1) {
+            return std::vector<std::byte>{};
+        }
+        std::vector<std::byte> payload(static_cast<std::size_t>(5 + index));
+        for (std::size_t i = 0; i < payload.size(); ++i) {
+            payload[i] = static_cast<std::byte>((index * 31 + i * 7) & 0xFF);
+        }
+        if (index < payloads.size()) {
+            payloads[index] = payload;
+        }
+        return payload;
+    };
+    const Encoded encoded = encode_all(config, make_pcm(2, 40 * 20, 24, 8));
+    Decoder decoder;
+    for (std::size_t i = 0; i < encoded.units.size(); ++i) {
+        auto parsed = parse_access_unit(encoded.units[i].bytes, 1, true);
+        REQUIRE(parsed.has_value());
+        if (i % 3 == 1) {
+            REQUIRE(!parsed->extra_data.has_value());
+        } else {
+            REQUIRE(parsed->extra_data.has_value());
+            REQUIRE(parsed->extra_data->check_ok);
+            REQUIRE(parsed->extra_data->framing_ok);
+            REQUIRE(parsed->extra_data->parity_ok);
+            REQUIRE(std::equal(parsed->extra_data->evolution_payload.begin(),
+                               parsed->extra_data->evolution_payload.end(), payloads[i].begin(),
+                               payloads[i].end()));
+        }
+        // The audio decodes the same with or without it.
+        auto decoded = decoder.decode(encoded.units[i].bytes);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+    }
+}
+
+TEST_CASE("the stream reads back through the elementary reader and probe",
+          "[truehd][encoder][stream]") {
+    EncoderConfig config;
+    config.channels = 6;
+    config.sample_rate = 96000;
+    config.restart_interval_units = 8;
+    const Encoded encoded = encode_all(config, make_pcm(6, 80 * 40, 24, 2));
+    std::vector<std::byte> stream;
+    for (const auto& unit : encoded.units) {
+        stream.insert(stream.end(), unit.bytes.begin(), unit.bytes.end());
+    }
+    auto info = probe_stream(stream);
+    REQUIRE(info.has_value());
+    REQUIRE(info->sample_rate == 96000);
+    REQUIRE(info->num_substreams == 2);
+    REQUIRE(info->channels[0] == 2);
+    REQUIRE(info->channels[1] == 6);
+    REQUIRE(info->samples_per_access_unit == 80);
+    ElementaryReader reader(stream);
+    std::size_t count = 0;
+    while (reader.next()) {
+        ++count;
+    }
+    REQUIRE(count == encoded.units.size());
+    REQUIRE(reader.skipped_bytes() == 0);
+}
+
+TEST_CASE("the 2 and 6 channel decodes of a spread stream give the first channels unchanged",
+          "[truehd][encoder][roundtrip]") {
+    EncoderConfig config;
+    config.channels = 8;
+    config.restart_interval_units = 8;
+    const auto pcm = make_pcm(8, 40 * 40, 24, 13);
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(Encoder::create(config)->substreams() == 3);
+    for (const auto& [presentation, channels] :
+         {std::pair{Presentation::k2ch, 2}, std::pair{Presentation::k6ch, 6},
+          std::pair{Presentation::k8ch, 8}}) {
+        const auto decoded = decode_all(encoded.units, 24, channels, presentation);
+        REQUIRE(decoded.size() == static_cast<std::size_t>(40 * 40 * channels));
+        for (std::size_t t = 0; t < 40 * 40; ++t) {
+            for (int c = 0; c < channels; ++c) {
+                REQUIRE(
+                    decoded[t * static_cast<std::size_t>(channels) + static_cast<std::size_t>(c)] ==
+                    pcm[t * 8 + static_cast<std::size_t>(c)]);
+            }
+        }
+    }
+}
+
+TEST_CASE("silence costs almost nothing and a pair of equal channels costs one",
+          "[truehd][encoder][size]") {
+    EncoderConfig config;
+    config.restart_interval_units = 128;
+    const std::vector<std::int32_t> silence(2 * 48000, 0);
+    const Encoded quiet = encode_all(config, silence);
+    REQUIRE(quiet.stats.bytes <= quiet.stats.access_units * 16);  // the unit overhead and no more
+
+    std::vector<std::int32_t> twin(2 * 48000);
+    const auto mono = make_pcm(1, 48000, 24, 6);
+    for (std::size_t t = 0; t < 48000; ++t) {
+        twin[2 * t] = mono[t];
+        twin[2 * t + 1] = mono[t];
+    }
+    const Encoded paired = encode_all(config, twin);
+    config.channels = 1;
+    const Encoded single = encode_all(config, mono);
+    REQUIRE(paired.stats.bytes < single.stats.bytes + single.stats.bytes / 8);
+}
+
+namespace {
+
+// The 24 bit 5.1 music of testdata/truehd-dee/sources/fx_music_51.wav (0.25 s, a 44 byte header
+// and L R C LFE Ls Rs): the front and surround channels are 16 bit material with 7 or 8 clear low
+// bits and the centre and the LFE use all 24 bits.
+std::vector<std::int32_t> read_music_51() {
+    const std::string path =
+        std::string(ICLFORGE_GOLDEN_AUDIO_DIR) + "/../truehd-dee/sources/fx_music_51.wav";
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in.good());
+    const std::vector<char> file((std::istreambuf_iterator<char>(in)),
+                                 std::istreambuf_iterator<char>());
+    REQUIRE(file.size() > 44);
+    std::vector<std::int32_t> pcm;
+    for (std::size_t at = 44; at + 3 <= file.size(); at += 3) {
+        const auto b = [&](std::size_t k) {
+            return static_cast<std::uint32_t>(file[at + k]) & 0xFFU;
+        };
+        const std::uint32_t raw = b(0) | (b(1) << 8U) | (b(2) << 16U);
+        pcm.push_back(static_cast<std::int32_t>(raw << 8U) >> 8);
+    }
+    REQUIRE(pcm.size() % 6 == 0);
+    return pcm;
+}
+
+}  // namespace
+
+TEST_CASE("each channel sends its own clear low bits as its output shift and quantiser step",
+          "[truehd][encoder][stream]") {
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    config.verify = true;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(decode_all(encoded.units, 24, 6) == pcm);
+
+    // Substream 1 codes channels 2 to 5 and its block header sets the shift and step of all six.
+    auto parsed = parse_access_unit(encoded.units.front().bytes, 2, true);
+    REQUIRE(parsed.has_value());
+    const auto payload = parsed->segments[1];
+    iclforge::BitReader reader(payload);
+    REQUIRE(reader.read(1) == 1);  // block_header_exists
+    REQUIRE(reader.read(1) == 1);  // restart_header_exists
+    auto restart = read_restart_header(reader, payload, true);
+    REQUIRE(restart.has_value());
+    BlockContext context;
+    context.min_chan = restart->min_chan;
+    context.max_chan = restart->max_chan;
+    context.max_matrix_chan = restart->max_matrix_chan;
+    context.noise_type = restart->noise_type();
+    auto block = read_block_header(reader, context);
+    REQUIRE(block.has_value());
+    REQUIRE(block->output_shift);
+    REQUIRE(block->quant_step);
+    // L R Ls Rs: 8 clear bits (7 of them the shift) or 7 (the shift alone); C and LFE: none.
+    const std::array<int, 6> shift{7, 7, 0, 0, 7, 7};
+    const std::array<int, 6> step{1, 1, 0, 0, 0, 0};
+    for (std::size_t ch = 0; ch < 6; ++ch) {
+        CAPTURE(ch);
+        CHECK((*block->output_shift)[ch] == shift[ch]);
+        CHECK((*block->quant_step)[ch] == step[ch]);
+    }
+    // One step for all six sent the low 8 bits of four channels, 101,314 bytes in all; FFmpeg's
+    // encoder writes 63,254 and DEE's 58,688 for these samples.
+    CHECK(encoded.stats.bytes < 60'000);
+}
+
+TEST_CASE(
+    "one bit flipped in the payload of any unit of a real stream is refused by a strict decode",
+    "[truehd][decoder][checks]") {
+    // FFmpeg's strict decode of the same streams warns of the failed parity, checksum and lossless
+    // check and writes the wrong audio with exit status 0 (tools/checks/compare_truehd_decoders.py,
+    // `flip-payload`); this decoder stops at the unit.
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(encoded.units.size() > 60);
+    std::size_t flips = 0;
+    for (const std::size_t victim : {std::size_t{5}, std::size_t{40}}) {
+        const std::size_t length = encoded.units[victim].bytes.size();
+        for (std::size_t step = 0; step < 24; ++step) {
+            std::vector<std::byte> damaged = encoded.units[victim].bytes;
+            const std::size_t at = length * 4 / 10 + step * (length * 5 / 10) / 24;
+            damaged[at] ^= std::byte{static_cast<unsigned char>(1U << (step % 8))};
+            Decoder decoder(DecoderConfig{});
+            for (std::size_t unit = 0; unit < victim; ++unit) {
+                auto clean = decoder.decode(encoded.units[unit].bytes);
+                REQUIRE(clean.has_value());
+            }
+            CHECK_FALSE(decoder.decode(damaged).has_value());
+            ++flips;
+        }
+    }
+    CHECK(flips == 48);
+}

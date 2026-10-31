@@ -18,14 +18,14 @@ they are sung.
     (E-AC-3) and about 10% (AC-4 5.1), and with the song filling the screen the light streams' decode
     time moves by 5 to 12% (under 1% of a frame). **The glitches the first measurement put on the glass
     are not its:** about one play in five reaches the kit with its first chunk 300 to 600 ms late, with
-    the glass, without it and at 40 Hz, over Wi-Fi and (more often) over the cable, and those plays
+    the glass, without it and at 40 Hz, over Wi-Fi and (more often) over wired, and those plays
     lose the start of their first second: lwIP's six-entry TCP receive mailbox refused the first
     segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk
     ([the trace](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#what-the-glitches-were-the-first-chunk-comes-late)).
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
     owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
-    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it,
-    takes an update over it, falls back to Wi-Fi when the cable is pulled and returns to the cable
+    Wi-Fi ([wired](#wired-and-wi-fi)): the sink answers on it, plays Sendspin through it,
+    takes an update over it, falls back to Wi-Fi when the Ethernet cable is pulled and returns to wired
     when it is put back, so the kit can run on a PoE splitter; **the splitter itself is not yet tried.**
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
@@ -60,14 +60,14 @@ and plain defaults: say the target and the overlays.
 **Chip revision v1.x** (the FireBeetle 2, stereo, no screen):
 
 ```bash
-idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin" build
+idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.ac4" build
 idf.py -p PORT flash monitor
 ```
 
 **Chip revision v3.x with the 7-inch panel** (the image CI publishes as `hearth-sink-esp32p4-rev3`):
 
 ```bash
-idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi" build
+idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.panel;sdkconfig.panel-dsi" build
 ```
 
 **A board with no panel, to see the screen** (any P4; the picture is read back over HTTP,
@@ -84,7 +84,11 @@ idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.h
 | `sdkconfig.panel` | LVGL's heap in PSRAM, TrueType fonts, right-to-left text |
 | `sdkconfig.panel-null` / `sdkconfig.panel-dsi` | The frame buffer with no panel, or the 7-inch MIPI DSI panel |
 
-AC-4 is `sdkconfig.ac4` after those ([ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
+AC-4 is `sdkconfig.ac4`, in both release profiles: since the fold of `p4-rev1-ac4` into `p4-rev1` and, on 2026-10-29, into `p4-rev3`,
+an image of either revision decodes AC-3, E-AC-3 and AC-4. The v3.x image keeps the decode task's stack of an HTTP play in PSRAM
+(`sdkconfig.p4-rev3`): the screen leaves it 74 KB of internal RAM at the start of a play, and an AC-4 5.1 play leaves 8 to 10 KB of it at its
+tightest ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
+[ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
 
 ## On the v1.x board
 
@@ -175,12 +179,157 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![The title card](screenshots/p4-panel-title-card.png) | **Playing, no lyrics, and the server has said what is playing** (the title card, [below](#a-song-with-no-lyrics)). The title, the artist, the album and year, and the song's time with a progress line |
 | ![The clock](screenshots/p4-panel-clock.png) | **Playing, no lyrics, and the clock chosen** ([below](#the-clock)). The time, the date and the line over them; nothing until a time server has answered |
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **The same with that screen turned off.** The sentence this screen had before |
-| ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched |
+| ![Adjust](screenshots/p4-panel-adjust.png) | **Adjust.** The lyric delay in 50 ms steps and the text size, and nothing else; put away after eight seconds untouched |
+| ![Preferences](screenshots/p4-panel-prefs.png) | **Preferences.** What is chosen once and left, grouped and scrollable ([below](#adjust-and-preferences)): the screen for a song with no lyrics and when it dims; a choice the board cannot make is greyed, with the reason |
 
-**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size
-(Smaller, Normal or Larger, which the sheet says beside its buttons), what its screen shows while a
-song has no lyrics, when that dims, and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
+**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms) and its text size
+(Smaller, Normal or Larger, which the sheet says beside its buttons) in **Adjust**, and what it shows
+while a song has no lyrics, when that dims and the rest of what is chosen once in **Preferences**
+([below](#adjust-and-preferences)). Which vocals sound and the reproduction are the server's settings and are
 shown, not changed, until the role has a way to carry a request back.
+
+#### Adjust and Preferences
+
+The footer has two buttons, **Preferences** and **Adjust** (Adjust is where it always was, at the right). One is for
+what a person does while a song is on, the other for what they choose once and leave.
+
+**Adjust** keeps the two tweaks of the lyric screen: the lyric delay (50 ms steps, up to 1,000 ms either way) and the
+text size (Smaller, Normal or Larger). It is 250 px tall on the kit's panel (it was 352 when it also held the screen for
+a song with no lyrics and its dim time) and puts itself away after eight seconds untouched.
+
+![Adjust: the lyric delay and the text size](screenshots/p4-panel-adjust.png)
+
+**Preferences** is a full-screen, scrollable list of everything that is chosen once and left, grouped Display, Sound,
+Network, Time, Updates and System (a group with nothing in it is not drawn), with *Close* at the top right. It keeps the
+screen lit while it is open, puts itself away after a minute untouched, and is built when it opens and deleted when it
+closes, so the lyric screen is as it was with it shut. It holds what the screen shows while a song has no lyrics and
+when it dims (the two settings that were in Adjust), the screen's **brightness**, how the clock view writes the time,
+the **night schedule** and the **time zone**, then the Sound group (the test tone through each speaker, and the level and distance of each speaker on [the Speakers sheet](sink-speakers.md#setting-them)),
+then the Network and System groups: wired or
+Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset
+([On the screen](#on-the-screen)). The technical settings (slot width, the second I2S line, the time
+server) stay in the [developer view](#the-developer-view) and the routes.
+
+![Preferences: brightness, the clock's hours and seconds, and the night schedule](screenshots/p4-panel-prefs-display.png)
+
+The brightness is a stepper (every tenth from 10% to 100%), the clock's hours and seconds are a choice and a switch, and
+the night schedule is a switch, a button that opens an editor for its two times, and a switch for whether it darkens the
+idle screen too. **A value that is chosen in a list or a pair of times is a button that opens an editor over the sheet**,
+with a *Done* of its own:
+
+![The night schedule's two times: a quarter of an hour a step, and a button held goes on stepping](screenshots/p4-panel-prefs-night-times.png)
+
+Each time steps a quarter of an hour round the clock (22:00 up is 22:15, and 00:00 down is 23:45); a button held keeps
+stepping, ten times a second, and after eight steps moves an hour at a time. The pair is written half a second after
+the last step, so that a held button is one write and not forty. The editor says what the two mean (*Dark from 22:00
+until 07:00, through midnight, by the board's own time. A touch lights the screen for 30 seconds.*), that the schedule is
+switched off when it is, and, for the same time twice, that the screen is never dark.
+
+![The time zone: the regions, then the places in one](screenshots/p4-panel-prefs-zone-regions.png)
+
+The time zone is the same picker as the web page's: the regions of the zone table (Africa to Pacific, and *No zone
+(UTC)* above them), then the places in one, **opening at the region of the zone already chosen with that place in
+view**, so a person who wants the city next to the board's own does not scroll for it. A tap on a place chooses it
+at once; the editor says *Now: Melbourne (Australia)*, and *Regions* (a chevron on a narrow bar) goes back up.
+
+![The places of Australia, with Melbourne chosen](screenshots/p4-panel-prefs-zone.png)
+
+![Preferences on the kit](screenshots/p4-panel-prefs.png)
+
+**One product base, many boards.** What a board can do is data, not an `#ifdef` and not "is this the P4X".
+`iclforge::BoardCaps` (`libs/device/include/iclforge/board_caps.hpp`) describes it: the display (how it is attached, its
+size, whether it has touch and a backlight), the sink (the bits in a TDM frame, whether a second line is possible,
+whether the chip can open a TDM frame at all, and the slot width and second line in force), the networks, whether the
+board keeps the time, the object cap, and the chip's own facts (`HardwareFacts`, which `GET /hardware` reports). The
+firmware fills it from the build and the hardware (`main/board_caps.cpp`), and `board_variants.hpp` has every board the
+product knows and a few it does not (an ESP32-S3 with a 320 by 240 SPI panel, an ESP32-C3 with a panel that has no
+touch) for the host tests to walk.
+
+The **preference registry** (`libs/device/include/iclforge/preferences.hpp`) is the list the screen, `GET /preferences`
+and the web page all draw from. An entry has an id, a group, a label, a kind (choice, stepper, toggle, text, action, info,
+list or sheet: a row that says what is set and opens an editor of its own), whether a change applies live, at the next play or after a restart, the route that sets the same value, its
+choices, what **Reset preferences** does with it (`on_reset`: put back to its default word, or keep; an entry that says
+neither fails a host test), and **`availability(caps)`**, once for the entry and once for each choice: whether this board
+can do it and, if not, why. The values are read and set through a typed `Backend` that the firmware implements once over the `settings_*`
+functions (`main/preferences.cpp`), so the screen, the routes and the host tests go through the same code.
+
+**A preference the board cannot support is shown, greyed, with the reason, and never hidden.** On a board whose screen
+has no touch, the Dark view (which a touch lights) and the dim time (which a touch wakes) are greyed, and the sheet says
+why:
+
+![Preferences on a board whose screen has no touch: Dark and Dim after greyed, with the reason under each](screenshots/p4-panel-prefs-greyed.png)
+
+A tap on a greyed control does nothing, and `prefs::set_value()` refuses it before the board is asked. The host tests
+(`libs/device/tests/test_preferences.cpp`) check every entry against every known board: a reason wherever something is
+greyed, and a default that is never a choice the board cannot make.
+
+| Preference | Id | Route | Available when |
+|---|---|---|---|
+| Screen without lyrics: speakers, title, clock, meters, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *meters* a screen of at least 240 x 240 and the Sendspin player, *dark* needs touch |
+| Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| Speakers style: glow, pulse | `speakers-style` | `/speakers-style` | the board has a screen (it is greyed, with the reason, while the screen is set to the clock or off, which draw no speakers) |
+| Brightness: 10% to 100% in tens | `brightness` | `/brightness` | the board has a screen whose backlight it controls |
+| Clock hours: 24 or 12 | `clock-hours` | `/clock-format` | the board has a screen and keeps the time |
+| Clock seconds: on or off | `clock-seconds` | `/clock-format` | the board has a screen and keeps the time |
+| Night schedule: on or off | `night-schedule` | `/night-schedule` | a screen with touch, and a clock |
+| Night from and to: a pair of times (editor) | `night-times` | `/night-schedule` | the same |
+| Night covers idle screen: on or off | `night-idle` | `/night-idle` | the same |
+| Time zone: a place by region (editor) | `time-zone` | `/timezone` | the board keeps the time |
+| Wired or Wi-Fi: automatic, wired, Wi-Fi | `network-preference` | `/network-preference` | the board has both a wired network and Wi-Fi |
+| Name of this player | `name` | `/name` | always |
+| About | `about` | `/hardware` | always |
+| Paired servers | `paired-servers` | `/pairing` | the board runs the Sendspin player |
+| Restart | `restart` | `/restart` | not while an update is under way, nor while the new image is on trial |
+| Reset preferences | `reset-preferences` | `/reset-preferences` | not while an update is under way |
+| Factory reset | `factory-reset` | `/factory-reset` | as Restart |
+| Identify speakers: a button, *Identify*, that opens the Speakers sheet and plays the tone through every speaker in turn | `identify-speakers` | `/identify` | the build has a Sendspin player; a song playing says so under the row |
+| Speaker levels and distances: a sheet (kind `sheet`), the same Speakers sheet, with the room, a level and a distance for each speaker | `speaker-trim` | `/trim` | the build has a Sendspin player; the distance needs delay lines (PSRAM) |
+| Late night: standard or late night; from the next stream, and put back by Reset preferences ([Late night](sink-esp32-s3.md#late-night)) | `late-night` | `/dynamic-range` | the build has a Sendspin player: it decodes the Dolby streams |
+
+**`GET /preferences`** lists every entry as this board sees it, on every board (one with no screen lists the Display
+entries greyed with *This board has no screen.*): its id, group, label, kind, how a change applies, the route, the
+value, whether it is available and why not, and each choice the same way. It is read-only; a change goes through the
+entry's own route.
+
+```json
+{"profile":"p4-rev3","display":"dsi","preferences":[{"id":"now-view","group":"Display","label":"Screen without lyrics","kind":"choice","apply":"live","route":"/now-playing","value":"speakers","available":true,"reason":"","choices":[{"id":"speakers","label":"Speakers","available":true,"reason":""}]}]}
+```
+
+**Any size of screen.** The sizes are the display's, not 1024 by 600's. `libs/device/include/iclforge/screen_metrics.hpp`
+derives the margins, the gaps, the type and the height of a button from the display's shorter side (host tested for every
+size), and the footer and both sheets are laid out from them, so the kit's own sizes are as they were:
+
+| Display | Margin | Type | Button (Adjust / list) | Adjust sheet |
+|---|---|---|---|---|
+| 1024 by 600 | 32 | 24 | 72 / 64 | 250 px |
+| 800 by 480 | 24 | 22 | 64 / 56 | 222 px |
+| 480 by 320 | 16 | 18 | 56 / 52 | 194 px |
+| 320 by 240 | 10 | 16 | 48 / 48 | 170 px |
+
+![Preferences on a 320 by 240 screen](screenshots/p4-panel-prefs-small.png)
+
+**The fingertip.** A control that is touched is at least **48 px** on both sides, with at least 6 px to the next one:
+48 px is 7.2 mm on the kit's 7-inch 1024 by 600 panel (about 6.7 px a millimetre) and 7.4 mm on a 2.4-inch 320 by 240
+module, over the 7 mm that Apple and Google give as the least a finger hits reliably (44 pt, 48 dp). The preview tool
+([below](#developing-the-screen-without-a-panel)) draws Adjust and Preferences at the four sizes above and **fails the
+run** if text is cut off, a control sticks out of what holds it or off the screen, a touch target is under 48 px or
+closer than 6 px to another, a tap does not do what it says, a greyed choice answers a tap, or a list longer than the
+glass does not scroll. A display backend for a chip other than the P4 is not written (no such panel is on the bench):
+`panel/lvgl/display.hpp` is the seam one would fill, and everything above it takes its size from the display.
+
+**Adding a preference** is a registry entry (id, group, label, choices and their availability rules), a getter and a
+setter in `Backend` (a pure virtual, so a firmware that forgot the setter does not build), the same pair in the host
+tests' fake, and the firmware's implementation; only a control that is not one of the five kinds needs an editor, and
+it names one (`Pref::editor`: a pair of times, a place in a list) which `panel/lvgl/prefs_editors.cpp` draws. There are
+no bespoke buttons in `lyric_screen.cpp`.
+
+**A tap's setter runs on the panel's own task**, which holds the panel's lock (a `std::mutex`, not recursive) for the frame
+that reads the tap, so **no `panel_set_*` may take that lock** or touch the glass: a tap on Brightness - or + once hung the
+screen for good (the first run on the kit, 2026-10-26) because the brightness setter did both. What the screen follows is
+`iclforge::panelfollow::PanelFollow` (`libs/device/include/iclforge/panel_follow.hpp`): atomics only, the brightness only
+marks the backlight stale, and the panel's loop gives the glass the level in its next cycle (within a tenth of a second).
+`test_panel_follow.cpp` holds a lock across every setter, and reads `panel.cpp` to fail if a `panel_set_*` mentions a lock,
+a wait or the glass.
 
 #### A song with no lyrics
 
@@ -193,14 +342,46 @@ what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*, *PCM t
 
 ![The speakers in a 7.1.4 room](screenshots/p4-panel-speakers-7-1-4.png)
 
-It is meant to be left on for hours in a dim room: the glow moves in a few steps, slowly (it rises
-at once and falls at 14 dB a second), and is never brighter than the accent at 55%. **After five
-minutes with nothing touched** (the time is Adjust's, or `PUT /dim-after`: `never`, or whole minutes
+It is meant to be left on for hours in a dim room: the glow moves in a few steps, and is never brighter
+than the accent at 55%. **After five
+minutes with nothing touched** (the time is a Preference, or `PUT /dim-after`: `never`, or whole minutes
 from 1 to 240) the backlight goes to 4% and a black screen with one line is over everything; any tap
 brings the speakers back, and the tap does not also press what is under it. Only this screen dims:
 the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
+
+**How the speakers follow the sound** (the plan is [planning/p4x-speakers-options.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-speakers-options.md)).
+The screen reads the level of every 100 ms window the player measures (a lock and two short arrays,
+`BurstPlayer::levels()`; the heading and the title are still read five times a second), where it once read
+every other one. A level is judged against **the loudest the room has lately been** (it rises at once and
+falls 2 dB a second, and is never lower than -48 dB of full scale), so that the same music shows the same at
+any volume: the player's volume is applied before the meter, and against full scale the glow would shrink with
+the knob. The core of a speaker is six steps over 30 dB (6 dB a step) and the halo, from the peak, two. The
+level rises at once and falls at 60 dB a second, so a hit is a step down in the window after the next, and a
+step changes only when the level is 0.4 of a step past its edge (0.7 for the halo), so that a level on a
+boundary does not flicker. A speaker with nothing on it is still a hollow outline. These are the constants of
+`libs/render/include/iclforge/render/room_plan.hpp`, chosen over a synthetic groove in 2.0, 5.1 and 7.1.4
+(`firmware/hearth-sink/preview/speakers_options/tune.cpp`): 72% of the onsets of 5 dB or more showed as a step
+up in the same window (the 5 Hz glow before it: 3 to 26%), 3 to 5% of steady windows moved a step, and the
+view flushed 18 000 pixels a second at 2.0, 56 000 at 5.1, 82 000 at 7.1.4 and 101 000 at 9.1.6 (the lyric
+screen's song filling: 192 000). The pixels are what the view costs; what they cost a stream on the kit (the
+first design, at about 45 000 a second at 5.1, cost a burst 0.4%, below) is still to be measured for these
+constants.
+
+**The speakers' style.** `glow` (the default) is the above. `pulse` makes the filled circle of each speaker
+grow and shrink with its level, a little: eight sizes between 88% and 112% of the plan's, moved by at most
+three in a window, held until the level is a quarter size past an edge, and a speaker 18 dB or more under the
+room's loudest (or silent) stays at its smallest and does not move. The halo is not resized, so a size change
+redraws the circle's rectangle and nothing else. It needs no meter and no seam the glow does not have. It is
+set in Preferences (Display) or with `PUT /speakers-style`; the value is kept on the
+board as `np_style` (0 glow, 1 pulse; never renumbered).
+
+![The speakers in the pulse style, 5.1: the louder a speaker, the larger its circle](screenshots/p4-panel-speakers-pulse-5-1.png)
+![The speakers in the pulse style, 2.0](screenshots/p4-panel-speakers-pulse-2-0.png)
+
+Both styles stay: the owner, 2026-10-25, saw the glow, as it was and as it became, beside the pulse at plus and
+minus 12% (the bound is `kPulseReach`), and kept both as a choice, with the glow the default.
 
 Which screen shows is the owner's: `speakers` (the default), `title`, `clock` ([below](#the-clock)),
 `dark`, or `off`, which is the old sentence. The plan, with how each was chosen and built, is
@@ -216,6 +397,87 @@ lyric screens have them, where the server gave a progress and the board's clock 
 
 ![The title card](screenshots/p4-panel-title-card.png)
 ![A long title, cut at two rows](screenshots/p4-panel-title-card-long.png)
+
+**The Meters view.** A choice of the screen without lyrics (`meters`, stored as `np_view` 5, never renumbered; Preferences,
+Display, *Screen without lyrics*, or `PUT /now-playing`): an instrument rather than a picture of the room. The top of the screen is a
+third-octave spectrum of the main mix (31 bands from 20 Hz to 20 kHz, 0 dB a full-scale sine, 60 dB of range) with a dB scale, a
+peak tick that holds one second and then falls, and the colours of a level meter: green, then amber from -30 dB and red from -15 dB.
+Under it are the room's channels, drawn the way the size of the screen and the number of outputs ask for
+(`iclforge/meters_view.hpp`, `representation_for`):
+
+| Screen width | A 2.0 room | More than two outputs |
+| --- | --- | --- |
+| under 400 px | the pair, L and R, with a peak tick each | the pair (the stereo downmix of the room) |
+| 400 to 799 px | the pair | one meter for each of L, C, R, LFE, Ls, Rs (the surround sum) |
+| 800 px and wider | the pair | every output, in groups: Front, Surround, Rear, Height, LFE |
+
+The bars are green, amber from -18 dB and red from -6 dB, with a peak tick that holds 1.5 s. The spectrum has one bar a band on the
+wide screen, two bands a bar on the middle one and three (an octave) on the small one. **The Meters view needs a screen of at
+least 240 by 240 and the Sendspin player**, because the player is where the sound is: on a board without either, the choice is shown
+greyed with the reason and `PUT /now-playing` answers 409. While Meters shows, *Speakers style* does nothing (the glow and pulse
+are the speakers' view) and is greyed too.
+
+What it draws comes from the player, not the glass: after the output stage has set its gain, `BurstPlayer` hands each block of the
+frames about to be played to a `BlockTap` (`iclforge/block_tap.hpp`), one pointer read when nothing is listening. `MeterTap`
+(`iclforge/meters_tap.hpp`) keeps a mono mix of the outputs in a ring of 340 ms and, for each output, the largest sample in each
+50 ms; the screen takes the mix, analyses it (`iclforge/dsp/spectrum.hpp`: a 2048-point transform of the signal at 12 kHz for the
+17 bands up to 800 Hz and a 1024-point one at 48 kHz above it, so that a low band is not smeared over a fifth of a second and a high
+one is not slow), averages the power over 80 ms, and lets the bars fall at 30 dB a second (meters 24). It does this twenty times a
+second whatever the frame rate. The spectrum, the channel bars and the pair of meters are each one canvas, redrawn only where a bar or a tick moved, in a few rectangles (one for each run of
+neighbouring bars that move alike), so an update is a handful of invalid areas and not a hundred (a rectangle for each part of each bar, which the kit measured at 80 to 290 ms a refresh). When the screen is dimmed or another view is
+chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
+tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
+How fast it runs on the kit, and the protocol that measures it, are in
+([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
+
+![The Meters view, a 2.0 room: the spectrum, and the pair of meters under it](screenshots/p4-panel-meters-2-0.png)
+![The Meters view, 5.1: every output a bar, grouped in space](screenshots/p4-panel-meters-5-1.png)
+![The Meters view, 7.1.4](screenshots/p4-panel-meters-7-1-4.png)
+![The Meters view, a 5.1 stream on a 9.1.6 room: sixteen bars](screenshots/p4-panel-meters-9-1-6.png)
+![On a 480 by 320 screen: the surround sum, six bars, and half the spectrum's bars](screenshots/p4-panel-meters-sum-480x320.png)
+![On a 240 by 240 screen: the pair, whatever the room](screenshots/p4-panel-meters-pair-240x240.png)
+
+**What the Meters view costs, and the rate it holds.** `GET /panel-stats` (port 80, on a board with a screen) says what the panel
+costs: LVGL's refreshes (the start of one to its end, the flush to the glass included), the panel task's stack never-free minimum, the
+PSRAM and internal heap now and at their lowest, and, once the view has been opened, the Meters view's own figures since it opened: the rate it
+holds, how long an update's analysis, widgets and render take (last, mean, largest), the updates that were late or missed, and what the player's
+tap costs the audio path for a burst of 1,536 frames. The developer view shows the same in its PERFORMANCE section. The view runs at **twenty updates
+a second when the panel's task can keep up and ten when it cannot** (`iclforge/meters_governor.hpp`): over the last 20 updates, an average cost
+above 70 % of the 50 ms step, or 4 updates started more than 15 ms later than the loop could have started them, drops it to ten; it returns to
+twenty only after 10 s at ten with the cost under 60 % and nothing late, so that it does not flip; the first two seconds of a view are not judged (its first draw and the
+cold code are not what it costs). The target is **20 Hz if possible, else a steady 10 Hz** (no more than
+1 % of the steps without an update, an update under half of its step), and the kit protocol says which room holds which. **The audio comes first:** while the decoder is
+busy (a mean burst of 14 ms or more of its 32: a 7.1.4 object stream, AC-4; not a 5.1 E-AC-3 room) the view is held at ten, since the drawing and the analysis beside the decoder
+cost it 1.5 to 2 ms a burst in those rooms (`ICLFORGE_EXAMPLE_PANEL_YIELD`, default 1; 2 also keeps the panel's task on the decode core, and 0 turns it off). How each room holds up on the kit, and the
+protocol that measures it, are in
+([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
+
+**The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
+and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
+*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With
+**Preferences** and **Adjust** both in the footer there are 386 px for it on the kit's panel (it was 558 with Adjust
+alone), which holds *Decoded on this board - 768 kb/s* and not the server's name: the developer view has that.
+A coded stream (E-AC-3, AC-3, AC-4) is sent undecoded and decoded on the board, which the wording says; a
+PCM one was decoded by the server, and the footer says *PCM from Music Assistant*. The bitrate is what was
+played: the coded bytes of the chunks played over the time they took, over windows of a second and
+smoothed, not a figure from a header (it is absent until the first second has played). The server is the
+name in `/status` `server` without the id in brackets (`Music Assistant (d5369777-music-assistant)` is
+*Music Assistant*); the developer view keeps the whole string.
+
+![A 7.1.4 Atmos stream from Music Assistant](screenshots/p4-panel-stream-details.png)
+![A PCM stream from Music Assistant](screenshots/p4-panel-stream-pcm.png)
+
+**A layout for a server that sends none.** A board's layout is the image's (`CONFIG_ICLFORGE_EXAMPLE_LAYOUT`,
+`2.0` on the kit) until a server's settings replace it for the stream: Hearth sends one, Music Assistant
+does not, so a 5.1 or 7.1.4 stream to a 2.0 board shows two speakers. `PUT /layout` now keeps what it is
+given in NVS, so it survives a restart, and the board starts with it (a stored layout this sink cannot
+carry is said on the console and the image's stands):
+
+```
+curl -X PUT -d 7.1.4 http://<board address>/layout
+```
+
+The role's own settings message still wins for the stream and is not stored.
 
 **Until a title has come, there is no card.** With `title` chosen and nothing said (a server that
 does not send the role, or has not yet), or with a title in a script the fonts cannot draw, the
@@ -241,30 +503,46 @@ aiosendspin can send up to 20 s ahead and Music Assistant does not) takes effect
 is **off** from the moment a song with no lyrics begins, however long ago anything last touched the
 panel, and the screen says nothing. **A tap lights the speakers for 30 seconds from the last touch**
 (another tap moves that on), and then it is dark again. The tap that lights it does not also press what
-is under it; the developer view keeps the screen lit while it is open (the Adjust sheet puts itself
-away after eight seconds, inside the 30). The sheet's dim row, which has no meaning here, says "30
-seconds, then dark again" in place of its dim times. Only this screen goes dark: a lyric screen and
-the idle screen are lit as they always were.
+is under it; the developer view and Preferences keep the screen lit while they are open (the Adjust sheet
+puts itself away after eight seconds, inside the 30). Preferences' dim row, which has no meaning here, is
+greyed and says "Not used by the Dark view: a touch lights it for 30 seconds, then it is dark again." Only this
+screen goes dark: a lyric screen and the idle screen are lit as they always were.
 
-![The Adjust sheet with Dark chosen](screenshots/p4-panel-controls-dark.png)
+![Preferences with Dark chosen](screenshots/p4-panel-prefs-dark.png)
 
 | Route | Takes | Default |
 |---|---|---|
-| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `off` or `dark` | `speakers` |
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
+| `GET` and `PUT /speakers-style` | `glow` or `pulse` | `glow` |
+| `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |
+| `GET` and `PUT /clock-format` | `24`, `12`, `24 seconds` or `12 seconds` | `24` |
+| `GET` and `PUT /night-schedule` | two times and a state: `22:00-07:00 on`; `PUT` also takes just the times (and switches it on), or `on`, or `off` | `22:00-07:00 off` |
+| `GET` and `PUT /night-idle` | `on` or `off` | `off` |
 
-Both are stored on the board and take effect at once, with no restart; a board with no panel answers
-404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
-dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; and the [time of day](#the-time-of-day)'s state.
+All six are stored on the board and take effect at once, with no restart; a board with no panel answers
+404. **The brightness is the lit level, and the dim floor stays under it**: the dimmed screen is at 4%, or at
+the brightness if that is lower, and the dark view is off whatever it is. A screen whose backlight cannot be
+dimmed (the frame buffer a board with no panel runs) refuses it with a 409. `GET :8081/panel` says which `view`
+is chosen, whether the screen is `dimmed` (a black cover is up, dimmed or dark) and the `backlight` in percent:
+80 lit (or the brightness set), 4 dimmed, 0 dark; whether Preferences is open (`prefs_view`), how many times
+it was built and the longest a build took (`prefs_builds`, `prefs_build_us_max`); and the
+[time of day](#the-time-of-day)'s state.
 
 #### The clock
 
-The time of day, for a room where the sound is the thing and the panel is a glance: **the time in 24
-hours at 200 px, the date under it, and nothing else**, in the muted tone (the time at about 80% of
-it and the date at about 60%, so that neither is the brightest thing in a dim room). It shows no
-seconds, so what the screen redraws is the time's rectangle once a minute (the preview counts 224,000
-pixels, against none for a second that passes), and the line over it still says what the stream is
-(*Dolby Digital Plus 5.1 to 5.1*).
+The time of day, for a room where the sound is the thing and the panel is a glance: **the time at 200 px, the
+date under it, and nothing else**, in the muted tone (the time at about 80% of it and the date at about 60%, so
+that neither is the brightest thing in a dim room). By default it is in 24 hours and shows no seconds, so what the
+screen redraws is the time's rectangle once a minute (the preview counts 224,000 pixels, against none for a second
+that passes), and the line over it still says what the stream is (*Dolby Digital Plus 5.1 to 5.1*).
+
+**A person can have 12 hours** (*9:47*, with a small *PM* beside it; midnight is 12:05 AM) **and the seconds**
+(small beside the digits, *:12*), in any combination: `PUT /clock-format` takes `24`, `12`, `24 seconds` or `12 seconds`.
+The small text is a label of its own, so a second that passes redraws about 9,600 pixels and not the digits' 300,000,
+and with the seconds off a second redraws nothing.
+
+![The clock in 12 hours with the seconds: 9:05, :07 AM](screenshots/p4-panel-clock-12h-seconds.png)
 
 ![The clock: 21:47 and Tuesday 20 October](screenshots/p4-panel-clock.png)
 
@@ -281,6 +559,34 @@ answer from before 2026 is a server with a wrong clock, and is not taken for the
 **A dim leaves the clock on the glass.** Dimming lowers the backlight to its floor, as for the speakers,
 but the clock is what a dark room has the screen for, so no black cover goes over it: a clear one
 catches the tap that wakes the screen, and the time goes on changing under it.
+
+#### The night schedule
+
+**Go dark between two times**, by the board's own time (the [time of day](#the-time-of-day), in its zone). It is off
+until a person switches it on, and then it is **22:00 to 07:00** until they change the times. While it is in force
+the no-lyrics screen behaves as the [dark view](#a-song-with-no-lyrics) does: **dark from the moment it begins to show**
+(a song that starts at 23:00 is dark at once; one already playing at 22:00 goes dark once nothing has touched the glass
+for 30 seconds), **a tap lights it for 30 seconds from the last touch**, and the tap that lights it does not also press
+what is under it. A window that ends before it starts crosses midnight; the same time twice is an empty window (never
+dark: a whole day is the Dark view's job); **a board that has not heard the time yet is lit**, never dark by accident;
+and a zone with daylight saving moves the window with the clock (the night the clocks go forward is eight real hours of
+dark, the night they go back ten). With the Dark view chosen, or the screen without lyrics Off, the rows say the schedule
+is not used (*The Dark view is dark already: a touch lights it for 30 seconds, as at night.*).
+
+**The idle screen is a switch of its own** (`night-idle`, *Night covers idle screen*), off. Whether the night should
+darken the screen between two songs as well is the owner's to say; with it on, the idle screen counts as showing while
+the night is in force and is dark from the moment the night begins, with the same touch. It is not used while the
+schedule is off, and the row says so.
+
+**Kept as one number.** NVS `night` holds the two times and both switches (from in bits 0 to 10, to in bits 11 to 21,
+bit 22 on, bit 23 the idle screen), so a power cut cannot leave half a schedule; a number no build wrote is dropped with a
+line on the console and the Kconfig default (`ICLFORGE_EXAMPLE_NIGHT_SCHEDULE`, `22:00-07:00 off`, and
+`ICLFORGE_EXAMPLE_NIGHT_IDLE`) stands. Reset preferences returns it; the time zone it is read in stays. The panel is
+handed the schedule and the board's local minute of the day (read only while the schedule is on, and nothing until the
+clock has converged) and `lyric_screen.cpp` passes both to `dim_state()`: that is the whole of what the screen does for it.
+The rule, its words and its changeover cases are host-tested (`test_now_view.cpp`), and the preview tool drives it on the
+screen: lit at noon, dark at 23:00, a touch lights it for 30 s, lit at 07:00 and with no time known, and the idle screen
+dark only when told.
 
 **On the kit, the title card** (2026-10-21): `hearth-testserver` said a song over Sendspin (`--title`, `--artist`, `--album`, `--year`, `--track-seconds`, and `--then-after` for a second song with no artist) and the panel's read-back was the card above, then the second song alone with nothing kept from the first, and the speakers again when the play ended; a play that said nothing, with the card chosen, showed the speakers; a 119-character title ended in three dots after two rows, and `0:08 / 24:45` fitted. A 5.1 E-AC-3 programme at layout 5.1 took 5,325 µs a burst with the view off, 5,341 with the speakers (their header the song) and 5,333 with the card (three plays each, none late, no underrun or resynchronisation); at 2.0 with a stereo programme 2,614, 2,628 and 2,633; at 7.1.4 6,475, 6,478 and 6,491. The role itself cost nothing that showed: the image without it took 5,364 µs for the same play. The panel redraws about 5.7 times a second for the song's time and line. The owner's Music Assistant had not reconnected to the kit by then, so what it sends this role is from aiosendspin's source (the whole state each time, as the specification has it) and not yet seen on the board.
 
@@ -319,7 +625,7 @@ leave the audio alone). This is a page for someone at arm's length, not the two-
 
 | Section | What it says |
 |---|---|
-| **Network** | The interface **in use**; for the cable and for the radio its link (the cable's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page |
+| **Network** | The interface **in use**; for the wired network and for the radio its link (the wired network's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page |
 | **Configuration** | The profile and its hash (`/hardware`), the firmware version and the slot it runs from, the chip and its revision, the ESP-IDF, the cores and the CPU and PSRAM clocks, the output layout, the slots and their width and the sink, how long the board has been up and why it last reset, and whether a core dump is stored |
 | **Streaming** | The server and the connections; whether the clock has converged and its error; the stream; bursts played, underruns, late, dropped, resyncs and invalid chunks; the playout's offset and the burst time, each with its worst; a meter for each output; and the figures of a play from `POST /play` (`us_per_frame`, `worst_frame_us`, `sink_us_per_frame`, `render_us_per_frame`), which are dashes until one has run |
 | **Performance** | The internal heap and the PSRAM, free and at their lowest; the panel's own render time and late cycles; the touch controller's reads, failures and touches |
@@ -330,18 +636,18 @@ clock that has not converged while something plays, a reset by a panic, a watchd
 (`wdt` is not one: it is how this board restarts), a stored core dump, an internal heap that has
 fallen below 16 KB.
 
-![The same view of a board in trouble: no cable, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
+![The same view of a board in trouble: no wired link, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
 
-**The network preference.** The row of three buttons, Auto, Ethernet and Wi-Fi, is the board's
-[network preference](#the-cable-and-wi-fi), the chosen one in the accent colour. A tap on another one
+**The network preference.** The row of three buttons, Automatic, Wired and Wi-Fi, is the board's
+[network preference](#wired-and-wi-fi), the chosen one in the accent colour. A tap on another one
 **asks first**, so that a stray tap cannot cut the board off the network it is being used over:
 
-![Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-dev-confirm.png)
+![Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-dev-confirm.png)
 
 Cancel, a tap anywhere else or eight seconds of nothing changes nothing. A change the board is sure
 to refuse (the interface it names holds no address, or no Wi-Fi network is stored) is said so in the
 accent colour and Switch is dimmed. **Switch** asks for the change as `PUT /network-preference` does
-(the same call; it returns at once and the work is done on a task of its own, verified as the cable
+(the same call; it returns at once and the work is done on a task of its own, verified as the wired
 section says), and the view says "Switching..." until the board keeps the preference, then "Done.",
 or "The board refused the change." if it has not after 45 seconds.
 
@@ -359,7 +665,7 @@ and its pictures are drawn by the same code as the board's, by the
 ### The time of day
 
 **Every ESP board that has a network keeps its time with a time server**, by default, from the
-moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its cable), where QEMU's
+moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its wired network), where QEMU's
 network has nothing to ask and a build with no network has nothing to ask over, so those keep no
 time (the routes below answer 404). It is lwIP's SNTP client (`firmware/hearth-sink/main/clock/sntp/`).
 The panel's [clock view](#the-clock) draws what it keeps; a board with no screen has it for its page,
@@ -385,32 +691,54 @@ starts the question again at once if no server has answered yet.
 |---|---|---|
 | `GET` and `PUT /time-sync` | `on` or `off` | `on` |
 | `GET` and `PUT /ntp-server` | a host name or an IPv4 address, or `none` | `none`: the router's, then the pool |
-| `GET` and `PUT /timezone` | a POSIX time zone, or `none` | `none`: UTC |
+| `GET` and `PUT /timezone` | a name from `GET /time-zones` (`Australia/Melbourne`), a POSIX time zone, or `none` | `none`: UTC |
+| `GET /time-zones` | the names `PUT /timezone` takes, one a line | 420 of them |
 
-All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`) and take effect at once,
-with no restart. **They are on the board's own web page too**, in a Time section of Settings: the time
-the board keeps and how it got it, a checkbox for whether to ask a time server, and a list of zones and cities
-(*UTC+10 Melbourne, Sydney, Hobart, Canberra*; 42 of them, each a POSIX string the board's C library is
-held to) with a field for any other, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
-object (`sync`, `asking`, `synced`, `local`, `zone`, `server`, `servers`, `answers`), and the console
+All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`, and `tz_name` for the name a person
+chose) and take effect at once, with no restart. **They are on the board's own web page too**, in a Time section
+of Settings: the time the board keeps and how it got it, a checkbox for whether to ask a time server, a region and a
+city (the page asks the board for its list of zones) with a field for any other zone, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
+object (`sync`, `asking`, `synced`, `local`, `zone`, `zone_name`, `zone_place`, `zone_label`, `server`, `servers`, `answers`), and the console
 says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
 pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
 it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
 made up), and a clock view then shows only its heading.
 
-**The time zone is a POSIX string**, because the firmware has no zone database and a list of names
-would be a table to keep: `PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and
-Hobart. Its offset is the hours *west* of UTC, so an Australian zone has a minus sign; `none` takes
-the zone away. A string that is not a zone, or one with daylight saving and no rules (which the
+**The time zone is a POSIX string**, because the firmware has no zone database: `PUT /timezone
+AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and Hobart. Its offset is the hours *west* of UTC, so an
+Australian zone has a minus sign; `none` takes the zone away. **A person need not type one.** The board carries a table of
+the zones people choose by region and city, **420 of them in 11,578 bytes of flash**, generated from IANA's tzdata (2026e;
+`tools/hearth/gen_time_zones.py`), Australia complete: `PUT /timezone Australia/Melbourne` stores the string that
+name stands for **and the name** (the Preferences screen has the same picker, [above](#adjust-and-preferences)), so the screen can say *Melbourne* (the string alone could not: Melbourne, Sydney, Hobart and
+Canberra are one string). A name from the table says the zone, so a release that carries a government's new rules
+moves the boards that chose that city and no others. A name that is not in the table is a 400, as is a string that is
+not a zone. A string that is not a zone, or one with daylight saving and no rules (which the
 board's C library would give its own for, differently from the next one's), is refused with a 400
 that says so; one the grammar accepts is then read by the board's own C library, on a day in January
 and a day in July, and refused with a 409 if the library did not read it as written (a library that
 cannot parse a string falls back to UTC without saying so). With none set the time is UTC.
 
+**A screen or a page never shows the string.** It is the board's way of keeping a zone and the routes' way of reporting
+it (`GET /timezone`, `GET /status`'s `zone` and the Preferences entry's `value`, for tools); a person reads the place
+(`iclforge::wallclock::zone_readable`, host tested). The name they chose is the place. A zone set with a string and no
+name (through the page before it had a picker, or by hand) is read as **the place the table holds for the string**: an
+exact match, and where several places share it (Melbourne, Sydney, Hobart and Canberra are one) the most populous, which
+`tools/hearth/gen_time_zones.py` writes down as `PREFERRED` (51 strings are shared; the table says which place
+each means, in 102 bytes of flash), so a board set to `AEST-10AEDT,M10.1.0,M4.1.0/3` reads *Melbourne (Australia)* on the
+Preferences row, in the picker (which opens at Australia with Melbourne marked) and on the page, though no name was stored.
+A zone in no table reads as its offset and as the person's own: *UTC+09:45 (custom)*, *UTC+09:30 (custom, with daylight
+saving)*. The guess is display only and is not stored: it would turn a guess at which of four cities was meant into a
+choice. `GET /status`'s `time` has the place (`zone_place`: a name in the table, or `none`) and the words
+(`zone_label`: *Melbourne (Australia)*, *UTC*, *UTC+09:45 (custom)*), which the page shows in *Now* and under the time zone.
+The page's field for a zone not in the list is never filled in with the board's string; Save with nothing typed asks
+for a choice and sends nothing (UTC is Other, then UTC).
+
 The grammar and the words (`libs/device/include/iclforge/wall_clock.hpp`) are held to the letter by
 the host tests (`test_wall_clock.cpp`: the zones and the servers taken and the ones refused, the offsets,
-the dates and the words), and the device page's stand-in is held to the same lists
-(`apps/demos/wasm/tests/device-ui/contract.spec.js`).
+the dates and the words; `test_time_zones.cpp`: every string in the table taken by the board's reader, Australia
+complete, and Melbourne's changeovers, with 15 other zones', at tzdata's own instants), and the device page's
+stand-in is held to the same lists (`apps/demos/wasm/tests/device-ui/contract.spec.js`). The generator holds every
+string to tzdata itself (`gen_time_zones.py --verify`: 4,500 changes from 2026 to 2036, no disagreement).
 
 ### Wiring
 
@@ -433,29 +761,29 @@ screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this imag
 driver) and which touch controller (the older board's has a GT911). **Secure Download is not
 supported on a v3.1 chip, and the image never enables it.**
 
-### The cable, and Wi-Fi
+### Wired, and Wi-Fi
 
 The kit's RJ45 port (the chip's own Ethernet MAC and an IP101GR PHY on RMII, 10/100 Mbit/s) is a
 network of the sink as the Wi-Fi is, so the kit can sit on a PoE splitter with no USB cable: the
 splitter's Ethernet leg into the RJ45, its USB-C leg into the kit's **power** input (not the
 connector marked JTAG, which is the console and the flashing port). The image is updated over the
 same network, the way [Sink firmware](sink-firmware.md) describes, and everything that answers on
-Wi-Fi answers on the cable: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
+Wi-Fi answers on wired: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
 mDNS (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`), the Sendspin player and its pairing,
-and the idle screen, which shows the address and then `Ethernet` or `Wi-Fi <network>`.
+and the idle screen, which shows the address and then `Wired` or `Wi-Fi <network>`.
 
 **Which one it uses.** The board takes an address on whichever has a link, by DHCP, under the name
-it is called (`hearth-<mac tail>`). With **auto**, the default, it uses the cable while the cable
-holds an address and the Wi-Fi when only that does, and goes back to the cable when it returns, with
-no restart. Both are up when the cable is in and a Wi-Fi network is stored, the cable's interface
+it is called (`hearth-<mac tail>`). With **auto**, the default, it uses wired while wired
+holds an address and the Wi-Fi when only that does, and goes back to wired when it returns, with
+no restart. Both are up when the Ethernet cable is in and a Wi-Fi network is stored, the wired interface
 with the higher route priority (200 against the Wi-Fi's 100; ESP-IDF's own number for Ethernet, 50,
-would have put a board with both on Wi-Fi). A board with the cable in and **no Wi-Fi network
-stored** comes up on the cable alone and needs nothing else. The setting, `network preference`,
+would have put a board with both on Wi-Fi). A board with the Ethernet cable in and **no Wi-Fi network
+stored** comes up on wired alone and needs nothing else. The setting, `network preference`,
 chooses what the board does:
 
-| Preference | The cable | The Wi-Fi station |
+| Preference | Wired | The Wi-Fi station |
 |---|---|---|
-| `auto` | used while it holds an address | joined as the way out if the cable goes; used when only it holds an address |
+| `auto` | used while it holds an address | joined as the way out if wired goes; used when only it holds an address |
 | `ethernet` | the only network | switched off: no radio, nothing joined |
 | `wifi` | switched off | the only network |
 
@@ -468,17 +796,17 @@ curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes eff
 ```
 
 A pinned preference leaves the board with one network and nothing to fall back to, so a change made
-while the board runs is checked before it is kept. `ethernet` brings the cable up first (it waits
+while the board runs is checked before it is kept. `ethernet` brings wired up first (it waits
 for a link and an address) and only then stores the preference and switches the Wi-Fi off; `wifi`
-joins the stored network first and only then stores it and stops the cable. A change whose interface
+joins the stored network first and only then stores it and stops wired. A change whose interface
 does not come up is **not kept**: the preference stays what it was, the other interface stays on, and
-the console says so (`network: no cable answered, so the WiFi station is not switched off`). The
+the console says so (`network: no wired link answered, so the WiFi station is not switched off`). The
 reply (`200`) is sent before any of this, so it comes back over the interface the change may switch
 off; read `GET /network-preference` a few seconds later to see what was kept.
 `PUT /network-preference wifi` with no Wi-Fi network stored is refused (`409`). Improv over USB and
-`PUT /network` still store a Wi-Fi network, and a board on the cable alone reports Improv's *ready*
+`PUT /network` still store a Wi-Fi network, and a board on wired alone reports Improv's *ready*
 state (it has no Wi-Fi), so a client still offers its Wi-Fi form; the Wi-Fi it is given joins while
-the cable stays in use.
+wired stays in use.
 
 **What `GET /status` says.** The `network` object keeps its four fields (`kind`, `ssid`,
 `rssi_dbm`, `address`), which now describe the interface **in use** (`kind` is `"ethernet"` or
@@ -499,9 +827,9 @@ one network `preference` and `interfaces` are `null`.
 }
 ```
 
-`enabled` is "not switched off by the preference", `link` is a cable with a partner on it
-(Ethernet) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
-stored, and `mac` is the interface's own address, for a DHCP reservation (the cable's is the chip's
+`enabled` is "not switched off by the preference", `link` is a partner on the Ethernet port
+(wired) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
+stored, and `mac` is the interface's own address, for a DHCP reservation (the wired one is the chip's
 base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A diagnostics view or a
 control for the preference reads `GET /status` and `GET` and `PUT /network-preference` and nothing
 else.
@@ -511,49 +839,154 @@ else.
     rescued by the update's own rollback (an image that does not reach the network, the HTTP server
     and the Sendspin player inside five minutes goes back to the one before it, and so does one that
     panics on its first boot; both were tried on the kit) or by putting the USB cable back. Keep the
-    Wi-Fi network stored, so the board has a way out if the cable goes. See
-    [What was tested](#what-was-tested-on-the-cable) for what was and was not tried.
+    Wi-Fi network stored, so the board has a way out if wired goes. See
+    [What was tested](#what-was-tested-on-wired) for what was and was not tried.
 
-#### What was tested on the cable
+#### What was tested on wired
 
-On the v3.2 kit, 2026-10-20, with the owner's cable to their router (100 Mbit/s, full duplex), the
+On the v3.2 kit, 2026-10-20, with the owner's Ethernet cable to their router (100 Mbit/s, full duplex), the
 Wi-Fi and the USB cable on as well. Details and the numbers:
 [the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20).
 
-- **The update path, before the cable:** ten `ota.py push` runs (eight accepted, an image that never
+- **The update path, before wired:** ten `ota.py push` runs (eight accepted, an image that never
   becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
   bootloader in about 25 s), a `PUT` rollback, eight `POST /restart` and four rounds of a USB flash
   followed 20 s later by an update: the C6 link was back each time, 7 to 10 s after the restart.
 - **The PHY** answers on the default pins at SMI address 1 with the IP101's ID, and negotiates 100
   Mbit/s full duplex.
-- **Boot:** with the cable in, it answers on the cable 10 s after reset and the Wi-Fi joins behind it
-  at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
-  **no Wi-Fi network stored** it comes up on the cable alone, with the page, mDNS and the Sendspin
-  player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.
-- **A cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
+- **Boot:** with the Ethernet cable in, it answers on wired 10 s after reset and the Wi-Fi joins behind it
+  at 14 s; with no Ethernet cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
+  **no Wi-Fi network stored** it comes up on wired alone, with the page, mDNS and the Sendspin
+  player, and Improv over USB then gives it a Wi-Fi network that joins while wired stays in use.
+- **An Ethernet cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
   pulled** (four times, by the owner, three with the board idle and one in the middle of a play)
-  made the Wi-Fi the interface in use within half a second, with no restart, and the cable returned
-  4 to 5 s after it was put back. A play cut by the pull ended there (926 bursts, no underrun until
+  made the Wi-Fi the interface in use within half a second, with no restart, and wired returned
+  4 to 5 s after the cable was put back. A play cut by the pull ended there (926 bursts, no underrun until
   it) and the board was idle and answering; the next play ran in full.
-- **Everything that answers on Wi-Fi answers on the cable:** the page, `/api`, `/hardware`, `GET /log`,
-  `PUT /firmware` (an update over the cable restarted the board, which answered on the cable 10 s
+- **Everything that answers on Wi-Fi answers on wired:** the page, `/api`, `/hardware`, `GET /log`,
+  `PUT /firmware` (an update over wired restarted the board, which answered on wired 10 s
   later and passed its trial), mDNS (`hearth-<mac tail>.local` has an A record for each address) and
-  Sendspin, which played four 30 s AC-3 streams through the cable, 938 of 938 bursts each with no
+  Sendspin, which played four 30 s AC-3 streams through wired, 938 of 938 bursts each with no
   underrun (one with a late burst and a resync at its start).
-- **The preference** set to each of the three words with the cable in did what the table says, and
+- **The preference** set to each of the three words with the Ethernet cable in did what the table says, and
   survived a restart; `ethernet` with no cable in was not kept and left the Wi-Fi on throughout.
-  With `ethernet` set (the Wi-Fi radio off), an update sent to the cable's address restarted the
-  board, which came back on the cable alone and passed its trial: the PoE case with the radio off.
-- **Bad images on the cable:** an image that panics on its trial and one that never reports healthy,
-  both built with the cable, pushed to the cable's address, were rolled back (about 25 s, and at the
-  300 s deadline) and the board returned on the cable.
+  With `ethernet` set (the Wi-Fi radio off), an update sent to the wired address restarted the
+  board, which came back on wired alone and passed its trial: the PoE case with the radio off.
+- **Bad images on wired:** an image that panics on its trial and one that never reports healthy,
+  both built with wired, pushed to the wired address, were rolled back (about 25 s, and at the
+  300 s deadline) and the board returned on wired.
 - **Cost:** the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
   smaller (about 281 KB free, largest block about 256 KB).
 
 **Not tested:** a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. A
-board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is joined as well
-(the cable goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
-out if the cable goes, and the first move to PoE should be done with the USB cable at hand.**
+board whose DHCP server is slow gives wired 15 s at boot before the Wi-Fi is joined as well
+(wired goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
+out if wired goes, and the first move to PoE should be done with the USB cable at hand.**
+
+### Name, restart and reset
+
+The routes that name, restart and reset a board are the same on every Hearth board
+([Name, restart and reset](sink-esp32-s3.md#name-restart-and-reset) has the rules and the table of
+what a rename changes); what the kit adds is below.
+
+- **A restart resets the whole system**, not the CPU alone, through the RTC watchdog
+  (`system_reset.cpp`), because a CPU reset sometimes left the radio on the ESP32-C6 with a dead link.
+  The restart a person asks for - `POST /restart`, and the restart that Restart and the factory
+  reset end in - all go through it, a second slower than a CPU reset, with the USB console's port
+  gone for a second or two.
+- **A factory reset leaves the kit reachable on wired.** Wired needs nothing stored: the
+  kit asks the router for an address again, and has no Wi-Fi network until you give it one (the
+  page's *Wi-Fi network* field, or Improv over the USB-C marked JTAG). **The same reset on a board
+  without an Ethernet cable plugged in leaves it with no network at all.** Whether wired has a link is what the
+  confirming step reads, and it says which of the two the board is in.
+- **The radio's own copy of the network.** ESP-IDF's Wi-Fi driver keeps the SSID and passphrase it is
+  given in NVS, and on the kit the driver is the ESP32-C6's. The factory reset asks the radio to forget
+  them (`esp_wifi_restore`) when the Wi-Fi was up this run; it cannot reach a radio that was never
+  started. *Not yet checked on the kit.*
+- **Restart is refused for about half a minute after an update**: the new image is on trial, and a
+  restart then goes back to the image before it.
+
+#### On the screen
+
+The footer's **Preferences** button opens the sheet of everything a person chooses once, and its **Network**
+and **System** groups are these routes with a screen over them. Each is a registry entry
+(`libs/device/include/iclforge/preferences.hpp`), so a board with no screen has the same choices over REST, and
+a choice the board cannot make is shown greyed with the reason and not hidden: a board with Wi-Fi alone shows
+"Wired or Wi-Fi" greyed, "This board has Wi-Fi only, so there is nothing to choose between." Every page below is
+drawn at the size of the display it is on: the preview holds each one to the fingertip size and to text that is
+not cut off at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240.
+
+![The System group of the Preferences sheet: About, Paired servers, Restart, Reset preferences and Factory reset, each with the button that opens or runs it](screenshots/p4-panel-prefs-system.png)
+
+| Entry | A tap |
+|---|---|
+| **Wired or Wi-Fi** | Automatic, Wired or Wi-Fi, on a board that has both. It asks first, in the developer view's words, and a switch the board is certain to refuse says so and cannot be made. |
+| **Name of this player** | Opens the keyboard. |
+| **About** | Opens the version, the slot it runs from, the name, the address and MAC of each interface, the page's address, the chip, the layout and the number of paired servers. |
+| **Paired servers** | Opens the list, each server with a Forget. |
+| **Restart** | Asks, and restarts as `POST /restart` does. |
+| **Reset preferences** | Asks, naming what changes on this board, and puts those choices back. |
+| **Factory reset** | Asks twice: what is lost, and then a button held for three seconds. |
+
+**The switch between wired and Wi-Fi** is the developer view's control (the same words, the same call), here
+with a card over the sheet. The board keeps the preference only once the interface it names holds an address, as
+[the wired section](#wired-and-wi-fi) says.
+
+![Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-prefs-network.png)
+
+**The name** is typed on a keyboard of its own: lower case, a shift for one capital, digits and the punctuation a
+room's name uses (`- _ . , ' & ( ) # + !`), and two pages of accented letters (Latin-1, and the Latin Extended-A
+letters that Polish, Czech, Hungarian, Turkish and Romanian add). It offers only what the name's rule accepts and
+the screen's fonts can draw, counts bytes and not letters (an accented letter is two, and the counter says how many
+of the 32 are used), takes the last letter back whole, and enables Save only for a name that passes, saying why
+when it does not. A saved name takes effect at once, with no restart.
+
+![The keyboard with "Study" typed: 5 of 32 bytes used, the lower-case page, a page tab for digits, accents and the Latin Extended-A letters, a shift, and Space](screenshots/p4-panel-prefs-name.png)
+
+The same keyboard on a 480 by 320 panel, where the keys scroll under the name:
+
+![The keyboard on a 480 by 320 panel, with the name above the keys](screenshots/p4-panel-prefs-name-small.png)
+
+**About** is the friendly subset of the developer view, read the same way (it shares the developer view's reading
+of the board), and never shows the Wi-Fi passphrase or the pairing token. The developer view stays behind the three
+taps on the name.
+
+![About: the version, the slot, the name, the wired and the radio's addresses and MACs, the page, the chip, the layout and the paired servers](screenshots/p4-panel-prefs-about.png)
+
+**The paired servers** are listed by name, with what each is doing ("playing now", "connected", "played here
+last", "not seen since the player started"), and a Forget on each. Forgetting one asks first and says what
+follows: that server has to pair with the player again, and to remove the player from its list first. **The server
+that is playing is allowed**, with a warning that the music stops: it is the one a person gives a board away from.
+The list never offers the board's bare `forget` (every pairing and a new identity): that is `pair forget` on the
+console and *Forget every server* on the page.
+
+![Paired servers: Music Assistant, playing now, and Hearth on STUDIO-PC, each with Forget](screenshots/p4-panel-prefs-servers.png)
+
+![Forget Music Assistant? It is playing to this player now: the music stops. This player stops listening to it and erases its pairing. Cancel, Forget](screenshots/p4-panel-prefs-forget.png)
+
+**Reset preferences** puts back the choices that every registry entry says are reset (the screen without
+lyrics, its dim time, the brightness, the clock's hours and seconds and the night schedule; an entry that another page
+adds says for itself) and keeps the name, the Wi-Fi network, the choice between wired and Wi-Fi, the wiring, the
+speaker layout, the time zone and the pairings. It goes through each entry's own
+setter, so the screen and the clock follow as they follow a change.
+
+**Factory reset** is the one action that can strand a board, so it asks twice. The first card says what is lost
+(the name, the network and its password, the paired servers, the layout, the DAC wiring and every preference), how
+many servers will have to pair again, and, from what the board sees, whether it stays reachable: with the wired
+network linked, "The wired network stays in use"; with no wired link, or on a board that has Wi-Fi alone, "After the reset it has NO
+network", and what brings it back (Improv over the USB cable, at improv-wifi.com in Chrome or Edge).
+
+![Erase everything? What is lost, that two servers have to pair again, and that the wired network stays in use. Cancel, Continue](screenshots/p4-panel-prefs-factory.png)
+
+The second step is a button that has to be held for three seconds, its progress filling it; letting go cancels, and
+a tap does nothing.
+
+![Hold to erase: Keep your finger on the button for 3 seconds. Letting go cancels. The button half filled](screenshots/p4-panel-prefs-hold.png)
+
+On a 320 by 240 panel the card is taller than the glass, so its paragraphs scroll and its buttons stay where a
+finger finds them:
+
+![The factory reset's first card on a 320 by 240 panel: its text scrolls above Cancel and Continue](screenshots/p4-panel-prefs-factory-small.png)
 
 ### Memory and time
 
@@ -630,10 +1063,19 @@ build-preview/panel_preview <output directory>
 ```
 
 `managed_components/lvgl__lvgl` appears after any P4 build of `firmware/hearth-sink`. It reads the
-example songs in `examples/karaoke` and writes 24-bit BMP files.
+example songs in `examples/karaoke` and writes 24-bit BMP files. After the screens above it draws
+[Adjust and Preferences](#adjust-and-preferences) at 1024 by 600, 800 by 480, 480 by 320 and 320 by 240, for the kit
+and for a board whose screen has no touch (`iclforge/board_variants.hpp`), and checks them: it exits 3 when text is
+clipped, a control is smaller than a fingertip or sticks out of its sheet, a tap does nothing, or a greyed choice
+answers one.
 
 **On a P4 with no panel** (`sdkconfig.panel-null`): LVGL draws into a frame buffer in PSRAM, and a
-second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 for none) serves it:
+second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 for none) serves it.
+**That server has no authentication** (anyone on the network can read the screen and press its buttons), so
+**a released image does not start it**: the port is 0 in the release profiles (`p4-rev3` locks it) and in the
+Kconfig default, and `package_firmware.py` refuses a build with any other. An image that is run on a bench
+turns it on with the `panel-capture` overlay (`sink_profile.py defaults p4-rev3 --overlay panel-capture`), and
+`panel-null` has it on because that build exists to be read back:
 
 | Request | Answer |
 |---|---|

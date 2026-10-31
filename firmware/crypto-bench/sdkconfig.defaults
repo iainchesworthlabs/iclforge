@@ -1,0 +1,28 @@
+# The crypto bench's common settings; sdkconfig.defaults.<target> adds each chip's.
+
+# -O2, not the -Os the Hearth sink is built at: the portable reference should not be handicapped by
+# the size setting, and the sink's decode-critical sources are -O2 as well.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# ChaCha20-Poly1305, which ESP-IDF leaves off and the Sendspin player turns on
+# (firmware/esp-idf/iclforge/Kconfig, ICLFORGE_SENDSPIN selects both). Without them the bench's
+# ChaCha key import is refused, and it measures the AEAD the firmware's default suite really uses.
+CONFIG_MBEDTLS_CHACHA20_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y
+
+# The boards' console is the chip's own USB Serial/JTAG (firmware/hearth-sink/sdkconfig.hw).
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# The boards' flash. A bootloader that believes in less than the chip has still boots; one that
+# believes in more does not.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# The Hearth sink's partition table, not IDF's single-app one: the bench is put on a board that has
+# the sink's, and `bench_flash.py flash --app-only` writes only the `app` and `otadata` sections of
+# a build, which are then at the offsets the board already has (ota_0 at 0x20000, otadata at
+# 0x10000) and leave the bootloader, the table and NVS - the board's pairings and network - alone.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../hearth-sink/partitions.csv"
+
+# Nothing here needs the default stack to be large, and the bench prints from app_main's own task.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

@@ -115,9 +115,13 @@ fi
 # script's own location rather than $PWD, so it does not matter where the
 # script was invoked from.
 FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/audio" && pwd)"
+# The TrueHD and MLP streams FFmpeg's encoders wrote (tools/generators/gen_truehd_ffmpeg.py).
+TRUEHD_FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/truehd" && pwd)"
 # The karaoke example's project, for the `forge project` section at the end. Resolved here for the
 # same reason: CI runs this script by a relative path, which names nothing after the `cd`.
 PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
+# The checks directory, for the AC-4 content signing section: resolved here for the same reason.
+CHECKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../checks" && pwd)"
 
 WORKDIR="${2:-$(mktemp -d)}"
 mkdir -p "$WORKDIR"
@@ -1242,6 +1246,145 @@ run decode atmos_enc_ajoc.ac4 atmos_enc_ajoc.wav atmos_enc_ajoc_dir
 run atmos-encode bootstrap_51.wav atmos_enc_direct.mp4 256 6 codec=ac4 coding=direct dialnorm=27
 run_ac4_frames_check atmos_enc_direct.mp4
 run decode atmos_enc_direct.mp4 atmos_enc_direct.wav atmos_enc_direct_dir
+# --- AC-4 content signing (libs/ac4/ERRATA.md) --------------------------------
+# One signature over the whole stream, written after the last sync frame, with the operator's own
+# key and chain. Nothing is built into forge, so this makes a throwaway root and signer with openssl
+# (and skips with a message where there is none: the commands below are still named in this file).
+# Each signature carries a random nonce, so the signed files are removed once they have been read:
+# the cross-tier mode above diffs every file this script leaves behind. FFmpeg has no part in it -
+# its raw AC-4 demuxer takes the trailer for five more packets - so the frame count that is compared
+# is forge's own, signed against unsigned.
+run_fails() {
+    local want=$1
+    shift
+    count=$((count + 1))
+    echo "[$count] (exit $want expected) $*"
+    local got=0
+    "$CLI" "$@" >/dev/null 2>&1 || got=$?
+    if [[ "$got" != "$want" ]]; then
+        echo "forge $* exited $got, not $want" >&2
+        exit 1
+    fi
+}
+if command -v openssl >/dev/null 2>&1; then
+    mkdir -p cs
+    openssl ecparam -name prime256v1 -genkey -noout -out cs/root.key
+    openssl req -new -x509 -key cs/root.key -sha256 -days 30 -subj "/CN=Matrix Root CA" \
+        -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" \
+        -out cs/root.pem
+    openssl ecparam -name prime256v1 -genkey -noout -out cs/signer.key
+    openssl req -new -key cs/signer.key -sha256 \
+        -subj "/CN=Matrix Content Signer/title=Code\/Content Signer" -out cs/signer.csr
+    printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n' > cs/signer.ext
+    openssl x509 -req -in cs/signer.csr -CA cs/root.pem -CAkey cs/root.key -CAcreateserial \
+        -sha256 -days 30 -extfile cs/signer.ext -out cs/signer.pem
+    cat cs/signer.pem cs/root.pem > cs/chain.pem
+    run ac4-sign ac4_stereo_192.ac4 cs/signed.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        publisher-uuid=3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84
+    run ac4-sign ac4_stereo_192.ac4 cs/anonymous.ac4 content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem
+    run ac4-verify cs/signed.ac4 unanchored-ok
+    run ac4-verify cs/signed.ac4 check-content
+    run decode cs/signed.ac4 cs/signed.wav verify-content trust-anchor=cs/root.pem
+    run decode cs/signed.ac4 cs/signed_report.wav check-content
+    run probe cs/signed.ac4
+    run ac4-encode "$FIXTURES/reference_stereo.wav" cs/encoded.ac4 192 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/encoded.ac4 trust-anchor=cs/root.pem
+    run atmos-encode bootstrap_51.wav cs/atmos.ac4 256 6 codec=ac4 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run ac4-verify cs/atmos.ac4 trust-anchor=cs/root.pem
+    # The remaining options of the family: the root pinned by its SHA-256 and by its SHA-1 instead of
+    # named as an anchor, the three readings of when the chain must be valid, the title the leaf must
+    # carry, and the date a new signature records (a day ahead, inside the chain's validity, which
+    # verify-time=signed then judges it at: the output must say so).
+    root_pin=$(openssl x509 -in cs/root.pem -noout -fingerprint -sha256 | sed 's/.*=//; s/://g')
+    root_pin1=$(openssl x509 -in cs/root.pem -noout -fingerprint -sha1 | sed 's/.*=//; s/://g')
+    run ac4-verify cs/signed.ac4 pin="$root_pin"
+    run ac4-verify cs/signed.ac4 pin="$root_pin1"
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=signed
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=ignore
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem leaf-title=any
+    signed_when=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S"))')
+    run ac4-sign ac4_stereo_192.ac4 cs/dated.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        signed-date="$signed_when"
+    dated_report=$("$CLI" ac4-verify cs/dated.ac4 trust-anchor=cs/root.pem verify-time=signed)
+    if [[ "$dated_report" != *"signed      $signed_when (UTC)"* ]]; then
+        echo "ac4-verify does not report the signed-date $signed_when" >&2
+        exit 1
+    fi
+    # CS spec v2.6: the signer information of section 5.3 (who signed, with what product and on what
+    # platform), reported by ac4-verify; verify-content, the strict reading, refuses a signature
+    # without a publisher UUID and takes one with a well formed UUID; and check-content judges the
+    # certificates at the signed date, which the report says.
+    run ac4-sign ac4_stereo_192.ac4 cs/described.ac4 content-key=cs/signer.key content-chain=cs/chain.pem \
+        publisher-uuid=3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84 publisher-name="Matrix Publisher" \
+        product-id=7 product-name="Matrix Product" wrapper-name="Matrix Wrapper" \
+        os-name="Matrix OS" os-version=1.0 os-description="Matrix OS 1.0 test host"
+    described_report=$("$CLI" ac4-verify cs/described.ac4 trust-anchor=cs/root.pem)
+    for expected in "publisher   Matrix Publisher (UUID 3B9C1F52-7A4E-4D08-B6A1-2F0E9D7C5A84)" \
+        "product     Matrix Product (wrapper Matrix Wrapper)" \
+        "platform    Matrix OS 1.0 (Matrix OS 1.0 test host)" "ok   signer nonce: 128 bytes"; do
+        if [[ "$described_report" != *"$expected"* ]]; then
+            echo "ac4-verify does not report '$expected'" >&2
+            exit 1
+        fi
+    done
+    run ac4-verify cs/described.ac4 trust-anchor=cs/root.pem verify-content
+    # The publisher UUID is an account's, not in the certificate (v2.6): compared only with the accounts
+    # expect-publisher-uuid= names, a finding in ac4-verify and a refusal with verify-content.
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-content \
+        expect-publisher-uuid=3b9c1f52-7a4e-4d08-b6a1-2f0e9d7c5a84
+    run ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-content \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 2 decode cs/signed.ac4 cs/refused_account.wav verify-content trust-anchor=cs/root.pem \
+        expect-publisher-uuid=0F0E0D0C-0B0A-4908-8706-050403020100
+    run_fails 1 ac4-verify cs/signed.ac4 expect-publisher-uuid=not-a-uuid
+    run ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem
+    run_fails 6 ac4-verify cs/anonymous.ac4 trust-anchor=cs/root.pem verify-content
+    run_fails 2 decode cs/anonymous.ac4 cs/refused_strict.wav verify-content trust-anchor=cs/root.pem
+    check_report=$("$CLI" ac4-verify cs/signed.ac4 check-content)
+    if [[ "$check_report" != *"(signed, the default of check-content)"* ]]; then
+        echo "ac4-verify check-content does not say it judged the certificates at the signed date" >&2
+        exit 1
+    fi
+    # Signing an MP4 is out of scope (section 8.3.2): both ways in are refused, naming the reason.
+    run ac4-encode "$FIXTURES/reference_stereo.wav" cs/in.mp4 192
+    run_fails 1 ac4-sign cs/in.mp4 cs/in_signed.mp4 content-key=cs/signer.key content-chain=cs/chain.pem
+    run_fails 1 ac4-encode "$FIXTURES/reference_stereo.wav" cs/out.mp4 192 sign-content \
+        content-key=cs/signer.key content-chain=cs/chain.pem
+    run_fails 1 ac4-sign ac4_stereo_192.ac4 cs/bad_uuid.ac4 content-key=cs/signer.key \
+        content-chain=cs/chain.pem publisher-uuid=not-a-uuid
+    # What must be refused: no anchor, nothing signed, a changed byte, a key nobody asked for, a chain
+    # judged at a time it has expired by, a leaf of another title, and a pin that matches nothing.
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem verify-time=2099-01-01T00:00:00
+    run_fails 6 ac4-verify cs/signed.ac4 trust-anchor=cs/root.pem leaf-title=Nobody
+    run_fails 6 ac4-verify cs/signed.ac4 pin=0000000000000000000000000000000000000000
+    run_fails 6 ac4-verify cs/signed.ac4
+    run_fails 6 ac4-verify ac4_stereo_192.ac4 trust-anchor=cs/root.pem
+    run_fails 1 ac4-encode "$FIXTURES/reference_stereo.wav" cs/unasked.ac4 192 content-key=cs/signer.key
+    run_fails 2 decode ac4_stereo_192.ac4 cs/refused.wav verify-content trust-anchor=cs/root.pem
+    # Signed against unsigned: the same frames decode.
+    decoded_plain=$("$CLI" decode ac4_stereo_192.ac4 cs/plain.wav | sed -n 's/^decoded \([0-9]*\) AC-4 frames.*/\1/p')
+    decoded_signed=$("$CLI" decode cs/signed.ac4 cs/signed_again.wav | sed -n 's/^decoded \([0-9]*\) AC-4 frames.*/\1/p')
+    if [[ -z "$decoded_plain" ]] || [[ "$decoded_plain" != "$decoded_signed" ]]; then
+        echo "forge decoded '$decoded_plain' frames unsigned and '$decoded_signed' signed" >&2
+        exit 1
+    fi
+    cmp cs/plain.wav cs/signed_again.wav
+    # OpenSSL's reading of the same signature (tools/checks/check_content_signature_openssl.py).
+    python3 "$CHECKS_DIR/check_content_signature_openssl.py" --forge "$CLI"
+    rm -rf cs
+elif [[ "${ICLFORGE_REQUIRE_OPENSSL:-0}" = "1" ]]; then
+    # A job that is meant to run this section says so, so that a runner image without the openssl
+    # program fails here and does not pass having checked nothing.
+    echo "openssl not found, and ICLFORGE_REQUIRE_OPENSSL=1 asks for the AC-4 content signing section" >&2
+    exit 1
+else
+    echo "openssl not found: skipping AC-4 content signing (ac4-sign, ac4-verify, sign-content, verify-content)"
+fi
 # Phase E5: frame rates other than the native one, the average and variable
 # rates, I-frames at an interval, and the metadata options, raw and in MP4,
 # where 29.97 fps counts at 240 000 Hz (TS 103 190-2 Table E.1) and the
@@ -1325,6 +1468,505 @@ run fmp4 ac4_51_192.ac4 i1_ac4_fmp4 24
 run_ac4_fmp4_check i1_ac4_fmp4 ac4_51_192.ac4
 run fmp4 ac4_stereo_2997.mp4 i1_ac4_fmp4_2997 20
 run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
+
+# --- TrueHD and MLP (iclforge::truehd, planning/truehd.md) ----------------------------------------
+# The lossless codec makes every check here exact: a decode is the source sample for sample or it
+# is wrong, so these are comparisons of bytes, not SNR floors. FFmpeg's strict decode is the
+# independent oracle (CONTRIBUTING.md's "Oracles", #2): the PCM forge writes must equal the PCM
+# FFmpeg's decoder gives for the same stream, and every container the CLI writes must be read back
+# by FFmpeg to the same PCM. What FFmpeg's encoders do not write (IIR filters, LSB bypass, noise,
+# the 16-channel substream) has no leg here: tools/checks/verify_truehd_interop.py --handbuilt holds
+# FFmpeg's decode of hand-built streams to their signals (the FFmpeg Validate job runs it), and
+# libs/truehd's tests hold the library to them.
+#
+# The streams are testdata/truehd's, FFmpeg-made (tools/generators/gen_truehd_ffmpeg.py).
+
+# FFmpeg's strict decode of $1 (a TrueHD stream or MLP stream, bare or in a container; $2 names its
+# demuxer when the container is not self-describing) as 32-bit little-endian PCM on stdout.
+truehd_ffmpeg_pcm() {
+    ffmpeg -v error -xerror -err_detect crccheck+bitstream+buffer+explode "${@:2}" -i "$1" -f s32le -
+}
+
+# forge's decode of $1 must give the PCM FFmpeg gives for $2 (the stream, read as codec $3).
+run_truehd_bitexact_check() {
+    count=$((count + 1))
+    echo "[$count] truehd bit-exact $1 against ffmpeg's strict decode of $2"
+    truehd_ffmpeg_pcm "$1" >"$1.s32" # a WAV: ffmpeg widens its 24-bit samples to the 32-bit layout
+    truehd_ffmpeg_pcm "$2" -f "$3" >"$2.ffmpeg.s32"
+    cmp -s "$1.s32" "$2.ffmpeg.s32" || {
+        echo "forge's decode of $2 differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+}
+
+# A container's file must give FFmpeg the PCM the bare stream gives it.
+run_truehd_container_check() {
+    count=$((count + 1))
+    echo "[$count] truehd container $1 reads in ffmpeg as $2 does"
+    truehd_ffmpeg_pcm "$1" >"$1.s32"
+    truehd_ffmpeg_pcm "$2" -f "$3" >"$2.ffmpeg.s32"
+    cmp -s "$1.s32" "$2.ffmpeg.s32" || {
+        echo "ffmpeg's decode of $1 differs from its decode of $2" >&2
+        exit 1
+    }
+}
+
+# probe json=1 of $1 must parse: a TrueHD stream in a container once wrote the key "container" twice,
+# and a run that only checked the exit status did not see it.
+run_truehd_probe_json_check() {
+    count=$((count + 1))
+    echo "[$count] truehd probe json=1 of $1 is valid JSON"
+    "$CLI" probe "$1" json=1 | python3 -c 'import json, sys; json.load(sys.stdin)'
+}
+
+# Every stream of the fixtures' manifest, so that a fixture added to testdata/truehd has these legs the
+# day it lands. The manifest's `spliced` streams are not among them: the library's strict decode
+# stops at the join by design (libs/truehd/ERRATA.md, question 20), and the interop script holds those.
+mapfile -t truehd_streams < <(python3 -c '
+import json, sys
+for fixture in json.load(open(sys.argv[1]))["fixtures"]:
+    print(fixture["file"])' "$TRUEHD_FIXTURES/manifest.json")
+if [[ "${#truehd_streams[@]}" -lt 25 ]]; then
+    echo "testdata/truehd/manifest.json lists ${#truehd_streams[@]} streams, fewer than the 25 it held" >&2
+    exit 1
+fi
+for fixture in "${truehd_streams[@]}"; do
+    name="${fixture%.*}"
+    case "$fixture" in
+        *.mlp) codec=mlp ;;
+        *) codec=truehd ;;
+    esac
+    cp "$TRUEHD_FIXTURES/$fixture" "th_$fixture"
+    run probe "th_$fixture"
+    run probe "th_$fixture" json=1
+    run_truehd_probe_json_check "th_$fixture"
+    run probe - <"th_$fixture" # a pipe has no name to sniff by
+    run decode "th_$fixture" "th_$name.wav"
+    run_truehd_bitexact_check "th_$name.wav" "th_$fixture" "$codec"
+    run levels "th_$fixture"
+    run qc "th_$fixture" # the integrity gate: every FFmpeg-made stream passes it
+    run decode "th_$fixture" "th_${name}_lenient.wav" truehd-check=lenient
+    cmp -s "th_$name.wav" "th_${name}_lenient.wav" || {
+        echo "a lenient decode of the undamaged th_$fixture differs from the strict one" >&2
+        exit 1
+    }
+done
+
+# Loudness needs more than the 400 ms of one gating block, which the 0.25 s fixtures do not have: a
+# two-second stream from FFmpeg's own TrueHD encoder, decoded bit-exactly as above, is measured.
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=2:sample_rate=48000" -ac 2 \
+    -c:a truehd -strict -2 -f truehd th_sine.thd
+run decode th_sine.thd th_sine.wav
+run_truehd_bitexact_check th_sine.wav th_sine.thd truehd
+run loudness th_sine.thd
+run levels th_sine.thd
+
+# The presentations a stream with a 2-channel and a 6-channel substream gives (the 5.1 fixtures).
+for presentation in 2ch 6ch best; do
+    run decode th_truehd_m51_s24.thd "th_m51_${presentation}.wav" truehd-presentation=$presentation
+done
+
+# The containers: each is written by forge, read back by forge's demux byte for byte, and read by
+# FFmpeg to the PCM the bare stream gives it. libs/containers/ERRATA.md says that every layout is
+# FFmpeg's (a single oracle) and names what no document backs.
+for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd truehd_m51_s24.thd \
+    truehd_mono48_s24.thd truehd_st44_s24.thd; do
+    name="${fixture%.*}"
+    src="th_$fixture"
+    run mkv "$src" "th_$name.mkv"
+    run demux "th_$name.mkv" "th_$name.mkv.thd"
+    cmp -s "$src" "th_$name.mkv.thd" || {
+        echo "demux of th_$name.mkv did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.mkv" "$src" truehd
+    run probe "th_$name.mkv"
+    run_truehd_probe_json_check "th_$name.mkv"
+    run mp4 "$src" "th_$name.mp4"
+    run demux "th_$name.mp4" "th_$name.mp4.thd"
+    cmp -s "$src" "th_$name.mp4.thd" || {
+        echo "demux of th_$name.mp4 did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.mp4" "$src" truehd
+    run probe "th_$name.mp4" json=1
+    run_truehd_probe_json_check "th_$name.mp4"
+    run ts "$src" "th_$name.ts"
+    run ts "$src" "th_${name}_bluray.ts" bluray
+    cmp -s "th_$name.ts" "th_${name}_bluray.ts" || {
+        echo "ts with and without the bluray profile differ for $src" >&2
+        exit 1
+    }
+    run demux "th_$name.ts" "th_$name.ts.thd"
+    cmp -s "$src" "th_$name.ts.thd" || {
+        echo "demux of th_$name.ts did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run_truehd_container_check "th_$name.ts" "$src" truehd
+    run probe "th_$name.ts"
+    run_truehd_probe_json_check "th_$name.ts"
+    # Remuxing one container into another goes through the same readers and writers. A transport
+    # stream without a profile is Blu-ray's for TrueHD (remux once passed dvb, which ts refuses).
+    run mkv "th_$name.mp4" "th_${name}_remux.mkv"
+    run mp4 "th_$name.mkv" "th_${name}_remux.mp4"
+    run remux "th_$name.mkv" "th_${name}_remux.ts"
+    run demux "th_${name}_remux.ts" "th_${name}_remux.ts.thd"
+    cmp -s "$src" "th_${name}_remux.ts.thd" || {
+        echo "remux of th_$name.mkv to a transport stream did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    # MAT: a raw burst file and an eight-channel WAV carrier both read back to the units, and the
+    # whole bursts are FFmpeg's `spdif` output byte for byte (a last partial burst is padded here
+    # and dropped by FFmpeg, so the comparison stops at FFmpeg's length).
+    run spdif "$src" "th_$name.mat"
+    run unspdif "th_$name.mat" "th_$name.mat.thd"
+    cmp -s "$src" "th_$name.mat.thd" || {
+        echo "unspdif of th_$name.mat did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    run spdif "$src" "th_$name.mat.wav"
+    run unspdif "th_$name.mat.wav" "th_$name.matwav.thd"
+    cmp -s "$src" "th_$name.matwav.thd" || {
+        echo "unspdif of th_$name.mat.wav did not reproduce $src byte for byte" >&2
+        exit 1
+    }
+    count=$((count + 1))
+    echo "[$count] truehd MAT bursts of $src equal ffmpeg's spdif muxer's"
+    ffmpeg -v error -y -f truehd -i "$src" -c copy -f spdif "th_$name.ffmpeg.mat"
+    ff_bytes=$(wc -c <"th_$name.ffmpeg.mat")
+    if [[ "$ff_bytes" -gt 0 ]]; then
+        cmp -s -n "$ff_bytes" "th_$name.mat" "th_$name.ffmpeg.mat" || {
+            echo "th_$name.mat differs from ffmpeg's spdif output" >&2
+            exit 1
+        }
+    fi
+done
+
+# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
+# cut and cat once stopped with AC-3's sync error (exit 2); the other
+# transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
+# dropped (a verification flag above all, which must never exit 0 without verifying). play and
+# monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
+# this job has not got. Each line names the command and the exit status it gave.
+count=$((count + 1))
+echo "[$count] truehd is refused by cut, cat, transcode and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options)"
+th_in=th_truehd_st48_s24.thd
+for refused in "cut $th_in th_refused.thd 0.05 0.1" \
+    "cat th_refused.thd $th_in $th_in" \
+    "metadata $th_in th_refused.thd dialnorm=27" \
+    "normalize $th_in th_refused.thd dialnorm=27" \
+    "transcode $th_in th_refused.ac3 192" \
+    "qc $th_in layout=rendered" "fmp4 $th_in th_refused_fmp4 24" \
+    "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
+    "remux th_truehd_st48_s24.mkv th_refused.ts dvb" \
+    "decode $th_in th_refused.wav verify-content" "decode $th_in th_refused.wav check-content" \
+    "decode $th_in th_refused.wav verify-objects" "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
+    "decode $th_in th_refused.wav channels=2" "decode $th_in th_refused.wav programme=3" \
+    "levels $th_in programme=1" "loudness $th_in programme=1" \
+    "mkv $th_in th_refused.mkv mainid=1" "mp4 $th_in th_refused.mp4 asvc=1" \
+    "ts $th_in th_refused.ts programme=1" "spdif $th_in th_refused.wav mainid=1"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    echo "  forge $refused -> exit $refused_status"
+    [[ "$refused_status" -eq 1 ]] || {
+        echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
+        exit 1
+    }
+done
+
+# --- decode strict (planning/ac4.md, option D) --------------------------------------------------------
+# A decode that loses frames exits 0 and warns; with `strict` it writes what it could decode and exits 2
+# when a frame or unit was lost after the first one decoded. An AC-3 stream with a damaged frame
+# (concealed under conceal=), and a TrueHD stream with bytes in the middle that are not a unit (a lenient
+# decode skips them), against the same streams undamaged.
+run sine strict_clean.ac3 2 192 440 70 stereo
+python3 - <<'PYEOF'
+import pathlib
+data = bytearray(pathlib.Path("strict_clean.ac3").read_bytes())
+data[3 * 768 + 384] ^= 0xFF  # the middle of the fourth 768-byte syncframe
+pathlib.Path("strict_damaged.ac3").write_bytes(data)
+stream = bytearray(pathlib.Path("th_truehd_st48_s24_gap8.thd").read_bytes())  # copied by the loop above
+offset = 0
+for _ in range(11):
+    offset += ((stream[offset] & 0xF) << 8 | stream[offset + 1]) * 2
+stream[offset:offset] = b"\x5a" * 9
+pathlib.Path("strict_junk.thd").write_bytes(stream)
+PYEOF
+count=$((count + 1))
+echo "[$count] decode strict: exit 0 for a stream that loses nothing, 2 for one that lost a frame, and the output is the same"
+"$CLI" decode strict_clean.ac3 strict_clean.wav strict >/dev/null
+"$CLI" decode strict_damaged.ac3 strict_damaged.wav conceal=repeat >/dev/null
+"$CLI" decode "th_truehd_st48_s24_gap8.thd" strict_gap8.wav truehd-check=lenient strict >/dev/null
+"$CLI" decode strict_junk.thd strict_junk.wav truehd-check=lenient >/dev/null
+for lossy in "strict_damaged.ac3 strict_damaged_strict.wav conceal=repeat strict" \
+    "strict_junk.thd strict_junk_strict.wav truehd-check=lenient strict"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" decode $lossy >/dev/null 2>&1
+    strict_status=$?
+    set -e
+    echo "  forge decode $lossy -> exit $strict_status"
+    [[ "$strict_status" -eq 2 ]] || {
+        echo "forge decode $lossy should exit 2 (input: frames were lost), exited $strict_status" >&2
+        exit 1
+    }
+done
+cmp -s strict_damaged.wav strict_damaged_strict.wav || {
+    echo "decode strict wrote a different WAV from the decode without it" >&2
+    exit 1
+}
+cmp -s strict_junk.wav strict_junk_strict.wav || {
+    echo "decode strict of the TrueHD stream wrote a different WAV from the decode without it" >&2
+    exit 1
+}
+
+# --- TrueHD encoding (iclforge::truehd::Encoder, planning/truehd.md phase T2a) -------------------
+# FFmpeg makes the sources, a different sine in each channel, with the speaker mask of the layout
+# (forge reads the channels' meaning from it: 7.1 is FL FR FC LFE BL BR SL SR, which forge codes as
+# L R C LFE Lrs Rrs Ls Rs; ERRATA 33 says how FFmpeg orders such a stream). Every stream is
+# held to three readings of the same samples: FFmpeg's read of the source WAV, FFmpeg's strict
+# decode of forge's stream, and forge's own decode of it. The codec is lossless, so each pair is
+# equal byte for byte. `verify` makes the encoder decode every access unit as it writes it.
+thd_sines() { # out.wav rate channels layout pcm_codec
+    local out="$1" rate="$2" channels="$3" layout="$4" pcm="$5" c merge=""
+    local -a inputs=()
+    for ((c = 0; c < channels; c++)); do
+        inputs+=(-f lavfi -i "sine=frequency=$((300 + 110 * c)):sample_rate=$rate:duration=2")
+        merge+="[$c]"
+    done
+    if [[ "$channels" -eq 1 ]]; then
+        ffmpeg -v error -y "${inputs[@]}" -af "aformat=sample_fmts=s32" -c:a "$pcm" "$out"
+    else
+        ffmpeg -v error -y "${inputs[@]}" -filter_complex \
+            "${merge}amerge=inputs=${channels},aformat=sample_fmts=s32:channel_layouts=${layout}" \
+            -c:a "$pcm" "$out"
+    fi
+}
+
+# forge's decode writes a stream's channels in stream order; FFmpeg returns a 7.1 stream in the
+# order of its own layout (back pair before side pair): $3 maps the one to the other.
+truehd_reorder_pcm() { # file.wav "map" (e.g. 0|1|2|3|6|7|4|5), as s32le on stdout
+    if [[ -z "$2" ]]; then
+        ffmpeg -v error -i "$1" -f s32le -
+    else
+        ffmpeg -v error -i "$1" -af "channelmap=map=$2" -f s32le -
+    fi
+}
+
+run_truehd_encode_case() { # name rate channels layout pcm_codec channelmap [forge options...]
+    local name="te_$1" rate="$2" channels="$3" layout="$4" pcm="$5" map="$6"
+    shift 6
+    thd_sines "$name.wav" "$rate" "$channels" "$layout" "$pcm"
+    run truehd-encode "$name.wav" "$name.thd" verify "$@"
+    run probe "$name.thd"
+    count=$((count + 1))
+    echo "[$count] truehd encode $name: ffmpeg's strict decode and forge's decode equal the source"
+    ffmpeg -v error -y -i "$name.wav" -f s32le "$name.src.s32"
+    truehd_ffmpeg_pcm "$name.thd" -f truehd >"$name.ffmpeg.s32"
+    cmp -s "$name.src.s32" "$name.ffmpeg.s32" || {
+        echo "ffmpeg's strict decode of $name.thd differs from the source samples" >&2
+        exit 1
+    }
+    run decode "$name.thd" "$name.dec.wav"
+    truehd_reorder_pcm "$name.dec.wav" "$map" >"$name.dec.s32"
+    cmp -s "$name.dec.s32" "$name.ffmpeg.s32" || {
+        echo "forge's decode of $name.thd differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+}
+
+run_truehd_encode_case st44_s24 44100 2 stereo pcm_s24le ""
+run_truehd_encode_case st48_s24 48000 2 stereo pcm_s24le ""
+run_truehd_encode_case st48_s16 48000 2 stereo pcm_s16le ""
+run_truehd_encode_case st96_s24 96000 2 stereo pcm_s24le ""
+run_truehd_encode_case st192_s24 192000 2 stereo pcm_s24le ""
+run_truehd_encode_case mono48_s24 48000 1 mono pcm_s24le ""
+run_truehd_encode_case m51_48_s24 48000 6 5.1 pcm_s24le ""
+run_truehd_encode_case m51_48_s16 48000 6 5.1 pcm_s16le ""
+run_truehd_encode_case m51_96_s24 96000 6 5.1 pcm_s24le ""
+run_truehd_encode_case m71_48_s24 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5"
+run_truehd_encode_case m71_96_s16 96000 8 7.1 pcm_s16le "0|1|2|3|6|7|4|5"
+
+# Every encoder option once, on a stream each of which is read back as above: the restart interval,
+# the prediction order, the matrix search, the 2-channel mode, the downmix presentations and their
+# gains, and a peak rate the stream is allowed to break.
+run_truehd_encode_case opt_restart 48000 2 stereo pcm_s24le "" truehd-restart=8 truehd-fir-order=0 \
+    truehd-matrix=off truehd-stereo-mode=ltrt
+run_truehd_encode_case opt_headphone 48000 2 stereo pcm_s24le "" truehd-restart=1 truehd-stereo-mode=headphone
+run_truehd_encode_case opt_downmix 48000 6 5.1 pcm_s24le "" truehd-downmix=standard \
+    truehd-downmix-gains=-6,-6,off,-6
+run_truehd_encode_case opt_downmix71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" truehd-downmix=standard
+run_truehd_encode_case opt_rate 48000 6 5.1 pcm_s24le "" truehd-peak-rate=18000 truehd-rate-check=lenient \
+    truehd-downmix=none
+
+# The channel meaning of TH spec section 14.1, every field of every presentation set (provisional, no
+# oracle until the DEE set: FFmpeg's encoder writes zeros). FFmpeg's strict decode must still give the
+# samples, which holds its reader to the major sync's CRC over the new bytes, and forge's probe must
+# give the values back.
+thd_meaning_options=(truehd-dialnorm-2ch=40 truehd-dialnorm-6ch=27 truehd-dialnorm-8ch=24
+    truehd-mix-level-2ch=33 truehd-mix-level-6ch=17 truehd-mix-level-8ch=49
+    truehd-source-format-6ch=5 truehd-source-format-8ch=38 truehd-control-2ch=on truehd-control-6ch=off
+    truehd-control-8ch=on truehd-heavy-drc-start-up-gain=-9 truehd-drc-start-up-gain=21)
+run_truehd_encode_case opt_meaning51 48000 6 5.1 pcm_s24le "" truehd-restart=8 "${thd_meaning_options[@]}"
+run_truehd_encode_case opt_meaning71 48000 8 7.1 pcm_s24le "0|1|2|3|6|7|4|5" truehd-restart=8 \
+    "${thd_meaning_options[@]}"
+for case in opt_meaning51 opt_meaning71; do
+    count=$((count + 1))
+    echo "[$count] truehd probe of te_$case.thd gives the channel meaning back"
+    "$CLI" probe "te_$case.thd" json=1 | python3 -c '
+import json, sys
+meaning = json.load(sys.stdin)["truehd"]["channel_meaning"]
+sys.exit(0 if meaning["heavy_drc_start_up_gain"] == -9 and meaning["drc_start_up_gain"] == 21
+         and meaning["distinct_in_stream"] == 1
+         and [meaning["presentations"][name]["dialogue_norm"] for name in ("2ch", "6ch", "8ch")] == [40, 27, 24]
+         and [meaning["presentations"][name]["mix_level"] for name in ("2ch", "6ch", "8ch")] == [33, 17, 49]
+         and meaning["presentations"]["6ch"]["source_format"] == 5
+         and meaning["presentations"]["8ch"]["source_format"] == 38
+         and [meaning["presentations"][name]["control_enabled"] for name in ("2ch", "6ch", "8ch")] == [True, False, True]
+         else 1)'
+done
+
+# `metadata` sets the same fields in a finished stream without re-encoding it: every major sync is
+# rewritten under its CRC and nothing else changes. FFmpeg's strict decode of the patched stream must
+# give what it gave for the original, forge's decode must equal its decode of the original, the probe
+# must give the values, and a second pass with the same values must change no byte. FFmpeg's own
+# streams and forge's.
+for stream in th_truehd_m51_s24.thd th_truehd_st48_s24.thd th_truehd_st192_s24.thd \
+    th_truehd_mono48_s24.thd th_truehd_st48_s16.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    patched="${stream%.thd}_meta.thd"
+    again="${stream%.thd}_meta2.thd"
+    run metadata "$stream" "${stream%.thd}_meta.thd" "${thd_meaning_options[@]}"
+    count=$((count + 1))
+    echo "[$count] truehd metadata $stream: ffmpeg's strict decode of the patched stream equals the original's"
+    truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig.s32"
+    truehd_ffmpeg_pcm "$patched" -f truehd >"$patched.s32"
+    cmp -s "$stream.orig.s32" "$patched.s32" || {
+        echo "ffmpeg's strict decode of $patched differs from its decode of $stream" >&2
+        exit 1
+    }
+    run decode "$stream" "$stream.orig.wav"
+    run decode "$patched" "$patched.wav"
+    cmp -s "$stream.orig.wav" "$patched.wav" || {
+        echo "forge's decode of $patched differs from its decode of $stream" >&2
+        exit 1
+    }
+    "$CLI" probe "$patched" json=1 | python3 -c '
+import json, sys
+meaning = json.load(sys.stdin)["truehd"]["channel_meaning"]
+sys.exit(0 if meaning["distinct_in_stream"] == 1 and meaning["drc_start_up_gain"] == 21
+         and meaning["presentations"]["6ch"]["dialogue_norm"] == 27
+         and meaning["presentations"]["8ch"]["source_format"] == 38 else 1)'
+    run metadata "${stream%.thd}_meta.thd" "${stream%.thd}_meta2.thd" "${thd_meaning_options[@]}"
+    cmp -s "$patched" "$again" || {
+        echo "a second metadata pass with the same values changed $patched" >&2
+        exit 1
+    }
+done
+
+# `normalize` measures each presentation of a finished stream and writes its dialogue norm, changing
+# nothing else: FFmpeg's strict decode of the result must equal its decode of the original, and the
+# probe must show a dialogue norm of 1 to 31 where the stream had 0. forge's own streams, which are
+# long enough for the 400 ms blocks of a loudness measurement (the fixtures are 0.25 s).
+for stream in te_st48_s24.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    normalized="${stream%.thd}_norm.thd"
+    run normalize "$stream" "${stream%.thd}_norm.thd"
+    count=$((count + 1))
+    echo "[$count] truehd normalize $stream: ffmpeg's strict decode of the result equals the original's"
+    truehd_ffmpeg_pcm "$stream" -f truehd >"$stream.orig2.s32"
+    truehd_ffmpeg_pcm "$normalized" -f truehd >"$normalized.s32"
+    cmp -s "$stream.orig2.s32" "$normalized.s32" || {
+        echo "ffmpeg's strict decode of $normalized differs from its decode of $stream" >&2
+        exit 1
+    }
+    "$CLI" probe "$normalized" json=1 | python3 -c '
+import json, sys
+presentations = json.load(sys.stdin)["truehd"]["channel_meaning"]["presentations"]
+present = [p for p in ("2ch", "6ch", "8ch") if presentations[p]["in_stream"]]
+sys.exit(0 if present and all(1 <= presentations[p]["dialogue_norm"] <= 31 for p in present) else 1)'
+done
+
+# `qc` of a TrueHD stream: the integrity gate passes forge's own streams (the FFmpeg-made ones pass it
+# above), a preset gate it cannot meet is exit 6, and so is a flipped bit, which the lenient decode
+# counts and the CRC and parity checks name. The spliced fixture fails the lossless check at its join
+# by design (libs/truehd/ERRATA.md, question 20), which the gate reports.
+for stream in te_st48_s24.thd te_m51_48_s24.thd te_m71_48_s24.thd; do
+    run qc "$stream"
+done
+python3 - <<'PYEOF'
+import pathlib
+data = bytearray(pathlib.Path("te_m51_48_s24.thd").read_bytes())
+offset = 0
+for _ in range(10):
+    offset += ((data[offset] & 0xF) << 8 | data[offset + 1]) * 2
+data[offset + 60] ^= 0x04
+pathlib.Path("te_m51_48_s24_damaged.thd").write_bytes(data)
+PYEOF
+cp "$TRUEHD_FIXTURES/truehd_cat_st48_s24.thd" th_truehd_cat_st48_s24.thd
+count=$((count + 1))
+echo "[$count] truehd qc exits 6 for a preset the stream misses, a flipped bit and a join, and not for forge's own stream"
+for failing in "te_m51_48_s24.thd preset=ebu-r128-s2" "te_m51_48_s24_damaged.thd" "th_truehd_cat_st48_s24.thd"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" qc $failing >/dev/null 2>&1
+    qc_status=$?
+    set -e
+    echo "  forge qc $failing -> exit $qc_status"
+    [[ "$qc_status" -eq 6 ]] || {
+        echo "forge qc $failing should exit 6 (a gate failed), exited $qc_status" >&2
+        exit 1
+    }
+done
+
+# The streams forge wrote, in the containers forge writes: encode straight into each, read it back
+# with demux byte for byte, and by FFmpeg to the PCM the bare stream gives. The bare stream on
+# stdout is the file's bytes.
+for case in st48_s24 m51_48_s24 m71_48_s24; do
+    bare="te_$case.thd"
+    for container in mkv mp4 ts; do
+        run truehd-encode "te_$case.wav" "te_$case.$container"
+        run demux "te_$case.$container" "te_$case.$container.thd"
+        cmp -s "$bare" "te_$case.$container.thd" || {
+            echo "forge's truehd-encode into te_$case.$container did not carry the bare stream's units" >&2
+            exit 1
+        }
+        run_truehd_container_check "te_$case.$container" "$bare" truehd
+    done
+    run spdif "$bare" "te_$case.mat"
+    run unspdif "te_$case.mat" "te_$case.mat.thd"
+    cmp -s "$bare" "te_$case.mat.thd" || {
+        echo "unspdif of te_$case.mat did not reproduce $bare byte for byte" >&2
+        exit 1
+    }
+done
+count=$((count + 1))
+echo "[$count] truehd-encode to stdout is the file's bytes"
+"$CLI" truehd-encode te_st48_s24.wav - quiet >te_stdout.thd
+cmp -s te_st48_s24.thd te_stdout.thd || {
+    echo "forge truehd-encode to stdout differs from the file it writes" >&2
+    exit 1
+}
+
+# What the encoder does not write, and an output it has no name for, are usage errors (exit 1).
+count=$((count + 1))
+echo "[$count] truehd-encode refuses an MLP name, an unknown output, an unsupported rate and options it does not apply"
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:sample_rate=32000:duration=1" -c:a pcm_s24le te_32k.wav
+for refused in "truehd-encode te_st48_s24.wav te_refused.mlp" "truehd-encode te_st48_s24.wav te_refused.wav" \
+    "truehd-encode te_32k.wav te_refused.thd" \
+    "truehd-encode te_st48_s24.wav te_refused.thd src=te_st48_s24.wav" \
+    "truehd-encode te_st48_s24.wav te_refused.thd dialnorm=27" "truehd-encode te_st48_s24.wav te_refused.thd map=0:0"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    [[ "$refused_status" -eq 1 ]] || {
+        echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
+        exit 1
+    }
+done
 
 # --- A Forge project file, run as the commands it stands for (apps/shared/project) --------------
 # `forge project` reads a .forgeproj and runs the line the Forge GUI's command bar shows for it, so

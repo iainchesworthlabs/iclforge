@@ -146,7 +146,7 @@ void apply(NetworkPreference want) {
             return;
         case NetworkPreference::ethernet:
             if (!net::ethernet_start() || !net::ethernet_wait(kLinkWaitMs, kAddressWaitMs)) {
-                refuse("no cable answered, so the WiFi station is not switched off");
+                refuse("no wired link answered, so the WiFi station is not switched off");
                 return;
             }
             if (keep()) {
@@ -155,7 +155,7 @@ void apply(NetworkPreference want) {
             return;
         case NetworkPreference::wifi:
             if (!net::station_configured() || !net::station_up()) {
-                refuse("the WiFi station did not join, so the cable is not switched off");
+                refuse("the WiFi station did not join, so wired is not switched off");
                 return;
             }
             if (keep()) {
@@ -229,15 +229,15 @@ bool network_up() {
     }
     if (p == NetworkPreference::ethernet) {
         std::printf(
-            "network: the preference is the cable alone and no cable gave the board an "
+            "network: the preference is wired alone and no wired link gave the board an "
             "address\n");
         return false;
     }
     // No cable, or none that gave an address: the station, as a board without one would.
     if (!station) {
         std::printf(
-            "network: no cable, and no WiFi network stored or built in; plug the cable in "
-            "or provision the board\n");
+            "network: no wired link, and no WiFi network stored or built in; plug in the "
+            "Ethernet port or provision the board\n");
         return false;
     }
     (void)net::station_up();
@@ -316,6 +316,10 @@ const char* network_source() {
 
 void network_adopt_built_in() {
     net::station_adopt_built_in();
+}
+
+void network_forget_driver_state() {
+    net::station_forget_driver_state();
 }
 
 bool network_has_choice() {

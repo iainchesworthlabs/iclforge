@@ -35,9 +35,13 @@ if (!bridged) {
     return 1;
 }
 
-iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, static_cast<int>(bridged->channel_count())};
-// Per frame: slice bridged->pcm[i] to the frame's sample range, evaluate
-// iclforge::objects::oba::evaluate_placements(bridged->paths, t), call encoder.encode_frame(...).
+// The LFE bed channel(s) are not objects (see below): the encoder is built for the others, and the LFE
+// goes in as its own span.
+iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, static_cast<int>(bridged->object_slot_count())};
+// Per frame: slice bridged->pcm[i] to the frame's sample range for each i with !bridged->is_lfe[i],
+// evaluate iclforge::objects::oba::evaluate_placements(bridged->paths, t) and take those channels'
+// placements, and call encoder.encode_frame(objects, placement, lfe) with the LFE channel's slice as
+// `lfe` (empty when the master has none). examples/encode_adm.cpp does exactly this.
 ```
 
 ## Where it lives
@@ -71,9 +75,16 @@ parsing — see "Bridging IAB" below for exactly what differs between the two.
   nothing in that signature distinguishing a bed channel from a dynamic object — so a bed channel
   is represented as an object with an unmoving, pinned placement, the only way the API allows it,
   the same convention every existing caller (`forge`'s `run_atmos_encode`, the GUI's
-  `encodeObjects`) already uses. A bed channel whose `speakerLabel` identifies it as the LFE
-  (BS.2076-2 Table 12: `LFE`, `LFE1`, `LFE2`) is routed at gain 0 / `lfe_send` 1 instead of panned
-  — objects never reach the LFE by panning.
+  `encodeObjects`) already uses.
+- **The LFE is not an object.** A bed channel whose `speakerLabel` identifies it as the LFE
+  (BS.2076-2 Table 12: `LFE`, `LFE1`, `LFE2`) is marked in `BridgeResult::is_lfe`, and a caller
+  hands its PCM to `AtmosEncoder::encode_frame(objects, placement, lfe)` as the `lfe` span and builds
+  the encoder for the other channels only. It cannot ride an object: an object reaches the LFE as
+  `lfe_send * gain`, and the same gain pans it into the speakers, so no path can send to the LFE and
+  nowhere else — which is why the channel's own path is inert (gain 0 / `lfe_send` 1: fed as an
+  object it is silent, not bass in a speaker). The LFE therefore takes none of the fifteen object
+  slots; `BridgeResult::object_slot_count()` is the number that does. A stream has one LFE, so a
+  dual-LFE bed's two channels are added together by the caller (`forge atmos-adm` does, and says so).
 - **Position/gain automation** — `build_channel_path()` walks a channel's `audioBlockFormat`
   sequence into one `iclforge::objects::oba::ObjectPath`, implementing BS.2076-2 §10.3's `jumpPosition`/
   `interpolationLength` state machine: `jumpPosition = 0` interpolates continuously across a
@@ -228,8 +239,9 @@ content this bridge selects one of.
 resolved once via `iclforge::objects::oba::bed_label_position()`, the same pinned-placement convention bed
 channels already get from ADM's `speakerLabel`; only `ChannelGain` (§10.3.8) can legitimately vary
 frame to frame, so a Bed channel's timeline is one keyframe per frame it is present in. An LFE Bed
-channel (ChannelID `0xD`, or `0x86`/`0x87`'s BS.2051-2 `LFE1`/`LFE2` aliases) routes at gain 0 /
-`lfe_send` 1, the same convention `build_channel_path()` documents for ADM.
+channel (ChannelID `0xD`, or `0x86`/`0x87`'s BS.2051-2 `LFE1`/`LFE2` aliases) is not an object, for
+the reason given for ADM above: `is_lfe` marks it, its PCM is for `encode_frame`'s `lfe` span, and
+its own path is the same inert gain 0 / `lfe_send` 1.
 
 **Every channel Table 19 defines has a position.** A bed channel reaches the encode as a pinned
 position, so what the bridge needs from its ChannelID is where that loudspeaker is. The codes with an
@@ -374,10 +386,13 @@ struct BridgeResult {
     std::vector<std::string> channel_ids;
     std::vector<std::vector<std::string>> unmapped;  // per channel: ADM features not carried
     std::vector<bool> is_bed;
-    std::vector<bool> is_lfe;
+    std::vector<bool> is_lfe;                  // the LFE bed channel(s): not objects - see "What gets mapped"
     std::vector<iclforge::objects::oba::ObjectPath> paths;   // pass directly to evaluate_placements
     std::vector<std::span<const float>> pcm;   // borrowed from the AdmDocument passed to build()
     std::uint32_t sample_rate = 0;
+    std::size_t channel_count() const;         // paths.size()
+    std::size_t lfe_count() const;             // channels marked is_lfe
+    std::size_t object_slot_count() const;     // the rest: what AtmosEncoder takes as objects
 };
 std::expected<BridgeResult, BridgeError> build(const iclforge::adm::AdmDocument& document,
                                                std::string_view programme_id = {});
@@ -394,11 +409,14 @@ iclforge::objects::oba::Position iab_position_to_room(const iclforge::iab::Posit
 struct IabBridgeResult {
     std::vector<std::string> channel_ids;
     std::vector<bool> is_bed;
-    std::vector<bool> is_lfe;
+    std::vector<bool> is_lfe;                  // as BridgeResult's: not objects
     std::vector<iclforge::objects::oba::ObjectPath> paths;
     std::vector<std::vector<float>> pcm;       // OWNED - see "Bridging IAB" above
     std::uint32_t sample_rate = 0;
     std::vector<std::vector<std::string>> unmapped;  // per channel: carried approximately or not at all
+    std::size_t channel_count() const;         // paths.size()
+    std::size_t lfe_count() const;             // channels marked is_lfe
+    std::size_t object_slot_count() const;     // the rest: what AtmosEncoder takes as objects
 };
 std::expected<IabBridgeResult, BridgeError> build_iab(
     std::span<const iclforge::iab::IABitstreamFrame> frames);
@@ -423,11 +441,13 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
 
 `BridgeResult` is deliberately struct-of-arrays, not one struct per channel — `paths` is directly
 usable as the `std::span<const iclforge::objects::oba::ObjectPath>` `iclforge::objects::oba::evaluate_placements` wants, with
-no projection step. `channel_count() <= 15`: `AtmosEncoder`'s own constructor `objects` parameter
+no projection step. `object_slot_count() <= 15`: `AtmosEncoder`'s own constructor `objects` parameter
 is dynamic objects only, with the bed's own LFE bookkeeping as an implicit, always-present 16th
 (TS 103 420 §8.3.2.2 caps the total at 16) — the same cap `forge`'s `run_atmos_encode`/
-`run_atmos_path` already enforce, reused here rather than re-derived. `build()` and `build_iab()`
-refuse more channels than that whatever consumes the result, so `atmos-adm` and `atmos-iab` with
+`run_atmos_path` already enforce, reused here rather than re-derived. The LFE channels (`lfe_count()`
+of them, `is_lfe`) are that 16th and are not counted: a 9.1.6 bed is fifteen speaker feeds and an LFE,
+which fits, and `channel_count()` of it is 16. `build()` and `build_iab()`
+refuse more objects than that whatever consumes the result, so `atmos-adm` and `atmos-iab` with
 `codec=ac4` are held to 15 as well, though the AC-4 object encoder takes 64. `sample_rate` is the raw
 `iclforge::adm::PcmAudio::sample_rate`, unconverted — mapping it to `iclforge::ac3::SampleRate` (and rejecting an
 unsupported rate) is left to the caller, the same way every existing WAV-reading entry point

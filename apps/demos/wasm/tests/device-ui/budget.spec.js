@@ -27,19 +27,27 @@
 // its name with a Forget, and the one dialog asking before forgetting one
 // server or every server. Decision 22's re-derivation has the images.
 //
+// 81,920 (80 KiB) since the layout chooser and the Preferences work: the owner, 2026-10-25, "we can increase the device web page size if
+// required". Raised with room for the settings that follow (a per-speaker trim, a zone picker) rather than to fit one change;
+// decision 22's third re-derivation has the images, slot by slot.
+//
 // 65,536 since the zone list of the Time section (61,440 with the section alone) (a board's time zone, time server and whether it asks one: planning/p4x-now-playing.md,
 // stage 3), which every board that has a network has; 57,344 since the firmware section (decision 29): both slots, a trial, an
 // upload and the last update; an upload from a file with the bytes sent
 // shown; Restart and Roll back behind the dialog, which now asks before
 // anything that cannot be taken back. Decision 22's second re-derivation has
 // the images.
+//
+// 69,632 since the Speakers section (a level and a distance for each speaker, a test tone out of each, and what the
+// build can do about a delay: planning/p4x-preferences.md), which every board with a Sendspin player has: a table
+// of the layout's speakers, two fields and a button a row, and three buttons. About 4.7 KB; the images have room.
 
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { UI_DIR } = require('./stub');
 
-const BUDGET = 65536;
+const BUDGET = 81920;
 
 test('the page and its script fit the flash budget', () => {
     const files = ['iclforge_ui.html', 'iclforge_ui.js'].map((name) => fs.readFileSync(path.join(UI_DIR, name)));

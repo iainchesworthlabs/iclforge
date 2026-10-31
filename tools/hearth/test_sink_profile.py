@@ -136,6 +136,17 @@ class TheFile(unittest.TestCase):
                     (sp.PROJECT / f"sdkconfig.{spec['fragment']}").is_file(), f"overlay {name}"
                 )
 
+    def test_every_profile_has_a_layout_evidence_row(self) -> None:
+        """layout_options.hpp says what a kind of board has been measured to play, by profile id,
+        and answers "not verified" for an id it has no row for. A new profile is a new kind of
+        board: it names its measurements there, or says in the row that it has none."""
+        header = (REPO / "libs/device/include/iclforge/layout_options.hpp").read_text("utf-8")
+        table = header.split("kLayoutEvidence{{", 1)[1].split("}};", 1)[0]
+        rows = set(re.findall(r'^\s*\{"([a-z0-9-]+)",', table, re.MULTILINE))
+        self.assertEqual(
+            rows, set(self.data["profiles"]), "kLayoutEvidence and profiles.json differ"
+        )
+
     def test_a_profile_names_a_target_the_packager_knows(self) -> None:
         for ident, spec in self.data["profiles"].items():
             self.assertIn(spec["target"], sp.TARGETS, ident)
@@ -203,19 +214,61 @@ class TheFile(unittest.TestCase):
     def test_a_measure_image_is_the_profile_s_and_its_hash_key_may_differ_from_the_locked_value(
         self,
     ) -> None:
-        locked = self.data["profiles"]["p4-rev1-ac4"]["locked"]
+        locked = self.data["profiles"]["p4-rev1"]["locked"]
         self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH"], "0")
         moved = sp.touched(self.data, ("measure",))
         self.assertTrue(sp._matches("CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH", moved))
-        names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
+        names = sp.fragment_names(self.data, "p4-rev1", ("measure",))
         self.assertEqual(names[-1], "sdkconfig.measure")
+
+    def test_a_published_image_does_not_serve_its_screen_over_http(self) -> None:
+        """The screen's read-back and touch server has no authentication: anyone on the network
+        reads the picture and presses the buttons. A profile that names a published image has the
+        port at 0 in what its fragments ask for and in what it locks, so that the image the
+        release builds is the one with no server; a bench that wants it builds with the
+        `panel-capture` overlay, which a release does not."""
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"
+        checked = []
+        for ident, spec in self.data["profiles"].items():
+            if not spec.get("image"):
+                continue
+            checked.append(ident)
+            self.assertEqual(sp.requested(self.data, ident).get(key, "0"), "0", ident)
+            self.assertEqual(spec.get("locked", {}).get(key, "0"), "0", ident)
+        self.assertIn("p4-rev3", checked)
+        self.assertEqual(self.data["profiles"]["p4-rev3"]["locked"][key], "0")
+
+    def test_the_kconfig_default_of_the_screen_server_is_off(self) -> None:
+        text = (sp.PROJECT / "main" / "Kconfig.projbuild").read_text("utf-8")
+        match = re.search(
+            r"^config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT\b.*?^\s+default (\d+)$",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match, "the symbol is not in main/Kconfig.projbuild")
+        self.assertEqual(match.group(1), "0")
+
+    def test_the_panel_capture_overlay_turns_on_the_server_and_nothing_else(self) -> None:
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"
+        spec = self.data["overlays"]["panel-capture"]
+        self.assertEqual(spec.get("fragment"), "panel-capture")
+        asked = sp.parse_config((sp.PROJECT / "sdkconfig.panel-capture").read_text("utf-8"))
+        self.assertEqual(asked, {key: "8081"})
+        self.assertEqual(
+            sp.touched(self.data, ("panel-capture",)), ["ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT"]
+        )
+        # Given after the profile's own fragments, so that it wins over the profile's 0.
+        names = sp.fragment_names(self.data, "p4-rev3", ("panel-capture",))
+        self.assertEqual(names[-1], "sdkconfig.panel-capture")
+        self.assertEqual(sp.requested(self.data, "p4-rev3")[key], "0")
+        self.assertEqual(sp.requested(self.data, "p4-rev3", ("panel-capture",))[key], "8081")
 
     def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_the_kit_as_its_board(
         self,
     ) -> None:
         spec = self.data["profiles"]["p4-rev3"]
         self.assertEqual(
-            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
+            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "ac4", "panel", "panel-dsi"]
         )
         self.assertEqual(spec["target"], "esp32p4")
         # The kit (chip v3.2) ran this image on 2026-10-20; it is the only board of that silicon.
@@ -289,8 +342,9 @@ class TheFile(unittest.TestCase):
         second (an S3 over Sendspin falls behind at 29.97), a P4 with the decoder at 6 channels
         and no rate limit; no other profile lists it."""
         listed = {
-            "s3-n16r8-ac4": ("1", "2", "25"),
-            "p4-rev1-ac4": ("1", "6", "0"),
+            "s3-n16r8": ("1", "2", "25"),
+            "p4-rev1": ("1", "6", "0"),
+            "p4-rev3": ("1", "6", "0"),
         }
         for ident, spec in self.data["profiles"].items():
             locked = spec["locked"]
@@ -306,7 +360,7 @@ class TheFile(unittest.TestCase):
                 self.assertEqual(got[2], "0", ident)
 
     def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
-        for ident in ("s3-n16r8-ac4", "p4-rev1-ac4"):
+        for ident in ("s3-n16r8", "p4-rev1", "p4-rev3"):
             locked = self.data["profiles"][ident]["locked"]
             self.assertEqual(
                 locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
@@ -320,11 +374,9 @@ class TheFile(unittest.TestCase):
         checked = set(re.findall(r'"\$profile" verify ([a-z0-9-]+)', text))
         board_builds = {
             "s3-n16r8",
-            "s3-n16r8-ac4",
             "c6-16mb",
             "c6-4mb",
             "p4-rev1",
-            "p4-rev1-ac4",
             "p4-rev3",
         }
         self.assertEqual(read, board_builds)
@@ -367,7 +419,7 @@ class TheFile(unittest.TestCase):
             self.assertIn("if: ${{ !cancelled() }}", step.split("run: |")[0], head)
         # the S3 profile builds, the QEMU twin and the S3 image upload; the C6 and P4 builds
         # and their upload
-        self.assertGreaterEqual(len(guarded), 10, guarded)
+        self.assertGreaterEqual(len(guarded), 9, guarded)
         package = text[text.index("\n  package-esp32-firmware:") :]
         self.assertIn("if: ${{ !cancelled() && inputs.run_esp }}", package.split("steps:")[0])
 
@@ -590,6 +642,28 @@ class Verify(unittest.TestCase):
         (build / sp.APP_NAME).write_bytes(b"\0" * 100)
         self.assertEqual(sp.verify(self.data, "a", build), [])
 
+    def test_an_image_with_less_room_than_a_change_must_leave_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 91)
+        # Without the ask it is inside its budget, as before.
+        self.assertEqual(sp.verify(self.data, "a", build), [])
+        findings = sp.verify(self.data, "a", build, app_headroom=10)
+        self.assertEqual(self.rules(findings), ["budget"])
+        self.assertIn("9 under the profile's 100", findings[0].message)
+        self.assertIn("leave 10 free", findings[0].message)
+
+    def test_an_image_with_exactly_the_room_asked_for_passes(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 90)
+        self.assertEqual(sp.verify(self.data, "a", build, app_headroom=10), [])
+
+    def test_an_image_over_its_budget_is_one_finding_with_or_without_the_room(self) -> None:
+        build = make_build(self.root, dict(FINAL))
+        (build / sp.APP_NAME).write_bytes(b"\0" * 101)
+        findings = sp.verify(self.data, "a", build, app_headroom=10)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("over the profile's 100", findings[0].message)
+
     def test_a_profile_that_locks_nothing_is_said_so(self) -> None:
         self.data["profiles"]["a"]["locked"] = {}
         build = make_build(self.root, dict(FINAL))
@@ -745,7 +819,7 @@ class ExpectedConsole(unittest.TestCase):
     def test_the_release_profile_expects_the_http_stack_in_psram(self) -> None:
         """The 2026-10-12 failure, as a line a build has to print."""
         lines = sp.expected_console(sp.load(), "s3-n16r8")
-        self.assertIn("player: decode stack 32768 bytes in PSRAM", lines)
+        self.assertIn("player: decode stack 40960 bytes in PSRAM", lines)
 
 
 class Snapshot(unittest.TestCase):
@@ -828,6 +902,21 @@ class CommandLine(unittest.TestCase):
             )
             self.assertEqual(code, 1)
             self.assertIn("::error title=profile a, locked::", out)
+
+    def test_verify_with_app_headroom_fails_an_image_too_close_to_its_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profiles = Path(tmp) / "profiles.json"
+            profiles.write_text(json.dumps(small_data()), "utf-8")
+            build = make_build(Path(tmp), dict(FINAL))
+            (build / sp.APP_NAME).write_bytes(b"\0" * 95)
+            argv = ("--profiles", str(profiles), "verify", "a", "--build-dir", str(build))
+            self.assertEqual(self.run_cli(*argv)[0], 0)
+            code, out, _ = self.run_cli(*argv, "--app-headroom", "10", "--github")
+            self.assertEqual(code, 1)
+            self.assertIn("::error title=profile a, budget::", out)
+            self.assertIn("a change must leave 10 free", out)
+            code, _, _ = self.run_cli(*argv, "--app-headroom", "5")
+            self.assertEqual(code, 0)
 
 
 class KconfigChange(unittest.TestCase):

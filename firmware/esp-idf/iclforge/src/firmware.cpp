@@ -42,6 +42,7 @@
 
 #include "iclforge/firmware_image.hpp"
 #include "iclforge/firmware_status.hpp"
+#include "iclforge/firmware_update.hpp"
 
 namespace iclforge {
 namespace {
@@ -504,19 +505,22 @@ struct Firmware::Impl {
 
     struct UploadJob {
         Impl* im = nullptr;
-        httpd_req_t* req = nullptr;  // the async copy
+        httpd_req_t* req = nullptr;  // the async copy; none for an image the board downloads
         std::size_t length = 0;
         ContentDigest digest;
+        PulledImage* pulled = nullptr;  // an image the board downloads (O10), in place of a request
     };
     struct Outcome {
         const char* status = "500 Internal Server Error";
         std::string body;
+        std::string code;  // for a pulled image: the word firmware_update.hpp has words for
         bool json = false;
         bool restart = false;
         bool erased = false;  // the other slot was erased, so its report is out of date
         std::string version;
     };
     Outcome run_upload(UploadJob& job);
+    void settle(const Outcome& out);
     static void upload_task(void* arg);
     static void on_trial(void* arg);
     static void give_up_task(void* arg);
@@ -969,6 +973,7 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     auto* buffer = static_cast<std::uint8_t*>(
         heap_caps_malloc(config.buffer_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     if (buffer == nullptr) {
+        out.code = "no_memory";
         out.body = "the board could not allocate a receive buffer";
         return out;
     }
@@ -984,6 +989,19 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     const std::int64_t deadline_us = esp_timer_get_time() + static_cast<std::int64_t>(config.upload_deadline_ms) * 1000;
     bool too_slow = false;
     const auto receive = [&](std::span<std::uint8_t> into) -> bool {
+        if (job.pulled != nullptr) {
+            if (esp_timer_get_time() > deadline_us) {
+                too_slow = true;
+                job.pulled->code = "unreachable";
+                job.pulled->text = "The download took too long.";
+                return false;
+            }
+            if (!job.pulled->read(into)) {
+                return false;
+            }
+            received += into.size();
+            return true;
+        }
         std::size_t got = 0;
         int stalls = 0;
         while (got < into.size()) {
@@ -1021,6 +1039,10 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     if (!receive(head_bytes)) {
         out.status = "400 Bad Request";
         out.body = "the upload ended before the image's header did";
+        if (job.pulled != nullptr) {
+            out.code = job.pulled->code.empty() ? "unreachable" : job.pulled->code;
+            out.body = job.pulled->text.empty() ? update::error_text(out.code) : job.pulled->text;
+        }
         return out;
     }
     const ParsedHead parsed = parse_image_head(head_bytes);
@@ -1036,7 +1058,22 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
         drain();
         out.status = "400 Bad Request";
         out.body = *why;
+        out.code = "bad_image";
         return out;
+    }
+    if (job.pulled != nullptr) {
+        // The index named this image: the version in it is the one named, and it is not below the
+        // running image's security level (planning/esp32-ota.md, O10, "What an update may do").
+        if (head.version != job.pulled->version ||
+            head.secure_version < esp_app_get_description()->secure_version) {
+            out.status = "400 Bad Request";
+            out.code = "bad_image";
+            out.body = head.version != job.pulled->version
+                           ? "the download is " + head.version + ", not the " +
+                                 job.pulled->version + " the update list named"
+                           : "the download is below the security level of the version running";
+            return out;
+        }
     }
 
     psa_hash_operation_t hash = PSA_HASH_OPERATION_INIT;
@@ -1075,6 +1112,7 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     const esp_err_t begun = esp_ota_begin(other, erased, &ota);
     if (begun != ESP_OK) {
         (void)psa_hash_abort(&hash);
+        out.code = "write_failed";
         out.status = begun == ESP_ERR_OTA_ROLLBACK_INVALID_STATE ? "409 Conflict" : "500 Internal Server Error";
         out.body = std::string("the slot could not be prepared: ") + esp_err_to_name(begun);
         return out;
@@ -1098,6 +1136,9 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
             (void)esp_ota_abort(ota);
             (void)psa_hash_abort(&hash);
             out.status = "400 Bad Request";
+            if (job.pulled != nullptr) {
+                out.code = job.pulled->code.empty() ? "unreachable" : job.pulled->code;
+            }
             out.body = too_slow ? "the upload took longer than " + std::to_string(config.upload_deadline_ms / 60'000) +
                                       " minutes: " + std::to_string(received) + " of " +
                                       std::to_string(job.length) + " bytes had arrived"
@@ -1115,7 +1156,16 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     if (!written || psa_hash_finish(&hash, body_sha.data(), body_sha.size(), &sha_length) != PSA_SUCCESS) {
         (void)esp_ota_abort(ota);
         (void)psa_hash_abort(&hash);
+        out.code = "write_failed";
         out.body = "writing the slot failed after " + std::to_string(received) + " bytes";
+        return out;
+    }
+    if (job.pulled != nullptr && body_sha != job.pulled->sha256) {
+        (void)esp_ota_abort(ota);
+        out.status = "400 Bad Request";
+        out.code = "bad_hash";
+        out.body = "the download was damaged on the way: its SHA-256 is " + hex(body_sha) +
+                   ", and the update list says " + hex(job.pulled->sha256);
         return out;
     }
     if (job.digest.kind == ContentDigest::Kind::kSha256 && body_sha != job.digest.sha256) {
@@ -1135,6 +1185,7 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     const esp_err_t ended = esp_ota_end(ota);
     if (ended != ESP_OK) {
         out.status = ended == ESP_ERR_OTA_VALIDATE_FAILED ? "400 Bad Request" : "500 Internal Server Error";
+        out.code = ended == ESP_ERR_OTA_VALIDATE_FAILED ? "bad_image" : "write_failed";
         out.body = ended == ESP_ERR_OTA_VALIDATE_FAILED
                        ? "the image in flash does not check out (its own SHA-256, or its layout): it was "
                          "damaged before it was sent, or on its way into flash"
@@ -1146,12 +1197,14 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     const auto in_flash = hash_slot(other, job.length, buf);
     if (!in_flash || *in_flash != body_sha) {
         out.status = "400 Bad Request";
+        out.code = "write_failed";
         out.body = "what reached flash is not what was sent: read back, its SHA-256 is " +
                    (in_flash ? hex(*in_flash) : std::string("unreadable")) + ", not " + hex(body_sha);
         return out;
     }
     const esp_err_t selected = esp_ota_set_boot_partition(other);
     if (selected != ESP_OK) {
+        out.code = "write_failed";
         out.body = std::string("the slot could not be made the next boot: ") + esp_err_to_name(selected);
         return out;
     }
@@ -1184,6 +1237,36 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     return out;
 }
 
+// The end of an upload that did not restart the board: recorded and reported before the answer goes
+// out, so that a client that sends its next request as soon as it has read this answer finds the
+// board free. A 4xx is the image or the request, a 5xx the board.
+void Firmware::Impl::settle(const Outcome& out) {
+    const char* result = out.status[0] == '4' ? "refused" : "failed";
+    std::printf("firmware: upload %s (%s): %s\n", result, out.status, out.body.c_str());
+    // The record and the end of the upload's marker in one commit.
+    nvs_set_texts({{kKeyLastVersion, out.version},
+                   {kKeyLastResult, result},
+                   {kKeyLastReason, out.body},
+                   {kKeyUploading, ""}});
+    // What the erased slot holds now: nothing, or the head of an image that stopped part-way or did
+    // not check out.
+    std::optional<SlotFacts> theirs;
+    if (out.erased) {
+        theirs = read_slot(other, false);
+    }
+    {
+        const std::lock_guard lock(mutex);
+        busy = false;
+        upload.reset();
+        last_update = FirmwareLastUpdate{out.version, result, out.body};
+        if (theirs) {
+            other_facts = *theirs;
+        }
+    }
+    // Still in flash mode: a corrected image can follow, and the idle timer starts again from here.
+    arm_idle_timer();
+}
+
 void Firmware::Impl::upload_task(void* arg) {
     auto* job = static_cast<UploadJob*>(arg);
     Impl& im = *job->im;
@@ -1194,34 +1277,7 @@ void Firmware::Impl::upload_task(void* arg) {
                 static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
     (void)heap_caps_monitor_local_minimum_free_size_stop();
     if (!out.restart) {
-        // Settled before the answer goes out: a client that sends its next
-        // request as soon as it has read this answer finds the board free.
-        // A 4xx is the image or the request, a 5xx the board.
-        const char* result = out.status[0] == '4' ? "refused" : "failed";
-        std::printf("firmware: upload %s (%s): %s\n", result, out.status, out.body.c_str());
-        // The record and the end of the upload's marker in one commit.
-        nvs_set_texts({{kKeyLastVersion, out.version},
-                       {kKeyLastResult, result},
-                       {kKeyLastReason, out.body},
-                       {kKeyUploading, ""}});
-        // What the erased slot holds now: nothing, or the head of an image
-        // that stopped part-way or did not check out.
-        std::optional<SlotFacts> theirs;
-        if (out.erased) {
-            theirs = read_slot(im.other, false);
-        }
-        {
-            const std::lock_guard lock(im.mutex);
-            im.busy = false;
-            im.upload.reset();
-            im.last_update = FirmwareLastUpdate{out.version, result, out.body};
-            if (theirs) {
-                im.other_facts = *theirs;
-            }
-        }
-        // Still in flash mode: a corrected image can follow, and the idle
-        // timer starts again from here.
-        im.arm_idle_timer();
+        im.settle(out);
     }
     httpd_resp_set_hdr(job->req, "Connection", "close");
     if (out.json) {
@@ -1368,6 +1424,23 @@ bool Firmware::flash_mode() const {
     return impl_->flash_mode;
 }
 
+Firmware::Activity Firmware::activity() const {
+    Activity out;
+    if (impl_ == nullptr) {
+        return out;
+    }
+    const std::lock_guard lock(impl_->mutex);
+    out.on_trial = impl_->trial.has_value();
+    out.busy = impl_->busy;
+    out.flash_mode = impl_->flash_mode;
+    return out;
+}
+
+bool Firmware::host_allowed(httpd_req* req) const {
+    // A board that takes no updates has no names to check against; its other routes have no Host check.
+    return impl_ == nullptr || impl_->host_allowed(req);
+}
+
 void Firmware::restart(const char* why) {
     if (impl_ == nullptr) {
         std::printf("firmware: restarting %s\n", why);
@@ -1391,6 +1464,66 @@ int Firmware::on_status(httpd_req* req) {
         return reply_text(req, "404 Not Found", "this board takes no firmware updates");
     }
     return reply(req, "200 OK", "application/json", render_firmware_status(impl_->status()));
+}
+
+FirmwareFacts Firmware::facts() const {
+    FirmwareFacts f;
+    if (impl_ == nullptr) {
+        return f;
+    }
+    const Impl& im = *impl_;
+    const BoardFacts board = im.board();
+    f.chip_id = board.chip_id;
+    f.revision_full = board.revision_full;
+    f.project = board.project;
+    f.has_other_slot = im.other != nullptr;
+    f.slot_bytes = im.other != nullptr ? im.other->size : 0;
+    // esp_image_flash_size_t: 0 is 1 MB, 1 is 2 MB, 2 is 4 MB, and so on to 7, 128 MB.
+    f.flash_mb = im.flash_size_code <= 7 ? (1U << im.flash_size_code) : 0U;
+    const esp_app_desc_t* desc = esp_app_get_description();
+    f.version = field_text(desc->version);
+    f.secure_version = desc->secure_version;
+    const std::lock_guard lock(im.mutex);
+    f.flash_mode = im.flash_mode;
+    f.busy = im.busy;
+    f.on_trial = im.trial.has_value();
+    if (im.trial) {
+        f.trial_remaining_ms = im.trial->remaining_ms(now_ms());
+    }
+    f.last_update = im.last_update;
+    f.upload = im.upload;
+    return f;
+}
+
+PullInstall Firmware::install_pulled(PulledImage& image) {
+    if (impl_ == nullptr || impl_->other == nullptr) {
+        return {"no_slot", "This board takes no updates over the network."};
+    }
+    Impl& im = *impl_;
+    if (image.length < kImageHeadBytes || image.length > im.other->size) {
+        return {"bad_image", "The update list gives a size the slot cannot take."};
+    }
+    {
+        const std::lock_guard lock(im.mutex);
+        if (im.trial) {
+            return {"on_trial", "The running image is still on trial."};
+        }
+        if (im.busy) {
+            return {"busy", "An update is already running."};
+        }
+        im.busy = true;
+    }
+    Impl::UploadJob job{&im, nullptr, image.length, ContentDigest{}, &image};
+    const Impl::Outcome out = im.run_upload(job);
+    std::printf("firmware: the pulled image's least free internal heap was %u bytes\n",
+                static_cast<unsigned>(
+                    heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
+    (void)heap_caps_monitor_local_minimum_free_size_stop();
+    if (out.restart) {
+        im.restart_now("into the new image, on trial");
+    }
+    im.settle(out);
+    return {out.code.empty() ? "write_failed" : out.code, out.body};
 }
 
 int Firmware::on_upload(httpd_req* req) {

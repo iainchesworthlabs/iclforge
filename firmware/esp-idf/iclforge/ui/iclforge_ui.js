@@ -21,7 +21,7 @@
   // The Sendspin player's words for what /status reports of it.
   const LINK = { 'long-term': 'Paired, encrypted', pairing: 'Pairing, encrypted', sentinel: 'Encrypted, not paired' };
   const PLAYING = { bursts: 'Bursts, decoded here', pcm: 'PCM', idle: 'Nothing' };
-  const KINDS = { wifi: 'Wi-Fi', ethernet: 'Ethernet' }; // /status's network.kind
+  const KINDS = { wifi: 'Wi-Fi', ethernet: 'Wired' }; // /status's network.kind
   // GET /firmware's words (iclforge/firmware_status.hpp): a slot's state, and
   // an upload's stage.
   const SLOT = { valid: 'accepted', trial: 'on trial', new: 'written, not started yet', invalid: 'failed its trial', aborted: 'stopped during its trial' };
@@ -89,6 +89,9 @@
   let code = '';
   let hardwareShown = false;
   let hardware = {};
+  // GET /layout-options by layout name, and the slots, slot width and wiring it was read for.
+  let layoutOptions = new Map();
+  let layoutKey = '';
   // GET /firmware: the last body (null on a board without the route), whether
   // to read it at the next poll, the running version the page was loaded
   // against, and when the page last asked the board to restart (0: not since
@@ -346,6 +349,59 @@
     return li;
   }
 
+  // GET /trim: the speakers the layout in force has at an output, each with the level and distance the listener
+  // set (iclforge/render/speaker_trim.hpp). A board with no Sendspin player answers 404 and the section stays
+  // hidden. Read again when the layout changes and after each change the page makes.
+  let trimRead = false;
+  let trimLayout;
+  async function loadTrim() {
+    let t;
+    try {
+      const r = await call('GET', 'trim');
+      if (r.status !== 200 && r.status !== 404) return; // read again at the next poll
+      t = r.status === 200 ? JSON.parse(r.text) : null;
+    } catch {
+      return;
+    }
+    trimRead = true;
+    trimLayout = status.layout;
+    $('sound').hidden = !t;
+    if (!t) return;
+    const notes = [];
+    if (!t.delay.available) notes.push('Distance is not available: ' + t.delay.reason + '.');
+    if (t.server_level || t.server_delay) notes.push('A server has set the ' + (t.server_level ? 'levels' : 'distances') + ' that play now, in place of these.');
+    $('sound-note').textContent = notes.join(' ');
+    $('sound-note').hidden = !notes.length;
+    $('trim-rows').replaceChildren(...t.speakers.map((x) => trimRow(x, t.delay)));
+  }
+
+  // PUT /trim's statements and POST /identify's words, one call each.
+  const trim = (label, body, done) => act(label, 'PUT', 'trim', body, done, { key: 'trim' });
+  const tone = (label, body, done) => act(label, 'POST', 'identify', body, done);
+
+  // A speaker's row: two fields that send one statement each (PUT /trim), what the delay comes to, and its tone.
+  function trimRow(x, delay) {
+    const tr = document.createElement('tr');
+    const th = tr.appendChild(document.createElement('th'));
+    th.scope = 'row';
+    th.textContent = x.label;
+    const field = (what, value, min, max, off, send) => {
+      const input = tr.appendChild(document.createElement('td')).appendChild(document.createElement('input'));
+      Object.assign(input, { type: 'number', min, max, step: what === 'level' ? 0.5 : 0.01, disabled: off, value });
+      input.setAttribute('aria-label', x.label + ' ' + what);
+      input.addEventListener('change', () => trim(x.label + ' ' + what, x.role + ' ' + send(input.value), loadTrim));
+    };
+    field('level', x.level_db, -12, 12, false, (v) => 'level=' + (v || 0));
+    field('distance', x.distance_m || '', 0.1, 10, !delay.available, (v) => 'distance=' + (v || 'none'));
+    tr.appendChild(document.createElement('td')).textContent = x.delay_ms.toFixed(1) + ' ms';
+    const play = tr.appendChild(document.createElement('td')).appendChild(document.createElement('button'));
+    play.type = 'button';
+    play.textContent = 'Play';
+    play.setAttribute('aria-label', 'Play a tone from the ' + x.label);
+    play.addEventListener('click', () => tone('Tone from the ' + x.label, x.role, () => {}));
+    return tr;
+  }
+
   // What this board is: fetched once, since nothing in it changes while the
   // board runs (unlike everything else this page polls). Tried again at the
   // next successful status poll if it failed the first time - a board whose
@@ -384,14 +440,51 @@
     }
   }
 
+  // Which layouts the board can be set to, and why not: read again when the sink's slots, slot width
+  // or wiring change. A board without the route leaves the presets to their own count.
+  async function loadLayoutOptions(key) {
+    layoutKey = key;
+    layoutOptions = new Map();
+    try {
+      const r = await call('GET', 'layout-options');
+      const list = r.status === 200 ? JSON.parse(r.text).options : [];
+      for (const o of Array.isArray(list) ? list : []) layoutOptions.set(o.layout, o);
+    } catch {
+      layoutKey = ''; // asked again at the next poll
+    }
+    const unmet = [...layoutOptions.values()].filter((o) => o.verdict !== 'supported' && str(o.reason));
+    $('layout-why').replaceChildren(...unmet.map((o) => {
+      const li = document.createElement('li');
+      li.textContent = o.reason.startsWith(o.layout) ? o.reason : o.layout + ': ' + o.reason;
+      return li;
+    }));
+    $('layout-why-box').hidden = !unmet.length;
+    $('layout-why-sum').textContent = 'Why ' + unmet.length + (unmet.length === 1 ? ' layout is' : ' layouts are') + ' unavailable or limited';
+    markLayouts(status);
+  }
+
+  // A preset the board cannot carry is greyed, with the reason on hover and in the list below; one it
+  // carries with a limit keeps its place and the reason.
+  function markLayouts(s) {
+    for (const preset of radios('layout')) {
+      const o = layoutOptions.get(preset.value);
+      preset.disabled = o ? o.verdict === 'unavailable' : num(s.sink_slots) && need(preset.value) > s.sink_slots;
+      preset.parentNode.title = str(o?.reason) ?? '';
+    }
+  }
+
   // What the board is and what it runs, after a status read and one request
   // at a time, as the board has few sockets: GET /hardware until it has
-  // answered, and GET /firmware when it is due. After a restart the page asked
+  // answered, GET /layout-options when the sink's ceiling moved, and GET
+  // /firmware when it is due. After a restart the page asked
   // for, GET /firmware at each poll for a while: a board back within a few
   // seconds may never fail a poll, since the browser sends a request that
   // meets a closed connection again.
   async function board() {
     if (!hardwareShown) await loadHardware();
+    if (!trimRead || status.layout !== trimLayout) await loadTrim();
+    const key = [status.sink_slots, status.slot_bits, status.second_line].join();
+    if (str(status.layout) && layoutKey !== key) await loadLayoutOptions(key);
     const asked = restarting && Date.now() - restarting < RESTART_MS;
     if (!sending && (fwDue || asked || (fw && (fw.trial || fw.upload)))) await loadFirmware();
   }
@@ -455,25 +548,36 @@
   // this page last sent: a choice whose request is out, or that a read begun
   // before its answer would undo, keeps what the user chose, and a field is
   // never changed under someone typing in it.
-  // The zones the page offers: a label and the POSIX string the board is given, `;` between them and `|` inside.
-  // A zone not here is typed in the field under it.
-  const ZONES = ('UTC, no daylight saving|none;UTC-12 Baker Island|<-12>12;UTC-11 Pago Pago|<-11>11;UTC-10 Honolulu|HST10;' +
-    'UTC-9 Anchorage|AKST9AKDT,M3.2.0,M11.1.0;UTC-8 Los Angeles, Vancouver|PST8PDT,M3.2.0,M11.1.0;' +
-    'UTC-7 Denver, Calgary|MST7MDT,M3.2.0,M11.1.0;UTC-7 Phoenix|MST7;UTC-6 Chicago, Winnipeg|CST6CDT,M3.2.0,M11.1.0;' +
-    'UTC-6 Mexico City|CST6;UTC-5 New York, Toronto|EST5EDT,M3.2.0,M11.1.0;UTC-5 Bogota, Lima|<-05>5;' +
-    'UTC-4 Halifax|AST4ADT,M3.2.0,M11.1.0;UTC-3:30 St John\'s|NST3:30NDT,M3.2.0,M11.1.0;' +
-    'UTC-3 Sao Paulo, Buenos Aires|<-03>3;UTC-2 South Georgia|<-02>2;UTC-1 Azores|<-01>1<+00>,M3.5.0/0,M10.5.0/1;' +
-    'UTC+0 London, Dublin, Lisbon|GMT0BST,M3.5.0/1,M10.5.0;UTC+0 Reykjavik, Accra|GMT0;' +
-    'UTC+1 Paris, Berlin, Rome, Madrid|CET-1CEST,M3.5.0,M10.5.0/3;UTC+1 Lagos|<+01>-1;' +
-    'UTC+2 Athens, Helsinki, Kyiv|EET-2EEST,M3.5.0/3,M10.5.0/4;UTC+2 Cairo, Johannesburg|SAST-2;' +
-    'UTC+3 Moscow, Istanbul, Riyadh|<+03>-3;UTC+3:30 Tehran|<+0330>-3:30;UTC+4 Dubai, Baku|<+04>-4;' +
-    'UTC+4:30 Kabul|<+0430>-4:30;UTC+5 Karachi, Tashkent|<+05>-5;UTC+5:30 Mumbai, Delhi, Colombo|IST-5:30;' +
-    'UTC+5:45 Kathmandu|<+0545>-5:45;UTC+6 Dhaka, Almaty|<+06>-6;UTC+7 Bangkok, Jakarta, Hanoi|<+07>-7;' +
-    'UTC+8 Singapore, Beijing, Perth|<+08>-8;UTC+9 Tokyo, Seoul|JST-9;UTC+9:30 Adelaide|ACST-9:30ACDT,M10.1.0,M4.1.0/3;' +
-    'UTC+9:30 Darwin|ACST-9:30;UTC+10 Melbourne, Sydney, Hobart, Canberra|AEST-10AEDT,M10.1.0,M4.1.0/3;' +
-    'UTC+10 Brisbane, Port Moresby|AEST-10;UTC+11 Noumea, Honiara|<+11>-11;' +
-    'UTC+12 Auckland, Wellington|NZST-12NZDT,M9.5.0,M4.1.0/3;UTC+12 Fiji|<+12>-12;UTC+13 Tonga|<+13>-13')
-    .split(';').map((z) => z.split('|'));
+  // The time zones the board offers (GET /time-zones, asked for once when the Time section first shows): one name
+  // each, `Australia/Melbourne`, chosen by region and then city. A zone not in the list is typed in the field under it.
+  let zoneNames = null;
+  let zonesAsked = false;
+  const zoneRegion = (name) => (name.includes('/') ? name.slice(0, name.indexOf('/')) : 'Other');
+  // A city as a person reads it: underscores as spaces, and what lies between region and city in brackets after it.
+  function zoneCity(name) {
+    const parts = name.split('/').slice(1).map((p) => p.replaceAll('_', ' '));
+    return parts.length ? parts.pop() + (parts.length ? ' (' + parts.join(', ') + ')' : '') : name;
+  }
+  function zoneCities(region, chosen) {
+    const city = $('zone-city');
+    city.replaceChildren(new Option('City', ''));
+    for (const name of zoneNames.filter((n) => zoneRegion(n) === region)) city.add(new Option(zoneCity(name), name));
+    city.value = chosen;
+  }
+  async function loadZones() {
+    if (zonesAsked) return;
+    zonesAsked = true;
+    try {
+      const r = await call('GET', 'time-zones');
+      zoneNames = r.status === 200 ? r.text.split('\n').filter(Boolean) : [];
+    } catch {
+      zonesAsked = false; // asked again at the next read
+      return;
+    }
+    $('zone-select').replaceChildren(new Option('Region', ''));
+    for (const region of new Set(zoneNames.map(zoneRegion))) $('zone-select').add(new Option(region, region));
+    $('zone-pick').hidden = zoneNames.length === 0;
+  }
 
   // A field is set to what the board says unless someone is typing in it or has typed in it since.
   function field(input, value) {
@@ -486,13 +590,22 @@
   function time(t, fresh) {
     $('time-group').hidden = !t || typeof t !== 'object';
     if ($('time-group').hidden) return;
+    // The zone is shown as the place it is ("Melbourne (Australia)", "UTC", "UTC+10:00 (custom)"), never as the string the
+    // board keeps it by: that is the board's, and a person who types one types it.
+    const where = str(t.zone_label);
     $('time-now').textContent = str(t.local)
-      ? t.local + (t.zone === 'none' ? ' UTC' : '')
+      ? t.local + (where ? ' ' + where : '')
       : t.sync ? 'Waiting for a time server.' : 'Not kept: no time server is asked.';
+    $('zone-now').textContent = where ? 'Now: ' + where + '.' : '';
     if (fresh('timesync')) $('time-sync').checked = t.sync === true;
-    field($('zone-input'), t.zone === 'none' ? '' : str(t.zone));
-    if (document.activeElement !== $('zone-select')) {
-      $('zone-select').value = ZONES.some((z) => z[1] === t.zone) ? t.zone : 'other';
+    field($('zone-input'), '');
+    loadZones();
+    // The place the zone is, by the name chosen or by the table's place for the string, is shown by region and city; a zone
+    // in no table leaves both lists at their prompts.
+    if (zoneNames?.length && document.activeElement !== $('zone-select') && document.activeElement !== $('zone-city')) {
+      const place = zoneNames.includes(t.zone_place) ? t.zone_place : '';
+      $('zone-select').value = place ? zoneRegion(place) : '';
+      zoneCities(place ? zoneRegion(place) : '', place);
     }
     field($('ntp-input'), t.server === 'none' ? '' : str(t.server));
     $('ntp-help').textContent = 'A host name or an IPv4 address. Empty is the router\'s, then pool.ntp.org.' +
@@ -518,10 +631,8 @@
     $('layout-fit').textContent = fit && ' ' + fit;
     if (num(s.slot_bits) && fresh('slot')) radios('slot-width').forEach((r) => (r.checked = r.value === String(s.slot_bits)));
     if (typeof s.second_line === 'boolean' && fresh('wiring')) $('wiring').checked = s.second_line;
-    for (const preset of radios('layout')) {
-      preset.disabled = num(s.sink_slots) && need(preset.value) > s.sink_slots;
-      if (fresh('layout')) preset.checked = preset.value === s.layout;
-    }
+    markLayouts(s);
+    if (fresh('layout')) for (const preset of radios('layout')) preset.checked = preset.value === s.layout;
     if (!filled) {
       filled = true;
       // The device keeps 95 characters of a layout's text and cuts the rest, so a text
@@ -590,14 +701,13 @@
     if (ok && after) done();
   }
 
-  // A preset and the field both end here: the page sends every layout and
-  // lets the firmware decide, counting slots only to explain a refusal.
+  // A preset and the field both end here: the page sends every layout and lets the firmware decide, which
+  // answers a refusal with its reason (the page counts slots only to grey presets on a firmware without
+  // GET /layout-options).
   function setLayout(layout) {
-    const n = need(layout);
-    const room = status.sink_slots;
     $('layout-input').value = layout;
     act('Output layout ' + layout, 'PUT', 'layout', layout, () => say('Output layout ' + layout + ' from the next play.'),
-      { why: num(room) && n > room ? 'it needs ' + n + ' slots and this sink has ' + room + '.' : '', after: true, key: 'layout' });
+      { after: true, key: 'layout' });
   }
 
   // POST /pairing's bodies: reset, cancel, forget, and forget with a server_id.
@@ -659,18 +769,22 @@
   const setZone = (zone) => act('Time zone', 'PUT', 'timezone', zone || 'none',
     () => say(zone && zone !== 'none' ? 'Time zone ' + zone + '.' : 'No time zone: UTC.'), { why: 'this board reads that zone differently.' });
 
-  for (const [label, zone] of [...ZONES, ['Other: type a POSIX string below', 'other']]) {
-    $('zone-select').add(new Option(label, zone));
-  }
+  $('zone-select').addEventListener('change', (event) => zoneCities(event.target.value, ''));
 
-  $('zone-select').addEventListener('change', (event) => {
-    if (event.target.value === 'other') $('zone-input').focus();
-    else setZone(event.target.value);
+  $('zone-city').addEventListener('change', (event) => {
+    if (event.target.value) setZone(event.target.value);
   });
 
   $('zone-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    setZone($('zone-input').value.trim());
+    const typed = $('zone-input').value.trim();
+    // The field is never filled in with the zone the board has, so an empty one is nothing typed, not UTC; where there is no
+    // list to choose UTC from, it still is.
+    if (!typed && !$('zone-pick').hidden) {
+      say('Choose a region and a city, or type a zone.');
+      return;
+    }
+    setZone(typed);
   });
 
   $('ntp-form').addEventListener('submit', (event) => {
@@ -679,6 +793,17 @@
     act('Time server', 'PUT', 'ntp-server', server || 'none',
       () => say(server ? 'Asking ' + server + ' for the time.' : 'Asking the router\'s time server, then pool.ntp.org.'));
   });
+
+  // The test tone stops by itself; these end it sooner, start the whole round, and put every speaker back.
+  $('tone-all').addEventListener('click', () => tone('Test tones', 'all', () => say('Each speaker in turn, quietly.')));
+
+  $('tone-off').addEventListener('click', () => tone('Stop the tone', 'off', () => say('Stopped.')));
+
+  $('trim-reset').addEventListener('click', () => ask('Reset every speaker?', 'Every level goes back to 0 dB and every distance is cleared.', 'Reset',
+    () => trim('Reset', 'reset', () => say('Levels and distances are cleared.')).then(loadTrim)));
+
+  // Leaving the page ends a tone that is still going.
+  addEventListener('pagehide', () => $('sound').hidden || navigator.sendBeacon('identify', 'off'));
 
   $('ss-cancel').addEventListener('click', () => pairing('Cancel pairing', 'cancel', 'Pairing cancelled.'));
 

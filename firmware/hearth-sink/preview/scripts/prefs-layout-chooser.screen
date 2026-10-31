@@ -1,0 +1,35 @@
+# The speaker layout on the kit, which carries every layout: Change opens the sheet, a quick pick is taken at Apply while
+# nothing plays, and the other way in (how many around you, how many heights, how they are mounted) builds the same
+# names. The worst case, nine around you with six ceiling heights, is on the glass with every control reachable.
+board p4-rev3-kit
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+expect shown "Speaker layout"
+expect pref speaker-layout = 2.0
+
+tap "Change" in "Speaker layout"
+expect shown "Quick picks"
+tap "7.1.4"
+expect text "seven around you, one subwoofer, four high speakers"
+tap "Apply"
+expect pref speaker-layout = 7.1.4
+expect text "Seven around you"
+
+tap "Change" in "Speaker layout"
+tap "Build yours"
+tap "9"
+tap "6"
+tap "In the ceiling"
+expect text "9.1.6:top"
+shot layout-9-1-6-ceiling
+tap "Apply"
+expect pref speaker-layout = 9.1.6:top
+
+tap "Change" in "Speaker layout"
+tap "2.0"
+tap "Apply"
+expect pref speaker-layout = 2.0
+
+tap "Close"

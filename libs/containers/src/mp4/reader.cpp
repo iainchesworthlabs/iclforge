@@ -1,6 +1,7 @@
 #include "iclforge/containers/mp4/reader.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -62,6 +63,18 @@ constexpr std::uint32_t kAc4Entry = fourcc("ac-4");  // TS 103 190-2 Annex E.4
 constexpr std::uint32_t kDac3 = fourcc("dac3");
 constexpr std::uint32_t kDec3 = fourcc("dec3");
 constexpr std::uint32_t kDac4 = fourcc("dac4");
+// A protected sample entry (ISO/IEC 23001-7 Common Encryption) replaces the entry type with
+// 'enca' (audio) or 'encv' (video) and adds a 'sinf' child; the type it had is in the 'sinf's
+// 'frma'. The entry types are as the W3C ISO Common Encryption stream format note gives them.
+constexpr std::uint32_t kEnca = fourcc("enca");
+constexpr std::uint32_t kEncv = fourcc("encv");
+constexpr std::uint32_t kSinf = fourcc("sinf");
+constexpr std::uint32_t kFrma = fourcc("frma");
+constexpr std::uint32_t kSchm = fourcc("schm");
+constexpr std::uint32_t kSchi = fourcc("schi");
+constexpr std::uint32_t kTenc = fourcc("tenc");
+constexpr std::uint32_t kMlpaEntry = fourcc("mlpa");  // Dolby TrueHD; ERRATA C1
+constexpr std::uint32_t kDmlp = fourcc("dmlp");
 
 // Boxes that are pure containers: the walk descends into them rather than
 // buffering them whole, which is what keeps a moov of any size from being
@@ -80,6 +93,38 @@ constexpr std::uint32_t kDac4 = fourcc("dac4");
            type == kTrex || type == kTfhd || type == kTrun;
 }
 
+// The sampling frequency a TrueHD ratebits code names (TH spec §1.4), 0 for a code it does not.
+[[nodiscard]] std::uint32_t mlp_rate_hz(std::uint32_t ratebits) {
+    switch (ratebits) {
+        case 0x0:
+            return 48000;
+        case 0x1:
+            return 96000;
+        case 0x2:
+            return 192000;
+        case 0x8:
+            return 44100;
+        case 0x9:
+            return 88200;
+        case 0xA:
+            return 176400;
+        default:
+            return 0;
+    }
+}
+
+// The sampling frequency a 'dmlp' format_info word states, 0 for one it does not. The word is the
+// major sync's field of that name, byte for byte (ERRATA C3), so its layout is the stream's. A TrueHD
+// word opens with the rate code, [31:28], and keeps [27:24] reserved (TH spec §5.1). An MLP word
+// opens with the two groups' bit depths and then their rates: group 1's rate is at [23:20], and a
+// stream with one group sends 0xF as group 2's depth at [27:24] (TH spec §5.2). That 0xF, which a
+// TrueHD word never has, tells the two apart. Read as TrueHD's, an MLP stream's 24-bit depth code in
+// [31:28] is the code for 192 kHz.
+[[nodiscard]] std::uint32_t dmlp_rate_hz(std::uint32_t format_info) {
+    const bool mlp_layout = ((format_info >> 24U) & 0xFU) == 0xFU;
+    return mlp_rate_hz(mlp_layout ? (format_info >> 20U) & 0xFU : format_info >> 28U);
+}
+
 // --- the dac3/dec3 configuration box ---------------------------------------
 //
 // The read twin of iclforge::ac3::io::build_codec_config_box (ac3/io/dec3.hpp), field
@@ -94,6 +139,17 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
     CodecConfig out;
     out.eac3 = box_type == kDec3;
     out.payload.assign(payload.begin(), payload.end());
+    if (box_type == kDmlp) {
+        // 'dmlp' (ERRATA C3): format_info(32) peak_data_rate(15) reserved(1) reserved(32). The
+        // fields are read when the box is long enough and left at zero when it is not; the bytes
+        // are kept either way.
+        out.mlp = true;
+        if (payload.size() >= 6) {
+            out.mlp_format_info = get_u32(payload, 0);
+            out.mlp_peak_data_rate = static_cast<int>(get_u16(payload, 4) >> 1U);
+        }
+        return out;
+    }
     if (box_type == kDac4) {
         // ac4_dsi_v1 (TS 103 190-2 Annex E.5) shares no field with the
         // dac3/dec3 layout below, and this module has no business
@@ -186,6 +242,10 @@ struct PendingTrack {
     std::uint32_t handler = 0;
     std::uint32_t first_entry = 0;
     bool has_entry = false;
+    // The first protected sample entry of the track, if it has one, and whether 'stsd' also
+    // holds an entry that is not protected.
+    std::optional<Protection> protection;
+    bool has_clear_entry = false;
     std::uint32_t entry_type = 0;
     std::uint32_t sample_rate = 0;
     int channels = 0;
@@ -226,6 +286,107 @@ constexpr std::size_t kMaxSkippedTracks = 64;
     return out;
 }
 
+// --- the protection scheme information box ---------------------------------
+//
+// Walks the boxes that fill body[at, end), calling fn(type, body) for each. A box whose header
+// does not parse, or whose size runs past `end`, ends the walk and is not an error: a damaged
+// 'sinf' must not turn a protected track into a malformed file or into a clear one, because the
+// damage is no reason to read its samples.
+template <typename Fn>
+void for_each_child(std::span<const std::byte> body, std::size_t at, std::size_t end,
+                    const Fn& fn) {
+    while (end - at >= 8) {
+        BoxHeader child{};
+        if (read_box_header(body.first(end), at, child) != BoxRead::kOk || child.to_eof ||
+            child.size > end - at) {
+            return;
+        }
+        fn(child.type, body.subspan(at + child.header_bytes,
+                                    static_cast<std::size_t>(child.size) - child.header_bytes));
+        at += static_cast<std::size_t>(child.size);
+    }
+}
+
+// 'tenc', the track encryption box of ISO/IEC 23001-7 (DASH-IF IOP v5 part 6 section 6.2 cites its
+// clause 8.2). The standard has not been read; this layout is what GPAC, FFmpeg and Shaka Packager
+// write (planning/cenc-conformance.md, M3 and M7) and what tools/generators/cenc_make_protected.py
+// writes and GPAC and FFmpeg decrypt: version and flags (4), a reserved byte, a byte that is
+// reserved in version 0 and in version 1 holds crypt_byte_block (high four bits) and
+// skip_byte_block (low four), default_isProtected, default_Per_Sample_IV_Size, default_KID (16),
+// and, for a protected track with an IV size of 0, a constant IV that is not read here.
+void read_tenc(std::span<const std::byte> body, Protection& out) {
+    constexpr std::size_t kTencBytes = 24;
+    if (body.size() < kTencBytes) {
+        return;
+    }
+    out.has_tenc = true;
+    if (get_u8(body, 0) >= 1) {
+        out.crypt_byte_block = static_cast<std::uint8_t>(get_u8(body, 5) >> 4U);
+        out.skip_byte_block = static_cast<std::uint8_t>(get_u8(body, 5) & 0x0FU);
+    }
+    out.default_is_protected = get_u8(body, 6) != 0;
+    out.default_iv_size = get_u8(body, 7);
+    for (std::size_t i = 0; i < out.default_kid.size(); ++i) {
+        out.default_kid[i] = get_u8(body, 8 + i);
+    }
+}
+
+// 'sinf' holds 'frma' (the original format: four characters), 'schm' (version and flags, the
+// scheme_type's four characters, a 32-bit scheme_version) and 'schi', which for Common Encryption
+// holds the 'tenc'. The 'schm' scheme_uri that flag 1 adds is not read.
+void read_sinf(std::span<const std::byte> body, Protection& out) {
+    for_each_child(
+        body, 0, body.size(), [&out](std::uint32_t type, std::span<const std::byte> inner) {
+            if (type == kFrma && inner.size() >= 4) {
+                out.original_format = fourcc_text(get_u32(inner, 0));
+            } else if (type == kSchm && inner.size() >= 12) {
+                out.scheme = fourcc_text(get_u32(inner, 4));
+                out.scheme_version = get_u32(inner, 8);
+            } else if (type == kSchi) {
+                for_each_child(inner, 0, inner.size(),
+                               [&out](std::uint32_t schi_type, std::span<const std::byte> tenc) {
+                                   if (schi_type == kTenc) {
+                                       read_tenc(tenc, out);
+                                   }
+                               });
+            }
+        });
+}
+
+// The protection a sample entry [start, end) of `body` declares. The 'sinf' sits among the
+// entry's child boxes, after the fixed fields of an AudioSampleEntry (28 bytes, as in
+// parse_stsd) or a VisualSampleEntry (78: 8 of SampleEntry and 70 of its own, ISO/IEC 14496-12
+// section 12.1.3, from the fields' widths), and Dolby's text puts it after the 'dec3' or 'dac4'
+// while parsers must also accept it first (cenc-conformance.md, section 3); the walk takes either.
+// An entry whose 'sinf' cannot be read is still protected: the result says so with empty fields.
+Protection parse_protection(std::uint32_t entry_type, std::span<const std::byte> body,
+                            std::size_t start, std::size_t end, std::uint32_t index) {
+    Protection out;
+    out.entry_type = fourcc_text(entry_type);
+    out.entry_index = index;
+    const std::size_t fixed = entry_type == kEnca ? 28 : 78;
+    if (end - start < fixed) {
+        return out;
+    }
+    for_each_child(body, start + fixed, end,
+                   [&out](std::uint32_t type, std::span<const std::byte> sinf) {
+                       if (type == kSinf) {
+                           read_sinf(sinf, out);
+                       }
+                   });
+    return out;
+}
+
+// Whether a track whose only protected entry has this original format is one the reader would
+// otherwise have read: a Dolby audio format, or one the entry does not state. A protected AAC or
+// AVC track is an ordinary track the reader does not take, listed with its protection.
+[[nodiscard]] bool is_dolby_or_unstated(const Protection& protection) {
+    return protection.entry_type == "enca" &&
+           (protection.original_format.empty() || protection.original_format == "ac-3" ||
+            protection.original_format == "ec-3" || protection.original_format == "ac-4" ||
+            protection.original_format == "mlpa");
+}
+
 // What a track that was not selected is listed as: its handler decides the kind, and its first
 // sample entry (whatever it is) the codec.
 [[nodiscard]] SkippedTrack skipped_of(const PendingTrack& track) {
@@ -243,6 +404,7 @@ constexpr std::size_t kMaxSkippedTracks = 64;
         out.codec_id = fourcc_text(track.first_entry);
     }
     out.language = track.language;
+    out.protection = track.protection;
     return out;
 }
 
@@ -317,15 +479,67 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kMalformed:
             return "malformed box, sample table or fragment layout";
         case DemuxError::kNoAudioTrack:
-            return "no 'ac-3'/'ec-3'/'ac-4' track (or the requested track id is absent)";
+            return "no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (or the requested track id is absent)";
         case DemuxError::kLimitExceeded:
             return "box size, sample count or nesting depth beyond the reader's limits";
         case DemuxError::kMoovAfterMdat:
             return "the sample table (moov) follows the media data it indexes: this layout "
                    "cannot be read as a stream; read it from a source that can be read at an "
                    "offset (demux_seekable()) or hand demux() the whole file";
+        case DemuxError::kProtectedTrack:
+            return "the audio track is protected (Common Encryption, ISO/IEC 23001-7): its "
+                   "samples are encrypted and decryption is not supported";
     }
     return "unknown error";
+}
+
+// The 8-4-4-4-12 form of DASH's cenc:default_KID attribute (DASH-IF IOP v5 part 6 section 7.2).
+std::string format_kid(const std::array<std::uint8_t, 16>& kid) {
+    constexpr std::string_view kDigits = "0123456789abcdef";
+    std::string out;
+    out.reserve(36);
+    for (std::size_t i = 0; i < kid.size(); ++i) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
+            out.push_back('-');
+        }
+        out.push_back(kDigits[kid[i] >> 4U]);
+        out.push_back(kDigits[kid[i] & 0x0FU]);
+    }
+    return out;
+}
+
+std::string describe(const Protection& protection) {
+    std::string out = protection.scheme.empty() ? "scheme not stated" : protection.scheme;
+    out += protection.original_format.empty() ? ", original format not stated"
+                                              : ", original format " + protection.original_format;
+    out += protection.has_tenc ? ", default KID " + format_kid(protection.default_kid)
+                               : ", no default KID stated";
+    return out;
+}
+
+std::string describe_refusal(std::span<const SkippedTrack> refused) {
+    std::string out;
+    for (const SkippedTrack& track : refused) {
+        if (!track.protection.has_value()) {
+            continue;
+        }
+        const Protection& protection = *track.protection;
+        if (!out.empty()) {
+            out += "; ";
+        }
+        const std::string id = std::to_string(track.track_id);
+        if (protection.track_has_clear_entry) {
+            out += "track " + id + " mixes a clear sample entry with a protected one, entry " +
+                   std::to_string(protection.entry_index) + " (" + describe(protection) +
+                   "), and is refused whole";
+        } else {
+            out += "track " + id + " is protected (" + describe(protection) + ")";
+        }
+    }
+    if (out.empty()) {
+        return std::string{describe(DemuxError::kProtectedTrack)};
+    }
+    return out + "; decryption is not supported";
 }
 
 namespace detail {
@@ -361,6 +575,9 @@ struct ReaderState {
     bool track_found = false;
     // The tracks that were not selected, to kMaxSkippedTracks.
     std::vector<SkippedTrack> skipped;
+    // Those of them refused for being protected (each is in `skipped` too), to kMaxSkippedTracks:
+    // the reason finish_verdict gives kProtectedTrack and not kNoAudioTrack.
+    std::vector<SkippedTrack> refused;
     bool saw_box = false;
     bool saw_mdat = false;
     // A moov that arrived after mdat: fatal for the streaming Reader, fine
@@ -408,19 +625,43 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
         }
         if (top.type == kTrak) {
             bool selected_now = false;
-            if (s.in_trak && !s.track_found && s.pending.has_entry) {
-                const bool wanted = options.track_id != 0
-                                        ? s.pending.track_id == options.track_id
-                                        : (s.pending.entry_type == kAc3Entry ||
-                                           s.pending.entry_type == kEc3Entry ||
-                                           s.pending.entry_type == kAc4Entry);
+            // A track with a protected sample entry is never selected, whatever else its 'stsd'
+            // holds. The entry a sample belongs to is named per chunk ('stsc'
+            // sample_description_index) or per fragment ('tfhd', 'trex'); a packager that writes a
+            // clear lead-in puts a clear entry and a protected one in one track, and a reader that
+            // took the clear entry would hand back the lead-in, or the lead-in and then ciphertext
+            // as audio (planning/cenc-conformance.md, G1 and M7). Refusing the whole track is the
+            // strictest rule that keeps every clear track working, and it is decided here, at
+            // 'moov', before any sample is delivered, so the streaming Reader and a pipe get the
+            // same answer as demux(). The price is that a track declaring a protected entry no
+            // sample uses is refused too; none of the files examined writes one. Reading the clear
+            // samples of such a track, and decrypting the rest, waits for a key
+            // (planning/cenc-read-side.md, 5.4).
+            const bool refuse =
+                s.in_trak && s.pending.protection.has_value() &&
+                (s.pending.has_entry || is_dolby_or_unstated(*s.pending.protection));
+            if (s.in_trak && s.pending.protection.has_value()) {
+                s.pending.protection->track_has_clear_entry = s.pending.has_clear_entry;
+            }
+            if (refuse) {
+                if (s.refused.size() < kMaxSkippedTracks) {
+                    s.refused.push_back(skipped_of(s.pending));
+                }
+            } else if (s.in_trak && !s.track_found && s.pending.has_entry) {
+                const bool wanted =
+                    options.track_id != 0
+                        ? s.pending.track_id == options.track_id
+                        : ((s.pending.entry_type == kAc3Entry && options.auto_select.ac3) ||
+                           (s.pending.entry_type == kEc3Entry && options.auto_select.eac3) ||
+                           (s.pending.entry_type == kAc4Entry && options.auto_select.ac4) ||
+                           (s.pending.entry_type == kMlpaEntry && options.auto_select.truehd));
                 if (wanted) {
                     s.track = ReadTrack{
                         .track_id = s.pending.track_id,
-                        .codec_id =
-                            std::string{s.pending.entry_type == kAc3Entry    ? kCodecAc3
-                                        : s.pending.entry_type == kAc4Entry ? kCodecAc4
-                                                                            : kCodecEac3},
+                        .codec_id = std::string{s.pending.entry_type == kAc3Entry    ? kCodecAc3
+                                                : s.pending.entry_type == kAc4Entry  ? kCodecAc4
+                                                : s.pending.entry_type == kMlpaEntry ? kCodecTruehd
+                                                                                     : kCodecEac3},
                         .sample_rate = s.pending.sample_rate,
                         .channels = s.pending.channels,
                         .timescale = s.pending.timescale,
@@ -550,9 +791,68 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
     }
 }
 
-// stsd is a FullBox whose body is an entry count followed by sample entries.
-// Only the first 'ac-3'/'ec-3' one matters here; anything else means this
-// trak is not ours, which is not an error.
+// §12.2.3's AudioSampleEntry, on top of §8.5.2's SampleEntry: reserved(6)
+// data_reference_index(2) reserved(8) channelcount(2) samplesize(2) pre_defined(2) reserved(2)
+// samplerate(4, 16.16) = 28 bytes before the child boxes.
+constexpr std::size_t kAudioSampleEntryBytes = 28;
+
+// The 'ac-3'/'ec-3'/'ac-4'/'mlpa' entry at `at` in `body`: the track's channel count, rate and
+// codec configuration box. False only for a layout that cannot be read.
+[[nodiscard]] bool parse_dolby_entry(std::span<const std::byte> body, const BoxHeader& entry,
+                                     std::size_t at, PendingTrack& track) {
+    const std::size_t fields = at + entry.header_bytes;
+    if (fields + kAudioSampleEntryBytes > body.size()) {
+        return false;
+    }
+    track.entry_type = entry.type;
+    track.channels = static_cast<int>(get_u16(body, fields + 16));
+    const std::uint32_t rate_field = get_u32(body, fields + 24);
+    // 16.16 fixed point, except in 'mlpa', where the field holds the rate as a plain integer
+    // (ERRATA C2). A plain rate always has a non-zero low half (no rate is a multiple of 65,536),
+    // a 16.16 one of the same rate never does, which tells a file written either way apart.
+    track.sample_rate = (entry.type == kMlpaEntry && (rate_field & 0xFFFFU) != 0)
+                            ? rate_field
+                            : rate_field >> 16U;
+    track.has_entry = true;
+
+    // The one child that matters: dac3, dec3, dac4 or dmlp.
+    std::size_t child = fields + kAudioSampleEntryBytes;
+    const std::size_t entry_end = at + static_cast<std::size_t>(entry.size);
+    while (child + 8 <= entry_end) {
+        BoxHeader config{};
+        if (read_box_header(body, child, config) != BoxRead::kOk || config.to_eof) {
+            return false;
+        }
+        if (config.size > entry_end - child) {
+            return false;
+        }
+        if (config.type == kDac3 || config.type == kDec3 || config.type == kDac4 ||
+            config.type == kDmlp) {
+            track.codec_config = parse_codec_config(
+                config.type,
+                body.subspan(child + config.header_bytes,
+                             static_cast<std::size_t>(config.size) - config.header_bytes));
+            if (config.type == kDmlp) {
+                // dmlp's ratebits are the rate the decoder uses; they win over the sample entry's
+                // field when they name one (ERRATA C2).
+                const std::uint32_t hz = dmlp_rate_hz(track.codec_config.mlp_format_info);
+                if (hz != 0) {
+                    track.sample_rate = hz;
+                }
+            }
+            break;
+        }
+        child += static_cast<std::size_t>(config.size);
+    }
+    return true;
+}
+
+// stsd is a FullBox whose body is an entry count followed by sample entries. The first
+// 'ac-3'/'ec-3'/'ac-4' one gives the track its codec; anything else means this trak is not ours,
+// which is not an error. Every entry is looked at for protection (close_finished says why): the
+// first 'enca' or 'encv' is read into the track's Protection, and whether an entry that is not
+// protected sits beside it is noted. Once the track has its codec entry, an entry that cannot be
+// walked ends the scan quietly, as the scan ended there before; before it, it is malformed.
 [[nodiscard]] bool parse_stsd(std::span<const std::byte> body, PendingTrack& track) {
     if (body.size() < 8) {
         return false;
@@ -561,53 +861,29 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
     std::size_t at = 8;
     for (std::uint32_t i = 0; i < entry_count && at + 8 <= body.size(); ++i) {
         BoxHeader entry{};
-        if (read_box_header(body, at, entry) != BoxRead::kOk || entry.to_eof) {
-            return false;
-        }
-        if (entry.size > body.size() - at) {
-            return false;
+        if (read_box_header(body, at, entry) != BoxRead::kOk || entry.to_eof ||
+            entry.size > body.size() - at) {
+            return track.has_entry;
         }
         if (track.first_entry == 0) {
             track.first_entry = entry.type;
         }
-        if (entry.type == kAc3Entry || entry.type == kEc3Entry || entry.type == kAc4Entry) {
-            // §12.2.3's AudioSampleEntry, on top of §8.5.2's SampleEntry:
-            // reserved(6) data_reference_index(2) reserved(8)
-            // channelcount(2) samplesize(2) pre_defined(2) reserved(2)
-            // samplerate(4, 16.16) = 28 bytes before the child boxes.
-            constexpr std::size_t kAudioSampleEntryBytes = 28;
-            const std::size_t fields = at + entry.header_bytes;
-            if (fields + kAudioSampleEntryBytes > body.size()) {
+        const std::size_t entry_end = at + static_cast<std::size_t>(entry.size);
+        if (entry.type == kEnca || entry.type == kEncv) {
+            if (!track.protection.has_value()) {
+                track.protection =
+                    parse_protection(entry.type, body, at + entry.header_bytes, entry_end, i + 1);
+            }
+        } else {
+            track.has_clear_entry = true;
+            if (!track.has_entry &&
+                (entry.type == kAc3Entry || entry.type == kEc3Entry || entry.type == kAc4Entry ||
+                 entry.type == kMlpaEntry) &&
+                !parse_dolby_entry(body, entry, at, track)) {
                 return false;
             }
-            track.entry_type = entry.type;
-            track.channels = static_cast<int>(get_u16(body, fields + 16));
-            track.sample_rate = get_u32(body, fields + 24) >> 16U;
-            track.has_entry = true;
-
-            // The one child that matters: dac3 or dec3.
-            std::size_t child = fields + kAudioSampleEntryBytes;
-            const std::size_t entry_end = at + static_cast<std::size_t>(entry.size);
-            while (child + 8 <= entry_end) {
-                BoxHeader config{};
-                if (read_box_header(body, child, config) != BoxRead::kOk || config.to_eof) {
-                    return false;
-                }
-                if (config.size > entry_end - child) {
-                    return false;
-                }
-                if (config.type == kDac3 || config.type == kDec3 || config.type == kDac4) {
-                    track.codec_config = parse_codec_config(
-                        config.type, body.subspan(child + config.header_bytes,
-                                                  static_cast<std::size_t>(config.size) -
-                                                      config.header_bytes));
-                    break;
-                }
-                child += static_cast<std::size_t>(config.size);
-            }
-            return true;
         }
-        at += static_cast<std::size_t>(entry.size);
+        at = entry_end;
     }
     return true;
 }
@@ -1037,9 +1313,20 @@ std::expected<void, DemuxError> walk(ReaderState& s, std::span<const std::byte> 
     }
     if (!s.track_found) {
         // A file that never got as far as a trak was cut short; one that had
-        // traks but none we can use is a different answer.
-        return std::unexpected(s.traks_seen > 0 ? DemuxError::kNoAudioTrack
-                                                : DemuxError::kTruncated);
+        // traks but none we can use is a different answer, and a protected track
+        // is the one worth naming: the file has the audio, and it is encrypted. A
+        // named track_id means the protected track asked for, not any.
+        if (s.traks_seen == 0) {
+            return std::unexpected(DemuxError::kTruncated);
+        }
+        const bool protected_named =
+            s.options.track_id == 0
+                ? !s.refused.empty()
+                : std::ranges::any_of(s.refused, [&s](const SkippedTrack& track) {
+                      return track.track_id == s.options.track_id;
+                  });
+        return std::unexpected(protected_named ? DemuxError::kProtectedTrack
+                                               : DemuxError::kNoAudioTrack);
     }
     return {};
 }
@@ -1090,6 +1377,9 @@ Reader::~Reader() = default;
 const ReadTrack& Reader::track() const { return state_->track; }
 bool Reader::track_found() const { return state_->track_found; }
 std::size_t Reader::samples_read() const { return state_->samples_read; }
+const std::vector<SkippedTrack>& Reader::refused_tracks() const {
+    return state_->refused;
+}
 
 std::expected<void, DemuxError> Reader::push(std::span<const std::byte> chunk,
                                              const SampleFn& on_sample) {
@@ -1132,21 +1422,18 @@ std::expected<void, DemuxError> Reader::finish() {
     return finish_verdict(s);
 }
 
-std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std::uint64_t size,
-                                                    const TrackFn& on_track,
-                                                    const Reader::SampleFn& on_sample,
-                                                    const ReadOptions& options) {
-    detail::ReaderState s;
-    s.options = options;
+namespace {
 
-    // Pass one: the boxes. walk() steps over every box it does not need by
-    // arithmetic (mdat above all), so the window is only ever asked for at the
-    // parser's own position - the audio is not read to find the table that
-    // indexes it, whichever side of mdat that table is on.
+// Pass one of demux_seekable() and all of list_refused_tracks(): the boxes. walk() steps over
+// every box it does not need by arithmetic (mdat above all), so the window is only ever asked
+// for at the parser's own position - the audio is not read to find the table that indexes it,
+// whichever side of mdat that table is on.
+[[nodiscard]] std::expected<void, DemuxError> read_boxes(ReaderState& s, const ReadAtFn& read_at,
+                                                         std::uint64_t size) {
     constexpr std::uint64_t kWindow = 64U * 1024U;
     // A leaf box worth reading has to be held whole, and ReadOptions bounds
     // it; the window may grow to that and a header, never past it.
-    const std::uint64_t window_cap = options.max_box_bytes + kWindow;
+    const std::uint64_t window_cap = s.options.max_box_bytes + kWindow;
     std::uint64_t want = kWindow;
     std::vector<std::byte> window;
     while (s.parse_pos < size) {
@@ -1168,12 +1455,27 @@ std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std
         }
         // No progress: the box at `at` is not wholly in the window. A window
         // that already reaches the end of the input means the file is cut
-        // short - the verdict below says what that amounts to; otherwise
+        // short - the verdict says what that amounts to; otherwise
         // ask for more, up to the box bound.
         if (length >= size - at || want >= window_cap) {
             break;
         }
         want = std::min(want * 2, window_cap);
+    }
+    return {};
+}
+
+}  // namespace
+
+std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std::uint64_t size,
+                                                    const TrackFn& on_track,
+                                                    const Reader::SampleFn& on_sample,
+                                                    const ReadOptions& options) {
+    detail::ReaderState s;
+    s.options = options;
+
+    if (const auto boxes = read_boxes(s, read_at, size); !boxes.has_value()) {
+        return std::unexpected(boxes.error());
     }
 
     const auto verdict = finish_verdict(s);
@@ -1204,6 +1506,32 @@ std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std
         ++s.samples_read;
     }
     return s.track;
+}
+
+std::expected<std::vector<SkippedTrack>, DemuxError> list_refused_tracks(
+    std::span<const std::byte> file, const ReadOptions& options) {
+    detail::ReaderState s;
+    s.options = options;
+    if (const auto walked = walk(s, file, 0); !walked.has_value()) {
+        return std::unexpected(walked.error());
+    }
+    if (!s.saw_box) {
+        return std::unexpected(DemuxError::kNotIsobmff);
+    }
+    return s.refused;
+}
+
+std::expected<std::vector<SkippedTrack>, DemuxError> list_refused_tracks(
+    const ReadAtFn& read_at, std::uint64_t size, const ReadOptions& options) {
+    detail::ReaderState s;
+    s.options = options;
+    if (const auto boxes = read_boxes(s, read_at, size); !boxes.has_value()) {
+        return std::unexpected(boxes.error());
+    }
+    if (!s.saw_box) {
+        return std::unexpected(DemuxError::kNotIsobmff);
+    }
+    return s.refused;
 }
 
 }  // namespace iclforge::containers::mp4

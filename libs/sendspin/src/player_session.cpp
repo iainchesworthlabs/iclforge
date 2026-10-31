@@ -335,7 +335,9 @@ SessionOutput PlayerSession::on_json_message(std::string_view text, std::int64_t
         rehandshake = true;
         return {};
     }
-    if (phase_ == Phase::kHello) {
+    // After a re-handshake the specification goes straight to server/activate; a server that
+    // re-sends server/hello first (the extension page's C39) is still answered.
+    if (phase_ == Phase::kHello && !(rehandshaken_ && type == "server/activate")) {
         if (type != "server/hello") {
             return {};
         }
@@ -710,6 +712,7 @@ SessionOutput PlayerSession::on_rehandshake(std::string_view text) {
     activities_.clear();
     active_roles_.clear();
     phase_ = Phase::kHello;
+    rehandshaken_ = true;
     phase_started_ = clock_source_->now_us();
     return out;
 }

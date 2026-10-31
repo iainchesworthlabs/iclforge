@@ -1,5 +1,13 @@
 menu "iclforge hearth sink"
 
+# THE TRUST ANCHORS OF UPDATES FROM GITHUB RELEASES (planning/esp32-ota.md, O10): the public certificates a
+# pulled update's signed index has to chain to. A PEM file, relative to the project; embedded in the image.
+# Empty embeds none, which is a build that cannot verify a pull and says so. A project that runs its own
+# releases points this at its own CA (and ICLFORGE_FIRMWARE_UPDATE_BASE_URL at its own repository).
+config ICLFORGE_EXAMPLE_TRUST_ANCHORS
+    string "Trust anchors for updates pulled from GitHub releases: a PEM file in the project"
+    default ""
+
 # Defaults chosen to be safe on an ESP32-S3-DevKitC-1 rather than to match any
 # particular DAC board: 5, 6 and 7 are ordinary GPIOs - not strapping pins
 # (0, 45, 46), not the USB pair (19, 20), not the console UART (43, 44) and not
@@ -373,8 +381,8 @@ config ICLFORGE_EXAMPLE_NETWORK_ETHERNET
     default n
     help
         Drives the chip's own Ethernet MAC through an RMII PHY. The board takes an address by DHCP
-        on whichever interface has a link, prefers the cable when both have one, and goes on by WiFi
-        when the cable is out (and back to the cable when it returns) with no restart. The
+        on whichever interface has a link, prefers wired when both have one, and goes on by WiFi
+        when wired has no link (and back to wired when it returns) with no restart. The
         preference between the two is a setting of the board (PUT /network-preference), stored in
         NVS like its name and its network.
 
@@ -487,6 +495,22 @@ config ICLFORGE_EXAMPLE_DRC_MODE
         as coded, which is what firmware/baremetal/probe.cpp's references are
         measured against; sdkconfig.ci-render uses it so the rendered levels
         can be compared with the probe's to the digit.
+
+config ICLFORGE_EXAMPLE_DYNAMIC_RANGE
+    int "Dynamic range a board starts with: standard (0) or late night (1)"
+    default 0
+    range 0 1
+    help
+        The listener's choice (PUT /dynamic-range, and a screen's Preferences
+        where the board has one), which NVS keeps; this is the value of a
+        board that has none stored. 0 leaves everything to the operating mode
+        above and to what a server sends: what a board did before the choice
+        existed. 1 is late night: line mode's level with the stream's own heavy
+        compression (compr) on top, which wins over a server's mode and
+        compression settings for as long as it is on. It changes only streams
+        whose encoder wrote the compression for it (compr words in AC-3 and
+        E-AC-3, DRC decoder modes in AC-4), and never the level dialogue is
+        heard at. planning/hearth-late-night.md has the measurements.
 
 config ICLFORGE_EXAMPLE_STEREO_FOLD
     int "Fold for a 2.0 layout: Lo/Ro (0) or Lt/Rt (1)"
@@ -711,76 +735,19 @@ config ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES
         well; 125 is every four seconds at 48 kHz. A Sendspin stream prints a
         sendspin.progress line every N chunks, with the internal heap free.
 
-# THE SENDSPIN PLAYER - main/sendspin.hpp, over the component's player
-# (CONFIG_ICLFORGE_SENDSPIN, in the component's own menu). A build with a
-# network and the component's player has one; each of these sizes it.
-menu "Sendspin player"
-    depends on ICLFORGE_SENDSPIN
-
-config ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES
-    int "Ring of chunks between the session and the decode, bytes"
-    default 262144
-    range 8192 4194304
+# What the player and the board state about themselves in every build, whether or not it has a Sendspin player:
+# main/settings.cpp reads the trim and main/board_caps.cpp the two limits. They are here, outside the menu below,
+# because a symbol in a menu that depends on ICLFORGE_SENDSPIN is undeclared in a build without it, and a source
+# that names it then fails to compile (the ESP32-S3 capture-sink build of CI's QEMU leg).
+config ICLFORGE_EXAMPLE_SPEAKER_TRIM
+    string "The listener's level and distance for each speaker, as a build starts with them"
+    default ""
     help
-        What a server may send ahead of playing it, less a little for stream
-        starts and ends, is this: 256 KB is about four and a half seconds of
-        a 448 kbit/s E-AC-3 stream's bursts, or 0.9 s of 24-bit stereo PCM.
-        In PSRAM when the part has it; a build with none (QEMU) sizes it to
-        what its internal RAM can spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
-    int "The largest chunk taken, bytes"
-    default 25600
-    range 4096 65535
-    help
-        An E-AC-3 burst at the bitstream's ceiling is 24,585 bytes with its
-        header, and 150 ms of 24-bit stereo PCM 21,613. A shape that plays
-        only small streams can take less, and the decode task's buffer for
-        one chunk shrinks with it.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
-    int "Stack for the Sendspin decode task, bytes"
-    default 32768
-    range 12288 65536
-    help
-        As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
-        Sendspin stream's bursts: the decoder's frames are most of it. The
-        page's Sendspin section says what a run left spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
-    int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
-    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
-    default 0
-    range 0 1
-    help
-        As ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM, for the task that decodes a
-        Sendspin stream's bursts. On an ESP32-S3 with Wi-Fi up no internal block
-        is over 31,744 bytes by the time the player starts, which is less than
-        the stack's default 32,768, so a stack in internal RAM fits only while
-        what was allocated before it leaves a block that size: an image that
-        started its player fitted by a few bytes, and did not after a few more
-        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
-        In PSRAM it does not depend on that, and the internal RAM is free for
-        the rest. Needs CONFIG_SPIRAM and
-        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
-        stack is internal as before.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
-    int "Stack for the Sendspin WebSocket server's task, bytes"
-    default 8192
-    range 6144 32768
-    help
-        Every session runs on this task, the Noise handshake's X25519 and
-        SHA-256 included. The page's Sendspin section says what a run left
-        spare.
-
-config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
-    int "Longest per-output delay a server can set, milliseconds (0 = none)"
-    default 20
-    range 0 100
-    help
-        The delay lines are one buffer per output of this length: sixteen
-        outputs of 20 ms is about 61 KB, in PSRAM when the part has it.
+        What a board has before anyone sets anything: a PUT /trim body on one line,
+        statements separated by semicolons - "L level=-1.5 distance=2.4; R level=-1.5
+        distance=2.4". Empty is every speaker at 0 dB with no distance, which is
+        what a stream plays through unchanged. What a person sets over the control
+        surface or on the screen is kept in NVS and replaces this whole.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
     int "Widest syncframe decoded: full-bandwidth channels plus LFE (0 = no limit)"
@@ -849,6 +816,82 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP
         (planning/esp32-714-realtime.md).
 
+# THE SENDSPIN PLAYER - main/sendspin.hpp, over the component's player
+# (CONFIG_ICLFORGE_SENDSPIN, in the component's own menu). A build with a
+# network and the component's player has one; each of these sizes it.
+menu "Sendspin player"
+    depends on ICLFORGE_SENDSPIN
+
+config ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES
+    int "Ring of chunks between the session and the decode, bytes"
+    default 262144
+    range 8192 4194304
+    help
+        What a server may send ahead of playing it, less a little for stream
+        starts and ends, is this: 256 KB is about four and a half seconds of
+        a 448 kbit/s E-AC-3 stream's bursts, or 0.9 s of 24-bit stereo PCM.
+        In PSRAM when the part has it; a build with none (QEMU) sizes it to
+        what its internal RAM can spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
+    int "The largest chunk taken, bytes"
+    default 25600
+    range 4096 65535
+    help
+        An E-AC-3 burst at the bitstream's ceiling is 24,585 bytes with its
+        header, and 150 ms of 24-bit stereo PCM 21,613. A shape that plays
+        only small streams can take less, and the decode task's buffer for
+        one chunk shrinks with it.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
+    int "Stack for the Sendspin decode task, bytes"
+    default 32768
+    range 12288 65536
+    help
+        As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
+        Sendspin stream's bursts: the decoder's frames are most of it. The
+        page's Sendspin section says what a run left spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
+    int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
+    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
+    default 0
+    range 0 1
+    help
+        As ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM, for the task that decodes a
+        Sendspin stream's bursts. On an ESP32-S3 with Wi-Fi up no internal block
+        is over 31,744 bytes by the time the player starts, which is less than
+        the stack's default 32,768, so a stack in internal RAM fits only while
+        what was allocated before it leaves a block that size: an image that
+        started its player fitted by a few bytes, and did not after a few more
+        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
+        In PSRAM it does not depend on that, and the internal RAM is free for
+        the rest. Needs CONFIG_SPIRAM and
+        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
+        stack is internal as before.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
+    int "Stack for the Sendspin WebSocket server's task, bytes"
+    default 8192
+    range 6144 32768
+    help
+        Every session runs on this task, the Noise handshake's X25519 and
+        SHA-256 included. The page's Sendspin section says what a run left
+        spare.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS
+    int "Longest per-output delay, milliseconds (0 = none)"
+    default 20
+    range 0 100
+    help
+        The most one speaker can be delayed against another, by a server's settings
+        or by the listener's own distances (Preferences, PUT /trim). The delay lines
+        are one buffer per output of this length: sixteen outputs of 20 ms is about
+        61 KB, in PSRAM when the part has it. 20 ms is 6.86 m of sound's travel, the
+        most the nearest and the farthest speaker can be apart; 30 ms would be 10.3 m.
+        A build with less holds a shorter span and says so (GET /trim), and a build
+        with 0 has levels only.
+
 config ICLFORGE_EXAMPLE_SENDSPIN_AC4
     int "List AC-4 among the Sendspin data types (1) or not (0)"
     default 1 if IDF_TARGET_ESP32P4 && ICLFORGE_AC4
@@ -868,7 +911,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4
         stream it was measured on up to 5.1 (2.0 0.28 to 0.69, 5.1 0.62 to 0.91 with the second
         core, planning/ac4.md D14g to D14i), so it lists AC-4 and states 6 channels, which leaves
         5.1.4 to the server. An ESP32-S3 with the decoder and the 64 KB data cache
-        (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8-ac4 profile) keeps up with every
+        (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8 profile) keeps up with every
         2.0 stream up to 25 frames a second over Sendspin, 0.48 to 0.59 of a frame at frame rate
         index 13 and 0.78 to 0.80 at 24 and 25, and falls behind at 29.97 (0.99, with underruns),
         so it lists AC-4 at 2 channels and 25 frames a second and a server decodes the rest and
@@ -1025,6 +1068,33 @@ config ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY
         and above the idle task. The screen is a guest: when the cores are
         busy it is drawn late rather than the audio being.
 
+config ICLFORGE_EXAMPLE_PANEL_YIELD
+    int "The audio first: 0 nothing, 1 hold the Meters view at ten a second while the decoder is busy, 2 that and the screen's task on the decode core"
+    default 1
+    range 0 2
+    help
+        A decoder that spends most of its 32 ms on a burst (a 7.1.4 object
+        stream, AC-4) is slowed by the screen's drawing and analysis running
+        beside it, whatever their priority. On the kit the Meters view cost
+        a burst 1.6 to 1.8 ms under JOC 7.1.4 and 1.5 ms under AC-4 5.1; 1
+        holds it at ten updates a second while the decoder is busy and the
+        cost falls to 0.9 to 1.2 and 1.1 ms (a steady ten, 2 to 3 % of the
+        steps without an update). 2 also makes the panel task on the decode
+        core (always: FreeRTOS here cannot move a task between cores), where
+        it can only run while the decode task sleeps: 0.5 to 0.7 and 0.65 ms,
+        but the view then misses 11 to 16 % of its steps and every other
+        view under JOC refreshes in twice the time (planning/p4x-meters-view.md,
+        "What the screen costs the audio path"). 0 leaves the screen as it
+        was. The audio comes first, so the default is 1.
+
+config ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+    int "A mean burst this long, microseconds, is a busy decoder"
+    default 14000
+    range 1000 30000
+    help
+        Read once a second from the player's mean burst; in at this, out at
+        70 % of it. A 5.1 E-AC-3 burst is 4 ms, JOC 7.1.4 21 ms, AC-4 5.1 26.
+
 config ICLFORGE_EXAMPLE_PANEL_STACK_BYTES
     int "Stack of the panel's task, bytes (PSRAM)"
     default 16384
@@ -1038,16 +1108,37 @@ config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
         LVGL draws a dirty area through two buffers of this many rows of the
         panel's width, in RGB565: 80 KB each at 1024 wide and 40 rows.
 
+config ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH
+    bool "Copy each render buffer into the DSI frame buffer with the 2D-DMA"
+    default y
+    depends on ICLFORGE_EXAMPLE_PANEL_DSI
+    help
+        Without this ESP-IDF copies each rendered area into the frame buffer
+        on the CPU, line by line, PSRAM to PSRAM, and tells LVGL it is done
+        before returning: the panel task is held for the copy and the second
+        render buffer never overlaps it. With it the copy is a 2D-DMA job and
+        LVGL is told from the interrupt that ends it, so the task draws the
+        next chunk meanwhile. The jobs read and write PSRAM, as the CPU did.
+        If the DMA cannot be set up the CPU copy stays.
+
 config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT
     int "Port that serves the picture as a BMP at /panel.bmp (0 = none)"
-    default 8081
+    default 0
     range 0 65535
     help
         A second, tiny HTTP server for development: GET /panel.bmp is what is
         on the glass (or in the frame buffer, with no glass), GET /panel is
-        the drawing statistics as JSON and POST /panel/tap?x=..&y=.. is a tap
-        (a touch with no touch controller). It is how a design is checked
-        before the panel is here. Set 0 for a release image.
+        the drawing statistics as JSON, POST /panel/tap?x=..&y=.. is a tap
+        (a touch with no touch controller) and POST /panel/demo?mode=.. plays
+        a demo song. It has no authentication: anyone on the network can read
+        the screen and press its buttons. It is how a design is checked before
+        the panel is here, and what the screen tests drive a board by.
+
+        0, the default, starts no server. A release image has 0
+        (profiles.json locks it, and package_firmware.py refuses an image
+        built with any other). 8081 comes from the panel-capture overlay
+        (sdkconfig.panel-capture) for an image that is run on a bench, and
+        from sdkconfig.panel-null, which exists to be read back.
 
 config ICLFORGE_EXAMPLE_PANEL_BACKLIGHT_GPIO
     int "Backlight PWM GPIO (-1 = none)"
@@ -1116,6 +1207,40 @@ config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_MV
     int "That LDO's voltage, millivolts"
     default 2500
     range 500 3300
+
+# What a person chooses once and leaves (the Preferences screen, planning/p4x-preferences.md), as the board
+# has it before anyone has chosen: NVS holds the choice, and a QEMU run or a new board uses these. Read by every
+# build (settings.cpp) and acted on by the one with a panel.
+config ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT
+    int "Backlight when lit, percent (10 to 100)"
+    default 80
+    range 10 100
+    help
+        The level of the backlight while the screen is lit. The dimmed screen goes to a floor of 4 percent
+        (never above this), and the dark view turns it off.
+
+config ICLFORGE_EXAMPLE_CLOCK_FORMAT
+    int "Clock view: 24 hours (0), 12 hours (1), 24 hours with seconds (2), 12 hours with seconds (3)"
+    default 0
+    range 0 3
+    help
+        Bit 0 is the 12-hour clock and bit 1 the seconds: the stored value of iclforge::wallclock::ClockFormat.
+
+config ICLFORGE_EXAMPLE_NIGHT_SCHEDULE
+    string "Night schedule: two times by the board's own time, then on or off"
+    default "22:00-07:00 off"
+    help
+        Go dark between the two times (HH:MM-HH:MM, across midnight when the second is earlier), as the dark view
+        is: a touch lights the screen for a while. The form PUT /night-schedule takes. A board that does not
+        know the time is lit whatever this says.
+
+config ICLFORGE_EXAMPLE_NIGHT_IDLE
+    int "Night schedule also darkens the idle screen (0 or 1)"
+    default 0
+    range 0 1
+    help
+        Whether the night schedule covers the screen shown between songs as well as the one shown while a song
+        with no lyrics plays. Off until the owner decides (planning/p4x-now-playing.md, "Open").
 
 endmenu
 

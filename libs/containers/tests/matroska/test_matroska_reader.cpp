@@ -1,11 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "iclforge/containers/matroska/matroska.hpp"
@@ -136,6 +138,8 @@ Bytes ebml_header(std::string_view doc_type = "matroska") {
     return out;
 }
 
+Bytes frame_of(std::size_t size, std::uint8_t fill);
+
 struct TrackSpec {
     std::uint64_t number = 1;
     std::uint64_t type = 2;  // audio
@@ -144,6 +148,10 @@ struct TrackSpec {
     std::uint64_t channels = 6;
     std::string language{"eng"};
     bool float32_rate = false;
+    // A ContentEncodings element: with a ContentEncryption (AES, a key ID) when `encrypted`, with
+    // a ContentCompression (header stripping) alone when `compressed`.
+    bool encrypted = false;
+    bool compressed = false;
 };
 
 Bytes track_entry(const TrackSpec& spec) {
@@ -161,6 +169,29 @@ Bytes track_entry(const TrackSpec& spec) {
     put_string_element(entry, kCodecId, spec.codec_id);
     put_string_element(entry, kLanguage, spec.language);
     put_element(entry, kAudio, audio);
+    if (spec.encrypted || spec.compressed) {
+        // ContentEncodings > ContentEncoding > ContentEncodingOrder, Scope, Type and then the
+        // ContentEncryption (ContentEncAlgo 5 = AES, ContentEncKeyID) or ContentCompression
+        // (ContentCompAlgo 3 = header stripping). Ids as the Matroska specification has them.
+        Bytes encoding;
+        put_uint_element(encoding, 0x5031, 0);
+        put_uint_element(encoding, 0x5032, 1);
+        if (spec.encrypted) {
+            put_uint_element(encoding, 0x5033, 1);
+            Bytes encryption;
+            put_uint_element(encryption, 0x47E1, 5);
+            put_element(encryption, 0x47E2, frame_of(16, 0x6B));
+            put_element(encoding, 0x5035, encryption);
+        } else {
+            put_uint_element(encoding, 0x5033, 0);
+            Bytes compression;
+            put_uint_element(compression, 0x4254, 3);
+            put_element(encoding, 0x5034, compression);
+        }
+        Bytes encodings;
+        put_element(encodings, 0x6240, encoding);
+        put_element(entry, 0x6D80, encodings);
+    }
 
     Bytes out;
     put_element(out, kTrackEntry, entry);
@@ -915,8 +946,170 @@ TEST_CASE("Matroska describe() names every demux error", "[matroska][reader]") {
                              iclforge::containers::matroska::DemuxError::kTruncated,
                              iclforge::containers::matroska::DemuxError::kMalformed,
                              iclforge::containers::matroska::DemuxError::kNoAudioTrack,
-                             iclforge::containers::matroska::DemuxError::kLimitExceeded}) {
+                             iclforge::containers::matroska::DemuxError::kLimitExceeded,
+                             iclforge::containers::matroska::DemuxError::kEncryptedTrack}) {
         CHECK_FALSE(iclforge::containers::matroska::describe(error).empty());
         CHECK(iclforge::containers::matroska::describe(error) != "unknown error");
+    }
+}
+
+namespace {
+
+// A file of `tracks`, one cluster holding one block per entry of `blocks` (track, frame).
+Bytes file_of(const std::vector<TrackSpec>& tracks,
+              const std::vector<std::pair<std::uint64_t, Bytes>>& blocks) {
+    Bytes track_entries;
+    for (const auto& track : tracks) {
+        put_bytes(track_entries, track_entry(track));
+    }
+    Bytes cluster;
+    put_uint_element(cluster, kClusterTimestamp, 0);
+    for (const auto& [number, frame] : blocks) {
+        put_element(cluster, kSimpleBlock, block_payload(number, 0, 0x80, frame));
+    }
+    Bytes segment;
+    put_element(segment, kTracks, track_entries);
+    put_element(segment, kCluster, cluster);
+    Bytes file = ebml_header();
+    put_element(file, kSegment, segment);
+    return file;
+}
+
+}  // namespace
+
+TEST_CASE("Matroska refuses an audio track that declares ContentEncryption",
+          "[matroska][reader][encrypted]") {
+    using iclforge::containers::matroska::DemuxError;
+    using iclforge::containers::matroska::ReadOptions;
+    // Nothing else in the entry marks its frames as ciphertext, so a reader that ignored
+    // ContentEncodings handed them back as audio with exit code 0 (audit M11, G4).
+    const std::vector<std::pair<std::uint64_t, Bytes>> blocks{{1, frame_of(64, 0xEE)},
+                                                              {1, frame_of(64, 0xEF)}};
+
+    SECTION("the only audio track is encrypted") {
+        const auto file = file_of({TrackSpec{.encrypted = true}}, blocks);
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == DemuxError::kEncryptedTrack);
+
+        // The streaming Reader reaches the same verdict, and delivers no frame on the way.
+        iclforge::containers::matroska::Reader reader{};
+        std::size_t delivered = 0;
+        const auto sink = [&delivered](std::span<const std::byte>) { ++delivered; };
+        for (std::size_t offset = 0; offset < file.size(); offset += 5) {
+            const auto take = std::min<std::size_t>(5, file.size() - offset);
+            REQUIRE(reader.push(std::span<const std::byte>{file}.subspan(offset, take), sink)
+                        .has_value());
+        }
+        const auto done = reader.finish();
+        REQUIRE_FALSE(done.has_value());
+        CHECK(done.error() == DemuxError::kEncryptedTrack);
+        CHECK(delivered == 0);
+        CHECK_FALSE(reader.track_found());
+    }
+
+    SECTION("naming the encrypted track is a refusal, naming an absent one is not") {
+        const auto file = file_of({TrackSpec{.encrypted = true}}, blocks);
+        const auto named =
+            iclforge::containers::matroska::demux(file, ReadOptions{.track_number = 1});
+        REQUIRE_FALSE(named.has_value());
+        CHECK(named.error() == DemuxError::kEncryptedTrack);
+        const auto absent =
+            iclforge::containers::matroska::demux(file, ReadOptions{.track_number = 7});
+        REQUIRE_FALSE(absent.has_value());
+        CHECK(absent.error() == DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("a clear audio track beside it is read, and the encrypted one is listed") {
+        const auto file =
+            file_of({TrackSpec{.number = 1, .encrypted = true},
+                     TrackSpec{.number = 2, .codec_id = "A_AC3", .channels = 2}},
+                    {{1, frame_of(64, 0xEE)}, {2, frame_of(32, 0x21)}, {2, frame_of(32, 0x22)}});
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 2);
+        CHECK(owned(out->frames) == std::vector<Bytes>{frame_of(32, 0x21), frame_of(32, 0x22)});
+        REQUIRE(out->skipped.size() == 1);
+        CHECK(out->skipped[0].track_number == 1);
+        // The encrypted track is still one the caller can ask for by number, and is refused.
+        const auto named =
+            iclforge::containers::matroska::demux(file, ReadOptions{.track_number = 1});
+        REQUIRE_FALSE(named.has_value());
+        CHECK(named.error() == DemuxError::kEncryptedTrack);
+    }
+
+    SECTION("an encrypted track of another codec is not this reader's to name") {
+        const auto file = file_of({TrackSpec{.codec_id = "A_AAC", .encrypted = true}}, blocks);
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("a ContentEncodings with no ContentEncryption is not taken for encryption") {
+        // Compression (here header stripping) is another matter, which the reader does not apply;
+        // this shows only that the refusal keys on ContentEncryption.
+        const auto file = file_of({TrackSpec{.compressed = true}}, blocks);
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->frames.size() == 2);
+    }
+}
+
+// A Blu-ray remux has TrueHD first and AC-3 or E-AC-3 after it. Auto-selection takes the first
+// track of a codec it reads; AutoSelect lets a caller that cannot use one of them have the next.
+TEST_CASE("Matroska auto-selection passes over a codec that ReadOptions::auto_select leaves out",
+          "[matroska][reader][truehd]") {
+    using iclforge::containers::matroska::AutoSelect;
+    using iclforge::containers::matroska::ReadOptions;
+    const Bytes truehd_frame = frame_of(80, 0x31);
+    const Bytes eac3_frame = frame_of(120, 0x32);
+    const auto file = file_of({TrackSpec{.number = 1, .codec_id = "A_TRUEHD", .channels = 8},
+                               TrackSpec{.number = 2, .codec_id = "A_EAC3", .channels = 6}},
+                              {{1, truehd_frame}, {2, eac3_frame}, {1, truehd_frame}});
+
+    SECTION("by default the first track is taken, TrueHD, as it was") {
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 1);
+        CHECK(out->track.codec_id == "A_TRUEHD");
+        CHECK(out->frames.size() == 2);
+    }
+
+    SECTION("without TrueHD the E-AC-3 track after it is taken, and the other is listed") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 2);
+        CHECK(out->track.codec_id == "A_EAC3");
+        CHECK(owned(out->frames) == std::vector<Bytes>{eac3_frame});
+        REQUIRE(out->skipped.size() == 1);
+        CHECK(out->skipped[0].track_number == 1);
+        CHECK(out->skipped[0].kind == iclforge::containers::matroska::TrackKind::kAudio);
+        CHECK(out->skipped[0].codec_id == "A_TRUEHD");
+
+        // The streaming reader makes the same choice.
+        CHECK(read_in_chunks(file, 7, ReadOptions{.auto_select = AutoSelect{.truehd = false}}) ==
+              std::vector<Bytes>{eac3_frame});
+    }
+
+    SECTION("without E-AC-3 the first track stays the one taken") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 1);
+    }
+
+    SECTION("with nothing left to take there is no audio track") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.auto_select = AutoSelect{.eac3 = false, .truehd = false}});
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == iclforge::containers::matroska::DemuxError::kNoAudioTrack);
+    }
+
+    SECTION("naming a track number is not narrowed by it") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, ReadOptions{.track_number = 1, .auto_select = AutoSelect{.truehd = false}});
+        REQUIRE(out.has_value());
+        CHECK(out->track.codec_id == "A_TRUEHD");
     }
 }

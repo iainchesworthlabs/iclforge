@@ -36,6 +36,10 @@ void network_adopt_built_in() {
     net::station_adopt_built_in();
 }
 
+void network_forget_driver_state() {
+    net::station_forget_driver_state();
+}
+
 // One network: nothing to choose between, and the station is the network.
 bool network_has_choice() {
     return false;

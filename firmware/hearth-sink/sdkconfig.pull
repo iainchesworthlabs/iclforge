@@ -1,0 +1,12 @@
+# Updates pulled from GitHub releases (planning/esp32-ota.md, O10): the HTTPS client, a certificate bundle of
+# the three roots GitHub's hosts chain to (tls_roots.pem) and not ESP-IDF's whole default one, and the
+# routes. A board that takes it also needs a trust anchor for the signed index it pulls
+# (ICLFORGE_EXAMPLE_TRUST_ANCHORS in its sdkconfig, or the ICLFORGE_TRUST_ANCHORS_FILE CMake variable);
+# with none it says it cannot verify a pull and pulls nothing. Not part of any locked profile yet: a profile
+# takes it with a board run, once the project's anchor exists (firmware/hearth-sink/profiles.json).
+#
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;...;sdkconfig.pull"
+CONFIG_ICLFORGE_FIRMWARE_PULL=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="tls_roots.pem"

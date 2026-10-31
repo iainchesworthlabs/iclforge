@@ -31,19 +31,24 @@
 #include "ac4_stream.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/decoder/dynamic_range.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/identify.hpp"
+#include "iclforge/render/identify_sequence.hpp"
+#include "iclforge/render/output_trim.hpp"
 #include "iclforge/render/render.hpp"
 #include "iclforge/render/routing.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/render/trim_delay.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "opus_stream.hpp"
 
 #include "iclforge/access_units.hpp"
+#include "iclforge/decoder_keep.hpp"
 #include "iclforge/object_limit.hpp"
 #include "iclforge/pcm_unpack.hpp"
 
@@ -53,11 +58,15 @@ namespace {
 namespace ss = iclforge::sendspin;
 namespace ac = ss::player;
 namespace m = ss::messages;
+using iclforge::render::IdentifySequence;
 using iclforge::render::IdentifyTone;
 using iclforge::render::LayoutRenderer;
 using iclforge::render::OutputLayout;
+using iclforge::render::OutputTrim;
 using iclforge::render::Routing;
+using iclforge::render::SpeakerTrimTable;
 using iclforge::render::TrimDelay;
+namespace speaker_trim = iclforge::render::speaker_trim;
 using Location = iclforge::ac3::eac3::chanmap::Location;
 
 constexpr std::size_t kBlock = Playout::kBlockFrames;
@@ -176,7 +185,10 @@ class TimedSink final : public PlayoutSink {
 struct BurstPlayer::Impl {
     Impl(const BurstPlayerConfig& cfg, ScheduledSink& snk)
         : config(cfg), sink(snk), timed(snk), layout(cfg.layout), renderer(cfg.layout, cfg.sample_rate),
-          tone(cfg.sample_rate) {}
+          tone(cfg.sample_rate), local_identify(cfg.sample_rate) {
+        applied_range = cfg.dynamic_range;
+        wanted_range.store(static_cast<std::uint8_t>(cfg.dynamic_range));
+    }
 
     BurstPlayerConfig config;
     ScheduledSink& sink;
@@ -265,16 +277,25 @@ struct BurstPlayer::Impl {
 
     OutputLayout layout;
     iclforge::ac3::render::Serving serving;
+    // The decoder settings as the board and the server left them (the server's replace the board's
+    // whole), and what the decoders are made with: those, served for the layout, and the listener's
+    // dynamic range over them (rebuild_decoder_config).
+    iclforge::ac3::DecoderConfig decoder_base;
     iclforge::ac3::DecoderConfig decoder_config;
+    // The dynamic range the decoders were made for, and the one the listener last chose: the
+    // decoders are made again, at a stream's start, when the two differ.
+    iclforge::base::DynamicRange applied_range = iclforge::base::kDefaultDynamicRange;
+    std::atomic<std::uint8_t> wanted_range{static_cast<std::uint8_t>(iclforge::base::kDefaultDynamicRange)};
     LayoutRenderer renderer;
     Routing routing;
-    TrimDelay trim_delay;
-    // The trims and delays last set, kept so that reopening the sink for
-    // another output count keeps them.
-    std::array<double, Playout::kMaxOutputs> trims_db{};
-    std::array<double, Playout::kMaxOutputs> delays_ms{};
+    // The level and delay of every output: the listener's table, or a server's settings where they speak. Kept
+    // across a reopening of the sink for another output count.
+    OutputTrim trim;
     std::size_t outputs_open = 0;
+    // A server's identify tone, which it starts and stops, and the board's own sequence (identify_local()),
+    // which stops itself.
     IdentifyTone tone;
+    IdentifySequence local_identify;
     std::optional<ac::Identify> identifying;
     std::optional<ac::Identify> identify_applied;
 
@@ -293,14 +314,16 @@ struct BurstPlayer::Impl {
     std::size_t mark_head = 0;
     std::size_t mark_count = 0;
 
-    // Whether every output's trim is 0 dB and its delay none: the levels the meter reads are then
-    // the source's own.
-    bool trim_neutral = true;
     // The levels of the PCM block being emitted, measured in integers while it was unpacked
     // (play_pcm()), for the meter to use in place of measuring the floats again. Null for anything
     // else: a burst's blocks have no source of this kind.
     const PcmLevel* source_levels = nullptr;
     std::size_t source_channels = 0;
+    // The output each source channel's level is for, or -1 where the level is not the output's own: the
+    // slot the renderer puts the channel on, and the output that slot is patched to (play_pcm()). A channel
+    // is not on the output of its own number: a stereo bed in a 5.1 room puts R on slot 2, which is C's
+    // number in the room's order.
+    std::array<int, 2> source_outputs{-1, -1};
     unsigned source_bits = 16;
 
     // The meter.
@@ -313,6 +336,9 @@ struct BurstPlayer::Impl {
     // Volume, in by any task, ramped by the decode task.
     std::atomic<float> target_gain{1.0F};
     float gain = 1.0F;
+
+    // What the screen has asked to see of the output (BurstPlayer::set_block_tap); read once a block.
+    std::atomic<BlockTap*> block_tap{nullptr};
 
     // Burst timing.
     std::uint64_t decode_us_total = 0;
@@ -327,6 +353,8 @@ struct BurstPlayer::Impl {
 
     std::uint64_t late_chunks = 0;
     std::uint64_t bursts_played = 0;
+    // The coded bytes of the chunks played, for the screen's bitrate.
+    std::uint64_t coded_bytes = 0;
     bool have_decoder_report = false;
     ac::DecoderReport decoder_report;
     // Whether this stream has already printed why it refused a syncframe
@@ -343,10 +371,14 @@ struct BurstPlayer::Impl {
     bool have_server_settings = false;
     std::optional<ac::Identify> pending_identify;
     bool identify_changed = false;
+    // From the control surface: the listener's table, and the board's own identify request.
+    std::optional<SpeakerTrimTable> pending_trim;
+    std::optional<IdentifyRequest> pending_local_identify;
     std::int64_t settings_revision = 0;
 
     mutable std::mutex status_mutex;
     BurstPlayerStatus status;
+    BurstPlayerTrim trim_report;
 
     // ---------------------------------------------------------------------------
 
@@ -397,13 +429,12 @@ struct BurstPlayer::Impl {
     // Everything that follows from the layout and the decoder's settings.
     void configure(const OutputLayout& new_layout, const iclforge::ac3::DecoderConfig& decoder, iclforge::ac3::DownmixTarget fold,
                    iclforge::ac3::render::ObjectsPolicy objects, double crossover_hz, const std::optional<Routing>& new_routing,
-                   std::span<const double> trims, std::span<const double> delays) {
+                   std::optional<std::span<const double>> trims, std::optional<std::span<const double>> delays) {
         layout = new_layout;
         serving = iclforge::ac3::render::serve(layout, fold, objects);
         objects_always = objects == iclforge::ac3::render::ObjectsPolicy::kAlways;
-        decoder_config = decoder;
-        iclforge::ac3::render::configure_decoder(serving, decoder_config);
-        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        decoder_base = decoder;
+        rebuild_decoder_config();
         renderer = LayoutRenderer{layout, config.sample_rate, crossover_hz};
         renderer_bed.reset();
         if (new_routing) {
@@ -411,16 +442,37 @@ struct BurstPlayer::Impl {
         } else {
             routing = Routing::identity(layout.slots(), layout.slots()).value_or(Routing{});
         }
-        trims_db.fill(0.0);
-        delays_ms.fill(0.0);
-        std::copy_n(trims.begin(), std::min(trims.size(), trims_db.size()), trims_db.begin());
-        std::copy_n(delays.begin(), std::min(delays.size(), delays_ms.size()), delays_ms.begin());
+        // A server's trims and delays replace the listener's table whole, each as the server sent it; a key it
+        // left out is the table's.
+        trim.set_server(trims, delays);
         // Given back before the sink is opened: a layout with more outputs makes the sink's DMA
         // queue larger (a TDM line's holds the outputs it carries), and an AC-4 decoder keeps
         // nearly all of internal RAM between plays.
         drop_decoders();  // made with the settings these are
         open_outputs(false);
         reset_decoding();
+    }
+
+    // The configuration the AC-3 and E-AC-3 decoders are made with: the board's and the server's
+    // settings, the layout's serving, and the listener's dynamic range over all of it.
+    void rebuild_decoder_config() {
+        decoder_config = decoder_base;
+        iclforge::ac3::render::configure_decoder(serving, decoder_config);
+        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
+        iclforge::ac3::apply_dynamic_range(applied_range, decoder_config);
+    }
+
+    // The listener's latest choice, taken up at a stream's start: the decoders made for the one
+    // before are let go, and made again (AC-4's with the new range in its config) by the stream.
+    void take_up_dynamic_range() {
+        const auto wanted = static_cast<iclforge::base::DynamicRange>(wanted_range.load());
+        if (wanted == applied_range) {
+            return;
+        }
+        applied_range = wanted;
+        rebuild_decoder_config();
+        drop_decoders();
+        std::printf("burst player: dynamic range %s\n", iclforge::base::dynamic_range_name(applied_range).data());
     }
 
     // The decoders given back, for a change of the configuration they were made with.
@@ -454,18 +506,12 @@ struct BurstPlayer::Impl {
                 playout->realign();
             }
         }
-        (void)trim_delay.configure(delay_storage, outputs_open, max_delay_samples);
-        trim_neutral = true;
-        for (std::size_t o = 0; o < outputs_open; ++o) {
-            (void)trim_delay.set_trim_db(o, trims_db[o]);
-            (void)trim_delay.set_delay(o, TrimDelay::samples_for_ms(delays_ms[o], config.sample_rate));
-            trim_neutral = trim_neutral && trims_db[o] == 0.0 && delays_ms[o] == 0.0;
-        }
+        trim.configure(layout, routing, outputs_open);
     }
 
     void configure_defaults(const OutputLayout& new_layout) {
         configure(new_layout, config.decoder, config.stereo_fold, config.objects, LayoutRenderer::kDefaultCrossoverHz,
-                  std::nullopt, {}, {});
+                  std::nullopt, std::nullopt, std::nullopt);
     }
 
     // The server's settings, which replace every earlier one whole: a key
@@ -543,10 +589,10 @@ struct BurstPlayer::Impl {
         if (s.routing) {
             new_routing = Routing::parse(*s.routing, std::min(config.max_outputs, Playout::kMaxOutputs));
         }
-        const std::vector<double> none;
         configure(new_layout, decoder, fold, objects, s.crossover_hz.value_or(LayoutRenderer::kDefaultCrossoverHz),
-                  new_routing, s.trim_db ? std::span<const double>(*s.trim_db) : std::span<const double>(none),
-                  s.delay_ms ? std::span<const double>(*s.delay_ms) : std::span<const double>(none));
+                  new_routing,
+                  s.trim_db ? std::optional<std::span<const double>>(std::span<const double>(*s.trim_db)) : std::nullopt,
+                  s.delay_ms ? std::optional<std::span<const double>>(std::span<const double>(*s.delay_ms)) : std::nullopt);
         std::printf("burst player: settings %lld applied: layout %s, %u outputs\n",
                     static_cast<long long>(s.revision), layout.text().data(), static_cast<unsigned>(outputs_open));
     }
@@ -557,12 +603,20 @@ struct BurstPlayer::Impl {
         std::optional<OutputLayout> own_layout;
         std::optional<ac::Identify> identify;
         bool identify_update = false;
+        std::optional<SpeakerTrimTable> new_trim;
+        std::optional<IdentifyRequest> local_request;
         {
             const std::lock_guard lock(settings_mutex);
             settings.swap(pending_settings);
             own_layout.swap(pending_layout);
             identify = pending_identify;
             identify_update = std::exchange(identify_changed, false);
+            new_trim.swap(pending_trim);
+            local_request.swap(pending_local_identify);
+        }
+        if (new_trim) {
+            // Before the settings below, which configure everything from scratch with the table in force.
+            trim.set_table(*new_trim);
         }
         if (settings) {
             apply(*settings);
@@ -580,6 +634,53 @@ struct BurstPlayer::Impl {
             if (outputs_needed() != outputs_open) {
                 open_outputs(false);
             }
+            if (identifying) {
+                // A server's tone replaces the board's own.
+                local_identify.stop(true);
+            }
+        }
+        if (local_request) {
+            start_local_identify(*local_request);
+        }
+    }
+
+    // The board's own identify request, at a moment nothing else is using the sink: the tone out of the speaker
+    // of the layout in force that has the role asked for, or each in turn. The outputs are the layout's channels
+    // as the patch has them.
+    void start_local_identify(const IdentifyRequest& request) {
+        using Shape = IdentifyRequest::Shape;
+        if (request.shape == Shape::kOff) {
+            local_identify.stop();
+            return;
+        }
+        if (stream != Stream::kIdle || identifying || held.load()) {
+            return;
+        }
+        std::array<IdentifySequence::Target, IdentifySequence::kMaxTargets> targets{};
+        std::size_t count = 0;
+        const std::size_t channels = std::min(layout.slots(), routing.channels());
+        for (std::size_t c = 0; c < channels && count < targets.size(); ++c) {
+            const int output = routing.output_of(c);
+            const speaker_trim::RoleCode role = speaker_trim::role_of_slot(layout, c);
+            if (output < 0 || static_cast<std::size_t>(output) >= outputs_open || role == speaker_trim::kNoRole) {
+                continue;
+            }
+            if (request.shape != Shape::kEach && role != request.role) {
+                continue;
+            }
+            targets[count++] = IdentifySequence::Target{
+                .output = static_cast<std::uint8_t>(output),
+                .band = carries_lfe(static_cast<std::size_t>(output)) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull};
+        }
+        const IdentifySequence::Mode mode = request.shape == Shape::kEach   ? IdentifySequence::Mode::kEach
+                                            : request.shape == Shape::kLoop ? IdentifySequence::Mode::kLoop
+                                                                            : IdentifySequence::Mode::kOnce;
+        if (local_identify.start(mode, std::span<const IdentifySequence::Target>(targets.data(), count), request.level_db)) {
+            std::printf("burst player: identify %.*s: %u speaker%s, at most %d dB\n",
+                        request.shape == Shape::kEach ? 4 : static_cast<int>(speaker_trim::role_name(request.role).size()),
+                        request.shape == Shape::kEach ? "each" : speaker_trim::role_name(request.role).data(),
+                        static_cast<unsigned>(request.shape == Shape::kEach ? count : 1), count == 1 ? "" : "s",
+                        static_cast<int>(IdentifySequence::clamp_level_db(request.level_db)));
         }
     }
 
@@ -617,18 +718,20 @@ struct BurstPlayer::Impl {
         bed_count = 0;
         renderer_bed.reset();
         renderer.reset();
-        trim_delay.reset();
+        trim.reset();
         decoded_frame_set = false;
         mark_count = 0;
         mark_head = 0;
     }
 
     void new_stream(Stream kind) {
+        take_up_dynamic_range();
         reset_decoding();
         stream = kind;
         have_origin = false;
         have_decoder_report = false;
         bursts_played = 0;
+        coded_bytes = 0;
         late_chunks = 0;
         late_kept_chunks = 0;
         lost_frames = 0;
@@ -657,29 +760,35 @@ struct BurstPlayer::Impl {
         (void)heap_caps_monitor_local_minimum_free_size_start();
         // An Opus stream's decoder is kept from one Opus stream to the next, as the AC-3 ones are,
         // and let go when another kind of stream starts; the AC-3 ones are let go when an Opus
-        // stream does. Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
+        // stream does, and when a PCM stream does on a part with PSRAM to make them again (iclforge/
+        // decoder_keep.hpp). Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
         // An AC-4 stream's decoder is the largest by far, 286 KB at 2.0: it goes with the AC-3
         // ones when any other kind starts, and they go when it does. Its allocations go where
         // CONFIG_ICLFORGE_AC4_INTERNAL_BELOW puts them for as long as the stream plays.
         const bool ac4_stream = kind == Stream::kBursts && data_type == ac::DataType::kAc4;
+        const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
+        const DecoderNeed need = ac4_stream    ? DecoderNeed::kAc4
+                                 : opus_stream ? DecoderNeed::kOpus
+                                 : kind == Stream::kPcm ? DecoderNeed::kNone
+                                                        : DecoderNeed::kAc3Family;
+        const DecodersKept keep = decoders_kept(need, heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0);
         ac4_failed = false;
         ac4_frame_samples = 0;
-        if (!ac4_stream) {
-            ac4.reset();
-        } else {
+        if (!keep.ac3_family) {
             ac3_decoder.reset();
             eac3_decoder.reset();
-            opus.reset();
+        }
+        if (!keep.ac4) {
+            ac4.reset();
+        } else {
             if (!ac4) {
                 ac4 = std::make_unique<Ac4Stream>();
             }
             ac4->begin_stream();
         }
-        const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
         if (!opus_stream) {
             opus.reset();
         } else if (!opus) {
-            drop_decoders();
             auto decoder = std::make_unique<OpusStream>();
             if (decoder->open(pcm_format.sample_rate, pcm_format.channels)) {
                 opus = std::move(decoder);
@@ -857,14 +966,30 @@ struct BurstPlayer::Impl {
     // (LayoutRenderer::render_reached()), bit n for output n: the ones the patch feeds from them. Every
     // other output is silence, and costs nothing from here to the sink: it is not routed, trimmed,
     // scaled or metered, and the playout hands the sink the same block of zeros for all of them. An
-    // output with a delay keeps a line that holds audio past the block that gave it, and the identify
-    // tone writes every output, so with either all of them are live.
+    // output with a delay keeps a line that holds audio past the block that gave it, so it stays live
+    // whatever reached it, and a server's identify tone writes every output.
     [[nodiscard]] std::uint32_t live_outputs(std::uint32_t reached) const {
         const std::uint32_t open = outputs_open >= 32 ? ~std::uint32_t{0} : (std::uint32_t{1} << outputs_open) - 1U;
-        if (identifying || trim_delay.delayed()) {
+        if (identifying) {
             return open;
         }
-        return routing.outputs_fed_by(reached) & open;
+        return (routing.outputs_fed_by(reached) | trim.delayed_outputs()) & open;
+    }
+
+    // An output that is live though no slot reached by this block feeds it (a delay line's tail, a server's
+    // identify tone) reads its channel's slot, which render_reached() left as it was: the audio of an earlier
+    // block. Those slots are zeroed first, so that the output takes silence.
+    void silence_unfed_slots(std::uint32_t live, std::uint32_t reached, std::size_t n) {
+        const std::uint32_t unfed = live & ~routing.outputs_fed_by(reached);
+        for (std::size_t o = 0; unfed != 0 && o < outputs_open; ++o) {
+            if (((unfed >> o) & 1U) == 0) {
+                continue;
+            }
+            const int channel = routing.channel_of(o);
+            if (channel != Routing::kUnassigned && static_cast<std::size_t>(channel) < layout.slots()) {
+                std::fill_n(rendered[static_cast<std::size_t>(channel)].data(), n, 0.0F);
+            }
+        }
     }
 
     // The rendered slots from here on: `n` frames of them, `reached` the slots that hold any.
@@ -880,6 +1005,7 @@ struct BurstPlayer::Impl {
         }
         const std::span<const std::span<float>> out(view.data(), outputs_open);
         const std::uint32_t live = live_outputs(reached);
+        silence_unfed_slots(live, reached, n);
         routing.apply(std::span<const std::span<const float>>(rendered_views.data(), slots), out, live);
         // Outputs past the patch's own, which only the identify tone opens.
         for (std::size_t o = routing.outputs(); o < outputs_open; ++o) {
@@ -887,7 +1013,7 @@ struct BurstPlayer::Impl {
                 std::fill(view[o].begin(), view[o].end(), 0.0F);
             }
         }
-        trim_delay.process(out, live);
+        trim.process(out, live);
         if (identifying) {
             // Every output carries the tone or silence; the stream goes on
             // underneath, decoded and discarded, and keeps its timeline.
@@ -896,6 +1022,7 @@ struct BurstPlayer::Impl {
             tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
         }
         const bool scaled = apply_gain(out, n, live);
+        tap_block(out, n, live);
         if (scaled || !meter_from_source(n)) {
             meter(out, n, live);
         }
@@ -917,6 +1044,14 @@ struct BurstPlayer::Impl {
             return false;
         }
         return layout.slot(static_cast<std::size_t>(channel)).kind == iclforge::render::Speaker::Kind::kLfe;
+    }
+
+    // The block as it is about to be heard, to whatever is looking at it (iclforge/block_tap.hpp): nothing when nothing is.
+    void tap_block(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live) {
+        BlockTap* const tap = block_tap.load(std::memory_order_acquire);
+        if (tap != nullptr && tap->wants_blocks()) {
+            tap->block(out, n, live);
+        }
     }
 
     // True when the block was scaled: a block at unity is left as it is, and costs nothing. Only the
@@ -989,27 +1124,27 @@ struct BurstPlayer::Impl {
     }
 
     // The block's levels from the integers its PCM source was unpacked from (play_pcm()), where the
-    // outputs carry that source and nothing else: unity gain, every source channel on the output of
-    // its own number, no trim or delay, no identify tone (and, which the caller checks, no gain
-    // applied to the block). The same peak and mean square the floats would give, without a
+    // outputs carry that source and nothing else: unity gain, every source channel on one output
+    // (source_outputs, which is where the renderer and the patch put it, not the channel's number), no
+    // trim or delay, no identify tone (and, which the caller checks, no gain applied to the block). The same peak and mean square the floats would give, without a
     // soft-float operation a sample. False when any of that does not hold, and the caller measures
     // the floats.
     [[nodiscard]] bool meter_from_source(std::size_t n) {
-        if (source_levels == nullptr || identifying || !trim_neutral ||
-            source_channels > outputs_open) {
+        if (source_levels == nullptr || identifying || trim.active()) {
             return false;
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            if (routing.output_of(c) != static_cast<int>(c)) {
+            if (source_outputs[c] < 0) {
                 return false;
             }
         }
         for (std::size_t c = 0; c < source_channels; ++c) {
-            window_peak[c] =
-                std::max(window_peak[c], pcm_level_peak(source_levels[c], source_bits));
+            const std::size_t o = static_cast<std::size_t>(source_outputs[c]);
+            window_peak[o] =
+                std::max(window_peak[o], pcm_level_peak(source_levels[c], source_bits));
             const double sum = pcm_level_square_sum(source_levels[c], source_bits);
-            window_sum[c] += sum;
-            stream_sum[c] += sum;
+            window_sum[o] += sum;
+            stream_sum[o] += sum;
         }
         meter_commit(n);
         return true;
@@ -1189,7 +1324,8 @@ struct BurstPlayer::Impl {
                        .executor = lane.has_value() ? &*lane : nullptr,
                        .max_channels = config.max_ac4_channels,
                        .sample_rate_hz = config.sample_rate,
-                       .max_frame_rate = config.max_ac4_frame_rate})) {
+                       .max_frame_rate = config.max_ac4_frame_rate,
+                       .dynamic_range = applied_range})) {
             return true;
         }
         ac4_failed = true;
@@ -1366,6 +1502,7 @@ struct BurstPlayer::Impl {
         }
         mark(frame, local_us);
         ++bursts_played;
+        coded_bytes += payload.size();
         const std::int64_t started = esp_timer_get_time();
         // An AC-4 chunk is one sync frame, whole: it is not cut into units as AC-3's and E-AC-3's
         // bursts are.
@@ -1506,6 +1643,11 @@ struct BurstPlayer::Impl {
                 source_levels = levels.data();
                 source_channels = channels;
                 source_bits = width == 2 ? 16U : 24U;
+                for (std::size_t c = 0; c < source_outputs.size(); ++c) {
+                    source_outputs[c] = c < channels ? output_of_slot_only(serving.fold ? renderer.folded_slot(c, channels)
+                                                                                     : renderer.unity_slot(c))
+                                                     : -1;
+                }
             }
             emit(n, reached);
             source_levels = nullptr;
@@ -1514,14 +1656,41 @@ struct BurstPlayer::Impl {
         count_time(started);
     }
 
+    // The output a slot is patched to, when the slot's samples are all that output carries; else -1.
+    [[nodiscard]] int output_of_slot_only(int slot) const {
+        if (slot < 0) {
+            return -1;
+        }
+        const int output = routing.output_of(static_cast<std::size_t>(slot));
+        if (output < 0 || static_cast<std::size_t>(output) >= outputs_open ||
+            routing.channel_of(static_cast<std::size_t>(output)) != slot) {
+            return -1;
+        }
+        return output;
+    }
+
     // The identify tone with nothing playing: blocks of it straight to the
     // sink, paced by the sink.
     void identify_idle() {
         const std::span<const std::span<float>> out(outputs.data(), outputs_open);
-        const std::size_t output =
-            identifying->output >= 0 ? static_cast<std::size_t>(identifying->output) : outputs_open;
-        tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
+        if (local_identify.active()) {
+            (void)local_identify.fill(out);
+            // The tone takes the speaker's level trim, as music does, so that a level set by ear is heard.
+            for (std::size_t o = 0; o < outputs_open; ++o) {
+                const float g = trim.gain(o);
+                if (g != 1.0F) {
+                    for (std::size_t k = 0; k < kBlock; ++k) {
+                        outputs[o][k] *= g;
+                    }
+                }
+            }
+        } else {
+            const std::size_t output =
+                identifying->output >= 0 ? static_cast<std::size_t>(identifying->output) : outputs_open;
+            tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
+        }
         apply_gain(out, kBlock);
+        tap_block(out, kBlock, ~std::uint32_t{0});
         meter(out, kBlock);
         for (std::size_t o = 0; o < outputs_open; ++o) {
             output_views[o] = outputs[o];
@@ -1541,6 +1710,7 @@ struct BurstPlayer::Impl {
                                   .late_chunks = late_chunks,
                                   .dropped_chunks = dropped_chunks.load(),
                                   .invalid_chunks = invalid_chunks.load()};
+        s.coded_bytes = coded_bytes;
         s.playout = playout->stats();
         if (s.playout.have_last) {
             s.have_play = true;
@@ -1561,6 +1731,23 @@ struct BurstPlayer::Impl {
         std::memcpy(s.layout.data(), text.data(), length);
         s.layout[length] = '\0';
         s.identifying = identifying.has_value();
+        s.identify_local = local_identify.active();
+        const int tone_output = local_identify.output();
+        s.identify_output = static_cast<std::int8_t>(tone_output);
+        s.identify_role = tone_output >= 0 ? trim.role(static_cast<std::size_t>(tone_output)) : speaker_trim::kNoRole;
+        s.identify_remaining_ms = local_identify.remaining_ms();
+        BurstPlayerTrim& t = trim_report;
+        t.layout = s.layout;
+        for (std::size_t o = 0; o < Playout::kMaxOutputs; ++o) {
+            t.role[o] = trim.role(o);
+            t.level_db[o] = static_cast<float>(trim.level_db(o));
+            t.delay_samples[o] = trim.delay_samples(o);
+        }
+        t.clamped = trim.clamped();
+        t.server_level = trim.server_level();
+        t.server_delay = trim.server_delay();
+        t.max_delay_samples = static_cast<std::uint32_t>(trim.max_delay_samples());
+        t.farthest_cm = trim.farthest_cm();
         if (stream == Stream::kIdle) {
             s.have_levels = false;
         }
@@ -1569,6 +1756,8 @@ struct BurstPlayer::Impl {
     // Something else has the sink: nothing is written until it is given back,
     // and then the sink is opened again the player's own way.
     void wait_while_held() {
+        // Whatever takes the sink next has it to itself: not even a quiet tone is left in it.
+        local_identify.stop(true);
         playout->restart();
         reset_decoding();
         have_origin = false;
@@ -1604,7 +1793,7 @@ struct BurstPlayer::Impl {
             if (stream == Stream::kIdle) {
                 apply_pending();
             }
-            const TickType_t wait = identifying && stream == Stream::kIdle ? 0 : pdMS_TO_TICKS(50);
+            const TickType_t wait = (identifying || local_identify.active()) && stream == Stream::kIdle ? 0 : pdMS_TO_TICKS(50);
             const std::size_t free_now = xMessageBufferSpacesAvailable(ring);
             const std::size_t held = ring_free_empty > free_now ? ring_free_empty - free_now : 0;
             const std::size_t got = xMessageBufferReceive(ring, receive_buffer, entry_bytes, wait);
@@ -1617,7 +1806,7 @@ struct BurstPlayer::Impl {
                 publish_status();
             }
             if (got < sizeof(Header)) {
-                if (identifying && stream == Stream::kIdle) {
+                if ((identifying || local_identify.active()) && stream == Stream::kIdle) {
                     identify_idle();
                 }
                 continue;
@@ -1629,6 +1818,8 @@ struct BurstPlayer::Impl {
             switch (header.kind) {
                 case Kind::kStartBursts:
                 case Kind::kStartPcm: {
+                    // A play begins: the board's own tone is over before its first block, not after it.
+                    local_identify.stop(true);
                     const Stream kind = header.kind == Kind::kStartBursts ? Stream::kBursts : Stream::kPcm;
                     const ac::DataType type = static_cast<ac::DataType>(header.data_type);
                     const m::AudioFormat format{.codec = kind == Stream::kPcm && header.pc == 1
@@ -1768,6 +1959,8 @@ bool BurstPlayer::start() {
     }
     im.delay_storage = all.subspan(at);
     im.playout.emplace(staging, outputs, im.config.tuning);
+    im.trim.setup(im.delay_storage, outputs, im.max_delay_samples, im.config.sample_rate);
+    im.trim.set_table(im.config.speaker_trim);
 
     im.configure_defaults(im.config.layout);
     std::printf("burst player: ring %u bytes and buffers in %s, layout %s, %u outputs, delay up to %u samples\n",
@@ -1927,11 +2120,57 @@ bool BurstPlayer::set_layout(const OutputLayout& layout) {
     return true;
 }
 
+void BurstPlayer::set_dynamic_range(iclforge::base::DynamicRange range) {
+    impl_->wanted_range.store(static_cast<std::uint8_t>(range));
+}
+
 void BurstPlayer::identify(std::optional<ac::Identify> tone) {
     const std::lock_guard lock(impl_->settings_mutex);
     impl_->pending_identify = tone;
     impl_->identify_changed = true;
 }
+
+void BurstPlayer::set_speaker_trim(const SpeakerTrimTable& table) {
+    const std::lock_guard lock(impl_->settings_mutex);
+    impl_->config.speaker_trim = table;
+    impl_->pending_trim = table;
+}
+
+IdentifyOutcome BurstPlayer::identify_local(const IdentifyRequest& request) {
+    Impl& im = *impl_;
+    if (request.shape == IdentifyRequest::Shape::kOff) {
+        const std::lock_guard lock(im.settings_mutex);
+        im.pending_local_identify = request;
+        return IdentifyOutcome::kStopped;
+    }
+    if (im.held.load() || im.stopping.load() || im.task == nullptr) {
+        return IdentifyOutcome::kBusy;
+    }
+    if (im.active.load()) {
+        return IdentifyOutcome::kPlaying;
+    }
+    if (status().identifying) {
+        return IdentifyOutcome::kServer;
+    }
+    // The speakers the layout in force has at an output, as the last report said.
+    const BurstPlayerTrim now = trim_status();
+    bool any = false;
+    bool found = false;
+    for (std::size_t o = 0; o < Playout::kMaxOutputs; ++o) {
+        if (now.role[o] != speaker_trim::kNoRole) {
+            any = true;
+            found = found || now.role[o] == request.role;
+        }
+    }
+    if (!any || (request.shape != IdentifyRequest::Shape::kEach && !found)) {
+        return IdentifyOutcome::kNoSuchSpeaker;
+    }
+    const std::lock_guard lock(im.settings_mutex);
+    im.pending_local_identify = request;
+    return IdentifyOutcome::kStarted;
+}
+
+void BurstPlayer::set_block_tap(BlockTap* tap) { impl_->block_tap.store(tap, std::memory_order_release); }
 
 void BurstPlayer::set_volume(int volume, bool muted) {
     const float linear = static_cast<float>(std::clamp(volume, 0, 100)) / 100.0F;
@@ -1956,6 +2195,25 @@ bool BurstPlayer::hold(bool held) {
 BurstPlayerStatus BurstPlayer::status() const {
     const std::lock_guard lock(impl_->status_mutex);
     return impl_->status;
+}
+
+BurstPlayerLevels BurstPlayer::levels() const {
+    BurstPlayerLevels out;
+    const std::lock_guard lock(impl_->status_mutex);
+    const BurstPlayerStatus& s = impl_->status;
+    out.have = s.have_levels && impl_->active.load();
+    out.serial = s.levels_serial;
+    out.outputs = std::min(s.outputs, out.peak_db.size());
+    for (std::size_t o = 0; o < out.outputs; ++o) {
+        out.peak_db[o] = s.peak_db[o];
+        out.rms_db[o] = s.rms_db[o];
+    }
+    return out;
+}
+
+BurstPlayerTrim BurstPlayer::trim_status() const {
+    const std::lock_guard lock(impl_->status_mutex);
+    return impl_->trim_report;
 }
 
 bool BurstPlayer::active() const { return impl_->active.load(); }

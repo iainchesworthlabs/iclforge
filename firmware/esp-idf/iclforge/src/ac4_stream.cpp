@@ -11,6 +11,7 @@
 #include "esp_heap_caps.h"
 
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/dynamic_range.hpp"
 #include "iclforge/render/render.hpp"
 
 #include "ac4_bridge.hpp"
@@ -45,6 +46,9 @@ constexpr std::size_t kHeapFloorBytes = 286365;
 struct Ac4Stream::Impl {
     std::optional<iclforge::ac4::Decoder> decoder;
     Config config;
+    // The output processing the decoder was made with, which the listener's dynamic range is
+    // applied over (iclforge::ac4::follow_dynamic_range).
+    iclforge::ac4::OutputConfig base_output;
     bool placement = false;
     std::string_view reason;
     std::size_t frame_samples = 0;
@@ -102,6 +106,7 @@ bool Ac4Stream::open(const Config& config) {
     decoder_config.output.downmix = ac4bridge::target(config.fold);
     decoder_config.executor = config.executor;
     decoder_config.skip_objects = config.skip_objects;
+    im.base_output = decoder_config.output;
     im.config = config;
     im.decoder.emplace(decoder_config);
     return true;
@@ -114,6 +119,9 @@ bool Ac4Stream::is_open() const {
 void Ac4Stream::reset() {
     if (impl_->decoder) {
         impl_->decoder->reset();
+        // The next stream's first frame is not played at the level the last one's dialnorm gave
+        // (late night only; standard never leaves the base).
+        (void)iclforge::ac4::restore_base_output(*impl_->decoder, impl_->base_output);
     }
 }
 
@@ -176,6 +184,8 @@ Ac4Stream::Result Ac4Stream::decode(std::span<const std::byte> sync_frame, Block
     }
     const iclforge::ac4::FrameInfo& info = **decoded;
     im.frame_samples = info.samples;
+    // Late night follows the stream's dialnorm and DRC modes, which this frame has now said.
+    (void)iclforge::ac4::follow_dynamic_range(*im.decoder, im.config.dynamic_range, im.base_output);
     // A stream's frames come faster than the board keeps up with: the converter's cost is the
     // same for a frame at 29.97 a second as at 24, so the play would fall behind and underrun.
     // The slack covers the 1000/1001 rates, whose frames alternate between two lengths.

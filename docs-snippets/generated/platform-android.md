@@ -11,5 +11,6 @@
 | Hearth for Android (Sendspin sink) | **In development**<br>confirmed on hardware<br>AC-3 and E-AC-3 from a Hearth server passed to the receiver, karaoke lyrics on screen; no decoding on the device yet; CI builds a debug APK, no release carries one |
 | Atmos encode and HDMI output | **Source**<br>confirmed on hardware<br>confirmed through an AV receiver |
 | AC-4 decode and encode | **Source**<br>build only<br>the NDK build compiles the AC-4 library; the Shield demo links none of it |
+| TrueHD and MLP decode and encode | **Unavailable**<br>the Shield demo links none of it; the NDK build is not checked for it |
 | AC-4 IEC 61937 output | **Source**<br>build only<br>ENCODING_IEC61937; the demo never sends AC-4; no receiver accepts AC-4 |
 | Audio capture | **Unavailable**<br>playback-only demo |

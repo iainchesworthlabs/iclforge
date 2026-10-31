@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR.",
+  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR. A row that names a layout needs the board to carry it: the suite asks the board (GET /layout-options, the same verdict PUT /layout applies) and plays the row where it does; where the board cannot carry the layout the row is its refusal (PUT /layout answers 409 with the board's own reason, and that is the pass; the default, if_unavailable refuse) or is left out with the reason stated (if_unavailable skip). A layout carried with a limit is played and the limit is noted.",
   "frame_us": 32000,
   "tolerance": {
     "relative": 0.05,
@@ -35,94 +35,137 @@
       "codec": "AC-4",
       "units": 3,
       "pin": "ac4_20_music",
-      "what": "AC-4 2.0 from DEE, A-SPX, 192 kbit/s, three frames", "sendspin_seconds": 20, "period_us": 42667},
+      "what": "AC-4 2.0 from DEE, A-SPX, 192 kbit/s, three frames",
+      "sendspin_seconds": 20,
+      "period_us": 42667
+    },
     "ac4-20-acpl": {
       "file": "testdata/ac4/constructed/2_0-acpl1-stereoproc.ac4",
       "codec": "AC-4",
       "pin": "ac4_20_acpl",
-      "what": "AC-4 2.0 constructed, A-CPL", "sendspin_seconds": 20, "period_us": 42667},
+      "what": "AC-4 2.0 constructed, A-CPL",
+      "sendspin_seconds": 20,
+      "period_us": 42667
+    },
     "ac4-51-music": {
       "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4",
       "codec": "AC-4",
       "units": 3,
       "pin": "ac4_51_music",
       "pin_layout": "5.1",
-      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames; on a sink of two outputs the decoder folds it to 2.0, which the 5.1 pin is not, and the row is held to its own hash", "sendspin_seconds": 20, "period_us": 42667},
+      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames; on a sink of two outputs the decoder folds it to 2.0, which the 5.1 pin is not, and the row is held to its own hash",
+      "sendspin_seconds": 20,
+      "period_us": 42667
+    },
     "ac4-20-companding": {
       "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4",
       "codec": "AC-4",
       "units": 3,
       "pin": "ac4_20_companding",
-      "what": "AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s, three frames", "sendspin_seconds": 20, "period_us": 42667}
+      "what": "AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s, three frames",
+      "sendspin_seconds": 20,
+      "period_us": 42667
+    }
   },
   "profiles": {
     "s3-n16r8": {
-      "baseline_accepted": {"profile_hash": "156f7310e8d0", "why": "#1459 added ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE to every profile at 0, an inert key that moves no figure: the baseline is kept under the hash it was recorded under (the owner's rule, 2026-10-12)."},
       "tolerance": {
-        "glitched_plays": {"eac3-2.0-sendspin": 2},
-        "play_heap_free_bytes": {"eac3-2.0-sendspin": 2048},
+        "glitched_plays": {
+          "eac3-2.0-sendspin": 2
+        },
+        "play_heap_free_bytes": {
+          "eac3-2.0-sendspin": 2048,
+          "ac4-20-music-sendspin": 2048
+        },
         "note": "Measured on S3a (2026-10-12, five plays a row after eight restarts, both S3 images). The S3's E-AC-3 stream over Sendspin glitched two plays of five in each profile (11 to 17 late chunks at the start of the stream, which is 0.35 to 0.55 s of audio) and one of four in the probes, so a play that glitches is the common case and the baseline's two are allowed two more (a stream that glitches every time is 5 of 5). Its least internal heap while it plays was 2,935 and 2,539 bytes (6.6 KB after AC-3 streams in the same boot, 59.8 KB on the first stream of a boot), so a play that takes 2,048 of it is the regression; the AC-3 row's heap reads 24 to 58 KB and has no tolerance."
       },
       "plays": [
-        {"id": "ac3-2.0", "stream": "ac3-2.0"},
-        {"id": "eac3-2.0", "stream": "eac3-2.0"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
-        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}
-      ]
-    },
-    "s3-n16r8-ac4": {
-      "tolerance": {
-        "glitched_plays": {"eac3-2.0-sendspin": 2},
-        "play_heap_free_bytes": {"eac3-2.0-sendspin": 2048, "ac4-20-music-sendspin": 2048},
-        "note": "Measured on S3a (2026-10-12, five plays a row after eight restarts, both S3 images). The S3's E-AC-3 stream over Sendspin glitched two plays of five in each profile (11 to 17 late chunks at the start of the stream, which is 0.35 to 0.55 s of audio) and one of four in the probes, so a play that glitches is the common case and the baseline's two are allowed two more (a stream that glitches every time is 5 of 5). Its least internal heap while it plays was 2,935 and 2,539 bytes (6.6 KB after AC-3 streams in the same boot, 59.8 KB on the first stream of a boot), so a play that takes 2,048 of it is the regression; the AC-3 row's heap reads 24 to 58 KB and has no tolerance."
-      },
-      "plays": [
-        {"id": "ac3-2.0", "stream": "ac3-2.0"},
-        {"id": "eac3-2.0", "stream": "eac3-2.0"},
-        {"id": "ac4-20-music", "stream": "ac4-20-music"},
-        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
-        {"id": "ac4-20-companding", "stream": "ac4-20-companding"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
-        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"},
-        {"id": "ac4-20-music-sendspin", "stream": "ac4-20-music", "via": "sendspin"},
-        {"id": "ac4-20-acpl-sendspin", "stream": "ac4-20-acpl", "via": "sendspin"}
+        {
+          "id": "ac3-2.0",
+          "stream": "ac3-2.0"
+        },
+        {
+          "id": "eac3-2.0",
+          "stream": "eac3-2.0"
+        },
+        {
+          "id": "ac4-20-music",
+          "stream": "ac4-20-music"
+        },
+        {
+          "id": "ac4-20-acpl",
+          "stream": "ac4-20-acpl"
+        },
+        {
+          "id": "ac4-20-companding",
+          "stream": "ac4-20-companding"
+        },
+        {
+          "id": "ac3-2.0-sendspin",
+          "stream": "ac3-2.0",
+          "via": "sendspin"
+        },
+        {
+          "id": "eac3-2.0-sendspin",
+          "stream": "eac3-2.0",
+          "via": "sendspin"
+        },
+        {
+          "id": "ac4-20-music-sendspin",
+          "stream": "ac4-20-music",
+          "via": "sendspin"
+        },
+        {
+          "id": "ac4-20-acpl-sendspin",
+          "stream": "ac4-20-acpl",
+          "via": "sendspin"
+        }
       ]
     },
     "c6-16mb": {
       "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its /play rows are that refusal, clean, with no reboot. Its audio path is Sendspin, so the rows with via sendspin play the same two streams the way the product does: the repository's hearth-testserver pairs the board and sends them as bursts, and the board's sendspin.stream= line is read (tools/hearth/suite_sendspin.py). Both streams are rows, the AC-3 one first and the E-AC-3 one after it, as a user plays them. The E-AC-3 stream used to play with 916 to 4,496 bytes of internal heap spare and, after an AC-3 stream in the same boot, failed to allocate its Wi-Fi receive buffers and ended late (planning/esp32-platform-profiles.md, 'Sendspin rows'): the decoder's feature tables were 27,776 bytes of static RAM, and with them out of it the same plays leave 18,936 to 30,920 bytes at their least (6,836 once in 5, 26,788 the least of 3), against the AC-3 stream's 48,148 to 85,100. With the decoder holding only the spectra its frame codes (PR 1494, 24,576 bytes less on this stream) the E-AC-3 stream's single plays after AC-3 streams read 28,748 to 57,648 (median 52,968), 25,836 as the least of five, and none of fifteen plays glitched.",
       "tolerance": {
         "largest_block_bytes": 12288,
-                "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. With the decoder's feature tables out of static RAM (27,776 bytes, the image's DIRAM 144,139 to 116,307) the eight boots of the record read the largest block at 116,736 to 124,928 and free RAM at 134,196 to 140,428: the same spread of 8,192, 28 KB higher. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot. The E-AC-3 row's least heap while it played is not one number either: 6,836 as the least of five plays, 18,936 to 30,920 on six single plays after AC-3 streams in the same boot, 26,788 as the least of three. 3,072 bytes under the baseline is the allowance: the failure this row is for left 916 to 4,496, and a play that took the room back would read there. The AC-3 row's reads 48,148 to 85,100 and has none.",
+        "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. With the decoder's feature tables out of static RAM (27,776 bytes, the image's DIRAM 144,139 to 116,307) the eight boots of the record read the largest block at 116,736 to 124,928 and free RAM at 134,196 to 140,428: the same spread of 8,192, 28 KB higher. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot. The E-AC-3 row's least heap while it played is not one number either: 6,836 as the least of five plays, 18,936 to 30,920 on six single plays after AC-3 streams in the same boot, 26,788 as the least of three. 3,072 bytes under the baseline is the allowance: the failure this row is for left 916 to 4,496, and a play that took the room back would read there. The AC-3 row's reads 48,148 to 85,100 and has none.",
         "internal_free_bytes": 2048,
-        "play_heap_free_bytes": {"eac3-2.0-sendspin": 3072}
+        "play_heap_free_bytes": {
+          "eac3-2.0-sendspin": 3072
+        }
       },
       "plays": [
-        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
-        {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
-        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}
+        {
+          "id": "ac3-2.0-refused",
+          "stream": "ac3-2.0",
+          "expect": "refused-memory"
+        },
+        {
+          "id": "eac3-2.0-refused",
+          "stream": "eac3-2.0",
+          "expect": "refused-memory"
+        },
+        {
+          "id": "ac3-2.0-sendspin",
+          "stream": "ac3-2.0",
+          "via": "sendspin"
+        },
+        {
+          "id": "eac3-2.0-sendspin",
+          "stream": "eac3-2.0",
+          "via": "sendspin"
+        }
       ]
     },
     "c6-4mb": {
       "note": "No board on the bench: the rows are c6-16mb's, which differs in flash and partition table alone.",
       "plays": [
-        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"}
+        {
+          "id": "ac3-2.0-refused",
+          "stream": "ac3-2.0",
+          "expect": "refused-memory"
+        }
       ]
     },
     "p4-rev1": {
-      "baseline_accepted": {"profile_hash": "60ce70a0bf92", "why": "#1459 added ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE to every profile at 0, an inert key that moves no figure: the baseline is kept under the hash it was recorded under (the owner's rule, 2026-10-12)."},
-      "tolerance": {
-        "largest_block_bytes": 8192,
-        "note": "The P4's largest internal block at boot steps by 4 KB: on the ten boots read one by one (the OTA's, a reset's and the record's eight, P4a, 2026-10-12) it was 221,184 on eight and 217,088 on two; free RAM read 291,875 to 292,211. Two 4 KB steps is the allowance (twice the one seen) and free RAM keeps the suite's 2,048. The S3's 1,024 would fail one boot in five."
-      },
-      "plays": [
-        {"id": "ac3-2.0", "stream": "ac3-2.0"},
-        {"id": "eac3-2.0", "stream": "eac3-2.0"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
-        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}
-      ]
-    },
-    "p4-rev1-ac4": {
       "tolerance": {
         "relative": 0.12,
         "largest_block_bytes": 8192,
@@ -130,16 +173,50 @@
         "note": "Measured on P4a with the measure image (2026-10-12). The AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself: ac4-20-music read 220 to 253 permille in five plays, ac4-20-acpl 280 to 302 (a median of two 297 against a recorded 281) and ac4-20-companding 268 to 303, against the S3's AC-3 at 122 to 124. 12% is twice that and still calls a fifth more decoder time a regression. The largest boot block was 217,088 or 221,184 (two steps allowed), and free RAM at boot 289,271 to 289,891 on fifteen of seventeen boots and 286,331 on two: 4,096 under the recorded worst of eight keeps that lower mode inside."
       },
       "plays": [
-        {"id": "ac3-2.0", "stream": "ac3-2.0"},
-        {"id": "eac3-2.0", "stream": "eac3-2.0"},
-        {"id": "ac4-20-music", "stream": "ac4-20-music"},
-        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
-        {"id": "ac4-51-music", "stream": "ac4-51-music"},
-        {"id": "ac4-20-companding", "stream": "ac4-20-companding"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
-        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"},
-        {"id": "ac4-20-music-sendspin", "stream": "ac4-20-music", "via": "sendspin"},
-        {"id": "ac4-51-music-sendspin", "stream": "ac4-51-music", "via": "sendspin"}
+        {
+          "id": "ac3-2.0",
+          "stream": "ac3-2.0"
+        },
+        {
+          "id": "eac3-2.0",
+          "stream": "eac3-2.0"
+        },
+        {
+          "id": "ac4-20-music",
+          "stream": "ac4-20-music"
+        },
+        {
+          "id": "ac4-20-acpl",
+          "stream": "ac4-20-acpl"
+        },
+        {
+          "id": "ac4-51-music",
+          "stream": "ac4-51-music"
+        },
+        {
+          "id": "ac4-20-companding",
+          "stream": "ac4-20-companding"
+        },
+        {
+          "id": "ac3-2.0-sendspin",
+          "stream": "ac3-2.0",
+          "via": "sendspin"
+        },
+        {
+          "id": "eac3-2.0-sendspin",
+          "stream": "eac3-2.0",
+          "via": "sendspin"
+        },
+        {
+          "id": "ac4-20-music-sendspin",
+          "stream": "ac4-20-music",
+          "via": "sendspin"
+        },
+        {
+          "id": "ac4-51-music-sendspin",
+          "stream": "ac4-51-music",
+          "via": "sendspin"
+        }
       ]
     },
     "p4-rev3": {
@@ -158,8 +235,28 @@
           "stream": "ac3-5.1",
           "layout": "9.1.6",
           "slots": 16
+        },
+        {
+          "id": "ac4-20-music",
+          "stream": "ac4-20-music"
+        },
+        {
+          "id": "ac4-20-acpl",
+          "stream": "ac4-20-acpl"
+        },
+        {
+          "id": "ac4-51-music",
+          "stream": "ac4-51-music"
+        },
+        {
+          "id": "ac4-20-companding",
+          "stream": "ac4-20-companding"
         }
-      ]
+      ],
+      "tolerance": {
+        "relative": 0.12,
+        "note": "As p4-rev1's: the AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself."
+      }
     }
   }
 }

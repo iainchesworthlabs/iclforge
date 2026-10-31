@@ -1,0 +1,75 @@
+# The box types and scheme names an MP4 reader meets in a protected audio track, for libFuzzer's
+# -dict=. The first group is every four-character code libs/containers/src/mp4/reader.cpp matches
+# (the box walk, the sample table, the sample entries and the protection boxes it parses); the
+# second is the boxes of Common Encryption it walks over (ISO/IEC 23001-7) and the scheme types a
+# `schm` names, so that a mutation can turn one box into another.
+
+# The box walk and the sample table.
+box_ftyp="ftyp"
+box_styp="styp"
+box_moov="moov"
+box_mvhd="mvhd"
+box_mvex="mvex"
+box_trex="trex"
+box_trak="trak"
+box_tkhd="tkhd"
+box_edts="edts"
+box_elst="elst"
+box_mdia="mdia"
+box_mdhd="mdhd"
+box_hdlr="hdlr"
+box_minf="minf"
+box_stbl="stbl"
+box_stsd="stsd"
+box_stsz="stsz"
+box_stz2="stz2"
+box_stsc="stsc"
+box_stco="stco"
+box_co64="co64"
+box_moof="moof"
+box_traf="traf"
+box_tfhd="tfhd"
+box_trun="trun"
+box_mdat="mdat"
+
+# Handler types, and the sample entries and configuration boxes of the codecs.
+handler_soun="soun"
+handler_vide="vide"
+handler_text="text"
+entry_ac3="ac-3"
+entry_ec3="ec-3"
+entry_ac4="ac-4"
+entry_mlpa="mlpa"
+config_dac3="dac3"
+config_dec3="dec3"
+config_dac4="dac4"
+config_dmlp="dmlp"
+
+# Protection: the encrypted sample entries and the boxes the reader parses.
+entry_enca="enca"
+entry_encv="encv"
+box_sinf="sinf"
+box_frma="frma"
+box_schm="schm"
+box_schi="schi"
+box_tenc="tenc"
+
+# Protection: the boxes the reader walks over, and the sample groups that mark a clear or a rotated
+# key.
+box_senc="senc"
+box_saiz="saiz"
+box_saio="saio"
+box_pssh="pssh"
+box_sgpd="sgpd"
+box_sbgp="sbgp"
+group_seig="seig"
+
+# The scheme types a schm box names.
+scheme_cenc="cenc"
+scheme_cbc1="cbc1"
+scheme_cens="cens"
+scheme_cbcs="cbcs"
+
+# A schm box for each scheme: version and flags 0, the scheme type, a scheme version of 1.0.
+schm_cenc="schm\x00\x00\x00\x00cenc\x00\x01\x00\x00"
+schm_cbcs="schm\x00\x00\x00\x00cbcs\x00\x01\x00\x00"

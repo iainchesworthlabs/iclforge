@@ -54,6 +54,16 @@ directly, via the same error-message path real bad input hits:
              whose usage names no AC-4 file at all skips it, as an older
              build skips the vbr checks.
 
+  truehd     the same for TrueHD and MLP: every command whose usage row names an
+             in.thd, in.mlp or out.thd file must be run on one (a `run <command>`
+             line whose arguments name a th_ or te_ file, or a .thd or .mlp one),
+             and every truehd-<name>= option the usage text names must appear in
+             the matrix, so an encoder option added without a leg fails here.
+  signature  every option of the usage text's "AC-4 content signature options"
+             block (sign-content, content-key=, verify-time=, pin= and the rest)
+             must appear in the matrix. The block is read off the usage, so an
+             option added to it is required the day it lands.
+
 Coverage is a presence check for commands, layouts, Atmos modes and vbr: each
 canonical token just has to appear as a whole word somewhere in the matrix
 script. That is looser than confirming it is in the *right* loop, but it is
@@ -149,6 +159,55 @@ def ac4_commands(cli: str) -> set[str]:
         if m and re.search(r"\b(?:in|out)\.ac4\b", m.group(2)):
             names.add(m.group(1))
     return names
+
+
+def truehd_commands(cli: str) -> set[str]:
+    """The commands whose usage row names a TrueHD or MLP file (in.thd, in.mlp, out.thd), read
+    off the usage table as ac4_commands() reads AC-4's. Empty for a build that names none."""
+    _, out, _ = run(cli)
+    names = set()
+    for line in out.splitlines():
+        m = re.match(r"\s*forge\s+(\S+)\s+(.*)$", line)
+        if m and re.search(r"\b(?:in|out)\.(?:thd|mlp)\b", m.group(2)):
+            names.add(m.group(1))
+    return names
+
+
+def truehd_options(cli: str) -> set[str]:
+    """The truehd-<name>= options the usage text names, each with its '='. Empty for a build
+    without them."""
+    _, out, _ = run(cli)
+    return set(re.findall(r"\btruehd-[a-z0-9]+(?:-[a-z0-9]+)*=", out))
+
+
+def signature_options(cli: str) -> dict[str, bool]:
+    """The options of the usage text's "AC-4 content signature options" block: name -> whether it
+    takes a value (content-key=<path>, verify-time=now|signed|...) or is a bare flag. An option
+    line starts two spaces in; the lines under it are indented further. Empty for a build
+    without the block."""
+    _, out, _ = run(cli)
+    options: dict[str, bool] = {}
+    inside = False
+    for line in out.splitlines():
+        if line.startswith("AC-4 content signature options"):
+            inside = True
+            continue
+        if not inside:
+            continue
+        if not line.strip():
+            break
+        m = re.match(r"  ([a-z][a-z0-9-]*)(=?)", line)
+        if m:
+            options[m.group(1)] = m.group(2) == "="
+    return options
+
+
+def option_covered(matrix_text: str, name: str, takes_value: bool) -> bool:
+    """Whether the matrix gives the option: `name=` for one that takes a value, the bare word
+    (not part of a longer option name) for a flag."""
+    if takes_value:
+        return re.search(rf"(?<![\w-]){re.escape(name)}=", matrix_text) is not None
+    return re.search(rf"(?<![\w-]){re.escape(name)}(?![\w=-])", matrix_text) is not None
 
 
 def vbr_supported(cli: str) -> bool:
@@ -259,6 +318,15 @@ def ac4_invocations(matrix_text: str) -> set[str]:
             if "ac4" in m.group(2)}
 
 
+def truehd_invocations(matrix_text: str) -> set[str]:
+    """Every command the matrix runs on TrueHD or MLP: a `run <command> ...` whose arguments name
+    a th_ file (the fixtures), a te_ file (the encoder's streams) or a .thd or .mlp one."""
+    text = join_continuations(matrix_text)
+    return {m.group(1)
+            for m in re.finditer(r"^\s*run\s+([a-z][a-z0-9-]*)\b(.*)$", text, re.M)
+            if re.search(r"\b(?:th|te)_|\.(?:thd|mlp)\b", m.group(2))}
+
+
 def matrix_tool_tokens(matrix_text: str) -> set[str]:
     """Every tool token the matrix actually ENCODES WITH, rather than every one
     it happens to contain - see the module docstring for the false pass that
@@ -345,6 +413,29 @@ def main() -> None:
             check("ac4-commands", canonical_ac4, canonical_ac4 - ac4_invocations(matrix_text))
         else:
             print("  SKIP  ac4-commands: this forge build's usage names no AC-4 file")
+
+        print("TrueHD commands - every command whose usage names a TrueHD or MLP file, run on one")
+        canonical_truehd = truehd_commands(cli) - EXCLUDED_COMMANDS
+        if canonical_truehd:
+            check("truehd-commands", canonical_truehd,
+                  canonical_truehd - truehd_invocations(matrix_text))
+        else:
+            print("  SKIP  truehd-commands: this forge build's usage names no TrueHD file")
+        truehd_opts = truehd_options(cli)
+        if truehd_opts:
+            check("truehd-options", truehd_opts,
+                  {o for o in truehd_opts if not option_covered(matrix_text, o[:-1], True)})
+        else:
+            print("  SKIP  truehd-options: this forge build's usage names no truehd- option")
+
+        print("AC-4 content signature options - every option of the usage block")
+        signature = signature_options(cli)
+        if signature:
+            check("signature-options", set(signature),
+                  {n for n, value in signature.items()
+                   if not option_covered(matrix_text, n, value)})
+        else:
+            print("  SKIP  signature-options: this forge build's usage has no such block")
 
         print("AC-3 layouts - forge sine's own accepted set")
         ac3_layouts = layout_names(cli, tmp, "sine")

@@ -60,7 +60,9 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -68,6 +70,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "associated_mix.hpp"
 #include "code_pages.hpp"
+#include "commands/truehd.hpp"
 #include "container_input.hpp"
 #include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
@@ -285,6 +288,84 @@ bool parse_block_mix_config(std::string_view text,
 // parse_options then leaves for programmeN-layout=/-bitrate= or, failing
 // those too, its own final "unknown option".
 enum class MetadataOptionResult : std::uint8_t { kNotMetadata, kOk, kError };
+
+// A whole number in [low, high] with nothing else in the token, signs allowed.
+bool parse_int_in(std::string_view text, int low, int high, int& out) {
+    int value = 0;
+    const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || ptr != text.data() + text.size() || value < low || value > high) {
+        return false;
+    }
+    out = value;
+    return true;
+}
+
+// The channel meaning options of TH spec §14.1, which `truehd-encode` writes and `metadata` sets in
+// a finished stream: one option for each field of each presentation, named after the presentation
+// it belongs to. The ranges are the widths of the fields (iclforge::truehd::channel_meaning_problem).
+// Provisional, no oracle until the DEE set: libs/truehd/ERRATA.md, questions 51 to 55.
+using MeaningEdit = iclforge::truehd::ChannelMeaningEdit;
+
+struct MeaningNumber {
+    std::string_view name;  // after "truehd-"
+    int low;
+    int high;
+    std::optional<int> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningNumber, 10> kMeaningNumbers{{
+    {"dialnorm-2ch", 0, 63, &MeaningEdit::twoch_dialogue_norm},
+    {"dialnorm-6ch", 0, 31, &MeaningEdit::sixch_dialogue_norm},
+    {"dialnorm-8ch", 0, 31, &MeaningEdit::eightch_dialogue_norm},
+    {"mix-level-2ch", 0, 63, &MeaningEdit::twoch_mix_level},
+    {"mix-level-6ch", 0, 63, &MeaningEdit::sixch_mix_level},
+    {"mix-level-8ch", 0, 63, &MeaningEdit::eightch_mix_level},
+    {"source-format-6ch", 0, 31, &MeaningEdit::sixch_source_format},
+    {"source-format-8ch", 0, 63, &MeaningEdit::eightch_source_format},
+    {"heavy-drc-start-up-gain", -32, 31, &MeaningEdit::heavy_drc_start_up_gain},
+    {"drc-start-up-gain", -64, 63, &MeaningEdit::drc_start_up_gain},
+}};
+
+struct MeaningFlag {
+    std::string_view name;
+    std::optional<bool> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningFlag, 3> kMeaningFlags{{
+    {"control-2ch", &MeaningEdit::twoch_control_enabled},
+    {"control-6ch", &MeaningEdit::sixch_control_enabled},
+    {"control-8ch", &MeaningEdit::eightch_control_enabled},
+}};
+
+// kNotMetadata when `name` (an option without its "truehd-") is none of them.
+MetadataOptionResult parse_truehd_meaning_option(std::string_view name, std::string_view value,
+                                                 std::string_view token, MeaningEdit& edit) {
+    for (const MeaningNumber& number : kMeaningNumbers) {
+        if (name != number.name) {
+            continue;
+        }
+        int parsed = 0;
+        if (!parse_int_in(value, number.low, number.high, parsed)) {
+            fmt::println(stderr, "error: truehd-{} is a whole number from {} to {} (got '{}')",
+                         name, number.low, number.high, token);
+            return MetadataOptionResult::kError;
+        }
+        edit.*number.field = parsed;
+        return MetadataOptionResult::kOk;
+    }
+    for (const MeaningFlag& flag : kMeaningFlags) {
+        if (name != flag.name) {
+            continue;
+        }
+        if (value != "on" && value != "off") {
+            fmt::println(stderr, "error: truehd-{} is on or off (got '{}')", name, token);
+            return MetadataOptionResult::kError;
+        }
+        edit.*flag.field = value == "on";
+        return MetadataOptionResult::kOk;
+    }
+    return MetadataOptionResult::kNotMetadata;
+}
 
 // "programmeN" or "programmeN-<suffix>" for N in 2..8 - the range §E2.3.1.2
 // allows beyond the primary programme (kMaxProgrammes - 1 extra independent
@@ -1574,12 +1655,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
     // play's bitstream legs hand a stream on or place it undecoded and say so.
     const bool takes_karaoke = command == "decode" || command == "monitor" || command == "play" ||
                                command == "spdif" || command == "spatial";
+    out.command = std::string{command};
     for (char* raw : tokens) {
         const std::string_view token{raw};
         const auto eq = token.find('=');
         const std::string_view key = token.substr(0, eq);
         const std::string_view value =
             eq == std::string_view::npos ? std::string_view{} : token.substr(eq + 1);
+        out.given.emplace_back(token);
 
         // 'decode' reads these for one format only; run_decode says which it
         // ignores once it knows what the stream is. drcmode=line and rf, and
@@ -1630,6 +1713,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (token == "insert") {
             out.insert_missing = true;
+            continue;
+        }
+        // decode's strict mode: a decode that lost frames or units exits 2 (DecodeLoss). Scoped to
+        // decode, so that another command given it refuses it as an unknown option and does not
+        // drop it.
+        if (token == "strict" && command == "decode") {
+            out.strict = true;
             continue;
         }
         if (token == "couple" || token == "heavy" || token == "heavy2" || token == "mixmeta" ||
@@ -1743,6 +1833,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (token == "gate-objects") {
             out.gate_objects = true;
+            continue;
+        }
+        if (token == "sign-content") {
+            out.sign_content = true;
+            continue;
+        }
+        if (token == "verify-content") {
+            out.verify_content = true;
+            continue;
+        }
+        if (token == "check-content") {
+            out.check_content = true;
+            continue;
+        }
+        if (token == "unanchored-ok") {
+            out.unanchored_ok = true;
             continue;
         }
         if (token == "verify") {
@@ -2311,6 +2417,152 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             out.bap_census_path = std::string{value};
             continue;
+        }
+        // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
+        // something else.
+        const bool reads_truehd = command == "decode" || command == "levels" ||
+                                  command == "loudness" || command == "qc";
+        if (reads_truehd && key == "truehd-presentation") {
+            if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
+                fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
+                return false;
+            }
+            out.truehd_presentation = std::string{value};
+            continue;
+        }
+        if (reads_truehd && key == "truehd-check") {
+            if (value != "strict" && value != "lenient") {
+                fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);
+                return false;
+            }
+            out.truehd_lenient = value == "lenient";
+            continue;
+        }
+        // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
+        // finished TrueHD stream.
+        if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {
+            switch (parse_truehd_meaning_option(key.substr(7), value, token, out.thd_meaning)) {
+                case MetadataOptionResult::kOk:
+                    continue;
+                case MetadataOptionResult::kError:
+                    return false;
+                case MetadataOptionResult::kNotMetadata:
+                    break;
+            }
+        }
+        // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
+        if (command == "truehd-encode" && key.starts_with("truehd-")) {
+            Options::TruehdEncode& enc = out.thdenc;
+            const std::string_view name = key.substr(7);
+            if (name == "downmix") {
+                if (value != "none" && value != "standard") {
+                    fmt::println(stderr, "error: truehd-downmix is none or standard (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.downmix = std::string{value};
+                continue;
+            }
+            if (name == "restart") {
+                const auto units = parse_u32_or(value, 0);
+                if (units == 0 || units > 4096) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-restart is the access units between restart headers, "
+                        "1 or 8 to 4096 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.restart_units = static_cast<int>(units);
+                continue;
+            }
+            if (name == "peak-rate") {
+                const auto kbps = parse_u32_or(value, 0);
+                if (kbps == 0 || kbps > 100000) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-peak-rate is a rate in kbit/s, 1 to 100000 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.peak_rate_kbps = kbps;
+                continue;
+            }
+            if (name == "rate-check") {
+                if (value != "strict" && value != "lenient") {
+                    fmt::println(stderr, "error: truehd-rate-check is strict or lenient (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.rate_lenient = value == "lenient";
+                continue;
+            }
+            if (name == "fir-order") {
+                if (value.size() != 1 || value[0] < '0' || value[0] > '8') {
+                    fmt::println(stderr, "error: truehd-fir-order is 0 to 8 (got '{}')", token);
+                    return false;
+                }
+                enc.fir_order = value[0] - '0';
+                continue;
+            }
+            if (name == "matrix") {
+                if (value != "on" && value != "off") {
+                    fmt::println(stderr, "error: truehd-matrix is on or off (got '{}')", token);
+                    return false;
+                }
+                enc.matrix = value == "on";
+                continue;
+            }
+            if (name == "stereo-mode") {
+                if (value == "stereo") {
+                    enc.stereo_mode = 0;
+                } else if (value == "ltrt") {
+                    enc.stereo_mode = 1;
+                } else if (value == "headphone") {
+                    enc.stereo_mode = 2;
+                } else {
+                    fmt::println(
+                        stderr, "error: truehd-stereo-mode is stereo, ltrt or headphone (got '{}')",
+                        token);
+                    return false;
+                }
+                continue;
+            }
+            if (name == "downmix-gains") {
+                std::array<double, 4> gains{};
+                std::string_view rest = value;
+                bool good = true;
+                for (std::size_t i = 0; i < gains.size() && good; ++i) {
+                    const std::size_t comma = rest.find(',');
+                    const std::string_view part = rest.substr(0, comma);
+                    double db = 0.0;
+                    if (part == "off") {
+                        gains[i] = 0.0;
+                    } else if (parse_double(part, db) && std::isfinite(db) && db <= 0.0 &&
+                               db >= -60.0) {
+                        gains[i] = std::pow(10.0, db / 20.0);
+                    } else {
+                        good = false;
+                    }
+                    if (i + 1 < gains.size()) {
+                        good = good && comma != std::string_view::npos;
+                        rest = comma == std::string_view::npos ? std::string_view{}
+                                                               : rest.substr(comma + 1);
+                    } else {
+                        good = good && comma == std::string_view::npos;
+                    }
+                }
+                if (!good) {
+                    fmt::println(
+                        stderr,
+                        "error: truehd-downmix-gains is four gains in dB, 0 to -60 or off, for C, "
+                        "Ls and Rs, LFE, and Lrs and Rrs, e.g. -3,-3,off,-3 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.downmix_gains = gains;
+                continue;
+            }
         }
         // Scoped like bap-census, and for the same reason: only these two
         // record an AC-4 syntax trace. 'decode' refuses it for AC-3 and E-AC-3
@@ -3191,8 +3443,12 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "detail") {
-            if (value != "frames" && value != "blocks") {
-                fmt::println(stderr, "error: detail must be frames or blocks (got '{}')", token);
+            if (value != "frames" && value != "blocks" && value != "evolution" &&
+                value != "structure" && value != "format") {
+                fmt::println(stderr,
+                             "error: detail must be frames, blocks, evolution, structure or format "
+                             "(got '{}')",
+                             token);
                 return false;
             }
             out.detail = std::string{value};
@@ -3204,6 +3460,129 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 return false;
             }
             out.signing_keys.emplace_back(value);
+            continue;
+        }
+        if (key == "content-key") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: content-key= needs a private key file path");
+                return false;
+            }
+            out.content_key = std::string{value};
+            continue;
+        }
+        if (key == "content-chain") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: content-chain= needs a certificate file path");
+                return false;
+            }
+            out.content_chains.emplace_back(value);
+            continue;
+        }
+        if (key == "trust-anchor") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: trust-anchor= needs a certificate file path");
+                return false;
+            }
+            out.trust_anchors.emplace_back(value);
+            continue;
+        }
+        if (key == "pin") {
+            // A SHA-1 (40 hex digits) or SHA-256 (64) fingerprint; the colons a tool prints
+            // between the bytes are allowed.
+            std::size_t hex_digits = 0;
+            bool clean = !value.empty();
+            for (const char c : value) {
+                if (c == ':') {
+                    continue;
+                }
+                clean = clean && std::isxdigit(static_cast<unsigned char>(c)) != 0;
+                ++hex_digits;
+            }
+            if (!clean || (hex_digits != 40 && hex_digits != 64)) {
+                fmt::println(stderr,
+                             "error: pin= is a certificate fingerprint: 40 hex digits (SHA-1) or "
+                             "64 (SHA-256), colons allowed (got '{}')",
+                             token);
+                return false;
+            }
+            out.pins.emplace_back(value);
+            continue;
+        }
+        if (key == "leaf-title") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: leaf-title= needs a title, or 'any' to check none");
+                return false;
+            }
+            out.leaf_title = std::string{value};
+            continue;
+        }
+        if (key == "signed-date") {
+            if (!iclforge::base::crypto::parse_iso8601_utc(value).has_value()) {
+                fmt::println(stderr, "error: signed-date= is YYYY-MM-DDTHH:MM:SS in UTC (got '{}')",
+                             token);
+                return false;
+            }
+            out.signed_date = std::string{value};
+            continue;
+        }
+        if (key == "publisher-uuid") {
+            if (!iclforge::base::crypto::is_uuid(value)) {
+                fmt::println(stderr,
+                             "error: publisher-uuid= is the UUID of your publisher account, as "
+                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (got '{}')",
+                             token);
+                return false;
+            }
+            out.publisher_uuid = std::string{value};
+            continue;
+        }
+        if (key == "expect-publisher-uuid") {
+            if (!iclforge::base::crypto::is_uuid(value)) {
+                fmt::println(stderr,
+                             "error: expect-publisher-uuid= is a publisher account's UUID, as "
+                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (got '{}')",
+                             token);
+                return false;
+            }
+            out.expect_publisher_uuids.emplace_back(value);
+            continue;
+        }
+        if (key == "publisher-name" || key == "product-name" || key == "wrapper-name" ||
+            key == "os-name" || key == "os-version" || key == "os-description") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: {}= needs text, or leave the option out", key);
+                return false;
+            }
+            std::string& field = key == "publisher-name"  ? out.publisher_name
+                                 : key == "product-name"  ? out.product_name
+                                 : key == "wrapper-name"  ? out.wrapper_name
+                                 : key == "os-name"       ? out.os_name
+                                 : key == "os-version"    ? out.os_version
+                                                          : out.os_description;
+            field = std::string{value};
+            continue;
+        }
+        if (key == "product-id") {
+            int id = 0;
+            if (!parse_index(value, std::numeric_limits<int>::max(), id)) {
+                fmt::println(stderr,
+                             "error: product-id= is a whole number from 0 (the default) (got '{}')",
+                             token);
+                return false;
+            }
+            out.product_id = id;
+            continue;
+        }
+        if (key == "verify-time") {
+            if (value != "now" && value != "signed" && value != "ignore" &&
+                !iclforge::base::crypto::parse_iso8601_utc(value).has_value()) {
+                fmt::println(stderr,
+                             "error: verify-time= is now, signed, ignore or YYYY-MM-DDTHH:MM:SS in "
+                             "UTC (got '{}')",
+                             token);
+                return false;
+            }
+            out.verify_time = std::string{value};
             continue;
         }
         if (key == "programme") {
@@ -3272,6 +3651,71 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         fmt::println(stderr, "error: unknown option '{}'", token);
         print_meta_usage();
         return false;
+    }
+    // AC-4 content signing is opt-in and belongs to a few commands; asking for it elsewhere is
+    // said, not dropped.
+    {
+        const bool signs_content = command == "ac4-encode" || command == "atmos-encode" ||
+                                   command == "atmos-adm" || command == "atmos-iab" ||
+                                   command == "ac4-sign";
+        const bool checks_content = command == "decode" || command == "ac4-verify";
+        const bool signer_info_given =
+            !out.publisher_uuid.empty() || !out.publisher_name.empty() || out.product_id.has_value() ||
+            !out.product_name.empty() || !out.wrapper_name.empty() || !out.os_name.empty() ||
+            !out.os_version.empty() || !out.os_description.empty();
+        const bool signing_given = out.sign_content || !out.content_key.empty() ||
+                                   !out.content_chains.empty() || out.signed_date.has_value() ||
+                                   signer_info_given;
+        const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
+                                    !out.trust_anchors.empty() || !out.pins.empty() ||
+                                    !out.expect_publisher_uuids.empty() ||
+                                    out.verify_time.has_value();
+        if (signing_given && !signs_content) {
+            fmt::println(stderr,
+                         "error: sign-content, content-key=, content-chain=, signed-date= and the "
+                         "publisher-, product-, wrapper- and os- options sign AC-4 output: "
+                         "ac4-encode, atmos-encode codec=ac4 and ac4-sign take them");
+            return false;
+        }
+        if (checking_given && !checks_content) {
+            fmt::println(stderr,
+                         "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin=, "
+                         "expect-publisher-uuid= and verify-time= check an AC-4 content "
+                         "signature: decode and ac4-verify take them");
+            return false;
+        }
+        if (out.leaf_title.has_value() && !signs_content && !checks_content) {
+            fmt::println(stderr, "error: leaf-title= is for the AC-4 content-signature commands");
+            return false;
+        }
+        if (out.verify_content && out.check_content) {
+            fmt::println(stderr,
+                         "error: verify-content refuses a signature that does not check and "
+                         "check-content only reports it - give one, not both");
+            return false;
+        }
+        // Where signing or checking has to be asked for, the options that only say how are not
+        // taken for the asking: a key given to an encoder that was not told sign-content would
+        // otherwise be dropped, and an unsigned file reads exactly like a signature that failed.
+        const bool signing_asked = out.sign_content || command == "ac4-sign";
+        const bool checking_asked =
+            out.verify_content || out.check_content || command == "ac4-verify";
+        if (signs_content && !signing_asked &&
+            (signing_given || (out.leaf_title.has_value() && !checks_content))) {
+            fmt::println(
+                stderr,
+                "error: content-key=, content-chain=, signed-date=, leaf-title= and the "
+                "publisher-, product-, wrapper- and os- options say how to sign, and nothing is "
+                "signed unless sign-content asks for it");
+            return false;
+        }
+        if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
+            fmt::println(stderr,
+                         "error: trust-anchor=, pin=, expect-publisher-uuid=, unanchored-ok, "
+                         "verify-time= and leaf-title= say how to check, and nothing is checked "
+                         "unless verify-content or check-content asks for it");
+            return false;
+        }
     }
     // One says "refuse the command on a mismatch", the other "play the bed on
     // one": asking for both has no answer, and silently preferring either
@@ -4343,16 +4787,50 @@ std::vector<std::byte> read_all(std::string_view path) {
     return bytes;
 }
 
-std::vector<std::byte> read_elementary_stream(std::string_view in_path) {
+std::vector<std::byte> read_elementary_stream(std::string_view in_path, bool reads_truehd,
+                                              std::size_t* ac3_core_frames) {
     auto bytes = read_all(in_path);
     if (bytes.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
         return {};
     }
-    auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
+    auto result = iclforge::apps::elementary_stream_from_bytes(
+        bytes, iclforge::apps::CodecSet{.truehd = reads_truehd});
+    if (result.declined_codec == iclforge::apps::TrackCodec::kTruehd) {
+        // Nothing but TrueHD, for a command that does not read it: hand it over, and the command
+        // refuses it by name.
+        result = iclforge::apps::elementary_stream_from_bytes(
+            bytes, iclforge::apps::CodecSet{.truehd = true});
+    }
     if (!result.error.empty()) {
         fmt::println(stderr, "error: {} is a {}", in_path, result.error);
         return {};
+    }
+    if (ac3_core_frames != nullptr) {
+        *ac3_core_frames = 0;
+    }
+    // A TrueHD track of a Blu-ray transport stream may carry an AC-3 core between its access units.
+    const bool transport_truehd =
+        result.container.kind == iclforge::apps::ContainerKind::kMpegTs &&
+        result.container.stream_type == 0x83;
+    const bool bare_with_core =
+        result.container.kind == iclforge::apps::ContainerKind::kUnknown &&
+        commands::starts_with_ac3_core_then_truehd(result.bytes);
+    if (transport_truehd || bare_with_core) {
+        if (auto stripped = commands::strip_ac3_core(result.bytes)) {
+            fmt::println(stderr,
+                         "note: {}: set aside {} AC-3 frame(s) ({} bytes) between the TrueHD "
+                         "access units{}",
+                         in_path, stripped->frames, stripped->frame_bytes,
+                         stripped->leading_bytes != 0
+                             ? fmt::format(" and {} byte(s) before the first major sync",
+                                           stripped->leading_bytes)
+                             : std::string{});
+            if (ac3_core_frames != nullptr) {
+                *ac3_core_frames = stripped->frames;
+            }
+            return std::move(stripped->bytes);
+        }
     }
     return std::move(result.bytes);
 }

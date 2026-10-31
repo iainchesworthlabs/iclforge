@@ -4547,7 +4547,8 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 | Absolute output level | **partly** | Part 1 states no full-scale convention; it is settled against DEE's source, which assumes DEE's input convention is the decoder's |
 | Compression-curve DRC agrees with another decoder | **no** | The level detector is not normative |
 | The readings chosen for the errata | **partly** | A reading is checked where an encoder's stream exercises the tool; elsewhere it rests on the text |
-| Immersive stereo (`presentation_version` 2) | **by observation** | V1.3.1 names the version without defining it |
+| Immersive stereo (`presentation_version` 2) | **by observation** | V1.3.1 names the version without defining it; the second code, 0b1111001, rests on Dolby's AC-4 in MPEG-DASH text and the kit's two streams (`libs/ac4/ERRATA.md`) |
+| The decoder's output on Dolby's kit streams | **partly** | No PCM comes with them and no second decoder reads them; the check holds the decode to what they make checkable: framing, CRCs, sample counts, channel names, the LFE's band, loudness against the declared LKFS, and siblings (frame rates, languages, DD+, carriage) (`docs/verification.md`, "Dolby's Online Delivery Kit streams") |
 | Core decoding matches what a core decoder of Dolby's produces | **partly** | Checked against the text's matrices and gains on DEE and constructed streams; nothing here decodes the core otherwise |
 | AC-4 over IEC 61937 to a device | **no** | No device found that accepts it; D11 is checked against IEC 61937-14's tables only |
 | Real time on the ESP32-P4 and S3 in `float` and the C6 in fixed point | **on boards, in D14** | QEMU has no cache model and a fabricated clock, and none runs the P4 or the C6; the boards measure time. D14b measured the P4 (real time at 2.0 only, and no CI leg runs it); the S3 and the C6 are not built |
@@ -4560,6 +4561,75 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 | The WebAssembly module's C++ side and the Android build of the AC-4 libraries | **by CI only** | No Emscripten or NDK on the machine that made I4; I4b compiled `ac4_bindings.cpp` natively against a host model of `emscripten::val` |
 | Any DEE stream after 2026-11-06 | **no** | The licence is not renewed; G0, G1 and G2 made the sets before then (decision 23) |
 | What is published under the family's names | **partly** | Checked by hand on 2026-09-30 on GitHub, PyPI, npm, crates.io, the Homebrew tap and the two upstream pull requests. Not checked: the ESP Component Registry (its site was not queried), ConanCenter beyond a search of its pull requests, and the user's statement that Sendspin and the ESP32 firmware are unpublished |
+
+### Open after Dolby's kit streams (2026-10-29)
+
+Decoding the kit's 12 AC-4 streams, and their DASH, HLS and MP4 siblings, found one decoder defect, fixed
+(the second immersive stereo code, `libs/ac4/ERRATA.md`), and three items outside the decoder's syntax
+and reconstruction, two of them since fixed (the AC-4 decode's WAV now carries `dwChannelMask`, as the
+E-AC-3 path's does, and `forge probe` lists a 5.1.4 stream's ten channels, not Table 56's twelve):
+
+- **HLS packed audio.** `forge decode` and `probe` cannot read the kit's 12 `HLS/Audio_ID3/*_sub.ac4`
+  files: each has an ID3v2 tag before every segment (200 frames at 25 fps, 240 at 29.97), the detection
+  looks for a sync word at byte 0 and falls to AC-3. The frames between the tags are the elementary
+  stream's, byte for byte. Needed: skip a tag at the start and between frames, in the detection and in
+  `SyncFrameSplitter`.
+
+Dolby's Spott reference files (`docs/verification.md`, "A second source") decode in full now (OTT00234 once its direct-coded pair's metadata took the channel mode `audio_data_objs()` sets); what they leave open:
+
+- **Level 4** (`ac-4.02.01.04`, `md_compat` 4): read by observation from one stream, OTTEP00129, with a 5.1
+  core for a five-signal adaptive A-JOC downmix (`libs/ac4/ERRATA.md`, "md_compat 4"). Whether other
+  downmix counts have a core at level 4 needs another stream.
+- **`forge decode` exits 0 when a stream loses most of its frames** (96 % for OTTEP00128 before its
+  fix). It now says so on stderr, whatever the report goes to: "warning: N frames waiting for an I-frame
+  produced no output, of T in the stream; the output holds the other M" (`forge decode`, and the same
+  line, ending "the measurement is of the other M", from `qc` and the other commands that measure an AC-4
+  stream, which measured only what decoded). The exit code was the owner's to choose: option D below is the one chosen.
+  **Option D is built** (the owner chose it on 2026-10-29): `forge decode ... strict` exits 2, after writing what could be decoded, when a
+  frame was lost after the first one decoded, and the default is unchanged. "Lost" covers every codec that counts loss: an AC-4 frame
+  waiting for an I-frame, a frame or unit concealed under `conceal=` (AC-3, E-AC-3, AC-4) and, in a lenient TrueHD decode, bytes the reader
+  skipped, units it could not read and units that waited for a restart header (`docs/forge/cli/commands.md`, "Lost frames: `strict`";
+  `apps/forge/cli/tests/test_cli_decode_strict.cpp`). The options as they stood: (A) keep 0 and the warning, so a script reads stderr; (B) exit 2 whenever any frame waited,
+  which also fails a stream cut mid-GOP, whose leading frames wait for the first I-frame by design and
+  whose splices wait again; (C) exit 2 above a share lost, which needs a number nobody has chosen; (D)
+  keep 0 and the warning by default and add a `strict` mode that exits 2 when a frame waits after the
+  first one decoded, leaving the leading frames of a cut stream alone, as the content-signature modes
+  have an optional and a strict one. Recommended: D. A frame waiting after output has started means the
+  decoder dropped state, which is a fault in the decoder or the stream and not a property of a cut.
+  Other users of the count and what each does with it: `forge monitor`/`live` print "N waiting for an
+  I-frame played nothing" on stdout with the played count; `forge transcode` from AC-4 and the GUI's QC
+  and player controllers skip such frames without a word (`stream_tools.cpp`, the controllers); Hearth's
+  engine plays them as silence by design (`stream_decoder.hpp`); `forge probe` decodes nothing and has
+  no count.
+- **E-AC-3 changing layout mid-stream** (`run_decode_eac3`, `apps/forge/cli/src/commands/decode.cpp`) used to
+  be handled silently: concatenating a 5.1 and a stereo Spott period file exited 0, with the later frames
+  dropped or cut to the first slots. It now stops with kExitInput and "frame N: the channel layout changes
+  mid-stream (W channels, then V)", as the AC-3 and AC-4 paths do; a unit concealed down to its bed
+  (`ConcealmentAction::kBedOnly`) is exempt. Open for the owner: whether an error is the right policy for a
+  spliced programme, against writing one WAV per layout or rendering every unit to the first layout.
+
+### Content signing against CS spec v2.5 (2026-10-29)
+
+Content signing (`pace-ccjf1`, `forge ac4-sign` and `ac4-verify`) has no phase of its own; its questions are the numbered list at the
+top of [libs/ac4/ERRATA.md](../libs/ac4/ERRATA.md) (cited as `AC4-n`). The owner released version 2.5 of the specification on 2026-10-29
+(version 2.4 was not seen); it differs from 2.3 in 62 places, and the library, `forge`, the tests and the documents were reconciled
+with it that day. Version 2.6 followed the same day and changes one rule of §5.3, below.
+
+- **Answered:** 2 (MP4: out of scope, §8.3.2; refused by name), 11 (no DER on the wire, no DER scan), 13 (the 24-bit frame size
+  escape), 16 (v2.6: the publisher UUID is the PACE account's, carried out of band, and is not in the certificate), and the choice about version numbers (§3.16: the wire version is 1; "3" names the scheme release). The signature input
+  (SHA-256 of `SignedInfoWire`) was already what the library did. Question 3 (signer information) is answered in part by the new §5.3.
+- **Changed in the code:** an MP4 is refused with its own error and a message that gives the reason; the signature is verified before the
+  digests it holds (§6.1, "verification order matters"); the publisher, product, platform and application are written from options and
+  reported on verifying; a nonce that is not 128 bytes and a publisher UUID that is not a UUID are refused when signing, and the UUID is
+  not compared with the signing certificate (v2.6) but with the accounts `expect-publisher-uuid=` names, a finding in `ac4-verify` and a
+  refusal with `verify-content`; `check-content` judges the certificates at the signed date (the owner's decision on the time), and `ac4-verify` and
+  `verify-content` at the time of the check.
+- **Still the owner's:** the validity time (the mapping of "strict" and "own-QC" to commands is a reading, question 1), exactly one
+  signature entry (6), revocation (7), trust anchors (8), `ContentSignatureInfo` (5), the ID3 and damaged-frame trailers (14, 15). v2.5
+  does not change what it says of them.
+- **New, from §5.3 and its "may":** what a verifier does with a bad nonce or UUID (17: reported always, refused by `verify-content`,
+  which also refuses a UUID that is none of the expected accounts); whether `std::random_device` is the CSPRNG (18); whether the digest is over the bytes
+  received or a fresh serialisation (19). `signed-date=` stays, with a warning, against §5.3's "actual signing time" (question 10).
 
 ## Coordination
 
@@ -4615,7 +4685,8 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
 - Writing immersive stereo (`presentation_version` 2): V1.3.1 names the version without defining it,
   so the encoder does not copy DEE's use of it, while the decoder reads it by the observed rule
   (decision 10).
-- Protected (encrypted) AC-4 tracks.
+- Protected (encrypted) AC-4 tracks. The MP4 reader refuses one, naming the Common Encryption scheme,
+  the original format and the default KID, and nothing decrypts it (planned: `cenc-read-side.md`).
 - MPEG-2 TS under ATSC A/342-2's profile, which `ac3cli ts` refuses; DVB's is carried.
 - AC-4 on the ESP32-C3 and the other ESP32 parts; D14 plans the P4, the S3 and the C6, and has built
   the P4. The encoder on any ESP32.

@@ -6,12 +6,15 @@
 #include <cstdio>
 #include <fmt/base.h>
 #include <fmt/format.h>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <span>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -35,8 +38,10 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
 #include "container_input.hpp"
 #include "probe_json.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -505,6 +510,9 @@ void print_container(const iclforge::apps::ContainerFacts& facts) {
             }
             others += fmt::format("{} track {} '{}' ({})", other.kind, other.id, other.codec_id,
                                   other.language);
+            if (other.protection.has_value()) {
+                others += fmt::format(", protected, not read ({})", other.protection->description);
+            }
         }
         fmt::println("{:<16}{}", "other tracks", others);
     }
@@ -521,6 +529,21 @@ void print_ac4_table(std::string_view path, const Ac4Summary& summary,
                  summary.sync_frames);
     if (summary.parse_error.has_value()) {
         fmt::println("{:<16}{}", "parse error", iclforge::ac4::describe(*summary.parse_error));
+    }
+    if (summary.content_signature.present) {
+        const auto& signature = summary.content_signature;
+        if (signature.readable) {
+            fmt::println(
+                "{:<16}{} bytes, signer {}, dated {} (UTC), {} certificate(s); not "
+                "verified (forge ac4-verify)",
+                "content sig", signature.blob_size, signature.signer, signature.signed_date,
+                signature.certificates);
+        } else {
+            fmt::println(
+                "{:<16}{} bytes after the last sync frame that do not read as a content "
+                "signature: {}",
+                "content sig", signature.blob_size, signature.problem);
+        }
     }
     if (!summary.first_frame.has_value()) {
         return;
@@ -673,6 +696,39 @@ int run_probe_ac4(std::string_view in_path, std::istream& in, const Options& met
     return summary.crc_failures > 0 || summary.parse_error ? 1 : 0;
 }
 
+// How much of a file or pipe is looked at to tell what it is: a TrueHD or MLP stream may have up to
+// kMaxLeadingBytes of something else ahead of its first access unit (libs/truehd/ERRATA.md,
+// question 49), and its first access unit and the header of the next must follow.
+constexpr std::size_t kProbeHeadBytes = iclforge::truehd::kMaxLeadingBytes + 16384;
+
+// The bytes already taken from a pipe to tell what the stream is, given back ahead of the rest of
+// it: a pipe cannot be read twice, and the AC-3 family's reader below pulls forward from the start.
+class ReplayBuffer final : public std::streambuf {
+   public:
+    ReplayBuffer(std::span<const char> head, std::streambuf* rest)
+        : head_(head.begin(), head.end()), rest_(rest) {
+        setg(head_.data(), head_.data(), head_.data() + head_.size());
+    }
+
+   protected:
+    int_type underflow() override {
+        if (gptr() < egptr()) {
+            return traits_type::to_int_type(*gptr());
+        }
+        const std::streamsize got = rest_->sgetn(tail_.data(), std::ssize(tail_));
+        if (got <= 0) {
+            return traits_type::eof();
+        }
+        setg(tail_.data(), tail_.data(), tail_.data() + got);
+        return traits_type::to_int_type(*gptr());
+    }
+
+   private:
+    std::vector<char> head_;
+    std::array<char, 8192> tail_{};
+    std::streambuf* rest_;
+};
+
 }  // namespace
 
 int run_probe(std::string_view in_path, const Options& meta) {
@@ -703,27 +759,88 @@ int run_probe(std::string_view in_path, const Options& meta) {
     iclforge::apps::ContainerFacts container;
     std::istringstream demuxed;
     std::istream* source = is_stdio_path(in_path) ? static_cast<std::istream*>(&std::cin) : &file;
+    // A bare stream on stdin is told by its first bytes, which are read once and handed back to
+    // whichever reader takes the stream (ReplayBuffer).
+    std::unique_ptr<ReplayBuffer> replay;
+    std::istream replayed{nullptr};
+    if (is_stdio_path(in_path)) {
+        std::vector<char> head(kProbeHeadBytes);
+        std::cin.read(head.data(), static_cast<std::streamsize>(head.size()));
+        const auto got = static_cast<std::size_t>(std::cin.gcount());
+        std::cin.clear();
+        if (is_truehd_stream(std::as_bytes(std::span{head}).first(got))) {
+            // TrueHD and MLP are read whole, as a container's track is.
+            std::vector<std::byte> all(got);
+            std::memcpy(all.data(), head.data(), got);
+            std::vector<char> chunk(65536);
+            while (const std::streamsize n =
+                       std::cin.rdbuf()->sgetn(chunk.data(), std::ssize(chunk))) {
+                const auto* bytes = reinterpret_cast<const std::byte*>(chunk.data());
+                all.insert(all.end(), bytes, bytes + n);
+            }
+            return run_probe_truehd_stream(all, in_path, meta, {}, {});
+        }
+        replay = std::make_unique<ReplayBuffer>(std::span<const char>{head}.first(got),
+                                                std::cin.rdbuf());
+        replayed.rdbuf(replay.get());
+        source = &replayed;
+    }
     if (!is_stdio_path(in_path)) {
         // The sniff decides within a few hundred bytes (sniff_container).
-        std::array<char, 4096> head{};
+        std::vector<char> head(kProbeHeadBytes);
         file.read(head.data(), static_cast<std::streamsize>(head.size()));
         const auto got = static_cast<std::size_t>(file.gcount());
         file.clear();
         file.seekg(0, std::ios::beg);
         const auto kind =
             iclforge::apps::sniff_container(std::as_bytes(std::span{head}).first(got));
+        // A TrueHD or MLP stream starts with an access unit whose major sync follows its four header
+        // bytes; run_probe_truehd reads the file itself.
+        if (kind == iclforge::apps::ContainerKind::kUnknown &&
+            (is_truehd_stream(std::as_bytes(std::span{head}).first(got)) ||
+             starts_with_ac3_core_then_truehd(std::as_bytes(std::span{head}).first(got)))) {
+            return run_probe_truehd(in_path, meta);
+        }
         if (kind != iclforge::apps::ContainerKind::kUnknown) {
             const auto bytes = read_all(in_path);
-            auto result = iclforge::apps::elementary_stream_from_bytes(bytes);
+            auto result = iclforge::apps::elementary_stream_from_bytes(
+                bytes, iclforge::apps::CodecSet{.truehd = true});
             if (!result.error.empty()) {
                 fmt::println(stderr, "error: {} is a {}", in_path, result.error);
                 return 1;
             }
             container = std::move(result.container);
+            // A Blu-ray transport stream's TrueHD track may carry an AC-3 core between its access
+            // units (support.cpp, read_elementary_stream); the access units are what is probed.
+            std::size_t ac3_core_frames = 0;
+            if (container.kind == iclforge::apps::ContainerKind::kMpegTs &&
+                container.stream_type == 0x83) {
+                if (auto stripped = strip_ac3_core(result.bytes)) {
+                    ac3_core_frames = stripped->frames;
+                    result.bytes = std::move(stripped->bytes);
+                }
+            }
+            // A TrueHD or MLP track (MP4 'mlpa', Matroska A_TRUEHD, TS 0x83) gives up whole
+            // access units, which the TrueHD probe reads with what the container said of the
+            // track beside them.
+            if (is_truehd_stream(result.bytes)) {
+                return run_probe_truehd_stream(
+                    result.bytes, in_path, meta,
+                    [&container](iclforge::apps::JsonSink& sink) {
+                        write_container(sink, container);
+                    },
+                    [&container] { print_container(container); }, ac3_core_frames);
+            }
             demuxed.str(std::string{reinterpret_cast<const char*>(result.bytes.data()),
                                     result.bytes.size()});
             source = &demuxed;
         }
+    }
+    if (meta.detail.has_value() &&
+        (*meta.detail == "evolution" || *meta.detail == "structure" || *meta.detail == "format")) {
+        fmt::println(stderr, "error: detail={} describes TrueHD and MLP streams, and {} is not one",
+                     *meta.detail, in_path);
+        return 1;
     }
     std::istream& in = *source;
 

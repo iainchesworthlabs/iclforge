@@ -59,7 +59,13 @@ Card {
                     var modeName = HearthController.decoderSettings.mode;
                     // The dynamic range mode is this decoder's; a receiver
                     // sent the stream applies its own.
-                    var mode = root.transcoded ? qsTr("transcoded to AC-3")
+                    // TrueHD and MLP are lossless: A/52's operating modes are not theirs, and
+                    // what the decoder does with a failed check is.
+                    var lossless = kind === "TrueHD" || kind === "MLP";
+                    var checks = HearthController.decoderSettings.truehdLenient ? qsTr("lossless, lenient checks")
+                                                                              : qsTr("lossless, strict checks");
+                    var mode = lossless ? checks
+                             : root.transcoded ? qsTr("transcoded to AC-3")
                              : root.receiverDecodes ? qsTr("sent as it is")
                              : modeName === "rf" ? qsTr("RF mode")
                              : modeName === "custom" ? qsTr("custom mode") : qsTr("line mode");
@@ -69,6 +75,18 @@ Card {
                 color: Theme.text
                 font.bold: true
                 font.pixelSize: Theme.fontBody
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                objectName: "signalPathTruehd"
+                Layout.fillWidth: true
+                visible: HearthController.thisFrame.truehd === true
+                text: qsTr("Substream %1, %n channels. Dialogue normalisation and dynamic range are read and not applied. "
+                           + "Passthrough of TrueHD is not available, so it is decoded here.", "",
+                           HearthController.thisFrame.truehdChannels ?? 0)
+                          .arg((HearthController.thisFrame.truehdSubstream ?? 0) + 1)
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
                 wrapMode: Text.WordWrap
             }
             Text {

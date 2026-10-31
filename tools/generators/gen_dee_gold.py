@@ -38,6 +38,17 @@ Groups (G2_GROUPS names what each is for):
                                      presentations, each 2ch format, DRC per presentation, the
                                      surround attenuation, dialnorm and loudness presets, embedded
                                      timecode, and --optimize-data-rate
+  truehd-open    dee_dthd_encoder    the TrueHD gold set of 2026-10-29 (GOLD_VERSION 2): the rates
+                                     above 96 kHz DEE was asked for, downmix presentations with
+                                     three substreams, DRC per presentation and dialnorm on 2.0
+                                     and 7.1, lengths that are not a whole number of access
+                                     units, 20-bit and other bit depths, other channel counts,
+                                     --optimize-data-rate, --add-silence and the trim options,
+                                     and the Atmos masters named with --atmos-master
+  truehd-fixtures dee_dthd_encoder   0.25 s TrueHD streams, committed under testdata/truehd-dee/
+                                     (--fixtures-out)
+  truehd-long    dee_dthd_encoder    300 s TrueHD programmes (2.0, 5.1, 7.1), made in a second set
+                                     directory
   programme      all four            60 s programmes at the common configurations, and 300 s ones
                                      for soak tests
   objects        all four            the Atmos-master inputs with --masters (the ADM BWF masters of
@@ -73,17 +84,25 @@ made them. Each TrueHD entry says so (TRUEHD_NOTE).
 
 What DEE 6.5.4 could not be made to write is in the manifest's dee_cannot (DEE_CANNOT).
 
+The TrueHD legs are what tools/checks/score_truehd_decode.py scores a decoder with, from this
+manifest and the streams and sources it names (docs/verification.md, "Scoring DEE's TrueHD
+streams"). Make them before the licence ends: --only thd- makes just those.
+
 Usage (repo root):
   python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold [--cli ICLFORGE_CLI]
-      [--jobs N] [--only NAME_PART ...] [--masters DIR]
+      [--jobs N] [--only NAME_PART ...] [--masters DIR] [--atmos-master NAME=PATH ...]
+  python tools/generators/gen_dee_gold.py --gold-set D:/ac3bld/dee-gold
+      --fixtures-out testdata/truehd-dee       # no DEE run: the committed fixtures' copy
 
 Never run in CI - see guard_not_ci(), the same rule gen_external_baseline.py states.
 """
 
 import argparse
+import getpass
 import hashlib
 import json
 import os
+import platform
 import re
 import struct
 import subprocess
@@ -108,7 +127,10 @@ DTHD = "dee_dthd_encoder"
 ENCODERS = (DDP, DDPJOC, DTHD)
 
 # 1: the first set, 2026-09-26.
-GOLD_VERSION = 1
+# 2: the TrueHD gold set of 2026-10-29: truehd-open, truehd-fixtures and truehd-long beside
+# the first set's legs, which are unchanged, and the manifest's strict FFmpeg decode, forge's TrueHD
+# probe and its per-presentation decodes.
+GOLD_VERSION = 2
 MANIFEST = "dee-gold-manifest.json"
 DEFAULT_MASTERS = Path("D:/ac3bld/ac4-gold/masters")
 
@@ -136,6 +158,11 @@ SPEAKERS = {
     "20": ("L", "R"),
     "51": ("L", "R", "C", "LFE", "Ls", "Rs"),
     "71": ("L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs"),
+    "30": ("L", "R", "C"),
+    "31": ("L", "R", "C", "LFE"),
+    "40": ("L", "R", "Ls", "Rs"),
+    "50": ("L", "R", "C", "Ls", "Rs"),
+    "70": ("L", "R", "C", "Ls", "Rs", "Lrs", "Rrs"),
     "514": ("L", "R", "C", "LFE", "Ls", "Rs", "Tfl", "Tfr", "Tbl", "Tbr"),
     "714": ("L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "Tfl", "Tfr", "Tbl", "Tbr"),
     "916": ("L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "Lw", "Rw", "Tfl", "Tfr", "Ltm",
@@ -176,6 +203,17 @@ THD_PRESETS = ("atsc_a85", "atsc_a85_agile", "ebu_r128", "freetv_op59", "arib_b3
 THD_DIALNORMS = (-31, -27, -24, -20, -17, -10, -1)
 TIMECODE_RATES = ("24", "25", "29.97", "30")
 
+# The rates the TrueHD block C probes (tag: Hz); only the ones DEE accepted get the longer legs.
+HIGH_RATES = {"44k": 44100, "88k": 88200, "176k": 176400, "192k": 192000}
+# All four probes were refused on 2026-10-29, so none of the longer legs at these rates is made;
+# a rate DEE accepts later goes here to make them.
+HIGH_RATES_ACCEPTED = ()
+HOT_HZ = 997
+HOT_AMPLITUDE = 0.5
+# Sample counts that are not a whole number of access units (40 at 48 kHz): block F.
+LENGTH_SAMPLES = (12000, 12001, 12039, 4001, 41)
+FIXTURE_SECONDS = 0.25
+
 TRUEHD_NOTE = ("A test input only (the user's decision, 2026-09-26): decode it, pass it through "
                "and round-trip it, with no analysis of how Dolby's encoder made it. ROADMAP.md "
                "keeps TrueHD interoperability by black-box analysis of Dolby streams out of scope.")
@@ -195,8 +233,19 @@ G2_GROUPS = {
     "ac3-metadata": "AC-3 metadata, the same, and AC-3's timecode",
     "joc": "E-AC-3 JOC from channel beds: the object layer's third-party coverage "
            "(test_dee_joc_fixture.cpp), transcoding to AC-4 (planning/ac4.md I1, I5)",
-    "truehd": "TrueHD with a lossless source: the TrueHD module's decode material "
-              "(feature/truehd-atmos-support, ROADMAP.md) and MAT passthrough",
+    "truehd": "TrueHD with a lossless source: the TrueHD module's decode material, scored "
+              "against the sources by tools/checks/score_truehd_decode.py (planning/truehd.md), "
+              "and MAT passthrough",
+    "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md "
+                   "(planning/truehd.md, \"Oracles\"): the rates, downmix presentations and "
+                   "three substreams, DRC and dialnorm, lengths that are not a whole number of "
+                   "access units, other bit depths and layouts, the encoder's data-rate and "
+                   "stream-end options, and the Atmos input",
+    "truehd-fixtures": "short TrueHD streams with their sources, committed under "
+                       "testdata/truehd-dee/ as the only streams in the tree from an outside "
+                       "encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
+    "truehd-long": "300 s TrueHD programmes for soak tests of the decoder and the network path "
+                   "to Hearth sinks",
     "programme": "60 s and 300 s programmes for soak tests and listening: the ESP32 player "
                  "(planning/esp32-stream-set.md), Hearth",
     "objects": "Atmos-master inputs, refused on provenance as in the AC-4 gold set",
@@ -227,6 +276,17 @@ DEE_CANNOT = [
      "its parser refuses"),
     ("multi-input (gapless) or split (cut-point) E-AC-3 JOC from channel beds ('Multi-input CBI "
      "encoding is not supported', 'Splitting CBI input is not supported')"),
+    ("TrueHD options this build lists none of: a restart or random-access interval, a peak data "
+     "rate or bit-rate cap, a target disc format, noise shaping or dither, a data check, the "
+     "prediction filter order, a DVD-Audio (MLP) mode, signing, the mix levels of the downmix "
+     "presentations, a DRC start-up gain, the mix level and the room type; only "
+     "--optimize-data-rate, --add-silence and the trim options touch the stream's rate or its "
+     "ends"),
+    ("TrueHD above 96 kHz (44.1, 88.2, 176.4 and 192 kHz are each refused at 2.0), and a single "
+     "WAV of 1, 3, 4, 5 or 7 channels: those layouts are taken only as a channel list with the "
+     "missing slots left silent, so the stream has its presentation's full channel count"),
+    ("a TrueHD input of more than eight channels (the sixteen-channel legs), or an "
+     "evolution-frame file as an input; its Atmos presentation takes only an Atmos master"),
 ]
 
 WAV_LIST = (DDP,)
@@ -324,6 +384,21 @@ def upsample2(x, taps=255):
 def speaker_tones(speakers, seconds, rate=RATE):
     t = np.arange(round(seconds * rate)) / rate
     return [TONE_AMPLITUDE * np.sin(2.0 * np.pi * SPEAKER_HZ[s] * t) for s in speakers]
+
+
+def hot_tones(speakers, seconds):
+    """Every channel the same HOT_HZ tone at HOT_AMPLITUDE plus its own pink noise, so that a
+    downmix of the channels reaches full scale."""
+    count = round(seconds * RATE)
+    t = np.arange(count) / RATE
+    tone = HOT_AMPLITUDE * np.sin(2.0 * np.pi * HOT_HZ * t)
+    return [tone + pink_noise(count, ALL_SPEAKERS.index(s) + 1, NOISE_RMS) for s in speakers]
+
+
+def round20(x):
+    """x quantised to 20 bits, as 24-bit samples with the low four bits clear (wav_bytes scales
+    by 8388607, so a multiple of 16 over 8388607 comes out as that multiple)."""
+    return np.round(x * (8388607.0 / 16.0)) * (16.0 / 8388607.0)
 
 
 def music_speakers(music, seconds):
@@ -450,7 +525,7 @@ def source_plan():
     def tones_text(layout, rate=RATE):
         return (f"one tone per channel, {' '.join(SPEAKERS[layout])}: "
                 + ", ".join(str(SPEAKER_HZ[k]) for k in SPEAKERS[layout])
-                + f" Hz at -20 dBFS, {rate // 1000} kHz")
+                + f" Hz at -20 dBFS, {rate / 1000:g} kHz")
 
     bed = ("L R the music from 0 s, C its mono mix from 10 s x 0.6, LFE its mono mix from 0 s "
            "low-passed at 120 Hz x 0.8, Ls Rs from 20 s x 0.5, Lrs Rrs from 7.5 s x 0.4, Tfl "
@@ -480,7 +555,7 @@ def source_plan():
         add(f"transient_{layout}", layout, ("transient", layout),
             "1 s of silence, then a decaying noise burst each second per channel, the channels "
             "a 1/n of a second apart (the LFE's a 55 Hz thump)")
-    for layout in ("20", "51", "514"):
+    for layout in ("20", "51", "71", "514"):
         add(f"steps_{layout}", layout, ("steps", layout),
             f"a {STEP_HZ} Hz tone in every channel but the LFE, from {STEP_LEVELS_DB[0]} to "
             f"{STEP_LEVELS_DB[-1]} dBFS in 3 dB steps of {STEP_SECONDS:g} s",
@@ -489,7 +564,7 @@ def source_plan():
         add(f"programme_{layout}", layout, ("programme", layout),
             "a programme: music throughout, with the speech fixture's 0-20 s at 20 s and 20-30 "
             "s at 45 s, the music ducked under it", seconds=PROGRAMME_SECONDS)
-    for layout in ("51", "514"):
+    for layout in ("20", "51", "71", "514"):
         add(f"programme_{layout}_300", layout, ("programme", layout),
             "the programme for 300 s, its speech placed each minute", seconds=SOAK_SECONDS)
     for layout in ("20", "51", "71"):
@@ -506,23 +581,92 @@ def source_plan():
         layout, seconds, rate, _bits, _builder, _text = plan[name]
         add(f"{name}_16", layout, ("round16", name), f"{name} rounded to 16 bits",
             seconds=seconds, rate=rate, bits=16)
+    thd_open_sources(plan, add, tones_text)
     return plan
 
 
-def build_columns(spec, music, speech, plan, cache):
+def thd_open_sources(plan, add, tones_text):
+    """The sources of the TrueHD gold set of 2026-10-29 (GOLD_VERSION 2): other layouts, the
+    rates DEE was asked for above 96 kHz, 20-bit and 16-bit copies, lengths that are not a whole
+    number of access units, loud downmix sources and the 0.25 s fixtures."""
+    for layout in ("30", "31", "40", "50", "70"):
+        add(f"tones_{layout}", layout, ("tones", layout, RATE), tones_text(layout))
+    for layout in ("51", "71"):
+        add(f"hot_{layout}", layout, ("hot", layout),
+            f"every channel the same {HOT_HZ} Hz tone at {HOT_AMPLITUDE} plus its own pink noise "
+            "at -26 dBFS RMS, so that a downmix passes full scale")
+    for tag, rate in HIGH_RATES.items():
+        for layout in ("20", "51", "71"):
+            add(f"tones_{layout}_{tag}", layout, ("tones", layout, rate),
+                tones_text(layout, rate), rate=rate)
+        for layout in ("20", "51"):
+            add(f"noise_{layout}_{tag}", layout, ("noise", layout, rate),
+                f"pink noise made at {rate / 1000:g} kHz", rate=rate)
+        add(f"sweep_20_{tag}", "20", ("sweep", "20", rate),
+            f"a logarithmic sweep, 20 Hz to {0.45 * rate / 1000:g} kHz", rate=rate)
+    add("music_20_192k", "20", ("music192", "20"),
+        "the music bed up-sampled by two twice (upsample2())", rate=192000)
+    add("tones_20_192k_16", "20", ("round16", "tones_20_192k"),
+        "tones_20_192k rounded to 16 bits", rate=192000, bits=16)
+    add("tones_20_192k_b20", "20", ("round20", "tones_20_192k"),
+        "tones_20_192k rounded to 20 bits (the low four bits of each 24-bit sample clear)",
+        rate=192000)
+    for name, base in (("music_20_b20", "music_20"), ("music_51_b20", "music_51"),
+                       ("tones_71_b20", "tones_71"), ("music_20_96k_b20", "music_20_96k")):
+        layout, seconds, rate, _bits, _builder, _text = plan[base]
+        add(name, layout, ("round20", base), f"{base} rounded to 20 bits (the low four bits of "
+            "each 24-bit sample clear)", seconds=seconds, rate=rate)
+    for name, base in (("music_20_96k_16", "music_20_96k"), ("music_51_96k_16", "music_51_96k")):
+        layout, seconds, rate, _bits, _builder, _text = plan[base]
+        add(name, layout, ("round16", base), f"{base} rounded to 16 bits", seconds=seconds,
+            rate=rate, bits=16)
+    for n in LENGTH_SAMPLES:
+        add(f"tones_20_n{n}", "20", ("tones", "20", RATE), f"{tones_text('20')}, exactly {n} "
+            "samples", seconds=n / RATE)
+    add("tones_20_96k_n24001", "20", ("tones", "20", 96000), f"{tones_text('20', 96000)}, "
+        "exactly 24001 samples", seconds=24001 / 96000, rate=96000)
+    add("tones_20_192k_n48001", "20", ("tones", "20", 192000),
+        f"{tones_text('20', 192000)}, exactly 48001 samples", seconds=48001 / 192000,
+        rate=192000)
+    add("tones_51_n12001", "51", ("tones", "51", RATE), f"{tones_text('51')}, exactly 12001 "
+        "samples", seconds=12001 / RATE)
+    f = FIXTURE_SECONDS
+    add("fx_tones_71", "71", ("tones", "71", RATE), tones_text("71"), seconds=f)
+    add("fx_tones_71_96k", "71", ("tones", "71", 96000), tones_text("71", 96000),
+        seconds=f / 2, rate=96000)
+    add("fx_music_51", "51", ("music", "51"), "music_51 for 0.25 s", seconds=f)
+    add("fx_music_20", "20", ("music", "20"), "music_20 for 0.25 s", seconds=f)
+    add("fx_music_20_96k", "20", ("music96", "20"), "music_20_96k for 0.25 s", seconds=f,
+        rate=96000)
+    add("fx_tones_20", "20", ("tones", "20", RATE), tones_text("20"), seconds=f)
+    add("fx_tones_20_16", "20", ("round16", "fx_tones_20"), "fx_tones_20 rounded to 16 bits",
+        seconds=f, bits=16)
+    add("fx_tones_20_b20", "20", ("round20", "fx_tones_20"), "fx_tones_20 rounded to 20 bits",
+        seconds=f)
+    for tag in ("88k", "176k", "192k"):
+        add(f"fx_tones_20_{tag}", "20", ("tones", "20", HIGH_RATES[tag]),
+            tones_text("20", HIGH_RATES[tag]), seconds=f, rate=HIGH_RATES[tag])
+
+
+def build_columns(spec, music, speech, plan, cache, seconds=SECONDS):
     kind = spec[0]
     if kind == "tones":
         _, layout, rate = spec
-        return speaker_tones(SPEAKERS[layout], SECONDS, rate)
+        return speaker_tones(SPEAKERS[layout], seconds, rate)
+    if kind == "hot":
+        return hot_tones(SPEAKERS[spec[1]], seconds)
     if kind == "music":
         layout = spec[1]
         if layout == "10":
-            return [cut(music.mean(axis=1), 0.0, SECONDS)]
-        cols = music_speakers(music, SECONDS)
+            return [cut(music.mean(axis=1), 0.0, seconds)]
+        cols = music_speakers(music, seconds)
         return [cols[k] for k in SPEAKERS[layout]]
     if kind == "music96":
         return [upsample2(c) for c in build_columns(("music", spec[1]), music, speech, plan,
-                                                     cache)]
+                                                     cache, seconds)]
+    if kind == "music192":
+        return [upsample2(upsample2(c)) for c in build_columns(("music", spec[1]), music, speech,
+                                                                plan, cache, seconds)]
     if kind == "speech":
         x = cut(speech, 0.0, SECONDS)
         return [x.mean(axis=1)] if spec[1] == "10" else list(x.T)
@@ -536,10 +680,11 @@ def build_columns(spec, music, speech, plan, cache):
                 for k in SPEAKERS[spec[1]]]
     if kind == "sweep":
         _, layout, rate = spec
-        return sweeps(SPEAKERS[layout], SECONDS, rate, top=20000.0 if rate == RATE else 40000.0)
+        top = 20000.0 if rate == RATE else 40000.0 if rate == 96000 else 0.45 * rate
+        return sweeps(SPEAKERS[layout], seconds, rate, top=top)
     if kind == "noise":
         _, layout, rate = spec
-        return noises(SPEAKERS[layout], SECONDS, rate)
+        return noises(SPEAKERS[layout], seconds, rate)
     if kind == "transient":
         return transients(SPEAKERS[spec[1]], SECONDS)
     if kind == "steps":
@@ -549,6 +694,8 @@ def build_columns(spec, music, speech, plan, cache):
     if kind == "round16":
         base = cache[spec[1]]
         return [np.round(c * 32767.0) / 32767.0 for c in base]
+    if kind == "round20":
+        return [round20(c) for c in cache[spec[1]]]
     raise ValueError(spec)
 
 
@@ -603,16 +750,18 @@ def build_sources(root, names):
     with tempfile.TemporaryDirectory() as temporary:
         music = read_fixture(AUDIO / "programme_music_stereo.flac", temporary)
         speech = read_fixture(AUDIO / "programme_speech_stereo.flac", temporary)
-    bases = {plan[n][4][1] for n in names if plan[n][4][0] == "round16"}
+    rounded = ("round16", "round20")
+    bases = {plan[n][4][1] for n in names if plan[n][4][0] in rounded}
     cache, entries = {}, {}
-    for name in sorted(names, key=lambda n: plan[n][4][0] == "round16"):
+    for name in sorted(names, key=lambda n: plan[n][4][0] in rounded):
         layout, seconds, rate, bits, builder, text = plan[name]
-        if builder[0] == "round16" and builder[1] not in cache:
-            cache[builder[1]] = build_columns(plan[builder[1]][4], music, speech, plan, cache)
+        if builder[0] in rounded and builder[1] not in cache:
+            cache[builder[1]] = build_columns(plan[builder[1]][4], music, speech, plan, cache,
+                                              plan[builder[1]][1])
         if builder[0] == "programme":
             cols = programme(music, speech, SPEAKERS[layout], seconds)
         else:
-            cols = build_columns(builder, music, speech, plan, cache)
+            cols = build_columns(builder, music, speech, plan, cache, seconds)
         if name in bases:
             cache[name] = cols
         path = root / "sources" / f"{name}.wav"
@@ -625,7 +774,8 @@ def build_sources(root, names):
             print(f"source {name}: written", flush=True)
         entries[name] = {"layout": layout, "speakers": list(SPEAKERS[layout]),
                          "seconds": seconds, "sample_rate": rate, "bits": bits,
-                         "description": text, "sha256": hashlib.sha256(data).hexdigest()}
+                         "description": text, "size_bytes": len(data),
+                         "sha256": hashlib.sha256(data).hexdigest()}
     return entries
 
 
@@ -813,14 +963,20 @@ def g2_legs():
     # TrueHD.
     def thd(name, presentations, loudness=None, extra_args=(), group="truehd", **extra):
         opts = []
-        for presentation, source in presentations:
+        slots = {}
+        for presentation, given in presentations:
             opts += ["--presentation", presentation]
-            if source:
-                opts += ["--input-format", "wav", "-i", "{" + source + "}"]
+            if isinstance(given, tuple):
+                # (name, slots): the source's channels as mono WAVs in the slots of a wav_list,
+                # None leaving a slot silent.
+                slots[given[0]] = given[1]
+                opts += ["--input-format", "wav_list", "-i", "{wavlist:" + given[0] + "}"]
+            elif given:
+                opts += ["--input-format", "wav", "-i", "{" + given + "}"]
         opts += [*(loudness or []), *extra_args]
-        sources = [s for _, s in presentations if s]
+        sources = [s[0] if isinstance(s, tuple) else s for _, s in presentations if s]
         add(group, name, DTHD, sources[0], opts, "truehd", sources=sources,
-            use_note=TRUEHD_NOTE, **extra)
+            use_note=TRUEHD_NOTE, **({"wav_slots": slots} if slots else {}), **extra)
 
     for pres, layout in (("2ch", "20"), ("6ch", "51"), ("8ch", "71")):
         for source in ("tones", "music", "noise", "sweep", *(("film",) if layout != "20"
@@ -866,6 +1022,8 @@ def g2_legs():
             extra_args=["--optimize-data-rate", "1"],
             audio_altered="--optimize-data-rate requantises the samples before coding")
 
+    thd_open_legs(thd)
+
     # Programmes.
     for kbps in (96, 128, 192, 256):
         ddp_leg("programme", f"ddp-20-programme-{kbps}", "ddp", "programme_20", "20", kbps)
@@ -891,7 +1049,119 @@ def g2_legs():
     return legs
 
 
-def object_legs(masters):
+def thd_open_legs(thd):
+    """The TrueHD gold set of 2026-10-29, blocks C to L of the work order (block B's Atmos legs
+    are object_legs(), whose masters are named on the command line). Every exploratory leg is
+    allowed to be refused, and its refusal kept. What DEE has no option for is in DEE_CANNOT."""
+    def op(name, presentations, group="truehd-open", **extra):
+        thd(name, presentations, group=group, refusal_ok=True, **extra)
+
+    # C: the sample rates. First the probes; then, for each rate DEE accepted, the longer legs.
+    for tag in HIGH_RATES:
+        op(f"thd-2ch-tones-{tag}24", [("2ch", f"tones_20_{tag}")])
+    for tag in HIGH_RATES_ACCEPTED:
+        legs = [("2ch", "noise", "20"), ("6ch", "tones", "51"), ("8ch", "tones", "71")]
+        if tag != "44k":
+            legs += [("2ch", "sweep", "20"), ("6ch", "noise", "51")]
+        for pres, kind, layout in legs:
+            op(f"thd-{pres}-{kind}-{tag}24", [(pres, f"{kind}_{layout}_{tag}")])
+    if "192k" in HIGH_RATES_ACCEPTED:
+        op("thd-2ch-music-192k24", [("2ch", "music_20_192k")])
+        op("thd-2ch-tones-192k16", [("2ch", "tones_20_192k_16")])
+        op("thd-2ch-tones-192k20", [("2ch", "tones_20_192k_b20")])
+        op("thd-len-2ch-192k-48001", [("2ch", "tones_20_192k_n48001")])
+
+    # D: the downmix presentations, which are also the streams with three substreams.
+    op("thd-dmx-8ch-hot-48k24-dmx6-dmx2", [("8ch", "hot_71"), ("6ch", None), ("2ch", None)])
+    op("thd-dmx-8ch-hot-48k24-dmx2", [("8ch", "hot_71"), ("2ch", None)])
+    op("thd-dmx-6ch-hot-48k24-dmx2", [("6ch", "hot_51"), ("2ch", None)])
+    op("thd-dmx-8ch-music-48k24-dmx6", [("8ch", "music_71"), ("6ch", None)])
+    op("thd-dmx-8ch-tones-96k24-dmx6-dmx2", [("8ch", "tones_71_96k"), ("6ch", None),
+                                             ("2ch", None)])
+
+    # E: DRC and loudness metadata.
+    for profile in ("film_light", "film_standard", "music_light", "music_standard", "speech",
+                    "not_indicated"):
+        op(f"thd-drc-2ch-steps-48k24-{profile}", [(f"2ch:drc_profile={profile}", "steps_20")])
+        op(f"thd-drc-8ch-steps-48k24-{profile}", [(f"8ch:drc_profile={profile}", "steps_71")])
+    for value in (31, 24, 1):
+        for pres, source in (("2ch", "music_20"), ("8ch", "music_71")):
+            op(f"thd-dialnorm-{pres}-{value}", [(pres, source)],
+               loudness=["--loudness-management", f"skip:dialnorm={-value}"])
+
+    # F: stream ends and lengths that are not a whole number of access units.
+    for n in LENGTH_SAMPLES:
+        op(f"thd-len-2ch-48k-{n}", [("2ch", f"tones_20_n{n}")])
+    op("thd-len-2ch-96k-24001", [("2ch", "tones_20_96k_n24001")])
+    op("thd-len-6ch-48k-12001", [("6ch", "tones_51_n12001")])
+
+    # G: the encoder's data-rate and stream-end options: --optimize-data-rate, --add-silence and
+    # the trim options are all this build lists (dee-options.md).
+    op("thd-opt-rate-off-48k24", [("2ch", "music_20")], extra_args=["--optimize-data-rate", "0"])
+    op("thd-opt-rate-off-96k24", [("2ch", "music_20_96k")],
+       extra_args=["--optimize-data-rate", "0"])
+    op("thd-opt-rate-on-96k24", [("2ch", "music_20_96k")],
+       extra_args=["--optimize-data-rate", "1"],
+       audio_altered="--optimize-data-rate requantises the samples before coding")
+    op("thd-opt-end-silence", [("2ch", "music_20")], extra_args=["--add-silence", "0.25:0.5"],
+       audio_altered="--add-silence pads the source with silence at both ends")
+    op("thd-opt-end-silence-frames", [("2ch", "music_20")],
+       extra_args=["--timecode-frame-rate", "25", "--add-silence", "3f:5f"],
+       audio_altered="--add-silence pads the source with silence at both ends")
+    op("thd-opt-end-trim", [("2ch", "music_20")],
+       extra_args=["--start", "1.5", "--end", "7.25"],
+       audio_altered="--start and --end cut the source")
+
+    # H: other bit depths.
+    for name, pres, source in (("thd-2ch-music-48k20", "2ch", "music_20_b20"),
+                               ("thd-6ch-music-48k20", "6ch", "music_51_b20"),
+                               ("thd-8ch-tones-48k20", "8ch", "tones_71_b20"),
+                               ("thd-2ch-music-96k20", "2ch", "music_20_96k_b20"),
+                               ("thd-2ch-music-96k16", "2ch", "music_20_96k_16"),
+                               ("thd-6ch-music-96k16", "6ch", "music_51_96k_16")):
+        op(name, [(pres, source)])
+
+    # I: channel counts, each into the smallest presentation that can hold it.
+    for layout, pres in (("10", "2ch"), ("30", "6ch"), ("31", "6ch"),
+                                ("40", "6ch"), ("50", "6ch"), ("70", "8ch")):
+        op(f"thd-chn-{layout}-{pres}-48k24", [(pres, f"tones_{layout}")])
+
+    # The same sources as channel lists, the missing channels left silent (DEE's wav_list takes
+    # '-' for a channel to replace with silence).
+    for layout, pres, slots in (("10", "2ch", (0, None)),
+                                ("30", "6ch", (0, 1, 2, None, None, None)),
+                                ("31", "6ch", (0, 1, 2, 3, None, None)),
+                                ("40", "6ch", (0, 1, None, None, 2, 3)),
+                                ("50", "6ch", (0, 1, 2, None, 3, 4)),
+                                ("70", "8ch", (0, 1, 2, None, 3, 4, 5, None))):
+        op(f"thd-chn-{layout}-{pres}-48k24-wavlist", [(pres, (f"tones_{layout}", slots))])
+
+    # J: the fixtures, 0.25 s each.
+    def fx(name, presentations, **extra):
+        op(name, presentations, group="truehd-fixtures", **extra)
+
+    fx("thd-fx-8ch-tones-48k24-dmx6-dmx2", [("8ch", "fx_tones_71"), ("6ch", None), ("2ch", None)])
+    fx("thd-fx-6ch-music-48k24", [("6ch", "fx_music_51")])
+    fx("thd-fx-2ch-music-48k24", [("2ch", "fx_music_20")])
+    fx("thd-fx-2ch-music-96k24", [("2ch", "fx_music_20_96k")])
+    fx("thd-fx-8ch-tones-96k24", [("8ch", "fx_tones_71_96k")])
+    for tag in ("88k", "176k", "192k"):
+        if tag in HIGH_RATES_ACCEPTED:
+            fx(f"thd-fx-2ch-tones-{tag}24", [("2ch", f"fx_tones_20_{tag}")])
+    fx("thd-fx-2ch-tones-48k16", [("2ch", "fx_tones_20_16")])
+    fx("thd-fx-2ch-tones-48k20", [("2ch", "fx_tones_20_b20")])
+    fx("thd-fx-2ch-music-48k24-drc-film_standard",
+       [("2ch:drc_profile=film_standard", "fx_music_20")])
+    fx("thd-fx-2ch-music-48k24-timecode", [("2ch", "fx_music_20")],
+       extra_args=["--embed-timecode", "01:00:00:00", "--timecode-frame-rate", "25"])
+
+    # L: the 300 s programmes, made in their own set directory.
+    for pres, layout in (("2ch", "20"), ("6ch", "51"), ("8ch", "71")):
+        op(f"thd-long-{pres}-programme_300-48k24", [(pres, f"programme_{layout}_300")],
+           group="truehd-long")
+
+
+def object_legs(masters, atmos_masters=None):
     """The objects group: each Atmos master given to each encoder that takes one."""
     legs = []
     for name, path in masters.items():
@@ -904,6 +1174,18 @@ def object_legs(masters):
                          "ddp"]},
             {**common, "name": f"obj-thd-atmos-{name}", "encoder": DTHD, "codec": "truehd",
              "options": ["--presentation", "atmos", "-i", "{master}"], "use_note": TRUEHD_NOTE},
+        ]
+    # Masters the owner names (--atmos-master), read in place: the Atmos presentation alone, and
+    # with the lower presentations beside it.
+    for name, path in (atmos_masters or {}).items():
+        common = {"group": "truehd-open", "source": str(path), "refusal_ok": True,
+                  "master": True, "encoder": DTHD, "codec": "truehd", "use_note": TRUEHD_NOTE}
+        legs += [
+            {**common, "name": f"obj-thd-atmos-{name}",
+             "options": ["--presentation", "atmos", "-i", "{master}"]},
+            {**common, "name": f"obj-thd-atmos-{name}-dmx",
+             "options": ["--presentation", "atmos", "-i", "{master}", "--presentation", "8ch",
+                         "--presentation", "6ch", "--presentation", "2ch"]},
         ]
     return legs
 
@@ -988,6 +1270,30 @@ def split_wav_list(source, work):
     return ":".join(p.name for p in files), files
 
 
+def wav_list_argument(source, work, slots):
+    """DEE's wav_list argument for the source's channels in the given slots ('-' for a silent
+    one), and the mono WAVs it names, written to the leg's directory before the run."""
+    with wave.open(str(source), "rb") as r:
+        channels, width, rate = r.getnchannels(), r.getsampwidth(), r.getframerate()
+        raw = np.frombuffer(r.readframes(r.getnframes()), dtype=np.uint8)
+    frames = raw.reshape(-1, channels, width)
+    files, names = {}, []
+    for slot in slots:
+        if slot is None:
+            names.append("-")
+            continue
+        with tempfile.SpooledTemporaryFile() as f:
+            with wave.open(f, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(width)
+                w.setframerate(rate)
+                w.writeframes(np.ascontiguousarray(frames[:, slot, :]).tobytes())
+            f.seek(0)
+            files[work / f"in_{slot}.wav"] = f.read()
+        names.append(f"in_{slot}.wav")
+    return ":".join(names), files
+
+
 def leg_command(leg, sources, outs, work):
     """DEE's command line for a leg, and the files to write before it runs."""
     exe = str(dee_exe(leg["encoder"]))
@@ -1012,8 +1318,16 @@ def leg_command(leg, sources, outs, work):
         return [exe, *options[:2], *pairs, "--overwrite", "1", *options[2:]], files
     # TrueHD: each "{name}" placeholder is that presentation's source path.
     by_name = {Path(s).stem: s for s in sources}
-    options = [by_name[o[1:-1]] if o.startswith("{") and o[1:-1] in by_name else
-               (str(sources[0]) if o == "{master}" else o) for o in leg["options"]]
+    options = []
+    for o in leg["options"]:
+        if o.startswith("{wavlist:"):
+            argument, listed = wav_list_argument(by_name[o[9:-1]], work, leg["wav_slots"][o[9:-1]])
+            files.update(listed)
+            options.append(argument)
+        elif o.startswith("{") and o[1:-1] in by_name:
+            options.append(by_name[o[1:-1]])
+        else:
+            options.append(str(sources[0]) if o == "{master}" else o)
     return [exe, *options, "-o", str(outs[0]), "--overwrite", "1", "--temp-dir", str(work)], files
 
 
@@ -1058,8 +1372,15 @@ def forge_probe(cli, stream):
         text = (result.stderr + result.stdout).decode("utf-8", "replace").strip().splitlines()
         return {"error": f"exit {result.returncode}: {(text or [''])[0][:300]}"}
     try:
-        stream_info = json.loads(result.stdout)["stream"]
-    except (json.JSONDecodeError, KeyError) as exc:
+        info = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return {"error": f"unreadable JSON: {exc}"}
+    # A TrueHD or MLP stream's facts are under "truehd", not "stream".
+    if "truehd" in info:
+        return info["truehd"]
+    try:
+        stream_info = info["stream"]
+    except KeyError as exc:
         return {"error": f"unreadable JSON: {exc}"}
     keep = ("codec", "bsid", "bsmod", "acmod", "lfeon", "layout", "coded_channels",
             "rendered_channels", "substreams", "access_units", "syncframes", "bitrate_kbps",
@@ -1085,12 +1406,12 @@ def wav_shape(path):
     return None
 
 
-def forge_decode(cli, stream, scratch):
+def forge_decode(cli, stream, scratch, extra=(), tag=""):
     scratch.mkdir(parents=True, exist_ok=True)
-    wav = scratch / f"{stream.parent.name}-{stream.stem}.wav"
+    wav = scratch / f"{stream.parent.name}-{stream.stem}{tag}.wav"
     wav.unlink(missing_ok=True)
-    result = subprocess.run([str(cli), "decode", str(stream), str(wav)], capture_output=True,
-                            check=False, timeout=3600)
+    result = subprocess.run([str(cli), "decode", str(stream), str(wav), *extra],
+                            capture_output=True, check=False, timeout=3600)
     shape = wav_shape(wav) if wav.is_file() else None
     wav.unlink(missing_ok=True)
     if result.returncode == 0 and shape:
@@ -1128,6 +1449,14 @@ def ffmpeg_check(stream, scratch, source=None):
     demuxer = ["-f", "truehd"] if stream.suffix == ".mlp" else []
     if demuxer:
         out["demuxer"] = "truehd"
+    strict = subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-err_detect",
+                             "crccheck+bitstream+buffer+explode", "-f", "truehd", "-i",
+                             str(stream), "-f", "null", "-"], capture_output=True, check=False,
+                            timeout=3600)
+    strict_errors = (strict.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+    out["strict"] = ("ok" if strict.returncode == 0 and not strict_errors
+                     else f"exit {strict.returncode}: " + " | ".join(dict.fromkeys(
+                         strict_errors))[:400])
     result = subprocess.run(["ffmpeg", "-v", "error", *demuxer, "-i", str(stream), "-f", "null",
                              "-"], capture_output=True, check=False, timeout=3600)
     errors = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()
@@ -1193,6 +1522,13 @@ def ffmpeg_check(stream, scratch, source=None):
     return out
 
 
+def presentations_wanted(leg):
+    """Whether each presentation of the stream is decoded in turn: legs with more than one
+    presentation, and the Atmos and sixteen-channel ones."""
+    return (leg["options"].count("--presentation") > 1
+            or leg["name"].startswith(("obj-thd-atmos", "thd-16ch")))
+
+
 def run_leg(task):
     """Makes one leg in DIR/streams/<name> (reusing streams whose command and sources are
     unchanged) and describes it: (name, manifest entry)."""
@@ -1226,7 +1562,8 @@ def run_leg(task):
              else str(leg["source"]), "sources": [s.name for s in sources],
              "source_sha256": shas, "options": leg["options"] + leg.get("extra_args", []),
              "command": stamp["command"]}
-    for key in ("kbps", "layout", "audio_altered", "use_note", "parts", "outputs"):
+    for key in ("kbps", "layout", "audio_altered", "use_note", "parts", "outputs",
+                "wav_slots"):
         if key in leg:
             entry[key] = leg[key]
     if fresh:
@@ -1264,11 +1601,21 @@ def run_leg(task):
                 d["mp4"] = mux_mp4(stream, work, "ac3" if ext == "ac3" else "eac3", suffix)
             else:
                 d["mp4"] = previous["mp4"]
+        if ext == "mlp":
+            # DEE's own log and encode-request files, hashed and not read.
+            reports = {r.name: sha256(r) for r in sorted(work.glob(f"{stream.name}.*"))}
+            if reports:
+                d["reports"] = reports
         if cli:
             d["forge_probe"] = forge_probe(cli, stream)
             d["forge_decode"] = forge_decode(cli, stream, scratch / "decode")
+            if ext == "mlp" and presentations_wanted(leg):
+                d["forge_presentations"] = {
+                    p: forge_decode(cli, stream, scratch / "decode",
+                                    [f"truehd-presentation={p}"], f"-{p}")
+                    for p in ("2ch", "6ch", "8ch", "all")}
         else:
-            for key in ("forge_probe", "forge_decode"):
+            for key in ("forge_probe", "forge_decode", "forge_presentations"):
                 if key in previous:
                     d[key] = previous[key]
         d["ffmpeg"] = ffmpeg_check(stream, scratch / "decode", lossless_source)
@@ -1296,7 +1643,7 @@ def gold_run(args, version):
             master = child / "adm-master.wav"
             if master.is_file():
                 masters[child.name] = master
-    legs += object_legs(masters)
+    legs += object_legs(masters, args.atmos_master)
     names = [leg["name"] for leg in legs]
     dupes = sorted({n for n in names if names.count(n) > 1})
     if dupes:
@@ -1388,6 +1735,101 @@ def gold_run(args, version):
         raise SystemExit(1)
 
 
+# The legs committed under testdata/truehd-dee/, in the order the budget is spent: block J of the
+# work order, then the short block F legs.
+FIXTURE_LEGS = (
+    "thd-fx-8ch-tones-48k24-dmx6-dmx2", "thd-fx-6ch-music-48k24", "thd-fx-2ch-music-48k24",
+    "thd-fx-2ch-music-96k24", "thd-fx-8ch-tones-96k24", "thd-fx-2ch-tones-88k24",
+    "thd-fx-2ch-tones-176k24", "thd-fx-2ch-tones-192k24", "thd-fx-2ch-tones-48k16",
+    "thd-fx-2ch-tones-48k20", "thd-fx-2ch-music-48k24-drc-film_standard",
+    "thd-fx-2ch-music-48k24-timecode", "thd-len-2ch-48k-12000", "thd-len-2ch-48k-12001",
+    "thd-len-2ch-48k-12039", "thd-len-2ch-48k-4001")
+FIXTURE_LEG_BYTES = 768 * 1024
+FIXTURE_TOTAL_BYTES = 4 * 1024 * 1024
+# Lines of DEE's log that are dropped from the committed copy: anything naming the entitlement, a
+# key, a host, a user or a machine, or holding a MAC address.
+LOG_DROP = re.compile(r"licen[sc]e|seria[l]|key|host|user|machine|computer|"
+                      r"([0-9a-f]{2}[:-]){5}[0-9a-f]{2}", re.IGNORECASE)
+
+
+def sanitised(text, root):
+    """(text with its absolute paths made relative to the set, the lines dropped)."""
+    own = [v for v in (getpass.getuser(), platform.node()) if v]
+    kept, dropped = [], 0
+    for line in text.splitlines():
+        if LOG_DROP.search(line) or any(v.lower() in line.lower() for v in own):
+            dropped += 1
+            continue
+        kept.append(line)
+    out = "\n".join(kept) + "\n"
+    return relative_paths(out, root), dropped
+
+
+def relative_paths(text, root):
+    for form in (str(root), root.as_posix()):
+        text = text.replace(form, ".")
+    return re.sub(r'"[^"]*dee_[a-z0-9]+_encoder\.exe"|[^\s"]*dee_[a-z0-9]+_encoder\.exe',
+                  "dee_dthd_encoder", text)
+
+
+def write_fixture_copy(root, dest):
+    """DIR/dee-gold-manifest.json cut to FIXTURE_LEGS and their sources, and the streams, logs and
+    sources themselves, laid out as a gold set (score_truehd_decode.py --set reads it as it is).
+    Legs that are not in the manifest, were refused, or do not fit the budget are named and left
+    out."""
+    manifest = json.loads((root / MANIFEST).read_text(encoding="utf-8"))
+    dest.mkdir(parents=True, exist_ok=True)
+    legs, sources, total, dropped, counted = {}, {}, 0, 0, set()
+    for name in FIXTURE_LEGS:
+        entry = manifest["legs"].get(name)
+        if not entry or "refused" in entry or "failed" in entry:
+            print(f"{name}: not in the set or not made; left out")
+            continue
+        stream = root / "streams" / name / "dee.mlp"
+        log, lost = sanitised((root / "streams" / name / "dee_output.txt").read_text(
+            encoding="utf-8", errors="replace"), root)
+        files = [(f"streams/{name}/dee.mlp", stream.read_bytes()),
+                 (f"streams/{name}/dee_output.txt", log.encode("utf-8"))]
+        for source in entry["sources"]:
+            files.append((f"sources/{source}", (root / "sources" / source).read_bytes()))
+        cost = sum(len(d) for p, d in files if p.startswith("streams")
+                   or p not in counted)
+        if cost > FIXTURE_LEG_BYTES or total + cost > FIXTURE_TOTAL_BYTES:
+            print(f"{name}: {cost} bytes over the budget; left out")
+            continue
+        total += cost
+        counted.update(p for p, _ in files)
+        dropped += lost
+        for path, data in files:
+            (dest / path).parent.mkdir(parents=True, exist_ok=True)
+            (dest / path).write_bytes(data)
+        copy = {k: v for k, v in entry.items() if k not in ("mediainfo", "reports")}
+        copy["command"] = relative_paths(entry["command"], root).replace("\\", "/")
+        copy["options"] = [relative_paths(o, root) for o in entry["options"]]
+        copy["source"] = relative_paths(entry["source"], root)
+        copy["sources"] = [Path(s).stem + ".wav" for s in entry["sources"]]
+        copy["files"] = {"dee.mlp": entry["sha256"],
+                         "dee_output.txt": hashlib.sha256(log.encode("utf-8")).hexdigest()}
+        legs[name] = copy
+        for source in entry["sources"]:
+            sources[Path(source).stem] = manifest["sources"][Path(source).stem]
+    out = {"_comment": ("The TrueHD fixtures of tools/generators/gen_dee_gold.py (GOLD_VERSION 2), "
+                        "cut from the 2026-10-29 gold set to the legs below and their sources: "
+                        "DEE's streams, each with its source and DEE's log. The set's root is "
+                        "'.', the logs lose the lines that name the machine, its user or its "
+                        "entitlement, and MediaInfo's and DEE's own report digests "
+                        "are left out. They are test inputs, decoded and compared with their "
+                        "sources and not analysed (docs/verification.md, \"Scoring DEE's TrueHD "
+                        "streams\")."),
+           **{k: manifest[k] for k in ("gold_version", "made", "updated", "dee_version",
+                                       "mediainfo_version", "ffmpeg_version", "forge")},
+           "groups": {g: manifest["groups"][g] for g in {e["group"] for e in legs.values()}},
+           "sources": sources, "legs": legs}
+    (dest / MANIFEST).write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {dest}: {len(legs)} legs, {total} bytes of streams, sources and logs, "
+          f"{dropped} log lines dropped")
+
+
 def main():
     guard_not_ci()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -1401,10 +1843,20 @@ def main():
     parser.add_argument("--only", nargs="+", metavar="NAME_PART",
                         help="make only the legs whose names contain one of these; the others "
                              "keep their manifest entries")
+    parser.add_argument("--atmos-master", action="append", default=[], metavar="NAME=PATH",
+                        help="an Atmos master (DAMF, BWF ADM or MXF IAB) for the TrueHD Atmos "
+                             "legs obj-thd-atmos-NAME and -NAME-dmx, read in place")
+    parser.add_argument("--fixtures-out", type=Path, metavar="DIR",
+                        help="write the committed copy of the TrueHD fixtures (FIXTURE_LEGS) "
+                             "from --gold-set to DIR and stop; no DEE is run")
     parser.add_argument("--masters", type=Path, default=DEFAULT_MASTERS,
                         help="a directory of <name>/adm-master.wav Atmos masters for the "
                              f"objects group (default {DEFAULT_MASTERS.as_posix()})")
     args = parser.parse_args()
+    args.atmos_master = {n: Path(p) for n, _, p in (a.partition("=") for a in args.atmos_master)}
+    if args.fixtures_out:
+        write_fixture_copy(args.gold_set.resolve(), args.fixtures_out.resolve())
+        return
     for encoder in ENCODERS:
         if not dee_exe(encoder).exists():
             raise SystemExit(f"{dee_exe(encoder)} not found - this generator only runs on a "

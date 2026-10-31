@@ -268,6 +268,18 @@ struct Facts {
     unsigned long touch_reads = 0;
     unsigned long touch_failures = 0;
     unsigned long touch_points = 0;
+    // The Meters view, once it has been opened (planning/p4x-meters-view.md; GET /panel-stats has every figure): the rate it holds, the shape
+    // it takes ("grid 12": the representation and the outputs), the means of what an update costs, and what it missed.
+    unsigned long meters_opens = 0;
+    bool meters_showing = false;
+    int meters_rate_hz = 0;
+    std::string meters_shape;
+    unsigned long meters_analysis_us = 0;
+    unsigned long meters_widgets_us = 0;
+    unsigned long meters_render_us = 0;
+    unsigned long meters_late = 0;
+    unsigned long meters_dropped = 0;
+    unsigned long meters_tap_us = 0;  // what the audio path pays for a burst of 1,536 frames
 };
 
 // --- the rows --------------------------------------------------------------------------------------
@@ -355,7 +367,7 @@ inline std::string join(std::initializer_list<std::string_view> parts, std::stri
         return net.configured ? "not joined" : "no network stored";
     }
     if (!net.link) {
-        return "no cable";
+        return "no link";
     }
     std::string out = "up";
     if (net.speed_mbps) {
@@ -430,7 +442,7 @@ inline constexpr int kWeakSignalDbm = -75;
         const Tone address_tone = in.address.empty() ? Tone::muted : Tone::text;
         net.rows.push_back(one("", address_text(in), address_tone));
     };
-    interface_rows("Ethernet", "ethernet", facts.ethernet, false);
+    interface_rows("Wired", "ethernet", facts.ethernet, false);
     interface_rows("Wi-Fi", "wifi", facts.wifi, true);
     if (!facts.ethernet.present && !facts.wifi.present) {
         net.rows.push_back(one("Network", facts.web_address.empty() ? "none" : facts.web_address,
@@ -530,6 +542,20 @@ inline constexpr int kWeakSignalDbm = -75;
     perf.rows.push_back(one("Touch", join({grouped(facts.touch_reads) + " reads", std::to_string(facts.touch_failures) + " failed",
                                            grouped(facts.touch_points) + " touches"}),
                             facts.touch_failures > 0 ? Tone::attention : Tone::text));
+    if (facts.meters_opens > 0) {
+        // Ten a second is the governor's answer to a task that could not keep up: worth a look while the view shows.
+        const bool slow = facts.meters_showing && facts.meters_rate_hz < 20;
+        perf.rows.push_back(one("Meters", join({std::to_string(facts.meters_rate_hz) + " Hz", facts.meters_shape,
+                                                facts.meters_showing ? "showing" : "closed"}),
+                                slow ? Tone::attention : (facts.meters_showing ? Tone::text : Tone::muted)));
+        const auto us = [](unsigned long v) { return micros_text(static_cast<long long>(v)); };
+        perf.rows.push_back(one("Update", join({"analysis " + us(facts.meters_analysis_us), "widgets " + us(facts.meters_widgets_us),
+                                                "render " + us(facts.meters_render_us)}),
+                                facts.meters_showing ? Tone::text : Tone::muted));
+        perf.rows.push_back(one("Missed", join({std::to_string(facts.meters_late) + " late", std::to_string(facts.meters_dropped) + " dropped",
+                                                "tap " + us(facts.meters_tap_us) + "/burst"}),
+                                facts.meters_dropped > 0 ? Tone::attention : (facts.meters_showing ? Tone::text : Tone::muted)));
+    }
     return page;
 }
 
@@ -575,41 +601,41 @@ struct Confirm {
 [[nodiscard]] inline Confirm confirm_text(const Facts& facts, Preference target) {
     Confirm confirm;
     const auto where_now = [&](const NetInterface& to) {
-        return " The board is " + std::string(facts.active == "ethernet" ? "on the cable" : "on Wi-Fi") +
+        return " The board is " + std::string(facts.active == "ethernet" ? "on wired" : "on Wi-Fi") +
                " now: this page's address changes" + (to.address.empty() ? "." : " to " + to.address + ".");
     };
     switch (target) {
         case Preference::automatic:
-            confirm.headline = "Use auto?";
-            confirm.detail = "The cable when it is linked, Wi-Fi when it is not. Both stay on.";
+            confirm.headline = "Use automatic?";
+            confirm.detail = "Wired when it is linked, Wi-Fi when it is not. Both stay on.";
             return confirm;
         // The board keeps a pin only once the interface it names holds an address, and brings it up
         // itself if it is off now (a pin to the other one switches it off): so an interface that is
         // off is not a reason to refuse, and a switched-on one with nothing to answer it is.
         case Preference::ethernet:
-            confirm.headline = "Use the cable only?";
+            confirm.headline = "Use wired only?";
             confirm.detail = "Wi-Fi is switched off.";
             if (facts.ethernet.enabled && !facts.ethernet.link) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
-                confirm.detail = "No cable is linked, so the board would be cut off: it refuses.";
+                confirm.detail = "Wired has no link, so the board would be cut off: it refuses.";
             } else if (!facts.ethernet.enabled) {
-                confirm.detail += " The cable is brought up first, and Wi-Fi stays on until it holds an address.";
+                confirm.detail += " Wired is brought up first, and Wi-Fi stays on until it holds an address.";
             } else if (facts.active != "ethernet") {
                 confirm.detail += where_now(facts.ethernet);
             }
             return confirm;
         case Preference::wifi:
             confirm.headline = "Use Wi-Fi only?";
-            confirm.detail = "The cable is switched off.";
+            confirm.detail = "Wired is switched off.";
             if (!facts.wifi.configured) {
                 confirm.tone = Tone::attention;
                 confirm.blocked = true;
                 confirm.detail = "No Wi-Fi network is stored, so the board would be cut off: it refuses.";
             } else if (!facts.wifi.enabled) {
-                confirm.detail += " Wi-Fi is joined first, and the cable stays on until it holds an address.";
+                confirm.detail += " Wi-Fi is joined first, and wired stays on until it holds an address.";
             } else if (facts.wifi.address.empty()) {
-                confirm.detail += " Wi-Fi has no address yet: if it cannot join, the board keeps the cable.";
+                confirm.detail += " Wi-Fi has no address yet: if it cannot join, the board keeps wired.";
             } else if (facts.active != "wifi") {
                 confirm.detail += where_now(facts.wifi);
             }
@@ -622,7 +648,7 @@ struct Confirm {
 [[nodiscard]] inline std::string net_change_text(NetChange state, std::string_view word) {
     switch (state) {
         case NetChange::working:
-            return "Switching to " + std::string(word == "wifi" ? "Wi-Fi" : word == "ethernet" ? "the cable" : "auto") + "...";
+            return "Switching to " + std::string(word == "wifi" ? "Wi-Fi" : word == "ethernet" ? "wired" : "automatic") + "...";
         case NetChange::done:
             return "Done.";
         case NetChange::refused:

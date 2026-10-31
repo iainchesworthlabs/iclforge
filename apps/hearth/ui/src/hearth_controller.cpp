@@ -57,6 +57,7 @@
 #include "diagnostics_server.hpp"
 #include "engine_thread.hpp"
 #include "item_loader.hpp"
+#include "mat_status.hpp"
 #include "media_inspector.hpp"
 #include "network_output_status.hpp"
 #include "output_decision.hpp"
@@ -93,6 +94,14 @@ constexpr int kPollMs = 60;
 }
 
 [[nodiscard]] QString stream_kind_name(const iclforge::hearth::ItemFacts& facts) {
+    // TrueHD and MLP have no bitstream format (passthrough of them is not available), so their
+    // name is the codec's.
+    if (facts.codec == iclforge::hearth::ItemCodec::kTruehd) {
+        return QStringLiteral("TrueHD");
+    }
+    if (facts.codec == iclforge::hearth::ItemCodec::kMlp) {
+        return QStringLiteral("MLP");
+    }
     if (!facts.stream.has_value()) {
         return QString();
     }
@@ -105,11 +114,17 @@ constexpr int kPollMs = 60;
     return *facts.stream == audio::BitstreamFormat::kAc3 ? QStringLiteral("AC-3") : QStringLiteral("E-AC-3");
 }
 
-// The queue row's own codec chip (main-play.png, "01 QUEUE"): "A3"/"E3"/"A4"
-// from what a probe already found (ItemFacts.stream), or "" before that;
+// The queue row's own codec chip (main-play.png, "01 QUEUE"): "A3"/"E3"/"A4"/"TH"/"ML"
+// from what a probe already found (ItemFacts.stream, ItemFacts.codec), or "" before that;
 // PlayPage.qml falls back to the file's own extension until then, a
 // presentation question this controller does not need to answer twice.
 [[nodiscard]] QString codec_badge(const iclforge::hearth::ItemFacts& facts) {
+    if (facts.codec == iclforge::hearth::ItemCodec::kTruehd) {
+        return QStringLiteral("TH");
+    }
+    if (facts.codec == iclforge::hearth::ItemCodec::kMlp) {
+        return QStringLiteral("ML");
+    }
     if (!facts.stream.has_value()) {
         return QString();
     }
@@ -648,6 +663,45 @@ constexpr int kPollMs = 60;
     return map;
 }
 
+// A TrueHD or MLP item's stream (MediaInfo::truehd), under the names media_info_json()'s "truehd"
+// member has, in the camel case this map uses.
+[[nodiscard]] QVariantMap media_truehd_to_map(const iclforge::hearth::TruehdIndex& index,
+                                              std::string_view codec) {
+    QVariantMap map;
+    map[QStringLiteral("codec")] = to_qstring(codec);
+    map[QStringLiteral("sampleRate")] = index.sample_rate;
+    map[QStringLiteral("substreams")] = index.substreams;
+    QVariantList channels;
+    for (int i = 0; i < index.substreams; ++i) {
+        channels.append(index.channels[static_cast<std::size_t>(i)]);
+    }
+    map[QStringLiteral("channels")] = channels;
+    map[QStringLiteral("accessUnits")] = static_cast<qlonglong>(index.units);
+    map[QStringLiteral("samplesPerAccessUnit")] = index.samples_per_unit;
+    map[QStringLiteral("paddingSamples")] = index.padding_samples;
+    map[QStringLiteral("variableRate")] = index.variable_rate;
+    map[QStringLiteral("peakDataRate")] = index.peak_data_rate;
+    map[QStringLiteral("objectSubstream")] = index.object_substream;
+    map[QStringLiteral("majorSyncs")] = static_cast<qlonglong>(index.major_syncs);
+    if (index.major_syncs > 0) {
+        map[QStringLiteral("restartIntervalUnits")] =
+            static_cast<double>(index.units) / static_cast<double>(index.major_syncs);
+        // The same interval in milliseconds, which is what a listener meets in a seek.
+        if (index.sample_rate != 0) {
+            map[QStringLiteral("restartIntervalMs")] =
+                1000.0 * static_cast<double>(index.units) * static_cast<double>(index.samples_per_unit) /
+                static_cast<double>(index.major_syncs) / static_cast<double>(index.sample_rate);
+        }
+    }
+    map[QStringLiteral("skippedBytes")] = static_cast<qlonglong>(index.skipped_bytes);
+    if (index.sample_rate != 0 && index.samples() != 0) {
+        map[QStringLiteral("bitrateKbps")] =
+            static_cast<double>(index.unit_bytes) * 8.0 / 1000.0 /
+            (static_cast<double>(index.samples()) / static_cast<double>(index.sample_rate));
+    }
+    return map;
+}
+
 [[nodiscard]] QVariantMap media_info_to_map(const iclforge::hearth::MediaInfo& info) {
     QVariantMap map;
     map[QStringLiteral("path")] = QString::fromStdString(info.path);
@@ -677,6 +731,10 @@ constexpr int kPollMs = 60;
     }
     if (info.ac4) {
         map[QStringLiteral("ac4")] = media_ac4_to_map(*info.ac4);
+    }
+    if (info.truehd && info.codec) {
+        map[QStringLiteral("truehd")] =
+            media_truehd_to_map(*info.truehd, iclforge::hearth::codec_token(*info.codec));
     }
     map[QStringLiteral("json")] = QString::fromStdString(media_info_json(info));
     return map;
@@ -924,6 +982,36 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     return decoder_map_from_request(pending.request);
 }
 
+// iclforge::truehd::Presentation as the Decoder page's TrueHD tab names it. "all" (the sixteen-channel
+// substream) is not a choice the page offers, and reads as "best".
+[[nodiscard]] QString truehd_presentation_name(iclforge::truehd::Presentation presentation) {
+    switch (presentation) {
+        case iclforge::truehd::Presentation::k2ch:
+            return QStringLiteral("2ch");
+        case iclforge::truehd::Presentation::k6ch:
+            return QStringLiteral("6ch");
+        case iclforge::truehd::Presentation::k8ch:
+            return QStringLiteral("8ch");
+        case iclforge::truehd::Presentation::kBest:
+        case iclforge::truehd::Presentation::kAll:
+        default:
+            return QStringLiteral("best");
+    }
+}
+
+[[nodiscard]] iclforge::truehd::Presentation truehd_presentation_from_name(const QString& name) {
+    if (name == QLatin1String("2ch")) {
+        return iclforge::truehd::Presentation::k2ch;
+    }
+    if (name == QLatin1String("6ch")) {
+        return iclforge::truehd::Presentation::k6ch;
+    }
+    if (name == QLatin1String("8ch")) {
+        return iclforge::truehd::Presentation::k8ch;
+    }
+    return iclforge::truehd::Presentation::kBest;
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -1126,6 +1214,9 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     map[QStringLiteral("ac4PreferredDownmix")] = ac4.preferred_downmix;
     map[QStringLiteral("ac4ImmersiveLayout")] = ac4_immersive_layout_name(ac4.immersive_layout);
     map[QStringLiteral("ac4CoreDecoding")] = ac4.core_decoding;
+    // TrueHD and MLP's own (DecoderTruehd.qml).
+    map[QStringLiteral("truehdPresentation")] = truehd_presentation_name(settings.truehd.presentation);
+    map[QStringLiteral("truehdLenient")] = settings.truehd.lenient;
     return map;
 }
 
@@ -1235,6 +1326,13 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     }
     if (map.contains(QStringLiteral("ac4CoreDecoding"))) {
         ac4.core_decoding = map[QStringLiteral("ac4CoreDecoding")].toBool();
+    }
+    if (map.contains(QStringLiteral("truehdPresentation"))) {
+        out.truehd.presentation =
+            truehd_presentation_from_name(map[QStringLiteral("truehdPresentation")].toString());
+    }
+    if (map.contains(QStringLiteral("truehdLenient"))) {
+        out.truehd.lenient = map[QStringLiteral("truehdLenient")].toBool();
     }
     return out;
 }
@@ -1400,6 +1498,14 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     row[QStringLiteral("sampleRates")] = rates;
     row[QStringLiteral("supportsAc3")] = device.supports_ac3_passthrough;
     row[QStringLiteral("supportsEac3")] = device.supports_eac3_passthrough;
+    // TrueHD as MAT: the endpoint opens the eight-channel link. `matRun` is whether a run on a
+    // receiver has shown this platform's MAT output to work, which none has (mat_status.hpp): the
+    // picker says "not run" beside the mark until one has, because an open is not a lit TrueHD
+    // indicator on the receiver.
+    row[QStringLiteral("supportsMat")] = device.supports_mat_passthrough;
+    row[QStringLiteral("matRun")] =
+        iclforge::hearth::mat_status(iclforge::audio::passthrough_backend()).run ==
+        iclforge::hearth::MatRun::kRun;
     return row;
 }
 
@@ -1431,12 +1537,15 @@ void keep_held_link_marks(QVariantList& rows, const QVariantList& before, const 
         const QVariantMap listed = was->toMap();
         row[QStringLiteral("supportsAc3")] = listed.value(QStringLiteral("supportsAc3")).toBool();
         row[QStringLiteral("supportsEac3")] = listed.value(QStringLiteral("supportsEac3")).toBool();
+        row[QStringLiteral("supportsMat")] = listed.value(QStringLiteral("supportsMat")).toBool();
     }
     const QString stream = output_format.value(QStringLiteral("stream")).toString();
     if (stream == QLatin1String("AC-3")) {
         row[QStringLiteral("supportsAc3")] = true;
     } else if (stream == QLatin1String("E-AC-3")) {
         row[QStringLiteral("supportsEac3")] = true;
+    } else if (stream == QLatin1String("TrueHD (MAT)")) {
+        row[QStringLiteral("supportsMat")] = true;
     }
     *held = row;
 }
@@ -2119,6 +2228,32 @@ void HearthController::poll() {
                 new_this_frame[QStringLiteral("ac4DrcMode")] = *ac4.drc_mode;
             }
             new_this_frame[QStringLiteral("ac4LatencySamples")] = ac4.latency_samples;
+        } else if (report->truehd) {
+            // A TrueHD unit has no A/52 dialnorm, dynrng or compr: the major sync's own words
+            // are shown as sent, raw, and not applied. The counters are the decoder's, since it
+            // was made (see TruehdUnitReport).
+            const iclforge::hearth::TruehdUnitReport& truehd = *report->truehd;
+            new_this_frame[QStringLiteral("truehd")] = true;
+            new_this_frame[QStringLiteral("truehdMlp")] = truehd.mlp;
+            new_this_frame[QStringLiteral("truehdSubstream")] = truehd.substream;
+            new_this_frame[QStringLiteral("truehdChannels")] = truehd.channels;
+            new_this_frame[QStringLiteral("truehdRestarted")] = truehd.restarted;
+            new_this_frame[QStringLiteral("truehdExtraDataBytes")] =
+                static_cast<qlonglong>(truehd.extra_data_bytes);
+            if (truehd.dialogue_norm) {
+                new_this_frame[QStringLiteral("truehdDialogueNorm")] = *truehd.dialogue_norm;
+            }
+            if (truehd.mix_level) {
+                new_this_frame[QStringLiteral("truehdMixLevel")] = *truehd.mix_level;
+            }
+            new_this_frame[QStringLiteral("truehdRestarts")] =
+                static_cast<qlonglong>(truehd.counters.restarts);
+            new_this_frame[QStringLiteral("truehdUnitsWaiting")] =
+                static_cast<qlonglong>(truehd.counters.units_waiting);
+            new_this_frame[QStringLiteral("truehdLosslessFailures")] =
+                static_cast<qlonglong>(truehd.counters.lossless_check_failures);
+            new_this_frame[QStringLiteral("truehdCheckFailures")] =
+                static_cast<qlonglong>(truehd.counters.check_failures);
         } else {
             new_this_frame[QStringLiteral("dialnorm")] = report->dialnorm;
         }

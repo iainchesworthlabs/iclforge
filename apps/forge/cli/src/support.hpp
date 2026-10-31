@@ -42,6 +42,7 @@
 #include "iclforge/containers/mp4/dash.hpp"
 #include "iclforge/containers/mp4/hls.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "recording_sink.hpp"
 #include "associated_mix.hpp"
 #include "stream_playback.hpp"
@@ -110,6 +111,18 @@ struct PositionSourceSpec {
     std::uint16_t port = 0;
 };
 
+// What a decode lost after the first frame or unit had decoded, for `decode strict`. A frame that
+// waits for a sync point (an AC-4 I-frame, a TrueHD restart header) before any has decoded is the
+// start of a stream cut in the middle of a group, and is not counted.
+struct DecodeLoss {
+    std::size_t waiting =
+        0;  // frames or units that waited for a sync point, after output had begun
+    std::size_t concealed = 0;  // frames or units made in place of ones that failed (conceal=)
+    std::size_t dropped =
+        0;  // TrueHD: units a lenient decode could not read, or the reader skipped
+    [[nodiscard]] std::size_t total() const noexcept { return waiting + concealed + dropped; }
+};
+
 // Everything a command accepts after its positional arguments, in any order.
 // The metadata group is iclforge::ac3::plan::Metadata verbatim; drc_scale is decode-
 // side local, because nothing an encoder is configured with corresponds to
@@ -132,6 +145,39 @@ struct Options {
     // pays one null pointer and no per-block work. See the header for why this
     // has to exist before any masked comparison does.
     std::string bap_census_path;
+    // The command the options were given to, and every option token of the line in the order given,
+    // as parse_options read them. A run that reads TrueHD or MLP applies few options, and says which
+    // of the others it was given and refuses them (commands/truehd.hpp, check_options_applied)
+    // where it would otherwise accept them and drop them.
+    std::string command;
+    std::vector<std::string> given;
+    // 'decode', 'levels' and 'loudness' of TrueHD and MLP only: the substreams to read (best, 2ch,
+    // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
+    std::string truehd_presentation;
+    bool truehd_lenient = false;
+    // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
+    // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
+    // it such a decode exits 0 and warns where it always did.
+    bool strict = false;
+    // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's
+    // own default.
+    struct TruehdEncode {
+        std::string downmix;                          // truehd-downmix=: "" or none, standard
+        std::optional<int> restart_units;             // truehd-restart=
+        std::optional<std::uint32_t> peak_rate_kbps;  // truehd-peak-rate=
+        bool rate_lenient = false;                    // truehd-rate-check=lenient
+        std::optional<int> fir_order;                 // truehd-fir-order=
+        bool matrix = true;                           // truehd-matrix=
+        unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone
+        // truehd-downmix-gains=: the linear gains of C, Ls/Rs, LFE and Lrs/Rrs, "off" being 0.
+        std::optional<std::array<double, 4>> downmix_gains;
+    };
+    TruehdEncode thdenc{};
+    // 'truehd-encode' and 'metadata' of TrueHD: the channel meaning of TH spec §14.1 the line names,
+    // per presentation (2, 6 and 8 channels): dialogue norm, mix level, source format, the
+    // control-enabled bit, and the two DRC start-up gains. Unset members are not touched.
+    // Provisional, no oracle until the DEE set (libs/truehd/ERRATA.md, questions 51 to 55).
+    iclforge::truehd::ChannelMeaningEdit thd_meaning{};
     // 'ac4-encode' and 'decode' of AC-4 only: when non-empty, write the
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value
@@ -388,6 +434,55 @@ struct Options {
     // verify-objects; the two cannot be combined (one says "refuse", the other
     // "play the bed"). See ac3::signing::gate_atmos_stream.
     bool gate_objects = false;
+    // AC-4 content signing (docs/concepts/object-signing.md, "AC-4 content signing"): a signature
+    // over the whole stream, made with the operator's own key and certificate chain and carried as
+    // a trailer after the last sync frame. Unlike the EMDF tag it is not per frame, and nothing
+    // here is on by default: signing, checking and reporting each need their own token.
+    // 'ac4-encode'/'atmos-encode codec=ac4': sign what was just written (needs content-key= and
+    // content-chain=).
+    bool sign_content = false;
+    // 'decode'/'ac4-verify': refuse unless the signature, its chain and its trust anchor all check.
+    bool verify_content = false;
+    // 'decode'/'ac4-verify': say what the checks found and carry on, whatever they found.
+    bool check_content = false;
+    // With verify-content: accept a signature that checks out against a chain no trust-anchor= or
+    // pin= vouches for. Off by default, because that is the integrity of the file against itself
+    // and not the identity of its signer.
+    bool unanchored_ok = false;
+    // content-key=<path>: the operator's private key; content-chain=<path>, repeatable: the
+    // certificates (a bundle, or several files) that vouch for it.
+    std::string content_key;
+    std::vector<std::string> content_chains;
+    // trust-anchor=<path> (repeatable): certificates the operator trusts as the top of a chain;
+    // pin=<hex> (repeatable): a certificate by SHA-1 or SHA-256 fingerprint.
+    std::vector<std::string> trust_anchors;
+    std::vector<std::string> pins;
+    // expect-publisher-uuid=<UUID> (repeatable): the publisher accounts the operator accepts. A
+    // signature naming another is a finding in ac4-verify and a refusal in verify-content. CS spec
+    // v2.6 §5.3: the UUID is not in the signing certificate, so without this it is only reported.
+    std::vector<std::string> expect_publisher_uuids;
+    // leaf-title=<title|any>: the `title` the signer certificate must carry (default
+    // "Code/Content Signer", CS spec v2.3 §6.1 step 4); "any" checks none. Unset: the default.
+    std::optional<std::string> leaf_title;
+    // signed-date=<YYYY-MM-DDTHH:MM:SS>: the date written into a signature, UTC; unset: now. CS spec
+    // v2.6 §5.3 says signedDate is the time of signing, so a date that is not that is warned about.
+    std::optional<std::string> signed_date;
+    // The signer information of CS spec v2.6 §5.3, for ac4-sign and sign-content: whom the
+    // signature names as its publisher and product, and the platform it was made on. Unset: left
+    // empty (publisher-uuid= is the one the specification asks for; its absence is warned about).
+    std::string publisher_uuid;  // publisher-uuid=<UUID>
+    std::string publisher_name;  // publisher-name=<text>
+    std::optional<int> product_id;  // product-id=<n>
+    std::string product_name;       // product-name=<text>
+    std::string wrapper_name;       // wrapper-name=<text>
+    std::string os_name;            // os-name=<text>
+    std::string os_version;         // os-version=<text>
+    std::string os_description;     // os-description=<text>
+    // verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>: the instant every certificate must be
+    // valid at. Unset, it depends on how the signature is being checked: "now", CS spec v2.6 §6.1
+    // steps 3 and 4, for ac4-verify and verify-content (the strict checks), and "signed", the date
+    // the signer wrote (only as good as the signer), for check-content, which reports and carries on.
+    std::optional<std::string> verify_time;
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.
@@ -1146,7 +1241,19 @@ std::vector<std::byte> read_all(std::string_view path);
 // caller's `if (stream.empty()) { ...; return kExitInput; }` guard already
 // does the right thing with an empty result regardless of which of those it
 // was.
-[[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path);
+// For a TrueHD transport stream (stream_type 0x83), or a file that opens with an AC-3 core and then
+// TrueHD, the AC-3 frames between the access units are set aside; `ac3_core_frames`, when given,
+// receives how many, and the stream says so on stderr.
+//
+// A file with more than one audio track gives its first, whatever the codec, to a caller that
+// reads TrueHD (`reads_truehd`, the default: decode, probe, levels, loudness and the container
+// commands). A command that does not read it (qc, play, monitor, transcode, fmp4) says false and
+// gets the first track of another codec, so that a Blu-ray remux with its TrueHD track first is
+// read as its AC-3 or E-AC-3 one. A file with TrueHD alone is returned whole for the command to
+// refuse by name (refuse_truehd).
+[[nodiscard]] std::vector<std::byte> read_elementary_stream(std::string_view in_path,
+                                                            bool reads_truehd = true,
+                                                            std::size_t* ac3_core_frames = nullptr);
 
 // Wraps iclforge::ac3::io::read_wav to honor the "-" stdin convention (is_stdio_path
 // above): "-" reads the WAV from stdin, binary mode set first, instead of

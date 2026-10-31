@@ -1,10 +1,14 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 
+#include "iclforge/meters_tap.hpp"
 #include "iclforge/now_view.hpp"
+#include "iclforge/preferences.hpp"
 #include "iclforge/render/room_plan.hpp"
 #include "iclforge/wall_clock.hpp"
 
@@ -52,6 +56,10 @@ struct BoardInfo {
 struct NowPlaying {
     // "Dolby Digital Plus 5.1 to 7.1.4": what arrives and what it is played on.
     LvString heading;
+    // What the decoder found, and the coded stream's bitrate in kb/s (0 until it is known): the footer says
+    // them (iclforge::nowview::stream_info_options).
+    iclforge::nowview::StreamFacts facts;
+    int kbps = 0;
     // One per output slot, in slot order; empty while the board does not know its layout.
     LvVector<iclforge::render::PlanSpot> spots;
     // Per slot, in dB of full scale (-120 is silence); empty before the first 100 ms window has closed.
@@ -61,6 +69,18 @@ struct NowPlaying {
 
 // Fills `out` from the player, called five times a second. False when no stream is playing.
 [[nodiscard]] bool read_now_playing(NowPlaying& out);
+
+// The levels of the last 100 ms window alone, which the speakers view reads itself every frame and follows when
+// the window is a new one (planning/p4x-speakers-options.md): a lock and two short arrays, no heap. `serial`
+// moves by one for each window the player closes, so that the view knows how long it has been since the last.
+// False when no stream is playing or no window has closed yet.
+struct NowLevels {
+    std::uint32_t serial = 0;
+    std::size_t outputs = 0;
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> peak_db{};
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
+};
+[[nodiscard]] bool read_now_levels(NowLevels& out);
 
 // What the server says is playing (metadata@v1), for the title card and the speakers' header
 // (planning/p4x-now-playing.md, stage 2): the player's store copied in place five times a second, the
@@ -91,6 +111,11 @@ bool read_now_title(NowTitle& out);
 struct NowSettings {
     iclforge::nowview::View view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+    iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
+    // The night schedule, and the board's local minute of the day while the schedule is on and the time is known
+    // (nothing otherwise: a board that does not know the time is never dark by accident).
+    iclforge::nowview::NightSchedule night;
+    std::optional<int> minute_of_day;
 };
 [[nodiscard]] NowSettings read_now_settings();
 
@@ -101,10 +126,17 @@ struct NowSettings {
 // The backlight, percent (display.hpp's display_set_backlight on the firmware).
 void set_backlight(int percent);
 
-// A choice made on the sheet: stored (settings.hpp) and followed at once, as PUT /now-playing and
-// PUT /dim-after do.
-void choose_now_view(iclforge::nowview::View view);
-void choose_dim_after(int minutes);
+// The preferences' side of this board (iclforge/preferences.hpp): what the Preferences sheet reads and sets, stored
+// (settings.hpp) and followed at once, as PUT /now-playing, PUT /dim-after and the rest do.
+[[nodiscard]] iclforge::prefs::Backend& preferences_backend();
+
+// The player's output as the Meters view takes it (iclforge/meters_tap.hpp): a mono mix in a ring and each output's peak over 50 ms. The firmware's is made
+// the first time it is asked for, in LVGL's heap, and handed to the player (sendspin_set_block_tap); the screen asks for blocks while it shows.
+[[nodiscard]] iclforge::meters::MeterTap& meters_tap();
+
+// The time between the panel task's frames while it draws (microseconds): what a view that updates on its own beat may be late by without
+// anyone having held the task (CONFIG_ICLFORGE_EXAMPLE_PANEL_FPS; the preview's own).
+[[nodiscard]] int panel_frame_us();
 
 // A monotonic clock, microseconds.
 [[nodiscard]] std::int64_t time_us();

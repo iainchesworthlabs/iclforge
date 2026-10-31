@@ -373,6 +373,11 @@ std::expected<std::vector<const iclforge::adm::AudioObject*>, BridgeError> colle
 // one of those 16 regardless of what this bridge produces - the same cap and the same reasoning
 // apps/forge/cli/src/main.cpp's run_atmos_encode/run_atmos_path already apply to the `objects`
 // constructor parameter, reused here rather than re-derived.
+//
+// What the 15 counts is the channels that become an AtmosEncoder object: every one but the LFE bed
+// channels, which are that implicit LFE rather than objects of their own (BridgeResult::is_lfe, and
+// AtmosEncoder::encode_frame's `lfe` span). A 9.1.6 bed is fifteen speaker feeds and an LFE, which
+// fits exactly; counting the LFE against the 15 as well refused it.
 constexpr std::size_t kMaxChannels = 15;
 
 }  // namespace
@@ -444,7 +449,7 @@ std::expected<BridgeResult, BridgeError> build(const iclforge::adm::AdmDocument&
         }
     }
 
-    if (out.paths.size() > kMaxChannels) {
+    if (out.object_slot_count() > kMaxChannels) {
         return std::unexpected(BridgeError::kTooManyChannels);
     }
     return out;

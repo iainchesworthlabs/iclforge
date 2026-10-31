@@ -27,15 +27,21 @@ test('the board serves the page, and the page drives the board', async ({ page, 
     const status = async () => (await request.get('status')).json();
 
     // The page and its script, from the firmware's flash: the files in this
-    // tree, byte for byte, with the headers control.cpp sends.
+    // tree, byte for byte once the browser has unzipped them (the component embeds the gzip of each,
+    // tools/gzip_asset.py, and control.cpp sends them with Content-Encoding: gzip), with the headers control.cpp sends.
+    const html = fs.readFileSync(path.join(UI, 'iclforge_ui.html'));
     const response = await page.goto('./');
     expect(response && response.status()).toBe(200);
     const headers = response ? response.headers() : {};
     expect(headers['content-type']).toBe('text/html; charset=utf-8');
+    expect(headers['content-encoding']).toBe('gzip');
     expect(headers['cache-control']).toBe('no-cache');
     expect(headers['content-security-policy']).toContain("default-src 'self'");
-    expect(Number(headers['content-length'])).toBe(fs.statSync(path.join(UI, 'iclforge_ui.html')).size);
+    // What is sent is what the header says and a good deal less than the file; what the browser got is the file.
+    expect(Number(headers['content-length'])).toBeLessThan(html.length / 2);
+    expect(await response.body()).toEqual(html);
     const script = await request.get('ui.js');
+    expect(script.headers()['content-encoding']).toBe('gzip');
     expect(await script.body()).toEqual(fs.readFileSync(path.join(UI, 'iclforge_ui.js')));
 
     // What the boot play decoded: the WASM page's demo, E-AC-3 5.1 with objects.

@@ -71,7 +71,8 @@ target_compile_definitions(iclforge_test_support PUBLIC
     "ICLFORGE_GOLDEN_AUDIO_DIR=\"${_iclforge_golden}/audio\""
     "ICLFORGE_GOLDEN_OBJECT_DIR=\"${_iclforge_golden}/object-fixture\""
     "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${_iclforge_golden}/external-baseline\""
-    "AC4_GOLDEN_DIR=\"${_iclforge_golden}/ac4\"")
+    "AC4_GOLDEN_DIR=\"${_iclforge_golden}/ac4\""
+    "ICLFORGE_GOLDEN_TRUEHD_DIR=\"${_iclforge_golden}/truehd\"")
 unset(_iclforge_golden)
 
 # The decode scalar the library under test was built with (ICLFORGE_DECODE_SCALAR: double, float or

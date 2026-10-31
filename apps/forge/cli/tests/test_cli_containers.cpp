@@ -1505,3 +1505,284 @@ TEST_CASE("ts refuses AC-4 under the atsc profile with a real reason", "[cli][ts
     CHECK(report.find("ATSC") != std::string::npos);
     CHECK(report.find("dvb") != std::string::npos);
 }
+
+// --------------------------------------------------------------------------
+// Protected (Common Encryption) MP4s: refused by name, and never read as audio.
+//
+// The three files are the MP4 reader's fuzz seeds (tools/generators/gen_cenc_reader_fixtures.py,
+// from the audit's generator). Before the reader looked at 'sinf', `forge demux` of the first one
+// exited 0 and wrote its ciphertext as audio; the other two said only that the file had no
+// ac-3/ec-3/ac-4 track.
+
+namespace {
+
+constexpr std::string_view kProtectedKid = "a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90";
+
+fs::path protected_seed(std::string_view name) {
+    return fs::path{ICLFORGE_MP4_SEED_DIR} / name;
+}
+
+}  // namespace
+
+TEST_CASE("demux, decode and probe refuse a protected MP4 by name and write nothing",
+          "[cli][demux][mp4][protected]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "protected.log";
+
+    struct Fixture {
+        std::string_view file;
+        std::string_view scheme;
+        bool mixed;
+    };
+    for (const Fixture& fixture : {Fixture{"cenc-clear-entry-then-enca.mp4", "cenc", true},
+                                   Fixture{"cenc-enca-only.mp4", "cenc", false},
+                                   Fixture{"cbcs-enca-only.mp4", "cbcs", false}}) {
+        const auto input = protected_seed(fixture.file);
+        REQUIRE(fs::exists(input));
+        const std::string detail = std::string{fixture.scheme} +
+                                   ", original format ec-3, default KID " +
+                                   std::string{kProtectedKid} + ")";
+        const std::string lead =
+            fixture.mixed ? "track 1 mixes a clear sample entry with a protected one, entry 2 ("
+                          : "track 1 is protected (";
+        CAPTURE(fixture.file);
+
+        {
+            // demux of a path: exit 2, says why, leaves no output
+            const auto out = dir / (std::string{fixture.file} + ".path.ec3");
+            fs::remove(out);
+            CHECK(run_cli("demux " + quoted(input) + " " + quoted(out), log) == 2);
+            const auto report = read_log(log);
+            INFO(report);
+            CHECK(report.find(lead + detail) != std::string::npos);
+            CHECK(report.find("decryption is not supported") != std::string::npos);
+            CHECK_FALSE(fs::exists(out));
+        }
+        {
+            // demux of a pipe says the same
+            const auto out = dir / (std::string{fixture.file} + ".pipe.ec3");
+            fs::remove(out);
+            CHECK(run_cli("demux - " + quoted(out) + " < " + quoted(input), log) == 2);
+            const auto report = read_log(log);
+            INFO(report);
+            CHECK(report.find(lead + detail) != std::string::npos);
+            CHECK_FALSE(fs::exists(out));
+        }
+        {
+            // decode exits 2 with the same words
+            const auto out = dir / (std::string{fixture.file} + ".wav");
+            fs::remove(out);
+            CHECK(run_cli("decode " + quoted(input) + " " + quoted(out), log) == 2);
+            const auto report = read_log(log);
+            INFO(report);
+            CHECK(report.find("MP4 file this build cannot demux: " + lead + detail) !=
+                  std::string::npos);
+            CHECK_FALSE(fs::exists(out));
+        }
+        {
+            // probe exits 1, as it does for every failure, with the same words
+            CHECK(run_cli("probe " + quoted(input), log) == 1);
+            const auto report = read_log(log);
+            INFO(report);
+            CHECK(report.find("MP4 file this build cannot demux: " + lead + detail) !=
+                  std::string::npos);
+        }
+    }
+}
+
+namespace {
+
+void be32_into(std::vector<std::byte>& out, std::uint32_t value) {
+    for (int shift = 24; shift >= 0; shift -= 8) {
+        out.push_back(static_cast<std::byte>((value >> shift) & 0xFFU));
+    }
+}
+
+void text_into(std::vector<std::byte>& out, std::string_view text) {
+    for (const char c : text) {
+        out.push_back(static_cast<std::byte>(c));
+    }
+}
+
+std::vector<std::byte> mp4_box(std::string_view type, const std::vector<std::byte>& body) {
+    std::vector<std::byte> out;
+    be32_into(out, static_cast<std::uint32_t>(8 + body.size()));
+    text_into(out, type);
+    append(out, body);
+    return out;
+}
+
+std::vector<std::byte> mp4_fullbox(std::string_view type, const std::vector<std::byte>& body) {
+    std::vector<std::byte> full(4, std::byte{0});  // version 0, flags 0
+    append(full, body);
+    return mp4_box(type, full);
+}
+
+// A protected audio track with no samples: 'enca' over 'ec-3', cenc, the KID above. Enough for
+// the reader to list it beside the clear track and refuse to read it.
+std::vector<std::byte> protected_ec3_trak(std::uint32_t track_id) {
+    std::vector<std::byte> tenc_body{std::byte{0}, std::byte{0}, std::byte{1}, std::byte{8}};
+    constexpr std::array<std::uint8_t, 16> kid{0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x18,
+                                               0x29, 0x3a, 0x4b, 0x5c, 0x6d, 0x7e, 0x8f, 0x90};
+    for (const std::uint8_t b : kid) {
+        tenc_body.push_back(static_cast<std::byte>(b));
+    }
+    std::vector<std::byte> frma;
+    text_into(frma, "ec-3");
+    std::vector<std::byte> schm;
+    text_into(schm, "cenc");
+    be32_into(schm, 0x00010000);
+    std::vector<std::byte> sinf = mp4_box("frma", frma);
+    append(sinf, mp4_fullbox("schm", schm));
+    append(sinf, mp4_box("schi", mp4_fullbox("tenc", tenc_body)));
+
+    std::vector<std::byte> entry(28, std::byte{0});  // SampleEntry and AudioSampleEntry fields
+    entry[7] = std::byte{1};                         // data_reference_index
+    append(entry, mp4_box("sinf", sinf));
+    std::vector<std::byte> stsd_body;
+    be32_into(stsd_body, 1);
+    append(stsd_body, mp4_box("enca", entry));
+
+    std::vector<std::byte> hdlr_body(4, std::byte{0});  // pre_defined
+    text_into(hdlr_body, "soun");
+    hdlr_body.resize(hdlr_body.size() + 13, std::byte{0});
+    std::vector<std::byte> mdhd_body;
+    be32_into(mdhd_body, 0);
+    be32_into(mdhd_body, 0);
+    be32_into(mdhd_body, 48000);
+    be32_into(mdhd_body, 0);
+    be32_into(mdhd_body, 0x55C40000);  // "und" and pre_defined
+    std::vector<std::byte> mdia = mp4_fullbox("mdhd", mdhd_body);
+    append(mdia, mp4_fullbox("hdlr", hdlr_body));
+    append(mdia, mp4_box("minf", mp4_box("stbl", mp4_fullbox("stsd", stsd_body))));
+
+    std::vector<std::byte> tkhd_body;
+    be32_into(tkhd_body, 0);
+    be32_into(tkhd_body, 0);
+    be32_into(tkhd_body, track_id);
+    tkhd_body.resize(tkhd_body.size() + 68, std::byte{0});
+    std::vector<std::byte> trak = mp4_fullbox("tkhd", tkhd_body);
+    append(trak, mp4_box("mdia", mdia));
+    return mp4_box("trak", trak);
+}
+
+// `moov_last_file` is ftyp, mdat, moov; the new trak goes on the end of the moov, which needs no
+// chunk offset to move.
+std::vector<std::byte> with_protected_trak(std::vector<std::byte> moov_last_file) {
+    const auto ftyp_size = be32(moov_last_file, 0);
+    const auto mdat_size = be32(moov_last_file, ftyp_size);
+    const std::size_t moov_at = static_cast<std::size_t>(ftyp_size) + mdat_size;
+    REQUIRE(moov_last_file[moov_at + 4] == std::byte{'m'});  // "moov"
+    append(moov_last_file, protected_ec3_trak(2));
+    put_be32(moov_last_file, moov_at, static_cast<std::uint32_t>(moov_last_file.size() - moov_at));
+    return moov_last_file;
+}
+
+}  // namespace
+
+TEST_CASE("probe and demux read the clear track of an MP4 and list the protected one beside it",
+          "[cli][probe][demux][mp4][protected]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "beside.log";
+    const auto source = dir / "beside.ac3";
+    const auto plain = dir / "beside_plain.mp4";
+    REQUIRE(run_cli("sine " + quoted(source) + " 1 448 440 60 51", log) == 0);
+    REQUIRE(run_cli("mp4 " + quoted(source) + " " + quoted(plain), log) == 0);
+    const auto both = dir / "beside_both.mp4";
+    write_bytes(both, with_protected_trak(moov_last(read_file(plain))));
+
+    SECTION("demux writes the clear track, unchanged") {
+        const auto back = dir / "beside.back";
+        REQUIRE(run_cli("demux " + quoted(both) + " " + quoted(back), log) == 0);
+        CHECK(read_file(back) == read_file(source));
+    }
+
+    SECTION("the table says the other track is protected and not read") {
+        REQUIRE(run_cli("probe " + quoted(both), log) == 0);
+        const auto table = read_log(log);
+        INFO(table);
+        const auto at = table.find("other tracks");
+        REQUIRE(at != std::string::npos);
+        const auto line = table.substr(at, table.find('\n', at) - at);
+        CHECK(line.find(
+                  "audio track 2 'enca' (und), protected, not read (cenc, original format ec-3, "
+                  "default KID " +
+                  std::string{kProtectedKid} + ")") != std::string::npos);
+    }
+
+    SECTION("the JSON gives each other track a protection member: an object, or null") {
+        REQUIRE(run_cli("probe " + quoted(both) + " json=1", log) == 0);
+        const auto document = read_log(log);
+        INFO(document);
+        const std::string array = [&document] {
+            const std::string needle = "\"other_tracks\": [";
+            const auto from = document.find(needle);
+            REQUIRE(from != std::string::npos);
+            const auto to = document.find("\"mp4\"", from);
+            std::string stripped;
+            for (const char c : document.substr(from, to - from)) {
+                if (c != ' ' && c != '\n' && c != '\r' && c != '\t') {
+                    stripped.push_back(c);
+                }
+            }
+            return stripped;
+        }();
+        CHECK(
+            array.find("{\"track\":2,\"kind\":\"audio\",\"codec_id\":\"enca\",\"language\":\"und\","
+                       "\"protection\":{\"entry_type\":\"enca\",\"scheme\":\"cenc\","
+                       "\"original_format\":\"ec-3\",\"default_kid\":\"" +
+                       std::string{kProtectedKid} +
+                       "\",\"default_iv_size\":8,\"crypt_byte_block\":0,\"skip_byte_block\":0,"
+                       "\"has_clear_entry\":false}}") != std::string::npos);
+    }
+
+    SECTION("a file with no protected track has an empty other_tracks, as before") {
+        REQUIRE(run_cli("probe " + quoted(plain) + " json=1", log) == 0);
+        const auto document = read_log(log);
+        CHECK(document.find("\"protection\"") == std::string::npos);
+    }
+}
+
+TEST_CASE("demux and probe refuse an MPEG-TS whose audio packets are scrambled",
+          "[cli][demux][ts][scrambled]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "scrambled.log";
+    const auto source = dir / "scrambled.ac3";
+    const auto clear = dir / "scrambled_clear.ts";
+    REQUIRE(run_cli("sine " + quoted(source) + " 1 448 440 60 51", log) == 0);
+    REQUIRE(run_cli("ts " + quoted(source) + " " + quoted(clear), log) == 0);
+
+    // transport_scrambling_control is the top two bits of header byte 3; 10 is "scrambled, even
+    // key". The writer's audio PID is 0x0100. The payload is left as it is: only the bits are read.
+    auto bytes = read_file(clear);
+    std::size_t flagged = 0;
+    for (std::size_t at = 0; at + 188 <= bytes.size(); at += 188) {
+        const auto pid = static_cast<std::uint32_t>(
+            ((std::to_integer<std::uint32_t>(bytes[at + 1]) & 0x1FU) << 8U) |
+            std::to_integer<std::uint32_t>(bytes[at + 2]));
+        if (pid == 0x0100) {
+            bytes[at + 3] =
+                static_cast<std::byte>((std::to_integer<unsigned>(bytes[at + 3]) & 0x3FU) | 0x80U);
+            ++flagged;
+        }
+    }
+    REQUIRE(flagged > 0);
+    const auto scrambled = dir / "scrambled.ts";
+    write_bytes(scrambled, bytes);
+
+    const auto out = dir / "scrambled.back";
+    fs::remove(out);
+    CHECK(run_cli("demux " + quoted(scrambled) + " " + quoted(out), log) == 2);
+    CHECK(read_log(log).find("the audio stream is scrambled") != std::string::npos);
+    CHECK_FALSE(fs::exists(out));
+
+    CHECK(run_cli("probe " + quoted(scrambled), log) == 1);
+    CHECK(read_log(log).find(
+              "Transport Stream this build cannot demux (the audio stream is scrambled") !=
+          std::string::npos);
+
+    // The same stream, clear, still demuxes to the source.
+    const auto back = dir / "scrambled_clear.back";
+    REQUIRE(run_cli("demux " + quoted(clear) + " " + quoted(back), log) == 0);
+    CHECK(read_file(back) == read_file(source));
+}

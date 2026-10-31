@@ -89,6 +89,7 @@ jobs:
       compare_base: ${{ steps.plan.outputs.compare_base }}
       compare_pr: ${{ steps.plan.outputs.compare_pr }}
       esp: ${{ steps.plan.outputs.esp }}
+      esp_size: ${{ steps.plan.outputs.esp_size }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -191,6 +192,7 @@ jobs:
             echo "| Performance and memory comparisons | ${compare}${compare_pr:+ (pull request ${compare_pr})} |"
             echo "| Documentation only | ${docs_only} |"
             echo "| ESP32 profiles (configure-only guard) | $(sed -n 's/^esp=//p' plan.out) ($(sed -n 's/^esp_reason=//p' plan.out)) |"
+            echo "| ESP32 4 MB C6 image against its slot | $(sed -n 's/^esp_size=//p' plan.out) ($(sed -n 's/^esp_size_reason=//p' plan.out)) |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Required check `Branch Name`. Skipped (a pass) on anything that is not a
@@ -262,6 +264,20 @@ jobs:
     needs: plan
     if: needs.plan.outputs.esp == 'true'
     uses: ./.github/workflows/_profiles.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '["ubuntu-latest"]' || vars.GATE_RUNNER_JSON || '["ubuntu-latest"]' }}
+
+  # The 4 MB ESP32-C6's image against its OTA slot (_esp_size.yml): built, not configured, because a profile's budget
+  # there is the slot and an image over it cannot be flashed over the network. That held only after the merge, in
+  # ci.yml's ESP32 jobs, and main was red from 25 October 13:44Z on because of it. For a change to what the
+  # sinks compile in (a library, the sink, the component), not only to what a profile is configured from.
+  esp-size:
+    name: ESP32 4 MB C6 image
+    needs: plan
+    if: needs.plan.outputs.esp_size == 'true'
+    uses: ./.github/workflows/_esp_size.yml
     permissions:
       contents: read
     with:
@@ -528,7 +544,7 @@ jobs:
   ci-status:
     name: CI Status
     if: ${{ !cancelled() }}
-    needs: [plan, branch-name, static, toolchain-versions, linux-gcc, windows-msvc, compare, profiles]
+    needs: [plan, branch-name, static, toolchain-versions, linux-gcc, windows-msvc, compare, profiles, esp-size]
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && fromJSON('["ubuntu-latest"]') || fromJSON(vars.GATE_RUNNER_JSON || '["ubuntu-latest"]') }}
     timeout-minutes: 5
     steps:
@@ -543,10 +559,12 @@ jobs:
           R_WINDOWS: ${{ needs.windows-msvc.result }}
           R_COMPARE: ${{ needs.compare.result }}
           R_PROFILES: ${{ needs.profiles.result }}
+          R_ESP_SIZE: ${{ needs.esp-size.result }}
           WANT_BUILD: ${{ needs.plan.outputs.build }}
           WANT_WINDOWS: ${{ needs.plan.outputs.windows }}
           WANT_COMPARE: ${{ needs.plan.outputs.compare }}
           WANT_ESP: ${{ needs.plan.outputs.esp }}
+          WANT_ESP_SIZE: ${{ needs.plan.outputs.esp_size }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
@@ -574,6 +592,7 @@ jobs:
           check windows-msvc "$R_WINDOWS" "$([ "$WANT_WINDOWS" = true ] && echo true || echo false)"
           check compare "$R_COMPARE" "$([ "$WANT_COMPARE" = true ] && echo true || echo false)"
           check profiles "$R_PROFILES" "$([ "$WANT_ESP" = true ] && echo true || echo false)"
+          check esp-size "$R_ESP_SIZE" "$([ "$WANT_ESP_SIZE" = true ] && echo true || echo false)"
           if [ "$fail" -ne 0 ]; then
             echo "The gate failed - see the failing job(s) above."
             exit 1

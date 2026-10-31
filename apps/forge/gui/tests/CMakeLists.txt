@@ -12,6 +12,7 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     test_ac4_encode_settings.cpp
     test_karaoke_authoring.cpp
     test_karaoke_outputs.cpp
+    test_lfe_pins.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/gui_diagnostics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_encode_settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_presentations.cpp"

@@ -1,19 +1,19 @@
 {
   "format": 1,
   "profile": "p4-rev3",
-  "profile_hash": "ff9b27a6c4fd",
-  "version": "v0.10.0-beta.1-5140-ge2943c092",
+  "profile_hash": "0f4b39e24421",
+  "version": "v0.10.0-beta.1-5587-g2a14b2b968",
   "chip": "ESP32-P4",
   "board": "P4X",
-  "recorded": "2026-10-20T12:08Z",
+  "recorded": "2026-10-28T19:34Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 278659,
-    "largest": 253952,
-    "ask_total": 40960,
-    "ask_biggest": 32768,
-    "headroom": 221184,
+    "internal_free": 86967,
+    "largest": 56320,
+    "ask_total": 8192,
+    "ask_biggest": 8192,
+    "headroom": 48128,
     "verdict": "ok",
     "floor": 0
   },
@@ -23,16 +23,18 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        58,
-        57,
-        57
+        56,
+        56,
+        56,
+        56,
+        56
       ],
-      "decoder_permille": 57,
+      "decoder_permille": 56,
       "units": 938,
-      "decode_stack_free": 18468,
+      "decode_stack_free": 26276,
       "underruns": 0,
       "dry_ms": 0,
-      "min_headroom_ms": 5,
+      "min_headroom_ms": 4,
       "resync_bytes": 0
     },
     "eac3-2.0": {
@@ -40,16 +42,18 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        40,
-        40,
-        40
+        42,
+        42,
+        42,
+        42,
+        42
       ],
-      "decoder_permille": 40,
+      "decoder_permille": 42,
       "units": 938,
-      "decode_stack_free": 18372,
+      "decode_stack_free": 26180,
       "underruns": 0,
       "dry_ms": 0,
-      "min_headroom_ms": 5,
+      "min_headroom_ms": 4,
       "resync_bytes": 0
     },
     "ac3-5.1-tdm16": {
@@ -57,30 +61,113 @@
       "frames": 79,
       "why": "end of stream",
       "decoder_permille_samples": [
-        142,
-        142,
+        144,
+        143,
+        143,
+        143,
         142
       ],
-      "decoder_permille": 142,
+      "decoder_permille": 143,
       "units": 79,
-      "decode_stack_free": 18472,
+      "decode_stack_free": 26276,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 4,
       "resync_bytes": 0
+    },
+    "ac4-20-music": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        256,
+        266,
+        272,
+        250,
+        261
+      ],
+      "decoder_permille": 261,
+      "units": 3,
+      "decode_stack_free": 20712,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 4,
+      "resync_bytes": 0,
+      "pcm_hash": "f860e51f602ae753"
+    },
+    "ac4-20-acpl": {
+      "state": "finished",
+      "frames": 4,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        321,
+        319,
+        317,
+        316,
+        308
+      ],
+      "decoder_permille": 317,
+      "units": 4,
+      "decode_stack_free": 16904,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 4,
+      "resync_bytes": 0,
+      "pcm_hash": "e8b8cfa716dd0e1c"
+    },
+    "ac4-51-music": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "layout": "9.1.6",
+      "decoder_permille_samples": [
+        675,
+        693,
+        673,
+        694,
+        676
+      ],
+      "decoder_permille": 676,
+      "units": 3,
+      "decode_stack_free": 16824,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 4,
+      "resync_bytes": 0,
+      "pcm_hash": "6d36d7d2e8a070e9"
+    },
+    "ac4-20-companding": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        324,
+        320,
+        320,
+        321,
+        319
+      ],
+      "decoder_permille": 320,
+      "units": 3,
+      "decode_stack_free": 16904,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 4,
+      "resync_bytes": 0,
+      "pcm_hash": "5b93c61c57566b0c"
     }
   },
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      278659,
-      278675,
-      278659
+      86979,
+      86967,
+      86979
     ],
     "largest": [
-      253952,
-      253952,
-      253952
+      56320,
+      56320,
+      56320
     ]
   }
 }

@@ -899,6 +899,29 @@ jobs:
           if (-not $env:QT_ROOT_DIR) {
             throw "QT_ROOT_DIR is not set - did the 'Install Qt (prebuilt)' step run on this leg?"
           }
+          # link.exe embeds each executable's manifest itself (cmake -E vs_link_exe adds
+          # /MANIFEST:EMBED) and starts rc.exe from PATH to do it, so a PATH that cannot
+          # find rc.exe ends the first executable's link in LNK1158, "cannot run 'rc.exe'",
+          # three-quarters of an hour into the leg. That is how this step failed on the AWS
+          # overflow runners (2026-10-15 and 2026-10-21) while the fleet's persistent
+          # runners, whose PATH has the Windows SDK's bin directory, passed it. Put the SDK
+          # that vcvars chose (WindowsSdkVerBinPath, exported by Setup MSVC environment)
+          # first when rc.exe is not already found, and say which rc.exe the link will use.
+          if (-not (Get-Command rc.exe -ErrorAction SilentlyContinue)) {
+            $sdkBins = @()
+            if ($env:WindowsSdkVerBinPath) { $sdkBins += Join-Path $env:WindowsSdkVerBinPath 'x64' }
+            $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+            if (Test-Path $kits) {
+              $sdkBins += Get-ChildItem $kits -Directory | Where-Object { $_.Name -like '10.*' } |
+                Sort-Object { [version]$_.Name } -Descending | ForEach-Object { Join-Path $_.FullName 'x64' }
+            }
+            $sdkBin = $sdkBins | Where-Object { Test-Path (Join-Path $_ 'rc.exe') } | Select-Object -First 1
+            if (-not $sdkBin) {
+              throw "rc.exe is not on PATH and no Windows SDK x64 bin directory holds one (looked in: $($sdkBins -join '; '))"
+            }
+            $env:PATH = "$sdkBin;$env:PATH"
+          }
+          Write-Host "rc.exe for link.exe's manifest embedding: $((Get-Command rc.exe).Source)"
           cmake --preset config-windows-llvm-coverage "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
           if ($LASTEXITCODE -ne 0) { throw "the instrumented configure failed ($LASTEXITCODE)" }
           cmake --build --preset build-windows-llvm-coverage

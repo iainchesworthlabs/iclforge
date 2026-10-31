@@ -63,7 +63,8 @@ stereo, 5.0 or 5.1), monitors the AC-4 it encodes and hands a receiver the paral
 since no receiver found takes AC-4 over IEC 61937 — see
 [CLI → Commands → Live & hardware](../cli/commands.md#live-hardware). The GUI has no AC-4 live
 path, and the rail's **Record…** has no AC-4 encoder behind it either (it builds the AC-3 and
-E-AC-3 encoders only); record an AC-4 take with `forge record … codec=ac4`.
+E-AC-3 encoders only); record an AC-4 take with `forge record … codec=ac4`. TrueHD is not a live
+codec in either program: `forge record` refuses `codec=truehd`.
 
 ## Two-device capture: clock-master model
 

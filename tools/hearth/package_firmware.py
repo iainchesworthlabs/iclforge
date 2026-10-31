@@ -27,11 +27,19 @@ names) and writes into DIR:
 <version> is the version the image itself carries (esp_app_desc_t), so the
 file names and the image agree. An image with a Wi-Fi network built into it
 is refused: a published image gets its network from Improv or the board's
-page, and keeps it in NVS.
+page, and keeps it in NVS. So is an image whose screen is served over HTTP
+(CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT other than 0): that server has no
+authentication and is a bench's tool.
 
 `manifest` merges every <name>.json in DIR into hearth-sink-manifest.json,
 which ota.py push --release reads to choose an image for each board, and
 tools/ci/check_firmware_package.py checks before anything is uploaded.
+
+`index` writes the update index of one channel from a release's manifest:
+hearth-update-<channel>.json, the small file a board reads to learn what the
+newest release is and, for each image, its size and SHA-256 (planning/esp32-ota.md,
+O10). sign_index.py signs it afterwards. The facts are the manifest's, so they
+have one source; the board picks its image by them.
 
 Stdlib only, as the CI container's Python needs nothing installed for it.
 """
@@ -39,11 +47,13 @@ Stdlib only, as the CI container's Python needs nothing installed for it.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
 import re
 import struct
 import sys
+import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +61,8 @@ from typing import Any
 
 MANIFEST_NAME = "hearth-sink-manifest.json"
 MANIFEST_FORMAT = 1
+INDEX_FORMAT = 1
+CHANNELS = ("stable", "beta")
 
 # esp_image_header_t (24 bytes), esp_image_segment_header_t (8), then the
 # first segment's esp_app_desc_t: ESP-IDF v6.1's esp_app_format.h and
@@ -240,6 +252,13 @@ def package(
             "this build has a Wi-Fi network built into its image "
             "(CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID or _PASSWORD); a published image must not"
         )
+    capture_port = sdkconfig.get("CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT", "0")
+    if capture_port != "0":
+        raise PackageError(
+            f"this build serves its screen on port {capture_port} "
+            "(CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT): that HTTP server reads the picture and "
+            "presses the buttons for anyone on the network, so a published image must not have it"
+        )
 
     app_path = build / str(description.get("app_bin", ""))
     elf_path = build / str(description.get("app_elf", ""))
@@ -318,6 +337,9 @@ def package(
         "max_rev_full": max_rev,
         "flash_size": sdkconfig.get("CONFIG_ESPTOOLPY_FLASHSIZE", ""),
         "psram": sdkconfig.get("CONFIG_SPIRAM") == "y",
+        # esp_app_desc_t's secure_version (CONFIG_BOOTLOADER_APP_SECURE_VERSION): the floor a
+        # pull will not go under. ESP-IDF's anti-rollback, which would burn eFuses, stays off.
+        "secure_version": struct.unpack_from("<I", app, APP_DESC_AT + 4)[0],
         "slot_bytes": min(slots),
         "partitions": partitions,
         "elf_sha256": app[APP_DESC_AT + 144 : APP_DESC_AT + 176].hex(),
@@ -355,6 +377,83 @@ def merge_manifest(out: Path) -> dict[str, Any]:
     return manifest
 
 
+def build_index(
+    manifest: dict[str, Any], channel: str, sequence: int, released: str
+) -> dict[str, Any]:
+    """The update index of `channel` for the release `manifest` describes."""
+    if channel not in CHANNELS:
+        raise PackageError(f"the channel is '{channel}'; it is one of {', '.join(CHANNELS)}")
+    version = str(manifest.get("version", ""))
+    if not version:
+        raise PackageError(
+            "the manifest's images are of more than one version; an index names one release"
+        )
+    images = []
+    for image in manifest.get("images", []):
+        app = (image.get("files") or {}).get("app") or {}
+        images.append(
+            {
+                "name": image["name"],
+                "file": app["name"],
+                "size": app["size"],
+                "sha256": app["sha256"],
+                "project": image["project"],
+                "chip_id": image["chip_id"],
+                "min_rev_full": image["min_rev_full"],
+                "max_rev_full": image["max_rev_full"],
+                "flash_size": image["flash_size"],
+                "psram": image["psram"],
+                "secure_version": image.get("secure_version", 0),
+            }
+        )
+    if not images:
+        raise PackageError("the manifest lists no images")
+    return {
+        "format": INDEX_FORMAT,
+        "channel": channel,
+        "sequence": sequence,
+        "version": version,
+        "released": released,
+        "images": images,
+    }
+
+
+def write_index(
+    manifest_path: Path,
+    channel: str,
+    out: Path,
+    sequence: int | None = None,
+    released: str | None = None,
+) -> dict[str, Any]:
+    """Writes hearth-update-<channel>.json for the release `manifest_path` describes. The index
+    is held to the rules a board reads it by (index_verify.check_index) before it is kept."""
+    # Beside this file; imported here so that packaging needs nothing of the signing side.
+    import index_verify  # noqa: PLC0415
+
+    try:
+        manifest = json.loads(manifest_path.read_text("utf-8"))
+    except (OSError, ValueError) as error:
+        raise PackageError(f"{manifest_path} cannot be read: {error}") from error
+    now = dt.datetime.now(dt.timezone.utc)
+    try:
+        document = build_index(
+            manifest,
+            channel,
+            sequence if sequence is not None else int(time.time()),
+            released or f"{now:%Y-%m-%d}",
+        )
+    except KeyError as error:
+        raise PackageError(f"the manifest's image has no {error}") from error
+    data = (json.dumps(document, separators=(",", ":")) + "\n").encode("ascii")
+    try:
+        index_verify.check_index(data, channel)
+    except index_verify.VerifyError as error:
+        raise PackageError(f"the index would not be one a board reads: {error.text}") from error
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(data)
+    return document
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -376,6 +475,15 @@ def main(argv: list[str] | None = None) -> int:
         "manifest", help="merge the fragments in DIR into hearth-sink-manifest.json"
     )
     merge.add_argument("--out", type=Path, required=True)
+    index = commands.add_parser(
+        "index",
+        help="write hearth-update-<channel>.json from a release's hearth-sink-manifest.json",
+    )
+    index.add_argument("--manifest", type=Path, required=True)
+    index.add_argument("--channel", choices=CHANNELS, required=True)
+    index.add_argument("--out", type=Path, required=True, help="the index file to write")
+    index.add_argument("--sequence", type=int, help="default: the time now, in unix seconds")
+    index.add_argument("--released", help="YYYY-MM-DD; default: today (UTC)")
     args = parser.parse_args(argv)
     try:
         if args.command == "package":
@@ -386,6 +494,14 @@ def main(argv: list[str] | None = None) -> int:
                 f"{args.name} {fragment['version']}: {len(fragment['parts'])} regions, "
                 f"{fragment['files']['app']['size']:,}-byte app, "
                 f"smallest slot {fragment['slot_bytes']:,}"
+            )
+        elif args.command == "index":
+            document = write_index(
+                args.manifest, args.channel, args.out, args.sequence, args.released
+            )
+            print(
+                f"{args.out.name}: channel {document['channel']}, {document['version']}, "
+                f"sequence {document['sequence']}, {len(document['images'])} images"
             )
         else:
             manifest = merge_manifest(args.out)

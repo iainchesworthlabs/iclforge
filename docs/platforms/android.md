@@ -254,6 +254,16 @@ channels, is refused with `kUnsupportedFormat`. `supports_ac4_passthrough` takes
 answer, since the track is the same one. No receiver found so far decodes AC-4, and this path has
 been compiled but never run on a device.
 
+### TrueHD (MAT)
+
+!!! warning "Written, not built, not run"
+    The Hearth for Android bridge (`apps/hearth/android`) has two new optional methods, `isLinkSupported(carrierRateHz, channels)` and
+    `openLink(carrierRateHz, channels)`, that open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND` at 192 kHz (176.4 kHz for the
+    44.1 kHz family), for the backend's TrueHD (MAT). The native side looks them up as it looks up `pause()` and the rest, and refuses MAT
+    with `kUnsupportedFormat` for a bridge that lacks them, as this demo's does. It has not been compiled (the session that wrote it had
+    no NDK), has not run on a Shield, and has not been tried with the Onkyo TX-RZ740. Whether the Shield's HDMI policy takes it is a question for a run:
+    the findings list TrueHD and IEC 61937 at 7.1 masks, and only stereo IEC 61937 at 48 and 192 kHz has been tried.
+
 ### Diagnostic file replay
 
 `am start ... --es play_file /sdcard/Download/<file>.ec3` skips the live cursor and the demo and

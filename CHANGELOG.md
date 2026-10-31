@@ -10,8 +10,499 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-## [0.11.0-beta.1] - YYYY-MM-DD
+- **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
+  `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
+  units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
+  `truehdProbe`, `truehdScanUnits`, `TruehdScannedStream` and `TruehdDecoder`, with a `TruehdError` that carries the library's `ErrorKind`.
+  What a decode returns is a copy, so it stays valid across the next call. The module is built for Node as well as the web, and
+  `build-wasm` runs `truehd-wasm.test.js` over it: every fixture of `testdata/truehd` decodes to the SHA-256 of FFmpeg's strict decode,
+  and a decode from the restart for a sample gives that sample. The check that a decoded unit owns its samples fails when the module
+  returns a view into its heap. The encoder is not wrapped. The support catalogue's "TrueHD WebAssembly module" row moves from
+  unavailable to source and CI.
+- **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
+  borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
+  `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every
+  committed fixture to the SHA-256 of FFmpeg's strict decode, and to `forge decode` when `ICLFORGE_FORGE` names one; `cargo clippy
+  -D warnings` and `cargo fmt --check` pass. The encoder is not wrapped.
+- **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
+  `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
+  Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
+  `apps/crucible/ui` and `apps/hearth/ui` with `tools/checks/coverage_report.sh -q`. Only Crucible had a floor before, and only on Windows.
+  The three floors are provisional until the job's first hosted run. `tools/dev/qt-sandbox-setup.sh PREFIX` does the same installation by hand
+  (aqtinstall at the pinned commit, the apt packages, and for Hearth a private prefix with mbedTLS, cpp-httplib with the repository's patch and
+  mdns.h, each download checked against a pinned SHA-256) and prints the configure line. `hearth_qmltests` now links the coverage target, so
+  the controllers it recompiles are instrumented like the other two windows' are.
+- **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
+  A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
+  end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
+  where a decoder can start, thinned to one every `restart_spacing` units. `restart_for_sample()` and the C call of the same name give the unit
+  and the byte offset to decode from to reach a sample; decoding from there gives the samples an unbroken decode gives, checked on every
+  fixture. Hearth's player has had an index of this shape over a file it reads in windows; this is the in-memory form for the library, `forge`
+  and the bindings. Nothing else is changed.
 
+- **Fixed: a shared build of the library did not link `forge` or the TrueHD tests.** `EvolutionFrame::find` and `oamd` were defined in the library
+  and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
+  an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
+  tests and `forge` links, and the evolution tests pass against it.
+- **Added: TrueHD as MAT in the audio library's passthrough sink, and the Hearth output decision that knows it; not run on any platform.**
+  `BitstreamFormat::kMat` opens the eight-channel link (16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz family, 3,840 frames
+  to a 61,440-byte burst, the owner's decision of 2026-10-29): ALSA on an HDMI device, PipeWire as SPA's `TRUEHD`, WASAPI as
+  `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, and Android through two new optional bridge methods (not built); Core Audio refuses it. The sink
+  descriptor reads a MAT entry from ALSA's ELD and PipeWire's codec list. Hearth's output decision lists each platform as "not run" until a run on a
+  receiver passes, picks MAT automatically only for a platform that has, sends it when Bitstream is pinned (with the warning), and gives the
+  fallback for a TrueHD item that is decoded: the stream's presentation for the output's width, else stereo, else a refusal; there is no transcode.
+  The player does not pack MAT bursts yet, so a TrueHD item is still decoded. The Output picker shows "TrueHD (MAT) opens, not run".
+
+- **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
+  decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
+  (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
+  concealed (`conceal=`, AC-3, E-AC-3 and AC-4), or when a lenient TrueHD decode skipped bytes, could not read a unit or had units wait for
+  a restart header. The frames that wait before the first one decodes (a stream cut mid-group) are not a loss. `strict` is `decode`'s alone
+  and another command refuses it as an unknown option. The owner chose this on 2026-10-29 from the options `planning/ac4.md` listed.
+- **Added: `forge qc` reads a TrueHD or MLP stream: an integrity gate, the loudness of each presentation, the dialogue norm beside the
+  measurement, and the preset gates; exit 6 when one fails.** It was refused by name. The integrity gate counts, over a lenient decode
+  of every substream, the units and bytes the reader does not take for an access unit, the failed check nibbles, major sync and restart
+  header CRCs, parities and segment CRCs, the restart intervals whose lossless check fails (a join of two streams does, by design), and
+  the units that cannot be sent within the peak rate the stream declares and TH spec §18's 75 ms by the model the encoder keeps itself
+  to. All 20 FFmpeg-made TrueHD fixtures and six MLP ones pass; a flipped bit, stray bytes, a join, and a stream encoded to break a
+  declared 2 Mbit/s fail with exit 6. Each presentation (2, 6 and 8 channels for one, two and three substreams) is metered with the
+  BS.1770-5 Annex 3 weights `forge loudness` uses and shown beside the dialogue norm it carries, with the difference and the norm the
+  measurement implies; `preset=` judges the largest presentation, or `truehd-presentation=` names one. Provisional, with no oracle until
+  the DEE set: the rate model (the encoder's own; the peak-rate field is bits per second, TH spec v3.9 section 4.4, ERRATA question 12) and the dialogue norm's meaning (questions 51 and 54). Left for the owner,
+  because each is a decision: whether a dialogue norm that differs from the measurement by some tolerance fails the stream (E-AC-3's
+  `qc` reports it and does not fail it), and what tolerance the rate check should be held to. The audit's R14.
+- **Added: `forge normalize` sets a TrueHD stream's dialogue norms from the loudness of each presentation, without changing the audio.** It
+  decodes each presentation the stream has (2, 6 and 8 channels for one, two and three substreams), measures its integrated loudness with the
+  BS.1770-5 Annex 3 weights `forge loudness` uses, maps it to a dialogue norm the way E-AC-3's `normalize` does (ATSC A/85 §8: the loudness
+  negated and rounded, clamped to 1 to 31, which is the range the 5 bit fields hold) and writes it into that presentation's field of every
+  major sync. **No gain is applied: the stream is lossless, so only the field changes**; the mix level, source format, control-enabled bits
+  and DRC start-up gains are left as they were, and a presentation whose control-enabled bit is off is said to be one a decoder may not apply.
+  Nothing above the gate is exit 5, a damaged stream exit 2. The audit's T4. **Provisional, with no oracle until the DEE set**
+  (`libs/truehd/ERRATA.md`, questions 51 and 54).
+- **Added: `forge metadata` sets a TrueHD stream's channel meaning (TH spec §14.1) in a finished stream, without re-encoding it.** The
+  `truehd-dialnorm-6ch=` family of options `truehd-encode` takes sets the named fields in every major sync, which repeat at each restart, and
+  re-stamps each one's CRC-16 (polynomial 0x002D); no other check covers the major sync, so every other byte is copied and the audio is the
+  same. `iclforge::truehd::edit_channel_meaning()` does the rewrite in place (bytes the reader does not take for an access unit, and the
+  16-channel extension, are left alone). Held by: all 21 TrueHD fixtures patched (the four MLP ones are refused) and decoded by FFmpeg's strict decode and by
+  `forge decode` to the manifest's PCM, only the 8 channel-meaning bytes and the CRC of each major sync differing (checked byte by byte in
+  `tools/checks/verify_truehd_interop.py --forge`), and the same for the encoder's streams in the codec matrix; unit tests that fail without
+  the CRC re-stamp and without the range check. It refuses by name an option of E-AC-3's `metadata`, a call that names no field, a value
+  outside its field's width and an MLP stream, and the `truehd-` options on an AC-3 or E-AC-3 stream. **Provisional, with no oracle until the
+  DEE set** (`libs/truehd/ERRATA.md`, questions 51 to 55). The audit's T3 and the metadata half of P3.
+- **Added: `forge probe` shows a TrueHD stream's channel meaning (TH spec §14.1), in text and in JSON.** A `channel meaning` line with a line for
+  each presentation (2, 6 and 8 channels: control-enabled bit, dialogue norm as the number and as -n dBFS, mix level, source format) and one for
+  the two DRC start-up gains; in JSON a `channel_meaning` object under `truehd` (`null` for MLP, whose bytes at that place the specification does not
+  describe) that is valid in a bare stream and in Matroska, MP4 and a transport stream, and says when a stream's major syncs carry different
+  values. The audit's R13. **Provisional, with no oracle until the DEE set** (`libs/truehd/ERRATA.md`, questions 51 to 55).
+- **Added: `forge truehd-encode` writes the stream's channel meaning (TH spec §14.1), per presentation, and `EncoderConfig::channel_meaning`
+  rejects a value outside its field's width by name.** Options `truehd-dialnorm-2ch=` (0 to 63), `-6ch=` and `-8ch=` (0 to 31),
+  `truehd-mix-level-2ch=`, `-6ch=`, `-8ch=` (0 to 63), `truehd-source-format-6ch=` (0 to 31) and `-8ch=` (0 to 63), `truehd-control-2ch=`,
+  `-6ch=`, `-8ch=` (on or off) and the two DRC start-up gains `truehd-heavy-drc-start-up-gain=` (-32 to 31) and `truehd-drc-start-up-gain=`
+  (-64 to 63) go into every major sync with its CRC; a run that names none writes the bytes it wrote before (58 encodes of the committed
+  streams' decodes compared equal against the previous build, and the generators of the FFmpeg-made and hand-built fixtures reproduce all 43
+  committed files). **Provisional, with no oracle until the DEE set:** FFmpeg's encoder writes zeros, and the specification gives no unit
+  for the mix level, no table for the source format and no word on what a control-enabled bit gates; five numbered questions with
+  recommendations are in `libs/truehd/ERRATA.md` (51 to 55).
+- **Changed: AC-4 content signing follows the owner's CS spec v2.5 and v2.6.** An MP4 is refused by name (`ac4-sign` and `sign-content` exit
+  1, the second before anything is encoded): §8.3.2 puts signing an MP4 out of scope and asks for the raw `.ac4` stream. The signature is
+  checked before the digests it holds (§6.1), so a forged signature over altered content is reported as the signature's fault and the digest
+  lines say they rest on a signature that did not verify. The signer information of §5.3 is written and reported: `ac4-sign` and
+  `sign-content` take `publisher-uuid=`, `publisher-name=`, `product-id=`, `product-name=`, `wrapper-name=`, `os-name=`, `os-version=` and
+  `os-description=`; a nonce of another length than 128 bytes and a publisher UUID that is not a UUID are refused; a missing
+  `publisher-uuid=` and a `signed-date=` far from the clock are warned about. `ac4-verify` prints the publisher, product, platform and
+  application and two findings (`signer nonce`, `publisher UUID`) that do not change the verdict; `verify-content` makes them count. v2.6
+  withdraws v2.5's rule that the publisher UUID match the signing certificate: it is the PACE publisher account's, carried out of band, and
+  is in none of the sample's four certificates. It is not compared with the certificate; `expect-publisher-uuid=` (repeat for more) names the
+  accounts to accept, and a signature naming another is a finding in `ac4-verify` and a refusal with `verify-content`. `check-content` now
+  judges the certificates at the date the signature records, as the owner decided (`ac4-verify` and `verify-content` still judge at the
+  time of the check; `verify-time=` overrides both). Open questions 17 to 19 in `libs/ac4/ERRATA.md`; questions 2, 11, 13 and 16 are answered.
+- **Added: Hearth decodes and plays TrueHD and MLP.** The desktop player opens `.thd` and `.mlp` files and the TrueHD track of an MP4,
+  Matroska or MPEG-TS file, decodes them with `iclforge::truehd` (presentation `best`, strict checks) and plays the PCM to local
+  outputs and to a network group. The 25 FFmpeg-made fixtures and the hand-built streams the library decodes come out of the engine's
+  renderer sample for sample as `forge decode` writes them. A TrueHD access unit is delivered as one block of 40, 80 or 160 samples; a
+  bare file is indexed (the units a decoder can join at, and the exact length) and read as it plays, and is not held in memory. A unit
+  that does not decode plays as silence of its length until the stream's next restart header. The output decision says "Passthrough of
+  TrueHD is not available" and does not send the stream to a receiver or a network sink as it is. A file with TrueHD first and AC-3 or
+  E-AC-3 after it now plays the TrueHD track, where the previous change had it play the second. `hearth` may use `iclforge::truehd`
+  (`tools/checks/projects.json`).
+- **Added: seeks, joins and lost units in a TrueHD item in Hearth.** A seek starts the decoder at the last indexed unit with a major sync
+  before the place asked for and plays from the unit that holds it, so the audio is what an unbroken decode gives from there and nothing is
+  rounded to the restart (`Session::restart_at_or_before` says where a coded output, which can only send whole units, would start).
+  Two TrueHD items of one rate join without a gap at the sample the first one ends, which counts the padding of its last unit. Bytes that
+  do not read as a unit are skipped and the decoder is told, so it waits for the next restart header instead of checking an interval it
+  did not see.
+- **Added: what Hearth's window says of a TrueHD or MLP item.** The queue names it (TH and ML chips, "TrueHD" and "MLP" in the row and the
+  Signal path, which says "lossless, strict checks" in place of an A/52 mode); the file picker lists `.thd` and `.mlp` and the drop text
+  names them; the Media page has a Stream card and the `iclforge.hearth.media/1` document an additive `truehd` member (null for every other
+  item); the Decoder page has a TrueHD and MLP tab (presentation: best, 2, 6 or 8 channels; strict or lenient checks); the This frame card
+  shows the substream, the dialogue normalisation word as sent and not applied, and the decoder's counts; and the diagnostics file adds the
+  counts to each TrueHD item played. The Qt controller and QML changes were written without a Qt kit and are not built or run.
+- **Fixed: `forge probe` listed 12 channels for a 5.1.4 AC-4 stream, and `forge decode` wrote its AC-4 WAV with no channel mask.** A 5.1.4
+  stream is sent as 7.1.4 with `b_4_back_channels_present` 0; its presentation named Table 56's twelve channels (Lb and Rb among them) while the
+  decode wrote ten. The presentation's channels (`PresentationInfo::speakers`, the probe's table and JSON) now follow the source layout
+  (`b_4_back_channels_present`, `top_channels_present`), the ones decode() writes as coded. An AC-4 decode of three channels or more now
+  writes `dwChannelMask` as the AC-3 and E-AC-3 paths do (0x3F for 5.1), where it wrote the plain header.
+- **Fixed: the AC-4 decoder stopped at frame 1 of a stream with a pair of direct-coded dialogue objects ("tools_metadata_size does not
+  match").** `audio_data_objs()` sets the channel mode from the object count (two objects are stereo, one mono, three 3.0, five 5.0) and
+  `metadata()` reads its mode-dependent fields with it; the decoder took the mode as undefined, so a pair's `b_prev_dmx_info` shifted
+  every field after it. Dolby's OTT00234 (four presentations over one pair) now decodes 1,861 of 1,861 frames. Reading and evidence in
+  `libs/ac4/ERRATA.md`, "An object substream's channel_mode".
+- **Added: a warning on stderr when `forge decode` or a measuring command loses frames of an AC-4 stream, and
+  `tools/checks/check_dolby_spott_streams.py`.** A frame that waits for an I-frame produces no output and the run still exits 0; it now says
+  "N frames waiting for an I-frame produced no output, of T in the stream; the output holds the other M" (`qc` and the other commands that
+  measure say the measurement is of the other M). Whether such a run should exit non-zero is left to the owner, with options in
+  `planning/ac4.md`. The check reads Dolby's Spott files from `ICLFORGE_DOLBY_SPOTT_STREAMS` (SKIP when unset).
+- **Fixed: `forge decode` of an E-AC-3 stream that changes layout mid-stream wrote a wrong WAV and exited 0.** A stereo stream joined to a
+  5.1 one gave a stereo WAV with the 5.1 frames cut to their first two channels, and the other order a 6-channel WAV that lost the stereo
+  frames as a "ragged tail". It now stops with exit 2 and "frame N: the channel layout changes mid-stream (W channels, then V)", as the
+  AC-3 and AC-4 paths already did; a unit concealed down to its bed under `conceal=` is still written as it is.
+- **Added: TrueHD and MLP beside E-AC-3 in the documentation, with the status of each feature stated.** A Concepts page, "TrueHD and MLP",
+  says what the lossless codec is, why it has no published standard and how a stream travels (MP4 `mlpa`, Matroska `A_TRUEHD`, MPEG-TS
+  `stream_type` 0x83, MAT in IEC 61937 data type 22); it is in the navigation, on the home page and in the README, the quick start and the
+  library overview, each of which named only E-AC-3 and AC-4 for its codecs. The capability and status tables
+  (`docs/library/capabilities.md`, `development-status.md`), the application coverage and platform tables generated from
+  `support-catalogue.json`, the header map, the example list, the C API and bindings pages, `docs/verification.md` and the threat model give
+  TrueHD, the MAT burst, the AC-4 content signature and TrueHD's missing counterpart of it a row each. Where TrueHD is not built the row says
+  so: the Forge GUI, Hearth, Crucible, the Python, Rust and WebAssembly bindings, device output of a MAT burst, content signing of the evolution
+  frame, instruction counts and image sizes on the small parts, and seeds and corpora for its fuzz harnesses. `ROADMAP.md` replaces its TrueHD section with a table by layer,
+  adds the area-by-area rows of "TrueHD and E-AC-3 as equals" and a row for Dolby's reference content, and corrects the Blocked row that said
+  the reference material was non-public. The inventory of every page checked is `planning/documentation-sweep.md`.
+- **Fixed: `docs/forge/cli/commands.md` listed 46 commands, and its usage block predated TrueHD and AC-4 signing.** `forge --help` prints 49: the
+  block now has `ac4-sign` and `ac4-verify` and the `.thd` and `.mlp` inputs of `decode`, `levels`, `loudness`, `spdif`, `unspdif`, `mkv`, `mp4`, `ts`
+  and `demux`, and the count follows.
+- **Fixed: two pages pointed at the superseded TrueHD branch for the evolution frame's authenticity check.** Object signing and the
+  roadmap described a truncated HMAC-SHA-256 as TrueHD's check and left the branch to settle it. They now give both accounts (that note, and
+  the owner's specification, where the payload is the container AC-4's content signature uses), say the specification is the one the code
+  follows and that neither has been checked against a stream, and say nothing for TrueHD is built.
+- **Fixed: what `forge` does with TrueHD and MLP where it said nothing or the wrong thing (the first phase of the Forge parity audit).**
+  `forge probe json=1` of a stream in MP4, Matroska or a transport stream wrote the key `container` twice and was not JSON; a test now parses
+  the probe of every fixture in every container. `forge probe -` read a pipe as AC-3 and stopped at "lost sync"; it reads a TrueHD or MLP
+  stream from a pipe now, and still reads the AC-3 family forward in constant memory. `cut`, `cat`, `metadata` and `normalize` stopped with
+  AC-3's frame-sync error (exit 2) on a TrueHD or MLP stream; they refuse it by name with their reason and exit 1, as `qc`, `transcode` and
+  `fmp4` do. `levels` and `loudness` accept `truehd-presentation=` and `truehd-check=`, which only `decode` took. `remux` to a `.ts` passed
+  the DVB profile, which `ts` refuses for TrueHD with advice `remux` could not follow; without a profile it writes Blu-ray's for TrueHD and MLP.
+  A 48 kHz MLP stream in MP4 was reported as 192,000 Hz by `probe` and `demux`, because the `dmlp` word was read in TrueHD's layout; the
+  reader now reads MLP's. **A run on TrueHD or MLP refuses an option it does not apply, by name, with exit 1, where it accepted and dropped
+  it:** `decode ... verify-content` exited 0 having verified nothing, `truehd-encode ... src=other.wav` ignored the second source, and `ts`,
+  `mkv`, `mp4` and `spdif` dropped `mainid=`, `asvc=` and `programme=`. The rule is the audit's recommendation and provisional until the owner
+  answers (`libs/truehd/ERRATA.md`, question 21). `forge help truehd-encode`, `decode`, `levels` and `loudness` print their TrueHD options, and
+  the help, the man page and the banner name TrueHD. New cases cover the containers, MAT, levels, loudness and refusals over streams
+  `truehd-encode` makes, and the codec matrix lists every refusal with its exit status.
+- **Added: TrueHD Atmos groundwork from TH spec v3.6 (reading side only, provisional).** `libs/truehd` reads a unit's extra data into plain
+  structures (`read_extra_data`, `read_evolution`, `parse_evolution_frame`): the check nibble, framing and parity are reported and not
+  enforced, the evolution payload is read as the bit-level container of section 15.4 under two readings (the EMDF container E-AC-3 uses, and
+  the letter of section 15.4), and payload id 11, the object audio metadata, is handed out as bytes for `iclforge::objects` to parse. Nothing
+  decodes from it and nothing is verified (protection bytes, signatures). `forge probe` of a TrueHD stream whose units carry extra data now
+  prints an `evolution` report (and a `truehd.evolution` object with `json=1`; `detail=evolution`, `detail=structure` and `detail=format` add the frames one by one, their shapes, a walk of any Thrift payload by field id and type, the major sync, restart header, decode-check and terminator facts that a disc settles): the frames, the payload ids, the object count and bed through
+  `iclforge::objects`, the checks that pass, and which reading read them. No stream the project holds carries an evolution frame, so the
+  reading is provisional; the probe is the check to run on a real Atmos track. A new hand-built stream, `hb_substream3_limits`, holds the
+  decoder to substream 3's limits in v3.6 (restart sync 0x31EC, 15 matrices, `huff_lsbs` 29 to 31, values past 24 bits before the matrices):
+  the decoder already accepts all of it, and the refusal of `huff_lsbs` above the limit now names both limits. `libs/truehd/ERRATA.md`
+  sets sections 15.4 to 15.15 of v3.6 against ETSI TS 103 420 statement by statement, with 18 new questions for the owner (22 to 39).
+- **Fixed: the TrueHD decoder read `ch_assign` as the inverse of what the specification says, and now refuses a `ch_assign` that repeats a
+  value.** TH spec §7.4: the field "maps matrix channels to output channels". The decoder took output channel `p` from matrix channel
+  `ch_assign[p]`; FFmpeg's decoder, and the sentence, give output `ch_assign[m]` the matrix channel `m`, so output `p` takes the `m` with
+  `ch_assign[m] == p`, and the lossless check shifts by that `m`. A permutation and its inverse are the same for the identity and for a swap, which
+  is every stream the project holds, so no fixture told them apart; the differential fuzzer found it with `truehd_c40_s16.thd` and one
+  `ch_assign` value changed. A stream with a three-cycle (`[1, 2, 0]`), made with `tools/references/truehd_writer.py`, decodes to the samples
+  the new reading gives in FFmpeg's strict decode, the lossless check included, and the committed streams decode as before. A repeated value
+  leaves an output channel with no matrix channel; FFmpeg plays matrix channel 0 for it, the library stops with `kBadParameter`. The
+  Python transcription and the writer read the field the same way. `libs/truehd/ERRATA.md` entry 42 and question 41; two more questions the
+  harness raised are 40 (the word length of an MLP stream) and 42 (a changed major sync and the filter histories).
+- **Added: fuzz seeds, dictionaries, a repairing mutator and a differential harness for TrueHD, and seeds for the content signature and the
+  protected MP4 boxes.** `fuzz_truehd_parse`, `fuzz_truehd_decode`, `fuzz_truehd_encode` and `fuzz_mat_unwrap` were built and in no run list;
+  they are in `tools/fuzz/run.sh`'s default targets now, with seeds made by `tools/fuzz/truehd-seeds.py` from `testdata/truehd` and a
+  dictionary of the sync words. `libs/truehd/fuzz/truehd_mutator.hpp` rewrites a stream's checks (the unit's nibble, the major sync CRC, the
+  restart header CRC, a segment's parity and CRC, the extra data's nibble and parity) after each mutation, and the library's tests hold it to the
+  committed streams. `fuzz_differential_truehd_decode` decodes the same bytes with the library and with FFmpeg's strict decoder and requires
+  equal samples when both read the whole stream cleanly; it runs in `fuzz-differential` in steps that cannot fail the job until it has a clean
+  record against the FFmpeg the runners install, and in `fuzz-nightly`. `fuzz_content_signature` goes from 8 seeds to 31,
+  `fuzz_ac4_content_signature` from 3 to 11, made by `tools/fuzz/signature-seeds.py` under keys that are thrown away, and nine protected files
+  join `fuzz_mp4_demux`'s (`cenc_make_protected.py` takes `mlpa`). `tools/checks/check_fuzz_harnesses.py` fails on a harness that is not
+  registered, in no run list or without seeds; it names `fuzz_iamf_parse` as a known gap. Ten-minute runs of each found nothing in the
+  harnesses that were already there; `tools/fuzz/README.md` has the table.
+- **Added: optional checks of the MP4, DASH, HLS and TS writers and the protected-file layouts against Dolby's own Online Delivery Kit
+  tools.** `tools/checks/dolby_odk.py` finds (`where`) or downloads (`fetch`, the one step that uses the network: two 1.3 MB archives read
+  out of the AC-4 kit's zip by range request, SHA-256 checked) `streamdemuxer` and `mp4drop`, and runs them in an empty environment,
+  without network, in a temporary directory, with a time limit. `check_dolby_mp4_boxes.py` compares mp4drop's reading of `dac3`, `dec3`
+  and `dac4` with `forge probe`; `check_dolby_demux_roundtrip.py` sends forge's MP4, fragmented MP4, DASH, HLS and TS through
+  streamdemuxer and compares the stream that comes out; `check_dolby_cenc.py` reads 108 protected test files with mp4drop and, when the tool
+  decrypts, compares its output with the clear stream. All skip with status 77 without the tools; nothing from the kit is committed and CI
+  does not fetch it. Result on 2026-10-29: 10 and 23 legs agree, 108 protection-box legs agree, and every decryption leg is skipped because
+  the tested streamdemuxer (1.0.0.5519896) answers "Need a key for decryption" whatever key it is given; forge differs from Dolby's muxer
+  in the `channelcount` of a JOC entry (6 against 2) and in AC-4 framing (0xAC41 with CRC against 0xAC40). `dolby_validator_bundle.py` writes
+  the files and checklist for Dolby's hosted StreamValidator, which refused the automated browser with HTTP 403 at both addresses the kit
+  names. See `docs/verification.md`, "Dolby's Online Delivery Kit tools".
+- **Fixed: a Common Encryption MP4 is refused by name, and one with a clear sample entry beside a protected one no longer comes out as audio
+  (G1 to G5 of `planning/cenc-conformance.md`).** The MP4 reader skipped an `enca` sample entry as an unknown codec, took the first
+  `ac-3`, `ec-3` or `ac-4` entry of a track and ignored which entry a sample uses. A file with a clear `ec-3` entry and a `cenc` `enca`
+  entry, which is how a packager writes a clear lead-in, was read as clear: on the committed six-access-unit fixture `forge demux` exited 0
+  and wrote six access units, the last four of them ciphertext. Any other protected track said "no 'ac-3'/'ec-3'/'ac-4' track". The reader now
+  reads `sinf`, `frma`, `schm` and `tenc`, never selects a track that has a protected sample entry (the whole track is refused, at
+  `moov`, so `demux()`, `Reader` and a pipe agree) and says `track 1 is protected (cenc, original format ec-3, default KID
+  a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90); decryption is not supported`; `forge demux`, `decode` and the other commands exit 2 and write
+  nothing, `probe` exits 1 as it does for every failure. A protected track beside a readable one is listed under `container.other_tracks`
+  with a new `protection` member (an object, or `null` for a clear track; the schema stays `iclforge.probe/1`). Nothing decrypts, and a
+  key is not read: the read side is a plan in `planning/cenc-read-side.md`. The Matroska reader no longer reads a track that declares
+  `ContentEncryption` as clear (`kEncryptedTrack`), and the MPEG-TS reader stops at an audio packet with `transport_scrambling_control` set
+  (`kScrambled`); both were read as audio with exit code 0 (audit M11). The documents now say that the EMDF `protection` field is an
+  authenticity tag and has nothing to do with content protection. The reader gains `DemuxError::kProtectedTrack`, `Protection`,
+  `describe_refusal()`, `Reader::refused_tracks()` and `list_refused_tracks()`; three small protected files from
+  `tools/generators/gen_cenc_reader_fixtures.py` are the MP4 fuzz harness's seeds and the tests' input, and four more (`--set dolby-ott`)
+  carry the protection layout of the audio in Dolby's public OTT reference streams: a subsample map with a clear lead, a 1:9 `cbcs`
+  pattern, an empty `senc`, the PIFF copy of the `senc`, PlayReady and Widevine `pssh` in `moov`. The reader steps over all of it and
+  refuses the track, with or without the fragments.
+- **Fixed: the AC-4 decoder decoded only the I-frames of Dolby's object-based test streams, and refused its level 4 stream.** An A-JOC
+  substream after an I-frame that sent no dialogue configuration (`b_dmx_de_cfg` 0, as Dolby's Spott streams send in every frame) was
+  refused as missing its I-frame, so OTT00232 decoded 80 frames of 2,000 and OTTEP00128 32 of 750 and `forge decode` exited 0; an I-frame
+  now says there are no dialogue objects, and the frames after it read none. Spott's OTTEP00129 (`ac-4.02.01.04`, "OBI L4") has a version 1
+  presentation of `md_compat` 4, which Part 2 Table 55 reserves and the decoder refused ("no presentation this decoder can select"): 4 is
+  now taken as the level it names (selected by a decoder of level 4 or more, 7 by default; 5 and 6 stay reserved), and in such a
+  presentation an adaptive A-JOC substream of five downmix signals has a 5.1 core, whose custom downmix and loudness fields the presentation
+  substream carries (each of its 4,450 presentation substreams now ends at its size). OTT00234 (`ac-4.02.01.01`, four presentations) still
+  stops at frame 1 ("tools_metadata_size does not match the drc_frame() and dialog_enhancement() read"). Readings and evidence in
+  `libs/ac4/ERRATA.md`, "A-JOC's dialogue enhancement data across frames" and "md_compat 4".
+- **Fixed: the AC-4 decoder refused Dolby's immersive stereo test streams ("sect_cb 12 to 15 name no codebook").** Immersive stereo
+  (`presentation_version` 2) is signalled with `channel_mode` 0b1111000, or 0b1111001 when it is made from Dolby Atmos content (Dolby's
+  AC-4 in MPEG-DASH specification, in the Online Delivery Kit). The decoder read only the first as stereo, and read the second as 7.1
+  (3/4/0.1), so the presentation substream ran past its end and the audio failed in its section data. Both codes are stereo now, in the C++
+  decoder and in `tools/references/ac4_syntax.py`; the regression test sets the second code's bit in a DEE stream and needs nothing of
+  Dolby's. Reading and evidence in `libs/ac4/ERRATA.md`.
+- **Added: `tools/checks/check_ac4_kit_streams.py` holds the decoder to Dolby's AC-4 Online Delivery Kit streams.** The kit's 12 AC-4
+  elementary streams have no reference PCM, so the check measures what they make checkable (every frame decodes, CRCs, sample count at
+  the exact frame rate, channel names and order, the LFE's band, the heights of 5.1.4, BS.1770-4 loudness against the declared LKFS, the
+  25 and 29.97 fps versions, the two languages, the DD+ version) and that none carries a content signature. It reads the kit from
+  `ICLFORGE_DOLBY_AC4_KIT_STREAMS` and prints SKIP without it; the kit's DASH, HLS fMP4 and MP4 versions decode to the same samples as
+  the elementary streams, and its HLS packed-audio files (ID3v2 tags) are not read yet. See "Dolby's Online Delivery Kit streams" in
+  `docs/verification.md`.
+- **Added: a TrueHD encoder in `iclforge::truehd`, bit-exact with FFmpeg's strict decode in 43 cases.** `Encoder`, in the style of the AC-4
+  encoder's streaming API, writes 1 to 8 channels of 16, 20 or 24 bit PCM at 44.1 to 192 kHz as a lossless TrueHD stream: the output shift and
+  quantiser step of a narrower source, pair matrices, FIR prediction up to order 8, the three codebooks or raw bits with their offsets, restart
+  intervals of 1 or 8 to 4096 units, the declared peak data rate and 75 ms latency (`allow_rate_violations` to write past them), extra data
+  framing and `verify`, which has the library's decoder read every unit back. `DownmixMode::kStandard` writes the 2 and 6 channel
+  presentations as downmixes that the later substreams' matrices undo exactly. FFmpeg's strict decode returns every sample of 43 cases
+  (`tools/checks/verify_truehd_encode_interop.py`: real music, speech and 5.1, hard synthetic signals, stereo to 7.1, every rate and width), and
+  `tools/ci/fuzz_truehd_encoder_space.py` and the libFuzzer harness `fuzz_truehd_encode` search the configuration space; the streams are
+  0.95 times the size of FFmpeg's encoder's over the layouts it writes, and larger at 192 kHz, on full-scale squares, with a restart interval of 1 and with the downmix presentations. Writing
+  streams FFmpeg decodes added nine entries to `libs/truehd/ERRATA.md` (30 to 38) and four more questions for the owner
+  (12 to 15), and the decoder now reads a substream's predecessor's rows before that predecessor's matrices, as
+  FFmpeg's does. No IIR filter, LSB bypass, negative output shift, heavy DRC, noise or MLP is written (`ExperimentalTools` is refused with a
+  reason), and nothing outside the library reads the downmix presentations. `iclforge-truehd-encode-tool` is the test tool; `forge truehd-encode`
+  is the command (the entry on the `forge` commands, below).
+- **Added: `iclforge::truehd`, a TrueHD and MLP reader and lossless decoder, and `forge decode` and `forge probe` for `.thd` and `.mlp`
+  streams.** Written from the owner's TrueHD (MLP) Reference Specification v3.5 and checked against the streams FFmpeg's `truehd` and `mlp`
+  encoders write: the decoder gives the samples FFmpeg's strict decode gives for 25 committed fixtures (`testdata/truehd/`, 1 to 6
+  channels, 44.1 to 192 kHz, 16, 20 and 24 bits) and for 19 more while it was written, and `tools/references/truehd_syntax.py`, an
+  independent transcription, gives the same digests. It decodes substreams 0 to 2 and the generic 16-channel substream 3, the FIR and IIR
+  filters, the matrices with LSB bypass, the Huffman and raw residuals, and checks the check nibble, the CRCs, the parity bytes and the
+  lossless check of every restart interval. The specification and the streams disagree in 23 places (`libs/truehd/ERRATA.md`, which also
+  lists the eleven questions only the specification's owner can answer); one was the end-of-stream marker, a 32-bit field in the last unit
+  that counts its padding samples, which FFmpeg's decoder removes and this one does too. An IIR filter, LSB bypass, noise generator 0, several matrices,
+  the block data check and extra data are carried by fifteen hand-built streams (`tools/references/truehd_writer.py`), and
+  `tools/checks/verify_truehd_interop.py --handbuilt` holds FFmpeg's strict decode of them to the signal each was made from
+  (eleven of the fifteen; for the others the manifest says what FFmpeg does). Where FFmpeg decodes and the specification is
+  silent, this library follows FFmpeg and ERRATA marks the reading provisional: the lossless check's channel shift, the
+  filter histories across a restart, the width of noise generator 0's `shr7` and the block data length. The 16-channel
+  substream, the end-of-stream marker in every unit and the extra data's layout have **no external oracle**. Noise generator 1 (its table is not available) and heavy DRC are not decoded.
+  `forge decode` writes a 24-bit WAV in the stream's channel order (`truehd-presentation=`, `truehd-check=strict|lenient`; a strict decode
+  of a damaged stream exits 2); `forge probe` checks every unit and exits 1 on a failure. The Atmos substream is phase T2b
+  (`planning/truehd.md`); the encoder, the containers, the `forge` commands and the C API are the entries above this one.
+- **Added: TrueHD in MP4, Matroska, MPEG-TS and MAT.** `iclforge::containers` carries whole TrueHD access units in an `mlpa`
+  MP4 track (with its `dmlp` box, plain and fragmented), an `A_TRUEHD` Matroska track, a Blu-ray-profile MPEG-TS stream
+  (stream_type 0x83 and the `HDMV` registration; the reader also takes 192-byte packets and a bare 0x83) and 24-unit MAT bursts
+  of IEC 61937 data type 22. TH spec §21 gives no layout for any of them, so each is what FFmpeg's muxer writes: 120 legs of
+  `tools/checks/verify_truehd_containers.py` pass in both directions, and every whole MAT frame equals FFmpeg's `spdif` output
+  byte for byte at 44.1, 48, 96 and 192 kHz. FFmpeg's `spdif` demuxer reads no stream from its own TrueHD MAT, so reading MAT
+  has no oracle; nothing here has been played into a receiver or a disc player. The readers and `iclforge-truehd-container-tool`
+  have fuzz seeds, a `fuzz_mat_unwrap` harness and tests; the open questions are in `libs/containers/ERRATA.md`.
+- **Added: TrueHD and MLP in the `forge` commands, and `forge truehd-encode`.** `probe` (a stream in a container too), `levels`,
+  `loudness` (BS.1770-5 Annex 3 weights from the speakers the stream names), `mkv`, `mp4`, `ts` (Blu-ray profile; `dvb` and `atsc`
+  are refused), `spdif` (MAT 1.0 into an eight-channel PCM16 WAV or raw bursts), `unspdif`, `demux` and `remux` take a `.thd`,
+  a `.mlp` or a container holding one; `transcode`, `qc`, `fmp4`, `monitor` and `play` refuse it with exit status 1.
+  `truehd-encode` codes a WAV losslessly (`iclforge::truehd::Encoder`) bare or into mkv, mp4 and ts, with `truehd-downmix=`,
+  `truehd-downmix-gains=`, `truehd-restart=`, `truehd-fir-order=`, `truehd-matrix=`, `truehd-stereo-mode=`, `truehd-peak-rate=`,
+  `truehd-rate-check=` and `verify`; the WAV's channel mask names its speakers (a 7.1 file in WAV order is coded as the channels
+  it carries), and the readings that are this command's own are `libs/truehd/ERRATA.md` open questions 16 and 17. The codec matrix
+  runs the TrueHD legs against FFmpeg's strict decode: every fixture decoded, levelled and wrapped in each container and MAT, and the
+  encoder's streams in stereo, 5.1 and 7.1 at 44.1 to 192 kHz and 16 and 24 bits, each equal to the source byte for byte (898
+  commands in the full matrix). `verify_truehd_encode_interop.py --forge` runs its cases (32, or 43 with --full) through the command, and the gold-reference
+  gate, the `ffmpeg-validate` job and the nightly fuzz job run the TrueHD decode, encode, container and encoder-space checks.
+- **Added: TrueHD and MLP in the C API.** `iclforge_truehd_*` probes, scans and decodes streams into 24-bit `int32` PCM and encodes
+  PCM into access units, declared with or without `ICLFORGE_BUILD_TRUEHD` (`ICLFORGE_HAS_TRUEHD`; the absent library answers
+  `ICLFORGE_ERROR_UNSUPPORTED`). The fixtures decode through the C API to FFmpeg's SHA-256 and their PCM encodes and decodes again to the
+  same; `examples/capi_decode_truehd.c` and `capi_encode_truehd.c` run under ctest. New status codes 100 to 114 and 120 to 125, and
+  ABI allowlists for `libiclforge_truehd.so` (new, seeded with GCC 13 and not the pinned LLVM), `libiclforge_c.so` and
+  `libiclforge_containers.so`. The Python, JavaScript and Rust bindings are not written.
+- **Added: `tools/checks/score_truehd_decode.py` scores a decoder against the DEE gold set's TrueHD legs** (`--forge` or `--decoder`,
+  channel matching by content, a delay allowed, legs whose DEE options alter the audio reported, not failed), with a unit test,
+  and `docs/verification.md` gives the commands to run before DEE's licence ends on 2026-11-06.
+
+- **Changed: SHA-256 and HMAC-SHA-256 in `iclforge::base` run on the CPU's SHA instructions where it has them: 6.5 times faster on x86-64
+  SHA-NI, and the Atmos signer's per-frame tag 7 times faster.** `Sha256` picks, once per process, between the x86-64 SHA extensions, the
+  ARMv8 SHA2 instructions and the portable code it always had, so a binary built with a kernel still runs on a CPU without it. On a Ryzen 9
+  5950X the compression runs at 2,154 MB/s against 334, a 64-byte block 2.9 times faster, and the HMAC over a 2,304-byte frame takes 1.3 us
+  instead of 9.6. `update()` also hands whole blocks straight from the caller's buffer and `finish()` writes its padding in one step, which
+  made the portable path about 15 % faster too. The kernel is the one file built with `-msha` (or `-march=armv8-a+crypto`); CMake picks it and
+  a probe per compiler or OS from `libs/base/src/crypto/hw/`, with no `#ifdef`. The tests hold the hardware compression to the portable
+  one over 2,000 random states and the whole hash to an independent framing at every length to 600; the ARMv8 kernel has so far run only
+  against a model of its instructions and is first run on an Arm CPU by CI. Nothing changes on the ESP32 boards, whose hashing already goes
+  through PSA to the SHA peripheral: measured there it is 30 to 45 times the portable code at 64 KiB, with a fixed 25 to 29 us a call. New:
+  `iclforge-cryptobench` (`tests/performance/crypto_bench.cpp`), `firmware/crypto-bench` (the same measurements on a board, with the
+  procedure for putting one back as found) and `tools/hearth/crypto_bench_report.py`; the results, and what they say about the P4's crypto
+  clock, SHA busy flag and DMA, are in `planning/crypto-hardware-offload.md`.
+- **Changed: the ESP32-P4 v1.x release image decodes AC-4 as well as AC-3 and E-AC-3.** `p4-rev1` takes the AC-4 decoder
+  (`sdkconfig.ac4`) that `p4-rev1-ac4` held apart, with the same locked values and the decode stacks at 40,960 bytes; the
+  profile `p4-rev1-ac4` is gone, `p4-rev1` is what it was (the same hash, so P4a's baseline stands) and its app budget
+  is 3,400,000 bytes against the 4 MiB slot. The v3.x (P4X) and S3 images follow in the next entry; the C6 cannot hold the
+  decoder beside Wi-Fi (`planning/ac4-in-release-images.md`).
+- **Changed: the ESP32-S3 and the ESP32-P4X (v3.x) release images decode AC-4 as well as AC-3 and E-AC-3.** `s3-n16r8` takes the
+  decoder and the 64 KB data cache (`sdkconfig.ac4`, `sdkconfig.s3-dcache`) and keeps its 4 KB allocation limit: the image is 2,621,600
+  bytes (budget 2,750,000), the board boots with 75 KB of internal RAM free in place of 110, an E-AC-3 stream leaves 44 KB, and E-AC-3 JOC
+  7.1.4, 9.1.6 and 5.1.4 plays have 60 KB free at the end of their lap; its baseline is re-recorded on S3a and the AC-4 profile `s3-n16r8-ac4` is gone. `p4-rev3`
+  takes the decoder with the HTTP play's decode stack in PSRAM: 3,811,472 bytes (budget 3,950,000, slot 4,194,304), AC-4 5.1 at 0.68 of a
+  frame's duration on the kit with the PCM the host pins, AC-3, E-AC-3 and the 9.1.6 TDM row as fast as before; its baseline is re-recorded
+  on the kit. The C6 stays AC-3 and E-AC-3 only.
+- **Fixed: a play could not start on a board whose internal RAM is short, though PSRAM was free.** The player placed the decode task's
+  stack, and the AC-4 decoder's second lane its stack, in internal RAM and gave up when no block held it (on the P4X, after the I2S queue,
+  the largest block is 37,888 bytes: an AC-3 play with a 40,960-byte stack could not start its decode task and an AC-4 5.1 play ran on
+  one core at 1.3 to 1.4 of real time). Each reads the largest internal block first and takes PSRAM when it is too small; where the stack fits
+  it stays internal, as the baselines were measured.
+- **Fixed: `GET /log` lost the tail of every console line over 128 bytes on a board with no host on its USB console.** The
+  USB-Serial-JTAG console fails every write with EIO while no host is on the port, and the log's tee passed that failure to stdio, which then dropped
+  the rest of the line it was writing: the ring held `...decoder_us=89608 decoder` where the line goes on to its PCM hash, and the board suite
+  could not read an AC-4 play's figures. The write is reported whole (the console stays best effort).
+- **Fixed: an ESP32-S3 sink could stop answering on the network, with its CPUs, lwIP and its Wi-Fi association alive, in the
+  middle of a Sendspin session.** With Wi-Fi's buffers in PSRAM ESP-IDF leaves the TCP out-of-order queue unbounded, and the
+  part's 32 dynamic receive buffers could all be held by one connection's queue, so that the retransmission that would fill the
+  gap had no buffer to arrive in. `sdkconfig.psram` bounds the queue at 4 pbufs, as the C6 and the P4 already have it. Read
+  out on a board and written up in `planning/ac4-in-release-images.md`; soaked for three full board-suite runs.
+- **Changed: the audio comes first on the P4X: the Meters view's tap costs the decode task half as much, and the view is held at 10 Hz while
+  the decoder is busy.** The tap that hands the Meters view its audio cost 564 us a 1,536-frame burst in a 5.1 room, 701 us in a 7.1.4 one
+  and 582 us in AC-4 5.1, on the decode core: scalar loops and six 64-bit atomics a block, each a critical section on both cores (RV32 has
+  no 64-bit AMO). It takes four outputs at a time, writes its ring in place and keeps 32-bit counters: 303, 355 and 307 us on the kit, the
+  same numbers bit for bit (the test holds it to the old loops). The Meters view's drawing and analysis also slow the decoder while they run
+  beside it: 0.9 to 1.2 ms a burst in a 5.1 room, 1.6 to 2.2 ms under JOC 7.1.4 and 1.5 to 2 ms in AC-4 5.1 (the glow, the pulse and a dark
+  screen cost it nothing). `ICLFORGE_EXAMPLE_PANEL_YIELD` (default 1) holds the view at ten updates a second while the mean burst is 14 ms
+  of the 32 or more (JOC, AC-4; a 5.1 E-AC-3 room is never held): 0.4 to 0.7 ms a burst back, a steady ten. Level 2 also pins the panel's
+  task to the decode core for 0.9 to 1.1 ms back, at the price of 11 to 16 % of the view's steps and twice the refresh time for the other
+  views under JOC. `panel_measure.py` had been averaging `burst_us`, which the board keeps as a mean since the stream began, so every burst
+  figure it reported (here and in the entry below) was diluted two to four times; it now reads the burst between two readings, and
+  `--views baseline` puts the dark view either side of each view. Measurements in `planning/p4x-meters-view.md`, "What the screen costs
+  the audio path".
+- **Changed: the P4X's screen copies each drawn area into the frame buffer with the 2D-DMA, not the CPU.** ESP-IDF's DSI panel copied every
+  flushed area on the CPU (line by line, PSRAM to PSRAM) and the 2D-DMA hook was never turned on. `ICLFORGE_EXAMPLE_PANEL_DMA2D_FLUSH`
+  (on by default; the CPU copy stays if the DMA will not start) turns it on: on the kit the Meters view's drawing takes 6 to 11 % less
+  (0.5 to 1.6 ms an update), the audio burst, sync error and internal heap are unchanged, and the picture reads back right. The image
+  is 14.5 KB bigger. Measurements in `planning/p4x-meters-view.md`, "Kit results, 2026-10-28".
+- **Fixed: a bed's LFE was lost, and counted twice, going into Atmos from an ADM master, an IAB file or the window's object mode (#1627).**
+  An LFE cannot be an Atmos object: an object reaches the LFE as `lfe_send * gain`, and the same gain pans it into the speakers, so
+  the bridges' gain 0 / `lfe_send` 1 made it silent, and it took one of the fifteen object slots beside the encoder's own implicit LFE.
+  A 5.1.4 bed read back out of its own ADM master came out of `forge atmos-adm` with the LFE at -120 dBFS and "10 bed speaker feed(s) +
+  the bed's LFE = 11 objects"; a 9.1.6 one, fifteen feeds and an LFE, was refused as "more channels than AtmosEncoder supports". The LFE
+  is now the encoder's: `AtmosEncoder::encode_frame` takes it as an `lfe` span, added to the bed's LFE unpanned and at unity (a new
+  overload; the old one is unchanged), `forge atmos-adm` and `atmos-iab` feed it there for E-AC-3 and write it as AC-4's LFE object for
+  `codec=ac4` (where it went in as an object at -infinity dB), and `BridgeResult` and `IabBridgeResult` hold the objects to fifteen
+  without it (`lfe_count()`, `object_slot_count()`). Two LFE channels (LFE and LFE2) are added into the stream's one LFE, with a
+  warning; a source of nothing but its LFE is refused, since JOC needs an object to reconstruct. forge-gui's object mode built a channel
+  assigned to the LFE bed position the same way (silent, and counted against the fifteen) and now feeds it the same way, with the
+  count and the "Only the LFE is assigned" refusal to match. Not changed: `atmos-encode` of a plain WAV still makes every channel an
+  object, as documented, so the LFE column of a 5.1 file is panned with the rest; and a bed LFE's own gain in the master is still not
+  read (it is carried at unity).
+- **Changed: the speaker layout is chosen on the screen by what the room has, not from a long list.** Preferences' Speaker
+  layout is now the layout in force, in words, and a Change button that opens one sheet: quick picks in two groups (around
+  you, with heights), or Build yours (how many speakers around you, how many subwoofers, how many heights, and whether the
+  heights are high or in the ceiling), with the room the layout makes drawn beside the buttons, its name
+  in a footer that stays on the glass with Apply, and the verdict's own sentence for anything this board cannot carry. The
+  sheet is checked from 1024 by 600 down to 240 by 240, including that every control can be reached by scrolling to it.
+  Heights in the ceiling are put straight overhead; high heights, on the wall or up-firing, are played the same way, so the
+  sheet has one button for them.
+  `PUT /layout`, `GET /layout-options` and the device page are unchanged. The plan is `planning/p4x-layout-builder.md`.
+- **Added: the analysis and the rules of a Meters view for the Hearth sink's no-lyrics screen, host-tested and not yet drawn.** An instrument display
+  after the owner's reference, the displays of RME's audio interfaces: a third-octave spectrum of the main mix (31 bands, 20 Hz to 20 kHz, from the newest
+  171 ms of a 48 kHz mono mix, in float32 through the family's FFT, 100 kflops a pass, in `iclforge/dsp/spectrum.hpp`: 0 dB for a full-scale sine, a decibel
+  a band for white noise, the same as one 8,192-point FFT below 800 Hz) and, under it, a representation of the channels chosen from the display's width and
+  the number of outputs (`iclforge/meters_view.hpp`: a stereo master on the small screen, the surround sum on the middle one, every output grouped in
+  space on the large one). The plan, the prototype and the pictures are `planning/p4x-meters-view.md` and `firmware/hearth-sink/preview/meters_options/`.
+  Nothing is wired to a screen or a player yet.
+- **Added: the Sendspin player can show a screen each block of its output (`BlockTap`), for the Meters view.** `BurstPlayer::set_block_tap()` takes a tap that is
+  called once a block (256 frames) while it wants to be, after the speakers' trims and the volume, so that it sees what is heard; with none, or one that does not
+  want blocks, the path is one pointer load, so an image with no screen pays for an interface and not a feature. `MeterTap` (`iclforge/meters_tap.hpp`) is the
+  Meters view's: a mono mix of the live outputs in a lock-free ring of 16-bit samples (32 KB) and each output's peak over 50 ms, with the time, blocks, frames and
+  torn reads it costs counted. Nothing sets a tap yet.
+- **Added: a Meters view for the Hearth sink's screen without lyrics (3 of 5).** `meters` is a new choice of *Screen without lyrics* (Preferences, or `PUT /now-playing`; stored
+  as `np_view` 5): a third-octave spectrum of the main mix with a dB scale, peak ticks and the zones of a level meter (green, amber from -30 dB, red from -15 dB), and under it
+  the room's channels as the size of the screen and the number of outputs ask: the pair on a small screen or a 2.0 room, the surround sum on a middle one, every output in
+  groups on a large one. It is drawn from the player's tap, twenty times a second, only where a bar or a tick moved; a board without a screen of 240 by 240 or without
+  the Sendspin player shows the choice greyed with the reason. All of it is compiled only into an image with a panel (the C6 and S3 images grow by the registry's one choice).
+  `LV_INV_BUF_SIZE` is 256 for the sink (the meters invalidate many separate rectangles a frame, and above 32 LVGL redraws the whole glass).
+- **Added: `GET /panel-stats`, a rate governor for the Meters view, and the kit protocol that measures them (4 of 5).** On port 80, where the capture port is
+  off in a release image, a board with a screen says what its panel costs: LVGL's refresh times, the panel task's stack, the PSRAM and internal heap now and at
+  their lowest, and the Meters view's rate, its analysis, widgets and render times, its late and missed updates and the player tap's cost to the audio path
+  (`iclforge/panel_stats.hpp`; the developer view's PERFORMANCE section shows them too). The view updates 20 times a second and drops to 10 when the panel's task
+  cannot keep up, judged over the last second and not on one update, and returns after 10 s with the cost well under (`iclforge/meters_governor.hpp`). The
+  analysis's transform now works in buffers the analyzer owns, not 8 KB of the panel task's stack (held bit for bit to the library's by test).
+  `tools/hearth/panel_measure.py` runs the protocol of `planning/p4x-meters-view.md` on a booked board unattended (rows, schedule, criteria, report) and
+  compares the speakers view with the image before it. **Nothing here has run on a board.**
+- **Added: the Meters view's pictures and its checks at every size and room (5 of 5).** The panel preview draws the view in a 2.0, 5.1, 7.1.4 and 9.1.6 room at
+  1024 by 600, 800 by 480, 480 by 320, 320 by 240 and 240 by 240, and holds it to the plan: the representation the width and the outputs ask for, twenty updates
+  a second with no fall to ten, and no more than 4.5 screens' worth of pixels flushed a second (2 to 3.6 measured; the 19 of LVGL's default invalid-area table fails
+  it, so losing the 256 fails the preview and not a board). Six of the pictures are in `docs/hearth/sink-esp32-p4.md`. **The protocol of 4 of 5 has run on the kit once**
+  (`planning/p4x-meters-view.md`, "Kit results"): the stream is whole in every row and the Meters view costs the decode task 0.4 to 0.8 ms a burst, but on music an
+  update takes 130 to 440 ms (the step is 50), so the view falls to 10 updates a second and still does not keep up; the spectrum and the bars need to be drawn
+  as a few objects, not 100 to 200 small invalid areas.
+- **Changed: the Meters view draws each chart as one canvas, and its analysis works in float.** The kit put the view's cost in its 100 to 200 small invalid areas a
+  refresh (each a pass over the object tree and a flush to the glass). The spectrum plot, the channel bars and the pair of meters are now one RGB565 canvas each, redrawn
+  only in a few rectangles around the bars that moved (`iclforge/meters_draw.hpp`, `plan_cells()`: neighbouring bars share one when that is cheaper, and the result is held bit for bit to a
+  full redraw by test), so an update flushes 6 to 7 areas and 0.7 to 1.2 million pixels a second where it flushed 58 to 118 areas (the panel preview counts them and fails above 12); the numbers under the bars change at 4 Hz; the analysis's power average, levels and ballistics are float (the P4 has no double unit), and
+  the 17 bands up to 800 Hz are analysed every other update (`Analyzer::analyze_low` and `analyze_high`, equal to the whole by test); `meters_screen.cpp` and `panel.cpp` build at -O2.
+  `GET /panel-stats` gains the tap's cost in parts (`us_pass_per_burst`, `us_pack_per_burst`, `us_per_clock_read`) and an exact refresh mean. `tools/hearth/panel_measure.py`
+  now judges the rate as the owner asked, **20 Hz if possible, else a steady 10 Hz**, and says which cell holds which, and names faults that are only in the first, cold opening
+  of the view. The governor does not judge the first two seconds of a view (its first draw and the cold code), rises under 60 % of a fast step and takes the resting 100 ms of its loop as the
+  allowance at ten a second; an update is charged the refreshes since the last one and not the last refresh (a still picture costs nothing). The representations and the zone colours are unchanged.
+  **Measured on the kit** (planning/p4x-meters-view.md, "Kit results, second run"): an update costs 11 to 29 ms where it cost 130 to 440, and **a stereo, 5.1, 9.1.6, JOC 7.1.4 and AC-4 5.1 stream each hold 20 updates a second** with no fall to ten, in the first opening of the
+  view and the second; the audio is whole in every music row. Open: the JOC row misses 1.7 % of its steps and an update takes 59 % of the step, and the player's tap costs 330 to 720 us a burst (more than the plan's guess of 150 to 500).
+- **Changed: the `s3-n16r8` sink tries PSRAM first for every allocation of 4 KB and more, not 16 KB and more.** An E-AC-3 stream took
+  about 65 KB of the S3's internal heap in blocks between 4 and 16 KB and left the board 247 to 543 bytes free at its tightest,
+  where one failed allocation reboots it in the stream (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` in the new `sdkconfig.psram-4k`,
+  locked in `s3-n16r8`). On an S3 the same stream now leaves 70 KB or more, PCM reads 93 KB free where it read 69, and the boot
+  figure rises 14 KB; the decode of an E-AC-3 stream takes about 14 % longer (17.9 against 15.7 ms of the 32 ms a chunk lasts).
+  `s3-n16r8-ac4`, the P4 and the C6 profiles are unchanged: the AC-4 S3 profile's board suite hung at its first play with the lower limit.
+- **The speakers follow the sound more closely, and can pulse.** The P4X's no-lyrics screen reads the level of every
+  100 ms window (it read every other one), judges it against the loudest the room has lately been (so the same music shows
+  the same at any volume), and moves in six steps that fall fast enough for a hit to show, for about 56,000 pixels a second
+  at 5.1 (the lyric screen's song filling is 192,000). A new `GET` and `PUT /speakers-style` (`glow`, the default, or
+  `pulse`: each speaker's filled circle grows and shrinks a little, 88% to 112%, with its level) is kept as `np_style`.
+  No new meter and no change to the audio path beyond `BurstPlayer::levels()`, a lock and two short arrays. The plan is
+  `planning/p4x-speakers-options.md`.
+- **Fixed: a Hearth sink that had played E-AC-3 kept the decoder through every PCM stream after it.** The burst player keeps a
+  stream's AC-3 or E-AC-3 decoder for the next stream, so that a heap Wi-Fi has cut up is not asked for its scratch again, and
+  let it go only when an Opus or an AC-4 stream began. A PCM stream needs neither. On an ESP32-S3 the decoder is about 65 KB of
+  internal heap: a board that had played the Atmos demo read 7 to 14 KB free while it played PCM, where the same image after a
+  boot reads 70 KB, and Wi-Fi's receive buffers are made from what is left. A PCM stream now lets the AC-3 and E-AC-3 decoders
+  go on a part with PSRAM, which makes them again for the next coded stream as it does after a boot (`iclforge/decoder_keep.hpp`);
+  the ESP32-C6, which has none, keeps them as before.
+- **Fixed: an S3 or C6 sink came back from every update or restart at 2.0 and 32-bit slots.** `PUT /slot-width` changed the sink but stored nothing, so the width went back to the image's 32 at boot; a line holds 4 slots at 32-bit and 8 at 16-bit, so the stored layout (`PUT /layout` was always stored) no longer fitted, and boot kept 2.0. The width is now stored when it is set and applied at boot before the stored layout is judged, so a 5.1.2 at 16-bit stays through an update. A board set to 16-bit before this build is still at 32-bit after the first update to it, and needs the width set once more. (The P4X's wide sink, with 16 slots at either width, kept its layout all along.)
+- **Changed: a P4 sink takes a TCP window of 23,040 bytes, not lwIP's 5,760.** A window caps a stream at its size over the round-trip time and, at four segments, leaves a lost one only the retransmission timer to repair it. With five boards streaming PCM on one 2.4 GHz channel the round trip rose from 10-15 ms to 32-50 ms: a server saw 0.8-2 s stalls on a P4 and skipped 26 % of its stream as late, while the board counted three underruns. The S3 and C6 profiles keep the small window for now (their internal heap has less to spare).
+- **Fixed: the P4X image served its screen to anyone on the network.** `hearth-sink-esp32p4-rev3` started a second
+  HTTP server on port 8081 (`CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`) that answers with no authentication:
+  `GET /panel.bmp` is the screen as a picture, `GET /panel` its drawing state, and `POST /panel/tap?x=..&y=..` presses a
+  button on it (the Preferences sheets included) and `POST /panel/demo` starts a demo song. It was a development tool
+  that the profile had locked on, and its own help said a release image should have 0. The release profile, the panel
+  fragment and the Kconfig default now have 0 (no server), and `package_firmware.py` refuses to package a build with any
+  other port. The screen tests and the bench get the server from a new `panel-capture` overlay
+  (`sink_profile.py defaults p4-rev3 --overlay panel-capture`), and the `panel-null` development build keeps it. The control
+  surface on port 80 is still open to the network, as the device UI plan records; this closes the second door and not
+  that one. `p4-rev3`'s hash moves (`ff9b27a6c4fd` to `d3a19fc4876d`); its board-suite baseline was recorded again on the
+  kit with this image (three restarts, three plays of each row). The boot block holds only `internal_free` and `largest`:
+  over HTTP the board's `GET /log` cut the boot budget line at 128 characters, so its `ask_*`, `headroom`, `floor` and
+  `verdict` fields were not read; a run over the serial console reads them.
+- **Fixed: a stereo PCM stream's levels were on the wrong outputs in a room whose slots are not L, R.** The Sendspin
+  player measures a PCM stream's levels from the integers it unpacks the samples from, and had put channel 1's on output 1
+  (the centre of a 5.1, 7.1.4 or 9.1.6 room) where the renderer puts it on slot 2 (R): the P4X's speakers view lit L and C
+  while the sound came from L and R, and `GET /status`'s peak and RMS said the same. The player now reads where the renderer
+  puts each channel (`LayoutRenderer::unity_slot()` and `folded_slot()`) and which output the patch sends that slot to,
+  and measures the floats where the renderer does more than copy a channel to one slot (a small speaker's bass management,
+  a mono stream in a room with no centre). The sound was always right; only the meter was.
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
@@ -26,6 +517,17 @@ This release adds:
   `forge`, in a Karaoke flow in the Forge GUI and on a Karaoke page in Hearth, with timed lyrics
   from `.lrc`, SubRip, Advanced SubStation Alpha and MIDI karaoke files, a microphone with a pitch
   score, lyrics on the network sinks and in Crucible, and a browser demo;
+- Hearth's sink screen has a **Preferences** sheet beside **Adjust**, for what a person chooses once and leaves: a
+  scrollable list, grouped, drawn from a registry that asks a description of the board (its screen, sink, networks and
+  clock) what it can do, so a choice the board cannot make is greyed with the reason and never hidden, and
+  `GET /preferences` lists the same on every board; Adjust keeps only the lyric delay and the text size; both sheets
+  take their sizes from the display and are checked at four screen sizes;
+- Hearth's network sinks say which speaker layouts a board can take and why not for the others: `GET /layout-options`
+  lists thirteen layouts, each supported, taken with a limit, or unavailable with the reason and the setting that
+  would help; `PUT /layout`, the Preferences list (Speaker layout, with a question before a change that breaks the
+  music that plays) and the device page all ask the same verdict over the board's capabilities, so a layout offered
+  is one the board takes. An ESP32-P4 below revision v3.0 now reports the two slots its chip can open, and refuses a
+  wider layout with that reason, where it used to accept one it could not play;
 - new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
   `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
   self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`
@@ -46,6 +548,31 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**AC-4 content signing**
+
+- **A content signature for AC-4 streams: one ECDSA P-256 signature over the whole stream, made with the operator's own key and certificate
+  chain.** The `pace-ccjf1` scheme of the owner-supplied CS spec v2.3: SHA-256 of every byte before the signature, the signer information,
+  signed information and chain serialised with Thrift binary, appended after the last sync frame of a raw `.ac4` file (the frames are not
+  touched, so a signed file decodes as the unsigned one). The core under `iclforge::base::crypto` (SHA-1, SHA-256, ECDSA with RFC 6979
+  nonces and a constant-time ladder, DER, X.509, PEM, chain validation, the Thrift reader and writer, the signature) knows no codec;
+  `iclforge::ac4` adds the trailer. Opt-in at every call, **bring your own key**: the private key and chain are the operator's, read at run
+  time, zeroized and never stored, and no key, certificate or fingerprint of any issuer ships. A verdict of valid needs the chain to
+  lead to a trust anchor or pin the caller names; one that checks out against nothing it trusts is `chain unanchored`, never valid.
+  `forge ac4-sign` and `ac4-verify`; `sign-content` on `ac4-encode`, `atmos-encode`, `atmos-adm` and `atmos-iab` (with `codec=ac4`);
+  `verify-content` (refuse unless valid and anchored) and `check-content` (report and carry on) on `decode`; `content-key=`,
+  `content-chain=`, `trust-anchor=`, `pin=`, `leaf-title=`, `signed-date=`, `verify-time=` and `unanchored-ok`. `forge probe` shows
+  the signature without a key (`stream.content_signature`, `verified` always false), and a signed file no longer reads as a lost sync.
+  Checked with OpenSSL (`tools/checks/check_content_signature_openssl.py`, which also reads the owner's sample blob with no forge code)
+  and in `tools/ci/run_codec_matrix.sh`; two libFuzzer harnesses (`fuzz_ac4_content_signature`, `fuzz_content_signature`), not yet
+  run under libFuzzer. **Measured on the owner's sample, against the specification:** the signature is over the bytes of the signed
+  information and not the content digest; the signer-information digest is over the bytes as received; the certificates carry a
+  `40 82 LL LL` wrapper; a CA in the chain had expired before the signature was made (so "valid now" rejects a genuine signature, and
+  `verify-time=` exists); the signer's certificate is `CA:TRUE`; byte lists are lists of BYTE; `r` and `s` are raw. Fifteen open
+  questions for the owner, among them the validity-time default and MP4 carriage, are at the top of `libs/ac4/ERRATA.md`. Not
+  implemented: carriage in an MP4, a second signature entry (a blob with one is refused), revocation, digests other than
+  SHA-256; a chain is at most eight certificates. See
+  [Signing](docs/library/signing.md#ac-4-content-signing).
+
 **What the P4X's panel shows while a song has no lyrics**
 
 - **The speakers of the layout in force, each glowing with its own level**, in place of the sentence "No lyrics for this
@@ -56,6 +583,12 @@ The sections below contain the complete change list and fixes.
   /now-playing` (`speakers`, `title`, `clock`, `off`) and `GET` and `PUT /dim-after` (`never`, or minutes)
   set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
   `planning/p4x-now-playing.md`.
+- **Late night.** A sink decodes AC-3, E-AC-3 (with Atmos objects) and AC-4 for a listener who can choose how much
+  of their dynamic range is kept: `GET` and `PUT /dynamic-range`, `standard` (the default, and what a sink always
+  did) or `late-night`, which applies the stream's own heavy compression (`compr`, or an AC-4 speaker DRC mode) at the
+  level dialogue was already heard at, not RF mode's 11 dB higher. It is stored on the board, followed from the next
+  stream, and wins over a server's decoder mode while it is on; a board with a screen has it as *Late night* under
+  Preferences, which Reset preferences puts back. The plan and the measurements are `planning/hearth-late-night.md`.
 - **The title card.** The sink lists `metadata@v1` in its hello (a board with a screen only), so a server tells it what is
   playing, and the panel can show the title, the artist, and the album and year, with the song's time and a progress line
   as the lyric screens have. The card is the third choice in Adjust (`PUT /now-playing title`); until a server has said a
@@ -68,6 +601,14 @@ The sections below contain the complete change list and fixes.
   screen redraws one rectangle a minute. Until a time server has first answered the view shows only the stream's heading,
   never a time it made up. A dim lowers the backlight and leaves the clock on the glass.
 
+**Hearth Player for Windows**
+
+- **`hearth-player` is a Sendspin player that plays through the computer's speakers.** It lists `_iclforge_player@v1`
+  (AC-3 and E-AC-3, decoded here with the objects rendered and folded to stereo) and `player@v1` (PCM, FLAC, Opus),
+  advertises as `hearth-pc-<computer name>`, keeps its identity and pairing key in `%LOCALAPPDATA%\hearth-player`,
+  and plays each burst at the time the server gave it, measuring the sync error against the device's own queue.
+  `--list-devices`, `--device ID` and `--device null` choose the output. See `docs/hearth/player.md`.
+
 **Every ESP board keeps its time with a time server**
 
 - **Every ESP board that has a network now keeps its time with a time server.** On by default, from the moment the board
@@ -78,42 +619,80 @@ The sections below contain the complete change list and fixes.
   `GET /status` has a `time` object, and the board's own web page has a Time section with the same three settings and the
   time it keeps. QEMU's network and a build with no network keep no time, and those routes answer 404.
 
+**Display and time preferences: brightness, the clock's format, and 420 time zones by name**
+
+- **Brightness is a setting.** `GET` and `PUT /brightness` (10 to 100 percent, 80 by default) set the level of a board
+  screen's backlight while it is lit, at once and kept over a restart; the dimmed screen stays under it (the floor is
+  4 percent, and never above the brightness) and the dark view is off. A glass with no backlight to dim refuses it.
+- **The clock view can be in 12 hours and can show the seconds.** `GET` and `PUT /clock-format` take `24`, `12`,
+  `24 seconds` and `12 seconds`. The seconds and the AM or PM are small beside the digits, so a second redraws about
+  9,600 pixels and not the digits'.
+- **The time zone can be chosen by name.** The board carries 420 zones by region and city (IANA tzdata 2026e, Australia
+  complete, 11,578 bytes of flash), written by `tools/hearth/gen_time_zones.py`, which holds every one to tzdata's own
+  offsets to 2036. `PUT /timezone Australia/Melbourne` stores the zone and the name (`GET /time-zones` lists the names,
+  `GET /status`'s `time` object has `zone_name`), and the board's web page offers a region and a city. A POSIX string is
+  taken as before. The night schedule's rule (`dim_state()` with a window of times and the board's local minute, held to
+  Melbourne's daylight saving changeovers) is built and host-tested.
+- **A night schedule.** `GET` and `PUT /night-schedule` (`22:00-07:00 on`) make a board with a screen and a clock go dark
+  between two times by its own time, as the dark view does: a touch lights it for 30 seconds, and a board that does not
+  know the time is lit. Off until switched on; kept as one NVS number and returned by Reset preferences. Whether it
+  darkens the idle screen between songs too is a switch of its own, `GET` and `PUT /night-idle`, off.
+- **The Preferences screen has them all.** Brightness, the clock's hours and seconds, the night schedule, its two times
+  and the time zone are rows, and the two that are not a few buttons open an editor over the sheet: the pair of times
+  steps a quarter of an hour (held, it goes on, and faster) and the zone is a region and then a place, opening at the
+  place already chosen. The editors are drawn from the sheet's own metrics and held to its rules at five display sizes
+  down to 240 by 240. The routes now go through the same backend as the screen.
+- **The time zone is read as a place, never as its POSIX string.** A board whose zone was set through the page before it had
+  a picker showed `AEST-10AEDT,M10.1.0,M4.1.0/3` on the Preferences screen. A zone is now read as the place it is (the name
+  chosen; else the table's place for the exact string, the most populous where several share it, so that string is
+  *Melbourne (Australia)*; else its offset, *UTC+09:45 (custom)*), on the Preferences row, in the picker, and on the board's
+  page, whose `GET /status` has `zone_place` and `zone_label` beside the `zone` that tools read. Display only: nothing is
+  stored from the guess.
+- **The board's web page is embedded gzipped: 47 KB less in every image.** `iclforge_ui.html` and `iclforge_ui.js` are
+  69 KB as written and 22 KB gzipped; the component writes the gzip at build time (reproducibly) and the control surface sends
+  it with `Content-Encoding: gzip`, which a browser reads as it always did (`curl` needs `--compressed`). The 4 MB ESP32-C6
+  image, which had grown 8,720 bytes past its OTA slot, is 38,672 bytes under it.
+- **A tap on Brightness - or + no longer hangs the screen.** The setter took the panel's lock on the panel's own task,
+  which already held it (the first run on the kit found it; the same tap through `PUT /brightness` was fine). No
+  `panel_set_*` takes a lock now, the backlight is given the level by the panel's loop, and a host test reads `panel.cpp`
+  and fails if a setter is given one again.
+
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
 - **The `p4-rev3` Hearth sink uses the kit's RJ45 port as well as its Wi-Fi.** The chip's EMAC and the
   board's IP101GR (RMII; the pins are `CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the board's) take
-  an address by DHCP under the board's name, and everything that answers on Wi-Fi answers on the
-  cable: the page and the control surface on port 80, `GET /log`, `PUT /firmware`, mDNS
+  an address by DHCP under the board's name, and everything that answers on Wi-Fi answers on
+  wired: the page and the control surface on port 80, `GET /log`, `PUT /firmware`, mDNS
   (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`, now with an address for each interface),
   the Sendspin player and its pairing, and the idle screen, which names the interface in use. So the
-  kit can sit on a PoE splitter with no USB cable: a board with the cable in and no Wi-Fi network
-  stored comes up on the cable alone, and an image is updated over it like any other (`ota.py push`
-  to the cable's address; the update, its rollback and the rollback of a bad image were tried on the
-  kit, over the cable as well). By default the cable is used while it holds an address (its route
+  kit can sit on a PoE splitter with no USB cable: a board with the Ethernet cable in and no Wi-Fi network
+  stored comes up on wired alone, and an image is updated over it like any other (`ota.py push`
+  to the wired address; the update, its rollback and the rollback of a bad image were tried on the
+  kit, over wired as well). By default wired is used while it holds an address (its route
   priority is 200 against the station's 100; ESP-IDF's own number for Ethernet, 50, would have
-  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: a
-  cable pulled and put back four times moved the board to Wi-Fi within half a second and back to the
-  cable in 4 to 5 s. A PoE splitter itself is not yet tried.
+  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: the
+  Ethernet cable pulled and put back four times moved the board to Wi-Fi within half a second and back to
+  wired in 4 to 5 s. A PoE splitter itself is not yet tried.
 - **A stored network preference: `auto`, `ethernet` or `wifi`**, `GET` and `PUT /network-preference`
   (text, like `/name`) and `network.preference` in `GET /status`. `ethernet` and `wifi` pin the board to
   one interface and switch the other off, and a change is kept only once the interface it names holds
   an address, so a pin cannot cut a board off from the network it was asked over. `GET /status`'s
   `network` object keeps its four fields (the interface in use) and adds `interfaces`: each one's
-  link, address, MAC and, for the Wi-Fi, its SSID, signal and whether a network is stored; for the
-  cable, its speed and duplex. A diagnostics view or a control for the preference reads those and
-  nothing else. Improv asks about the Wi-Fi station alone, so a board on the cable still offers its
-  Wi-Fi form and joins the network it is given while the cable stays in use.
+  link, address, MAC and, for the Wi-Fi, its SSID, signal and whether a network is stored; for
+  wired, its speed and duplex. A diagnostics view or a control for the preference reads those and
+  nothing else. Improv asks about the Wi-Fi station alone, so a board on wired still offers its
+  Wi-Fi form and joins the network it is given while wired stays in use.
 - **The profile locks it.** `p4-rev3` locks `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y`, its hash
   moves, and its baseline is recorded again on the kit. The other profiles are unchanged. The Wi-Fi
   station is now its own file (`net/wifi/station.cpp`) that a board with the station alone builds
   through a thin adapter, the same code as before.
-  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-cable-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#wired-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
 
 **The ESP32-P4X panel's developer view**
 
 - **Three taps on the board's name in the footer open a screen of developer information; a tap
   closes it.** On the `p4-rev3` panel image only (it needs the touch screen), with the lyric and idle
-  screens as they were when it is shut. It shows the network (the interface in use, and for the cable
+  screens as they were when it is shut. It shows the network (the interface in use, and for wired
   and the radio the link, the address, the MAC, the SSID and the signal; the board's name, its mDNS
   name and the page's address), the configuration (profile and hash, firmware and slot, chip revision,
   clocks, output layout, uptime and reset reason, a stored core dump), the stream (the server, the
@@ -121,11 +700,60 @@ The sections below contain the complete change list and fixes.
   board's performance (both heaps, the panel's render time, the touch counters) and the console's last
   five lines, once a second (every two while a stream plays), with what is wrong in the accent colour. It never shows the Wi-Fi
   passphrase or the Sendspin pairing token.
-- **A control for the network preference, Auto, Ethernet or Wi-Fi**, which asks before it acts
-  ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address
+- **A control for the network preference, Automatic, Wired or Wi-Fi**, which asks before it acts
+  ("Use Wi-Fi only? Wired is switched off. The board is on wired now: this page's address
   changes to ...") and changes it with the call `PUT /network-preference` makes, with no restart.
   `GET :8081/panel` says whether the view is open (`dev_view`).
   ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-developer-view), planning/karaoke-p4x-panel.md, D10.)
+
+**A Hearth board: a rename without a restart, and reset routes**
+
+- **`PUT /name` takes effect at once.** The mDNS host name, the instance name and the `_sendspin._tcp`
+  record change with no restart, and a Sendspin server hears the new name in the player's hello: at
+  once on an idle board, and when the stream has ended on one that is playing, so that a rename never
+  cuts the music. The pairings are untouched (a pairing is the server's key and the board's key, not
+  its name). A name is now 1 to 32 bytes of well-formed UTF-8 with no control character in it and no
+  space at either end (`409` otherwise, as for one that was too long), and the host name spells a
+  Latin letter with an accent as the letter ("Café" is `cafe.local`).
+  ([Name, restart and reset](docs/hearth/sink-esp32-s3.md#name-restart-and-reset).)
+- **`POST /reset-preferences`** puts the choices a person made once back to their defaults, at once:
+  every entry of the preferences registry that says it is reset (what the screen shows without lyrics,
+  when it dims, the brightness, the clock's hours and seconds and the night schedule), each through its
+  own setter. It keeps the name, the Wi-Fi network, the
+  wired-or-Wi-Fi choice, the wiring, the layout, the time zone, the time server and the pairings.
+  **`POST /factory-reset`**, with the body `erase everything` and only on the board's own address or
+  name, erases the pairings, then every setting, then the Wi-Fi driver's own copy of the network, and
+  restarts the board as a new one. Both are listed in `GET /api`.
+- **Fixed with them:** `settings_forget()` kept the Wi-Fi network and the wired-or-Wi-Fi choice in
+  memory until the next restart, so a board that had just been told to forget them still used them.
+- In `libs/device`, and tested on the host: the rule for a name and the host name it answers to, with
+  the on-screen keyboard's keys (`device_name.hpp`); the NVS keys of the board's settings and which of
+  them a reset keeps (`settings_keys.hpp`); the words of the restart, the resets and the forgetting of
+  a paired server, with the button that is held for three seconds (`system_actions.hpp`); and the rows
+  of About (`about_view.hpp`).
+
+**The System group of the ESP32-P4X's Preferences sheet**
+
+- **Wired or Wi-Fi, the player's name, About, the paired servers, Restart, Reset preferences and Factory reset**
+  are entries of the preferences registry and pages of the sheet, at the size of the display they are on (the
+  preview checks 1024 by 600, 800 by 480, 480 by 320 and 320 by 240). The switch between wired and Wi-Fi
+  asks first in the developer view's words. The name is typed on a keyboard that offers only what the name's rule
+  accepts and the fonts can draw (the Latin subset, accents included), counted in bytes. About is the friendly
+  subset of the developer view. The paired servers are listed with a Forget on each, the one that plays included,
+  with a warning that the music stops. The factory reset asks twice: what is lost and whether the board stays
+  reachable (a wired network with a link, or no network and Improv over USB to bring it back), and then a button held for
+  three seconds. A board that cannot make a choice shows it greyed, with the reason.
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#on-the-screen).)
+
+**The choice of network reads Automatic, Wired or Wi-Fi everywhere**
+
+- **One word for the board's Ethernet port: "wired".** The Preferences row, its confirming card and
+  its result text, About, the developer view (its rows, its three buttons, its confirming step and the
+  "Switching to..." line), the idle screen, the device web page, the route listing (`GET /api`) and the
+  documentation said "cable" in some places, "Ethernet" in others and "auto" in a third; they say
+  "Wired", "Automatic" and "Wi-Fi" now, and "wired or Wi-Fi" in a sentence. The words a route takes
+  (`auto`, `ethernet`, `wifi`) are unchanged. A USB cable and the Ethernet cable a person plugs in are
+  still cables.
 
 **The Forge GUI, Hearth and Crucible open where they were left**
 
@@ -4147,6 +4775,8 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+- The ESP32-P4 kit screen now says, in its footer, that a coded stream is decoded on the board, its bitrate and which server sends it (`PCM from <server>` for PCM); `PUT /layout` is kept over a restart, so a board a server sends no layout to (Music Assistant) can show 5.1 or 7.1.4.
+
 **One vcpkg route, shared between checkouts**
 
 - **`cmake/VcpkgRoot.cmake` chooses the vcpkg checkout, and the presets no longer set the toolchain
@@ -4833,6 +5463,26 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**The Sendspin player sends `client/pair-init` on the Pairing PSK**
+
+- **A player now sends `client/pair-init` and then `client/pair-finalize`, as pairing.md requires.** It
+  sent the finalize alone, which aiosendspin 10.2.1 accepts and logs as non-compliant, and a strict
+  server would reject. The 9.1.1 dialect still sends the finalize alone, and Hearth's server already
+  accepts the init. A board takes the change when it is reflashed.
+
+**The ESP32-C6 on a 4 MB module has room for its player again**
+
+- **The 4 MB table (`partitions_c6.csv`) has two 1.875 MiB application slots, not 1.75, and no
+  `audio` or `storage` partition.** The C6's Sendspin image had grown from 86% of a slot in
+  September to 99.9% by 2026-10-20, and the changes after that (the cable, the time a board keeps
+  and its page, the title card, the burst player) took it 38,784 bytes past it: the build stopped at
+  its size check. `audio` and `storage` are the sample and the FAT volume the QEMU shapes and the
+  bare-metal demos play from flash, which the C6's player never reads, and they were 320 KB of the
+  4 MB. The project's CMake flashes each of them only when the table has it. The `c6-4mb` profile's
+  budget is the new slot, 1,966,080 bytes. A board moves to the table over USB, with one
+  `write-flash @flash_args` that keeps its NVS; none is known to be on this table (the C6 on the
+  bench has 16 MB), and a C6 with 16 MB of flash is not touched.
 
 **The Forge GUI's players play out what they queued**
 
@@ -6415,6 +7065,27 @@ The sections below contain the complete change list and fixes.
   coupling spectrum buffer (2,048 bytes, a member of every decoder) is made when a stream first
   uses enhanced coupling, as its second side was. Nothing a decode writes changes: the ac3 test binary's results are the same on the fixed tier (182 failing
   assertions of 3,721,493, the same ones as before) and all 1,011 cases pass on the double tier.
+- **Fixed: the TrueHD encoder sends each channel's own output shift and quantiser step.** One step for every channel was the smallest the whole
+  interval allowed, so a 5.1 programme whose L, R, Ls and Rs are 16-bit material and whose C and LFE use 24 bits sent the low 8 bits of four
+  channels for nothing: the 5.1 music of the DEE fixtures was 101,314 bytes, against FFmpeg's encoder's 63,254 and DEE's 58,688, and is 56,672
+  (0.896 and 0.966). A pair matrix is tried between rows with the same step only, and the downmix presentations keep one step. FFmpeg's strict
+  decode and the library's decoder return every sample (`libs/truehd/ERRATA.md` entry 90).
+- **Added: `tools/checks/compare_truehd_encoders.py` and `compare_truehd_decoders.py`, and the page [TrueHD against FFmpeg and DEE](docs/truehd-comparison.md).**
+  The first sizes forge's streams against FFmpeg's encoder's and DEE's (the 13 committed legs, programme material, a directory of WAV files), checks
+  that every stream counted decodes to the source, and fails the pull-request flow's FFmpeg job if forge is larger than either on a committed source.
+  The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
+  forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
+  says where forge is larger: 1.06 and 1.15 times FFmpeg's size at 192 kHz.
+- **Changed: the TrueHD encoder writes restart sync 0x31EB in substream 1 of every stream of two or more substreams.** It wrote 0x31EA there
+  for 3 to 6 channels, following the reference specification's exemption for the last substream of a presentation of at most 6 channels; every
+  retail stream seen carries 0x31EB there (the owner's 7.1 discs, and the 48 and 192 kHz 5.1 tracks of a UHD disc, which are the two-substream
+  layout of 2 and 6 channels the encoder now writes at 176.4 and 192 kHz). FFmpeg's strict decode takes either (`libs/truehd/ERRATA.md`
+  entry 97).
+- **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
+  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. The encoder
+  now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks
+  for and FFmpeg 8.0.1's strict decode refuses; FFmpeg's own encoder writes two, and its decode of forge's 192 kHz 5.1 programme is exact
+  (`libs/truehd/ERRATA.md` entry 90, provisional). The encoder fuzzer's 192 kHz cases, 10 of 110 failing before, pass (2,815 cases).
 
 ## [0.10.0-beta.1] - 2026-09-01
 

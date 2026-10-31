@@ -22,6 +22,10 @@
 // 48 kHz is 15,360 floats, about 61 KB. Per sample the work is a swap into a
 // ring and a float multiply, and an output at 0 dB with no delay costs
 // nothing. Tested on the host in libs/render/tests/test_trim_delay.cpp.
+//
+// A trim set with set_trim_db() is in force from the next sample; one set with ramp_trim_db() moves to its level
+// in a straight line over the next block that reaches the output, so a listener who steps a speaker's level
+// while a song plays hears the step and not a click.
 
 namespace iclforge::render {
 
@@ -80,6 +84,18 @@ class TrimDelay {
         }
         trim_db_[output] = db;
         gain_[output] = static_cast<float>(std::pow(10.0, db / 20.0));
+        shown_[output] = gain_[output];
+        return true;
+    }
+
+    // set_trim_db() for a trim that moves to its level over the next block that reaches the output, from the
+    // level it had. The same refusals.
+    bool ramp_trim_db(std::size_t output, double db) {
+        if (output >= outputs_ || !(db >= kMinTrimDb && db <= kMaxTrimDb)) {
+            return false;
+        }
+        trim_db_[output] = db;
+        gain_[output] = static_cast<float>(std::pow(10.0, db / 20.0));
         return true;
     }
 
@@ -107,11 +123,14 @@ class TrimDelay {
         return output < outputs_ ? delay_[output] : 0;
     }
 
+    // The linear gain an output's trim comes to (the level it moves to, for one that is ramping).
+    [[nodiscard]] float gain(std::size_t output) const { return output < outputs_ ? gain_[output] : 1.0F; }
+
     // Whether any output has a trim or a delay; process() changes nothing
     // when none has.
     [[nodiscard]] bool active() const {
         for (std::size_t o = 0; o < outputs_; ++o) {
-            if (delay_[o] != 0 || gain_[o] != 1.0F) {
+            if (delay_[o] != 0 || gain_[o] != 1.0F || shown_[o] != 1.0F) {
                 return true;
             }
         }
@@ -142,19 +161,25 @@ class TrimDelay {
     }
 
     // Whether any output has a delay: its line carries audio past the block that gave it.
-    [[nodiscard]] bool delayed() const {
+    [[nodiscard]] bool delayed() const { return delayed_outputs() != 0; }
+
+    // The outputs that have a delay (bit n for output n): the only ones that can carry audio in a block that no
+    // channel patched to them reached.
+    [[nodiscard]] std::uint32_t delayed_outputs() const {
+        std::uint32_t mask = 0;
         for (std::size_t o = 0; o < outputs_; ++o) {
             if (delay_[o] != 0) {
-                return true;
+                mask |= std::uint32_t{1} << o;
             }
         }
-        return false;
+        return mask;
     }
 
-    // Silence in every delay line, for a new stream; the settings stay.
+    // Silence in every delay line, for a new stream; the settings stay, and a ramp under way is over.
     void reset() {
         std::fill(storage_.begin(), storage_.end(), 0.0F);
         position_.fill(0);
+        shown_ = gain_;
     }
 
    private:
@@ -191,7 +216,16 @@ class TrimDelay {
             position_[o] = static_cast<std::uint32_t>(p);
         }
         const float g = gain_[o];
-        if (g != 1.0F) {
+        if (shown_[o] != g) {
+            // A straight line from the level it had to the level it has: the last sample of the block is the
+            // new level, and the next block starts there.
+            const float from = shown_[o];
+            const float step = (g - from) / static_cast<float>(n);
+            for (std::size_t k = 0; k < n; ++k) {
+                samples[k] *= from + (step * static_cast<float>(k + 1));
+            }
+            shown_[o] = g;
+        } else if (g != 1.0F) {
             for (std::size_t k = 0; k < n; ++k) {
                 samples[k] *= g;
             }
@@ -203,6 +237,8 @@ class TrimDelay {
     std::size_t max_delay_ = 0;
     std::array<double, kMaxOutputs> trim_db_{};
     std::array<float, kMaxOutputs> gain_ = unity();
+    // The gain in force at the end of the last block that reached the output: gain_, unless a ramp is under way.
+    std::array<float, kMaxOutputs> shown_ = unity();
     std::array<std::uint32_t, kMaxOutputs> delay_{};
     std::array<std::uint32_t, kMaxOutputs> position_{};
 };

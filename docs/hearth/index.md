@@ -10,24 +10,61 @@ audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group
 [Using the desktop player](desktop-player.md) walks through the window with a picture of each
 page. This page is the reference.
 
+!!! note "TrueHD and MLP are decoded here, and not passed through"
+    The desktop player decodes TrueHD and MLP (`.thd`, `.mlp`, and the TrueHD track of an MP4, Matroska or MPEG-TS file) and plays
+    the result as PCM, to this computer's outputs and to a network group. It does not send TrueHD to a receiver as it is (the
+    output decision says "Passthrough of TrueHD is not available"), no network sink is sent the coded stream, and Hearth for
+    Android and the ESP32 sinks do not take it. The decode is lossless and 24 bits wide, and what reaches the output is float32
+    through the operating system's mixer, so it is not a bit-exact path. How the work is staged is in the
+    [parity audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-hearth-player.md);
+    what the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is
+    [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
+
+    The audio library can now open the eight-channel MAT link for TrueHD (ALSA, PipeWire and WASAPI; Android has a bridge that has not
+    been built; Core Audio refuses it), and the output decision knows it. **Every platform is marked "not run"**: no receiver has
+    been played a MAT stream from any of them, and the player does not yet pack MAT bursts, so a TrueHD item is still decoded
+    whatever is chosen. The Output picker lists an output that opens the link as "TrueHD (MAT) opens, not run", and the reason line says so.
+    The decision also works out, for a TrueHD item that is decoded, which of the stream's own presentations the output's width calls for (8 or 6
+    channels, else stereo) as the owner's fallback chain says; the player does not apply it yet, and there is no transcode.
+
 ## The desktop player
 
 `hearth` runs on Windows, Linux, and macOS with a Qt 6.8 or later kit, and builds as the
-`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3` and `.ac4` elementary streams, and
-the first AC-3, E-AC-3 or AC-4 track of an MP4, Matroska or MPEG-TS file (`.mp4`, `.mkv`, `.ts`).
+`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3`, `.ac4`, `.thd` and `.mlp` elementary streams, and
+the first AC-3, E-AC-3, AC-4 or TrueHD track of an MP4, Matroska or MPEG-TS file (`.mp4`, `.mkv`, `.ts`).
 A container is told by its first bytes, not its name, and an MP4's edit list trims the priming and
-padding the encoder added. **Add folder…** lists those six kinds of file, and any file can be
+padding the encoder added. **Add folder…** lists those eight kinds of file, and any file can be
 added or dropped. The queue marks a file it cannot read as not playable, with the reason, when it
 reaches it, and skips it or stops there as Settings > Playback > **An item fails** says.
+
+A file with a TrueHD track first and an AC-3 or E-AC-3 track after it, as a Blu-ray remux has, plays the
+TrueHD track: it is the first track Hearth can play. The AC-3 or E-AC-3 track is listed in the Media page as
+another track of the file, and Hearth has no control yet to play it instead.
+
+TrueHD and MLP are decoded to the stream's own channels and rate (44.1 to 192 kHz, up to 8 channels of the
+2, 6 and 8 channel presentations) and placed on the output layout like any other bed: a layout that has a
+channel's speaker plays it exactly, and a channel the layout has no speaker for is panned between the speakers it has.
+A bare `.thd` or `.mlp` file is not read into memory; it is indexed once when it is opened, which reads the
+whole file, and then read as it plays. A TrueHD track in a container is demuxed from a copy of the whole file
+in memory, so a film's remux of tens of gigabytes is not something to open yet. A damaged unit plays as
+silence until the stream's next restart header; the This frame card shows the counts, and the diagnostics file adds them to the line of each item played.
+
+A TrueHD decoder can only join a stream at a unit that carries a major sync, and the encoder decides how
+often there is one (every 16 units, 13 ms, in FFmpeg's streams; every 128, 107 ms, by default in this project's
+encoder; at most every 4,096, 3.4 s). A seek goes back to the last of those before the place asked for, decodes forward
+and drops what comes before the place, so the audio starts in the unit that holds it, within a unit (0.83 ms) and not at the restart.
+What it costs is the decode of the part between, which is some 45 ms of work at the longest interval. Two TrueHD items of
+one rate join without a gap, and the sample count at the join is the exact length of the first item: whole units,
+less the padding its last unit counts.
 
 The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 
 | Page | What it holds |
 |---|---|
-| **Play** | The queue (add files or a folder, or drop them on the page), the transport bar (play and pause, stop, previous and next, a position scrubber, the Gapless toggle, volume), per-channel levels, BS.1770-4 loudness, the metadata of the frame being decoded, the Objects card for E-AC-3 with Atmos objects, and the signal path from decoder to output |
-| **Media** | What the decoder reads from a queued item: its stream, bitstream or presentation information and metadata, with **Copy** and **Export JSON…** |
+| **Play** | The queue (add files or a folder, or drop them on the page), the transport bar (play and pause, stop, previous and next, a position scrubber, the Gapless toggle, volume), per-channel levels, BS.1770-4 loudness, the metadata of the frame being decoded (for TrueHD, the substream, the dialogue normalisation word as sent, and the restarts, units that waited for one and lossless checks that failed so far), the Objects card for E-AC-3 with Atmos objects, and the signal path from decoder to output |
+| **Media** | What the decoder reads from a queued item: its stream, bitstream or presentation information and metadata, with **Copy** and **Export JSON…**. For a TrueHD or MLP item a Stream card gives the rate, the substreams and their channels, the access units, the bit rate and how often a decoder can join the stream |
 | **Speakers** | The speaker layout, the routing of each speaker to an output of the device, size, trim and delay per speaker, the bass-management crossover, and an identify tone |
-| **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab and an AC-4 tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame |
+| **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab, an AC-4 tab and a TrueHD and MLP tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame (a TrueHD change, at its next restart). The TrueHD tab chooses the presentation (best, or the 2, 6 or 8 channel one) and whether a failed check drops the unit (strict) or is counted and decoded on (lenient); it has no control for dialogue normalisation or dynamic range, which the stream carries and nothing applies |
 | **Network** | The Sendspin players found on the network, pairing, groups and their volumes, and each paired Hearth sink's own settings and firmware |
 | **Settings** | Playback, the network name and discovery, pairing records, appearance, language and diagnostics |
 | **Karaoke** | What a karaoke AC-3 or E-AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, which part each speaker carries, and the lyrics. See [Karaoke](#karaoke) |
@@ -513,8 +550,9 @@ at 360 MHz takes 2.0 and 5.1 in real time and states 6 channels
 ESP32-S3 with the 64 KB data cache takes 2.0 and states 2 channels and 25 frames a second
 ([on the S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). Neither decodes a
 presentation's objects, and the desktop player decodes what is past a sink's limits and sends it
-PCM. The published firmware images have the decoder off and list `ac3` and `eac3` alone, and an
-ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes as PCM.
+PCM. The published ESP32-P4 (v1.x and v3.x) and ESP32-S3 images carry the decoder and list `ac4` (since 2026-10-29; what it cost each
+board is measured in `planning/ac4-in-release-images.md`), and an ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4
+programmes as PCM.
 
 ## Where it runs
 
@@ -545,9 +583,9 @@ the build, the pairing, the screens and what has been run.
 
 ## What it does not do
 
-- **Send AC-4 as it is to a sink running a published firmware image.** Those images have no AC-4
-  decoder, so such a sink gets PCM decoded here; a board built with the decoder takes the stream
-  itself. [ESP32 sinks](#esp32-sinks) has the detail.
+- **Send AC-4 as it is to an ESP32-C6 running a published firmware image.** That image has no AC-4
+  decoder, so such a sink gets PCM decoded here; the P4 and S3 images take the stream
+  themselves. [ESP32 sinks](#esp32-sinks) has the detail.
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.
@@ -580,8 +618,12 @@ the build, the pairing, the screens and what has been run.
 - [An ESP32-C6 sink](sink-esp32-c6.md) — the stereo player on a part with no PSRAM.
 - [An ESP32-P4 sink](sink-esp32-p4.md) — the best tier, its two silicon generations and two images,
   and the lyric screen for a board with a panel.
+- [Speaker levels, distances and the test tone](sink-speakers.md) — what a sink does to each speaker
+  between the decoder and the DAC, and how to hear which speaker an output reaches.
 - [Sink firmware](sink-firmware.md) — install a published image, update over the network, and go
   back; or [install from the browser](sink-installer.md).
+- [Choosing the speaker layout of a sink](sink-layouts.md) — which layouts a board can take, and why
+  it cannot take the others.
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md) — decoder timing and memory measurements.
 - [AC-4](../concepts/ac4.md) and [AC-4 decoding and encoding](../library/ac4.md) — the format and
   the library's decoder.

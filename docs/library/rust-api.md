@@ -9,8 +9,10 @@ Two crates over [the C API](c-api.md), both in-tree under
 - `iclforge`: a safe wrapper with `Result` and `Option` in place of status codes and
   out-parameters, owned handles that free themselves on drop, and slices in place of raw pointers.
 
-The crates cover the C API's scope: AC-3, E-AC-3, Atmos (OAMD + JOC) and AC-4 (`iclforge::ac4`,
-below) — see [AC-4](ac4.md) for the wider C++ library both mirror a subset of.
+The crates cover most of the C API's scope: AC-3, E-AC-3, Atmos (OAMD + JOC) and AC-4 (`iclforge::ac4`,
+below) — see [AC-4](ac4.md) for the wider C++ library both mirror a subset of. The C API's TrueHD and MLP
+functions (`iclforge_truehd_*`) are declared in `iclforge-sys` and wrapped by nothing, and `build.rs` lists no
+`libs/truehd` path ([What is not wrapped](#what-is-not-wrapped)).
 
 Cargo is not part of the root CMake build, the same arrangement as `apps/demos/android` and Gradle. CI
 builds and tests the workspace on Linux, Windows and macOS (`build-rust` in

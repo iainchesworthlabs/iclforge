@@ -55,6 +55,9 @@ struct ImageHead {
     std::uint16_t max_rev_full = 0;
     std::uint8_t flash_size = 0;     // esp_image_flash_size_t: 2 is 4 MB, 4 is 16 MB
     bool hash_appended = false;      // the build appended the image's SHA-256
+    // esp_app_desc_t's secure_version (CONFIG_BOOTLOADER_APP_SECURE_VERSION): the floor an update
+    // from a release will not go under (planning/esp32-ota.md, O10). Not ESP-IDF's anti-rollback.
+    std::uint32_t secure_version = 0;
     std::string version;
     std::string project;
     std::string idf_version;
@@ -176,6 +179,7 @@ namespace detail {
     head.min_rev_full = detail::u16_at(bytes, 15);
     head.max_rev_full = detail::u16_at(bytes, 17);
     head.hash_appended = bytes[23] == 1;
+    head.secure_version = detail::u32_at(bytes, desc + 4);
     head.version = detail::text_at(bytes, desc + 16, 32);
     head.project = detail::text_at(bytes, desc + 48, 32);
     head.idf_version = detail::text_at(bytes, desc + 112, 32);

@@ -137,6 +137,19 @@ constexpr int kVisuallyImpaired = 0b010;
 }
 
 // Ac4Settings on one line, for describe().
+[[nodiscard]] std::string describe_truehd(const TruehdSettings& truehd) {
+    std::string_view presentation = "the best presentation";
+    switch (truehd.presentation) {
+        case iclforge::truehd::Presentation::kBest: break;
+        case iclforge::truehd::Presentation::k2ch: presentation = "the 2 channel presentation"; break;
+        case iclforge::truehd::Presentation::k6ch: presentation = "the 6 channel presentation"; break;
+        case iclforge::truehd::Presentation::k8ch: presentation = "the 8 channel presentation"; break;
+        case iclforge::truehd::Presentation::kAll: presentation = "every substream"; break;
+    }
+    return fmt::format("TrueHD: {}, {} checks, no dialogue normalisation or range compression",
+                       presentation, truehd.lenient ? "lenient" : "strict");
+}
+
 [[nodiscard]] std::string describe_ac4(const Ac4Settings& ac4) {
     std::vector<std::string> parts;
     if (ac4.presentation_id) {
@@ -222,6 +235,9 @@ DecoderSetup decoder_setup(const DecoderSettings& settings, const render::Output
     config.concealment = settings.concealment;
     ac3::render::configure_decoder(setup.serving, config);
     setup.ac4 = ac4_setup(settings, setup.serving);
+    setup.truehd.presentation = settings.truehd.presentation;
+    setup.truehd.strictness = settings.truehd.lenient ? iclforge::truehd::Strictness::kLenient
+                                                      : iclforge::truehd::Strictness::kStrict;
     return setup;
 }
 
@@ -311,6 +327,7 @@ std::string describe(const DecoderSettings& settings) {
     parts.emplace_back(settings.fast_inverse_transform ? "fast inverse transform"
                                                         : "reference inverse transform");
     parts.push_back(describe_ac4(settings.ac4));
+    parts.push_back(describe_truehd(settings.truehd));
     return joined(parts);
 }
 

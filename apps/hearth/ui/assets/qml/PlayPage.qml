@@ -122,7 +122,7 @@ Item {
         }
         var parts = [];
         var codec = { "ac3": qsTr("AC-3"), "eac3": qsTr("E-AC-3"), "ac3+eac3": qsTr("AC-3 core + E-AC-3"),
-                      "ac4": qsTr("AC-4") }[media.codec];
+                      "ac4": qsTr("AC-4"), "truehd": qsTr("TrueHD"), "mlp": qsTr("MLP") }[media.codec];
         var objectCount = media.probe?.objectCount;
         if (codec !== undefined) {
             // stream_kind_name() (hearth_controller.cpp) makes this same
@@ -257,7 +257,9 @@ Item {
                     // only, for this one row until then - the Media page's
                     // "Showing" picker reads the real table of contents.
                     readonly property string badge: modelData.codecBadge.length > 0 ? modelData.codecBadge
-                                                     : (/\.ac4$/i.test(modelData.path) ? "A4" : "")
+                                                     : (/\.ac4$/i.test(modelData.path) ? "A4"
+                                                        : (/\.thd$/i.test(modelData.path) ? "TH"
+                                                           : (/\.mlp$/i.test(modelData.path) ? "ML" : "")))
 
                     Accessible.role: Accessible.ListItem
                     Accessible.name: modelData.title
@@ -373,10 +375,10 @@ Item {
                     // both of its ends.
                     width: queueList.width
                     visible: queueList.count === 0
-                    // Names what item_loader.cpp reads: AC-3, E-AC-3 and
-                    // AC-4, raw or in an MP4, Matroska or MPEG-TS file, and
-                    // a folder of them.
-                    text: qsTr("Nothing in the queue.\nDrop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.")
+                    // Names what item_loader.cpp reads: AC-3, E-AC-3,
+                    // AC-4, TrueHD and MLP, raw or in an MP4, Matroska or
+                    // MPEG-TS file, and a folder of them.
+                    text: qsTr("Nothing in the queue.\nDrop AC-3, E-AC-3, AC-4, TrueHD or MLP files (raw, MP4, Matroska or MPEG-TS) or a folder here.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontBody
                     horizontalAlignment: Text.AlignHCenter
@@ -698,6 +700,38 @@ Item {
                         rowSpacing: Theme.gap / 2
 
                         StatTile {
+                            visible: HearthController.thisFrame.truehd === true
+                            label: qsTr("SUBSTREAM")
+                            value: HearthController.thisFrame.truehdSubstream !== undefined
+                                   ? qsTr("%1 · %n channels", "", HearthController.thisFrame.truehdChannels)
+                                         .arg(HearthController.thisFrame.truehdSubstream + 1)
+                                   : qsTr("—")
+                        }
+                        StatTile {
+                            visible: HearthController.thisFrame.truehd === true
+                            label: qsTr("DIALNORM")
+                            value: HearthController.thisFrame.truehdDialogueNorm !== undefined
+                                   ? qsTr("%1 (not applied)").arg(HearthController.thisFrame.truehdDialogueNorm)
+                                   : qsTr("—")
+                        }
+                        StatTile {
+                            visible: HearthController.thisFrame.truehd === true
+                            label: qsTr("RESTARTS")
+                            value: HearthController.thisFrame.truehdRestarts !== undefined
+                                   ? qsTr("%1 · %2 units waited")
+                                         .arg(HearthController.thisFrame.truehdRestarts)
+                                         .arg(HearthController.thisFrame.truehdUnitsWaiting)
+                                   : qsTr("—")
+                        }
+                        StatTile {
+                            visible: HearthController.thisFrame.truehd === true
+                            label: qsTr("LOSSLESS CHECKS")
+                            value: HearthController.thisFrame.truehdLosslessFailures !== undefined
+                                   ? qsTr("%1 failed").arg(HearthController.thisFrame.truehdLosslessFailures)
+                                   : qsTr("—")
+                        }
+                        StatTile {
+                            visible: HearthController.thisFrame.truehd !== true
                             label: qsTr("DIALNORM")
                             value: HearthController.thisFrame.dialnorm !== undefined
                                    ? Theme.ltrNumbers(qsTr("−%1 dB").arg(HearthController.thisFrame.dialnorm)) : qsTr("—")
@@ -782,7 +816,8 @@ Item {
         id: addFilesDialog
         title: qsTr("Add files")
         fileMode: FileDialog.OpenFiles
-        nameFilters: [qsTr("AC-3 / E-AC-3 / AC-4 (*.ac3 *.ec3 *.ac4)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("AC-3 / E-AC-3 / AC-4 / TrueHD / MLP (*.ac3 *.ec3 *.ac4 *.thd *.mlp)"),
+                      qsTr("MP4, Matroska and MPEG-TS (*.mp4 *.mkv *.ts)"), qsTr("All files (*)")]
         onAccepted: HearthController.addFiles(selectedFiles.map(function(u) { return HearthController.urlToLocalFile(u); }))
     }
 

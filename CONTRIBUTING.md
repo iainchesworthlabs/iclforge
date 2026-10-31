@@ -77,7 +77,7 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 12
+**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 17
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`, under `include/`), its sources (`src/`), its tests (`tests/`, a binary
 of their own: `ctest -L <name>`), its libFuzzer harnesses (`fuzz/`, with their seeds and the inputs
@@ -89,8 +89,9 @@ library's public headers declare into the namespace named for it under the famil
 into another library's namespace, or into `iclforge` itself.
 `libs/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `libs/ac4` is the
 AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
-`encoder`), and links nothing from `libs/ac3`.
-The two codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
+`encoder`), and links nothing from `libs/ac3`. `libs/truehd` is the TrueHD and MLP codec, in namespace
+`iclforge::truehd`, laid out by the same areas, and links only `libs/base`.
+The codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
 the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
 `Fixed32`, the project's own float functions and the SIMD seam), `libs/dsp` (the transforms more
 than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
@@ -325,7 +326,8 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    matrix actually encodes with, after a token that appeared only as an unrelated option's *value*
    produced a false pass. So a new layout, tool token or command needs a matching matrix entry in
    the same change, or CI says so — see that script's own header for what it does and does not
-   catch.
+   catch. It also requires a leg for each command whose usage names a TrueHD file, for each
+   `truehd-…=` option and for each option of the AC-4 content signature block.
 
    Both of those walk a *hand-enumerated* list of command lines against one bootstrap tone, so
    neither has any notion of option *combinations* or of the input material. The same job's
@@ -354,6 +356,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    Weaker than a decoder — two transcriptions can share a misreading — but they catch slips a
    self-consistent round trip cannot.
 5. **Dolby's Reference Player and Media Encoder**, for object-layer syntax.
+6. **Dolby's Online Delivery Kit tools** (`streamdemuxer`, `mp4drop`), for what the MP4, DASH, HLS and TS writers produce: free to download, run locally by the `tools/checks/check_dolby_*.py` scripts (which skip without them), never committed and never fetched by CI; see [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#dolbys-online-delivery-kit-tools).
 
 **AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4)
 and in `planning/ac4.md`. FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so
@@ -370,6 +373,15 @@ comparison, to MediaInfo's frame-by-frame reading and DEE's MP4 muxer
 (librempeg does not decode the one and refuses the other) or reads IEC 61937 bursts: for those,
 say so in the commit message and hold the change to the standard's own tables and formulas, as
 the tests there do.
+
+**TrueHD has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#truehd-and-mlp)
+and in `planning/truehd.md`. The codec is lossless, so FFmpeg's strict decode (flags as above) is held to the
+source sample for sample in both directions: its `truehd` and `mlp` encoders' streams through this decoder, and this
+encoder's streams through its decoder (`tools/checks/verify_truehd_interop.py`, `verify_truehd_encode_interop.py` and
+`verify_truehd_containers.py`). The syntax is transcribed a second time in `tools/references/truehd_syntax.py`, and
+`tools/references/truehd_writer.py` builds the streams no encoder writes. DEE's TrueHD streams of known sources are
+scored on the owner's machine only (`score_truehd_decode.py`). The specification the code follows is the owner's and is
+not in the tree: where it and a stream disagree, the reading taken goes in `libs/truehd/ERRATA.md`.
 
 **Object reconstruction has none of the four.** Dolby's tooling above verifies the object
 layer's *syntax*, not its audio: that decoder gates object decoding on a keyed authenticity tag
@@ -431,14 +443,16 @@ a mid-level developer who does not already know this audio domain.
 - `docs/performance-quality.md` and its trend pages own performance and quality reporting. Their
   client-side code reads append-only data from the `quality-history` branch. Preserve those page
   paths, element IDs, data names and branch-fed assets unless the data pipeline changes with them.
-- `CHANGELOG.md` records user-visible changes by release.
+- `CHANGELOG.md` records user-visible changes by release. A pull request never edits it: it adds
+  one `changelog.d/<slug>.<type>.md` per change (format in [`changelog.d/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/changelog.d/README.md)),
+  and the release assembles them, so two pull requests landing together cannot collide on it.
 - `ROADMAP.md` is the **status board** for in-flight, partial, proposed, blocked, and out-of-scope
   work. It uses plain-English names; do not allocate new numeric roadmap IDs (`EQ1`, `UX12`, …).
   Legacy IDs at the bottom of `ROADMAP.md` resolve old PR references only.
 - Product index pages (`docs/*/index.md`) and [`docs/library/capabilities.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md)
   state **what ships today**.
 - Detailed implementation decisions belong in [`planning/`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning)
-  or a product's `design/` record. When a plan lands, update CHANGELOG and the product index; trim
+  or a product's `design/` record. When a plan lands, add its changelog fragment and update the product index; trim
   the roadmap row; leave or mark the plan superseded ([`planning/SUPERSEDED.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/SUPERSEDED.md)).
 
 **Each product page set follows one shape.** An `index.md` opens with a status callout (what's

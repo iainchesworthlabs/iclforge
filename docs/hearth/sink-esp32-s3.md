@@ -49,30 +49,32 @@ over its network afterwards. Then continue at [The page](#the-page).
 **To build it yourself,** in an ESP-IDF v6.1 terminal, from `firmware/hearth-sink`:
 
 ```bash
-export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast"
+export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache"
 idf.py set-target esp32s3
 idf.py build
 idf.py -p PORT flash monitor
 ```
 
 In PowerShell, set the first line as `$env:SDKCONFIG_DEFAULTS = "..."`. `PORT` is the board's
-serial port, such as `COM5` or `/dev/ttyACM0`. The four files over the defaults do this:
+serial port, such as `COM5` or `/dev/ttyACM0`. The files over the defaults do this:
 
 | File | What it sets |
 |---|---|
 | `sdkconfig.hw` | The console on the S3's own USB connector, so one cable does everything |
 | `sdkconfig.psram` | Octal PSRAM for the decoder's large allocations and the player's ring, a deeper I2S queue, and a 32 KB instruction cache |
 | `sdkconfig.sendspin` | The Sendspin player on Wi-Fi, the page and the REST routes on port 80, nothing played at boot, and lwIP's task on core 0 beside the network |
+| `sdkconfig.psram-4k` | PSRAM tried first for every allocation of 4 KB and more, so that an E-AC-3 stream leaves the board 44 KB of internal RAM at its least where 16 KB left it a few hundred bytes |
+| `sdkconfig.ac4` | The AC-4 decoder, both decode stacks at 40,960 bytes (in PSRAM on this part), a frame's per-channel stages on both cores |
 | `sdkconfig.s3-fast` | The flash read four bits a clock (QIO), 64-byte lines in the data cache, and the firmware's code and constants run from PSRAM |
+| `sdkconfig.s3-dcache` | A 64 KB data cache, which is 32 KB of the heap |
 
 The QIO mode is the second stage bootloader's, so a board takes it with one USB flash that
 includes its bootloader (`idf.py flash` does); a network update leaves the mode the board has, and a
 bootloader that cannot set the flash chip's quad-enable bit stays in DIO.
 
-AC-4 is another file over those, `sdkconfig.ac4`, put before `sdkconfig.s3-fast`, and a fifth,
-`sdkconfig.s3-dcache`, after it: a 64 KB data cache, which is 32 KB of the heap (an AC-4 play with
-Wi-Fi up has 31 KB of internal RAM left at its least, from 64; an image without the AC-4 decoder
-does not have it to give, and the cache does nothing for AC-3 and E-AC-3). With all of them the part
+Since 2026-10-29 the published image has all of them: one image decodes AC-3, E-AC-3 and AC-4. The 64 KB data cache costs 32 KB of
+the heap (the board boots with 75 KB of internal RAM free in place of 110) and the allocation limit stays at 4 KB, so an E-AC-3 stream
+leaves 44 KB and an E-AC-3 JOC 7.1.4, 9.1.6 or 5.1.4 play 60 KB at the end of its lap; an AC-4 play takes 512 for itself. With all of them the part
 decodes 2.0 in real time (SIMPLE mode at 0.40 of a frame's duration, A-SPX at 0.50, with the
 decoder's second core), the frame-rate converter at every rate (0.67 to 0.87) and E-AC-3 7.1.4
 (0.75), and 5.1 in SIMPLE mode at 0.99; the rest of 5.1 takes 1.25 to 1.44 and 5.1.4 2.28 to 2.69.
@@ -132,13 +134,69 @@ network the same way.
   board keeps, whether it asks a time server (on by default), its time zone and the server to ask
   ([the time of day](sink-esp32-p4.md#the-time-of-day)). A choice is sent as it is made; a name, a
   layout typed in full, a network, a zone or a server is sent with its button.
+- **Levels and distances:** a level and a distance for each speaker of the layout, and a test tone
+  out of each ([Speaker levels, distances and the test tone](sink-speakers.md)).
 - **Real time**, **Hardware** and **Counters:** how long each frame takes, what the board is -
   chip, memory, the sink's ceiling and the firmware - and the player's counters.
 
 The same routes answer without the page (`GET /api` lists them): `GET /status` for a script, and
-`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is. A
-new name is advertised from the board's next restart. The page and the routes have no password
-([Security](#security)).
+`PUT /name`, `/layout`, `/slot-width`, `/wiring` and `/network` to change what the board is, and
+`GET` and `PUT /trim` and `POST /identify` for the speakers' levels and the test tone. A
+new name is advertised at once ([Name, restart and reset](#name-restart-and-reset)). The page and
+the routes have no password ([Security](#security)).
+
+## Name, restart and reset
+
+**The name.** A board is called `hearth-` and the last six hex digits of its MAC address until you
+name it, with the page's *Name* field or `PUT /name`. A name is 1 to 32 bytes of text (a letter with
+an accent is two) with no control character in it and no space at either end; the board answers
+`409` to anything else, and keeps the name it had. **A rename takes effect at once, with no
+restart:**
+
+| What | What a rename does |
+|---|---|
+| mDNS | The host name (`<name>.local`: lower case, a hyphen between words, a Latin letter with an accent as the letter it is spelt with, so "Café" is `cafe`), the instance name and the `_sendspin._tcp` record all change. |
+| The servers | The name in the player's hello changes. An idle board tells its servers to dial again and they list it under the new name; a board that is playing waits until the stream has ended, so that a rename never cuts the music. |
+| The page, the screen's footer, Improv | Their next draw or request reads it. |
+| The pairings | **Nothing.** A pairing is the server's key and the board's own key, not the name, so every server stays paired. |
+| The router's list of clients | The name the board gave DHCP changes at its next boot; an address already leased keeps the old name until then. |
+
+A name that a person gave the player on the server (Music Assistant keeps its own) is not changed.
+
+**Restart.** `POST /restart` restarts the board into the image that runs now, after telling its
+servers it is going. It is refused (`409`) while an update is under way, and while the running
+image is still on trial, when a restart would go back to the image before it. On the ESP32-P4 it
+resets the whole system, which a Wi-Fi link behind the companion chip needs
+([An ESP32-P4 sink](sink-esp32-p4.md#name-restart-and-reset)).
+
+**Reset preferences.** `POST /reset-preferences` puts the choices a person made once back to their
+defaults, at once and with no restart: every entry of the board's preferences that says it is reset
+(what the screen shows without lyrics, when it dims, the brightness, the clock's hours and seconds and
+the night schedule; an entry added later says for itself),
+each through its own setter, so the screen and the clock follow as they follow a change. **It keeps**
+the name, the Wi-Fi network and the choice between wired and Wi-Fi, the DAC wiring, the
+speaker layout and the time zone (the room's, not a matter of taste), the time server and whether
+the board asks it, and the pairings. On a board with a
+screen the same thing is *Reset preferences* on the sheet
+([An ESP32-P4 sink](sink-esp32-p4.md#on-the-screen)).
+
+**Factory reset.** `POST /factory-reset` with the body `erase everything` erases the paired servers
+(the board gets a new identity, so each server has to pair with it again, and has to remove it from
+its list first), then every setting (the name, the network and its passphrase, the wiring, the
+layout and the preferences), then the Wi-Fi driver's own copy of the network, and restarts the board
+as a new one. It is taken only for a request that names the board by its own address or name, as the
+firmware routes are.
+
+**A board on Wi-Fi alone has no network after a factory reset.** It cannot be reached to be told
+one. Connect it to a computer with a USB cable and give it a network over Improv, as
+[Join a network](#join-a-network) says. A board with a wired network (the ESP32-P4X kit) stays on it and
+asks the router for an address again. An image built with a Wi-Fi network of its own (a development
+build; no published image has one) joins that network again.
+
+```bash
+curl -X POST http://hearth-1a2b3c.local/reset-preferences
+curl -X POST -d "erase everything" http://hearth-1a2b3c.local/factory-reset
+```
 
 ## Pair a server
 
@@ -230,6 +288,28 @@ within 0.25 dB for as coded, aware, and capable with a vocal, with none, and wit
 and a vocal moved. One E-AC-3 run of three missed the part-level case and is not explained.
 Run it with `ICLFORGE_HEARTH_LIVE_KARAOKE_SINK=<the board's mDNS name>` and the tests named
 `network sinks live: ... karaoke stream is reproduced by the board that decodes it`.
+
+## Late night
+
+A film's loud passages and its quiet ones can be a long way apart, and at night the neighbours hear the first
+and you cannot hear the second. The streams the board decodes carry the mixer's own instructions for closing that
+distance, and the board has a setting that uses them: `GET` and `PUT /dynamic-range`, `standard` or `late-night`.
+
+- **`standard`** is what the board always did, and the default: AC-3 and E-AC-3 as the build's operating mode (line, so
+  dialogue is brought to the -31 dBFS reference and the stream's `dynrng` words are applied), AC-4 as coded, and
+  whatever a server sends for the decoder.
+- **`late-night`** applies the stream's heavy compression (the `compr` words of AC-3 and E-AC-3, the speaker DRC
+  modes of AC-4) at the same level dialogue was heard at, so that switching it on moves no stream by its dialnorm. It
+  is *not* RF mode, which would be 11 dB louder. It is the listener's choice at the board, and it wins over a server's
+  decoder mode and compression settings for as long as it is on.
+
+It changes the next stream, not the one that is playing, and it is kept over a restart. It can only be as strong as
+the stream's own words: a stream that carries no `compr` word decodes exactly as it does in `standard`, and PCM from
+Music Assistant has no such words at all. On a stream with them, the loud-to-quiet distance of the test stream fell
+from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). A board with a screen offers the choice as *Late night* under *Preferences*, in the Sound group, greyed with the
+reason where the build has no player; *Reset preferences* puts it back on `standard`. Every board with a Sendspin player
+answers the route; a board with no AC-4 decoder (the C6) is sent PCM for AC-4 and so has nothing to compress there.
+What was measured, and what was not, is in `planning/hearth-late-night.md`.
 
 ## Groups
 

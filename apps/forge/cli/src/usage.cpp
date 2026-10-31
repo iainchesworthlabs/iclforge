@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 112> kOptionTokens{{
+constexpr std::array<OptionToken, 156> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -50,6 +50,26 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
+    {"sign-content", "ac4-encode/atmos-encode: sign the AC-4 file with the operator's own key and chain (needs content-key=, content-chain=)"},
+    {"verify-content", "decode/ac4-verify: refuse unless the AC-4 content signature, its chain and an anchor all check, and the signer information is as CS spec 5.3 asks (a 128 byte nonce, a publisher UUID, and one of the expect-publisher-uuid= accounts if any are given)"},
+    {"check-content", "decode/ac4-verify: print what the AC-4 content signature checks find and carry on; the certificates are judged at the signed date unless verify-time= says otherwise"},
+    {"unanchored-ok", "with verify-content: accept a signature that checks out against a chain no trust-anchor= or pin= vouches for"},
+    {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
+    {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
+    {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
+    {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
+    {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
+    {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now, which is what CS spec 5.3 asks for; another date is warned about)"},
+    {"publisher-uuid=", "ac4-sign/sign-content: the UUID of your publisher account, written as the signature's publisherUUID (CS spec 5.3: an account's UUID, not in the signing certificate; it must be a UUID, and without it a warning)"},
+    {"expect-publisher-uuid=", "decode/ac4-verify: a publisher account UUID to accept; repeat for more. A signature naming another is a finding in ac4-verify and a refusal with verify-content; without it the UUID is only reported"},
+    {"publisher-name=", "ac4-sign/sign-content: your legal or trade name, written as the signature's publisherName"},
+    {"product-id=", "ac4-sign/sign-content: your product identifier, a whole number (default 0)"},
+    {"product-name=", "ac4-sign/sign-content: the product name associated with the signing credentials"},
+    {"wrapper-name=", "ac4-sign/sign-content: the name of the PACE wrapper binary, if one is in use"},
+    {"os-name=", "ac4-sign/sign-content: the operating system of the signing host, written as the signature's osName"},
+    {"os-version=", "ac4-sign/sign-content: the operating system version of the signing host"},
+    {"os-description=", "ac4-sign/sign-content: a description of the operating system of the signing host"},
+    {"verify-time=", "when every certificate must be valid: now (default; signed for check-content), signed, ignore, or YYYY-MM-DDTHH:MM:SS UTC"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"karaoke", "decode/monitor: an AC-3 or E-AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
@@ -60,6 +80,7 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"karaoke-v2=", "decode/monitor: the capable decoder's V2 level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
+    {"strict", "decode: exit 2, after writing what could be decoded, when any frame or unit was lost after the first one decoded (AC-4 frames waiting for an I-frame, concealed units, TrueHD units a lenient decode dropped); without it such a decode exits 0 and warns"},
     {"quiet", "no status output at all - errors and the payload only"},
     {"verbose", "print the stderr progress line whatever the run's length"},
     {"drc=", "§7.7.1 DRC profile (encode) or partial-compression scale (decode)"},
@@ -80,7 +101,7 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"numblkscod=", "atmos* encode: 0-3 (default 3), §E2.3.1.4 short syncframes of 1/2/3/6 blocks"},
     {"search=", "AC-3 encode, and eac3-encode under CBR: bit-allocation search, off (default)"},
     {"fgaincod=", "encode: auto (default) or 0..7, §7.2.2.4 fast gain pinned for the whole encode"},
-    {"verify", "eac3-encode: decode every access unit as it's encoded and diff against it"},
+    {"verify", "eac3-encode and truehd-encode: decode every access unit as it's encoded and diff against it"},
     {"channels=", "decode/monitor: 2 or 1 apply the §7.8 output stage; as-coded (default) is a no-op; "
                   "decode of AC-4: 5.1 folds a 7.X stream to 5.X"},
     {"ltrt-phase=", "decode/monitor: off skips §7.8.2's real 90° surround phase shift"},
@@ -89,6 +110,29 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"dialogue-enhancement=", "decode of AC-4: raise the dialogue by 0 to 12 dB, capped by the stream"},
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
+    {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all; qc: the presentation the preset gates judge, best, 2ch, 6ch or 8ch"},
+    {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
+    {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
+    {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
+    {"truehd-peak-rate=", "truehd-encode: the rate the stream is declared not to exceed, kbit/s (default 18000)"},
+    {"truehd-rate-check=", "truehd-encode: strict (the default) refuses a stream that cannot be sent within the peak rate; lenient writes it and counts"},
+    {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
+    {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
+    {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
+    {"truehd-dialnorm-2ch=", "truehd-encode and metadata: the 2 channel presentation's dialogue norm, 0 to 63 (TH spec 12.5; provisional, no oracle until the DEE set)"},
+    {"truehd-dialnorm-6ch=", "truehd-encode and metadata: the 6 channel presentation's dialogue norm, 0 to 31 (-n dBFS; provisional)"},
+    {"truehd-dialnorm-8ch=", "truehd-encode and metadata: the 8 channel presentation's dialogue norm, 0 to 31 (-n dBFS; provisional)"},
+    {"truehd-mix-level-2ch=", "truehd-encode and metadata: the 2 channel presentation's mix level, 0 to 63 (no unit given; provisional)"},
+    {"truehd-mix-level-6ch=", "truehd-encode and metadata: the 6 channel presentation's mix level, 0 to 63 (provisional)"},
+    {"truehd-mix-level-8ch=", "truehd-encode and metadata: the 8 channel presentation's mix level, 0 to 63 (provisional)"},
+    {"truehd-source-format-6ch=", "truehd-encode and metadata: the 6 channel presentation's source format, 0 to 31 (no table given; provisional)"},
+    {"truehd-source-format-8ch=", "truehd-encode and metadata: the 8 channel presentation's source format, 0 to 63 (provisional)"},
+    {"truehd-control-2ch=", "truehd-encode and metadata: on or off, the 2 channel presentation's control-enabled bit (what it gates is not given; provisional)"},
+    {"truehd-control-6ch=", "truehd-encode and metadata: on or off, the 6 channel presentation's control-enabled bit (provisional)"},
+    {"truehd-control-8ch=", "truehd-encode and metadata: on or off, the 8 channel presentation's control-enabled bit (provisional)"},
+    {"truehd-heavy-drc-start-up-gain=", "truehd-encode and metadata: the heavy DRC start-up gain, -32 to 31 (TH spec 12.3; provisional)"},
+    {"truehd-drc-start-up-gain=", "truehd-encode and metadata: the DRC start-up gain, -64 to 63 (TH spec 12.3; provisional)"},
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
@@ -165,7 +209,7 @@ constexpr std::array<OptionToken, 112> kOptionTokens{{
                "transcoding to AC-3 or falling back to decoded PCM"},
     {"preset=", "qc: gate the measurement against a named delivery spec"},
     {"json=", "probe: emit the JSON document instead of the human table"},
-    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail"},
+    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure or format"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
     {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
                "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
@@ -495,6 +539,49 @@ void print_decode_topic() {
     fmt::println("       E-AC-3 stream's objects, has no karaoke bed, and says so.");
 }
 
+void print_truehd_topic() {
+    fmt::println("");
+    fmt::println("TrueHD and MLP: the stream decides, bare or in Matroska, MP4 or a transport");
+    fmt::println("       stream. decode, levels and loudness read the best presentation the");
+    fmt::println("       stream has, or the one truehd-presentation=best|2ch|6ch|8ch|all names,");
+    fmt::println("       and stop at the first failed check unless truehd-check=lenient counts");
+    fmt::println("       them. truehd-encode codes a WAV losslessly, as set by");
+    fmt::println("       truehd-downmix=none|standard,");
+    fmt::println("       truehd-downmix-gains=<C,Ls/Rs,LFE,Lrs/Rrs in dB>,");
+    fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
+    fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
+    fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
+    fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
+    fmt::println("       the input.");
+    fmt::println("       truehd-encode also writes the stream's channel meaning (TH spec 14) into");
+    fmt::println("       every major sync, per presentation: truehd-dialnorm-2ch|6ch|8ch=,");
+    fmt::println("       truehd-mix-level-2ch|6ch|8ch=, truehd-source-format-6ch|8ch=,");
+    fmt::println("       truehd-control-2ch|6ch|8ch=on|off, truehd-heavy-drc-start-up-gain= and");
+    fmt::println("       truehd-drc-start-up-gain=, each refused by name outside its field's");
+    fmt::println("       width. Left out, a field is 0 (and a control bit off), as in FFmpeg's");
+    fmt::println("       streams. metadata takes the same options and sets them in a finished");
+    fmt::println("       stream: it rewrites every major sync and its CRC and copies everything");
+    fmt::println("       else, so the audio is the same sample for sample. normalize measures");
+    fmt::println("       each presentation's loudness (BS.1770-5) and writes its dialogue norm,");
+    fmt::println("       round(-LKFS) from 1 to 31 as E-AC-3's does; no gain is applied, since");
+    fmt::println("       the stream is lossless, only the field changes. PROVISIONAL, no oracle");
+    fmt::println("       until the DEE set: the units, which presentation applies when and what a");
+    fmt::println("       control bit gates are open (libs/truehd/ERRATA.md, questions 51 to 55).");
+    fmt::println("       A TrueHD or MLP run does not apply the other options (the output stage,");
+    fmt::println("       DRC, programmes, objects, metadata, sources, signatures) and refuses them");
+    fmt::println("       by name with a usage error instead of accepting and dropping them; a");
+    fmt::println("       verification flag such as verify-content never succeeds without verifying.");
+    fmt::println("       fast-mdct, fast-imdct and mode= choose a transform, which TrueHD has not,");
+    fmt::println("       and are warned about. qc gates a TrueHD or MLP stream's integrity (the");
+    fmt::println("       lossless check of every restart interval, the check nibbles, CRCs and");
+    fmt::println("       parity, and TH spec section 18's data rate against the peak rate the");
+    fmt::println("       stream declares) and meters each presentation, shows the dialogue norm");
+    fmt::println("       it carries beside the measurement, and judges preset= on the presentation");
+    fmt::println("       truehd-presentation= names (the largest by default); exit 6 when a gate");
+    fmt::println("       fails. cut, cat, transcode, fmp4, play and monitor do not read TrueHD or");
+    fmt::println("       MLP and say so.");
+}
+
 void print_ac4_decode_topic() {
     fmt::println("");
     fmt::println("AC-4 (decode, monitor, play, qc, levels, loudness, transcode): a stream of");
@@ -689,6 +776,10 @@ void print_probe_topic() {
     fmt::println("       each presentation (id, name, language, level, channels, substreams)");
     fmt::println("       and the selected one's dialnorm, loudness, DRC modes, dialogue");
     fmt::println("       enhancement and stereo downmix values.");
+    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
+    fmt::println("       the substreams and their channels, and how many segments pass their");
+    fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
+    fmt::println("       it has no such dump, and detail=evolution, structure and format are its own.");
 }
 
 void print_mkv_topic() {
@@ -755,6 +846,30 @@ void print_objects_topic() {
     fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
+void print_content_signature_topic() {
+    fmt::println("");
+    fmt::println("An AC-4 content signature is one signature over the whole stream, made with the");
+    fmt::println("operator's own P-256 key and certificate chain and written after the last sync");
+    fmt::println("frame; the frames are not touched, so a signed file plays as the unsigned one.");
+    fmt::println("Nothing signs or checks unless asked: ac4-sign, sign-content, ac4-verify,");
+    fmt::println("verify-content and check-content are the asking. The key and the chain are");
+    fmt::println("the operator's (content-key=, content-chain=, or ICLFORGE_CONTENT_KEY_FILE /");
+    fmt::println("ICLFORGE_CONTENT_KEY and ICLFORGE_CONTENT_CHAIN_FILE) and are never stored.");
+    fmt::println("A signature that checks out against a chain no trust-anchor= or pin= vouches");
+    fmt::println("for is reported as that, not as valid. Every certificate must be valid when");
+    fmt::println("the file is checked (ac4-verify, verify-content) unless verify-time= says");
+    fmt::println("otherwise; check-content judges them at the date the signer wrote, which is");
+    fmt::println("only as good as the signer. A signature names its publisher (publisher-uuid=,");
+    fmt::println("publisher-name=), product and platform, as CS spec v2.6 section 5.3 describes;");
+    fmt::println("ac4-verify reports them, and verify-content also refuses a nonce that is not");
+    fmt::println("128 bytes and a publisher UUID that is missing, or that is none of the");
+    fmt::println("accounts expect-publisher-uuid= names (the UUID is not in the signing");
+    fmt::println("certificate, so without it nothing is compared). Only a raw .ac4 stream is");
+    fmt::println("signed; an MP4 is refused (section 8.3.2 puts it out of scope). This is not");
+    fmt::println("an object signature (sign-objects is E-AC-3's); see");
+    fmt::println("docs/concepts/object-signing.md.");
+}
+
 // The per-topic sections, in the order both the full listing and a single
 // command's help print them. One table, so the two orders cannot diverge.
 struct TopicSection {
@@ -762,7 +877,7 @@ struct TopicSection {
     void (*print)();
 };
 
-constexpr std::array<TopicSection, 18> kTopicSections{{
+constexpr std::array<TopicSection, 19> kTopicSections{{
     {topic::kStdio, print_stdio_topic},
     {topic::kLive, print_live_topic},
     {topic::kPlay, print_play_topic},
@@ -777,6 +892,7 @@ constexpr std::array<TopicSection, 18> kTopicSections{{
     {topic::kTs, print_ts_topic},
     {topic::kDecode, print_decode_topic},
     {topic::kAc4Decode, print_ac4_decode_topic},
+    {topic::kTruehd, print_truehd_topic},
     {topic::kAc4Encode, print_ac4_encode_topic},
     {topic::kQc, print_qc_topic},
     {topic::kProbe, print_probe_topic},
@@ -791,6 +907,9 @@ void print_topic_sections(std::uint32_t mask) {
     }
     if ((mask & topic::kObjects) != 0) {
         print_objects_topic();
+    }
+    if ((mask & topic::kContentSignature) != 0) {
+        print_content_signature_topic();
     }
 }
 
@@ -1014,6 +1133,55 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("                    substream headers and each frame's object layer");
         fmt::println("  detail=blocks     the same, plus every block's coding tools and");
         fmt::println("                    exponent strategies - what a codec bug report needs");
+        fmt::println("  detail=evolution  TrueHD and MLP: the structure of the evolution frames in the");
+        fmt::println("                    extra data (container fields, payload ids and sizes, shapes,");
+        fmt::println("                    a walk of any Thrift payload by field id and type)");
+        fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
+        fmt::println("                    headers, a decode check, what follows each last block");
+        fmt::println("  detail=format     both; metadata only, no content");
+    }
+    if ((mask & topic::kContentSignature) != 0) {
+        fmt::println("");
+        fmt::println("AC-4 content signature options (ac4-sign, ac4-verify, ac4-encode, atmos-encode, "
+                     "decode; any order, after the positional arguments):");
+        fmt::println("  sign-content      ac4-encode/atmos-encode: sign the file once it is written; "
+                     "needs content-key= and content-chain=");
+        fmt::println("  verify-content    decode: stop (exit 2) unless the signature, its chain and an "
+                     "anchor all check; ac4-verify exits 6 for the same. Also refuses a signer "
+                     "nonce that is not 128 bytes and a publisher UUID that is missing or that is "
+                     "none of the expect-publisher-uuid= accounts (CS spec v2.6 section 5.3)");
+        fmt::println("  check-content     decode: report what the checks find and play on; the "
+                     "certificates are judged at the signed date unless verify-time= says otherwise");
+        fmt::println("  unanchored-ok     with verify-content: a signature that checks out but whose "
+                     "chain reaches no trust-anchor= or pin= also passes; it is still reported as "
+                     "unanchored, never as valid");
+        fmt::println("  content-key=<path>    the operator's private key, P-256, PEM or DER (or "
+                     "ICLFORGE_CONTENT_KEY_FILE / ICLFORGE_CONTENT_KEY)");
+        fmt::println("  content-chain=<path>  the certificates for that key, as a bundle; repeat it "
+                     "for more (or ICLFORGE_CONTENT_CHAIN_FILE)");
+        fmt::println("  trust-anchor=<path>   a certificate to trust as the top of the chain; repeat "
+                     "for more");
+        fmt::println("  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) "
+                     "fingerprint, trusted wherever it appears in the chain");
+        fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "
+                     "Code/Content Signer)");
+        fmt::println("  signed-date=<YYYY-MM-DDTHH:MM:SS>  the date a new signature records, UTC "
+                     "(default now, the time of signing that CS spec v2.6 section 5.3 asks for; "
+                     "another date is warned about)");
+        fmt::println("  publisher-uuid=<UUID>   ac4-sign, sign-content: the UUID of your publisher "
+                     "account (section 5.3), which is not in the signing certificate; without it a "
+                     "warning, and verify-content refuses the result");
+        fmt::println("  expect-publisher-uuid=<UUID>  ac4-verify, decode: a publisher account to "
+                     "accept; repeat for more. A signature naming another is a finding, and a "
+                     "refusal with verify-content; without it the UUID is only reported");
+        fmt::println("  publisher-name=<text>   your legal or trade name");
+        fmt::println("  product-id=<n>, product-name=<text>, wrapper-name=<text>   the product and, "
+                     "if one is used, the PACE wrapper (product-id defaults to 0)");
+        fmt::println("  os-name=<text>, os-version=<text>, os-description=<text>   the operating "
+                     "system of the signing host, for whoever audits the signature");
+        fmt::println("  verify-time=now|signed|ignore|<YYYY-MM-DDTHH:MM:SS>");
+        fmt::println("                    when every certificate must be valid; now is the default "
+                     "(signed for check-content), signed uses the date the signer wrote");
     }
 }
 
@@ -1088,7 +1256,7 @@ void print_exit_codes() {
     fmt::println("     configuration the encoder cannot express (an illegal bitrate for a");
     fmt::println("     layout, more objects than a stream can carry). Retrying the same command");
     fmt::println("     line cannot help.");
-    fmt::println("  {}  input: the input could not be read, or is not a valid AC-3/E-AC-3/AC-4/WAV/",
+    fmt::println("  {}  input: the input could not be read, or is not a valid AC-3/E-AC-3/AC-4/TrueHD/WAV/",
                  kExitInput);
     fmt::println("     ADM file, or stopped decoding part-way.");
     fmt::println("  {}  output: the destination could not be created, written or finalized.",
@@ -1112,7 +1280,7 @@ void print_exit_codes() {
 
 void print_meta_usage() {
     print_option_blocks(topic::kMeta | topic::kMulti | topic::kTake | topic::kLive | topic::kQc |
-                        topic::kProbe);
+                        topic::kProbe | topic::kContentSignature);
     print_common_options();
 }
 
@@ -1127,7 +1295,8 @@ void print_command_index(std::span<const CommandInfo> commands) {
 
 void print_usage(std::span<const CommandInfo> commands) {
     fmt::println("Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and "
-                 "AC-4 (ETSI TS 103 190) encoder/decoder");
+                 "AC-4 (ETSI TS 103 190) encoder/decoder, and a TrueHD / MLP lossless "
+                 "encoder/decoder");
     fmt::println("");
     print_command_index(commands);
     print_unavailable_reasons(commands);
@@ -1164,7 +1333,8 @@ void print_man_page(std::span<const CommandInfo> commands) {
                  roff_escape(iclforge::ac3::version_full));
     fmt::println(".SH NAME");
     fmt::println("forge \\- clean\\-room AC\\-3 / E\\-AC\\-3 (ATSC A/52) and AC\\-4 (ETSI TS 103 190) "
-                 "encoder, decoder and Atmos object tool");
+                 "encoder, decoder and Atmos object tool, and a TrueHD / MLP lossless encoder and "
+                 "decoder");
     fmt::println(".SH SYNOPSIS");
     fmt::println(".B forge");
     fmt::println(".I command");
@@ -1172,7 +1342,8 @@ void print_man_page(std::span<const CommandInfo> commands) {
     fmt::println(".SH DESCRIPTION");
     fmt::println("forge encodes, decodes, wraps, measures and plays AC\\-3, E\\-AC\\-3 and AC\\-4");
     fmt::println("(Dolby Digital, Dolby Digital Plus and AC\\-4, including E\\-AC\\-3's Atmos object");
-    fmt::println("layer and AC\\-4's object audio).");
+    fmt::println("layer and AC\\-4's object audio), and decodes, encodes and wraps the lossless");
+    fmt::println("TrueHD and MLP.");
     fmt::println("Positional arguments come first and options follow in any order; an option");
     fmt::println("is either a bare word or a");
     fmt::println(".IR key = value");

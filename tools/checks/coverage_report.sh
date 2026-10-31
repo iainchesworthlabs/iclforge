@@ -20,26 +20,24 @@
 # printed below the gate so a thin command shows up as thin rather than
 # averaging away inside the aggregate.
 #
-# apps/forge/gui is NOT gated and is deliberately out of scope. Its C++ needs a Qt
-# kit on the coverage leg, and no Linux CI leg installs one today
-# (.github/workflows/_build.yml installs Qt only on the `gui: true` matrix
-# entries, which are plain builds, not instrumented ones). Adding it means
-# either putting Qt on the coverage job or standing up a second instrumented
-# leg - a separate decision with its own runner-time cost, not something to
-# smuggle in behind a threshold table. apps/forge/gui's interactive surfaces are
-# covered by its own Qt Quick tests, and its Qt-free pieces are exercised by
-# iclforge-tests on every leg even though no row below gates them: RecordingSink
-# (since moved to apps/shared/media/src) and, from 2026-09-06,
-# apps/forge/gui/src/gui_diagnostics.cpp, whose whole reason for being Qt-free is that
+# apps/forge/gui, apps/crucible/ui and apps/hearth/ui are not gated by a plain run of this script:
+# their C++ needs a Qt kit on the coverage leg, and the leg that runs it (the coverage job of
+# .github/workflows/_ci-core.yml) installs none. A second instrumented leg, the coverage-qt job of the
+# same file, installs the kit CI pins and runs this script with -q, which gates those three trees
+# alone, from the tests labelled gui, forge-gui, crucible, crucible-ui, hearth and hearth-ui (the
+# test-linux-gcc-coverage-qt preset). The two modes share the filter and gate code and differ in
+# which rows they hold, so a Qt tree's floor sits beside the libraries' and moves the same way.
+# gcov counts the C++ only: QML has no line coverage from gcov, and the Qt Quick suites stay the
+# check on it. The Qt-free pieces of forge-gui are exercised by iclforge-tests on every leg
+# even though no row below gates them: RecordingSink (since moved to apps/shared/media/src) and, from
+# 2026-09-06, apps/forge/gui/src/gui_diagnostics.cpp, whose whole reason for being Qt-free is that
 # the no-secrets rule it holds is checked on legs that build no window.
 #
-# apps/crucible is out of scope here for the same reason and gated anyway,
-# somewhere else: tools/checks/coverage_crucible.ps1 holds its line and branch
-# floors and runs on the Windows clang-cl leg, where a Qt kit already is
-# (.github/workflows/_build.yml, "Crucible coverage floor"). Most of that tree
-# only executes under Qt - the window, its controller, and the Qt Quick suites
-# that are the only thing driving its platform seams - so a figure taken in
-# this job would cover the platform-free engine core and nothing else.
+# apps/crucible keeps a second set of floors somewhere else: tools/checks/coverage_crucible.ps1
+# holds its line and branch floors and runs on the Windows clang-cl leg, where a Qt kit already is
+# (.github/workflows/_build.yml, "Crucible coverage floor"). That figure covers the whole
+# application including the Windows seams; the -q row below covers its window's C++ on Linux,
+# and the engine core stays a row of the plain run.
 #
 # libs/sendspin and apps/hearth (Hearth, planning/hearth-reference-player.md) ARE gated here,
 # unlike apps/crucible above: config-linux-gcc-coverage is the one coverage preset that turns
@@ -64,7 +62,14 @@
 # place indefinitely - see ci.yml's coverage job comment for the calibration
 # history and why hosted-runner numbers are the calibration authority.
 #
-# Usage:  ./tools/checks/coverage_report.sh [-b <build-dir>] [-g <gcov-executable>]
+#   cmake --preset config-linux-gcc-coverage-qt     (a Qt kit found as cmake/FindQt6.cmake does)
+#   cmake --build --preset build-linux-gcc-coverage-qt -- -k 0
+#   ctest --preset test-linux-gcc-coverage-qt
+#   ./tools/checks/coverage_report.sh -q -g gcov-16
+#
+# Usage:  ./tools/checks/coverage_report.sh [-q] [-b <build-dir>] [-g <gcov-executable>]
+#         -q  the Qt applications' rows only (build-dir defaults to
+#             build/config-linux-gcc-coverage-qt)
 # Exit:   0 = every gate met, 1 = at least one gate missed or a component had
 #         no coverage data at all. Every component is reported before the
 #         failure exit, so the log always shows the whole table rather than
@@ -72,15 +77,24 @@
 
 set -euo pipefail
 
-build_dir="build/config-linux-gcc-coverage"
+build_dir=""
 gcov_exe="gcov"
-while getopts "b:g:" opt; do
+qt_only=0
+while getopts "b:g:q" opt; do
     case "$opt" in
         b) build_dir="$OPTARG" ;;
         g) gcov_exe="$OPTARG" ;;
-        *) echo "Usage: $0 [-b <build-dir>] [-g <gcov-executable>]" >&2; exit 2 ;;
+        q) qt_only=1 ;;
+        *) echo "Usage: $0 [-q] [-b <build-dir>] [-g <gcov-executable>]" >&2; exit 2 ;;
     esac
 done
+if [[ -z "$build_dir" ]]; then
+    if ((qt_only)); then
+        build_dir="build/config-linux-gcc-coverage-qt"
+    else
+        build_dir="build/config-linux-gcc-coverage"
+    fi
+fi
 
 if [[ ! -f CMakePresets.json ]]; then
     echo "::error::coverage: run this from the repository root (CMakePresets.json not found)" >&2
@@ -164,6 +178,14 @@ fi
 # this one was added without it, and the first run that got as far as the gate (2026-10-13, run
 # 38354367943) said "no data for libs/sink" of a library built and tested with coverage on.
 #
+# libs/truehd is the TrueHD and MLP library (bitstream, decoder, encoder). Measured 2026-10-29 on
+# its own test binary alone (iclforge-truehd-tests, GCC 13 at -O0, gcovr 8.7 with this script's flags):
+# 87.1 line and 79.7 branch over 2,541 lines. The suite of this job adds what the C API, the
+# containers and forge drive through it (core/format.cpp and io/major_sync.cpp, the two files the
+# library's own tests leave lowest, are among them), so the floors sit under that figure, a few points
+# lower than the other libraries' are under theirs: the first hosted run of this job is the
+# calibration authority, as it was for libs/sink.
+#
 # apps/crucible/engine/src is the platform-free engine core iclforge-crucible-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
@@ -179,12 +201,32 @@ libs/adm               82 75
 libs/sendspin          85 74
 libs/sink              80 65
 libs/ac4               88 80
+libs/truehd            84 74
 libs/iab               90 87
 apps/forge/cli/src              80 71
 apps/shared/media/src           78 66
 apps/crucible/engine/src        90 82
 apps/hearth           87 77
 "
+
+# The Qt applications' rows, gated by -q alone (the header says why they are not part of the plain
+# run). C++ only, and only each tree's src/: the Qt Quick suites drive the controllers there, and
+# the generated moc, rcc and qmlcachegen sources live in the build directory, outside these paths.
+#
+# UNMEASURED. These floors were set on 2026-10-31 without a Linux run to measure against (the
+# author's machine had none), so they are low on purpose: high enough that a tree which stops being
+# instrumented or whose suites stop running fails (the no-data check below catches the former
+# outright), low enough that the first hosted run cannot fail on a number nobody has seen. That
+# run's figures are the calibration, and the floors move up to a few points under them, as every
+# other row of this table did (the libs/sink and libs/truehd rows above were set the same way).
+qt_components="
+apps/forge/gui/src       40 25
+apps/crucible/ui/src     40 25
+apps/hearth/ui/src       40 25
+"
+if ((qt_only)); then
+    components="$qt_components"
+fi
 
 json="$build_dir/coverage.json"
 html="$build_dir/coverage.html"
@@ -222,17 +264,40 @@ html="$build_dir/coverage.html"
 # is its own flag (gcovr's --gcov-ignore-parse-errors appends per occurrence
 # rather than replacing) so a genuinely new problem in either category still
 # shows up rather than both going quiet under one blanket `all`.
+# --merge-lines (gcovr 8.4; the CI pin is 8.6) on every gcovr below: a header template is
+# instantiated once for every caller and every lambda passed to it, gcov reports each
+# instantiation's lines on their own, and gcovr counted each as a line of the file. A case
+# that reaches one branch of a function covers one copy of it and leaves the same branch
+# in all the others "missed". sink_wait.hpp's wait_until_played_out, a 100-line template
+# over a sink and a keep-waiting lambda that a test case passes a lambda of its own to,
+# went from 144 lines at 44% to 1,472 at 21% when it came (2026-10-14) and took
+# apps/shared/media/src from 87% to 63% line and 51% branch against floors of 78 and 66; the
+# nightly's coverage gate has failed on it every night since. Merged, a line is covered when
+# any instantiation ran it, which is what a line of source means.
+#
 # -fprofile-update=atomic would remove the threaded-code form of the race,
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
+if ((qt_only)); then
+    scope_filters=(
+        --filter 'apps/forge/gui/src/.*'
+        --filter 'apps/crucible/ui/src/.*'
+        --filter 'apps/hearth/ui/src/.*'
+    )
+else
+    scope_filters=(
+        --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|sink|ac4|truehd|iab)/.*'
+        --exclude 'libs/[^/]*/(tests|fuzz)/.*'
+        --filter 'apps/forge/cli/src/.*'
+        --filter 'apps/shared/media/src/.*'
+        --filter 'apps/crucible/engine/src/.*'
+        --filter 'apps/hearth/(engine|testsink)/src/.*'
+    )
+fi
 gcovr --root . \
-    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|sink|ac4|iab)/.*' \
-    --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
-    --filter 'apps/forge/cli/src/.*' \
-    --filter 'apps/shared/media/src/.*' \
-    --filter 'apps/crucible/engine/src/.*' \
-    --filter 'apps/hearth/(engine|testsink)/src/.*' \
+    "${scope_filters[@]}" \
     --gcov-executable "$gcov_exe" \
+    --merge-lines \
     --exclude-throw-branches --exclude-unreachable-branches \
     --gcov-ignore-errors=no_working_dir_found \
     --gcov-ignore-parse-errors=suspicious_hits.warn \
@@ -261,7 +326,7 @@ while read -r comp line_min branch_min; do
     echo
     echo "== $comp (gate: line >= $line_min%, branch >= $branch_min%) =="
     if ! gcovr --root . --add-tracefile "$json" --filter "$comp/.*" --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
-        --print-summary \
+        --merge-lines --print-summary \
         --fail-under-line "$line_min" --fail-under-branch "$branch_min"; then
         echo "::error::coverage gate missed for $comp (need line >= $line_min%, branch >= $branch_min%)"
         fail=1
@@ -277,6 +342,9 @@ EOF
 # a command sitting at 0% hide behind six that are not, which is precisely
 # the state apps/forge/cli/src was in when this gate was written (containers, audio_io
 # and live_audio were all at 0.0% line while the aggregate read 44.9%).
+if ((qt_only)); then
+    exit "$fail"
+fi
 echo
 echo "== apps/forge/cli/src per command (reported, not gated) =="
 printf '%-26s %8s %8s\n' "module" "line" "branch"
@@ -286,7 +354,7 @@ for src in apps/forge/cli/src/*.cpp apps/forge/cli/src/commands/*.cpp; do
     # whole report is captured and those two picked out of it. Redirecting the
     # table away with --txt /dev/null takes the summary with it.
     summary="$(gcovr --root . --add-tracefile "$json" --filter "${src}" \
-        --print-summary 2>/dev/null || true)"
+        --merge-lines --print-summary 2>/dev/null || true)"
     line_pct="$(echo "$summary" | awk '/^lines:/ {print $2}')"
     branch_pct="$(echo "$summary" | awk '/^branches:/ {print $2}')"
     printf '%-26s %8s %8s\n' "${src#apps/forge/cli/src/}" "${line_pct:-n/a}" "${branch_pct:-n/a}"

@@ -1,0 +1,40 @@
+# The fixed byte patterns of a TrueHD / MLP stream, for libFuzzer's -dict= (tools/fuzz/run.sh passes
+# it to fuzz_truehd_parse, fuzz_truehd_decode and fuzz_differential_truehd_decode, which share
+# seeds). Each is from the headers in libs/truehd/include/iclforge/truehd/: core/format.hpp for the
+# sync words and io/major_sync.hpp, io/access_unit.hpp and decoder/decoder.hpp for the rest.
+
+# TH spec section 4.2: the major sync word, TrueHD (0xF8726FBA) and MLP (0xF8726FBB).
+major_sync_truehd="\xF8\x72\x6F\xBA"
+major_sync_mlp="\xF8\x72\x6F\xBB"
+
+# The major sync word and the sample rate that follows it (format_info's top nibble in a TrueHD
+# stream: ratebits 0, 1 and 2 are 48, 96 and 192 kHz, 8, 9 and 10 are 44.1, 88.2 and 176.4).
+major_sync_truehd_48k="\xF8\x72\x6F\xBA\x00"
+major_sync_truehd_96k="\xF8\x72\x6F\xBA\x10"
+major_sync_truehd_192k="\xF8\x72\x6F\xBA\x20"
+major_sync_truehd_44k="\xF8\x72\x6F\xBA\x80"
+major_sync_truehd_88k="\xF8\x72\x6F\xBA\x90"
+major_sync_truehd_176k="\xF8\x72\x6F\xBA\xA0"
+
+# TH spec section 4.3: the signature (0xB752) that follows format_info.
+signature="\xB7\x52"
+
+# TH spec section 7.2: the 14-bit restart sync, 0x31EA, 0x31EB (noise_type) and 0x31EC (the
+# sixteen-channel substreams), as they sit after the two flag bits that open the block carrying a
+# restart header: 11 followed by the 14 bits, so the first two bytes are these.
+restart_sync_standard="\xF1\xEA"
+restart_sync_noise="\xF1\xEB"
+restart_sync_atmos="\xF1\xEC"
+
+# TH spec section 16.5: terminatorA (0xD234E, 20 bits) opens the end-of-stream marker, whose
+# 12-bit count of padding samples follows it; terminatorB (0x1234) ends a sixteen-channel segment.
+terminator_a="\xD2\x34\xE0"
+terminator_a_count_one="\xD2\x34\xE0\x01"
+terminator_b="\x12\x34"
+
+# TH spec section 6.1: a substream directory entry whose crc_present flag is set (the first nibble
+# is extra_substream_word, restart_nonexistent, crc_present, reserved), with a zero end pointer, and
+# the same with extra_substream_word set, which adds the 16-bit DRC word after it.
+directory_entry_crc="\x20\x00"
+directory_entry_extra_word_crc="\xA0\x00\x00\x00"
+directory_entry_no_restart_crc="\x60\x00"

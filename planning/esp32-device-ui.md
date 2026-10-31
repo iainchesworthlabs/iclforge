@@ -286,6 +286,16 @@ and this sink has 2.` - and with the firmware's reply otherwise; an accepted one
 layout 5.1 from the next play.` The page still sends every layout and lets `OutputLayout::parse`
 decide ([decision 16](#decisions)); it counts slots only to explain an answer.
 
+### Which layouts the board can take
+
+Since 2026-10-25 the page does not count slots itself for the presets: `GET /layout-options` says,
+for each, whether the board supports it, takes it with a limit, or cannot take it, with the reason
+([decision 30](#decisions); [`p4x-layout-options.md`](p4x-layout-options.md) has the rules, the
+evidence and what a layout change does to a playing stream). A preset the board cannot take is
+greyed with the reason as its tooltip, and a closed **Why some layouts are unavailable or limited**
+under the field lists every reason. A firmware without the route leaves the presets to the page's
+own count, as before.
+
 ### What `/status` adds
 
 Five fields. All are additive: no existing field changes its name, type or meaning, and none
@@ -375,21 +385,16 @@ old can only be running a build lenient enough to accept it):
 
 ```json
 {"target":"esp32p4","chip":"ESP32-P4","revision":"1.3","cores":2,"fpu":true,"cpu_freq_mhz":360,
- "psram_bytes":33554432,"sink_max_slots":32,"sink_max_slots_bits":16,
+ "psram_bytes":33554432,"sink_max_slots":2,"sink_max_slots_bits":16,
  "capabilities":["2 cores, a hardware floating-point unit","Running at 360 MHz",
- "32 MiB of PSRAM","This sink's bus reaches up to 32 slots at 16-bit"],
+ "32 MiB of PSRAM","This sink's bus reaches up to 2 slots at 16-bit"],
  "notices":["The detected chip is v1.3, below v3.0. This chip has no PLL clock source for I2S
  (hal/i2s_ll.h), and the APLL fallback's own 125 MHz ceiling falls short of what a full-width TDM
  frame needs: TDM output cannot open at any channel count above 2 on this board, regardless of
  layout - only standard 1-2 channel I2S is reachable."]}
 ```
 
-Note `sink_max_slots` (32) on this exact board: true of the sink's wiring at 16-bit slots, and
-still the right thing to report there (a build-time frame-width fact, unconditional on chip
-revision) - the notice above is what tells a reader that on THIS chip, nothing past 2 slots can
-actually open regardless of what the ceiling says. The two facts do not contradict each other; a
-board's own real ceiling is the lower of what its wiring allows and what its silicon allows, and
-this report gives both rather than silently picking the smaller one.
+Note `sink_max_slots` (2) on this exact board: **since 2026-10-25 the sink reports what the chip reaches** ([decision 31](#decisions)), so a chip below v3.0 says 2, not the 32 its 512-bit frame would hold at 16-bit slots; the notice above still says why. Before that date this report said 32 and relied on the notice to explain the gap ([decision 21](#decisions), taken (b)).
 
 The page's own **Hardware** section reads `chip`, `revision`, `cores`, `cpu_freq_mhz`, `fpu` and
 `psram_bytes` as its own rows (`hw-chip`, `hw-cores`, `hw-clock`, `hw-arithmetic`, `hw-psram`) and
@@ -620,7 +625,7 @@ twice after a lost reply would restart. The design is for one or two viewers at 
 
 `max_uri_handlers` is the size of Control's route table, 9 when the page was built and 27 now
 (`std::size(routes)` in `control.cpp`), so a route added without a slot cannot go missing, and a
-registration that fails says so on the console. Since then `/hardware`, `/slot-width`, `/name`,
+registration that fails says so on the console. Since then `/hardware`, `/layout-options`, `/slot-width`, `/name`,
 `/wiring`, `/network`, `/pairing`, `/firmware`, `/firmware/mode`, `/firmware/rollback`,
 `/firmware/coredump`, `/restart` and `/log` have joined the table, and `curl http://<board>/api`
 lists them all. The page and its script
@@ -642,6 +647,13 @@ mounts it gets the page: [`firmware/esp-idf/iclforge/ui/iclforge_ui.html`](../fi
 and [`ac3forge_ui.js`](../firmware/esp-idf/iclforge/ui/iclforge_ui.js), listed as `EMBED_FILES` in the
 component's `idf_component_register`. ESP-IDF places embedded files in `.rodata.embedded`, which
 is flash, and names their symbols after the file's base name (`_binary_ac3forge_ui_html_start`);
+**since 2026-10-26 they are embedded gzipped**: the component's CMakeLists writes each file's gzip into
+its build directory (`firmware/esp-idf/iclforge/tools/gzip_asset.py`: level 9, no name or time in the header, so a build is
+reproducible) and embeds that with `target_add_binary_data`, so the symbols are
+`_binary_iclforge_ui_html_gz_start` and so on, and `send_file` adds `Content-Encoding: gzip`. 69,221
+bytes as written, 21,700 sent: 47 KB less in every image (the 4 MB C6's slot had gone 8,720 bytes over).
+A client that does not ask for gzip is sent it all the same (a browser always does; `curl` needs
+`--compressed`). The size limit the page is held to (`budget.spec.js`) is on the source, as it was.
 the prefix is there because a firmware that embeds its own `index.html` would otherwise fail to
 link with two definitions of the same symbol.
 
@@ -669,7 +681,7 @@ mark after each handler, then reverted.
 
 | Item | Budget | Measured |
 |---|---|---|
-| Flash: the page and its script together, as stored | 65,536 bytes ([decision 22](#decisions)); 57,344 before the Time section, 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 61,830 (22,708 + 39,122); 55,926 before the Time section; 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
+| Flash: the page and its script together, as stored | 81,920 bytes ([decision 22](#decisions)); 65,536 before the layout chooser and the levels and distances section ([hearth-speaker-trim-identify.md](hearth-speaker-trim-identify.md)), 57,344 before the Time section, 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 68,509 (23,922 + 44,587) with both; 63,776 (22,835 + 40,941) with the layout chooser alone; 61,830 (22,708 + 39,122) before it; 55,926 before the Time section; 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
 | Internal heap held once the server is up: two more route registrations and handler slots | 256 bytes | 76, from the `heap:` line: 290,428 free against the base's 290,504 |
 | Internal heap held while a browser has the page open | - | 376, the keep-alive connection |
 | Internal heap at the peak of one `GET /status` | 3,072 bytes | 4,700 to 7,700 from the page's keep-alive connection; 5,100 from `curl`, a new connection each time |
@@ -848,7 +860,7 @@ below 98% of statements, lines and functions and 90% of branches. The suite reac
 and 94.8 when the page was first built, on 2026-09-11. The branch that loads the page again is
 run by the tests but not counted: a page's coverage is what its last load ran.
 
-**Budget.** A host test sums the two files, fails above 65,536 bytes, and fails on a carriage
+**Budget.** A host test sums the two files, fails above 81,920 bytes, and fails on a carriage
 return.
 
 **On the target.** A step in the ESP32 job, after the HTTP step and without changing it, boots the
@@ -1139,6 +1151,25 @@ run as root, so Playwright can install Chromium's system libraries).
     sends them and fills them from `GET /status`'s `time`. The tightest slot is the C6's on the 4 MB
     table, which was already 6,128 bytes over on main (1,840,112 bytes in a 1,835,008-byte slot) before this.
 
+    **Raised again 2026-10-25: 81,920 bytes (80 KiB).** The owner: "we can increase the device web page
+    size if required". The layout chooser took the page to 63,776 bytes (the list of reasons under the layout
+    field, the route's script, less the page's own slot count), and the Preferences work that follows it (a
+    per-speaker trim, a zone picker) will add more. The ceiling is raised with room for those rather than to
+    fit one change. Built on 2026-10-25 from this branch (prefs-core's Preferences work merged in), each image
+    against its slot:
+
+    | Image | Size | Its slot | Free |
+    |---|---|---|---|
+    | S3 board (`s3-n16r8`) | 1,604,960 bytes | 4 MiB | 62% |
+    | C6 on the 4 MB table (`c6-4mb`), the tightest | 1,889,504 bytes | 1,966,080 bytes (the table's 1.875 MiB) | 76,576 bytes (3.9%) |
+    | P4X kit (`p4-rev3`) | 2,629,056 bytes | 4 MiB | 37% |
+
+    The C6 is what a ceiling of this size is held to: a page at the new ceiling, 18,144 bytes larger than
+    today's, leaves it 58,432 bytes of 1,966,080. The page's ceiling is not a size the page has; the budget
+    test fails above it. The S3's and the P4's app budgets in `profiles.json` (1,600,000 and 2,600,000) are
+    about 5% over what those builds measured earlier and were already exceeded on `main` before this change;
+    they are raised by their own change, not here.
+
 23. **The output layout's control.** (a) **the named layouts as a segmented control, those wider
     than the sink disabled, above the field**; (b) the field with its suggestion list, as before;
     (c) the segmented control alone. **Recommend (a).** A `<datalist>` shows its suggestions only
@@ -1214,3 +1245,46 @@ run as root, so Playwright can install Chromium's system libraries).
     Cost: two ways out of the page rather than one; nothing checks the upload against what
     left the browser; and three of the board's checks are made twice, first in the page and
     then on the board. **Taken, (a).**
+
+30. **Which layouts the board can take** ([Which layouts the board can take](#which-layouts-the-board-can-take)).
+    (a) **a route of its own, `GET /layout-options`, built from the same facts `/status` and
+    `/hardware` read, and the page greying what it says is unavailable**; (b) the same fields in
+    `GET /layout`; (c) the page keeping its own count of slots. **Recommend (a).**
+    - **Not in `GET /layout`.** That route answers a bare name that `tools/hearth` and the board
+      suite read; JSON there breaks them.
+    - **Not the page's count.** A slot count cannot say that a chip below v3.0 opens no TDM, that a
+      build decodes two channels, or that nobody has measured a play this wide; those are the
+      board's to state, and a second client (the screen's Preferences) needs the same answer.
+    - **The listing is never looser than `PUT /layout`**, which stays as it was: it takes a layout
+      with no more slots than the sink has now. The listing is stricter for a chip that cannot open
+      TDM, where the route cannot know.
+    - **Sent in chunks**: the list is some 3 KB and the server task has 6 KB of stack.
+
+    Cost: one more request when the sink's slots, slot width or wiring change, and 1.7 KB of the
+    page's budget (63,776 of 81,920 bytes).
+
+31. **The sink reports what the chip reaches** (revises decision 21; [Which layouts the board can take](#which-layouts-the-board-can-take)).
+    Decision 21 kept `sink_max_slots` a pure wiring fact (32 on an ESP32-P4 below v3.0) with a notice
+    beside it, and the output layout then accepted a `5.1` the chip could not open. The owner, 2026-10-25:
+    "platform capabilities are a core piece here", so the mismatch is a bug and not a note. (a) **the wide
+    sink reads the chip revision and reports two slots when it cannot clock a TDM frame
+    (`sink_tdm_usable()`, `sink_slots()`, `sink_max_slots()`); the capability description
+    (`BoardCaps::sink.tdm_usable`) takes it from the sink, and `PUT /layout`, `GET /layout-options`, the
+    Preferences list and the page all ask one verdict over those capabilities**; (b) keep decision 21's
+    report and let the listing be stricter than the route; (c) have `accept_layout` read the revision
+    itself. **Taken, (a).**
+    - **The reason (b) was taken is gone.** Decision 21 kept the number free of chip-revision logic because
+      `sendspin.cpp` sizes its buffers from `sink_max_slots()`. Sized for two instead of thirty-two on a
+      chip that can never open more, they are smaller, which is the right size.
+    - **One revision constant** (`kEsp32p4TdmClockRevision`, `hardware_info.hpp`) for the sink and for
+      `GET /hardware`'s `revision_hard_limit_below`.
+    - **What changes on such a board:** `sink_slots` in `/status` and the Sendspin hello's `outputs.count`
+      are 2; `PUT /layout 5.1` is refused with "This chip (v1.3) has no clock for multi-channel output, so
+      only 1.0 and 2.0 can play."; a 5.1 stream plays folded to the 2.0 layout, as the board suite's fold
+      row already expected.
+    - **A refused layout says why in the 409's body**, and a layout with a limit is taken with the limit as
+      a note after the `ok`.
+
+    Cost: the board suite's row that set `5.1` on a P4 below v3.0 to test the fold can no longer do that
+    (it plays a 5.1 stream on the 2.0 layout, which tests the fold itself), and the suite learns what each
+    row needs (`planning/p4x-layout-options.md`).

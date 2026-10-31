@@ -55,11 +55,14 @@ test('landmarks, headings and a name for every control', async ({ page }) => {
 });
 
 test('every action from the keyboard, in page order', async ({ page, stub }) => {
+    // This is the page's other controls: the levels and distances have a test of their own (sound.spec.js).
+    stub.device.sound = null;
+    await page.reload();
     // The firmware section shows once GET /firmware has answered.
     await expect(page.getByRole('region', { name: 'Firmware' })).toBeVisible();
     await page.locator('body').click({ position: { x: 1, y: 1 } });
     // A radio group is one stop, at its chosen radio.
-    const order = ['ss-forget', 'wiring', 'slot-width=32', 'layout=2.0', 'layout-input', 'Apply', 'What an output layout does', 'name-input', 'Save', 'ssid-input', 'pass-input', 'pass-show', 'Save', 'Recent console output', 'fw-pick', 'fw-restart', 'Counters'];
+    const order = ['ss-forget', 'wiring', 'slot-width=32', 'layout=2.0', 'layout-input', 'Apply', 'layout-why-sum', 'What an output layout does', 'name-input', 'Save', 'ssid-input', 'pass-input', 'pass-show', 'Save', 'time-sync', 'zone-select', 'zone-city', 'zone-input', 'Save', 'ntp-input', 'Save', 'Recent console output', 'fw-pick', 'fw-restart', 'Counters'];
     const focused = () =>
         page.evaluate(() => {
             const el = /** @type {HTMLInputElement} */ (document.activeElement);
@@ -171,7 +174,8 @@ for (const colorScheme of /** @type {const} */ (['light', 'dark'])) {
         await expect(page.getByRole('status')).toHaveClass(/error/);
         await expect(page.locator('#reason')).toBeVisible();
         await expect(page.locator('#ss-code')).toBeVisible();
-        await expect(page.getByRole('table')).toBeVisible();
+        await expect(page.locator('#ss-levels')).toBeVisible();
+        await expect(page.locator('#trim')).toBeVisible();
         const worst = await page.evaluate(() => {
             const channel = (c) => {
                 const v = c / 255;
@@ -270,7 +274,8 @@ test('a 320 px screen, with nothing wider than it', async ({ page, stub }) => {
     stub.device.pairings = [
         pairedServer({ server_id: HEARTH_ID, name: 'Music Assistant (d5369777-music-assistant)', connected: true, last_playback: true }),
     ];
-    await expect(page.getByRole('table')).toBeVisible();
+    await expect(page.locator('#ss-levels')).toBeVisible();
+    await expect(page.locator('#trim')).toBeVisible();
     await expect(page.getByRole('list', { name: 'Paired servers' })).toBeVisible();
     await page.setViewportSize({ width: 320, height: 640 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

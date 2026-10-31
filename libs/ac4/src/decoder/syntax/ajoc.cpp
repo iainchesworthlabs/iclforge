@@ -237,20 +237,24 @@ ParseResult parse_ajoc_dmx_de_data(BitReader& r, int num_dmx_signals, int num_um
             }
         }
         state.config = config;
+        state.known = true;
     } else if (b_iframe) {
         // An I-frame depends on nothing before it: without a configuration
-        // there is none (Part 1 clause 4.3.14.3.2 sets Gmax to 0 dB alike).
+        // there is none (Part 1 clause 4.3.14.3.2 sets Gmax to 0 dB alike),
+        // and the frames after it have no dialogue objects to send
+        // coefficients for.
         state.config.reset();
+        state.known = true;
     }
     if (auto ok = check(r); !ok) {
         return ok;
     }
     if (out.b_keep_dmx_de_coeffs == false) {
         if (!state.config) {
-            if (!b_iframe) {
-                return fail(
-                    DecodeError::kMissingIFrame,
-                    "de_dlg_dmx_coeff_idx needs a dialogue configuration no I-frame has sent");
+            if (!state.known) {
+                return fail(DecodeError::kMissingIFrame,
+                            "de_dlg_dmx_coeff_idx needs the dialogue objects of an I-frame, and "
+                            "none has been read");
             }
         } else {
             const int count = state.config->num_dlg_obj * num_dmx_signals;

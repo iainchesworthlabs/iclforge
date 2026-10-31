@@ -14,6 +14,7 @@
 #include "iclforge/ac3/io/probe.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/content_signature.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
@@ -85,6 +86,9 @@ struct Ac4Summary {
     // sent one, by the substream's index, from the first frame that did: what
     // iclforge::ac4::SubstreamReport reports of it.
     std::map<int, iclforge::ac4::OamdCommonData> oamd_common_data{};
+    // The content signature after the last sync frame, as it describes itself. Nothing in it has
+    // been verified: that needs a trust anchor, which probe is not given (forge ac4-verify).
+    iclforge::ac4::SignatureSummary content_signature{};
 };
 
 [[nodiscard]] Ac4Summary summarize_ac4(std::span<const std::byte> data);

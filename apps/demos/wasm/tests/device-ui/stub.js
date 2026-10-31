@@ -22,6 +22,7 @@
 
 const crypto = require('crypto');
 const http = require('http');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
@@ -43,25 +44,45 @@ const REPLIES = {
         'POST /volume        body: 0.0 to 1.0',
         'GET  /layout        the output layout',
         'PUT  /layout        body: a name (5.1.4) or a speaker list; next play',
+        'GET  /layout-options  the layouts to choose from, each supported, with limits or unavailable on this board and why, as JSON',
         "GET  /name          this board's name; PUT one to change it",
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
-        'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
-        'GET  /now-playing   speakers, title, clock, off or dark on a board with a screen; PUT one to change it',
+        'GET  /network-preference  auto, ethernet or wifi on a board with wired and WiFi; PUT one to change it',
+        'GET  /now-playing   speakers, title, clock, meters, off or dark on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
-        'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
+        'GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; PUT one',
+        'GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, on a board with a screen; PUT one',
+        'GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a board with a screen; PUT one',
+        "GET  /night-schedule  the two times the screen goes dark between, by the board's own time, and on or off (22:00-07:00 on), on a board with a screen; PUT one, or on, or off",
+        'GET  /night-idle   on or off: whether the night schedule darkens the idle screen too; PUT one',
+        "GET  /dynamic-range standard or late-night: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range is kept; PUT one to change it (from the next stream)",
+        'GET  /preferences   every preference this board has, whether it can use it and why not, as JSON; change one through its own route',
+        'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one, or a name from /time-zones',
+        'GET  /time-zones    the names of the time zones PUT /timezone takes, one a line (Australia/Melbourne)',
         'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
         'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
+        "GET  /trim          each speaker's level and distance, as JSON, on a board with a Sendspin player",
+        'PUT  /trim          body: statements such as L level=-1.5 distance=2.4, or reset',
+        'GET  /identify      the test tone: what it is doing and its limits, as JSON',
+        'POST /identify      body: off, all, a speaker such as Ls or LFE, or a speaker and loop',
+        'GET  /panel-stats   what the panel and the Meters view cost, as JSON, on a board with a screen',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
         'PUT  /firmware      body: an app image; flash mode, then a restart into it',
         'PUT  /firmware/mode body: flash, or normal (a restart)',
         'PUT  /firmware/rollback  the image before this one boots next',
+        'GET  /firmware/available  an update from GitHub releases: the state of the flow',
+        'POST /firmware/check  look for a newer release (the result is on /firmware/available)',
+        'PUT  /firmware/from-release  body: the version a check offered; install it',
+        'PUT  /firmware/channel  body: stable or beta',
         "GET  /firmware/coredump  the last crash's core dump, as it lies in flash",
         'DELETE /firmware/coredump  erase it',
         'POST /restart       restart into the image that runs now',
+        "POST /reset-preferences  the screen's choices back to the defaults; the name, network, wiring and pairings stay",
+        'POST /factory-reset body: erase everything; erases the name, network, pairings and every setting, then restarts',
         'GET  /log           recent console output; ?from=N for what came after byte N',
         '',
     ].join('\n'),
@@ -78,8 +99,11 @@ const REPLIES = {
     layoutRefused:
         'not a layout this player can play: check the name or the list, and that it has no more slots than the sink\n',
     layoutOk: 'ok; takes effect at the next play\n',
+    layoutNote: 'ok; takes effect at the next play. Note: ',
+    layoutOptionsNone: 'this player has no layout to choose\n',
     nameEmpty: 'PUT /name wants a name\n',
-    nameRefused: 'not a name this player can hold: it is too long, or it could not be stored\n',
+    nameRefused:
+        'not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored\n',
     slotWidthBad: 'PUT /slot-width wants a number of bits\n',
     slotWidthRefused:
         "not a slot width this player's sink has: 16 or 32 on an I2S bus, and a sink with no hardware behind it keeps the one it was built for\n",
@@ -94,15 +118,33 @@ const REPLIES = {
         'that preference could not be set: wifi needs a WiFi network stored, and the board may be busy joining one\n',
     networkPreferenceOk: 'ok; takes effect in a moment, and is not kept if the interface it names does not come up\n',
     noScreen: 'this board has no screen\n',
-    nowPlayingBad: 'PUT /now-playing wants speakers, title, clock, off or dark\n',
+    nowPlayingBad: 'PUT /now-playing wants speakers, title, clock, meters, off or dark\n',
     nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
     nowPlayingOk: 'ok; the screen follows at once\n',
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
+    speakersStyleBad: 'PUT /speakers-style wants glow or pulse\n',
+    speakersStyleRefused: 'that style could not be stored\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
+    noDynamicRange: 'this board decodes no Dolby stream, so it has no dynamic range to choose\n',
+    dynamicRangeBad: 'PUT /dynamic-range wants standard or late-night\n',
+    dynamicRangeRefused: 'that setting could not be stored\n',
+    dynamicRangeOk: 'ok; takes effect from the next stream\n',
     noClock: 'this board keeps no time\n',
+    brightnessBad: 'PUT /brightness wants a number of percent from 10 to 100\n',
+    brightnessRefused:
+        'that brightness could not be set: this screen has no backlight to dim, or the setting could not be stored\n',
+    brightnessOk: 'ok; takes effect at once\n',
+    clockFormatBad: 'PUT /clock-format wants 24 or 12, and seconds after it when they are shown: 24, 12 seconds\n',
+    clockFormatRefused: 'that format could not be stored\n',
+    clockFormatOk: 'ok; takes effect at once\n',
+    nightScheduleBad: 'PUT /night-schedule wants two times of day and a state, 22:00-07:00 on, or just on or off\n',
+    nightIdleBad: 'PUT /night-idle wants on or off\n',
+    nightRefused: 'that schedule could not be stored\n',
+    nightIdleRefused: 'that setting could not be stored\n',
+    nightOk: 'ok; takes effect at once\n',
     timeZoneBad:
-        'PUT /timezone wants a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
+        'PUT /timezone wants a name from /time-zones (Australia/Melbourne), a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
     timeZoneRefused:
         "that zone could not be taken: this board's C library reads it differently, or it could not be stored\n",
     timeZoneOk: 'ok; the clock follows at once\n',
@@ -113,12 +155,24 @@ const REPLIES = {
     timeSyncBad: 'PUT /time-sync wants on or off\n',
     timeSyncRefused: 'that setting could not be stored\n',
     timeSyncOk: 'ok; takes effect at once\n',
+    noTrim: 'this board has no player to apply a speaker trim to\n',
+    trimOk: 'ok; in force at once\n',
+    noTone: 'this board has no player to play a test tone through\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
     pairingUnknown: 'this board has no pairing with that server\n',
     pairingRefused: 'this board is not a Sendspin player\n',
+    resetPreferencesNone: 'this board keeps no preferences to reset\n',
+    resetPreferencesOk:
+        'ok; the preferences are back to the defaults, and the name, the network, the wiring and the pairings are kept\n',
+    factoryResetHost: "a factory reset is taken only on the board's own address or name\n",
+    factoryResetBad: 'POST /factory-reset wants the body: erase everything\n',
+    factoryResetFixed: 'this board cannot be reset to its factory state\n',
+    factoryResetOk: 'erased; the board restarts with no name, network or pairings of its own\n',
     noFirmware: 'this board takes no firmware updates\n',
+    // A firmware built without updates from GitHub releases (CONFIG_ICLFORGE_FIRMWARE_PULL): firmware_pull_none.cpp.
+    noPull: 'this firmware cannot update itself from GitHub\n',
     noLog: 'this board keeps no log\n',
 };
 
@@ -165,6 +219,7 @@ const ROUTES = [
     'POST /volume',
     'GET /layout',
     'PUT /layout',
+    'GET /layout-options',
     'GET /name',
     'PUT /name',
     'GET /wiring',
@@ -178,21 +233,46 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /speakers-style',
+    'PUT /speakers-style',
+    'GET /brightness',
+    'PUT /brightness',
+    'GET /clock-format',
+    'PUT /clock-format',
+    'GET /night-schedule',
+    'PUT /night-schedule',
+    'GET /night-idle',
+    'PUT /night-idle',
+    'GET /time-zones',
+    'GET /dynamic-range',
+    'PUT /dynamic-range',
+    'GET /preferences',
     'GET /timezone',
     'PUT /timezone',
     'GET /ntp-server',
     'PUT /ntp-server',
     'GET /time-sync',
     'PUT /time-sync',
+    'GET /trim',
+    'PUT /trim',
+    'GET /panel-stats',
+    'GET /identify',
+    'POST /identify',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
     'PUT /firmware',
     'PUT /firmware/mode',
     'PUT /firmware/rollback',
+    'GET /firmware/available',
+    'POST /firmware/check',
+    'PUT /firmware/from-release',
+    'PUT /firmware/channel',
     'GET /firmware/coredump',
     'DELETE /firmware/coredump',
     'POST /restart',
+    'POST /reset-preferences',
+    'POST /factory-reset',
     'GET /log',
 ];
 
@@ -239,6 +319,79 @@ function speakersOf(text) {
 function slotsOf(text) {
     const speakers = speakersOf(text);
     return speakers ? speakers.length : 0;
+}
+
+// GET /panel-stats (iclforge/panel_stats.hpp): the keys in the order panel_stats_json writes them. The figures are those of a Meters view
+// on the kit's panel at 1024 by 600 with 7.1.4 playing, made up: nothing measured here.
+function timingStats(last, mean, max, n) {
+    return { last, mean, max, n };
+}
+
+function panelStats() {
+    return {
+        panel: {
+            width: 1024,
+            height: 600,
+            refreshes: 4120,
+            refresh_us: timingStats(11800, 12400.5, 31200, 4120),
+            task_stack_free_min: 14000,
+            psram_free: 27500000,
+            psram_free_min: 27100000,
+            psram_largest: 26000000,
+            internal_free: 98000,
+            internal_free_min: 61000,
+            internal_largest: 52000,
+        },
+        meters: {
+            showing: true,
+            representation: 'grid',
+            outputs: 12,
+            width: 1024,
+            height: 600,
+            opens: 2,
+            open_ms: 61000,
+            rate_hz: 20,
+            mean_cost_us: 21500,
+            updates: 1190,
+            late: 3,
+            dropped: 0,
+            falls: 0,
+            rises: 0,
+            analysis_us: timingStats(8200, 8100.2, 9900, 1190),
+            widgets_us: timingStats(1100, 1250.7, 3400, 1190),
+            render_us: timingStats(11800, 12400.5, 31200, 1190),
+            tap: { blocks: 11400, us_per_burst: 21.3, us_max_block: 38, us_pass_per_burst: 12.0, us_pack_per_burst: 6.0, us_per_clock_read: 0.5, reads: 1190, torn: 0, short_reads: 0 },
+        },
+    };
+}
+
+// GET /layout-options (iclforge/layout_options.hpp): the layouts the chooser lists, each judged against
+// the sink. The model knows the ceiling and nothing finer: whether a layout is supported or past the
+// sink, in the firmware's words for the second. The limits and the setting that would lift one are the
+// firmware's host tests' to hold (libs/device/tests/test_layout_options.cpp); a test that needs them
+// scripts device.layoutOptions.
+const LAYOUT_CATALOG = ['1.0', '2.0', '2.1', '5.0', '5.1', '5.1.2', '7.1', '5.1.4', '7.1.2', '7.1.4', '9.1.2', '9.1.4', '9.1.6'];
+
+const tooWide = (name, slots, carries) => `${name} needs ${slots} slots; this board's output carries ${carries}.`;
+
+function layoutOptions(device) {
+    return {
+        layout: device.layout,
+        slots: device.sinkSlots,
+        slot_bits: device.slotBits,
+        ...(typeof device.secondLine === 'boolean' ? { second_line: device.secondLine } : {}),
+        profile: '',
+        options: LAYOUT_CATALOG.map((name) => {
+            const slots = slotsOf(name);
+            if (slots <= device.sinkSlots) {
+                return { layout: name, slots, verdict: 'supported', fix: 'none', verified: true };
+            }
+            return {
+                layout: name, slots, verdict: 'unavailable', fix: 'hardware', verified: false,
+                reason: tooWide(name, slots, device.sinkSlots),
+            };
+        }),
+    };
 }
 
 // How the player serves a layout (planning/esp32-device-ui.md, "The output
@@ -433,8 +586,303 @@ function cableNetwork(preference = 'auto') {
 // The panel of a board with a screen (firmware/hearth-sink/main/panel/): what it shows while a song has
 // no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing and GET
 // /dim-after use. The title card is not built yet, so the build has three of the four views.
+// The night schedule a board starts with (iclforge::nowview::NightSchedule): off, 22:00 to 07:00, the idle screen not covered.
+function nightDefault() {
+    return { enabled: false, from: '22:00', to: '07:00', idle: false };
+}
+
+// GET /night-schedule's words: the two times, then the state.
+function nightText(night) {
+    return `${night.from}-${night.to} ${night.enabled ? 'on' : 'off'}`;
+}
+
+// What PUT /night-schedule takes (libs/device's now_view.hpp parse_night_schedule, rule for rule): `on` or `off`, the
+// times kept; or `HH:MM-HH:MM` alone (on) or followed by ` on` or ` off`. Nothing for any other body.
+function parseNight(body, current) {
+    const text = body.trim();
+    if (text === 'on' || text === 'off') {
+        return { ...current, enabled: text === 'on' };
+    }
+    const m = /^([01][0-9]|2[0-3]):([0-5][0-9])-([01][0-9]|2[0-3]):([0-5][0-9])( on| off)?$/.exec(text);
+    if (!m) {
+        return null;
+    }
+    return { ...current, from: `${m[1]}:${m[2]}`, to: `${m[3]}:${m[4]}`, enabled: m[5] !== ' off' };
+}
+
 function screenBoard() {
-    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+    // `dimmable` is a glass whose backlight can be dimmed; a frame buffer with no panel behind it has none.
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5', speakersStyle: 'glow', brightness: 80, dimmable: true, clockFormat: '24', night: nightDefault() };
+}
+
+// The preferences a board lists on GET /preferences (libs/device/include/iclforge/preferences.hpp, to_json): the
+// registry's entries with the registry's words, as far as the stand-in models them, in the registry's order.
+// contract.spec.js holds each to the registry. `needs` is what the entry asks of the board (the registry's
+// availability), and a board that lacks it lists the entry greyed, with the reason.
+const NO_SCREEN = 'This board has no screen.';
+const NO_CLOCK = 'This board keeps no time: it has no network to ask a time server on.';
+const NO_PLAYER = 'This build has no player, so it has no speakers to play a tone through.';
+const NO_DOLBY = 'This board decodes no Dolby stream: it has no Sendspin player.';
+const ON_OFF = [
+    ['on', 'On'],
+    ['off', 'Off'],
+];
+const PREFERENCES = [
+    {
+        id: 'now-view',
+        group: 'Display',
+        label: 'Screen without lyrics',
+        kind: 'choice',
+        apply: 'live',
+        route: '/now-playing',
+        needs: 'screen',
+        choices: [
+            ['speakers', 'Speakers'],
+            ['title', 'Title'],
+            ['clock', 'Clock'],
+            ['meters', 'Meters'],
+            ['dark', 'Dark'],
+            ['off', 'Off'],
+        ],
+    },
+    {
+        id: 'dim-after',
+        group: 'Display',
+        label: 'Dim after',
+        kind: 'stepper',
+        apply: 'live',
+        route: '/dim-after',
+        needs: 'screen',
+        choices: [
+            ['1', '1 min'],
+            ['5', '5 min'],
+            ['15', '15 min'],
+            ['30', '30 min'],
+            ['60', '1 hour'],
+            ['120', '2 hours'],
+            ['240', '4 hours'],
+            ['never', 'Never'],
+        ],
+    },
+    {
+        id: 'speakers-style',
+        group: 'Display',
+        label: 'Speakers style',
+        kind: 'choice',
+        apply: 'live',
+        route: '/speakers-style',
+        needs: 'screen',
+        choices: [
+            ['glow', 'Glow'],
+            ['pulse', 'Pulse'],
+        ],
+    },
+    {
+        id: 'brightness',
+        group: 'Display',
+        label: 'Brightness',
+        kind: 'stepper',
+        apply: 'live',
+        route: '/brightness',
+        needs: 'backlight',
+        choices: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => [String(n), `${n}%`]),
+    },
+    {
+        id: 'clock-hours',
+        group: 'Display',
+        label: 'Clock hours',
+        kind: 'choice',
+        apply: 'live',
+        route: '/clock-format',
+        needs: 'screenClock',
+        choices: [
+            ['24', '24 hour'],
+            ['12', '12 hour'],
+        ],
+    },
+    {
+        id: 'clock-seconds',
+        group: 'Display',
+        label: 'Clock seconds',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/clock-format',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
+        id: 'night-schedule',
+        group: 'Display',
+        label: 'Night schedule',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/night-schedule',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
+        id: 'night-times',
+        group: 'Display',
+        label: 'Night from and to',
+        kind: 'text',
+        apply: 'live',
+        route: '/night-schedule',
+        needs: 'screenClock',
+        choices: [],
+    },
+    {
+        id: 'night-idle',
+        group: 'Display',
+        label: 'Night covers idle screen',
+        kind: 'toggle',
+        apply: 'live',
+        route: '/night-idle',
+        needs: 'screenClock',
+        choices: ON_OFF,
+    },
+    {
+        id: 'identify-speakers',
+        group: 'Sound',
+        label: 'Identify speakers',
+        kind: 'action',
+        apply: 'live',
+        route: '/identify',
+        needs: 'player',
+        choices: [
+            ['run', 'Play each'],
+            ['running', 'Stop'],
+        ],
+    },
+    {
+        id: 'speaker-trim',
+        group: 'Sound',
+        label: 'Speaker levels and distances',
+        kind: 'sheet',
+        apply: 'live',
+        route: '/trim',
+        needs: 'player',
+        choices: [],
+    },
+    {
+        id: 'late-night',
+        group: 'Sound',
+        label: 'Late night',
+        kind: 'choice',
+        apply: 'next-play',
+        route: '/dynamic-range',
+        needs: 'dolby',
+        choices: [
+            ['standard', 'Standard'],
+            ['late-night', 'Late night'],
+        ],
+    },
+    {
+        id: 'time-zone',
+        group: 'Time',
+        label: 'Time zone',
+        kind: 'text',
+        apply: 'live',
+        route: '/timezone',
+        needs: 'clock',
+        choices: [],
+    },
+];
+
+// Why the board cannot use the entry, or '' when it can (the registry's availability functions, word for word).
+function unavailableReason(p, device) {
+    const screen = device.screen;
+    const clock = device.time ? '' : NO_CLOCK;
+    switch (p.needs) {
+        case 'screen':
+            return screen ? '' : NO_SCREEN;
+        case 'backlight':
+            return !screen ? NO_SCREEN : screen.dimmable ? '' : "This screen's backlight is not under the board's control.";
+        case 'screenClock':
+            return !screen ? NO_SCREEN : clock;
+        case 'player':
+            return device.sound ? '' : NO_PLAYER;
+        case 'dolby':
+            return device.dynamicRange ? '' : NO_DOLBY;
+        default:
+            return clock;
+    }
+}
+
+// The entry's value in the words its route takes (the registry's get functions).
+function preferenceValue(p, device) {
+    const screen = device.screen;
+    switch (p.id) {
+        case 'now-view':
+            return screen ? screen.view : '';
+        case 'dim-after':
+            return screen ? screen.dimAfter : '';
+        case 'speakers-style':
+            return screen ? screen.speakersStyle : '';
+        case 'brightness':
+            return screen ? String(screen.brightness) : '';
+        case 'clock-hours':
+            return screen ? (screen.clockFormat.startsWith('12') ? '12' : '24') : '';
+        case 'clock-seconds':
+            return screen ? (screen.clockFormat.endsWith('seconds') ? 'on' : 'off') : '';
+        case 'night-schedule':
+            return screen ? (screen.night.enabled ? 'on' : 'off') : '';
+        case 'night-times':
+            return screen ? `${screen.night.from}-${screen.night.to}` : '';
+        case 'night-idle':
+            return screen ? (screen.night.idle ? 'on' : 'off') : '';
+        case 'time-zone':
+            return device.time ? (device.time.zoneName !== 'none' ? device.time.zoneName : device.time.zone) : '';
+        case 'identify-speakers':
+            return device.sound && device.sound.identify.active ? 'running' : 'run';
+        case 'late-night':
+            return device.dynamicRange || '';
+        case 'speaker-trim': {
+            // libs/render's summary_text: how many speakers have a level or a distance set.
+            const set = device.sound ? device.sound.speakers.filter((x) => x.level !== 0 || x.distance > 0).length : 0;
+            return set === 0 ? 'none set' : `${set} ${set === 1 ? 'speaker' : 'speakers'} set`;
+        }
+        default:
+            return '';
+    }
+}
+
+// What the night schedule says when the screen without lyrics makes it moot (preferences.hpp, night_inert).
+function nightNote(device) {
+    const view = device.screen ? device.screen.view : '';
+    if (view === 'dark') {
+        return 'The Dark view is dark already: a touch lights it for 30 seconds, as at night.';
+    }
+    return view === 'off' ? 'Not used while the screen without lyrics is Off.' : '';
+}
+
+function preferencesJson(device) {
+    const entries = PREFERENCES.map((p) => {
+        const reason = unavailableReason(p, device);
+        const entry = {
+            id: p.id,
+            group: p.group,
+            label: p.label,
+            kind: p.kind,
+            apply: p.apply,
+            route: p.route,
+            value: preferenceValue(p, device),
+            available: reason === '',
+            reason,
+        };
+        const note = p.id === 'night-idle' ? (!reason && !device.screen.night.enabled ? 'Used while the night schedule is on.' : '') : p.id.startsWith('night-') && !reason ? nightNote(device) : '';
+        if (note) {
+            entry.note = note;
+        }
+        if (p.choices.length > 0) {
+            entry.choices = p.choices.map(([id, label]) => ({ id, label, available: reason === '', reason }));
+        }
+        return entry;
+    });
+    return JSON.stringify({
+        profile: (device.hardware && device.hardware.profile) || '',
+        display: device.screen ? 'dsi' : 'none',
+        preferences: entries,
+    }) + '\n';
 }
 
 // The time of a board that keeps it (firmware/hearth-sink/main/clock/sntp, every board with a network): in the
@@ -444,6 +892,7 @@ function timeBoard() {
     return {
         sync: 'on',
         zone: 'none',
+        zoneName: 'none',
         server: 'none',
         asking: true,
         synced: true,
@@ -452,6 +901,245 @@ function timeBoard() {
         answers: 1,
         zoneRefused: false,
     };
+}
+
+// The sound of a board with a Sendspin player (libs/render's speaker_trim.hpp and identify_request.hpp, hearth_sink.cpp's
+// handlers): the speakers the layout in force has at an output, with the level (dB) and distance (m, 0 for none)
+// the listener set, what the build can do about a delay, and the board's own test tone. `refuse` is the reason a
+// tone is refused ('playing', 'busy', 'server'), or '' for none.
+const ROLE_LABELS = {
+    L: 'Front left',
+    C: 'Centre',
+    R: 'Front right',
+    Ls: 'Left surround',
+    Rs: 'Right surround',
+    LFE: 'Subwoofer',
+    Lrs: 'Left rear surround',
+    Rrs: 'Right rear surround',
+};
+const ROLE_ALIASES = { fl: 'L', fr: 'R', sl: 'Ls', sr: 'Rs', bl: 'Lrs', br: 'Rrs', sub: 'LFE' };
+function soundBoard(fields) {
+    const roles = ['L', 'C', 'R', 'Ls', 'Rs', 'LFE'];
+    return {
+        layout: '5.1',
+        speakers: roles.map((role, output) => ({ role, output, level: 0, distance: 0 })),
+        delay: { available: true, reason: '', maxSpan: 6.86, samples: 960 },
+        serverLevel: false,
+        serverDelay: false,
+        identify: { active: false, output: -1, role: '', remaining: 0, refuse: '' },
+        ...fields,
+    };
+}
+
+// Whether a role is one the stand-in's labels know, in any case, or by a plain alias.
+function soundRole(word) {
+    const lower = word.toLowerCase();
+    const known = Object.keys(ROLE_LABELS).find((r) => r.toLowerCase() === lower);
+    return known || ROLE_ALIASES[lower] || null;
+}
+
+// GET /trim as trim_json writes it: the same keys in the same order, a level to a place, a distance to two.
+function trimJson(sound) {
+    const metres = (cm) => cm.toFixed(2);
+    const farthest = Math.max(0, ...sound.speakers.map((x) => x.distance));
+    const rows = sound.speakers.map((x) => {
+        const extra = x.distance > 0 && sound.delay.available ? farthest - x.distance : 0;
+        const samples = sound.serverDelay ? 0 : Math.min(sound.delay.samples, Math.round((extra * 100 * 48000) / 34300));
+        return (
+            `{"role":${JSON.stringify(x.role)},"label":${JSON.stringify(ROLE_LABELS[x.role] || x.role)},` +
+            `"output":${x.output},"level_db":${x.level.toFixed(1)},"distance_m":${metres(x.distance)},` +
+            `"applied_level_db":${x.level.toFixed(1)},"delay_samples":${samples},` +
+            `"delay_ms":${((samples * 1000) / 48000).toFixed(2)},"clamped":false}`
+        );
+    });
+    const d = sound.delay;
+    return (
+        `{"layout":${JSON.stringify(sound.layout)},` +
+        '"level":{"available":true,"min_db":-12.0,"max_db":12.0,"step_db":0.5},' +
+        `"delay":{"available":${d.available},"min_m":0.10,"max_m":10.00,"max_span_m":${d.available ? d.maxSpan.toFixed(2) : '0.00'},` +
+        `"samples":${d.available ? d.samples : 0},"reason":${JSON.stringify(d.available ? '' : d.reason)}},` +
+        `"server_level":${sound.serverLevel},"server_delay":${sound.serverDelay},"farthest_m":${metres(farthest)},` +
+        `"speakers":[${rows.join(',')}]}`
+    );
+}
+
+// PUT /trim's statements (SpeakerTrimTable::apply_text), all or nothing: nothing when taken, or {code, why}.
+function applyTrim(sound, body) {
+    const next = sound.speakers.map((x) => ({ ...x }));
+    let statements = 0;
+    for (const raw of body.split(/[\n;]/)) {
+        const statement = raw.trim();
+        if (statement === '') {
+            continue;
+        }
+        statements += 1;
+        const words = statement.split(/[ ,\t]+/).filter((w) => w !== '');
+        if (words.length === 1 && words[0].toLowerCase() === 'reset') {
+            next.forEach((x) => {
+                x.level = 0;
+                x.distance = 0;
+            });
+            continue;
+        }
+        const role = soundRole(words[0]);
+        if (!role || words.length < 2 || words.length > 6) {
+            return { code: 400, why: 'PUT /trim: a speaker wants reset, level=<dB> or distance=<m>' };
+        }
+        const row = next.find((x) => x.role === role);
+        for (const word of words.slice(1)) {
+            const [key, value] = word.split('=');
+            if (word.toLowerCase() === 'reset') {
+                if (row) {
+                    row.level = 0;
+                    row.distance = 0;
+                }
+            } else if (key.toLowerCase() === 'level') {
+                const db = Number(value.replace(/db$/i, ''));
+                if (!/^[+-]?[0-9]+(\.[0-9]+)?(db)?$/i.test(value) || db < -12 || db > 12 || Math.abs(db * 2 - Math.round(db * 2)) > 0.002) {
+                    return { code: 400, why: 'PUT /trim: a level is -12 to 12 dB, in steps of 0.5' };
+                }
+                if (row) {
+                    row.level = db;
+                }
+            } else if (key.toLowerCase() === 'distance') {
+                const metres = value.toLowerCase() === 'none' ? 0 : Number(value.replace(/m$/i, ''));
+                if (!/^(none|[0-9]+(\.[0-9]+)?m?)$/i.test(value) || (metres !== 0 && (metres < 0.1 || metres > 10))) {
+                    return { code: 400, why: 'PUT /trim: a distance is 0.1 to 10 metres, or none' };
+                }
+                if (row) {
+                    row.distance = metres;
+                }
+            } else {
+                return { code: 400, why: 'PUT /trim: a speaker wants reset, level=<dB> or distance=<m>' };
+            }
+        }
+    }
+    if (statements === 0) {
+        return { code: 400, why: 'PUT /trim: an empty body: say reset, or a speaker and a level or distance' };
+    }
+    if (!sound.delay.available && next.some((x, i) => x.distance !== sound.speakers[i].distance)) {
+        return { code: 409, why: `a distance is a delay, and ${sound.delay.reason}` };
+    }
+    // The delay lines hold only so much: the span of the set distances may not grow past it.
+    const span = (speakers) => {
+        const cm = speakers.map((x) => Math.round(x.distance * 100)).filter((c) => c > 0);
+        return cm.length > 1 ? Math.max(...cm) - Math.min(...cm) : 0;
+    };
+    const most = Math.round(sound.delay.maxSpan * 100);
+    if (span(next) > most && span(next) > span(sound.speakers)) {
+        return {
+            code: 409,
+            why: `the nearest and the farthest speaker can be at most ${sound.delay.maxSpan.toFixed(2)} m apart on this board (its delay lines hold ${Math.round((sound.delay.samples * 1000) / 48000)} ms)`,
+        };
+    }
+    sound.speakers = next;
+    return null;
+}
+
+// GET /identify as identify_json writes it.
+function identifyJson(sound) {
+    const i = sound.identify;
+    return (
+        `{"available":true,"reason":"","active":${i.active},"output":${i.output},"role":${JSON.stringify(i.role)},` +
+        `"label":${JSON.stringify(ROLE_LABELS[i.role] || '')},"remaining_ms":${i.remaining},"level_db":-30.0,` +
+        '"max_level_db":-24.0,"tone_ms":1500,"gap_ms":500,"total_ms":60000,' +
+        `"speakers":[${sound.speakers.map((x) => JSON.stringify(x.role)).join(',')}]}`
+    );
+}
+
+const IDENTIFY_REFUSALS = {
+    playing: 'a stream is playing; the tone would play over it',
+    busy: 'something else has the speakers: a play from this page, or an update',
+    server: "a server's identify tone is on",
+};
+
+// POST /identify: off, all, a speaker, or a speaker and loop. Nothing when taken, or {code, why}.
+function applyIdentify(sound, body) {
+    const words = body.trim().split(/[ \t,]+/).filter((w) => w !== '');
+    const bad = { code: 400, why: 'POST /identify wants off, all, a speaker such as L, Ls or LFE, or a speaker and loop' };
+    const i = sound.identify;
+    let role = null;
+    if (words.length === 1 && words[0].toLowerCase() === 'off') {
+        i.active = false;
+        i.output = -1;
+        i.role = '';
+        i.remaining = 0;
+        return null;
+    }
+    if (words.length === 1 && words[0].toLowerCase() === 'all') {
+        role = sound.speakers[0].role;
+    } else if (words.length === 1 || (words.length === 2 && words[1].toLowerCase() === 'loop')) {
+        role = soundRole(words[0]);
+    }
+    if (!role) {
+        return bad;
+    }
+    if (i.refuse) {
+        return { code: 409, why: IDENTIFY_REFUSALS[i.refuse] };
+    }
+    const row = sound.speakers.find((x) => x.role === role);
+    if (!row) {
+        return { code: 409, why: 'the layout in force has no such speaker' };
+    }
+    i.active = true;
+    i.output = row.output;
+    i.role = role;
+    i.remaining = 60000;
+    return null;
+}
+
+// The time zones the firmware offers by name: the rows of libs/device's time_zone_data.hpp, which tools/hearth/
+// gen_time_zones.py writes, read here so that the stand-in's list is the board's and cannot drift from it.
+const ZONE_DATA = path.resolve(__dirname, '../../../../../libs/device/include/iclforge/time_zone_data.hpp');
+const ZONE_TEXT = fs.readFileSync(ZONE_DATA, 'utf8');
+const ZONE_TABLE = [...ZONE_TEXT.matchAll(/\{"([^"]+)", "([^"]+)"\},/g)].map((m) => [m[1], m[2]]);
+// The place each shared string means (data::kPreferred, as indices into the table).
+const ZONE_PREFERRED = /kPreferred\[\] = \{([^}]*)\}/.exec(ZONE_TEXT)[1].match(/[0-9]+/g).map(Number);
+
+// What a person reads for a zone, as libs/device's time_zones.hpp has it (zone_place, zone_display, zone_readable): the
+// place by its name, else by its string (the preferred place of a shared one), else its offset. Never the string.
+function zonePlace(posix, name) {
+    const named = ZONE_TABLE.find((z) => z[0] === name);
+    if (named) {
+        return named[0];
+    }
+    if (!posix || posix === 'none') {
+        return null;
+    }
+    const preferred = ZONE_PREFERRED.map((i) => ZONE_TABLE[i]).find((z) => z[1] === posix);
+    return (preferred ?? ZONE_TABLE.find((z) => z[1] === posix))?.[0] ?? null;
+}
+
+function zoneDisplay(name) {
+    const first = name.indexOf('/');
+    if (first < 0) {
+        return name;
+    }
+    const last = name.lastIndexOf('/');
+    let city = name.slice(last + 1).replaceAll('_', ' ');
+    if (last !== first) {
+        city += ` (${name.slice(first + 1, last).replaceAll('_', ' ').replaceAll('/', ',')})`;
+    }
+    return city.includes(' (') ? city : `${city} (${name.slice(0, first)})`;
+}
+
+function zoneReadable(posix, name) {
+    const place = zonePlace(posix, name);
+    if (place) {
+        return zoneDisplay(place);
+    }
+    if (!posix || posix === 'none') {
+        return 'UTC';
+    }
+    const m = /^(?:<[^>]*>|[A-Za-z]+)([+-]?)([0-9]{1,3})(?::([0-9]{2}))?(?::[0-9]{2})?(.*)$/.exec(posix);
+    if (!m) {
+        return 'a zone this board does not read';
+    }
+    const west = (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
+    const east = -west;
+    const hours = String(Math.trunc(Math.abs(east) / 60)).padStart(2, '0');
+    const minutes = String(Math.abs(east) % 60).padStart(2, '0');
+    return `UTC${east < 0 ? '-' : '+'}${hours}:${minutes} (custom${m[4] ? ', with daylight saving' : ''})`;
 }
 
 // Whether a string is a time server the firmware takes: libs/device's wall_clock.hpp valid_ntp_server, rule for
@@ -624,6 +1312,47 @@ function firmwareTrial(fields) {
     };
 }
 
+// GET /firmware/available of a firmware without updates from GitHub releases, as render_status writes it
+// (libs/device/include/iclforge/firmware_update.hpp): every key always there.
+function updateNotBuilt(fw) {
+    return {
+        supported: false,
+        why: 'This firmware has no room for a secure connection.',
+        blocked: null,
+        state: 'idle',
+        channel: 'beta',
+        running: fw.running.version,
+        checked: null,
+        latest: null,
+        trust: { anchors: 0, source: 'build', fingerprints: [] },
+        signed_by: null,
+        error: null,
+        skipped: null,
+    };
+}
+
+// GET /firmware/available of a firmware that offers a release, as render_status writes it: what a check
+// found, whom it was signed by and the trust it was judged by. `over` changes a part (an error, say).
+function updateOffer(fw, over = {}) {
+    return {
+        ...updateNotBuilt(fw),
+        supported: true,
+        why: null,
+        state: 'available',
+        checked: 1792900000,
+        latest: {
+            version: 'v0.11.0',
+            released: '2026-11-05',
+            size: 1270624,
+            notes: 'https://github.com/iainchesworthlabs/iclforge/releases/tag/v0.11.0',
+            image: 'hearth-sink-esp32s3',
+        },
+        trust: { anchors: 1, source: 'build', fingerprints: ['5e3a91c0b27d44f8'] },
+        signed_by: 'Hearth Firmware Beta',
+        ...over,
+    };
+}
+
 // GET /firmware as render_firmware_status writes it, every key always there:
 // a board on the two-slot table (partitions.csv) running the image a USB
 // flash put in ota_0, with the other slot empty.
@@ -682,6 +1411,9 @@ function timeStatus(t) {
         synced: t.synced,
         local: t.synced ? t.local : null,
         zone: t.zone,
+        zone_name: t.zoneName,
+        zone_place: zonePlace(t.zone, t.zoneName === 'none' ? '' : t.zoneName) ?? 'none',
+        zone_label: zoneReadable(t.zone, t.zoneName === 'none' ? '' : t.zoneName),
         server: t.server,
         servers: t.servers,
         answers: t.answers,
@@ -719,6 +1451,26 @@ function statusJson(d) {
     return '{' + fields.map(([k, v]) => JSON.stringify(k) + ':' + v).join(',') + '}\n';
 }
 
+// Whether a string is a name the firmware takes: libs/device's device_name.hpp check_name, rule for rule. 1 to 32
+// bytes of well-formed text (the stand-in sees U+FFFD where the bytes were not), with no control character, line
+// separator, bidirectional control, zero-width mark or byte order mark in it, and no space at either end.
+function validName(text) {
+    if (text.length === 0 || Buffer.byteLength(text, 'utf8') > 32) {
+        return false;
+    }
+    if (text.startsWith(' ') || text.endsWith(' ')) {
+        return false;
+    }
+    return !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\ufffd]/.test(text);
+}
+
+// What the board answers to by name: its mDNS host name (devname::mdns_label, for the ASCII the stand-in's names
+// have), and the two loopback names the stand-in itself is reached at.
+function hostNames(name) {
+    const label = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'hearth';
+    return ['127.0.0.1', 'localhost', label + '.local'];
+}
+
 async function startStub() {
     const device = {
         state: 'stopped',
@@ -736,6 +1488,9 @@ async function startStub() {
         ssid: 'kitchen',
         password: '',
         layout: '2.0',
+        // GET /layout-options: undefined for the model's (layoutOptions), a body a test scripts, or null for
+        // a firmware with no such route.
+        layoutOptions: undefined,
         volume: 1,
         // A Sendspin player's firmware (sdkconfig.sendspin). Undefined for a
         // firmware with no player, whose /status has no "sendspin" key, and
@@ -751,9 +1506,16 @@ async function startStub() {
         // A board with a screen (a test sets screenBoard()): the view it shows while a song has no
         // lyrics, the views this build has, and when it dims. Null for a board with none.
         screen: null,
+        // How much of a Dolby stream's dynamic range the listener wants: 'standard' or 'late-night' on a board
+        // with a Sendspin player, which decodes for a listener; null for one that decodes none, whose routes
+        // answer 404.
+        dynamicRange: 'standard',
         // What the board says about its time (timeBoard); undefined for a firmware that keeps none (no
         // network, or QEMU's), whose /status has no "time" key and whose time routes answer 404.
         time: timeBoard(),
+        // The sound of a board with a Sendspin player (soundBoard); null for a firmware with no player, whose
+        // /trim and /identify answer 404.
+        sound: soundBoard(),
         hardware: defaultHardware(),
         // GET /firmware's body (defaultFirmware), or undefined for a firmware
         // that takes no updates.
@@ -781,8 +1543,16 @@ async function startStub() {
     // drop then meets it on a connection Chromium did not reuse, and is not
     // sent again (see next()).
     let dropsPending = 0;
+    // Chromium sends a request again that a connection it reused closes unanswered, whatever the method. Closing the
+    // idle connections and the answers (above, and next()) leaves a connection no drop can meet, except one that was
+    // not idle yet when next() closed the idle ones: a poll's answer, still going out, and the request to be dropped
+    // then goes down that connection, and its second sending is answered. So a drop that met a reused connection
+    // takes the same request's second sending with it, and that one is not recorded: the page sent it once.
+    const resends = new Map();
+    const RESEND_WINDOW_MS = 3000;
+    let reusing = false; // reuseConnections(): the answers and the idle connections are left open
     const closing = (res) => {
-        if (dropsPending > 0 || device.down > 0) {
+        if (!reusing && (dropsPending > 0 || device.down > 0)) {
             res.setHeader('Connection', 'close');
         }
     };
@@ -793,14 +1563,19 @@ async function startStub() {
         res.end(body);
     };
 
+    // The page is sent gzipped, as the firmware sends it (src/control.cpp send_file: the component embeds the gzip of
+    // each file, firmware/esp-idf/iclforge/tools/gzip_asset.py): a browser decodes it, so the page is what it was.
     const file = (res, name, type) => {
         closing(res);
+        const body = zlib.gzipSync(fs.readFileSync(path.join(UI_DIR, name)), { level: 9 });
         res.writeHead(200, {
             'Content-Type': type,
+            'Content-Encoding': 'gzip',
+            'Content-Length': body.length,
             'Cache-Control': 'no-cache',
             'Content-Security-Policy': POLICY,
         });
-        res.end(fs.readFileSync(path.join(UI_DIR, name)));
+        res.end(body);
     };
 
     // A play moves on at each poll, the way a player on its own tasks would
@@ -1016,8 +1791,11 @@ async function startStub() {
             case 'GET /name':
                 return send(res, 200, device.name + '\n');
             case 'PUT /name': {
-                if (!body || body.length > 32) {
-                    return send(res, body ? 409 : 400, body ? REPLIES.nameRefused : REPLIES.nameEmpty);
+                if (!body) {
+                    return send(res, 400, REPLIES.nameEmpty);
+                }
+                if (!validName(body)) {
+                    return send(res, 409, REPLIES.nameRefused);
                 }
                 device.name = body;
                 return send(res, 200, REPLIES.ok);
@@ -1085,6 +1863,11 @@ async function startStub() {
                 device.network = cableNetwork(body);
                 return send(res, 200, REPLIES.networkPreferenceOk);
             }
+            case 'GET /panel-stats':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, JSON.stringify(panelStats()) + '\n', 'application/json');
             case 'GET /now-playing':
                 if (!device.screen) {
                     return send(res, 404, REPLIES.noScreen);
@@ -1092,7 +1875,7 @@ async function startStub() {
                 return send(res, 200, device.screen.view + '\n');
             case 'PUT /now-playing': {
                 const word = body.trim();
-                if (!['speakers', 'title', 'clock', 'off'].includes(word)) {
+                if (!['speakers', 'title', 'clock', 'meters', 'dark', 'off'].includes(word)) {
                     return send(res, 400, REPLIES.nowPlayingBad);
                 }
                 if (!device.screen) {
@@ -1122,6 +1905,113 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /speakers-style':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.speakersStyle + '\n');
+            case 'PUT /speakers-style': {
+                const word = body.trim();
+                if (!['glow', 'pulse'].includes(word)) {
+                    return send(res, 400, REPLIES.speakersStyleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.speakersStyle = word;
+                return send(res, 200, REPLIES.nowPlayingOk);
+            }
+            case 'GET /brightness':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.brightness + '\n');
+            case 'PUT /brightness': {
+                const word = body.trim();
+                const percent = /^[0-9]{1,3}$/.test(word) ? Number.parseInt(word, 10) : -1;
+                if (percent < 10 || percent > 100) {
+                    return send(res, 400, REPLIES.brightnessBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                if (!device.screen.dimmable) {
+                    return send(res, 409, REPLIES.brightnessRefused);
+                }
+                device.screen.brightness = percent;
+                return send(res, 200, REPLIES.brightnessOk);
+            }
+            case 'GET /clock-format':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.clockFormat + '\n');
+            case 'PUT /clock-format': {
+                const word = body.trim();
+                if (!['24', '24 seconds', '12', '12 seconds'].includes(word)) {
+                    return send(res, 400, REPLIES.clockFormatBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.clockFormat = word;
+                return send(res, 200, REPLIES.clockFormatOk);
+            }
+            case 'GET /night-schedule':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, nightText(device.screen.night) + '\n');
+            case 'PUT /night-schedule': {
+                const night = parseNight(body, device.screen ? device.screen.night : nightDefault());
+                if (!night) {
+                    return send(res, 400, REPLIES.nightScheduleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.night = night;
+                return send(res, 200, REPLIES.nightOk);
+            }
+            case 'GET /night-idle':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, (device.screen.night.idle ? 'on' : 'off') + '\n');
+            case 'PUT /night-idle': {
+                const word = body.trim();
+                if (word !== 'on' && word !== 'off') {
+                    return send(res, 400, REPLIES.nightIdleBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.night.idle = word === 'on';
+                return send(res, 200, REPLIES.nightOk);
+            }
+            case 'GET /time-zones':
+                if (!device.time) {
+                    return send(res, 404, REPLIES.noClock);
+                }
+                return send(res, 200, ZONE_TABLE.map((z) => z[0] + '\n').join(''));
+            case 'GET /dynamic-range':
+                if (!device.dynamicRange) {
+                    return send(res, 404, REPLIES.noDynamicRange);
+                }
+                return send(res, 200, device.dynamicRange + '\n');
+            case 'PUT /dynamic-range': {
+                const word = body.trim();
+                if (!['standard', 'late-night'].includes(word)) {
+                    return send(res, 400, REPLIES.dynamicRangeBad);
+                }
+                if (!device.dynamicRange) {
+                    return send(res, 409, REPLIES.noDynamicRange);
+                }
+                device.dynamicRange = word;
+                return send(res, 200, REPLIES.dynamicRangeOk);
+            }
+            case 'GET /preferences':
+                return send(res, 200, preferencesJson(device), 'application/json');
             case 'GET /timezone':
                 if (!device.time) {
                     return send(res, 404, REPLIES.noClock);
@@ -1129,7 +2019,9 @@ async function startStub() {
                 return send(res, 200, device.time.zone + '\n');
             case 'PUT /timezone': {
                 const word = body.trim();
-                if (word !== 'none' && !validTimeZone(word)) {
+                // A name from the table, stored with the string it stands for; or a string, which has no name.
+                const named = ZONE_TABLE.find((z) => z[0] === word);
+                if (!named && word !== 'none' && !validTimeZone(word)) {
                     return send(res, 400, REPLIES.timeZoneBad);
                 }
                 if (!device.time) {
@@ -1138,7 +2030,8 @@ async function startStub() {
                 if (device.time.zoneRefused) {
                     return send(res, 409, REPLIES.timeZoneRefused);
                 }
-                device.time.zone = word;
+                device.time.zone = named ? named[1] : word;
+                device.time.zoneName = named ? named[0] : 'none';
                 return send(res, 200, REPLIES.timeZoneOk);
             }
             case 'GET /ntp-server':
@@ -1174,6 +2067,30 @@ async function startStub() {
                 device.time.asking = word === 'on';
                 device.time.synced = word === 'on' && device.time.synced;
                 return send(res, 200, REPLIES.timeSyncOk);
+            }
+            case 'GET /trim':
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTrim);
+                }
+                return send(res, 200, trimJson(device.sound) + '\n', 'application/json');
+            case 'PUT /trim': {
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTrim);
+                }
+                const refused = applyTrim(device.sound, body);
+                return refused ? send(res, refused.code, refused.why + '\n') : send(res, 200, REPLIES.trimOk);
+            }
+            case 'GET /identify':
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTone);
+                }
+                return send(res, 200, identifyJson(device.sound) + '\n', 'application/json');
+            case 'POST /identify': {
+                if (!device.sound) {
+                    return send(res, 404, REPLIES.noTone);
+                }
+                const refused = applyIdentify(device.sound, body);
+                return refused ? send(res, refused.code, refused.why + '\n') : send(res, 200, REPLIES.ok);
             }
             case 'GET /pairing':
                 if (!device.sendspin) {
@@ -1221,16 +2138,34 @@ async function startStub() {
             }
             case 'GET /layout':
                 return send(res, 200, device.layout + '\n');
+            case 'GET /layout-options':
+                // device.layoutOptions: a body a test scripts, or null for a firmware with no such route.
+                if (device.layoutOptions === null) {
+                    return send(res, 404, REPLIES.layoutOptionsNone);
+                }
+                {
+                    // A test that fixes GET /status has fixed the sink's ceiling too: the board's answers agree.
+                    const fixed = payload === null ? undefined : JSON.parse(payload).sink_slots;
+                    const slots = typeof fixed === 'number' ? fixed : device.sinkSlots;
+                    return send(res, 200, JSON.stringify(device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: slots })) + '\n', 'application/json');
+                }
             case 'PUT /layout': {
                 if (!body) {
                     return send(res, 400, REPLIES.layoutEmpty);
                 }
                 const slots = slotsOf(body);
-                if (!slots || slots > device.sinkSlots) {
+                if (!slots) {
                     return send(res, 409, REPLIES.layoutRefused);
                 }
+                // The verdict GET /layout-options gives, which this route answers with (the board has one): a layout
+                // past the sink is refused with its sentence, and one with a limit on it is taken with the note.
+                const listed = device.layoutOptions ?? layoutOptions({ ...device, sinkSlots: device.sinkSlots });
+                const judged = (listed.options ?? []).find((o) => o.layout === body);
+                if (slots > device.sinkSlots || judged?.verdict === 'unavailable') {
+                    return send(res, 409, `${judged?.reason ?? tooWide(body, slots, device.sinkSlots)}\n`);
+                }
                 device.layout = body;
-                return send(res, 200, REPLIES.layoutOk);
+                return send(res, 200, judged?.verdict === 'limits' && judged.reason ? `${REPLIES.layoutNote}${judged.reason}\n` : REPLIES.layoutOk);
             }
             // Updates over the network (planning/esp32-ota.md). A firmware
             // without them answers every one of these routes 404.
@@ -1264,6 +2199,18 @@ async function startStub() {
                 return restart(() => (fw.mode = 'normal'));
             case 'PUT /firmware/rollback':
                 return fw ? rollback(res) : send(res, 404, REPLIES.noFirmware);
+            // An update from GitHub releases (planning/esp32-ota.md, O10): a firmware built without it says
+            // so on GET /firmware/available (firmware_pull_none.cpp) and answers the rest 404. The model keeps
+            // the body firmware_update.hpp's render_status writes in `device.update` when a test gives it one.
+            case 'GET /firmware/available':
+                if (!fw) {
+                    return send(res, 404, REPLIES.noFirmware);
+                }
+                return send(res, 200, JSON.stringify(device.update ?? updateNotBuilt(fw)) + '\n', 'application/json');
+            case 'POST /firmware/check':
+            case 'PUT /firmware/from-release':
+            case 'PUT /firmware/channel':
+                return send(res, 404, fw ? REPLIES.noPull : REPLIES.noFirmware);
             case 'POST /restart':
                 if (!fw) {
                     return send(res, 404, REPLIES.noFirmware);
@@ -1273,6 +2220,40 @@ async function startStub() {
                 }
                 send(res, 200, FIRMWARE.restarting);
                 return restart(() => (fw.mode = 'normal'));
+            // Reset preferences: the screen's choices go back to the image's; the name, the network, the wiring, the
+            // pairings and the time zone stay (libs/device's settings_keys.hpp). At once.
+            case 'POST /reset-preferences':
+                if (device.screen) {
+                    Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
+                }
+                return send(res, 200, REPLIES.resetPreferencesOk);
+            // The factory reset: only by the board's own address or name, and only for the words; then
+            // everything is erased and the board restarts, with a new identity and no network of its own.
+            case 'POST /factory-reset': {
+                const host = (headers.host || '').split(':')[0];
+                if (!hostNames(device.name).includes(host)) {
+                    return send(res, 403, REPLIES.factoryResetHost);
+                }
+                if (body !== 'erase everything') {
+                    return send(res, 400, REPLIES.factoryResetBad);
+                }
+                send(res, 200, REPLIES.factoryResetOk);
+                return restart(() => {
+                    Object.assign(device, { name: 'hearth-a1b2c3', ssid: '', password: '', layout: '2.0', pairings: [] });
+                    if (device.sendspin) {
+                        device.sendspin = { ...idleSendspin(), client_id: 'Q1vGr0WkzZ5c2hXU8eYy0fKp3tNnJmAs7LbD4oHqIwE' };
+                    }
+                    if (device.screen) {
+                        Object.assign(device.screen, { view: 'speakers', dimAfter: '5', speakersStyle: 'glow', brightness: 80, clockFormat: '24', night: nightDefault() });
+                    }
+                    if (device.time) {
+                        Object.assign(device.time, { zone: 'none', zoneName: 'none', server: 'none', sync: 'on' });
+                    }
+                    if (fw) {
+                        fw.mode = 'normal';
+                    }
+                });
+            }
             // The last crash's core dump (O4): the bytes are the model's
             // `coredumpBytes`, and GET /firmware's `coredump` says there is one.
             case 'GET /firmware/coredump':
@@ -1317,6 +2298,21 @@ async function startStub() {
             const raw = Buffer.concat(chunks);
             const body = raw.toString('utf8');
             const route = req.method + ' ' + (req.url || '/').split('?')[0];
+            const reused = req.socket.served > 0;
+            req.socket.served = (req.socket.served || 0) + 1;
+            const resend = resends.get(route);
+            if (resend && body === resend.body && Date.now() - resend.at < RESEND_WINDOW_MS) {
+                // Another reused connection closes this one unanswered too, and the request is sent again, until it
+                // is on a new connection.
+                if (reused) {
+                    resend.at = Date.now();
+                } else {
+                    resends.delete(route);
+                }
+                req.socket.destroy();
+                return;
+            }
+            resends.delete(route);
             requests.push({ route, body, raw, at: Date.now(), headers: req.headers });
             if (device.down > 0 && route !== 'GET /' && route !== 'GET /ui.js') {
                 device.down -= 1;
@@ -1331,6 +2327,9 @@ async function startStub() {
             const next = (scripted.get(route) || []).shift();
             if (next === 'drop') {
                 dropsPending -= 1;
+                if (reused) {
+                    resends.set(route, { body, at: Date.now() });
+                }
                 req.socket.destroy();
             } else if (next === 'hang') {
                 // Never answered: the page's own timeout has to notice.
@@ -1369,8 +2368,15 @@ async function startStub() {
             scripted.get(route).push(reply);
             if (reply === 'drop') {
                 dropsPending += 1;
-                server.closeIdleConnections();
+                if (!reusing) {
+                    server.closeIdleConnections();
+                }
             }
+        },
+        // Leave the connections open as a drop is scripted, as a connection that was not idle yet when next() closed
+        // the idle ones is: the dropped request then meets a reused connection, and is sent again.
+        reuseConnections(on) {
+            reusing = on;
         },
         // Hold the answers to a route until the returned function is called.
         hold(route) {
@@ -1404,12 +2410,18 @@ module.exports = {
     cableNetwork,
     screenBoard,
     timeBoard,
+    soundBoard,
+    PREFERENCES,
+    validName,
+    hostNames,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,
     emptySlot,
     firmwareTrial,
     appImage,
+    updateNotBuilt,
+    updateOffer,
     REPLIES,
     FIRMWARE,
     FIRMWARE_PARTS,
@@ -1419,4 +2431,7 @@ module.exports = {
     slotsOf,
     speakersOf,
     served,
+    validTimeZone,
+    zonePlace,
+    zoneReadable,
 };

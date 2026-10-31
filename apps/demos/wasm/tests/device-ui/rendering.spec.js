@@ -299,7 +299,7 @@ test('the network the board is on', async ({ page, stub }) => {
     await expect(row).toHaveText('Wi-Fi kitchen \u00b7 -58 dBm \u00b7 192.168.1.23');
     await shows({ kind: 'wifi', ssid: '', rssi_dbm: null, address: '' }, 'Wi-Fi, not joined \u00b7 no address');
     // QEMU's emulated Ethernet, as the emulated board reports it.
-    await shows({ kind: 'ethernet', ssid: '', rssi_dbm: null, address: '10.0.2.15' }, 'Ethernet \u00b7 10.0.2.15');
+    await shows({ kind: 'ethernet', ssid: '', rssi_dbm: null, address: '10.0.2.15' }, 'Wired \u00b7 10.0.2.15');
     // A kind the page has no word for is shown as the firmware's own.
     await shows({ kind: 'thread', ssid: '', rssi_dbm: null, address: 'fd00::1' }, 'thread \u00b7 fd00::1');
     await shows({ address: '10.0.2.15' }, 'A network \u00b7 10.0.2.15');

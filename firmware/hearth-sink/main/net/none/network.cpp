@@ -28,6 +28,8 @@ const char* network_source() { return "none"; }
 
 void network_adopt_built_in() {}
 
+void network_forget_driver_state() {}
+
 bool network_has_choice() { return false; }
 
 bool network_set_preference(NetworkPreference) { return false; }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -42,6 +43,19 @@
 //              sample where the table says. Reads a moov-last file a stream
 //              refuses.
 //
+// PROTECTED TRACKS ARE REFUSED, NOT READ. A track whose sample entry is 'enca' (ISO/IEC
+// 23001-7 Common Encryption: the entry type of a protected audio track, with a 'sinf' naming
+// the scheme, the original format and, in 'tenc', the default key ID) holds ciphertext, and
+// nothing here decrypts. Such a track is never selected: demux(), Reader and demux_seekable()
+// report DemuxError::kProtectedTrack when it is the only candidate, and describe_refusal() says
+// which track, with what scheme, original format and default KID. A track that holds a clear
+// sample entry beside a protected one (how a packager writes a clear lead-in) is refused whole,
+// not read as far as its clear entry, because the entry a sample belongs to is named per chunk
+// ('stsc') or per fragment ('tfhd', 'trex') and a reader that returned the lead-in alone would
+// hand back a truncated programme as if it were the whole of it. A protected track beside a
+// readable one is listed in Demuxed::skipped with its Protection. See
+// planning/cenc-conformance.md and, for reading with a key, planning/cenc-read-side.md.
+//
 // UNTRUSTED INPUT. Every box length, chunk offset and sample size in an MP4
 // is self-declared, and the sample table is an INDEX - a hostile stsc can
 // point a chunk past the end of the file, an stsz can claim four billion
@@ -60,12 +74,15 @@ struct ReaderState;
 }  // namespace detail
 
 enum class DemuxError : std::uint8_t {
-    kNotIsobmff,       // no box structure worth calling ISOBMFF
-    kTruncated,        // the input ends before the track or its samples
-    kMalformed,        // a box, sample table or fragment layout that cannot be parsed
-    kNoAudioTrack,     // no 'ac-3'/'ec-3'/'ac-4' track (see ReadOptions::track_id)
-    kLimitExceeded,    // a box size, sample count or nesting depth beyond ReadOptions
-    kMoovAfterMdat,    // Reader only: the sample table follows the data it indexes
+    kNotIsobmff,      // no box structure worth calling ISOBMFF
+    kTruncated,       // the input ends before the track or its samples
+    kMalformed,       // a box, sample table or fragment layout that cannot be parsed
+    kNoAudioTrack,    // no 'ac-3'/'ec-3'/'ac-4'/'mlpa' track (see ReadOptions::track_id); protected
+                      // ones are kProtectedTrack
+    kLimitExceeded,   // a box size, sample count or nesting depth beyond ReadOptions
+    kMoovAfterMdat,   // Reader only: the sample table follows the data it indexes
+    kProtectedTrack,  // the audio track is protected (Common Encryption) and is not read; see
+                      // describe_refusal() for which and how, and the header comment above
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);
@@ -86,6 +103,10 @@ struct CodecConfig {
     // so when this is set only `payload` below is meaningful - the AC-3-shaped
     // fields stay at their defaults and iclforge::ac4::'s own parser is the authority.
     bool ac4 = false;
+    // 'dmlp' (a TrueHD 'mlpa' track): the fields the box holds. Zero in the other layouts.
+    bool mlp = false;
+    std::uint32_t mlp_format_info = 0;
+    int mlp_peak_data_rate = 0;  // 15 bits
     int fscod = 0;
     int bsid = 0;
     int bsmod = 0;
@@ -130,7 +151,7 @@ struct EditListEntry {
 // AudioTrack.
 struct ReadTrack {
     std::uint32_t track_id = 0;
-    std::string codec_id;  // kCodecAc3, kCodecEac3 or kCodecAc4
+    std::string codec_id;  // kCodecAc3, kCodecEac3, kCodecAc4 or kCodecTruehd
     // The sample entry's own 16.16 samplerate field, integer part.
     std::uint32_t sample_rate = 0;
     int channels = 0;
@@ -169,6 +190,39 @@ enum class TrackKind : std::uint8_t { kAudio, kVideo, kText, kOther };
     return "other";
 }
 
+// What a protected sample entry says about its protection: ISO/IEC 14496-12's protection scheme
+// information box ('sinf') of an 'enca' or 'encv' entry, and the track encryption box ('tenc')
+// that ISO/IEC 23001-7 puts in its 'schi'. Reported as stored, for a caller that tells a person
+// what protects a track; nothing here reads a key or decrypts a byte. The layouts are those of
+// files written by GPAC, FFmpeg and Shaka Packager (planning/cenc-conformance.md, M3 and M7); the
+// standard itself has not been read.
+struct Protection {
+    // The sample entry's four characters: "enca" (audio) or "encv" (video).
+    std::string entry_type;
+    // 'schm' scheme_type: "cenc", "cbc1", "cens" or "cbcs", or whatever else the file names.
+    // Empty when the entry has no 'schm'.
+    std::string scheme;
+    std::uint32_t scheme_version = 0;
+    // 'frma' data_format: the entry type the track had before it was protected ("ec-3", "ac-3",
+    // "ac-4", "avc1", "mp4a"). Empty when the entry has no 'frma'.
+    std::string original_format;
+    // Whether the entry has a 'tenc'; the fields below are meaningful only then.
+    bool has_tenc = false;
+    bool default_is_protected = false;
+    // default_Per_Sample_IV_Size: 8 or 16, or 0 for a track whose IV is constant (cbcs).
+    std::uint8_t default_iv_size = 0;
+    // default_KID, the 16 bytes as stored.
+    std::array<std::uint8_t, 16> default_kid{};
+    // 'tenc' version 1's pattern: crypt_byte_block and skip_byte_block, 0 and 0 in version 0.
+    std::uint8_t crypt_byte_block = 0;
+    std::uint8_t skip_byte_block = 0;
+    // The 1-based position of this entry in 'stsd' (the value 'stsc' and 'tfhd' call
+    // sample_description_index), for the first protected entry of the track.
+    std::uint32_t entry_index = 0;
+    // The track's 'stsd' also holds an entry that is not protected: a clear lead-in layout.
+    bool track_has_clear_entry = false;
+};
+
 // A track the walk saw and did not read: what a file holds besides the audio it gave up. The
 // reader reads no sample of one; this is what its boxes say, for a caller that wants to tell a
 // person what else the file carries (a picture, a subtitle track).
@@ -179,14 +233,49 @@ struct SkippedTrack {
     // that is not printable ASCII shown as '?'; empty when the track has no sample entry.
     std::string codec_id;
     std::string language{"und"};
+    // Set when a sample entry of the track is protected. The reader reads no sample of a track
+    // like this one, whether or not its original format is one it would otherwise read.
+    std::optional<Protection> protection;
+};
+
+// A KID as lower-case hex in the 8-4-4-4-12 form DASH's cenc:default_KID attribute uses
+// ("a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90"). A KID is public (it is in the MPD and in 'tenc'), so
+// printing one is no leak; the key it names is something else and is not read here.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string format_kid(
+    const std::array<std::uint8_t, 16>& kid);
+
+// "cenc, original format ec-3, default KID a1b2c3d4-e5f6-0718-293a-4b5c6d7e8f90": the protection
+// as a person reads it. A field the entry does not state is said not to be stated.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string describe(const Protection& protection);
+
+// The sentence kProtectedTrack stands for, one per refused track, joined by "; ":
+// "track 2 is protected (cenc, original format ec-3, default KID ...); decryption is not
+// supported". Empty `refused` gives the generic sentence describe(DemuxError) has. The tracks come
+// from Reader::refused_tracks() or list_refused_tracks().
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string describe_refusal(
+    std::span<const SkippedTrack> refused);
+
+// The codecs automatic track selection may take. A codec left false is passed over as if its
+// tracks were not in the file (they are listed in Demuxed::skipped), so the next audio track that
+// is wanted is taken. Every codec this reader selects is on by default, which is what the reader
+// did before a caller could say.
+struct AutoSelect {
+    bool ac3 = true;     // 'ac-3'
+    bool eac3 = true;    // 'ec-3'
+    bool ac4 = true;     // 'ac-4'
+    bool truehd = true;  // 'mlpa'
 };
 
 // Bounds on what the reader will do for one file - defences against a
 // hostile container, not tuning knobs.
 struct ReadOptions {
-    // The track to extract. 0 auto-selects the first 'ac-3'/'ec-3' track;
-    // any other value names a track_ID explicitly.
+    // The track to extract. 0 auto-selects the first 'ac-3'/'ec-3'/'ac-4'/'mlpa' track that
+    // auto_select allows and that is not protected; any other value names a track_ID explicitly
+    // (auto_select does not apply to it). A protected track is never extracted: naming one gives
+    // kProtectedTrack.
     std::uint32_t track_id = 0;
+    // Which codecs track_id 0 may take.
+    AutoSelect auto_select{};
     // The largest single box the reader will hold. A box it does not need is
     // skipped without ever being buffered, however large.
     std::uint64_t max_box_bytes = 64U << 20;  // 64 MiB
@@ -262,6 +351,10 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     [[nodiscard]] const ReadTrack& track() const;
     [[nodiscard]] bool track_found() const;
     [[nodiscard]] std::size_t samples_read() const;
+    // The audio tracks refused so far for being protected, in file order, each with its
+    // `protection` set. Complete once finish() has returned; the way to say why it returned
+    // kProtectedTrack.
+    [[nodiscard]] const std::vector<SkippedTrack>& refused_tracks() const;
 
    private:
     std::unique_ptr<detail::ReaderState> state_;
@@ -296,5 +389,17 @@ using TrackFn = std::function<void(const ReadTrack&)>;
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<ReadTrack, DemuxError> demux_seekable(
     const ReadAtFn& read_at, std::uint64_t size, const TrackFn& on_track,
     const Reader::SampleFn& on_sample, const ReadOptions& options = {});
+
+// The audio tracks of an MP4 that the reader refuses for being protected, in file order, each
+// with its `protection` set: the detail behind a kProtectedTrack that demux() or
+// demux_seekable() returned, for a caller that has no Reader to ask. Walks the boxes the way those
+// do and reads no sample. An empty list means no track is refused, which is also what a file with
+// a readable audio track and a protected video track gives. Errors are the walk's: kNotIsobmff,
+// kMalformed and kLimitExceeded.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<SkippedTrack>, DemuxError>
+list_refused_tracks(std::span<const std::byte> file, const ReadOptions& options = {});
+
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<SkippedTrack>, DemuxError>
+list_refused_tracks(const ReadAtFn& read_at, std::uint64_t size, const ReadOptions& options = {});
 
 }  // namespace iclforge::containers::mp4

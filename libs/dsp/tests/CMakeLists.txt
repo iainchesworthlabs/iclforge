@@ -11,7 +11,8 @@ iclforge_add_test_binary(iclforge-dsp-tests PROJECT dsp SOURCES
     test_dsp_qmf.cpp
     test_dsp_qmf_engine.cpp
     test_dsp_resampler.cpp
-    test_fft.cpp)
+    test_fft.cpp
+    test_spectrum.cpp)
 
 target_link_libraries(iclforge-dsp-tests PRIVATE iclforge::dsp iclforge::base_headers)
 

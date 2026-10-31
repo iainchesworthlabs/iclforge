@@ -128,6 +128,31 @@ bursts to a WAV and `unspdif` reads them back. In the other direction the captur
 recognises AC-4 bursts as it does AC-3's, and `forge record` then writes the AC-4 elementary
 stream; that is tested on synthetic carriers, and no capture device or receiver has produced one.
 
+### TrueHD (MAT)
+
+!!! warning "Not run on any platform"
+    TrueHD over HDMI (MAT) has been **built, and tested against software devices, and has not been run against a receiver on
+    Linux, ALSA or PipeWire**. Nothing here says a receiver names the stream TrueHD. The code does what the carrier decision of 2026-10-29
+    says, which is itself provisional ([libs/containers/ERRATA.md](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md),
+    question 7): eight channels of 16 bits at 192 kHz for content in the 48 kHz family and 176.4 kHz for the 44.1 kHz family,
+    3,840 frames to a 61,440-byte burst. The list of what has been run is `apps/hearth/engine/src/mat_status.hpp`, and
+    the output decision quotes it.
+
+`PassthroughSink` opens TrueHD (`BitstreamFormat::kMat`) as ordinary 16-bit PCM of **eight channels** at the link rate, with the
+non-audio channel status at that rate (192 kHz is `AES3=0x0e`, 176.4 kHz `0x0c`). Only an HDMI output offers eight channels
+at 192 kHz, so a S/PDIF output answers no, and a device that is stereo only is refused (`kFormatRejected`) rather than opened at two
+channels, where a MAT burst would be noise. The sink's descriptor read now reports a MAT entry (CEA-861 audio format code 12) beside AC-3 and
+E-AC-3, from the ELD under ALSA and from the `iec958.codecs` list under PipeWire.
+
+PipeWire negotiates SPA's `TRUEHD` codec (the Pi's Atmos receiver listed `TrueHD` unprompted, above) on the same link rate and 16-byte
+frames. That PipeWire reads a `TRUEHD` stream's rate and frame so is an assumption modelled on how E-AC-3 is handled, and no sink has
+been asked.
+
+Tested: the device names, the channel status, the codec list and the ELD parse (headless); the ALSA open against ALSA's `null`
+and `file` devices, with a 61,440-byte burst read back from an eight-channel device byte for byte
+(`libs/audio/tests/test_alsa_null_backend.cpp`, run in a container on Ubuntu 24.04 for this change). Not tested: any HDMI device, any PipeWire
+sink, any receiver.
+
 ### What has and has not been verified
 
 !!! note "ALSA and PipeWire are each hardware-confirmed once, on one Raspberry Pi"

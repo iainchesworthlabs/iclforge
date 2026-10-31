@@ -1,0 +1,83 @@
+# The 4 MB ESP32-C6's image, built and held to its OTA slot, at the pull request.
+#
+# The profile guard (_profiles.yml) configures each profile and holds it to its definition, and does
+# not compile: a size budget needs a build. For every profile but one that is a soft limit, and the
+# post-merge jobs of ci.yml hold it. The 4 MB C6's budget is its slot (partitions_c6.csv: two 1.875 MiB
+# app slots, 1,966,080 bytes, which firmware/hearth-sink/profiles.json's app_bytes_max is), an image
+# over it cannot be flashed over the network, and ESP-IDF fails the build itself. That used to be seen
+# only after the merge: the web page, the zone table, the preferences and the trims took the image
+# 8,720 bytes past its slot, and main was red at ci.yml's "Build hearth_sink's Sendspin player for the
+# ESP32-C6" step from 25 October 13:44Z, behind other red steps, until the page was gzipped.
+#
+# So the image is built here, for a change to anything it is compiled from (tools/ci/plan_gate.py,
+# ESP_IMAGE_PREFIXES: the sink, the component, the profile tools, the libraries), the same way ci.yml
+# builds it: the profile's fragments, its identity, `idf.py build` (which fails when the image is
+# bigger than the slot) and `sink_profile.py verify` with the size report. About six minutes of one
+# runner on a cold one (the first run: 164 s to start the IDF container, 182 s to build; the ci.yml
+# step builds it in 2m34s), beside the profile guard's seven to fourteen and the GCC job's nine: the
+# gate takes no longer. To hold another profile to its budget the same way, add it to the list below.
+#
+# A change must also leave room for the next one: `verify --app-headroom` fails an image with fewer
+# than that many bytes under the slot, 10,240 (10 KiB) for the 4 MB C6. The changes that cost the
+# image most lately were 25.6, 18.3, 9.0 and 8.1 KB, so a change that leaves less than 10 KiB is
+# the last one that fits, and the next feature is red with no lead time. To clear it, make room (a
+# smaller table, a Kconfig switch, the compiler's size flags) or ask for the slot to be moved in
+# partitions_c6.csv; do not lower the number below what the changes that land cost. Unlike the
+# profile guard this does not honour ESP32_PROFILE_GUARD=warn: a slot is not a soft limit.
+#
+# Called from pr-gate.yml, for a change the planner marks `esp_size`, in a pull request and in the
+# merge queue. ci-status reads its result and fails closed when the plan asked for it.
+#
+# `runner` is a JSON runner-label array, as _profiles.yml's. The IDF image is the one ci.yml's ESP
+# jobs use.
+name: ESP32 image size guard
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: 'Runner labels as a JSON array, e.g. ["ubuntu-latest"].'
+        type: string
+        default: '["ubuntu-latest"]'
+
+permissions:
+  contents: read
+
+jobs:
+  size:
+    name: ESP32 4 MB C6 image
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    container: espressif/idf:v6.1
+    # A cold build takes about three minutes: the limit is a backstop against a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the 4 MB C6 profile and hold its image to its slot
+        shell: bash
+        run: |
+          set -eu
+          . "$IDF_PATH/export.sh" > /dev/null
+          profile="$GITHUB_WORKSPACE/tools/hearth/sink_profile.py"
+          # Profiles that are built and held to their budget, one a line: id, the IDF target, and the
+          # bytes a change must leave free under the budget.
+          while IFS=' ' read -r id target headroom; do
+            dir="$RUNNER_TEMP/size-$id"
+            echo "::group::$id ($target)"
+            defaults="$(python3 "$profile" defaults "$id")"
+            read -r -a identity <<< "$(python3 "$profile" identity "$id" --cmake)"
+            (
+              cd "$GITHUB_WORKSPACE/firmware/hearth-sink"
+              idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET="$target" \
+                "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
+                -DPROJECT_VER=size-guard build
+              idf.py -B "$dir" size --format json2 > "$dir/size.json"
+            )
+            python3 "$profile" verify "$id" --build-dir "$dir" --size-json "$dir/size.json" \
+              --app-headroom "$headroom" --github
+            echo "::endgroup::"
+          done <<'PROFILES'
+          c6-4mb esp32c6 10240
+          PROFILES

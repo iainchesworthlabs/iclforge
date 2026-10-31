@@ -7,7 +7,8 @@ on — so a change here is a change to the ground truth every measurement sits
 on, not an implementation detail.
 
 Three scripts are the exception. `gen_dee_gold.py` and `gen_ac4_baseline.py --gold-set`
-write sets that stay on a local disk. `gen_conformance_vectors.py` builds the
+write sets that stay on a local disk (a few TrueHD legs of the first are committed, under
+`testdata/truehd-dee/`: see below). `gen_conformance_vectors.py` builds the
 conformance vector bundle that a release publishes, and it is the only script CI
 runs: the `linux-gcc` leg builds the bundle, and a release run builds it twice
 with `--check-determinism`.
@@ -145,7 +146,7 @@ All of these are run from the repo root.
 | `gen_gui_resample_test_wav.py` | `libs/base/fuzz/seeds/fuzz_wav_read/resample-44100.wav`, which the GUI's resample-on-load QML test also loads | stdlib only |
 | `gen_programme_fixtures.py` | both programme fixtures + `corpus.json` | needs `--source-dir` and `ffmpeg` |
 | `gen_external_baseline.py` | `testdata/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
-| `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, never committed | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
+| `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, not committed except a subset of the TrueHD legs (`testdata/truehd-dee/`, `--fixtures-out`) | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
 | `gen_dee_tpn_fixture.py` | `testdata/external-baseline/eac3-transient-stereo-128/` | needs the local DEE golden-master set (`--gold`) |
 | `gen_object_fixture.py` | `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes, and `dee_joc_714.ec3` / `dee_joc_916.ec3` from 7.1.4 and 9.1.6 beds that play one channel at a time | needs **Dolby DEE** and numpy |
 | `gen_ac4_baseline.py` | the committed AC-4 set: `testdata/external-baseline/ac4-*/dee.ac4`, `ac4-manifest.json` and the syntax digests under `testdata/ac4/`. With `--gold-set DIR`, a local set that is never committed | needs **Dolby DEE** (its licence ends 2026-11-06), numpy, `ffmpeg` and a built `forge` (`--cli`) |
@@ -164,6 +165,8 @@ All of these are run from the repo root.
 | `gen_conformance_vectors.py` | the conformance vector bundle under `--out`, and with `--archive` its `.tar.gz` | needs a built `forge` (`--cli`); the one script CI runs, see above |
 | `gen_karaoke_example.py` | `examples/karaoke/auld-lang-syne/`: the karaoke example's four parts, its two lyrics files and its Forge GUI project, and with `--forge` its stream | stdlib only; `--check` compares the committed files; `tools/checks/test_gen_karaoke_example.py` runs it in CI; the sample path uses no C library function, so the files are the same on every platform |
 | `gen_karaoke_duet_example.py` | `examples/karaoke/leave-her-johnny/`: the duet example's four parts (the two vocals sing different lines), its two lyrics files and its Forge GUI project, which names the parts and nothing of their layout, and with `--forge` its stream | stdlib only; shares its voices and WAV writer with `gen_karaoke_example.py` through `karaoke_synth.py`; `--check` compares the committed files; `tools/checks/test_gen_karaoke_duet_example.py` runs it in CI |
+| `cenc_make_protected.py` | a protected (Common Encryption) fragmented MP4 from a clear AC-3, E-AC-3 or AC-4 MP4: all four schemes, the clear-lead and key-rotation layouts, and with `--profile dolby-ott` the protection layout of Dolby's public OTT reference audio (subsample map, 1:9 pattern, PIFF copy, PlayReady and Widevine `pssh`); not committed | needs the `cryptography` package; the audit's fixture writer, [`planning/cenc-conformance.md`](../../planning/cenc-conformance.md), checked against GPAC and FFmpeg; not a reference for the standard |
+| `gen_cenc_reader_fixtures.py` | the seven small protected MP4s in `libs/containers/fuzz/seeds/fuzz_mp4_demux/` that the MP4 reader's tests and fuzz harness read: three from packager layouts (`--set refusal`) and four with Dolby's OTT audio layout (`--set dolby-ott`) | needs a built `forge` (`--forge`) and the `cryptography` package; `--check` compares the committed files |
 | `gen_pseudo_locale.py` | `apps/forge/gui/assets/translations/forge_gui_xx.ts`, the GUI's pseudo-locale, made from `forge_gui_fr.ts` | stdlib only |
 
 Regenerating a programme fixture:
@@ -187,6 +190,19 @@ it writes is consumed.
 `gen_dee_gold.py` writes a set that is not committed: it makes DEE's golden
 masters for AC-3, E-AC-3, E-AC-3 JOC and TrueHD while DEE's licence runs (it ends
 on 2026-11-06), a set of about 1,100 streams kept on a local disk with a
-manifest, each rebuildable from the committed programme fixtures.
+manifest, each rebuildable from the committed programme fixtures. The set is not
+committed, except that the `truehd-fixtures` legs (0.25 s streams of 7.1, three
+substreams, 96 kHz and 16 and 20 bits) and four short length legs are, with their
+sources and DEE's logs, under `testdata/truehd-dee/`; `--fixtures-out DIR` writes that
+copy from a set, laid out so that `tools/checks/score_truehd_decode.py --set` reads it.
+The `truehd-long` group (300 s programmes) is made in a second set directory.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
 writes the short streams under `testdata/external-baseline/` that CI reads.
+
+`gen_atmos_demo_track.py` writes a 72 s Dolby Atmos demo piece (E-AC-3 JOC, 768 kb/s,
+48 kHz, nine objects) as a raw `.ec3` and a tagged `.m4a` with a generated cover, for
+trying object audio end to end through a media server. The music is synthesised from
+numpy with a fixed seed, so the files are free to share and the output is reproducible.
+`python tools/generators/gen_atmos_demo_track.py --forge <a host build's forge> --out <dir>`;
+it needs numpy, scipy, `ffmpeg` on PATH and a built `forge`. Nothing it writes is committed.
+See `planning/atmos-demo-track.md`.

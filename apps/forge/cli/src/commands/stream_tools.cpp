@@ -21,6 +21,7 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
@@ -76,13 +77,38 @@ std::optional<LoadedStream> scan_loaded(std::vector<std::byte> bytes, std::strin
 
 }  // namespace
 
-std::optional<LoadedStream> load_stream(std::string_view path) {
+namespace {
+
+// Why `command` does not do to a TrueHD or MLP stream what it does to an AC-3 or E-AC-3 one.
+std::string_view truehd_reason(std::string_view command) {
+    if (command == "cut") {
+        return "a cut can start only at an access unit that carries a major sync, and this build "
+               "does not cut at those yet";
+    }
+    if (command == "cat") {
+        return "a join needs the second stream to open with a major sync and to match the "
+               "first's shape, and this build does not join them yet";
+    }
+    return {};
+}
+
+}  // namespace
+
+std::expected<LoadedStream, int> load_stream(std::string_view path, std::string_view command) {
     auto bytes = read_all(path);
     if (bytes.empty()) {
         fmt::println(stderr, "error: cannot read {}", path);
-        return std::nullopt;
+        return std::unexpected(kExitInput);
     }
-    return scan_loaded(std::move(bytes), path);
+    // AC-3's scan would fail on it with a frame-sync error that says nothing of the codec.
+    if (is_truehd_stream(bytes)) {
+        return std::unexpected(refuse_truehd(command, path, truehd_reason(command)));
+    }
+    auto loaded = scan_loaded(std::move(bytes), path);
+    if (!loaded.has_value()) {
+        return std::unexpected(kExitInput);
+    }
+    return std::move(*loaded);
 }
 
 namespace {
@@ -1224,8 +1250,9 @@ std::optional<std::vector<iclforge::ac3::eac3::chanmap::Location>> own_coding_mo
 
 int run_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   std::string_view layout, const Options& meta) {
-    // A stream inside a container is read as decode reads it.
-    auto bytes = read_elementary_stream(in_path);
+    // A stream inside a container is read as decode reads it, but for a TrueHD track, which
+    // this refuses: a file with another track after it gives that one.
+    auto bytes = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (bytes.empty()) {
         return kExitInput;
     }
@@ -1236,6 +1263,9 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
     const bool to_ac4 = *target_codec == plan::Codec::kAc4;
     if (bitrate == 0) {
         bitrate = to_ac4 ? 192 : 448;
+    }
+    if (is_truehd_stream(bytes)) {
+        return refuse_truehd("transcode", in_path);
     }
     if (is_ac4_stream(bytes)) {
         return transcode_from_ac4(in_path, out_path, bitrate, layout, meta, *target_codec, bytes);
@@ -1552,7 +1582,24 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
 }
 
 int run_metadata(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path);
+    // A TrueHD or MLP stream keeps its dialogue norm, mix level and the rest in the major sync, under
+    // its own CRC; truehd_tools.cpp rewrites those. The options of that rewrite are TrueHD's alone.
+    auto bytes = read_all(in_path);
+    if (bytes.empty()) {
+        fmt::println(stderr, "error: cannot read {}", in_path);
+        return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_metadata_truehd(std::move(bytes), in_path, out_path, meta);
+    }
+    if (!meta.thd_meaning.empty()) {
+        fmt::println(stderr,
+                     "error: {} is not a TrueHD stream: the truehd- options of metadata set the "
+                     "channel meaning of TH spec section 14, which only TrueHD has",
+                     in_path);
+        return kExitUsage;
+    }
+    auto loaded = scan_loaded(std::move(bytes), in_path);
     if (!loaded.has_value()) {
         return kExitInput;
     }
@@ -1673,7 +1720,17 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
 }
 
 int run_normalize(std::string_view in_path, std::string_view out_path, const Options& meta) {
-    auto loaded = load_stream(in_path);
+    // A TrueHD or MLP stream is measured presentation by presentation and its dialogue norms
+    // written into the major sync (truehd_tools.cpp).
+    auto bytes = read_all(in_path);
+    if (bytes.empty()) {
+        fmt::println(stderr, "error: cannot read {}", in_path);
+        return kExitInput;
+    }
+    if (is_truehd_stream(bytes)) {
+        return run_normalize_truehd(std::move(bytes), in_path, out_path, meta);
+    }
+    auto loaded = scan_loaded(std::move(bytes), in_path);
     if (!loaded.has_value()) {
         return kExitInput;
     }
@@ -1742,9 +1799,9 @@ int run_normalize(std::string_view in_path, std::string_view out_path, const Opt
 
 int run_cut(std::string_view in_path, std::string_view out_path, std::string_view start_seconds,
             std::string_view duration_seconds) {
-    const auto loaded = load_stream(in_path);
+    const auto loaded = load_stream(in_path, "cut");
     if (!loaded.has_value()) {
-        return kExitInput;
+        return loaded.error();
     }
     const auto& scan = loaded->scan;
     const auto total_units = scan.access_units.size();
@@ -1886,10 +1943,10 @@ int run_cat(std::string_view out_path, std::span<const std::string_view> in_path
     std::size_t units = 0;
     std::uint64_t samples = 0;
     for (const auto path : in_paths) {
-        const auto loaded = load_stream(path);
+        const auto loaded = load_stream(path, "cat");
         if (!loaded.has_value()) {
             sink.abort();
-            return kExitInput;
+            return loaded.error();
         }
         const auto& scan = loaded->scan;
         if (!reference.has_value()) {

@@ -207,6 +207,44 @@ class Conservative(unittest.TestCase):
         self.assertEqual(gate.plan([], force_all=True)["esp"], "true")
         self.assertEqual(gate.plan([])["esp"], "true")
 
+    def test_the_esp32_image_is_planned_for_what_is_compiled_into_it(self):
+        # What the profiles are configured from, and the libraries the sinks link: a header-only
+        # change to libs/device (the zone table, the preferences' registry) is 12 KB of a 4 MB
+        # C6's image.
+        for path in (
+            "firmware/hearth-sink/main/hearth_sink.cpp",
+            "firmware/esp-idf/iclforge/ui/iclforge_ui.js",
+            "firmware/hearth-sink/profiles.json",
+            "libs/device/include/iclforge/time_zone_data.hpp",
+            "libs/ac3/src/decoder/decoder.cpp",
+            "cmake/IclforgeTests.cmake",
+            "external/time-filter/filter.hpp",
+            ".github/workflows/_profiles.yml",
+            ".github/workflows/_esp_size.yml",
+        ):
+            with self.subTest(path=path):
+                got = plan(path)
+                self.assertEqual(got["esp_size"], "true")
+                self.assertEqual(got["esp_size_reason"], path)
+
+    def test_the_esp32_image_is_not_planned_for_what_is_not_in_it(self):
+        for path in (
+            "libs/ac3/tests/test_decoder.cpp",
+            "libs/device/tests/test_wall_clock.cpp",
+            "libs/ac3/fuzz/fuzz_decoder.cpp",
+            "apps/forge/cli/main.cpp",
+            "tools/hearth/board_suite.py",
+            "firmware/hearth-sink/README.md",
+            "planning/esp32-platform-profiles.md",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(plan(path)["esp_size"], "false")
+
+    def test_the_esp32_image_is_planned_for_a_full_run_and_for_no_list(self):
+        self.assertEqual(gate.plan([], force_all=True)["esp_size"], "true")
+        self.assertEqual(gate.plan([])["esp_size"], "true")
+        self.assertEqual(gate.plan(["docs/a.md"])["esp_size"], "false")
+
     def test_one_esp_path_among_others_is_enough_and_docs_only_is_not(self):
         got = gate.plan(["docs/a.md", "firmware/hearth-sink/profiles.json", "libs/ac3/x.cpp"])
         self.assertEqual(got["esp"], "true")
@@ -318,6 +356,7 @@ class ProjectTable(unittest.TestCase):
                 "js",
                 "esp-idf",
                 "hearth-sink",
+                "crypto-bench",
                 "esphome",
                 "baremetal",
             },
@@ -399,9 +438,11 @@ class Cli(unittest.TestCase):
                 "machinery",
                 "compare",
                 "esp",
+                "esp_size",
                 "reason",
                 "gui_reason",
                 "esp_reason",
+                "esp_size_reason",
             ],
         )
 

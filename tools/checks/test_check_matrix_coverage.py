@@ -48,6 +48,25 @@ USAGE_AC4 = USAGE + """\
 """
 
 
+# A build with TrueHD and the content signature block. ac4-sign and ac4-verify are commands of
+# the block's own; decode names a TrueHD file as well as an AC-4 one.
+USAGE_TRUEHD = USAGE_AC4 + """\
+  forge truehd-encode <in.wav> <out.thd|out.mkv> (lossless; truehd-restart=, truehd-fir-order=)
+  forge decode <in.ac3|in.thd|in.mlp> <out.wav>
+  forge mkv <in.ac3|in.thd> <out.mkv>
+  forge probe <in>
+AC-4 content signature options (ac4-sign, ac4-verify; any order):
+  sign-content      sign the file once it is written
+  content-key=<path>    the operator's private key
+  pin=<hex>         a certificate by fingerprint
+  verify-time=now|signed|ignore|<time>
+                    when every certificate must be valid
+
+common options (every command):
+  quiet             nothing
+"""
+
+
 class FakeCli:
     def __init__(self, usage=USAGE, layouts="mono | stereo | 51", eac3_layouts="stereo | 71",
                  tools="none | cpl | auto | numblkscod:N (cpl:N pins a band)"):
@@ -141,6 +160,74 @@ class Parsing(unittest.TestCase):
             "run probe in.ac3  # and ac4_51.ac4\n"
             "run_ac4_frames_check ac4_51.ac4\n")
         self.assertEqual(cmc.ac4_invocations(text), {"decode", "ac4-encode"})
+
+
+class TrueHdAndSignature(unittest.TestCase):
+    def test_truehd_commands_are_the_rows_that_name_a_truehd_file(self):
+        with mock.patch.object(cmc, "run", FakeCli(usage=USAGE_TRUEHD)):
+            self.assertEqual(cmc.truehd_commands("cli"), {"truehd-encode", "decode", "mkv"})
+        with mock.patch.object(cmc, "run", FakeCli()):
+            self.assertEqual(cmc.truehd_commands("cli"), set())
+
+    def test_truehd_invocations_are_runs_that_name_a_truehd_file(self):
+        text = cmc.strip_comments(
+            "run decode in.ac3 out.wav\n"
+            'run decode "th_$fixture" "th_$name.wav"\n'
+            'run truehd-encode "$name.wav" "$name.thd" verify\n'
+            'run mkv "$src" "te_$case.mkv"\n'
+            "run probe in.ac3  # and th_x.thd\n"
+            "run_truehd_encode_case st48 48000\n")
+        self.assertEqual(cmc.truehd_invocations(text), {"decode", "truehd-encode", "mkv"})
+
+    def test_a_truehd_command_the_matrix_runs_only_on_ac3_is_a_gap(self):
+        text = cmc.strip_comments("run mkv in.ac3 out.mkv\nrun decode th_a.thd o.wav\n")
+        gap = {"decode", "mkv"} - cmc.truehd_invocations(text)
+        self.assertEqual(gap, {"mkv"})
+
+    def test_truehd_options_are_the_names_with_an_equals_sign(self):
+        with mock.patch.object(cmc, "run", FakeCli(usage=USAGE_TRUEHD)):
+            self.assertEqual(cmc.truehd_options("cli"),
+                             {"truehd-restart=", "truehd-fir-order="})
+        with mock.patch.object(cmc, "run", FakeCli()):
+            self.assertEqual(cmc.truehd_options("cli"), set())
+
+    def test_signature_options_are_read_off_the_block_and_nothing_after_it(self):
+        with mock.patch.object(cmc, "run", FakeCli(usage=USAGE_TRUEHD)):
+            self.assertEqual(
+                cmc.signature_options("cli"),
+                {"sign-content": False, "content-key": True, "pin": True, "verify-time": True})
+        with mock.patch.object(cmc, "run", FakeCli()):
+            self.assertEqual(cmc.signature_options("cli"), {})
+
+    def test_an_option_is_covered_as_itself_and_not_as_part_of_another(self):
+        text = cmc.strip_comments(
+            "run ac4-verify a.ac4 trust-anchor=x pin=00 verify-time=signed\n"
+            "run ac4-encode in.wav out.ac4 sign-content\n"
+            "run decode a.ac4 o.wav verify-content\n")
+        self.assertTrue(cmc.option_covered(text, "pin", True))
+        self.assertTrue(cmc.option_covered(text, "verify-time", True))
+        self.assertTrue(cmc.option_covered(text, "sign-content", False))
+        self.assertFalse(cmc.option_covered(text, "content-key", True))
+        # "verify-content" is the matrix's, "content" alone and "check-content" are not.
+        self.assertTrue(cmc.option_covered(text, "verify-content", False))
+        self.assertFalse(cmc.option_covered(text, "check-content", False))
+        self.assertFalse(cmc.option_covered(text, "content", False))
+        # A value option is the name with its '=', not the bare word.
+        self.assertFalse(cmc.option_covered("run x pin\n", "pin", True))
+
+    def test_the_real_matrix_has_a_leg_for_every_signature_option_and_truehd_command(self):
+        real = cmc.strip_comments((cmc.REPO / "tools" / "ci" / "run_codec_matrix.sh").read_text())
+        for name, value in {"sign-content": False, "verify-content": False, "check-content": False,
+                            "unanchored-ok": False, "content-key": True, "content-chain": True,
+                            "trust-anchor": True, "pin": True, "leaf-title": True,
+                            "signed-date": True, "verify-time": True}.items():
+            with self.subTest(option=name):
+                self.assertTrue(cmc.option_covered(real, name, value))
+        invoked = cmc.truehd_invocations(real)
+        for command in ("truehd-encode", "decode", "probe", "levels", "loudness", "spdif",
+                        "unspdif", "mkv", "mp4", "ts", "demux"):
+            with self.subTest(command=command):
+                self.assertIn(command, invoked)
 
 
 class Main(unittest.TestCase):

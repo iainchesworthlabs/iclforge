@@ -122,7 +122,8 @@ endif()
 if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
                             "panel/lvgl/dev_screen.cpp" "panel/lvgl/dev_info.cpp"
-                            "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
+                            "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp" "panel/lvgl/meters_screen.cpp"
+                            "panel/lvgl/prefs_screen.cpp" "panel/lvgl/prefs_pages.cpp" "panel/lvgl/prefs_editors.cpp" "panel/lvgl/sound_sheet.cpp" "panel/lvgl/layout_sheet.cpp"
                             "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
         list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")
@@ -133,9 +134,22 @@ else()
     set(ICLFORGE_PANEL_SRCS "panel/none/panel.cpp")
 endif()
 
+# The Meters view's analysis (a 1,024- and a 512-point transform in float) and its drawing are the panel's heaviest loops, and the project's -Os does not
+# inline the transform's passes or unroll its loops: the kit measured 5 to 10 ms an update for about 100 kflops (planning/p4x-meters-view.md, "Kit
+# results"). meters_screen.cpp at -O2, as the component's player.cpp and burst_player.cpp are; and panel.cpp, where the player's tap
+# (iclforge/meters_tap.hpp, header-only, so its block() is compiled where the tap is made) runs inside the decode task's burst: the kit measured 370 to
+# 860 us a burst for it.
+if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/panel/lvgl/meters_screen.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/panel/lvgl/panel.cpp"
+                                PROPERTIES COMPILE_OPTIONS "-O2")
+endif()
+
 idf_component_register(
     SRCS "hearth_sink.cpp"
+         "board_caps.cpp"
+         "preferences.cpp"
          "settings.cpp"
+         "sound.cpp"
          "provision.cpp"
          "system_reset.cpp"
          "discovery.cpp"
@@ -154,6 +168,29 @@ idf_component_register(
              esp_wifi esp_eth esp_http_client esp_netif esp_event lwip nvs_flash
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
+
+# The trust anchors a pull verifies a signed update index against (planning/esp32-ota.md, O10): a PEM file of
+# public certificates, embedded as it is. ICLFORGE_TRUST_ANCHORS_FILE (a cache variable, for CI's QEMU test,
+# whose throwaway CA is made before the build) wins over the project's ICLFORGE_EXAMPLE_TRUST_ANCHORS; with
+# neither the image carries an empty file, and says it cannot verify a pull. Copied to a name of its own so
+# that the symbols the linker makes (_binary_trust_anchors_pem_start and _end) do not depend on the file's.
+# Only a build that pulls carries it.
+set(ICLFORGE_TRUST_ANCHORS_FILE "" CACHE FILEPATH "CI only: the trust anchors to embed")
+if(CONFIG_ICLFORGE_FIRMWARE_PULL)
+    set(iclforge_anchors_copy "${CMAKE_CURRENT_BINARY_DIR}/trust_anchors.pem")
+    if(ICLFORGE_TRUST_ANCHORS_FILE)
+        configure_file("${ICLFORGE_TRUST_ANCHORS_FILE}" "${iclforge_anchors_copy}" COPYONLY)
+    elseif(CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS)
+        configure_file("${PROJECT_DIR}/${CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS}" "${iclforge_anchors_copy}" COPYONLY)
+    else()
+        file(WRITE "${iclforge_anchors_copy}" "")
+    endif()
+    target_add_binary_data(${COMPONENT_LIB} "${iclforge_anchors_copy}" TEXT)
+    # hearth_sink.cpp names the symbols weakly, so that a build without them links, and a weak reference
+    # does not take an object out of an archive: the data would be left in libmain.a and the board would
+    # say it has no trust anchor. Naming the start undefined takes the member, and the end with it.
+    target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=_binary_trust_anchors_pem_start")
+endif()
 
 # The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): Archivo, which the apps bundle, and
 # Noto Sans for Greek and Cyrillic and for Hebrew, under the SIL Open Font License (panel/fonts/*OFL.txt),
@@ -242,6 +279,6 @@ set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
 # recompiles this one file. Empty for a build that was not made as a profile.
 set(ICLFORGE_PROFILE "" CACHE STRING "the locked profile this image is, or empty")
 set(ICLFORGE_PROFILE_HASH "" CACHE STRING "a hash of that profile's locked values")
-set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(SOURCE "hearth_sink.cpp" "board_caps.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
     "ICLFORGE_PROFILE_ID=\"${ICLFORGE_PROFILE}\""
     "ICLFORGE_PROFILE_HASH_TEXT=\"${ICLFORGE_PROFILE_HASH}\"")

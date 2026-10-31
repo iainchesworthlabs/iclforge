@@ -18,9 +18,10 @@
 # measurement) - with `-m 8M`, the board's size. At the other steps' `-m 32M` the PSRAM takes
 # the S3's whole external virtual address window and the partition table's flash mapping
 # finds none: "esp_mmu_map_virt: no such vaddr range" at app_main's first NVS call. An
-# allocation of 16 KB or more tries PSRAM first, as on the board (sdkconfig.psram), so the
-# decoder's small, hot state stays in internal RAM and its large scratch - the lane's
-# enhanced coupling scratch is 23 KB - does not.
+# allocation of 16 KB or more tries PSRAM first, which is the S3 board's limit (sdkconfig.psram;
+# the s3-n16r8 profile lowers it to 4 KB, sdkconfig.psram-4k) and is left as it is here: the lane
+# only needs its large scratch - the enhanced coupling scratch is 23 KB - out of internal RAM,
+# and a lower limit would move this shape's heap figures untried.
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_QUAD=y
 CONFIG_SPIRAM_USE_MALLOC=y

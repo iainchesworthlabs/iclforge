@@ -8,7 +8,11 @@
 
 /* iclforge's C API: a stable, minimal C-callable surface
  * over the encode/decode core, for bindings and embedding by callers that
- * cannot or do not want to link C++23.
+ * cannot or do not want to link C++23. It covers AC-3, E-AC-3 and Atmos
+ * (OAMD + JOC), AC-4 and TrueHD/MLP, each in its own section below, and the
+ * lyrics reader. The Rust crates wrap this header; the Python and WebAssembly
+ * bindings reach the C++ libraries directly. No binding wraps the TrueHD
+ * section yet.
  *
  * Conventions used throughout:
  *   - Every handle type (iclforge_encoder_t, iclforge_decoded_frame_t, ...)
@@ -54,7 +58,7 @@ typedef enum iclforge_status {
     ICLFORGE_ERROR_INTERNAL =
         3, /* an exception crossed the C boundary; see docs/library/c-api.md */
     /* A call this library was not built to answer - a codec this build left
-     * out (ICLFORGE_BUILD_AC4 off), not a bad argument or a bad stream. Every
+     * out (ICLFORGE_BUILD_AC4 or ICLFORGE_BUILD_TRUEHD off), not a bad argument or a bad stream. Every
      * fallible entry point of that codec's section returns it, including
      * *_create() (the created-object out-parameter is left NULL); a function
      * that returns something else directly returns a NULL pointer, 0, or a
@@ -103,7 +107,33 @@ typedef enum iclforge_status {
 
     /* iclforge_lyrics_parse(): the bytes are not lyrics - empty, in an encoding that is not read,
      * or with no lyrics in them. iclforge_lyrics_error_message() says which. */
-    ICLFORGE_ERROR_LYRICS_UNREADABLE = 90
+    ICLFORGE_ERROR_LYRICS_UNREADABLE = 90,
+
+    /* iclforge::truehd::ErrorKind, one for one, in its order - iclforge_truehd_probe(),
+     * iclforge_truehd_scan() and iclforge_truehd_decoder_decode() */
+    ICLFORGE_ERROR_TRUEHD_TRUNCATED = 100,
+    ICLFORGE_ERROR_TRUEHD_BAD_SYNC = 101,
+    ICLFORGE_ERROR_TRUEHD_BAD_CHECK_NIBBLE = 102,
+    ICLFORGE_ERROR_TRUEHD_BAD_LENGTH = 103,
+    ICLFORGE_ERROR_TRUEHD_BAD_SIGNATURE = 104,
+    ICLFORGE_ERROR_TRUEHD_BAD_MAJOR_SYNC_CRC = 105,
+    ICLFORGE_ERROR_TRUEHD_BAD_RESTART_SYNC = 106,
+    ICLFORGE_ERROR_TRUEHD_BAD_RESTART_CRC = 107,
+    ICLFORGE_ERROR_TRUEHD_BAD_PARITY = 108,
+    ICLFORGE_ERROR_TRUEHD_BAD_SUBSTREAM_CRC = 109,
+    ICLFORGE_ERROR_TRUEHD_BAD_PARAMETER = 110,
+    ICLFORGE_ERROR_TRUEHD_BAD_BLOCK_DATA = 111,
+    ICLFORGE_ERROR_TRUEHD_BAD_LOSSLESS_CHECK = 112,
+    ICLFORGE_ERROR_TRUEHD_NEEDS_RESTART = 113,
+    ICLFORGE_ERROR_TRUEHD_UNSUPPORTED = 114,
+
+    /* iclforge::truehd::EncodeErrorKind - iclforge_truehd_encoder_create(), _encode() and _flush() */
+    ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG = 120,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT = 121,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_UNSUPPORTED = 122,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED = 123,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_VERIFY_FAILED = 124,
+    ICLFORGE_ERROR_TRUEHD_ENCODE_INTERNAL = 125
 } iclforge_status_t;
 
 /* A short, static, human-readable description of `status` — e.g. for a log
@@ -2469,6 +2499,373 @@ ICLFORGE_C_EXPORT void iclforge_lyrics_position(const iclforge_lyrics_t* lyrics,
  * yet sung. */
 ICLFORGE_C_EXPORT iclforge_lyrics_word_state_t iclforge_lyrics_word_state(
     const iclforge_lyrics_t* lyrics, size_t line, size_t word, int64_t position_ms);
+
+
+/* --------------------------------------------------------------------- *
+ * TrueHD and MLP: iclforge::truehd
+ *
+ * A lossless decoder for Dolby TrueHD (0xF8726FBA) and MLP (0xF8726FBB) streams, and an
+ * encoder for TrueHD further down: the samples that come out are the samples that went in,
+ * 24 bits wide, bit for bit. Declared
+ * either way, like the AC-4 section above: a library built with ICLFORGE_BUILD_TRUEHD off
+ * answers every function with ICLFORGE_ERROR_UNSUPPORTED (a NULL, 0 or "" where the type
+ * allows), and ICLFORGE_HAS_TRUEHD (iclforge_c/version.h) says which library a program was
+ * built against.
+ *
+ * A TrueHD stream is a sequence of access units, each opening with a 4-byte header and
+ * carrying 40, 80 or 160 samples a channel by the sample rate. Container formats hand a
+ * program whole access units; a bare .thd or .mlp file is split with iclforge_truehd_scan().
+ * A decode takes one whole access unit at a time, header included, and keeps the state
+ * (filter histories, the restart headers, the lossless check) the next one continues.
+ *
+ * What the C++ library does and does not read is in docs/library/truehd.md and
+ * libs/truehd/ERRATA.md. In short: substreams 0 to 2 (up to eight channels) and the
+ * sixteen-channel substream 3 decode; a restart header that selects noise generator 1 is
+ * refused with ICLFORGE_ERROR_TRUEHD_UNSUPPORTED, and the extra data after the last
+ * substream (the object audio metadata is in it) is handed back as bytes and not read.
+ *
+ * Threads: a decoder, an encoder, a list of units and the handles a call returns (a decoded
+ * unit, an encode's access units) are each used by one thread at a time; the library takes no
+ * lock. Different handles can be used from different threads at once. A decoded unit and an
+ * encode's access units own their data and do not change when the decoder or encoder that made
+ * them is used again or destroyed. The sentence iclforge_truehd_decoder_last_error_detail
+ * (or the encoder's) returns is good until the next call on that decoder or encoder.
+ * --------------------------------------------------------------------- */
+
+typedef struct iclforge_truehd_decoder iclforge_truehd_decoder_t;
+typedef struct iclforge_truehd_units iclforge_truehd_units_t;
+typedef struct iclforge_truehd_scanned_stream iclforge_truehd_scanned_stream_t;
+typedef struct iclforge_truehd_decoded iclforge_truehd_decoded_t;
+
+/* Which substreams a decode reads: iclforge::truehd::Presentation, same ordinals. Reading
+ * fewer is cheaper; the PCM is the last one read. */
+typedef enum iclforge_truehd_presentation {
+    ICLFORGE_TRUEHD_PRESENTATION_BEST = 0, /* the highest of substreams 0 to 2 the stream has */
+    ICLFORGE_TRUEHD_PRESENTATION_2CH = 1,  /* substream 0 */
+    ICLFORGE_TRUEHD_PRESENTATION_6CH = 2,  /* substreams 0 and 1 */
+    ICLFORGE_TRUEHD_PRESENTATION_8CH = 3,  /* substreams 0 to 2 */
+    ICLFORGE_TRUEHD_PRESENTATION_ALL = 4   /* every substream, the sixteen-channel one last */
+} iclforge_truehd_presentation_t;
+
+typedef struct iclforge_truehd_decoder_config {
+    iclforge_truehd_presentation_t presentation;
+    /* 0 (the default): a check that fails (check nibble, CRC, parity, the lossless check of
+     * a restart interval) is an error and the unit is dropped. Nonzero: the failure is
+     * counted (iclforge_truehd_decoder_counters) and the unit is decoded as far as it reads. */
+    int lenient;
+} iclforge_truehd_decoder_config_t;
+
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_config_init(iclforge_truehd_decoder_config_t* config);
+
+/* What the first major sync and the restart headers after it say of a stream. */
+typedef struct iclforge_truehd_stream_info {
+    int is_mlp; /* 0 for TrueHD, 1 for MLP (DVD-Audio) */
+    uint32_t sample_rate;
+    int substreams;
+    /* The channels a decode of substream i delivers (the substream and the ones it builds on),
+     * 0 for a substream the probe did not reach. */
+    int channels[4];
+    int samples_per_access_unit;
+    size_t access_units; /* counted in the data given */
+    int variable_rate;
+    int peak_data_rate_field; /* the 15-bit field of the major sync, as written */
+    int has_object_substream; /* a fourth substream, or the major sync's Atmos bit */
+    size_t first_unit_offset; /* where the first access unit's header starts in the data given */
+} iclforge_truehd_stream_info_t;
+
+/* Reads the first major sync in `data` (it may start anywhere before it) and the restart headers
+ * after it. `info` is left untouched on an error; ICLFORGE_ERROR_TRUEHD_BAD_SYNC when the data
+ * holds no major sync. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_probe(const uint8_t* data, size_t size,
+                                                          iclforge_truehd_stream_info_t* info);
+
+/* Splits a bare stream into its access units. The data may start anywhere before the first
+ * major sync; bytes between units that do not read as one are skipped and counted. A stream
+ * with no unit in it is ICLFORGE_ERROR_TRUEHD_BAD_SYNC. The list holds offsets into `data`, not
+ * a copy of it, so the data has to outlive any use of an offset. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_scan(const uint8_t* data, size_t size,
+                                                         iclforge_truehd_units_t** out_units);
+ICLFORGE_C_EXPORT void iclforge_truehd_units_destroy(iclforge_truehd_units_t* units);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_units_count(const iclforge_truehd_units_t* units);
+/* Unit i's first byte (its 4-byte header) as an offset into the data given to scan, and its
+ * length. 0 for an index out of range. */
+ICLFORGE_C_EXPORT size_t iclforge_truehd_units_offset(const iclforge_truehd_units_t* units,
+                                                      size_t index);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_units_size(const iclforge_truehd_units_t* units,
+                                                    size_t index);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_units_skipped_bytes(const iclforge_truehd_units_t* units);
+
+/* A scan of a whole stream: how long it is, and where a decoder can join it. A unit holds 40, 80 or
+ * 160 samples, so a unit's first sample is its number times that length; a decoder can only start at
+ * a unit that carries a major sync, so those units are listed ("restarts"), thinned to one every
+ * `restart_spacing` units at most (0 or 1 lists every one). To reach a sample, decode from the
+ * last restart at or before its unit: the restart interval is the seek granule. Unit numbers count
+ * the units that read, from the first one; offsets are into the data given to create, which has to
+ * outlive any use of one. A handle is read by any number of threads at once and changed by none. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_scanned_stream_create(
+    const uint8_t* data, size_t size, uint64_t restart_spacing,
+    iclforge_truehd_scanned_stream_t** out_stream);
+ICLFORGE_C_EXPORT void iclforge_truehd_scanned_stream_destroy(
+    iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint32_t
+iclforge_truehd_scanned_stream_sample_rate(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT int iclforge_truehd_scanned_stream_samples_per_unit(
+    const iclforge_truehd_scanned_stream_t* stream);
+/* The units that read. */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_units(const iclforge_truehd_scanned_stream_t* stream);
+/* Every sample the stream holds per channel: whole units less the padding the last one counts. */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_samples(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT int iclforge_truehd_scanned_stream_padding_samples(
+    const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT double
+iclforge_truehd_scanned_stream_duration_seconds(const iclforge_truehd_scanned_stream_t* stream);
+/* Bytes that were not part of a unit that read, those ahead of the first unit included, and the
+ * part of them that came before the first unit (not a loss of the stream). */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_skipped_bytes(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_leading_bytes(const iclforge_truehd_scanned_stream_t* stream);
+/* Restart i's unit number and its first byte (the unit's 4-byte header) in the data. 0 for an
+ * index out of range. */
+ICLFORGE_C_EXPORT size_t
+iclforge_truehd_scanned_stream_restart_count(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_restart_unit(
+    const iclforge_truehd_scanned_stream_t* stream, size_t index);
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_restart_offset(
+    const iclforge_truehd_scanned_stream_t* stream, size_t index);
+/* The sample at `seconds`, rounded down; a negative time is sample 0. */
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_sample_at_seconds(
+    const iclforge_truehd_scanned_stream_t* stream, double seconds);
+/* Where to start decoding to reach `sample`: the unit number and the offset of the last restart
+ * at or before the unit that holds it. ICLFORGE_ERROR_INVALID_ARGUMENT for a sample past the end
+ * (the outputs are left untouched). Decode on from there; the first sample the decoder gives is
+ * the unit's number times iclforge_truehd_scanned_stream_samples_per_unit. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_scanned_stream_restart_for_sample(
+    const iclforge_truehd_scanned_stream_t* stream, uint64_t sample, uint64_t* out_unit,
+    uint64_t* out_offset);
+
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_decoder_create(
+    const iclforge_truehd_decoder_config_t* config, iclforge_truehd_decoder_t** out_decoder);
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_destroy(iclforge_truehd_decoder_t* decoder);
+/* Forgets the stream: the next unit has to carry a major sync. */
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_reset(iclforge_truehd_decoder_t* decoder);
+/* For a caller that dropped input between the unit it decoded last and the next one it will
+ * decode (a packet lost, bytes iclforge_truehd_scan() skipped): the decoder cannot see a missing
+ * unit, so this makes every substream wait for its next restart header, as after an error.
+ * The stream's major sync and the counters are kept. */
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_lost_data(iclforge_truehd_decoder_t* decoder);
+
+/* Decodes one whole access unit. On success `*out_decoded` is a new handle, or NULL when the
+ * unit gave no samples yet (it came before a major sync, or before its substreams' restart
+ * headers: a stream joined part way). On an error `*out_decoded` is left untouched, the
+ * decoder stays usable, and the substream that failed waits for its next restart header (every
+ * substream does, for a unit that does not read at all): the samples of the units in between
+ * are lost, and the decode is exact again from that restart header. In lenient mode a failed
+ * check is counted instead and the unit's samples can be wrong; the lossless check at the next
+ * restart header says so (lossless_check_failures), and none is made for the last restart
+ * interval of a stream, which no restart header follows.
+ * The status is one of the ICLFORGE_ERROR_TRUEHD_* codes; iclforge_truehd_decoder_last_error_detail
+ * gives the sentence that goes with it. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_decoder_decode(
+    iclforge_truehd_decoder_t* decoder, const uint8_t* access_unit, size_t size,
+    iclforge_truehd_decoded_t** out_decoded);
+
+/* The sentence that goes with the status of the most recent decode: a static string, "" when
+ * that decode succeeded or none has been made. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_decoder_last_error_detail(
+    const iclforge_truehd_decoder_t* decoder);
+
+typedef struct iclforge_truehd_counters {
+    uint64_t units;         /* given to decode() */
+    uint64_t units_decoded; /* ... that gave samples */
+    uint64_t units_waiting; /* ... that gave none because no restart header had come yet */
+    uint64_t restarts;
+    uint64_t lossless_checks_ok;
+    uint64_t lossless_check_failures;
+    uint64_t check_failures; /* nibble, major sync CRC, restart CRC, parity and segment CRC together */
+} iclforge_truehd_counters_t;
+
+ICLFORGE_C_EXPORT void iclforge_truehd_decoder_counters(const iclforge_truehd_decoder_t* decoder,
+                                                        iclforge_truehd_counters_t* out);
+
+/* One decoded access unit. The handle owns its samples, so it stays valid after the next
+ * decode and is released with _destroy. */
+ICLFORGE_C_EXPORT void iclforge_truehd_decoded_destroy(iclforge_truehd_decoded_t* decoded);
+ICLFORGE_C_EXPORT uint32_t iclforge_truehd_decoded_sample_rate(const iclforge_truehd_decoded_t* decoded);
+ICLFORGE_C_EXPORT int iclforge_truehd_decoded_channels(const iclforge_truehd_decoded_t* decoded);
+/* Samples a channel. */
+ICLFORGE_C_EXPORT int iclforge_truehd_decoded_samples(const iclforge_truehd_decoded_t* decoded);
+/* The substream the PCM is from. */
+ICLFORGE_C_EXPORT int iclforge_truehd_decoded_substream(const iclforge_truehd_decoded_t* decoded);
+/* Nonzero when a restart header was read in the substream decoded. */
+ICLFORGE_C_EXPORT int iclforge_truehd_decoded_restarted(const iclforge_truehd_decoded_t* decoded);
+/* The last unit of a stream that does not end on a unit boundary carries a marker counting
+ * the samples at its end that are padding. They are not in samples() or pcm(). */
+ICLFORGE_C_EXPORT int iclforge_truehd_decoded_padding_samples(const iclforge_truehd_decoded_t* decoded);
+/* Interleaved, samples() x channels() values, each 24 bits wide and sign-extended into the
+ * int32 (so a 16-bit stream's values are multiples of 256). NULL for a NULL handle. */
+ICLFORGE_C_EXPORT const int32_t* iclforge_truehd_decoded_pcm(const iclforge_truehd_decoded_t* decoded);
+/* The unit's bytes after its last substream segment, uninterpreted: `*out_size` is their count
+ * (0 when the unit has none, and the return is then NULL). Valid until the handle is destroyed. */
+ICLFORGE_C_EXPORT const uint8_t* iclforge_truehd_decoded_extra_data(
+    const iclforge_truehd_decoded_t* decoded, size_t* out_size);
+/* The speaker of channel i by the major sync's channel assignment ("L", "R", "C", "LFE",
+ * "Ls", "Rs", "Lrs", "Rrs", ...), or "" when the major sync does not name the channels for this
+ * channel count or the index is out of range. A static string. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_decoded_channel_name(
+    const iclforge_truehd_decoded_t* decoded, size_t index);
+
+
+/* --- TrueHD encoder (iclforge::truehd::Encoder) --- */
+
+/* A lossless TrueHD (0xF8726FBA) encoder: 1 to 8 channels of 16, 20 or 24 bit PCM at 44.1, 48, 88.2,
+ * 96, 176.4 or 192 kHz. What goes in comes out of any TrueHD decoder bit for bit. Declared either
+ * way, like the decoder above: a library built with ICLFORGE_BUILD_TRUEHD off answers every function
+ * with ICLFORGE_ERROR_UNSUPPORTED (a NULL, 0 or "" where the type allows).
+ *
+ * The encoder codes a restart interval at a time (128 access units, 107 ms at 48 kHz, by default), so
+ * most calls to iclforge_truehd_encoder_encode() give no access unit; the ones that complete an
+ * interval give all of it. iclforge_truehd_encoder_flush() codes what is held, padding the last unit
+ * with zero samples that the unit's end-of-stream marker counts, and the stream is then complete.
+ *
+ * The access units come back whole, one `data` run each, in stream order: a bare .thd file is the
+ * runs one after another, and a container takes each as one sample. What the encoder writes, and
+ * every place the specification and the streams disagree, is libs/truehd/ERRATA.md. */
+
+typedef struct iclforge_truehd_encoder iclforge_truehd_encoder_t;
+typedef struct iclforge_truehd_encoded iclforge_truehd_encoded_t;
+
+/* How the lower presentations of a multichannel stream are made: iclforge::truehd::DownmixMode. */
+typedef enum iclforge_truehd_downmix {
+    /* Substream 0 carries the first two channels as they are, substream 1 the next four and
+     * substream 2 the last two: how FFmpeg's encoder writes a stream. */
+    ICLFORGE_TRUEHD_DOWNMIX_NONE = 0,
+    /* Substream 0 carries a stereo downmix and substream 1 a 5.1 one, which the later substreams'
+     * matrices undo exactly. The gains below fold the channels in. */
+    ICLFORGE_TRUEHD_DOWNMIX_STANDARD = 1
+} iclforge_truehd_downmix_t;
+
+typedef struct iclforge_truehd_encoder_config {
+    uint32_t sample_rate; /* 44100, 48000, 88200, 96000, 176400 or 192000 */
+    int channels;         /* 1 to 8 */
+    /* The width of the PCM given to encode(): 16, 20 or 24. A sample is a signed integer of this
+     * many bits, not left-justified. */
+    int bits;
+    /* The 13-bit channel assignment (TH spec section 13.1) naming the speakers in the order of the
+     * PCM's channels; 0 picks iclforge_truehd_default_channel_assignment(channels). */
+    uint32_t channel_assignment;
+    /* Access units between restart headers: 1, or at least 8. */
+    int restart_interval_units;
+    /* The rate the stream is declared not to exceed, bits per second (18 000 000 is Blu-ray's). */
+    uint32_t peak_data_rate_bps;
+    /* 0: a stream that cannot be sent within the peak rate and the 75 ms of TH spec section 18 is
+     * ICLFORGE_ERROR_TRUEHD_ENCODE_RATE_EXCEEDED. Nonzero: it is written, and counted in the
+     * stats' rate_violations. */
+    int allow_rate_violations;
+    iclforge_truehd_downmix_t downmix;
+    /* The gains the standard downmix folds in, linear (0.7071 is -3 dB): C into L and R, Ls into L
+     * and Rs into R, LFE into L and R, and Lrs into Ls and Rrs into Rs. */
+    double downmix_centre;
+    double downmix_surround;
+    double downmix_lfe;
+    double downmix_rear_to_surround;
+    /* The 2 channel mode the stream declares: 0 stereo, 1 Lt/Rt matrix encoded, 2 headphone. */
+    unsigned stereo_mode;
+    /* The largest FIR prediction order tried, 0 (prediction off) to 8. */
+    int max_fir_order;
+    /* Nonzero: decorrelate channel pairs with a primitive matrix where that makes the stream smaller. */
+    int matrix_search;
+    /* Nonzero: decode every access unit with the library's decoder as it is written and compare it
+     * with the input; ICLFORGE_ERROR_TRUEHD_ENCODE_VERIFY_FAILED if it differs. Costs about as much
+     * again as the encode. */
+    int verify;
+} iclforge_truehd_encoder_config_t;
+
+/* The defaults of iclforge::truehd::EncoderConfig{}: 48 kHz stereo, 24 bit, the default assignment,
+ * 128-unit restart intervals, 18 Mbit/s, no downmix, -3 dB gains (LFE off), FIR order 8, the matrix
+ * search on, no verification. */
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_config_init(iclforge_truehd_encoder_config_t* config);
+
+/* The default channel assignment for a channel count (mono C, stereo L R, 3.0, 4.0, 5.0, 5.1, 6.0
+ * and 7.1 without LFE as 6 channels, 7.1 as 8), or 0 for a count with none. */
+ICLFORGE_C_EXPORT uint32_t iclforge_truehd_default_channel_assignment(int channels);
+
+/* The sentence iclforge_truehd_encoder_create() would fail with for this configuration, or "" if it
+ * would not. A static string. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_encoder_refusal_reason(
+    const iclforge_truehd_encoder_config_t* config);
+
+/* ICLFORGE_ERROR_TRUEHD_ENCODE_INVALID_CONFIG for a configuration the encoder does not write;
+ * `*out_encoder` is left untouched on an error. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_create(
+    const iclforge_truehd_encoder_config_t* config, iclforge_truehd_encoder_t** out_encoder);
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_destroy(iclforge_truehd_encoder_t* encoder);
+
+/* Takes interleaved PCM, `frames` x config.channels values, and writes the access units that are
+ * complete to `*out_encoded`: a new handle, or NULL when none is yet (the usual answer). On an error
+ * `*out_encoded` is left untouched. ICLFORGE_ERROR_TRUEHD_ENCODE_BAD_INPUT (a sample outside the
+ * range of `bits`) is found before anything is kept and leaves the encoder as it was; after any
+ * other error the encoder's stream state is not defined and it should be destroyed. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_encode(
+    iclforge_truehd_encoder_t* encoder, const int32_t* pcm, size_t frames,
+    iclforge_truehd_encoded_t** out_encoded);
+
+/* Codes what is held and ends the stream; as encode() otherwise. The encoder starts a new stream if
+ * it is given more input afterwards. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_encoder_flush(
+    iclforge_truehd_encoder_t* encoder, iclforge_truehd_encoded_t** out_encoded);
+
+/* The sentence that goes with the status of the most recent encode() or flush(): a static string, ""
+ * when that call succeeded or none has been made. */
+ICLFORGE_C_EXPORT const char* iclforge_truehd_encoder_last_error_detail(
+    const iclforge_truehd_encoder_t* encoder);
+
+/* The samples per channel in a full access unit (40 at 44.1 and 48 kHz, 80 at 88.2 and 96, 160 at
+ * 176.4 and 192), and the substreams the configuration writes. 0 for a NULL encoder. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoder_samples_per_access_unit(
+    const iclforge_truehd_encoder_t* encoder);
+ICLFORGE_C_EXPORT int iclforge_truehd_encoder_substreams(const iclforge_truehd_encoder_t* encoder);
+
+/* Tagged iclforge_truehd_encoder_stats_info rather than iclforge_truehd_encoder_stats, for the reason
+ * iclforge_version_info's comment gives: the function below has that name. */
+typedef struct iclforge_truehd_encoder_stats_info {
+    uint64_t access_units;
+    uint64_t restart_intervals;
+    uint64_t input_samples; /* per channel */
+    uint64_t bytes;
+    uint64_t rate_violations;
+    uint32_t max_unit_bytes;
+    uint64_t max_unit_rate_bps; /* the largest rate any unit would need to arrive at over its own duration */
+    uint64_t matrices_used;
+    uint64_t downmix_reduced_intervals; /* intervals whose downmix gains were lowered to fit 24 bits */
+    uint64_t verified_units;
+} iclforge_truehd_encoder_stats_t;
+
+ICLFORGE_C_EXPORT void iclforge_truehd_encoder_stats(const iclforge_truehd_encoder_t* encoder,
+                                                     iclforge_truehd_encoder_stats_t* out);
+
+/* The access units one encode() or flush() completed. The handle owns their bytes, so they stay
+ * valid until it is destroyed; an index out of range gives 0 or NULL. */
+ICLFORGE_C_EXPORT void iclforge_truehd_encoded_destroy(iclforge_truehd_encoded_t* encoded);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_encoded_count(const iclforge_truehd_encoded_t* encoded);
+/* One access unit, whole, from its 4-byte header. */
+ICLFORGE_C_EXPORT const uint8_t* iclforge_truehd_encoded_data(const iclforge_truehd_encoded_t* encoded,
+                                                              size_t index);
+ICLFORGE_C_EXPORT size_t iclforge_truehd_encoded_size(const iclforge_truehd_encoded_t* encoded,
+                                                      size_t index);
+/* The samples per channel the unit holds, padding included. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_samples(const iclforge_truehd_encoded_t* encoded,
+                                                      size_t index);
+/* The zero samples the last unit was filled up with (its end-of-stream marker counts them); 0 for
+ * every other. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_padding_samples(
+    const iclforge_truehd_encoded_t* encoded, size_t index);
+/* Nonzero when the unit opens with a major sync (the first of a restart interval): the units a
+ * container marks as sync samples. */
+ICLFORGE_C_EXPORT int iclforge_truehd_encoded_has_major_sync(
+    const iclforge_truehd_encoded_t* encoded, size_t index);
 
 
 #ifdef __cplusplus

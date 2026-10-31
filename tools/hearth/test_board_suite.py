@@ -81,6 +81,13 @@ class StandIn:
         self.layout = "2.0"
         self.layout_puts: list[str] = []  # every PUT /layout, in order
         self.refused_layouts: set[str] = set()  # the layouts PUT /layout answers 409 to
+        # the board's words for each: iclforge/layout_options.hpp's sentence, which is also GET
+        # /layout-options's reason for it
+        self.refusal_reasons: dict[str, str] = {}
+        # GET /layout-options's body; None is a firmware without the route (a 404)
+        self.layout_options: dict | None = None
+        # what PUT /layout says after the ok for a layout it takes with a limit on it
+        self.layout_notes: dict[str, str] = {}
         self.restarts = 0
         self.log = bytearray(
             b"boot line\n"
@@ -133,6 +140,8 @@ class StandIn:
                     self._send(200, data, {"X-Log-Next": str(nxt)})
                 elif path == "/layout":
                     self._send(200, stand_in.layout.encode())
+                elif path == "/layout-options" and stand_in.layout_options is not None:
+                    self._send(200, json.dumps(stand_in.layout_options).encode())
                 else:
                     self._send(404, b"")
 
@@ -144,10 +153,13 @@ class StandIn:
                     return
                 stand_in.layout_puts.append(body)
                 if body in stand_in.refused_layouts:
-                    self._send(409, b"more slots than this sink has\n")
+                    reason = stand_in.refusal_reasons.get(body, "more slots than this sink has")
+                    self._send(409, (reason + "\n").encode())
                     return
                 stand_in.layout = body
-                self._send(200, b"ok; takes effect at the next play\n")
+                note = stand_in.layout_notes.get(body)
+                said = "ok; takes effect at the next play" + (f". Note: {note}" if note else "")
+                self._send(200, (said + "\n").encode())
 
             def do_POST(self) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -293,11 +305,22 @@ class Suite(unittest.TestCase):
                     self.assertIsInstance(row.get("slots"), int, f"{profile}/{row['id']}")
                     self.assertNotIn("via", row, f"{profile}/{row['id']}: a layout is a /play's")
 
-    def test_only_the_v3_profile_plays_a_tdm_row(self) -> None:
-        # A chip below v3.0 has no I2S clock for a frame past two channels, so its rows would fail.
+    def test_a_row_on_a_layout_is_played_where_the_board_carries_it_and_refused_where_it_does_not(
+        self,
+    ) -> None:
+        # The suite asks the board (GET /layout-options) and does not guess from the profile: a
+        # chip below v3.0, which has no I2S clock for a frame past two channels, is the board's
+        # own answer, not a reason to keep the row out of its list. What a row is where the board
+        # cannot carry its layout is the row's `if_unavailable` (the default is the refusal).
         for profile, spec in self.suite["profiles"].items():
-            has_layout = any(row.get("layout") for row in spec["plays"])
-            self.assertEqual(has_layout, profile == "p4-rev3", profile)
+            for row in spec["plays"]:
+                self.assertIn(
+                    row.get("if_unavailable", "refuse"),
+                    bs.UNAVAILABLE_POLICIES,
+                    f"{profile}/{row['id']}",
+                )
+                if row.get("if_unavailable"):
+                    self.assertTrue(row.get("layout"), f"{profile}/{row['id']}")
 
     def test_a_sendspin_row_s_stream_says_how_many_bursts_it_is_or_how_long_it_loops(self) -> None:
         # The bursts the board accounted for are held to it, as a /play's units are: a file
@@ -521,11 +544,14 @@ class Run(unittest.TestCase):
     def run_rows(self, stand_in: StandIn, profile: str, **kwargs):
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
         if "only" not in kwargs:
-            # the /play rows: a Sendspin row is played by the test server (test_suite_sendspin.py)
+            # the /play rows the stand-in has a behaviour for (every profile but the C6's has AC-4
+            # rows now, which only the tests that name them play): a Sendspin row is played by the
+            # test server (test_suite_sendspin.py)
             kwargs["only"] = [
                 row["id"]
                 for row in bs.plan(self.suite, profile)
                 if row.get("via", "play") == "play"
+                and Path(self.suite["streams"][row["stream"]]["file"]).name in stand_in.behaviours
             ]
         return bs.run_suite(
             board,
@@ -573,6 +599,189 @@ class Run(unittest.TestCase):
         self.assertEqual(stand_in.plays, [])
         self.assertEqual(stand_in.layout_puts, ["9.1.6"], "nothing to put back: it was refused")
 
+    # --- a row declares what it needs; the board says what it carries (GET /layout-options) -----
+
+    CHIP = "This chip (v1.3) has no clock for multi-channel output, so only 1.0 and 2.0 can play."
+
+    def listing(self, **verdicts: str) -> dict:
+        """GET /layout-options for a board, as the firmware writes it: `verdicts` maps a layout to
+        its verdict (supported, limits or unavailable), the reason for the last two the CHIP words
+        unless given as "verdict:reason"."""
+        options = []
+        for layout, said in verdicts.items():
+            verdict, _, reason = said.partition(":")
+            entry = {"layout": layout.replace("_", "."), "verdict": verdict, "fix": "none"}
+            if verdict != "supported":
+                entry["reason"] = reason or self.CHIP
+            options.append(entry)
+        return {"layout": "2.0", "slots": 2, "profile": "p4-rev1", "options": options}
+
+    def test_a_layout_the_board_carries_is_played_whatever_the_profile(self) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        listing = self.listing(**{"9_1_6": "supported"})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+        self.assertEqual(results[0].findings, [])
+        self.assertEqual(results[0].state, "finished")
+        self.assertEqual(len(stand_in.plays), 1)
+
+    def test_a_layout_the_board_says_it_cannot_carry_is_refused_and_the_refusal_is_the_pass(
+        self,
+    ) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        stand_in.refused_layouts = {"9.1.6"}
+        stand_in.refusal_reasons = {"9.1.6": self.CHIP}
+        listing = self.listing(**{"9_1_6": "unavailable"})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+        self.assertEqual(results[0].findings, [])
+        self.assertEqual(results[0].state, "refused-layout")
+        self.assertEqual(results[0].why, self.CHIP)
+        self.assertTrue(
+            any("is refused, as the board's listing says" in n for n in results[0].notes)
+        )
+        self.assertEqual(stand_in.plays, [], "nothing is played: there is no layout to play on")
+        self.assertEqual(stand_in.layout_puts, ["9.1.6"])
+        self.assertEqual(stand_in.layout, "2.0")
+        # What the record keeps of it: the state and the board's words, no play's figures.
+        self.assertEqual(
+            results[0].figures(), {"state": "refused-layout", "frames": None, "why": self.CHIP}
+        )
+
+    def test_a_refusal_in_other_words_than_the_listing_s_is_a_finding(self) -> None:
+        # The route and the listing are one verdict: a board that says two things about one layout
+        # has two sources.
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        stand_in.refused_layouts = {"9.1.6"}
+        stand_in.refusal_reasons = {"9.1.6": "more slots than this sink has"}
+        listing = self.listing(**{"9_1_6": "unavailable"})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+        self.assertTrue(
+            any(
+                "was refused with 'more slots than this sink has'" in f for f in results[0].findings
+            ),
+            results[0].findings,
+        )
+
+    def test_a_board_that_takes_a_layout_it_lists_as_unavailable_is_a_finding_and_is_put_back(
+        self,
+    ) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        listing = self.listing(**{"9_1_6": "unavailable"})  # and the stand-in takes it
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+        self.assertTrue(any("answered 200, expected 409" in f for f in results[0].findings))
+        self.assertEqual(stand_in.layout, "2.0", "the board's own layout is put back")
+        self.assertEqual(stand_in.layout_puts, ["9.1.6", "2.0"])
+        self.assertEqual(stand_in.plays, [])
+
+    def test_a_row_that_says_skip_is_left_out_with_the_reason_and_nothing_is_sent(self) -> None:
+        suite = json.loads(json.dumps(self.suite))
+        suite["profiles"]["p4-rev3"]["plays"][2]["if_unavailable"] = "skip"
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        listing = self.listing(**{"9_1_6": "unavailable"})
+        board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+        results = bs.run_suite(
+            board,
+            "p4-rev3",
+            suite,
+            "http://127.0.0.1:1",
+            self.pins,
+            only=["ac3-5.1-tdm16"],
+            sleep=0.01,
+            timeout=5.0,
+            layouts=listing,
+        )
+        self.assertEqual(results[0].findings, [])
+        self.assertEqual(results[0].state, "skipped")
+        self.assertEqual(results[0].why, self.CHIP)
+        self.assertTrue(any(self.CHIP in n for n in results[0].notes))
+        self.assertEqual(stand_in.layout_puts, [], "a skipped row does not touch the board")
+        self.assertEqual(stand_in.plays, [])
+
+    def test_a_layout_carried_with_a_limit_is_played_and_the_limit_is_noted(self) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        limit = "Not verified: the widest layout measured on this kind of board is 2 slots."
+        stand_in.layout_notes = {"9.1.6": limit}
+        listing = self.listing(**{"9_1_6": "limits:" + limit})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+        self.assertEqual(results[0].findings, [])
+        self.assertEqual(results[0].state, "finished")
+        self.assertTrue(any("is listed with a limit" in n and limit in n for n in results[0].notes))
+
+    def test_a_layout_the_listing_does_not_have_is_tried_as_written(self) -> None:
+        # A firmware with no GET /layout-options (layouts is None), and a layout outside the
+        # catalog, are played as before: the suite does not invent a verdict.
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        for listing in (None, self.listing(**{"5_1": "supported"})):
+            stand_in.plays.clear()
+            results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"], layouts=listing)
+            self.assertEqual(results[0].findings, [])
+            self.assertEqual(len(stand_in.plays), 1)
+
+    def test_the_fold_is_a_5_1_stream_on_the_2_0_layout_and_needs_no_tdm(self) -> None:
+        # On a chip with no clock for a TDM frame the fold is still testable: a row with no layout
+        # plays on the board's own 2.0. (The row that set 5.1 to test it is the capability row.)
+        stand_in = self.board("p4-rev1", {"ffmpeg.ac3": Behaviour(units=79, slots=2)})
+        row = {
+            "id": "ac3-5.1-fold",
+            "stream": "ac3-5.1",
+            "stream_spec": self.suite["streams"]["ac3-5.1"],
+        }
+        board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+        played, _ = bs.run_play(
+            board,
+            row,
+            "http://127.0.0.1:1",
+            1,
+            None,
+            self.suite,
+            self.pins,
+            5.0,
+            0.01,
+            layouts=self.listing(**{"5_1": "unavailable"}),
+        )
+        self.assertEqual(played.findings, [])
+        self.assertEqual(played.state, "finished")
+        self.assertEqual(stand_in.layout_puts, [], "no layout is set: the board plays on its own")
+
+    def test_the_listing_is_described_in_a_line(self) -> None:
+        listing = self.listing(**{"2_0": "supported", "5_1": "limits:x", "7_1": "unavailable"})
+        self.assertEqual(
+            bs.describe_layouts(listing),
+            "layouts (2 slots): supported 2.0; with limits 5.1; unavailable 7.1",
+        )
+        self.assertIn("no GET /layout-options", bs.describe_layouts(None))
+
+    def test_a_row_that_says_what_to_do_must_say_it_in_words_the_suite_knows(self) -> None:
+        suite = json.loads(json.dumps(self.suite))
+        suite["profiles"]["p4-rev3"]["plays"][2]["if_unavailable"] = "shrug"
+        with self.assertRaisesRegex(bs.SuiteError, "if_unavailable 'shrug'"):
+            bs.plan(suite, "p4-rev3")
+        suite["profiles"]["p4-rev3"]["plays"][0]["if_unavailable"] = "skip"
+        suite["profiles"]["p4-rev3"]["plays"][2].pop("if_unavailable")
+        with self.assertRaisesRegex(bs.SuiteError, "names none"):
+            bs.plan(suite, "p4-rev3")
+
+    def test_the_layout_options_route_is_read_as_the_firmware_writes_it(self) -> None:
+        stand_in = self.board("p4-rev3", {})
+        board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+        self.assertIsNone(board.layout_options(), "no route is a 404, which is None")
+        stand_in.layout_options = self.listing(**{"2_0": "supported"})
+        self.assertEqual(board.layout_options()["options"][0]["layout"], "2.0")
+        stand_in.layout_options = {"options": "none"}
+        with self.assertRaisesRegex(bs.SuiteError, "no list of options"):
+            board.layout_options()
+
+    def test_a_baseline_row_the_board_no_longer_carries_says_why_in_the_boards_words(self) -> None:
+        baseline = {"profile": "p4-rev3", "plays": {"ac3-5.1-tdm16": {"state": "finished"}}}
+        run = {
+            "profile": "p4-rev3",
+            "plays": {"ac3-5.1-tdm16": {"state": "refused-layout", "why": self.CHIP}},
+        }
+        regressions, _ = bs.compare(run, baseline, {})
+        self.assertEqual(
+            regressions,
+            [f"ac3-5.1-tdm16: state refused-layout, baseline finished ({self.CHIP})"],
+        )
+
     def test_an_underrun_is_a_finding_with_its_figures(self) -> None:
         stand_in = self.board("s3-n16r8", {**standard(), "ffmpeg.ac3": Behaviour(underruns=1)})
         results = self.run_rows(stand_in, "s3-n16r8")
@@ -619,23 +828,23 @@ class Run(unittest.TestCase):
         pin = self.pins["ac4_20_music"]
         good = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash=pin)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **good}, **{}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **good}, **{}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertEqual(results[0].findings, [])
         self.assertEqual(results[0].decoder_permille, 480)
         wrong = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0123456789abcdef")}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **wrong}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **wrong}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("is not the host's" in f for f in results[0].findings))
         zero = {"ac4-20-music-192-3frames.ac4": Behaviour(units=3, pcm_hash="0" * 16)}
         results = self.run_rows(
-            self.board("s3-n16r8-ac4", {**standard(), **zero}),
-            "s3-n16r8-ac4",
+            self.board("s3-n16r8", {**standard(), **zero}),
+            "s3-n16r8",
             only=["ac4-20-music"],
         )
         self.assertTrue(any("AC4_PCM_HASH=1" in f for f in results[0].findings))
@@ -690,6 +899,7 @@ class Boot(unittest.TestCase):
                 "http://127.0.0.1:1",
                 {},
                 repeat=3,
+                only=["ac3-2.0", "eac3-2.0"],
                 sleep=0.01,
                 timeout=5.0,
             )
@@ -831,7 +1041,7 @@ class FoldedPin(unittest.TestCase):
 
     def test_the_folded_row_s_own_hash_is_what_the_baseline_holds_it_to(self) -> None:
         base = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",
@@ -842,7 +1052,7 @@ class FoldedPin(unittest.TestCase):
             },
         }
         same = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",
@@ -853,7 +1063,7 @@ class FoldedPin(unittest.TestCase):
             },
         }
         moved = {
-            "profile": "p4-rev1-ac4",
+            "profile": "p4-rev1",
             "plays": {
                 "ac4-51-music": {
                     "state": "finished",

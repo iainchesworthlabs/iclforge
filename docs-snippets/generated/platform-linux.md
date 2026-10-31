@@ -12,5 +12,7 @@
 | Live capture and PCM monitor | **Source**<br>built and tested in CI<br>ALSA or PipeWire | **Source**<br>confirmed on hardware<br>ALSA or PipeWire |
 | IEC 61937 output | **Source**<br>built and tested in CI<br>hardware untried | **Source**<br>confirmed on hardware<br>ALSA and PipeWire on one Pi 4B |
 | AC-4 decode and encode | **Next release**<br>built and tested in CI<br>forge and forge-gui decode and encode, Hearth decodes; decoded AC-4 plays through the PCM monitor | **Next release**<br>built and tested in CI<br>forge and forge-gui decode and encode, Hearth decodes |
+| TrueHD and MLP decode and encode | **Source**<br>built and tested in CI<br>library, C API and forge; not in forge-gui | **Source**<br>built and tested in CI<br>library, C API and forge; not in forge-gui |
 | AC-4 IEC 61937 output | **Source**<br>built and tested in CI<br>ALSA's null device; PipeWire has no AC-4 codec | **Source**<br>build only<br>ALSA; no receiver accepts AC-4 |
+| TrueHD IEC 61937 (MAT) output | **Limited**<br>built and tested in CI<br>MAT bursts to and from a file; no device output | **Limited**<br>built and tested in CI<br>MAT bursts to and from a file; no device output |
 | Per-application capture | **Source**<br>built and tested in CI<br>PipeWire | **Source**<br>confirmed on hardware<br>PipeWire on one Pi 4B |

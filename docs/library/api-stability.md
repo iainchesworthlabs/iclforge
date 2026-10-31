@@ -151,7 +151,8 @@ at the C++ symbol level) and share the same "not yet meaningful" argument for st
 `iclforge.h`) adds `ICLFORGE_C_VERSION_MAJOR`/`MINOR`/`PATCH` and a combined `ICLFORGE_C_VERSION`
 integer, usable in `#if` — the SDK version a translation unit compiled against, which a caller may
 need to gate on before it can even call `iclforge_version()` to check the other one. It also
-carries `ICLFORGE_HAS_AC4`, defined when the library was built with the AC-4 surface.
+carries `ICLFORGE_HAS_AC4` and `ICLFORGE_HAS_TRUEHD`, defined when the library was built with the
+AC-4 surface and the TrueHD surface.
 
 ## C config struct growth
 
@@ -176,10 +177,9 @@ not. Its own model is still being built out (the MXF track-file wrapping is read
 see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
 the Public tier above until this page deliberately promotes it. The same designation applies to
-`iclforge::mlp` when the TrueHD/MLP branch lands (itself already
-scoped as "an explicitly experimental module" gated behind its own `ICLFORGE_BUILD_MLP` — this
-page's policy just confirms that plan rather than overriding it; real interoperability, `IM6`,
-stays separately blocked on MLP/FBA source material that isn't public). A new module defaults to
+`iclforge::truehd` (TrueHD and MLP, gated behind `ICLFORGE_BUILD_TRUEHD`) and the
+`iclforge_truehd_*` functions of the C API over it, decoder and encoder; real interoperability, `IM6`, stays separately
+blocked on MLP/FBA source material that isn't public). A new module defaults to
 Experimental from its first merge, and only leaves that tier through a deliberate, documented
 decision on this page, the same way `iclforge::iab` will. `iclforge::render` is one: it began in
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the

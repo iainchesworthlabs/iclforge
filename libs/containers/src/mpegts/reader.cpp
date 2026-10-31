@@ -141,6 +141,9 @@ std::string_view describe(DemuxError error) {
             return "malformed PES or PSI section layout";
         case DemuxError::kLimitExceeded:
             return "a PES packet or PSI section beyond the reader's limits";
+        case DemuxError::kScrambled:
+            return "the audio stream is scrambled: a packet has transport_scrambling_control "
+                   "set, its payload is ciphertext and descrambling is not supported";
     }
     return "unknown error";
 }
@@ -236,6 +239,21 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
     const std::size_t program_info_length =
         ((static_cast<std::size_t>(byte_at(section, 10)) & 0x0FU) << 8U) | byte_at(section, 11);
     std::size_t at = 12 + program_info_length;
+    // The program-level descriptors: only the registration descriptor 'HDMV' matters, and only to
+    // say which form of TrueHD signalling follows.
+    bool hdmv = false;
+    for (std::size_t d = 12; d + 2 <= std::min(at, section.size() - 4);) {
+        const std::size_t length = byte_at(section, d + 1);
+        if (d + 2 + length > at) {
+            break;
+        }
+        if (byte_at(section, d) == kTagRegistrationDescriptor && length >= 4 &&
+            byte_at(section, d + 2) == 'H' && byte_at(section, d + 3) == 'D' &&
+            byte_at(section, d + 4) == 'M' && byte_at(section, d + 5) == 'V') {
+            hdmv = true;
+        }
+        d += 2 + length;
+    }
     // The CRC_32 is the last four bytes and is not part of the ES loop.
     const std::size_t loop_end = section.size() - 4;
     if (at > loop_end) {
@@ -257,11 +275,20 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
 
         bool eac3 = false;
         bool ac4 = false;
+        bool truehd = false;
         bool matched = false;
         CodecSignalling signalling = CodecSignalling::kAtscStreamType;
 
+        // TrueHD names the codec in stream_type 0x83 (TH spec §21.2).
+        if (stream_type == kStreamTypeTruehd) {
+            truehd = true;
+            matched = true;
+            signalling =
+                hdmv ? CodecSignalling::kHdmvStreamType : CodecSignalling::kBareTruehdStreamType;
+        }
+
         // ATSC names the codec in stream_type itself.
-        if (stream_type == kStreamTypeAtscAc3 || stream_type == kStreamTypeAtscEac3) {
+        if (!matched && (stream_type == kStreamTypeAtscAc3 || stream_type == kStreamTypeAtscEac3)) {
             eac3 = stream_type == kStreamTypeAtscEac3;
             matched = true;
             signalling = CodecSignalling::kAtscStreamType;
@@ -310,6 +337,17 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
         }
 
         if (matched) {
+            // A codec the caller left out of ReadOptions::auto_select is passed over, as if the
+            // PMT did not list the stream: the loop goes on to the next one.
+            const AutoSelect& allowed = s.options.auto_select;
+            const bool codec_allowed = truehd ? allowed.truehd
+                                       : ac4  ? allowed.ac4
+                                       : eac3 ? allowed.eac3
+                                              : allowed.ac3;
+            if (!codec_allowed) {
+                at = descriptors_at + es_info_length;
+                continue;
+            }
             // The loop above only IDENTIFIES the codec: ATSC's own
             // stream_type match never even looks at the descriptor loop
             // (matched is already true, so the `!matched` guard on that
@@ -321,7 +359,7 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
             // changes matched/eac3/ac4/signalling, only what (if anything)
             // ends up in ReadStream::service.
             std::optional<ServiceInfo> service;
-            if (!ac4) {
+            if (!ac4 && !truehd) {
                 const std::uint8_t dvb_tag =
                     eac3 ? kTagEnhancedAc3Descriptor : kTagAc3Descriptor;
                 const std::uint8_t atsc_tag =
@@ -347,6 +385,7 @@ void emit_pes(ReaderState& s, const Reader::PayloadFn& on_payload) {
                                   .stream_type = stream_type,
                                   .eac3 = eac3,
                                   .ac4 = ac4,
+                                  .truehd = truehd,
                                   .signalling = signalling,
                                   .packet_size = s.grid.stride,
                                   .service = service};
@@ -489,7 +528,13 @@ std::expected<void, DemuxError> parse_packet(ReaderState& s, std::span<const std
         return {};
     }
 
-    // The audio PID.
+    // The audio PID. transport_scrambling_control is the top two bits of the fourth header byte:
+    // 00 is clear and anything else says the payload of this packet is scrambled
+    // (ISO/IEC 13818-1 section 2.4.3.2; DVB uses 10 and 11 for the even and odd key). The PES
+    // parse below would take those bytes for audio, so the stream is refused here, before them.
+    if ((byte_at(packet, 3) >> 6U) != 0) {
+        return std::unexpected(DemuxError::kScrambled);
+    }
     if (unit_start) {
         // A new PES starts here, which is also what ends the previous one
         // when it used the unbounded length form.

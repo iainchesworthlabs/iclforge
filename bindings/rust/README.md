@@ -9,6 +9,9 @@ Roadmap item AP9: the first non-Python binding over `iclforge_c/iclforge.h`. Two
 - **`iclforge`** — a safe, idiomatic wrapper over it: `Result`/`Option` instead of status codes
   and out-parameters, RAII handles, slices instead of raw pointers.
 
+The header also declares the TrueHD and MLP functions (`iclforge_truehd_*`). `iclforge-sys` declares them like the rest, and
+`iclforge::truehd` wraps the decode side of them (below); the encoder's functions are declared and not wrapped.
+
 ## Why this lives in-tree
 
 AP10 (an out-of-tree GStreamer element) is out-of-tree for a reason specific to it — it sits
@@ -97,6 +100,16 @@ closed everything that list deferred:
   stay valid and unmodified" clause instead of documentation asking for it.
 - `meter::LoudnessMeter` (both constructors — acmod/lfe and the BS.1770-5 chanmap form) and
   `meter::dialnorm_from_lkfs`.
+- `truehd::probe`, `truehd::scan`, `truehd::ScannedStream` and `truehd::Decoder`/`Decoded` — TrueHD and MLP decode
+  (WP7). `probe` reads the first major sync; `scan` splits a bare stream into access units, as borrowed slices of the
+  caller's buffer; `ScannedStream` says how long a stream is and where a decoder can join it (`restart_for_sample`,
+  `stream_from`), and is `Send + Sync`; `Decoder` takes one whole access unit at a time and keeps the state the next
+  continues (`lost_data`, `reset`, `counters`, a lenient mode). A failure is `Error::Truehd(truehd::ErrorKind)`, one
+  variant for each `ICLFORGE_ERROR_TRUEHD_*` decode status; the encoder's `_ENCODE_*` statuses stay `Error::Other`
+  because nothing here wraps the encoder, the Atmos layer or the metadata edit. `tests/truehd_api.rs` holds every
+  committed fixture of `testdata/truehd` to the SHA-256 of what FFmpeg's strict decode gives, and, with
+  `ICLFORGE_FORGE` naming a `forge`, to the samples of `forge decode`. It carries its own SHA-256, since the crate
+  has no dependencies.
 - `iclforge::ac4::Decoder`/`Encoder` (roadmap plan phases I4 and I4b) — a distinct codec (ETSI TS 103 190),
   wrapping `iclforge_ac4_*` unconditionally, with no Cargo feature of its own: the header declares
   those functions whether or not the library was built with AC-4 (`ICLFORGE_BUILD_AC4`, default ON

@@ -975,12 +975,12 @@ struct ObjectLayout {
 }
 
 // §5.5.12 trim_element - see TrimElement own comment on kNumTrimConfigs.
-void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
+void read_trim_element(BitReader& r, int object_count, int num_configs, TrimElement& trim) {
     trim.warp_mode = static_cast<int>(r.read(2));
     r.skip(2);  // reserved
     trim.global_trim_mode = static_cast<int>(r.read(2));
     if (trim.global_trim_mode == 0b10) {  // custom_trim
-        trim.configs.assign(static_cast<std::size_t>(kNumTrimConfigs), TrimConfig{});
+        trim.configs.assign(static_cast<std::size_t>(num_configs), TrimConfig{});
         for (auto& config : trim.configs) {
             config.default_trim = r.read(1) != 0;
             if (config.default_trim) {
@@ -1257,8 +1257,24 @@ std::optional<DecodedProgram> parse_payload(std::span<const std::byte> payload) 
                 saw_object_element = saw_object_element || ok;
                 break;
             case 2: {  // trim_element
+                // NUM_TRIM_CONFIGS has two values in the wild (see
+                // kNumTrimConfigs): the count that makes the element parse to
+                // exactly its declared size is the one the encoder wrote. The
+                // smaller one goes first, so a stream both would fit reads
+                // as it always did.
+                int chosen = kNumTrimConfigs;
+                for (const int candidate : {kNumTrimConfigs, kNumTrimConfigsFull}) {
+                    BitReader trial = r;
+                    TrimElement probe{};
+                    read_trim_element(trial, total, candidate, probe);
+                    const std::size_t used = trial.bit_position() - element_start;
+                    if (!trial.overflowed() && element_bytes * 8 == (used + 7) / 8 * 8) {
+                        chosen = candidate;
+                        break;
+                    }
+                }
                 TrimElement trim{};
-                read_trim_element(r, total, trim);
+                read_trim_element(r, total, chosen, trim);
                 out.trim = std::move(trim);
                 break;
             }

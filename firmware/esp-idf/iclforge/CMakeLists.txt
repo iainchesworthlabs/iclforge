@@ -43,9 +43,9 @@
 #
 # The control surface (include/iclforge/control.hpp, src/control.cpp) is here
 # too, on esp_http_server, with the web page it serves: ui/iclforge_ui.html and
-# ui/iclforge_ui.js, embedded as they are and sent from flash
-# (planning/esp32-device-ui.md). IDF names an embedded file's symbols after its
-# base name, hence the component's name on both. Like the rest of this archive
+# ui/iclforge_ui.js, embedded gzipped (tools/gzip_asset.py: 22 KB where they are 69 KB as written, on every
+# board) and sent from flash with Content-Encoding: gzip (planning/esp32-device-ui.md). IDF names an embedded
+# file's symbols after its base name, hence the component's name on both. Like the rest of this archive
 # they reach a firmware only when something in it uses Control.
 #
 # The Sendspin player (CONFIG_ICLFORGE_SENDSPIN, this directory's Kconfig) adds
@@ -66,6 +66,13 @@
 # Firmware. src/log.cpp keeps the console's recent output for GET /log
 # (include/iclforge/log.hpp), once the firmware calls log_start().
 set(ICLFORGE_COMPONENT_SRCS "src/player.cpp" "src/control.cpp" "src/firmware.cpp" "src/log.cpp" "src/tcp_arrivals.cpp")
+# The update from GitHub releases (include/iclforge/firmware_pull.hpp): the one that does it, or the one
+# that says a build has none. Chosen here, as the Opus decoder is.
+if(CONFIG_ICLFORGE_FIRMWARE_PULL)
+    list(APPEND ICLFORGE_COMPONENT_SRCS "src/firmware_pull.cpp")
+else()
+    list(APPEND ICLFORGE_COMPONENT_SRCS "src/firmware_pull_none.cpp")
+endif()
 if(CONFIG_LWIP_IPV6)
     list(APPEND ICLFORGE_COMPONENT_SRCS "src/peer/dual_stack/ipv4_peer.cpp")
 else()
@@ -92,6 +99,25 @@ if(CONFIG_ICLFORGE_SENDSPIN)
         list(APPEND ICLFORGE_COMPONENT_SRCS "src/ac4_stream_none.cpp")
     endif()
 endif()
+# The web page, gzipped at build time into this component's binary directory and embedded from there (below the
+# registration). A change to either file or to the script writes the .gz again. Not in IDF's first pass over this file,
+# which reads it in script mode to learn the requirements, where a command may not be added.
+set(ICLFORGE_UI_GZ "")
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    idf_build_get_property(ICLFORGE_PYTHON PYTHON)
+    foreach(ICLFORGE_UI_ASSET iclforge_ui.html iclforge_ui.js)
+        set(ICLFORGE_UI_OUT "${CMAKE_CURRENT_BINARY_DIR}/ui/${ICLFORGE_UI_ASSET}.gz")
+        add_custom_command(
+            OUTPUT "${ICLFORGE_UI_OUT}"
+            COMMAND "${ICLFORGE_PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/tools/gzip_asset.py"
+                    "${CMAKE_CURRENT_LIST_DIR}/ui/${ICLFORGE_UI_ASSET}" "${ICLFORGE_UI_OUT}"
+            DEPENDS "${CMAKE_CURRENT_LIST_DIR}/ui/${ICLFORGE_UI_ASSET}" "${CMAKE_CURRENT_LIST_DIR}/tools/gzip_asset.py"
+            COMMENT "gzip ${ICLFORGE_UI_ASSET}"
+            VERBATIM)
+        list(APPEND ICLFORGE_UI_GZ "${ICLFORGE_UI_OUT}")
+    endforeach()
+endif()
+
 idf_component_register(
     SRCS ${ICLFORGE_COMPONENT_SRCS}
     INCLUDE_DIRS "include"
@@ -110,8 +136,17 @@ idf_component_register(
     # espcoredump: the same file's report and routes for the last crash's
     # core dump, when the project keeps one (CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH).
     # vfs: src/log.cpp's device, which stdout is reopened on.
+    # esp_http_client: src/firmware_pull.cpp's connection to GitHub, with the certificate bundle of mbedtls
+    # (esp_crt_bundle.h); the index's signature is checked with mbedtls's x509 and pk.
     PRIV_REQUIRES lwip esp_psram esp_app_format app_update esp_partition spi_flash hal espcoredump vfs
-    EMBED_FILES "ui/iclforge_ui.html" "ui/iclforge_ui.js")
+                  esp_http_client)
+
+# IDF names these `_binary_iclforge_ui_html_gz_start` and so on, after the file name (src/control.cpp).
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    foreach(ICLFORGE_UI_OUT ${ICLFORGE_UI_GZ})
+        target_add_binary_data(${COMPONENT_LIB} "${ICLFORGE_UI_OUT}" BINARY)
+    endforeach()
+endif()
 
 # libopus, built into this component when the Sendspin player is to decode Opus (opus.cmake).
 # Below the registration, as the conversion directory further down is: the option is not set in
@@ -233,10 +268,11 @@ endif()
 # these first means the root CMakeLists.txt's own option(...) calls see the
 # values already set and leave them alone.
 #
-# This is the same fourteen the root's own guard (CMakeLists.txt:230) refuses
-# the profile alongside. They are spelled out rather than looped because the
-# guard names them individually too, and a mismatch between the two lists should
-# be visible in a diff.
+# This is the same fifteen the root's own guard (the _ac3_minimal_conflicts list
+# in CMakeLists.txt) refuses the profile alongside. They are spelled out rather
+# than looped because the guard names them individually too, and a mismatch
+# between the two lists should be visible in a diff (tools/checks/
+# test_minimal_profile_options.py holds them to each other).
 set(ICLFORGE_BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_GUI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -251,6 +287,7 @@ set(ICLFORGE_BUILD_ADM OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_PYTHON OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_AC4 OFF CACHE BOOL "" FORCE)
+set(ICLFORGE_BUILD_TRUEHD OFF CACHE BOOL "" FORCE)
 
 # The AC-4 decoder is the one addition to that list, behind a switch that is off
 # by default. ICLFORGE_BUILD_AC4 above stays off, since it also builds the

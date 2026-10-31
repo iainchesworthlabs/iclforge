@@ -49,6 +49,7 @@ struct NowStyle {
 [[nodiscard]] constexpr bool now_view_drawn(iclforge::nowview::View view) {
     return view == iclforge::nowview::View::kSpeakers || view == iclforge::nowview::View::kTitle ||
            view == iclforge::nowview::View::kClock ||
+           view == iclforge::nowview::View::kMeters ||
            view == iclforge::nowview::View::kDark ||
            view == iclforge::nowview::View::kOff;
 }

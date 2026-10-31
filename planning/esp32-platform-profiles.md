@@ -109,21 +109,24 @@ Proposed ids, from the board and not from the codec:
 
 | Profile | Fragments after `sdkconfig.defaults`, in order | Release image | Boards |
 |---|---|---|---|
-| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a `.156`, S3b `.45` (16 MB flash, 8 MB octal PSRAM) |
-| `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | the same boards |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | `hearth-sink-esp32s3` | S3a `.156`, S3b `.45` (16 MB flash, 8 MB octal PSRAM) |
 | `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` | `hearth-sink-esp32c6-16mb` | C6 `.117` |
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none on the bench: any C6 module |
-| `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
-| `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | the same boards |
-| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
+| `p4-rev1` | `hw`, `p4`, `sendspin`, `ac4` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `ac4`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
 
-**AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`, and so is AC-4 on the P4
-(`p4-rev1-ac4`).** Both were decided by the owner on 2026-10-12. The reason it holds up: AC-4 changes
-locked keys, not just adds a feature. `sdkconfig.ac4` sets the decode stack to 40,960,
-`sdkconfig.s3-dcache` takes 32 KB of heap for a 64 KB data cache, and the two images have different
-heap budgets, different speeds and different baselines. An overlay that moves six locked keys is a
-profile with a longer name. The published P4 image stays AC-4 off (`esp32-ota.md`, O8); the boards
-run the AC-4 profile.
+**AC-4 was its own profile on the S3 and the P4 (the owner, 2026-10-12); since 2026-10-29 it is in every release profile but the C6's.** The owner
+decided on 2026-10-12 that AC-4 is a profile of its own on both boards, because it changes locked keys: `sdkconfig.ac4`
+sets the decode stack to 40,960, `sdkconfig.s3-dcache` takes 32 KB of heap for a 64 KB data cache, and the images had different
+heap budgets, speeds and baselines. **On 2026-10-29 the profiles were folded** (the owner: "if we need to fold the
+profiles together, that's fine. The budget can be grown"): `p4-rev1` is what `p4-rev1-ac4` was (the same fragments and the same
+locked values, so the same hash, `f797fb39d0f9`, and the baseline P4a recorded on 2026-10-12 stands for it), with an app budget
+of 3,400,000 bytes against the 4 MiB slot. `p4-rev3` took the decoder after the kit's first run of the AC-4 image on 2026-10-29 failed
+(the largest internal block, 37,888 bytes after the I2S queue, was under the 40,960-byte decode stack and the 24,576-byte lane
+stack): the player now places a stack in PSRAM when no internal block holds it, `p4-rev3` locks the HTTP play's decode stack
+in PSRAM, and its budget is 3,950,000 against an image of 3,811,472. `s3-n16r8` took the decoder and the 64 KB data cache and
+kept its 4 KB allocation limit (budget 2,750,000, image 2,621,600), with `psram-4k` after `psram` and `LWIP_TCP_OOSEQ_MAX_PBUFS` bounded in
+`sdkconfig.psram`. [`ac4-in-release-images.md`](ac4-in-release-images.md) has the measurements.
 
 A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside Wi-Fi
 ([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)).
@@ -145,7 +148,7 @@ it is:
   every profile with no screen, where it is inert, and `snapshot` skips a free key, while
   `verify` reads a locked key first. A test holds it locked here and in no other profile.
 - **Budgets**, about 5% over what the build measured, as the S3's and C6's are: the app
-  2,600,000 bytes (2,469,920 built; CI's #1400 build 2,466,032), static internal RAM 175,000
+  2,900,000 bytes (2,469,920 built when set at 2,600,000; CI's #1400 build 2,466,032; raised to 2,900,000 on 2026-10-25 because main alone then built to about 2,604,700 bytes and the Preferences screens, layout chooser, speakers styles and late-night mode add roughly 60 KB more: about 2,663 KB with all visible work, under the 4 MiB slot), static internal RAM 175,000
   (DIRAM 166,948), the bootloader 24,576 (22,448).
 - **CI reads it**: the `_build.yml` step for this image takes its fragments from
   `sink_profile.py defaults p4-rev3`, is held by `verify` and packaged with `--profile p4-rev3`,
@@ -184,6 +187,7 @@ someone saying where it lives on every board.
 | A fragment of the profile itself | any key it declares, once, in the profile's order | a locked key a later fragment resets without saying so |
 | `wifi-credentials` (the board's network) | `ICLFORGE_EXAMPLE_WIFI_*` | anything else; the packager already refuses an image with these |
 | `measure` (stage timers, `ICLFORGE_EXAMPLE_AC4_PCM_HASH`, report cadence) | observation keys | placement, sizes, caches, features |
+| `panel-capture` (the screen's read-back and touch server on 8081, which has no authentication) | `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT` | everything else; a release profile locks it at 0 and the packager refuses an image with it on |
 | `qemu-net` (the release shape on QEMU's Ethernet; [below](#2-a-qemu-twin-of-the-release-shape)) | network, sink and source choice, PSRAM mode and `-m` | stacks, rings, caches, features |
 | `ci-*` shapes (today's `sdkconfig.ci*`) | anything: they are tests of code, and are not profiles | they must not be named as a board's image |
 | A scratch overlay (someone's measurement) | whatever it declares | it cannot produce a baseline, and its image reports `+scratch` in its profile id |
@@ -472,7 +476,25 @@ the line; and a Sendspin play list for the C6 needs a server on the bench.
 
 A row may name a `layout`, set with `PUT /layout` for its play and put back after it, and the `slots`
 the sink must open for: `p4-rev3`'s 5.1 stream on `9.1.6` is the one, and fails when the sink opens
-for fewer than sixteen. `--fixtures-url` plays the streams from a server that is already running
+for fewer than sixteen.
+
+**A row declares what it needs, and the board says what it carries (2026-10-25).** A row that names a
+`layout` needs the board to carry it, and the suite does not guess that from the profile: it reads
+`GET /layout-options`, the firmware's one verdict over its capabilities (the same one `PUT /layout`, the
+Preferences list and the device page ask: [`p4x-layout-options.md`](p4x-layout-options.md)), once per run,
+and prints what the board carries, carries with a limit and does not. A layout the board carries is played
+as before; one it carries with a limit is played and the limit is noted. One it cannot carry is what the
+row's `if_unavailable` says: `refuse` (the default) sends `PUT /layout` and holds the board to answering
+409 with the reason the listing gives for it, which is the row's pass, since a board told a layout it
+cannot carry is meant to say no (state `refused-layout`, the reason in `why`); `skip` leaves the row out
+and says why (state `skipped`). A board that takes a layout it lists as unavailable, or refuses it in other
+words than it lists, is a finding. A firmware with no `GET /layout-options` plays the row as written. The
+old rule that only a v3.x profile could have a layout row is gone: a P4 below v3.0 reports two slots
+(`sink_slots()`) and says so, and the fold is tested where it always was, by a 5.1 stream on the board's own
+2.0. No row was added to another profile in this change: a new row is a new baseline, and a baseline is
+recorded on a board.
+
+`--fixtures-url` plays the streams from a server that is already running
 and serves the repository's paths, where the suite would otherwise start one over the whole
 repository on the LAN.
 

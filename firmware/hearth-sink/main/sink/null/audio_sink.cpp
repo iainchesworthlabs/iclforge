@@ -68,6 +68,10 @@ int sink_max_slots_bit_width() { return 0; }
 
 bool sink_second_line_possible() { return false; }
 
+int sink_frame_bit_max() { return 0; }
+
+bool sink_tdm_usable() { return true; }
+
 // Nothing here is interleaved into slots at all, so the width is only what a
 // caller asking gets told, and changing it would describe nothing.
 int sink_slot_bits() { return CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS; }

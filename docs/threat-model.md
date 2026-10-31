@@ -23,6 +23,9 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | E-AC-3 elementary streams, including dependent substreams | `iclforge::ac3::split_access_units`, `iclforge::ac3::Eac3Decoder::decode_access_unit` | yes |
 | AC-4 elementary streams: sync frames and the table of contents | `iclforge::ac4::scan`, `iclforge::ac4::SyncFrameSplitter`, `iclforge::ac4::parse_raw_frame` | yes — `fuzz_ac4_parse` |
 | AC-4 substreams: the syntax layer and the reconstruction to PCM | `iclforge::ac4::Decoder::parse`, `iclforge::ac4::Decoder::decode`, `decode_by_block` | yes — `fuzz_ac4_decode` |
+| TrueHD and MLP elementary streams: the units, major syncs, restart and block headers, filters, matrices and residuals | `iclforge::truehd::ElementaryReader`, `iclforge::truehd::Decoder::decode` | `fuzz_truehd_parse`, `fuzz_truehd_decode` and `fuzz_truehd_encode`, in `tools/fuzz/run.sh`'s default target list, with seeds made from `testdata/truehd`, a dictionary of the sync words and a mutator that puts the stream's checks right after each mutation; `fuzz_differential_truehd_decode` decodes the same bytes with FFmpeg and compares the samples, and holds three regressions |
+| TrueHD in an IEC 61937 MAT burst, and in MP4, Matroska and MPEG-TS | `iclforge::containers::iec61937::unwrap_mat_stream`, and the three demuxers | the demuxers are fuzzed as above, each with a TrueHD seed (`truehd-mono48.*`); `fuzz_mat_unwrap` is in `run.sh`'s default list, with three seeds (`libs/containers/fuzz/seeds/fuzz_mat_unwrap/`) and a dictionary of the preamble and the three code words; the MP4 demuxer's seeds include protected TrueHD and `mlpa` files |
+| An AC-4 content signature (Thrift, DER, X.509, PEM, the credentials, and where the sync frames stop) | `iclforge::base::crypto::verify_content_signature`, `iclforge::ac4` `io/content_signature.hpp` | yes — `fuzz_content_signature`, `fuzz_ac4_content_signature` (both in `run.sh`'s default list; the changelog entry for the signature says they had not yet run under libFuzzer when it was written) |
 | Format sniffing before any decoder commits | `iclforge::ac3::io::scan` | yes |
 | Metadata edit and insert, which read a syncframe's header and then write it | `iclforge::ac3::io::edit_stream_metadata`, `iclforge::ac3::io::insert_stream_metadata` | yes - driven by `fuzz_scan` on the same seeds |
 | EMDF containers in a skip field (§H.2.2) | `iclforge::objects::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
@@ -34,7 +37,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
 | Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
 | Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
-| MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`, `iclforge::containers::mp4::demux_seekable` | yes |
+| MP4/ISOBMFF containers, a protected (Common Encryption) track's `sinf`, `frma`, `schm` and `tenc` boxes included; the reader refuses such a track by name and decrypts nothing | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`, `iclforge::containers::mp4::demux_seekable` | yes — `fuzz_mp4_demux`, whose seeds include seven protected files |
 | MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
 | OSC control packets (UDP), a live object-position source | `iclforge::objects::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `tools/fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
 | Sendspin's handshake messages from a network peer (Hearth build) | `iclforge::sendspin::handshake` | yes — `fuzz_sendspin_handshake` |
@@ -102,8 +105,8 @@ is a set of specific properties rather than a language guarantee:
 
 What runs against it:
 
-- **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
-  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `tools/fuzz/run.sh`'s
+- **Thirty-two libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
+  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-seven are in `tools/fuzz/run.sh`'s
   default list and drive the entry points in the table above for crashes and undefined
   behaviour — format sniffing and the metadata edit and insert (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
   `fuzz_mp4_demux`, `fuzz_mpegts_demux`), the AC-3 and E-AC-3 decoders (`fuzz_ac3_decode`,
@@ -114,11 +117,19 @@ What runs against it:
   (`fuzz_signing_verify`), the OSC parser (`fuzz_osc_parse`) and Sendspin's four
   (`fuzz_sendspin_json`, `fuzz_sendspin_handshake`, `fuzz_sendspin_messages`,
   `fuzz_sendspin_frames`) — and `fuzz_ac4_encode`, which runs the AC-4 encoder over the
-  configurations and input it takes and holds it to the decoder. Two more
-  (`fuzz_differential_ac3_decode`, `fuzz_differential_eac3_decode`) decode the same mutated
-  bytes with FFmpeg as well and diff the PCM, so a *wrong* decode that does not crash is caught
-  too. The last, `fuzz_adm_parse`, is built only when `ICLFORGE_BUILD_ADM` is on — see
-  [ADM](#adm-xml-and-bw64). `Fuzz Regress` replays the checked-in seed and regression corpora on
+  configurations and input it takes and holds it to the decoder. Two press an AC-4 stream's
+  content signature, which arrives with the file it signs: `fuzz_ac4_content_signature` (where the
+  sync frames stop and what the digest covers) and `fuzz_content_signature` (the Thrift, DER,
+  X.509, PEM and credential readers, and the verifier that joins them). Four are TrueHD's and the
+  MAT unwrapper's: the reader, the decoder and the encoder (`fuzz_truehd_parse`,
+  `fuzz_truehd_decode`, `fuzz_truehd_encode`, with seeds made from the fixtures and the hand-built
+  streams, a dictionary and a mutator that rewrites the stream's checks) and `fuzz_mat_unwrap`. Three more
+  (`fuzz_differential_ac3_decode`, `fuzz_differential_eac3_decode`, `fuzz_differential_truehd_decode`)
+  decode the same mutated bytes with FFmpeg as well and diff the PCM (TrueHD's sample for sample, since
+  the codec is lossless), so a *wrong* decode that does not crash is caught too. `fuzz_adm_parse` is
+  built only when `ICLFORGE_BUILD_ADM` is on — see [ADM](#adm-xml-and-bw64) — and the last,
+  `fuzz_iamf_parse`, is built and has no seeds and no place in a run list yet
+  (`tools/checks/check_fuzz_harnesses.py` reports it on every run). `Fuzz Regress` replays the checked-in seed and regression corpora on
   every push to `main` and on pull requests into it (a repository variable can pause the
   pull-request run, as [Where each check runs](verification.md#where-each-check-runs) says);
   `Fuzz Short` and `Fuzz Differential` add a bounded mutation budget on pushes, and a nightly job
@@ -344,7 +355,7 @@ libadm and libbw64, plus Boost headers. That means:
   CI job that runs it — `Fuzz ADM Nightly` — is schedule/dispatch-only and `continue-on-error`,
   because a vcpkg restore plus the libbw64/libadm `FetchContent` pulls cost more than the mutation
   budget and most of what the harness reaches is third-party code. It is not one of the
-  twenty-one harnesses in `tools/fuzz/run.sh`'s default list, which run on every push. The resource
+  twenty-seven harnesses in `tools/fuzz/run.sh`'s default list, which run on every push. The resource
   limits above do not apply here either way: there
   is no document-size cap, no entity-expansion limit and no element-count limit; an enormous or
   deeply nested ADM document is bounded by nothing this project controls.

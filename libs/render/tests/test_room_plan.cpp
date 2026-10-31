@@ -1,10 +1,12 @@
 // The room seen from above, and the glow of a level (iclforge/render/room_plan.hpp), on the host.
 //
 // What is held here is what a picture cannot say: that the centre is where the centre goes, that no two
-// speakers of any layout the grammar can name are drawn on top of each other, and that a level sitting on
-// the edge of a step does not make the screen flicker.
+// speakers of any layout the grammar can name are drawn on top of each other, that a level sitting on
+// the edge of a step does not make the screen flicker, that the show is the same at any volume, and that a
+// pulsing speaker never moves much, or jumps, or flickers when it is quiet.
 
 #include <algorithm>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <cstdlib>
@@ -18,11 +20,13 @@
 namespace {
 
 using iclforge::render::Glow;
+using iclforge::render::LevelCeiling;
 using iclforge::render::OutputLayout;
 using iclforge::render::PlanArea;
 using iclforge::render::PlanNode;
 using iclforge::render::PlanShape;
 using iclforge::render::PlanSpot;
+using iclforge::render::Pulse;
 
 constexpr PlanArea kArea{1024, 472};
 
@@ -144,9 +148,17 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
     for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
         for (const int lfe : {0, 1, 2}) {
             for (const int height : {0, 2, 4, 6}) {
+              // The same layouts with the heights in the ceiling (":top"): every height speaker is straight overhead.
+              for (const bool ceiling : {false, true}) {
+                if (ceiling && height == 0) {
+                    continue;
+                }
                 std::string name = std::to_string(front) + "." + std::to_string(lfe);
                 if (height != 0) {
                     name += "." + std::to_string(height);
+                }
+                if (ceiling) {
+                    name += ":top";
                 }
                 const auto layout = OutputLayout::parse(name);
                 if (!layout) {
@@ -167,10 +179,81 @@ TEST_CASE("plan_nodes: no two speakers of any layout the grammar names are drawn
                         CHECK_FALSE(touches(nodes[a], nodes[b]));
                     }
                 }
+              }
             }
         }
     }
     CHECK(checked >= 20);
+}
+
+TEST_CASE("plan_nodes_fit: every layout the grammar names fits a small pane, inside it, with no two speakers on each other",
+          "[room_plan]") {
+    // The panes the layout sheet draws a room in: the kit's right-hand pane, an 800 by 480's, a 480 by 320's, and the
+    // strip at the top of a 240-pixel screen.
+    struct Pane {
+        int width;
+        int height;
+    };
+    std::size_t checked = 0;
+    for (const Pane pane : {Pane{345, 424}, Pane{400, 360}, Pane{270, 300}, Pane{300, 200}, Pane{161, 170}, Pane{220, 100},
+                            Pane{640, 560}}) {
+        for (const int front : {1, 2, 3, 4, 5, 7, 9}) {
+            for (const int lfe : {0, 1, 2}) {
+                for (const int height : {0, 2, 4, 6}) {
+                  for (const bool ceiling : {false, true}) {
+                    if (ceiling && height == 0) {
+                        continue;
+                    }
+                    std::string name = std::to_string(front) + "." + std::to_string(lfe);
+                    if (height != 0) {
+                        name += "." + std::to_string(height);
+                    }
+                    if (ceiling) {
+                        name += ":top";
+                    }
+                    const auto layout = OutputLayout::parse(name);
+                    if (!layout) {
+                        continue;
+                    }
+                    ++checked;
+                    const std::vector<PlanSpot> spots = iclforge::render::plan_spots(*layout);
+                    const std::vector<PlanNode> nodes = iclforge::render::plan_nodes_fit(spots, pane.width, pane.height);
+                    REQUIRE(nodes.size() == spots.size());
+                    for (std::size_t a = 0; a < nodes.size(); ++a) {
+                        INFO(name << " in " << pane.width << "x" << pane.height << " slot " << spots[a].name);
+                        CHECK(nodes[a].x - nodes[a].w / 2 >= 0);
+                        CHECK(nodes[a].x + nodes[a].w / 2 <= pane.width);
+                        CHECK(nodes[a].y - nodes[a].h / 2 >= 0);
+                        CHECK(nodes[a].y + nodes[a].h / 2 <= pane.height);
+                        for (std::size_t b = a + 1; b < nodes.size(); ++b) {
+                            INFO(name << ": " << spots[a].name << " and " << spots[b].name);
+                            CHECK_FALSE(touches(nodes[a], nodes[b]));
+                        }
+                    }
+                  }
+                }
+            }
+        }
+    }
+    CHECK(checked >= 160);
+}
+
+TEST_CASE("plan_nodes_fit: a bigger pane has bigger speakers, and an empty pane is an empty room", "[room_plan]") {
+    const auto layout = OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    const std::vector<PlanSpot> spots = iclforge::render::plan_spots(*layout);
+    const std::vector<PlanNode> big = iclforge::render::plan_nodes_fit(spots, 400, 360);
+    const std::vector<PlanNode> small = iclforge::render::plan_nodes_fit(spots, 200, 180);
+    REQUIRE(big.size() == small.size());
+    for (std::size_t i = 0; i < big.size(); ++i) {
+        INFO(spots[i].name);
+        CHECK(big[i].w > small[i].w);
+    }
+    // The screen's own area and style are what they were: 58-pixel speakers.
+    CHECK(planned("5.1").at("C").w == iclforge::render::kPlanEarSize);
+    for (const PlanNode& node : iclforge::render::plan_nodes_fit(spots, 0, 100)) {
+        CHECK(node.shape == PlanShape::kNone);
+    }
 }
 
 TEST_CASE("plan_nodes: slots placed at the same angle are drawn apart, not on each other", "[room_plan]") {
@@ -205,11 +288,12 @@ TEST_CASE("plan_nodes: no speakers at all, or only an LFE, is an empty room and 
 
 TEST_CASE("Glow: silence is step 0 and a loud output is the top step at once", "[room_plan][glow]") {
     Glow glow;
-    CHECK(glow.update(-120.0F, -120.0F, 0.2F) == true);  // the first update settles the first step
+    constexpr float kCeiling = -14.0F;
+    CHECK(glow.update(-120.0F, -120.0F, 0.1F, kCeiling) == true);  // the first update settles the first step
     CHECK_FALSE(glow.live());
     CHECK(glow.core() == 0);
     CHECK(glow.halo() == 0);
-    CHECK(glow.update(-10.0F, -4.0F, 0.2F));
+    CHECK(glow.update(-14.0F, -8.0F, 0.1F, kCeiling));
     CHECK(glow.live());
     CHECK(glow.core() == iclforge::render::kGlowCoreSteps);
     CHECK(glow.halo() == iclforge::render::kGlowHaloSteps);
@@ -217,25 +301,30 @@ TEST_CASE("Glow: silence is step 0 and a loud output is the top step at once", "
 
 TEST_CASE("Glow: an unchanged level changes no step, so nothing is redrawn", "[room_plan][glow]") {
     Glow glow;
-    glow.update(-30.0F, -20.0F, 0.2F);
+    glow.update(-30.0F, -20.0F, 0.1F, -14.0F);
     for (int i = 0; i < 20; ++i) {
-        CHECK_FALSE(glow.update(-30.0F, -20.0F, 0.2F));
+        CHECK_FALSE(glow.update(-30.0F, -20.0F, 0.1F, -14.0F));
     }
 }
 
-TEST_CASE("Glow: it falls slowly and goes dark only after a few seconds of silence", "[room_plan][glow]") {
+TEST_CASE("Glow: it falls fast enough for a beat to show, and goes dark after a couple of seconds of silence",
+          "[room_plan][glow]") {
     Glow glow;
-    glow.update(-14.0F, -8.0F, 0.2F);
+    glow.update(-14.0F, -8.0F, 0.1F, -14.0F);
     REQUIRE(glow.core() == iclforge::render::kGlowCoreSteps);
-    // A second of silence is not yet dark: 14 dB a second from -14 is -28, still well lit.
-    for (int i = 0; i < 5; ++i) {
-        glow.update(-120.0F, -120.0F, 0.2F);
-    }
+    // Each window of silence takes 6 dB off, a step: a hit that is gone is a step down within two windows.
+    glow.update(-120.0F, -120.0F, 0.1F, -14.0F);
+    glow.update(-120.0F, -120.0F, 0.1F, -14.0F);
     CHECK(glow.live());
     CHECK(glow.core() < iclforge::render::kGlowCoreSteps);
-    // Seven seconds is -112 dB: dark.
-    for (int i = 0; i < 40; ++i) {
-        glow.update(-120.0F, -120.0F, 0.2F);
+    // Half a second is 30 dB: still faintly lit, not yet dark.
+    for (int i = 0; i < 3; ++i) {
+        glow.update(-120.0F, -120.0F, 0.1F, -14.0F);
+    }
+    CHECK(glow.live());
+    // Two seconds is past the -80 dB where the output is silent: dark.
+    for (int i = 0; i < 15; ++i) {
+        glow.update(-120.0F, -120.0F, 0.1F, -14.0F);
     }
     CHECK_FALSE(glow.live());
     CHECK(glow.core() == 0);
@@ -243,26 +332,162 @@ TEST_CASE("Glow: it falls slowly and goes dark only after a few seconds of silen
 
 TEST_CASE("Glow: steps are monotonic in level", "[room_plan][glow]") {
     int last = 0;
-    for (float db = -70.0F; db <= -10.0F; db += 2.0F) {
+    int last_halo = 0;
+    for (float db = -70.0F; db <= -10.0F; db += 1.0F) {
         Glow glow;
-        glow.update(db, db + 6.0F, 0.2F);
+        glow.update(db, db + 6.0F, 0.1F, -14.0F);
         CHECK(glow.core() >= last);
+        CHECK(glow.halo() >= last_halo);
         last = glow.core();
+        last_halo = glow.halo();
     }
     CHECK(last == iclforge::render::kGlowCoreSteps);
+    CHECK(last_halo == iclforge::render::kGlowHaloSteps);
 }
 
 TEST_CASE("Glow: a level on the edge of a step does not make it flicker", "[room_plan][glow]") {
-    // The edge between the second and third lit steps is 1.5 steps up the 48 dB, 12 dB a step: -44 dB.
-    // A level that is seen 1.5 dB either side of it, window after window (the output falls 2.8 dB between
-    // two windows and the next one lifts it again), is a quarter of a step either way.
+    // With the ceiling at -14 dB the core's span is -46 to -16 dB, 6 dB a step: the edge between the second and
+    // third lit steps is 1.5 steps up, at -37 dB. A level seen 1.5 dB either side of it, window after window (the
+    // output falls 3 dB between two windows and the next one lifts it again), is a quarter of a step either way.
     Glow glow;
     for (int i = 0; i < 6; ++i) {
-        glow.update(i % 2 == 0 ? -42.5F : -45.5F, -120.0F, 0.2F);
+        glow.update(i % 2 == 0 ? -35.5F : -38.5F, -120.0F, 0.1F, -14.0F);
     }
     int changes = 0;
     for (int i = 0; i < 40; ++i) {
-        changes += glow.update(i % 2 == 0 ? -42.5F : -45.5F, -120.0F, 0.2F) ? 1 : 0;
+        changes += glow.update(i % 2 == 0 ? -35.5F : -38.5F, -120.0F, 0.1F, -14.0F) ? 1 : 0;
     }
     CHECK(changes == 0);
+}
+
+TEST_CASE("LevelCeiling: the loudest lately, rising at once and falling slowly, never below its floor", "[room_plan][glow]") {
+    LevelCeiling ceiling;
+    CHECK(ceiling.db() == iclforge::render::kCeilingFloorDb);
+    ceiling.feed(-12.0F, 0.1F);
+    CHECK(ceiling.db() == -12.0F);
+    // A quieter window does not lower it at once: 2 dB a second.
+    ceiling.feed(-30.0F, 0.1F);
+    CHECK(ceiling.db() > -12.5F);
+    for (int i = 0; i < 50; ++i) {
+        ceiling.feed(-30.0F, 0.1F);
+    }
+    CHECK(ceiling.db() > -23.0F);  // five seconds is 10 dB from -12: still well up
+    for (int i = 0; i < 60; ++i) {
+        ceiling.feed(-30.0F, 0.1F);
+    }
+    CHECK(ceiling.db() == -30.0F);  // ten seconds is 20 dB: down to the level itself
+    // Silence takes it to its floor and no further: a very quiet passage is not turned up to look loud.
+    for (int i = 0; i < 2000; ++i) {
+        ceiling.feed(-120.0F, 0.1F);
+    }
+    CHECK(ceiling.db() == iclforge::render::kCeilingFloorDb);
+}
+
+TEST_CASE("Glow: the same music shows the same at any volume", "[room_plan][glow]") {
+    // Three outputs of a programme, as the board measures them, at full volume and 24 dB down: the ceiling
+    // follows the loudest, so each output is on the same step at the end of the same few windows.
+    const float rms[3] = {-13.0F, -21.0F, -30.0F};
+    const float peak[3] = {-6.0F, -14.0F, -25.0F};
+    const auto run = [&](float offset_db) {
+        LevelCeiling ceiling;
+        Glow glow[3];
+        for (int w = 0; w < 30; ++w) {
+            ceiling.feed(rms[0] + offset_db, 0.1F);
+            for (int o = 0; o < 3; ++o) {
+                glow[o].update(rms[o] + offset_db, peak[o] + offset_db, 0.1F, ceiling.db());
+            }
+        }
+        return std::vector<int>{glow[0].core(), glow[1].core(), glow[2].core(), glow[0].halo(), glow[1].halo(), glow[2].halo()};
+    };
+    const std::vector<int> loud = run(0.0F);
+    CHECK(run(-12.0F) == loud);
+    CHECK(run(-24.0F) == loud);
+    // And the room still has its balance: the loudest output is brighter than the quietest.
+    CHECK(loud[0] > loud[2]);
+}
+
+TEST_CASE("Pulse: a silent speaker is at its smallest and never moves", "[room_plan][pulse]") {
+    Pulse pulse;
+    for (int i = 0; i < 50; ++i) {
+        CHECK_FALSE(pulse.update(-120.0F, 0.1F, -14.0F));
+    }
+    CHECK(pulse.step() == 0);
+    CHECK(pulse.scale() == Catch::Approx(1.0F - iclforge::render::kPulseReach));
+}
+
+TEST_CASE("Pulse: a speaker next to nothing on it stays at its smallest and does not flicker", "[room_plan][pulse]") {
+    // 40 dB under the ceiling, in and out of the noise: below the quiet level, so no size change at all.
+    Pulse pulse;
+    int changes = 0;
+    for (int i = 0; i < 100; ++i) {
+        changes += pulse.update(i % 2 == 0 ? -52.0F : -58.0F, 0.1F, -14.0F) ? 1 : 0;
+    }
+    CHECK(changes == 0);
+    CHECK(pulse.step() == 0);
+}
+
+TEST_CASE("Pulse: a loud speaker grows to its largest, by no more than a few sizes a window", "[room_plan][pulse]") {
+    Pulse pulse;
+    int largest_jump = 0;
+    int last = pulse.step();
+    for (int i = 0; i < 30; ++i) {
+        pulse.update(-14.0F, 0.1F, -14.0F);
+        largest_jump = std::max(largest_jump, std::abs(pulse.step() - last));
+        last = pulse.step();
+    }
+    CHECK(largest_jump <= iclforge::render::kPulseMaxStepsPerWindow);
+    CHECK(pulse.step() == iclforge::render::kPulseSteps - 1);
+    CHECK(pulse.scale() == Catch::Approx(1.0F + iclforge::render::kPulseReach));
+    // And then it falls back, more slowly than it rose.
+    int windows_to_rise = 0;
+    {
+        Pulse again;
+        while (again.step() < iclforge::render::kPulseSteps - 1 && windows_to_rise < 100) {
+            again.update(-14.0F, 0.1F, -14.0F);
+            ++windows_to_rise;
+        }
+    }
+    int windows_to_fall = 0;
+    while (pulse.step() > 0 && windows_to_fall < 100) {
+        pulse.update(-120.0F, 0.1F, -14.0F);
+        ++windows_to_fall;
+    }
+    CHECK(pulse.step() == 0);
+    CHECK(windows_to_fall > windows_to_rise);
+}
+
+TEST_CASE("Pulse: steady music moves it only a little, and an unchanged level changes nothing", "[room_plan][pulse]") {
+    Pulse pulse;
+    for (int i = 0; i < 30; ++i) {
+        pulse.update(-22.0F, 0.1F, -14.0F);
+    }
+    for (int i = 0; i < 40; ++i) {
+        CHECK_FALSE(pulse.update(-22.0F, 0.1F, -14.0F));
+    }
+    // A beat of 6 dB every half second: the size follows it by a size or two, not the whole range.
+    Pulse beat;
+    int low = iclforge::render::kPulseSteps;
+    int high = 0;
+    for (int i = 0; i < 100; ++i) {
+        beat.update(i % 5 == 0 ? -16.0F : -24.0F, 0.1F, -14.0F);
+        if (i > 30) {
+            low = std::min(low, beat.step());
+            high = std::max(high, beat.step());
+        }
+    }
+    CHECK(high - low <= 3);
+    CHECK(high - low >= 1);
+}
+
+TEST_CASE("Pulse: sizes are monotonic in the level", "[room_plan][pulse]") {
+    int last = 0;
+    for (float db = -60.0F; db <= -10.0F; db += 1.0F) {
+        Pulse pulse;
+        for (int i = 0; i < 40; ++i) {
+            pulse.update(db, 0.1F, -14.0F);
+        }
+        CHECK(pulse.step() >= last);
+        last = pulse.step();
+    }
+    CHECK(last == iclforge::render::kPulseSteps - 1);
 }

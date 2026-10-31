@@ -6,9 +6,11 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string_view>
 #include <system_error>
 
+#include "item_source.hpp"
 #include "container_input.hpp"
 
 namespace iclforge::hearth::ui {
@@ -23,17 +25,54 @@ namespace {
     return extension;
 }
 
-// The files Hearth reads, which is also what list_folder_items() lists: the
-// three elementary streams (AC-3 and E-AC-3, which io::scan() splits, and AC-4,
-// whose sync frames Session::open() splits - planning/ac4.md, I2) and the
-// three containers apps/shared/media/src/container_input.hpp demuxes.
-constexpr std::array<std::string_view, 6> kMediaExtensions{".ac3", ".ec3", ".ac4",
-                                                           ".mp4", ".mkv", ".ts"};
+// The files Hearth reads, which is also what list_folder_items() lists:
+// the elementary streams (AC-3 and E-AC-3, which io::scan() splits, AC-4,
+// whose sync frames Session::open() splits - planning/ac4.md, I2 - and TrueHD and
+// MLP, which Session::open() indexes) and the three containers
+// apps/shared/media/src/container_input.hpp demuxes.
+constexpr std::array<std::string_view, 8> kMediaExtensions{".ac3", ".ec3", ".ac4", ".thd",
+                                                           ".mlp", ".mp4", ".mkv", ".ts"};
 
 [[nodiscard]] bool is_media_extension(const std::string& extension) {
     return std::find(kMediaExtensions.begin(), kMediaExtensions.end(), extension) !=
            kMediaExtensions.end();
 }
+
+// The codecs a file's track may be in for Hearth to play it: all four. A file with TrueHD first
+// and AC-3 or E-AC-3 after it (a Blu-ray remux) plays the TrueHD, decoded here; Hearth cannot send
+// it on as it is yet, so a receiver that would have been sent the AC-3 track is not sent it.
+constexpr iclforge::apps::CodecSet kPlayedCodecs{
+    .ac3 = true, .eac3 = true, .ac4 = true, .truehd = true};
+
+// How much of a file the loader looks at to tell a bare TrueHD stream from the rest, before it
+// decides whether to read the file at all.
+constexpr std::size_t kSniffBytes = 64 * 1024;
+
+// A TrueHD or MLP file read as the player plays it (iclforge::hearth::ByteSource): by offset, a
+// window at a time, so that a film's lossless track is not held in memory.
+class FileByteSource final : public iclforge::hearth::ByteSource {
+public:
+    FileByteSource(const std::string& path, std::uint64_t size)
+        : file_(path, std::ios::binary), size_(size) {}
+
+    [[nodiscard]] bool ok() const { return static_cast<bool>(file_); }
+
+    [[nodiscard]] std::uint64_t size() const override { return size_; }
+
+    [[nodiscard]] std::size_t read(std::uint64_t offset, std::span<std::byte> out) override {
+        if (offset >= size_ || out.empty()) {
+            return 0;
+        }
+        file_.clear();
+        file_.seekg(static_cast<std::streamoff>(offset));
+        file_.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(out.size()));
+        return static_cast<std::size_t>(file_.gcount());
+    }
+
+private:
+    std::ifstream file_;
+    std::uint64_t size_;
+};
 
 }  // namespace
 
@@ -41,7 +80,7 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
     return [](const std::string& path) -> std::expected<LoadedItem, std::string> {
         if (!is_media_extension(lowercase_extension(path))) {
             return std::unexpected(
-                "not a file hearth reads: it opens .ac3, .ec3, .ac4, .mp4, .mkv and .ts files");
+                "not a file hearth reads: it opens .ac3, .ec3, .ac4, .thd, .mlp, .mp4, .mkv and .ts files");
         }
         std::error_code sized;
         const std::uintmax_t size = std::filesystem::file_size(path, sized);
@@ -52,9 +91,28 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         if (!file) {
             return std::unexpected("could not open the file");
         }
+        // A bare TrueHD or MLP stream is told by its first bytes and is not read into memory:
+        // the session indexes it and reads it as it plays.
+        std::vector<std::byte> head(static_cast<std::size_t>(std::min<std::uintmax_t>(size, kSniffBytes)));
+        if (!head.empty()) {
+            file.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+            if (!file) {
+                return std::unexpected("could not read the file");
+            }
+        }
+        if (iclforge::apps::sniff_container(head) == iclforge::apps::ContainerKind::kUnknown &&
+            iclforge::apps::looks_like_truehd(head)) {
+            auto source = std::make_shared<FileByteSource>(path, size);
+            if (!source->ok()) {
+                return std::unexpected("could not open the file");
+            }
+            return LoadedItem{.source = std::move(source), .truehd = true};
+        }
         std::vector<std::byte> bytes(static_cast<std::size_t>(size));
-        if (!bytes.empty()) {
-            file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        std::copy(head.begin(), head.end(), bytes.begin());
+        if (bytes.size() > head.size()) {
+            file.read(reinterpret_cast<char*>(bytes.data() + head.size()),
+                      static_cast<std::streamsize>(bytes.size() - head.size()));
             if (!file) {
                 return std::unexpected("could not read the file");
             }
@@ -66,7 +124,7 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         if (iclforge::apps::sniff_container(bytes) == iclforge::apps::ContainerKind::kUnknown) {
             return LoadedItem{.bytes = std::move(bytes)};
         }
-        auto stream = iclforge::apps::elementary_stream_from_bytes(bytes);
+        auto stream = iclforge::apps::elementary_stream_from_bytes(bytes, kPlayedCodecs);
         if (!stream.error.empty()) {
             return std::unexpected(std::move(stream.error));
         }
@@ -74,6 +132,7 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         // (Session applies skip_samples and play_samples); what the container
         // said about the track reaches the media information.
         return LoadedItem{.bytes = std::move(stream.bytes),
+                          .truehd = stream.codec == iclforge::apps::TrackCodec::kTruehd,
                           .skip_samples = stream.trim.start,
                           .play_samples = stream.trim.length,
                           .note = std::move(stream.trim_note),

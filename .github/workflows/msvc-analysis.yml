@@ -192,10 +192,22 @@ jobs:
           ruleset: .github/msvc-analysis.ruleset
           ignoredPaths: ${{ steps.test-dirs.outputs.paths }}
 
+      # Qt's tools write C++ into the build directory while it builds (qmlcachegen's
+      # .rcc/qmlcache/*_qml.cpp, moc's mocs_compilation.cpp); the analyzer compiles it with the
+      # target it belongs to, where ignoredPaths cannot leave it out, and it is not ours to fix:
+      # alerts 9750 and 9751 are C6262 on two generated Main_qml.cpp. So its results are left
+      # out of the upload, and an alert whose result stops arriving closes by itself. Results
+      # in project source are untouched. See tools/ci/sarif_drop_generated.py.
+      - name: Leave results in generated sources out of the upload
+        shell: bash
+        env:
+          SARIF: ${{ steps.run-analysis.outputs.sarif }}
+        run: python tools/ci/sarif_drop_generated.py "$SARIF" build/config-windows-msvc
+
       # No explicit category: the SARIF's own tool name (PREfast) is what the
       # alert history is keyed by, and it has been since the first upload.
       - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: ${{ steps.run-analysis.outputs.sarif }}
 

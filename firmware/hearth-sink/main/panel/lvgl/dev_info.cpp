@@ -37,6 +37,7 @@
 
 #include "../../audio_sink.hpp"
 #include "../../board_report.hpp"
+#include "meters_screen.hpp"
 #include "../../discovery.hpp"
 #include "../../network.hpp"
 #include "../../sendspin.hpp"
@@ -279,6 +280,18 @@ void read_performance(dv::Facts& facts, const PanelStats& panel, const TouchCoun
     facts.touch_reads = touch.reads.load();
     facts.touch_failures = touch.failures.load();
     facts.touch_points = touch.touches.load();
+    // The Meters view, once it has been opened.
+    const iclforge::panelstats::MetersStats meters = now_meters_stats();
+    facts.meters_opens = meters.opens;
+    facts.meters_showing = meters.showing;
+    facts.meters_rate_hz = meters.rate_hz;
+    facts.meters_shape = std::string(iclforge::panelstats::representation_name(meters.representation)) + " " + std::to_string(meters.outputs);
+    facts.meters_analysis_us = static_cast<unsigned long>(meters.analysis.mean_us());
+    facts.meters_widgets_us = static_cast<unsigned long>(meters.widgets.mean_us());
+    facts.meters_render_us = static_cast<unsigned long>(meters.render.mean_us());
+    facts.meters_late = static_cast<unsigned long>(meters.governor.late);
+    facts.meters_dropped = static_cast<unsigned long>(meters.governor.dropped);
+    facts.meters_tap_us = static_cast<unsigned long>(meters.tap.us_per_burst() + 0.5);
 }
 
 // The console's tail, kept as it is read: from a cursor, so a refresh takes only what is new. In
@@ -287,6 +300,29 @@ LvString g_tail;
 std::uint64_t g_cursor = 0;
 
 }  // namespace
+
+std::string panel_stats_report(const PanelStats& panel, const iclforge::panelstats::MetersStats& meters) {
+    constexpr std::uint32_t kInternal = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    constexpr std::uint32_t kExternal = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+    iclforge::panelstats::PanelStats out;
+    out.width = panel.width;
+    out.height = panel.height;
+    out.refreshes = panel.refreshes;
+    out.refresh.last_us = panel.render_us_last;
+    out.refresh.max_us = panel.render_us_max;
+    out.refresh.count = panel.refreshes;
+    out.refresh.total_us = panel.render_us_total;
+    out.task_stack_free_min = panel.stack_free;
+    out.psram_free = static_cast<std::uint32_t>(heap_caps_get_free_size(kExternal));
+    out.psram_free_min = static_cast<std::uint32_t>(heap_caps_get_minimum_free_size(kExternal));
+    out.psram_largest = static_cast<std::uint32_t>(heap_caps_get_largest_free_block(kExternal));
+    out.internal_free = static_cast<std::uint32_t>(heap_caps_get_free_size(kInternal));
+    out.internal_free_min = static_cast<std::uint32_t>(heap_caps_get_minimum_free_size(kInternal));
+    out.internal_largest = static_cast<std::uint32_t>(heap_caps_get_largest_free_block(kInternal));
+    out.has_meters = true;
+    out.meters = meters;
+    return iclforge::panelstats::panel_stats_json(out);
+}
 
 dv::Facts gather_dev_facts(const PanelStats& panel, const TouchCounters& touch) {
     dv::Facts facts;
@@ -307,6 +343,15 @@ dv::Facts gather_dev_facts(const PanelStats& panel, const TouchCounters& touch) 
     }
     facts.net_change = g_change;
     facts.net_change_word = dv::preference_word(g_wanted);
+    return facts;
+}
+
+dv::Facts gather_about_facts() {
+    dv::Facts facts;
+    const BoardReport report = board_report();
+    read_stream(facts, report);
+    read_network(facts, facts.player && !facts.stream.empty() && facts.stream != "idle");
+    read_configuration(facts, report);
     return facts;
 }
 

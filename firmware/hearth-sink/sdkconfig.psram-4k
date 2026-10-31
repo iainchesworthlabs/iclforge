@@ -1,0 +1,17 @@
+# The S3 (s3-n16r8) tries PSRAM first for every allocation of 4 KB and more, where
+# sdkconfig.psram stops at 16 KB. Layered on
+# sdkconfig.psram, after it:
+#
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+#
+# At 16 KB an E-AC-3 stream took about 65 KB of the S3's internal heap in blocks under
+# that and left the board 247 to 543 bytes free at its tightest, with a largest block of
+# 1,536 (S3b, 2026-10-25): a failed allocation aborts and reboots the board in the stream.
+# At 4 KB the same stream leaves 70 KB or more, a PCM stream reads 93 KB free where it read
+# 69, and the boot figure is 14 KB higher; an E-AC-3 stream's decode takes about 14 % longer.
+#
+# The AC-4 image has it too: its board suite hung at the first play after eight restarts with
+# this limit, twice in two attempts (2026-10-25, S3b), and that was the unbounded TCP out-of-order
+# queue (sdkconfig.psram, LWIP_TCP_OOSEQ_MAX_PBUFS), not the allocation limit; an AC-4 play takes
+# 512 for itself (ICLFORGE_AC4_INTERNAL_BELOW). planning/ac4-in-release-images.md has both.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096

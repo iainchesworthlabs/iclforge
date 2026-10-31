@@ -28,12 +28,20 @@ set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LVGL_DIR}" lvgl EXCLUDE_FROM_ALL)
+# The table of invalid rectangles the firmware's build gives LVGL (firmware/hearth-sink/CMakeLists.txt): 32 redraws the whole Meters view each step.
+target_compile_definitions(lvgl PRIVATE LV_INV_BUF_SIZE=256)
 
 add_executable(panel_preview
     preview.cpp
     "${MAIN}/panel/lvgl/lyric_screen.cpp"
     "${MAIN}/panel/lvgl/dev_screen.cpp"
     "${MAIN}/panel/lvgl/now_screen.cpp"
+    "${MAIN}/panel/lvgl/meters_screen.cpp"
+    "${MAIN}/panel/lvgl/prefs_screen.cpp"
+    "${MAIN}/panel/lvgl/prefs_pages.cpp"
+    "${MAIN}/panel/lvgl/prefs_editors.cpp"
+    "${MAIN}/panel/lvgl/sound_sheet.cpp"
+    "${MAIN}/panel/lvgl/layout_sheet.cpp"
     "${MAIN}/panel/lvgl/glyphs.cpp"
     "${REPO}/libs/lyrics/src/lyrics.cpp"
     "${REPO}/libs/lyrics/src/stage.cpp"
@@ -51,8 +59,20 @@ target_include_directories(panel_preview PRIVATE
     "${REPO}/libs/lyrics/include"
     "${REPO}/libs/render/include"
     "${REPO}/libs/base/include"
-    "${REPO}/libs/device/include")
+    "${REPO}/libs/device/include"
+    "${REPO}/libs/dsp/include")
 target_compile_definitions(panel_preview PRIVATE
     "PREVIEW_FONT_DIR=\"${MAIN}/panel/fonts\""
     "PREVIEW_EXAMPLES_DIR=\"${REPO}/examples/karaoke\"")
 target_link_libraries(panel_preview PRIVATE lvgl)
+
+# The screen scripts (scripts/*.screen, README.md "Scripted taps"): the taps a person makes, made by a virtual pointer
+# through `panel_preview --drive`, and the state the Preferences registry reports held to what the script says.
+#   ctest --test-dir build-preview --output-on-failure
+enable_testing()
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME panel_screen_scripts
+             COMMAND "${Python3_EXECUTABLE}" "${REPO}/tools/hearth/screen_script.py" run
+                     --preview "$<TARGET_FILE:panel_preview>" --out "${CMAKE_CURRENT_BINARY_DIR}/screen-script-out")
+endif()

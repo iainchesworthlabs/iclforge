@@ -92,8 +92,9 @@ button:hover{border-color:var(--fg)}
 .primary{border-color:var(--accent);background:var(--accent);color:var(--on-accent);font-weight:600}
 .danger{border-color:var(--ink);color:var(--ink)}
 .actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.25rem}
-input[type=text],input[type=password],select{min-width:0;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--edge);background:var(--field);color:var(--fg)}
+input[type=text],input[type=password],input[type=number],select{min-width:0;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--edge);background:var(--field);color:var(--fg)}
 select{width:100%;max-width:32rem;margin-bottom:.5rem}
+.scroll{overflow-x:auto}#trim input{width:5.5rem;text-align:end}
 .inline{display:flex;flex-wrap:wrap;gap:.5rem;max-width:32rem}
 .inline input{flex:1 1 12rem}
 .wide{width:100%;max-width:32rem}
@@ -212,6 +213,10 @@ dialog::backdrop{background:#0009}
 <button type="submit" class="primary">Apply</button>
 </form>
 <p id="layout-help" class="help">The speakers this player drives, one per output slot: a name such as 5.1 or 7.1.4, or one speaker per slot such as L,R,C,LFE,Ls,Rs. It takes effect at the next play.<span id="layout-fit"></span></p>
+<details id="layout-why-box" class="more" hidden>
+<summary id="layout-why-sum"></summary>
+<ul id="layout-why"></ul>
+</details>
 <details class="more">
 <summary>What an output layout does</summary>
 <p>2.0 or 1.0: the decoder folds every channel but the LFE into two channels, or one, heights and rear surrounds included.</p>
@@ -248,9 +253,10 @@ dialog::backdrop{background:#0009}
 </div></div>
 <form id="zone-form" class="row">
 <label class="lbl" for="zone-select">Time zone</label><div>
-<select id="zone-select" aria-describedby="zone-help"></select>
-<div class="inline"><input id="zone-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="UTC" aria-label="Time zone as a POSIX string"><button type="submit" class="primary">Save</button></div>
-<p id="zone-help" class="help">Choose a zone, or type a POSIX time zone such as AEST-10AEDT,M10.1.0,M4.1.0/3 (its offset counts hours west of UTC) and Save. Empty is UTC.</p>
+<p id="zone-now" class="val"></p>
+<div id="zone-pick" class="inline" hidden><select id="zone-select" aria-describedby="zone-help"></select><select id="zone-city" aria-label="City"></select></div>
+<div class="inline"><input id="zone-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="Another zone" aria-label="Another time zone, as a POSIX string"><button type="submit" class="primary">Save</button></div>
+<p id="zone-help" class="help">Choose a region and a city (Other, then UTC, is no zone), or type a POSIX time zone for a place that is not in the list, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (its offset counts hours west of UTC), and Save.</p>
 </div>
 </form>
 <form id="ntp-form" class="row">
@@ -260,6 +266,15 @@ dialog::backdrop{background:#0009}
 </div>
 </form>
 </div>
+</div>
+</section>
+<section id="sound" aria-labelledby="sound-heading" hidden>
+<h2 id="sound-heading">Levels and distances</h2>
+<div class="panel">
+<p id="sound-note" class="note" hidden></p>
+<div class="scroll" role="region" aria-label="Levels and distances, scrolls sideways" tabindex="0"><table id="trim"><caption>Level and distance of each speaker</caption><thead><tr><th scope="col">Speaker</th><th scope="col">Level, dB</th><th scope="col">Distance, m</th><th scope="col">Delay</th><th scope="col">Tone</th></tr></thead><tbody id="trim-rows"></tbody></table></div>
+<p class="help">Distance is from where you sit: the nearer speakers are delayed so that the sound of all of them arrives together, and the farthest is not. A tone is quiet and stops by itself.</p>
+<div class="actions"><button id="tone-all" type="button">Play each speaker</button><button id="tone-off" type="button">Stop the tone</button><button id="trim-reset" type="button" class="danger">Reset levels and distances</button></div>
 </div>
 </section>
 <section aria-labelledby="timing-heading">

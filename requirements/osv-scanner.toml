@@ -63,3 +63,102 @@ reason = "GHSA-86qp-5c8j-p5mr / CVE-2026-48710: starlette 0.52.1 is the newest e
 id = "GHSA-86qp-5c8j-p5mr"
 ignoreUntil = 2027-01-08
 reason = "PYSEC-2026-161 / CVE-2026-48710: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+# requirements-esphome.txt: pillow 12.3.0.
+# Pillow 13.0.0 fixes all nine, but every esphome release up to and including 2026.10.0 (the
+# newest) pins pillow==12.3.0 exactly in its own metadata, so the resolver rejects any bump in this
+# lock (requirements-ffmpeg-validate.txt and tools/sendspin/requirements.txt are bumped to 13.0.0;
+# they have no such cap). `esphome config` on firmware/esphome/tests/iclforge-test.yaml, the only
+# thing this lock runs, loads no image, font or display component, so Pillow never decodes a file;
+# the YAML is this repository's own. Renew or remove when esphome moves its pillow pin to >= 13.
+# Dated short on purpose: esphome ships monthly. Each advisory is listed under both identifiers.
+
+[[IgnoredVulns]]
+id = "CVE-2026-112395"
+ignoreUntil = 2026-12-01
+reason = "GHSA-462x-pgg6-55fp (TIFF tiled decode): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-462x-pgg6-55fp"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112395 (TIFF tiled decode): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112397"
+ignoreUntil = 2026-12-01
+reason = "GHSA-58r4-6rv3-gfh8 (_imagingmorph): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-58r4-6rv3-gfh8"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112397 (_imagingmorph): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112400"
+ignoreUntil = 2026-12-01
+reason = "GHSA-65qm-jvmh-6pqg (GIF seek): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-65qm-jvmh-6pqg"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112400 (GIF seek): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112403"
+ignoreUntil = 2026-12-01
+reason = "GHSA-8g5g-8vmr-9782 (JPEG decode): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-8g5g-8vmr-9782"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112403 (JPEG decode): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112404"
+ignoreUntil = 2026-12-01
+reason = "GHSA-c6hw-5grf-ff96 (TIFF tile/RGBA): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-c6hw-5grf-ff96"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112404 (TIFF tile/RGBA): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112895"
+ignoreUntil = 2026-12-01
+reason = "GHSA-p4wg-p73j-c528 (PDF page tree): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-p4wg-p73j-c528"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112895 (PDF page tree): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112896"
+ignoreUntil = 2026-12-01
+reason = "GHSA-pchr-8j38-3x4p (TIFF encoder ColorMap): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-pchr-8j38-3x4p"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112896 (TIFF encoder ColorMap): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112897"
+ignoreUntil = 2026-12-01
+reason = "GHSA-q45j-58j2-45rg (TIFF JPEG-in-TIFF): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-q45j-58j2-45rg"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112897 (TIFF JPEG-in-TIFF): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "CVE-2026-112899"
+ignoreUntil = 2026-12-01
+reason = "GHSA-vx6w-vv9f-6gvg (EPS load): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"
+
+[[IgnoredVulns]]
+id = "GHSA-vx6w-vv9f-6gvg"
+ignoreUntil = 2026-12-01
+reason = "CVE-2026-112899 (EPS load): pillow 12.3.0 is the only version esphome 2026.10.0 allows (pillow==12.3.0); esphome config decodes no images"

@@ -193,6 +193,26 @@ TEST_CASE("a hard revision limit fires only below its own threshold, the opposit
     REQUIRE_FALSE(has(describe_hardware(no_threshold).notices, "below v"));
 }
 
+TEST_CASE("a chip under its hard limit is a clause for the layout list", "[io][hardware_info]") {
+    HardwareFacts below;
+    below.revision_major = 1;
+    below.revision_minor = 3;
+    below.revision_hard_limit_below = 300;
+    below.revision_hard_limit_cost = "only standard 1-2 channel I2S works on this chip";
+    CHECK(tdm_blocked_clause(below) == "This chip (v1.3) has no clock for multi-channel output");
+
+    HardwareFacts at = below;
+    at.revision_major = 3;
+    at.revision_minor = 0;
+    CHECK(tdm_blocked_clause(at).empty());
+
+    // The limit without its words, or no limit at all: nothing to say.
+    HardwareFacts silent = below;
+    silent.revision_hard_limit_cost.clear();
+    CHECK(tdm_blocked_clause(silent).empty());
+    CHECK(tdm_blocked_clause(HardwareFacts{}).empty());
+}
+
 TEST_CASE("no clock reading claims no clock capability", "[io][hardware_info]") {
     HardwareFacts facts;
     facts.cpu_freq_mhz = 0;

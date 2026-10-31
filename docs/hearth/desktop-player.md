@@ -1,7 +1,8 @@
 # Using the desktop player
 
-`hearth` is the desktop player: a window that plays AC-3, E-AC-3, E-AC-3 with Atmos objects and
-AC-4 files through this computer's speakers or to a group of network sinks. This page walks through
+`hearth` is the desktop player: a window that plays AC-3, E-AC-3, E-AC-3 with Atmos objects, AC-4,
+TrueHD and MLP files through this computer's speakers or to a group of network sinks. It decodes TrueHD and
+MLP and does not pass them through ([Hearth](index.md) says what that means). This page walks through
 the window page by page. [Hearth](index.md) is the reference for what each feature does and does
 not do, and [Karaoke](../karaoke/index.md) covers the Karaoke page.
 

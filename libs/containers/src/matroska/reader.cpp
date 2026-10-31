@@ -1,5 +1,6 @@
 #include "iclforge/containers/matroska/reader.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -169,7 +170,7 @@ Need read_vint(Cursor& c, std::uint64_t& out) {
 // and a Segment holds the file, so neither is ever resident.
 [[nodiscard]] bool is_descended(std::uint32_t id) {
     return id == kSegment || id == kCluster || id == kBlockGroup || id == kTracks ||
-           id == kTrackEntry || id == kAudio;
+           id == kTrackEntry || id == kAudio || id == kContentEncodings || id == kContentEncoding;
 }
 
 // Leaf elements the walker needs the bytes of. Everything else is skipped by
@@ -177,7 +178,8 @@ Need read_vint(Cursor& c, std::uint64_t& out) {
 // attachment or a cue index free to read past.
 [[nodiscard]] bool is_wanted_leaf(std::uint32_t id) {
     return id == kTrackNumber || id == kTrackType || id == kCodecId || id == kLanguage ||
-           id == kSamplingFrequency || id == kChannels || id == kSimpleBlock || id == kBlock;
+           id == kSamplingFrequency || id == kChannels || id == kSimpleBlock || id == kBlock ||
+           id == kContentEncryption;
 }
 
 // A Segment-level id, i.e. one that cannot appear inside a Cluster. This is
@@ -342,11 +344,12 @@ enum class Lacing : std::uint8_t { kNone, kXiph, kFixed, kEbml };
 
 // --- track selection -------------------------------------------------------
 
-// Auto-selection accepts the two CodecID strings the writer declares. This
-// is the only codec-aware line in the module, and a caller naming a
-// TrackNumber explicitly bypasses it entirely (see ReadOptions).
-[[nodiscard]] bool is_selectable_codec(std::string_view codec_id) {
-    return codec_id == kCodecEac3 || codec_id == kCodecAc3;
+// Auto-selection accepts the CodecID strings the writer declares, the ones `allowed` leaves on.
+// This is the only codec-aware code in the module, and a caller naming a TrackNumber explicitly
+// bypasses it entirely (see ReadOptions).
+[[nodiscard]] bool is_selectable_codec(std::string_view codec_id, const AutoSelect& allowed) {
+    return (codec_id == kCodecEac3 && allowed.eac3) || (codec_id == kCodecAc3 && allowed.ac3) ||
+           (codec_id == kCodecTruehd && allowed.truehd);
 }
 
 // How many tracks a file may have listed beside the one that is read: a hostile Tracks declares as
@@ -384,9 +387,12 @@ std::string_view describe(DemuxError error) {
         case DemuxError::kMalformed:
             return "malformed element, vint or block layout";
         case DemuxError::kNoAudioTrack:
-            return "no A_AC3/A_EAC3 audio track (or the requested track number is absent)";
+            return "no A_AC3/A_EAC3/A_TRUEHD audio track (or the requested track number is absent)";
         case DemuxError::kLimitExceeded:
             return "element size or nesting depth beyond the reader's limits";
+        case DemuxError::kEncryptedTrack:
+            return "the audio track is encrypted: it declares ContentEncryption, its frames "
+                   "are ciphertext and decryption is not supported";
     }
     return "unknown error";
 }
@@ -415,6 +421,8 @@ struct ReaderState {
     bool pending_is_audio = false;
     std::uint64_t pending_track_type = 0;
     bool pending_has_number = false;
+    // A ContentEncryption was seen in this TrackEntry.
+    bool pending_encrypted = false;
     bool in_track_entry = false;
     std::uint32_t track_entries_seen = 0;
 
@@ -422,6 +430,9 @@ struct ReaderState {
     bool track_found = false;
     // The tracks that were not selected, to kMaxSkippedTracks.
     std::vector<SkippedTrack> skipped;
+    // The numbers of the audio tracks refused for being encrypted (each is in `skipped` too), to
+    // kMaxSkippedTracks: the reason finish_verdict gives kEncryptedTrack and not kNoAudioTrack.
+    std::vector<std::uint64_t> refused;
     // Set once a Tracks element has closed: no later one may retarget a
     // selection already made.
     bool tracks_seen = false;
@@ -467,10 +478,17 @@ void close_finished(ReaderState& s) {
         if (top.id == kTrackEntry) {
             bool selected_now = false;
             if (s.in_track_entry && !s.track_found && s.pending_has_number && s.pending_is_audio) {
-                const bool wanted = s.options.track_number != 0
-                                        ? s.pending.track_number == s.options.track_number
-                                        : is_selectable_codec(s.pending.codec_id);
-                if (wanted) {
+                const bool wanted =
+                    s.options.track_number != 0
+                        ? s.pending.track_number == s.options.track_number
+                        : is_selectable_codec(s.pending.codec_id, s.options.auto_select);
+                // An encrypted track holds ciphertext that nothing else in its entry marks, so it
+                // is never selected: read as audio it would be noise with exit code 0.
+                if (wanted && s.pending_encrypted) {
+                    if (s.refused.size() < kMaxSkippedTracks) {
+                        s.refused.push_back(s.pending.track_number);
+                    }
+                } else if (wanted) {
                     s.track = s.pending;
                     s.track_found = true;
                     selected_now = true;
@@ -582,6 +600,7 @@ std::expected<std::size_t, DemuxError> walk(ReaderState& s, std::span<const std:
                 s.pending_is_audio = false;
                 s.pending_track_type = 0;
                 s.pending_has_number = false;
+                s.pending_encrypted = false;
                 s.in_track_entry = true;
             }
             consume_open(s, header_bytes);
@@ -631,6 +650,9 @@ std::expected<std::size_t, DemuxError> walk(ReaderState& s, std::span<const std:
             }
             case kCodecId:
                 s.pending.codec_id = read_string(body);
+                break;
+            case kContentEncryption:
+                s.pending_encrypted = true;
                 break;
             case kLanguage:
                 s.pending.language = read_string(body);
@@ -696,7 +718,16 @@ std::expected<void, DemuxError> finish_verdict(const ReaderState& s) {
         return std::unexpected(DemuxError::kNotMatroska);
     }
     if (!s.track_found) {
-        return std::unexpected(s.tracks_seen ? DemuxError::kNoAudioTrack : DemuxError::kTruncated);
+        if (!s.tracks_seen) {
+            return std::unexpected(DemuxError::kTruncated);
+        }
+        // A named track_number means the encrypted track asked for, not any.
+        const bool encrypted_named =
+            s.options.track_number == 0
+                ? !s.refused.empty()
+                : std::ranges::find(s.refused, s.options.track_number) != s.refused.end();
+        return std::unexpected(encrypted_named ? DemuxError::kEncryptedTrack
+                                               : DemuxError::kNoAudioTrack);
     }
     return {};
 }

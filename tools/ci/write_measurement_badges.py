@@ -85,7 +85,7 @@ QUALITY_CODECS = {"ac3": "AC-3", "eac3": "E-AC-3"}
 # AC-3 encoder, iclforge::ac3::FrameEncoder, at 5.1 and 448 kbps - "plain" against the
 # E-AC-3 and Atmos rows beside it); eac3_*, ecpl_* and atmos_* are E-AC-3
 # (ecpl is its enhanced coupling, atmos is Dolby Atmos carried in E-AC-3 as
-# joint object coding); ac4_* are AC-4. The table, not the prefix, is what is
+# joint object coding); ac4_* are AC-4; truehd_* are TrueHD. The table, not the prefix, is what is
 # read, and a test holds the two together. The description always says whether
 # the workload encodes or decodes, because the two differ by an order of
 # magnitude in both time and allocation and a bare figure hides which one it is.
@@ -108,6 +108,16 @@ WORKLOADS = {
     "ac4_stereo_decode": ("AC-4", "stereo decode"),
     "ac4_51_encode": ("AC-4", "5.1 encode"),
     "ac4_51_decode": ("AC-4", "5.1 decode"),
+    "truehd_stereo_encode": ("TrueHD", "stereo encode"),
+    "truehd_stereo_decode": ("TrueHD", "stereo decode"),
+    "truehd_51_encode": ("TrueHD", "5.1 encode"),
+    "truehd_51_decode": ("TrueHD", "5.1 decode"),
+    "truehd_71_encode": ("TrueHD", "7.1 encode"),
+    "truehd_71_decode": ("TrueHD", "7.1 decode"),
+    "truehd_51_96k_encode": ("TrueHD", "5.1 96 kHz encode"),
+    "truehd_51_96k_decode": ("TrueHD", "5.1 96 kHz decode"),
+    "truehd_stereo_192k_encode": ("TrueHD", "stereo 192 kHz encode"),
+    "truehd_stereo_192k_decode": ("TrueHD", "stereo 192 kHz decode"),
 }
 
 # What the number of channels in a quality record says about its layout.
@@ -393,10 +403,15 @@ def _labelled(words, figure):
 
 
 def _per_codec(entries, describe):
-    """"AC-3 x | E-AC-3 y | AC-4 z": every codec in order, with no data where it has none."""
+    """"AC-3 x | E-AC-3 y | AC-4 z": every codec in order, with no data where it has none.
+
+    TrueHD comes last, and only once the series holds a TrueHD workload: it is lossless, so the
+    accuracy badge has nothing to say about it, and "TrueHD no data" on three badges would be noise.
+    """
+    codecs = (*CODECS, "TrueHD") if "TrueHD" in entries else CODECS
     return " | ".join(
         f"{codec} {describe(entries[codec]) if codec in entries else NO_DATA}"
-        for codec in CODECS)
+        for codec in codecs)
 
 
 def speed_badge(rows):

@@ -24,10 +24,12 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
+import http.client
 import importlib.util
 import io
 import json
 import random
+import socket
 import struct
 import subprocess
 import sys
@@ -72,11 +74,48 @@ TABLE = (
 
 # A GET /firmware that gets no answer: the board is restarting.
 DOWN = object()
-# A PUT /firmware the board closes without reading or recording anything, as a
-# board that resets part-way through an upload does; and one it reads to the
-# end first, then closes with no answer and nothing recorded.
+# A PUT /firmware the board stops reading after DROP_AFTER bytes and resets,
+# recording nothing, as a board that resets part-way through an upload does;
+# and one it reads to the end first, then closes with no answer and nothing
+# recorded.
 DROP = object()
 IGNORE = object()
+# Where a DROP breaks the upload: a known place, far below the 2 MB image the
+# cases that break one send.
+DROP_AFTER = 64 * 1024
+# What the tool and the stand-in board may hold between them, so that a break
+# is felt by a tool that is still sending. A desktop kernel is free to buffer
+# a lot of a connection nobody reads (557 KB on one Linux loopback, and its
+# autotuning may go to 4 MB sending and 6 MB receiving), and a tool that has
+# handed the whole image over before the board resets then sees an answer
+# lost, not an upload broken off, which is how this suite failed in CI. These
+# are the few tens of KB a board's TCP stack holds.
+BOARD_RECEIVE_BUFFER = 64 * 1024
+TOOL_SEND_BUFFER = 8 * 1024
+
+
+class BoardServer(ThreadingHTTPServer):
+    """The stand-in board's server, with the receive buffer of a board."""
+
+    def server_bind(self) -> None:
+        # Before listen(): the buffer is then fixed for every connection and
+        # the kernel does not grow it.
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BOARD_RECEIVE_BUFFER)
+        super().server_bind()
+
+
+class SmallSendBuffer(http.client.HTTPConnection):
+    """The tool's connection with a send buffer that cannot hold an image.
+
+    With the board's receive buffer this bounds what a connection can hold to
+    about 200 KB, so an upload that a board stops reading and resets is broken
+    off for the tool well before the last byte of a 2 MB image is handed over,
+    whatever the kernel's defaults are.
+    """
+
+    def connect(self) -> None:
+        super().connect()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, TOOL_SEND_BUFFER)
 
 
 def make_image(
@@ -271,6 +310,9 @@ class FakeBoard:
         self.bodies: dict[tuple[str, str], bytes] = {}
         self.upload_headers: dict[str, str] = {}
         self.received = b""
+        # How much of the body each DROP took before it reset the connection.
+        self.drop_after = DROP_AFTER
+        self.drops: list[int] = []
         self.uploaded = False
         # GET /firmware/coredump's bytes, None for a board with no dump; GET
         # /log's whole text, None for a board that keeps no log. The log
@@ -280,7 +322,7 @@ class FakeBoard:
         self.log_reply = 4096
         self.lock = threading.Lock()
         handler = type("Handler", (BoardHandler,), {"board": self})
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.server = BoardServer(("127.0.0.1", 0), handler)
         self.server.block_on_close = False
         thread = threading.Thread(target=self.server.serve_forever, args=(0.02,), daemon=True)
         thread.start()
@@ -364,12 +406,7 @@ class BoardHandler(BaseHTTPRequestHandler):
             if answer is IGNORE:
                 self._body()
             else:
-                # A real board takes a while to give an upload up. Without this
-                # a dropped upload and the status read after it can both finish
-                # inside a millisecond on a fast machine, and ota.py then reads
-                # an uptime of 1 ms as no shorter than the upload has been going
-                # (a CI run of the restarted-during-it case failed on that).
-                time.sleep(0.02)
+                self._drop()
             self.close_connection = True
             return
         if board.refuse_after_head:
@@ -397,6 +434,29 @@ class BoardHandler(BaseHTTPRequestHandler):
                 "restarting": True,
             }
             self._send(200, (json.dumps(reply) + "\n").encode(), "application/json")
+
+    def _drop(self) -> None:
+        """A board that resets part-way through an upload: it takes drop_after bytes, then goes.
+
+        The place is fixed by what the board has read, not by when: the tool
+        is still sending when the reset reaches it, as long as the image is
+        longer than DROP_AFTER and what the two ends can buffer.
+        """
+        board = self.board
+        length = int(self.headers.get("Content-Length") or 0)
+        taken = len(self.rfile.read(min(board.drop_after, length)))
+        with board.lock:
+            board.drops.append(taken)
+        # A real board takes a while to give an upload up. Without this a
+        # dropped upload and the status read after it can both finish inside a
+        # millisecond on a fast machine (or inside one tick of a coarse clock),
+        # and ota.py then reads an uptime of 1 ms as no shorter than the upload
+        # has been going (a CI run of the restarted-during-it case failed on
+        # that). It is a lower bound, not a race.
+        time.sleep(0.02)
+        # Reset the connection at once, as a board that restarts does, rather
+        # than close it in order.
+        self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
 
     def do_POST(self) -> None:
         board = self.board
@@ -730,6 +790,14 @@ class Refusals(Case):
 
 
 class Push(Case):
+    def setUp(self) -> None:
+        super().setUp()
+        # So that a board that resets part-way through an upload does so for a
+        # tool that is still sending it (see SmallSendBuffer).
+        small = mock.patch.object(http.client, "HTTPConnection", SmallSendBuffer)
+        small.start()
+        self.addCleanup(small.stop)
+
     def push(self, board: FakeBoard, data: bytes, *extra: str) -> tuple[int, str]:
         return run_ota("push", str(self.write_image(data)), "--host", board.host, *extra)
 
@@ -918,6 +986,9 @@ class Push(Case):
                 self.assertIn(said, out)
                 self.assertNotIn("it panicked", out)
                 self.assertEqual(board.puts(), ["/firmware"] * uploads)
+                # Broken off at the place the board was told to, each time; an
+                # upload read to the end is not a break.
+                self.assertEqual(board.drops, [DROP_AFTER] * uploads if answer is DROP else [])
 
     def test_an_upload_the_board_gave_up_is_sent_again(self) -> None:
         # The connection went, and the board said so from flash mode: the
@@ -938,6 +1009,7 @@ class Push(Case):
         self.assertIn("the board gave it up: the upload stopped after 65536", out)
         self.assertIn("sending it again", out)
         self.assertEqual(board.puts(), ["/firmware", "/firmware"])
+        self.assertEqual(board.drops, [DROP_AFTER])
 
     def test_a_board_that_restarted_during_the_upload_says_so_and_is_sent_it_again(self) -> None:
         cases = (
@@ -970,6 +1042,7 @@ class Push(Case):
                 self.assertEqual(code, ota.UPDATED, out)
                 self.assertIn(said, out)
                 self.assertEqual(board.puts(), ["/firmware", "/firmware"])
+                self.assertEqual(board.drops, [DROP_AFTER])
 
     def test_a_second_break_gives_up_and_takes_the_board_out_of_flash_mode(self) -> None:
         board = FakeBoard(self)
@@ -986,6 +1059,7 @@ class Push(Case):
         self.assertEqual(code, ota.REFUSED, out)
         self.assertIn("failed: the image was not taken", out)
         self.assertEqual(board.puts(), ["/firmware", "/firmware", "/firmware/mode"])
+        self.assertEqual(board.drops, [DROP_AFTER, DROP_AFTER])
         self.assertEqual(board.bodies[("PUT", "/firmware/mode")], b"normal")
         self.assertIn("told it to leave flash mode", out)
 
@@ -1366,11 +1440,9 @@ C6_TABLE_4MB = (
     ("nvs", 1, 0x02, 0x9000, 0x6000),
     ("phy_init", 1, 0x01, 0xF000, 0x1000),
     ("otadata", 1, 0x00, 0x10000, 0x2000),
-    ("ota_0", 0, 0x10, 0x20000, 0x1C0000),
-    ("ota_1", 0, 0x11, 0x1E0000, 0x1C0000),
-    ("coredump", 1, 0x03, 0x3A0000, 0x10000),
-    ("audio", 1, 0x40, 0x3B0000, 0x10000),
-    ("storage", 1, 0x81, 0x3C0000, 0x40000),
+    ("ota_0", 0, 0x10, 0x20000, 0x1E0000),
+    ("ota_1", 0, 0x11, 0x200000, 0x1E0000),
+    ("coredump", 1, 0x03, 0x3E0000, 0x10000),
 )
 
 
@@ -1409,7 +1481,7 @@ class PublishedImages(Case):
         c6 = {"target": "esp32c6", "chip": "ESP32-C6", "revision": "0.2", "psram_bytes": 0}
         p4 = {"target": "esp32p4", "chip": "ESP32-P4", "revision": "1.3", "psram_bytes": 32 << 20}
         c6_4mb = firmware(
-            flash_bytes=4 << 20, slot_bytes=0x1C0000, partitions=table_json(C6_TABLE_4MB)
+            flash_bytes=4 << 20, slot_bytes=0x1E0000, partitions=table_json(C6_TABLE_4MB)
         )
         self.assertEqual(self.chosen(s3, firmware()), "hearth-sink-esp32s3")
         self.assertEqual(self.chosen(c6, firmware()), "hearth-sink-esp32c6-16mb")

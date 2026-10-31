@@ -151,7 +151,7 @@ iclforge_install_pkgconfig(
 # installed: they are in libs/base/internal, which iclforge::base_headers (libs/base/CMakeLists.txt)
 # alone puts on an include path.
 iclforge_install_library(base
-    DESCRIPTION "The family's version, the bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
+    DESCRIPTION "The family's version, the bit reader and writer, the speaker vocabulary, the CPU feature probe, the signing key, SHA-1, SHA-256 and HMAC-SHA-256, and ECDSA P-256 signature checking with X.509 chains, which the iclforge libraries build on"
     GENERATED_HEADERS iclforge/base/version.hpp)
 iclforge_install_library(dsp
     DESCRIPTION "The FFT, the QMF bank, the sample-rate converter and the biquad sections the iclforge codecs share")
@@ -199,6 +199,15 @@ endif()
 if(ICLFORGE_BUILD_AC4)
     iclforge_install_library(ac4
         DESCRIPTION "AC-4 (ETSI TS 103 190-1 and TS 103 190-2) inspector, decoder and encoder"
+        REQUIRES iclforge-base)
+endif()
+
+# The TrueHD and MLP codec (libs/truehd, iclforge::truehd): the bitstream layer, the decoder and the
+# encoder. Like the components above it is optional (ICLFORGE_BUILD_TRUEHD); the vcpkg port and the Conan
+# recipe offer it as a feature and an option, off unless asked for.
+if(ICLFORGE_BUILD_TRUEHD)
+    iclforge_install_library(truehd
+        DESCRIPTION "TrueHD and MLP bitstream reader, lossless decoder and encoder"
         REQUIRES iclforge-base)
 endif()
 

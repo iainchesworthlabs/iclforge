@@ -15,10 +15,14 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/serving.hpp"
+#include "iclforge/render/identify_request.hpp"
+#include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/render/layout.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/messages.hpp"
+#include "iclforge/block_tap.hpp"
 #include "iclforge/playout.hpp"
 
 // The Sendspin player's audio (planning/hearth-reference-player.md, B3): what
@@ -33,9 +37,10 @@
 //   same layout as a stereo or mono bed.
 //
 // Either way each block is then routed to the sink's outputs, trimmed and
-// delayed per output (iclforge::render::Routing and TrimDelay), replaced by the
-// identify tone while one plays, metered, scaled by the player's volume, and
-// handed to a Playout, which writes it so that its first frame leaves the
+// delayed per output (iclforge::render::Routing and OutputTrim: the listener's
+// own level and distance for each speaker, or a server's per output), replaced
+// by the identify tone while one plays, metered, scaled by the player's volume,
+// and handed to a Playout, which writes it so that its first frame leaves the
 // audio port when the server said.
 //
 // ONE TASK DOES THE WORK. The Sendspin session's task only copies each chunk,
@@ -150,9 +155,26 @@ struct BurstPlayerConfig {
     iclforge::ac3::DecoderConfig decoder{.output = {.mode = iclforge::ac3::OperatingMode::kLine}};
     iclforge::ac3::DownmixTarget stereo_fold = iclforge::ac3::DownmixTarget::kLoRo;
     iclforge::ac3::render::ObjectsPolicy objects = iclforge::ac3::render::ObjectsPolicy::kAuto;
+    // The listener's choice of dynamic range (iclforge/base/dynamic_range.hpp), which is applied
+    // last, over the decoder settings above and over a server's: late night wins over a server's
+    // mode and compression keys, standard leaves them be. Changed with set_dynamic_range().
+    iclforge::base::DynamicRange dynamic_range = iclforge::base::kDefaultDynamicRange;
 
     Playout::Tuning tuning;
+
+    // The listener's own level and distance for each speaker (render/speaker_trim.hpp), in force until
+    // set_speaker_trim() says otherwise, and for every output a server's settings leave to the board.
+    iclforge::render::speaker_trim::SpeakerTrimTable speaker_trim;
 };
+
+// A role for every output of a status that has no speaker at any.
+[[nodiscard]] constexpr std::array<std::uint8_t, Playout::kMaxOutputs> no_trim_roles() {
+    std::array<std::uint8_t, Playout::kMaxOutputs> out{};
+    for (std::uint8_t& role : out) {
+        role = iclforge::render::speaker_trim::kNoRole;
+    }
+    return out;
+}
 
 // What the player reports, for the role's client/state and the board's page.
 // Fixed-size so a copy never allocates.
@@ -175,6 +197,8 @@ struct BurstPlayerStatus {
     std::uint32_t levels_serial = 0;
 
     iclforge::sendspin::player::Counters counters;
+    // The coded bytes of the chunks played so far in this stream (0 for PCM): the screen's bitrate.
+    std::uint64_t coded_bytes = 0;
     Playout::Stats playout;
 
     // The newest stream frame with a known play time: its position from the
@@ -193,8 +217,56 @@ struct BurstPlayerStatus {
     std::int64_t settings_revision = 0;
     // The layout in force, as text.
     std::array<char, iclforge::render::OutputLayout::kTextBytes> layout{};
+    // A server's identify tone is on.
     bool identifying = false;
+
+    // The identify sequence the board's own control surface started (BurstPlayer::identify_local()): it is
+    // running; the output its tone is on now, or -1 between two speakers; that output's speaker role
+    // (iclforge::render::speaker_trim), or kNoRole; and the milliseconds left of its time limit.
+    bool identify_local = false;
+    std::int8_t identify_output = -1;
+    std::uint8_t identify_role = iclforge::render::speaker_trim::kNoRole;
+    std::uint32_t identify_remaining_ms = 0;
+
 };
+
+// Just the levels of the last window that closed, for a screen that draws them every 100 ms: what the status
+// holds of them, with the count of windows closed so far (so that a reader knows whether it has seen this one),
+// and nothing else of the status. Fixed-size, so a copy never allocates.
+struct BurstPlayerLevels {
+    // A stream is running and its first window has closed.
+    bool have = false;
+    std::size_t outputs = 0;
+    // Windows closed since the player started: moves by one when a new window's levels are published.
+    std::uint32_t serial = 0;
+    std::array<float, Playout::kMaxOutputs> peak_db{};
+    std::array<float, Playout::kMaxOutputs> rms_db{};
+};
+
+// The level and delay in force at each output, and the speaker role there (kNoRole: none), as the decode task last
+// published them: a read of its own (BurstPlayer::trim_status()), since the status above is copied ten times a
+// second on a stack that has little to spare. A server's settings can put these away from the listener's table.
+struct BurstPlayerTrim {
+    // The layout in force, as text.
+    std::array<char, iclforge::render::OutputLayout::kTextBytes> layout{};
+    std::array<std::uint8_t, Playout::kMaxOutputs> role = no_trim_roles();
+    std::array<float, Playout::kMaxOutputs> level_db{};
+    std::array<std::uint32_t, Playout::kMaxOutputs> delay_samples{};
+    // The outputs whose delay is cut to what the build holds, or was not given for want of delay lines.
+    std::uint32_t clamped = 0;
+    bool server_level = false;
+    bool server_delay = false;
+    // The most delay a speaker can be given here, in samples (0: this build has no delay lines), and the
+    // distance the delays are counted from, in centimetres.
+    std::uint32_t max_delay_samples = 0;
+    std::uint16_t farthest_cm = 0;
+};
+
+// The board's own identify request (iclforge/render/identify_request.hpp): one speaker once, one speaker over and
+// over, each speaker in turn, or none. The tone's level and length are capped in iclforge::render::IdentifySequence
+// whatever is asked.
+using iclforge::render::IdentifyOutcome;
+using iclforge::render::IdentifyRequest;
 
 class BurstPlayer {
    public:
@@ -229,11 +301,28 @@ class BurstPlayer {
     // applied at the next burst boundary, and replaced by the next settings a
     // server sends. False for a layout the sink cannot carry.
     [[nodiscard]] bool set_layout(const iclforge::render::OutputLayout& layout);
-    // The identify tone on one output at `level_db`, or none.
+    // The listener's choice of dynamic range, from the next stream's start: a stream that is
+    // playing finishes as it began. Safe from any task.
+    void set_dynamic_range(iclforge::base::DynamicRange range);
+    // The identify tone on one output at `level_db`, or none: a server's, which it starts and stops itself.
     void identify(std::optional<iclforge::sendspin::player::Identify> tone);
+    // The board's own identify (planning/p4x-preferences.md): the tone, through the same output stage as the
+    // music, out of one speaker of the layout in force by role, or each in turn. Refused while a stream plays,
+    // while something else holds the sink, and while a server's tone is on; stopped at once by a stream's start,
+    // a hold, and kOff; and ended by its own limits in any case (iclforge/render/identify_sequence.hpp). Safe
+    // from any task.
+    IdentifyOutcome identify_local(const IdentifyRequest& request);
+    // The listener's level and distance for each speaker, in force at the next chunk (or at once while nothing
+    // plays). A server's trims and delays, while its settings stand, take precedence for the outputs they name.
+    void set_speaker_trim(const iclforge::render::speaker_trim::SpeakerTrimTable& table);
     // The player's volume, 0 to 100, and mute: (volume / 100)^1.5, ramped over
     // a block.
     void set_volume(int volume, bool muted);
+
+    // A tap that sees each block of rendered output after the trims and the volume are applied, while it wants to (the Meters view's mix,
+    // iclforge/meters_tap.hpp). Not owned: it outlives the player or is set to null first. With none, or one that does not want blocks, the
+    // path is one pointer load a block.
+    void set_block_tap(BlockTap* tap);
 
     // Something else is about to use the sink: the player drops what it
     // holds and stops writing, and this returns once it has (or after two
@@ -244,6 +333,9 @@ class BurstPlayer {
 
     // Safe from any task.
     [[nodiscard]] BurstPlayerStatus status() const;
+    // The levels alone, under the same lock: a lock and two short arrays, where status() copies the whole of it.
+    [[nodiscard]] BurstPlayerLevels levels() const;
+    [[nodiscard]] BurstPlayerTrim trim_status() const;
     // Whether a stream is running.
     [[nodiscard]] bool active() const;
     // Whether this build decodes Opus (CONFIG_ICLFORGE_SENDSPIN_OPUS): a firmware lists the format

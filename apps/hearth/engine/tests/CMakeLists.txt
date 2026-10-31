@@ -27,6 +27,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_play_meters.cpp
     test_player.cpp
     test_player_bitstream.cpp
+    test_player_truehd.cpp
     test_queue.cpp
     test_reference_melody.cpp
     test_session.cpp
@@ -36,6 +37,8 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_stream_decoder.cpp
     test_take_recorder.cpp
     test_transport.cpp
+    test_truehd_playback.cpp
+    test_truehd_index.cpp
     test_voice_file_input.cpp)
 target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
 # test_karaoke_example.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
@@ -187,7 +190,8 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
         test_aiosendspin_group.cpp
         test_group.cpp
         test_testsink.cpp
-        test_testsink_edges.cpp)
+        test_testsink_edges.cpp
+        test_hearth_player.cpp)
     # The engine's pairing records, its Network page bookkeeping (A6), its
     # NetworkGroupSink (A6, streaming to a group) and issue #874's own
     # exit - a group of two test sinks played from iclforge::hearth::Engine
@@ -217,7 +221,13 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     target_link_libraries(iclforge_tests_diagnostics_server
         PRIVATE hearth_engine iclforge_sendspin_httplib iclforge::warnings iclforge::coverage Catch2::Catch2)
     target_link_libraries(iclforge-hearth-tests PRIVATE iclforge_tests_diagnostics_server)
-    target_link_libraries(iclforge-hearth-tests PRIVATE hearth_testsink)
+    target_link_libraries(iclforge-hearth-tests PRIVATE hearth_testsink hearth_player)
+    # hearth-player's loopback case runs hearth-testserver against it: the executable and the
+    # clip are named here, and built before the tests are.
+    add_dependencies(iclforge-hearth-tests hearth-testserver)
+    target_compile_definitions(iclforge-hearth-tests PRIVATE
+        "ICLFORGE_TESTSERVER_EXE=\"$<TARGET_FILE:hearth-testserver>\""
+        "ICLFORGE_DEMO_EC3=\"${CMAKE_SOURCE_DIR}/apps/demos/wasm/assets/demo.ec3\"")
     # test_aiosendspin.cpp takes the player's address from std::getenv - same C4996 reasoning
     # as libs/ac3/tests/core/test_simd_kernels.cpp's. test_aiosendspin_group.cpp's own environment() helper
     # takes the same address the same way, test_network_live.cpp its sinks' names, and
@@ -236,4 +246,6 @@ target_link_libraries(iclforge-hearth-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::truehd
+        iclforge::json)

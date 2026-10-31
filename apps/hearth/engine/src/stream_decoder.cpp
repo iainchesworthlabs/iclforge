@@ -15,6 +15,7 @@
 #include "iclforge/ac4/decoder/config.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/decoder/presentation.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "ac4_stream.hpp"
 
 // See stream_decoder.hpp. The decode path is apps/hearth/testsink/
@@ -107,7 +108,98 @@ ac3::Acmod ac4_acmod(std::span<const iclforge::ac4::Speaker> speakers) {
     return has(iclforge::ac4::Speaker::kCentre) ? ac3::Acmod::k3_0 : ac3::Acmod::k2_0;
 }
 
+std::optional<ac3::eac3::chanmap::Layout> truehd_bed(
+    std::span<const iclforge::truehd::Channel> channels) {
+    using ac3::eac3::chanmap::Location;
+    namespace th = iclforge::truehd;
+    if (channels.empty() || channels.size() > render::LayoutRenderer::kMaxCoded) {
+        return std::nullopt;
+    }
+    ac3::eac3::chanmap::Layout bed;
+    for (const th::Channel channel : channels) {
+        Location location = Location::kLeft;
+        // clang-format off
+        switch (channel) {
+            case th::Channel::kL: location = Location::kLeft; break;
+            case th::Channel::kR: location = Location::kRight; break;
+            case th::Channel::kC: location = Location::kCentre; break;
+            case th::Channel::kLfe: location = Location::kLfe; break;
+            case th::Channel::kLs: location = Location::kLeftSurround; break;
+            case th::Channel::kRs: location = Location::kRightSurround; break;
+            case th::Channel::kLvh: location = Location::kVhl; break;
+            case th::Channel::kRvh: location = Location::kVhr; break;
+            case th::Channel::kLc: location = Location::kLc; break;
+            case th::Channel::kRc: location = Location::kRc; break;
+            case th::Channel::kLrs: location = Location::kLrs; break;
+            case th::Channel::kRrs: location = Location::kRrs; break;
+            case th::Channel::kCs: location = Location::kCs; break;
+            case th::Channel::kTs: location = Location::kTs; break;
+            case th::Channel::kLsd: location = Location::kLsd; break;
+            case th::Channel::kRsd: location = Location::kRsd; break;
+            case th::Channel::kLw: location = Location::kLw; break;
+            case th::Channel::kRw: location = Location::kRw; break;
+            case th::Channel::kCvh: location = Location::kVhc; break;
+            case th::Channel::kLfe2: location = Location::kLfe2; break;
+        }
+        // clang-format on
+        if (bed.index_of(location) >= 0) {
+            // A channel named twice has no place of its own for the renderer to put it.
+            return std::nullopt;
+        }
+        bed.items[static_cast<std::size_t>(bed.count++)] = location;
+    }
+    return bed;
+}
+
+TruehdCounters& TruehdCounters::operator+=(const TruehdCounters& other) {
+    units += other.units;
+    units_decoded += other.units_decoded;
+    units_waiting += other.units_waiting;
+    restarts += other.restarts;
+    lossless_checks_ok += other.lossless_checks_ok;
+    lossless_check_failures += other.lossless_check_failures;
+    check_failures += other.check_failures;
+    return *this;
+}
+
+TruehdCounters since(const TruehdCounters& now, const TruehdCounters& earlier) {
+    const auto minus = [](std::uint64_t a, std::uint64_t b) { return a > b ? a - b : 0; };
+    return TruehdCounters{
+        .units = minus(now.units, earlier.units),
+        .units_decoded = minus(now.units_decoded, earlier.units_decoded),
+        .units_waiting = minus(now.units_waiting, earlier.units_waiting),
+        .restarts = minus(now.restarts, earlier.restarts),
+        .lossless_checks_ok = minus(now.lossless_checks_ok, earlier.lossless_checks_ok),
+        .lossless_check_failures =
+            minus(now.lossless_check_failures, earlier.lossless_check_failures),
+        .check_failures = minus(now.check_failures, earlier.check_failures)};
+}
+
 namespace {
+
+[[nodiscard]] TruehdCounters counted(const iclforge::truehd::DecoderCounters& counters) {
+    return TruehdCounters{.units = counters.units,
+                          .units_decoded = counters.units_decoded,
+                          .units_waiting = counters.units_waiting,
+                          .restarts = counters.restarts,
+                          .lossless_checks_ok = counters.lossless_checks_ok,
+                          .lossless_check_failures = counters.lossless_check_failures,
+                          .check_failures = counters.check_failures};
+}
+
+// The A/52 audio coding mode with a bed's front and surround channels, which is how a TrueHD
+// unit's layout reads where an acmod is asked for (the same reading as ac4_acmod()).
+[[nodiscard]] ac3::Acmod acmod_of_bed(const ac3::eac3::chanmap::Layout& bed) {
+    using ac3::eac3::chanmap::Location;
+    if (bed.index_of(Location::kLeft) < 0) {
+        return ac3::Acmod::k1_0;
+    }
+    const bool centre = bed.index_of(Location::kCentre) >= 0;
+    if (bed.index_of(Location::kLeftSurround) >= 0) {
+        return centre ? ac3::Acmod::k3_2 : ac3::Acmod::k2_2;
+    }
+    return centre ? ac3::Acmod::k3_0 : ac3::Acmod::k2_0;
+}
 
 // The layout an access unit decodes to, from its headers alone: each
 // syncframe's acmod and lfeon, and a dependent's chanmap where it carries one,
@@ -232,6 +324,7 @@ void report_frame(const ac3::DecodedFrame& frame, const ac3::OutputConfig& outpu
     out.concealed = frame.concealed;
     out.objects.reset();
     out.ac4.reset();
+    out.truehd.reset();
 }
 
 void report_unit(const ac3::DecodedAccessUnit& unit, const ac3::OutputConfig& output,
@@ -252,6 +345,7 @@ void report_unit(const ac3::DecodedAccessUnit& unit, const ac3::OutputConfig& ou
     out.concealed = unit.concealed;
     out.objects = unit.object_metadata;
     out.ac4.reset();
+    out.truehd.reset();
     // Annex C's karaoke type, for the programme the decoder reproduces it for: one independent
     // substream, no object layer.
     out.karaoke = ac3::is_karaoke_programme(unit);
@@ -279,7 +373,8 @@ StreamDecoder::StreamDecoder(const render::OutputLayout& layout, std::uint32_t s
       serving_(decoder_setup(settings, layout).serving),
       config_(decoder_setup(settings, layout).config),
       renderer_(layout, sample_rate),
-      ac4_config_(decoder_setup(settings, layout).ac4) {
+      ac4_config_(decoder_setup(settings, layout).ac4),
+      truehd_config_(decoder_setup(settings, layout).truehd) {
     renderer_.set_joc_domain(config_.joc_domain);
 }
 
@@ -290,6 +385,10 @@ void StreamDecoder::reset() {
     discard_variant_blocks();
     ac3_decoder_.reset();
     eac3_decoder_.reset();
+    if (truehd_decoder_) {
+        truehd_before_ += counted(truehd_decoder_->counters());
+        truehd_decoder_.reset();
+    }
     if (ac4_decoder_) {
         ac4_decoder_->reset();
     }
@@ -393,9 +492,10 @@ void StreamDecoder::release_variants(std::size_t frames) {
 std::expected<std::size_t, std::string> StreamDecoder::decode(std::span<const std::byte> whole,
                                                               const BlockFn& deliver,
                                                               const UnitFn& reported,
-                                                              std::uint32_t unit_samples) {
+                                                              std::uint32_t unit_samples,
+                                                              UnitCodec codec) {
     if (variants_.empty()) {
-        return decode_unit(whole, deliver, reported, unit_samples);
+        return decode_unit(whole, deliver, reported, unit_samples, codec);
     }
     // Every layout's decoder takes the unit first and keeps its blocks; this
     // decoder's own then go out one at a time, each with its layouts' ahead of
@@ -415,21 +515,25 @@ std::expected<std::size_t, std::string> StreamDecoder::decode(std::span<const st
         };
         // An error resets that decoder and leaves the next unit clean; this
         // decoder's own result is the one that is reported.
-        (void)variant.decoder->decode(whole, keep, {}, unit_samples);
+        (void)variant.decoder->decode(whole, keep, {}, unit_samples, codec);
     }
     const BlockFn merged = [this, &deliver](std::span<const std::span<const float>> slots,
                                             std::size_t frames) {
         release_variants(frames);
         deliver(slots, frames);
     };
-    return decode_unit(whole, merged, reported, unit_samples);
+    return decode_unit(whole, merged, reported, unit_samples, codec);
 }
 
 std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<const std::byte> whole,
                                                                    const BlockFn& deliver,
                                                                    const UnitFn& reported,
-                                                                   std::uint32_t unit_samples) {
+                                                                   std::uint32_t unit_samples,
+                                                                   UnitCodec codec) {
     delivered_ = 0;
+    if (codec == UnitCodec::kTruehd) {
+        return decode_truehd(whole, deliver, reported, unit_samples);
+    }
     if (starts_ac4(whole)) {
         return decode_ac4(whole, deliver, reported, unit_samples);
     }
@@ -618,6 +722,13 @@ bool StreamDecoder::apply(const DecoderSettings& settings) {
         return false;
     }
     const DecoderSetup setup = decoder_setup(settings, layout_);
+    // A TrueHD decoder is built with its presentation and its strictness, and the substreams it
+    // has read cannot be had again: a change of either hands over to a new decoder, which joins
+    // the stream at its next restart. Anything else the settings hold is not the TrueHD path's.
+    if (truehd_decoder_ && (setup.truehd.presentation != truehd_config_.presentation ||
+                            setup.truehd.strictness != truehd_config_.strictness)) {
+        return false;
+    }
     // The concealment policy is fixed for an AC-4 decoder, which only its
     // output and presentation change in place.
     if (ac4_decoder_ && setup.ac4.concealment != ac4_config_.concealment) {
@@ -633,6 +744,7 @@ bool StreamDecoder::apply(const DecoderSettings& settings) {
     config_ = setup.config;
     renderer_.set_joc_domain(config_.joc_domain);
     ac4_config_ = setup.ac4;
+    truehd_config_ = setup.truehd;
     // A new presentation choice may select one that codes the screen pair or one that does not:
     // the next unit says.
     ac4_source_known_ = false;
@@ -848,6 +960,7 @@ void StreamDecoder::report_ac4(const iclforge::ac4::DecodedFrame& info, std::siz
                         ? std::optional<ac3::Concealment>{concealment_of(*info.concealed)}
                         : std::nullopt;
     out.objects.reset();
+    out.truehd.reset();
     out.karaoke = false;
     out.karaoke_reproduced = false;
     const iclforge::ac4::PresentationMetadata& metadata = ac4_decoder_->metadata();
@@ -861,6 +974,185 @@ void StreamDecoder::report_ac4(const iclforge::ac4::DecodedFrame& info, std::siz
     const double seconds = info.sample_rate_hz > 0 ? static_cast<double>(info.samples) /
                                                          static_cast<double>(info.sample_rate_hz)
                                                    : 0.0;
+    out.bitrate_kbps =
+        seconds > 0.0
+            ? std::optional<double>(static_cast<double>(unit_bytes) * 8.0 / 1000.0 / seconds)
+            : std::nullopt;
+    reported(out);
+}
+
+void StreamDecoder::note_lost_data() {
+    if (truehd_decoder_) {
+        truehd_decoder_->lost_data();
+    }
+    for (Variant& variant : variants_) {
+        variant.decoder->note_lost_data();
+    }
+}
+
+TruehdCounters StreamDecoder::truehd_counters() const {
+    TruehdCounters total = truehd_before_;
+    if (truehd_decoder_) {
+        total += counted(truehd_decoder_->counters());
+    }
+    return total;
+}
+
+std::expected<std::size_t, std::string> StreamDecoder::decode_truehd(
+    std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
+    std::uint32_t unit_samples) {
+    if (!truehd_decoder_) {
+        truehd_decoder_.emplace(truehd_config_);
+    }
+    const auto decoded = truehd_decoder_->decode(unit);
+    if (!decoded) {
+        // The decoder has let go of the substream that failed, and waits for its next restart
+        // header. The unit's time passes in silence.
+        deliver_silence(unit_samples, deliver);
+        const iclforge::truehd::Error& error = decoded.error();
+        const auto& major_sync = truehd_decoder_->major_sync();
+        return std::unexpected(fmt::format(
+            "{} access unit could not be decoded: {}.",
+            major_sync && major_sync->kind == iclforge::truehd::StreamKind::kMlp ? "An MLP"
+                                                                                 : "A TrueHD",
+            error.detail.empty()
+                ? std::string{iclforge::truehd::to_string(error.kind)}
+                : fmt::format("{}: {}", iclforge::truehd::to_string(error.kind), error.detail)));
+    }
+    if (!*decoded) {
+        // Nothing yet: no restart header has come since the stream was joined or a unit was lost.
+        deliver_silence(unit_samples, deliver);
+        return delivered_;
+    }
+    const iclforge::truehd::DecodedAccessUnit& pcm = **decoded;
+    place_truehd(pcm, deliver);
+    report_truehd(pcm, unit.size(), reported);
+    return delivered_;
+}
+
+void StreamDecoder::place_truehd(const iclforge::truehd::DecodedAccessUnit& pcm,
+                                 const BlockFn& deliver) {
+    const auto channels = static_cast<std::size_t>(pcm.channels);
+    const auto total = static_cast<std::size_t>(pcm.samples);
+    if (channels == 0 || total == 0) {
+        return;
+    }
+    // 24-bit integers to floats: a power of two and a value float holds exactly, so no sample
+    // changes by a bit.
+    constexpr float kScale = 1.0F / 8388608.0F;
+    truehd_planar_.resize(channels * total);
+    for (std::size_t sample = 0; sample < total; ++sample) {
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+            truehd_planar_[channel * total + sample] =
+                static_cast<float>(pcm.pcm[sample * channels + channel]) * kScale;
+        }
+    }
+    const std::optional<ac3::eac3::chanmap::Layout> bed = truehd_bed(pcm.layout);
+    if (bed && bed->count == static_cast<int>(channels) &&
+        (!renderer_bed_ || !same_layout(*renderer_bed_, *bed))) {
+        renderer_.set_bed(*bed);
+        renderer_bed_ = *bed;
+    }
+    const bool named = bed && bed->count == static_cast<int>(channels);
+    const std::size_t slots = layout_.slots();
+    truehd_channel_spans_.resize(channels);
+    // One block for the unit, or a few if a stream's units were ever longer than the block the
+    // output buffers are (kMaxSamplesPerAccessUnit is 255).
+    for (std::size_t offset = 0; offset < total; offset += block_[0].size()) {
+        const std::size_t n = std::min(block_[0].size(), total - offset);
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+            truehd_channel_spans_[channel] =
+                std::span<const float>(truehd_planar_).subspan(channel * total + offset, n);
+        }
+        std::array<std::span<float>, render::OutputLayout::kMaxSlots> spans{};
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            spans[slot] = std::span<float>(block_[slot]).first(n);
+        }
+        const std::span<const std::span<float>> out(spans.data(), slots);
+        const ac3::PcmBlock placed{.index = 0,
+                                   .blocks = 1,
+                                   .channels = std::span<const std::span<const float>>(
+                                       truehd_channel_spans_),
+                                   .objects = {},
+                                   .object_indices = {},
+                                   .object_metadata = nullptr};
+        if (named) {
+            renderer_.render(placed, false, 1.0F, out);
+        } else {
+            // Channels the stream does not name go to the layout's speakers in order.
+            renderer_.render_folded(placed, 1.0F, out);
+        }
+        std::array<std::span<const float>, render::OutputLayout::kMaxSlots> rendered{};
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            rendered[slot] = std::span<const float>(block_[slot].data(), n);
+        }
+        delivered_ += n;
+        deliver(std::span<const std::span<const float>>(rendered.data(), slots), n);
+    }
+}
+
+void StreamDecoder::report_truehd(const iclforge::truehd::DecodedAccessUnit& pcm,
+                                  std::size_t unit_bytes, const UnitFn& reported) {
+    if (!reported) {
+        return;
+    }
+    namespace th = iclforge::truehd;
+    UnitReport& out = report_;
+    const std::optional<ac3::eac3::chanmap::Layout> bed = truehd_bed(pcm.layout);
+    const bool named = bed && bed->count == pcm.channels;
+    out.layout = named ? *bed : ac3::eac3::chanmap::Layout{};
+    out.acmod = named ? acmod_of_bed(*bed) : (pcm.channels == 1 ? ac3::Acmod::k1_0 : ac3::Acmod::k2_0);
+    out.lfe = named && bed->index_of(ac3::eac3::chanmap::Location::kLfe) >= 0;
+    out.substreams = pcm.substream + 1;
+    out.bsmod.reset();
+    out.dialnorm = 31;
+    out.dialnorm2.reset();
+    out.compr.reset();
+    out.compr2.reset();
+    out.dynrng = {};
+    out.blocks = 0;
+    out.short_blocks.reset();
+    out.levels = ac3::MixLevels{};
+    out.concealed.reset();
+    out.objects.reset();
+    out.ac4.reset();
+    out.karaoke = false;
+    out.karaoke_reproduced = false;
+    TruehdUnitReport report;
+    const auto& major_sync = truehd_decoder_->major_sync();
+    report.mlp = major_sync && major_sync->kind == th::StreamKind::kMlp;
+    report.substream = pcm.substream;
+    report.channels = pcm.channels;
+    report.restarted = pcm.restarted;
+    report.extra_data_bytes = pcm.extra_data.size();
+    if (major_sync) {
+        report.variable_rate = major_sync->is_vbr;
+        if (major_sync->kind == th::StreamKind::kTrueHd) {
+            const th::ChannelMeaning& meaning = major_sync->channel_meaning;
+            switch (pcm.substream) {
+                case 0:
+                    report.dialogue_norm = meaning.twoch_dialogue_norm;
+                    report.mix_level = meaning.twoch_mix_level;
+                    break;
+                case 1:
+                    report.dialogue_norm = meaning.sixch_dialogue_norm;
+                    report.mix_level = meaning.sixch_mix_level;
+                    break;
+                case 2:
+                    report.dialogue_norm = meaning.eightch_dialogue_norm;
+                    report.mix_level = meaning.eightch_mix_level;
+                    break;
+                default: break;
+            }
+        }
+    }
+    report.counters = counted(truehd_decoder_->counters());
+    report.counters += truehd_before_;
+    out.truehd = report;
+    out.sequence = ++sequence_;
+    const double seconds = pcm.sample_rate > 0 ? static_cast<double>(pcm.samples) /
+                                                     static_cast<double>(pcm.sample_rate)
+                                               : 0.0;
     out.bitrate_kbps =
         seconds > 0.0
             ? std::optional<double>(static_cast<double>(unit_bytes) * 8.0 / 1000.0 / seconds)
@@ -1027,6 +1319,7 @@ std::size_t StreamDecoder::render_flushed(std::span<ac3::DecodedSubstream> subst
         report_.concealed = independent->concealed;
         report_.objects = independent->object_metadata;
         report_.ac4.reset();
+        report_.truehd.reset();
         for (const ac3::DecodedSubstream* dependent : dependents) {
             if (!report_.objects && dependent->object_metadata) {
                 report_.objects = dependent->object_metadata;

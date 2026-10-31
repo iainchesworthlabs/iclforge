@@ -1,0 +1,20 @@
+# Overlay for an ESP32-P4 of CHIP REVISION v3.x (the P4X kit, v3.2), after sdkconfig.defaults and
+# sdkconfig.defaults.esp32p4, which it corrects for this silicon (firmware/hearth-sink/sdkconfig.p4-rev3
+# has the reasons):
+#
+#   idf.py -B D:/esp/build/iclforge/crypto-bench-esp32p4x "-DSDKCONFIG=D:/esp/build/iclforge/crypto-bench-esp32p4x/sdkconfig" \
+#          "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.p4-rev3" -DCRYPTO_BENCH_REPORT=ethernet set-target esp32p4
+#
+# A v3.x image refuses a v1.x chip at boot and the other way round, so this is a separate build.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=n
+CONFIG_ESP32P4_REV_MIN_301=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
+
+# A v3.x second-stage bootloader is 576 bytes over the window below the partition table at Info level
+# (firmware/hearth-sink/sdkconfig.p4-rev3). The bench does not write the bootloader - the kit keeps its
+# own - but the build checks the size all the same.
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# The kit's bootloader has app rollback, and the way back from a bench image depends on it
+# (main/net_report.hpp). The application side of that switch is this one.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

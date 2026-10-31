@@ -2,7 +2,7 @@
 
 # containers
 
-The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing.
+The codec-blind carriage: IEC 61937 burst packing and detection (TrueHD's MAT included), the Matroska, MP4 and MPEG-TS writers and readers (TrueHD included), and IAMF reading and writing.
 
 A library.
 

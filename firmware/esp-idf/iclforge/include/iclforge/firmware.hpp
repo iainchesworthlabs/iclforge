@@ -1,12 +1,16 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "iclforge/firmware_status.hpp"
 #include "iclforge/firmware_trial.hpp"
 
 // Updates over the network (planning/esp32-ota.md): the routes Control
@@ -34,6 +38,48 @@
 struct httpd_req;
 
 namespace iclforge {
+
+// An image the board fetches for itself (planning/esp32-ota.md, O10, "The flow on the board"):
+// firmware_pull.hpp downloads it from a release whose signed index it has verified and hands the
+// bytes here as they arrive. They are written as PUT /firmware's body is - the same checks of the
+// image's head before anything is erased, the same erase-as-you-go writes, the same read-back and
+// trial - except that the SHA-256 they have to equal is the verified index's, and the version in
+// the image has to be the one the index named.
+struct PulledImage {
+    std::string version;                    // the version the verified index names
+    std::array<std::uint8_t, 32> sha256{};  // the verified index's, for this image
+    std::size_t length = 0;                 // the verified index's size, and the connection's
+    // Reads exactly into.size() bytes of the download; false when it ends, stalls or fails, having
+    // set `code` and `text`. It opens the connection on its first call, so that the connection (and
+    // the TLS memory it holds) comes after flash mode has stopped what plays.
+    std::function<bool(std::span<std::uint8_t> into)> read;
+    std::string code;  // a word firmware_update.hpp's error_text() has words for
+    std::string text;
+};
+
+// What install_pulled answers when it returns, which it does only when nothing was installed.
+struct PullInstall {
+    std::string code;
+    std::string text;
+};
+
+// What a pull needs to know about the board and its update state.
+struct FirmwareFacts {
+    bool flash_mode = false;
+    bool on_trial = false;
+    std::uint32_t trial_remaining_ms = 0;
+    bool busy = false;  // an upload, a rollback or a mode change is under way
+    bool has_other_slot = false;
+    std::uint64_t slot_bytes = 0;  // the slot an update goes to
+    std::uint16_t chip_id = 0;
+    std::uint16_t revision_full = 0;
+    std::uint32_t flash_mb = 0;  // the size the running image was built for
+    std::string project;
+    std::string version;  // what runs
+    std::uint32_t secure_version = 0;
+    std::optional<FirmwareLastUpdate> last_update;
+    std::optional<FirmwareUpload> upload;  // an update's progress, while there is one
+};
 
 struct FirmwareHooks {
     // Flash mode's teardown (planning/esp32-ota.md, "Flash mode"): end any
@@ -99,6 +145,23 @@ class Firmware {
     // setting then.
     [[nodiscard]] bool flash_mode() const;
 
+    // What a restart would interrupt, for an owner that restarts the board from somewhere other than
+    // POST /restart (the screen's Restart, the factory reset): the running image is still on trial, so
+    // a restart goes back to the image before it; an upload or a rollback is under way, or the board is
+    // in flash mode. The routes refuse in the same cases.
+    struct Activity {
+        bool on_trial = false;
+        bool busy = false;
+        bool flash_mode = false;
+    };
+    [[nodiscard]] Activity activity() const;
+
+    // Whether the request names this board by its own address or its mDNS host name in its Host header
+    // (hooks.host_names): the check the firmware routes make, so that a page on another site cannot get a
+    // browser to make a destructive request of the board by a name it controls. For any other route that
+    // must be taken only that way.
+    [[nodiscard]] bool host_allowed(httpd_req* req) const;
+
     // A restart its owner asks for, outside the routes, made as a route's
     // restart is: `why` on the console ("firmware: restarting <why>"), and
     // before_restart first. An image still on trial goes back at this
@@ -114,6 +177,16 @@ class Firmware {
     // The last crash's core dump (O4): sent as it lies in flash, and erased.
     int on_coredump(httpd_req* req);
     int on_coredump_erase(httpd_req* req);
+
+    // For firmware_pull.hpp (O10). The board and its update state as of now.
+    [[nodiscard]] FirmwareFacts facts() const;
+    // Writes an image the caller downloads, on the caller's own task, which needs the stack an
+    // upload does (task_stack_bytes) and more for TLS, from internal RAM: a task that writes flash
+    // may not have its stack where the cache is needed to reach it. Enters flash mode, writes the
+    // other slot as an upload does and, when it is whole and checked, restarts into it, and does
+    // not return. It returns only when nothing was installed, saying why; the board is then still
+    // in flash mode, as after a refused upload.
+    [[nodiscard]] PullInstall install_pulled(PulledImage& image);
 
     struct Impl;
 

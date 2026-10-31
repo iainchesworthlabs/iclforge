@@ -1326,17 +1326,28 @@ bool Player::start() {
     // The decoder first, so the ring never fills before anything can drain it.
     //
     // The stack in PSRAM is asked for and checked for presence as the ring is,
-    // not learned from a failed allocation.
+    // not learned from a failed allocation: it goes there when the profile asks
+    // for it, and when the largest internal block, read now, is too small for it
+    // (the P4X's I2S queue leaves 37 KB, and an image with the AC-4 decoder has
+    // a 40 KB stack to place; an AC-3 play then could not start its decode task).
+    // Where the stack fits, internal RAM keeps it, as the profile's baseline was
+    // measured.
+    constexpr std::size_t kTaskSlackBytes = 1024;
+    const bool psram_present = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+    const bool internal_fits =
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >=
+        im.config.decode_stack_bytes + kTaskSlackBytes;
     BaseType_t decode_created = pdFAIL;
-    if (im.config.decode_stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+    if (psram_present && (im.config.decode_stack_in_psram || !internal_fits)) {
         decode_created = xTaskCreatePinnedToCoreWithCaps(
             &Impl::decode_entry, "ac3-decode", im.config.decode_stack_bytes, &im,
             im.config.decode_priority, &im.decode_task, im.config.decode_core,
             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         im.decode_task_with_caps = decode_created == pdPASS;
         if (im.decode_task_with_caps) {
-            std::printf("player: decode stack %lu bytes in PSRAM\n",
-                        static_cast<unsigned long>(im.config.decode_stack_bytes));
+            std::printf("player: decode stack %lu bytes in PSRAM%s\n",
+                        static_cast<unsigned long>(im.config.decode_stack_bytes),
+                        im.config.decode_stack_in_psram ? "" : " (no internal block that size)");
         }
     }
     if (decode_created != pdPASS) {

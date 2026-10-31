@@ -1578,6 +1578,7 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                                   .frames = 0,
                                   .expected_frames = session_->total_samples(),
                                   .output_opens = opens_});
+    truehd_baseline_ = decoder_ ? decoder_->truehd_counters() : TruehdCounters{};
     segments_.assign(1, Segment{.record = history_.size() - 1,
                                 .output_start = link_start(),
                                 .item_start = session_->position_samples()});
@@ -1780,6 +1781,14 @@ void Player::fill(std::size_t frames) {
         // Frames a unit completed without a report of its own.
         encode_transcoded(false);
     }
+    note_truehd_counters();
+}
+
+void Player::note_truehd_counters() {
+    if (!session_ || !session_->truehd() || !decoder_ || history_.empty()) {
+        return;
+    }
+    history_.back().truehd = since(decoder_->truehd_counters(), truehd_baseline_);
 }
 
 std::size_t Player::drain(std::size_t budget) {
@@ -2153,6 +2162,7 @@ void Player::item_ended(PumpReport& report, bool heard) {
                                           .frames = 0,
                                           .expected_frames = session_->total_samples(),
                                           .output_opens = opens_});
+            truehd_baseline_ = decoder_ ? decoder_->truehd_counters() : TruehdCounters{};
             // The new item's first frame goes in behind everything the last
             // one still has queued, or packed toward a burst.
             segments_.push_back(Segment{.record = history_.size() - 1,

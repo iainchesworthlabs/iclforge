@@ -2081,3 +2081,56 @@ TEST_CASE("OAMD quantizes the screen and depth factors to the nearest code", "[o
     CHECK(decoded->objects[0].screen_factor == 4.0 / 8.0);
     CHECK(decoded->objects[0].depth_factor == 0.5);
 }
+
+TEST_CASE("OAMD reads a trim element of six or of nine configurations", "[oba][oamd][trim]") {
+    // NUM_TRIM_CONFIGS is not fixed on the wire: Dolby's reference stream
+    // carries six, a commercial 15-object music release nine. The element's
+    // own declared size is what tells them apart.
+    const iclforge::objects::oba::Program program{.dynamic_only = true, .dynamic_objects = 1};
+    const std::array<iclforge::objects::oba::DynamicObject, 1> objects{{{}}};
+    const auto base = iclforge::objects::oba::build_payload(program, objects);
+
+    // version 2 + object_count_bits 5 + dyn_only 1 + lfe 1 + alternate 1 = the
+    // first ten bits; then oa_element_count_bits (4), then the object element.
+    iclforge::BitReader in{base};
+    in.seek(14);
+    (void)in.read(4);  // oa_element_id_idx
+    const auto object_bytes = static_cast<std::size_t>(in.variable_bits(4, {}, 4)) + 1;
+    const std::size_t object_end = in.bit_position() + object_bytes * 8;
+
+    for (const int configs : {6, 9}) {
+        iclforge::BitWriter w;
+        in.seek(0);
+        for (int i = 0; i < 10; ++i) {
+            w.put(in.read(1), 1);
+        }
+        w.put(2, 4);  // oa_element_count_bits: the object element and a trim element
+        in.seek(14);
+        while (in.bit_position() < object_end) {
+            w.put(in.read(1), 1);
+        }
+        // trim_element: discard flag, warp_mode 0, reserved, custom_trim, the
+        // first configuration default and every other one disabled, and no
+        // per-object disable.
+        const int body_bits = 1 + 2 + 2 + 2 + 1 + 2 * (configs - 1) + 1;
+        w.put(2, 4);  // oa_element_id_idx
+        w.write_variable_bits(4, static_cast<std::uint64_t>((body_bits + 7) / 8 - 1), {}, 4);
+        w.put(0, 1);
+        w.put(0, 2);
+        w.put(0, 2);
+        w.put(0b10, 2);
+        w.put(1, 1);
+        for (int i = 1; i < configs; ++i) {
+            w.put(0, 1);  // b_default_trim
+            w.put(1, 1);  // b_disable_trim
+        }
+        w.put(0, 1);  // b_disable_trim_per_obj
+        w.align();
+
+        const auto decoded = iclforge::objects::oba::parse_payload(w.bytes());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->trim.has_value());
+        CHECK(decoded->trim->configs.size() == static_cast<std::size_t>(configs));
+        CHECK(decoded->objects.size() == 1);
+    }
+}

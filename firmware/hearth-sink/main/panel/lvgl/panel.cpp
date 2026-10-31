@@ -16,8 +16,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "esp_app_desc.h"
@@ -33,10 +35,12 @@
 #include "iclforge/lyrics/stage.hpp"
 
 #include "iclforge/now_view.hpp"
+#include "iclforge/panel_follow.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
 
 #include "../../network.hpp"
+#include "../../preferences.hpp"
 #include "../../sendspin.hpp"
 #include "../../settings.hpp"
 #include "../../wall_clock.hpp"
@@ -44,15 +48,27 @@
 #include "dev_info.hpp"
 #include "display.hpp"
 #include "lyric_screen.hpp"
+#include "meters_screen.hpp"
 #include "now_screen.hpp"
 
 namespace player {
 namespace {
 
-// What the no-lyrics screen follows: set from the control surface's task (PUT /now-playing, /dim-after)
-// and read by the panel's, every frame.
-std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
-std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
+// What the screen follows of the board's settings (the screen without lyrics, when it dims, the speakers' style, the
+// backlight's lit level, the clock's format, the night schedule, and the level the screen last asked the glass for, one
+// of display.hpp's three: lit, the dim floor, off). A tap on the Preferences sheet reaches the setters ON THIS TASK, while
+// g_lock is held, so none of them may take it: PanelFollow is atomics and nothing else (iclforge/panel_follow.hpp).
+iclforge::panelfollow::PanelFollow g_follow{panel::kBacklightNormalPercent};
+
+// The percent the glass is given for a level the screen asked for: the person's brightness for lit, the floor under
+// it for dimmed, nothing for off (iclforge::nowview::backlight_percent).
+int effective_backlight(int request) {
+    using iclforge::nowview::Dim;
+    const Dim dim = request <= panel::kBacklightOffPercent    ? Dim::kDark
+                    : request <= panel::kBacklightDimPercent ? Dim::kDimmed
+                                                              : Dim::kNone;
+    return iclforge::nowview::backlight_percent(dim, g_follow.brightness());
+}
 
 }  // namespace
 }  // namespace player
@@ -189,6 +205,21 @@ bool read_now_playing(NowPlaying& out) {
         out.heading.assign(heading.data(), heading.size());
     }
     first = false;
+    // The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure).
+    static iclforge::nowview::BitrateMeter meter;
+    static bool metered = false;
+    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
+        meter.reset();
+        metered = false;
+    } else {
+        if (!metered) {
+            meter.reset();
+            metered = true;
+        }
+        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
+    }
+    out.facts = playing.facts;
+    out.kbps = meter.kbps();
     if (playing.have_levels) {
         out.peak_db.assign(playing.peak_db.begin(), playing.peak_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
         out.rms_db.assign(playing.rms_db.begin(), playing.rms_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
@@ -196,6 +227,18 @@ bool read_now_playing(NowPlaying& out) {
         out.peak_db.clear();
         out.rms_db.clear();
     }
+    return true;
+}
+
+bool read_now_levels(NowLevels& out) {
+    const SendspinLevels levels = sendspin_now_levels();
+    if (!levels.have) {
+        return false;
+    }
+    out.serial = levels.serial;
+    out.outputs = levels.outputs;
+    out.peak_db = levels.peak_db;
+    out.rms_db = levels.rms_db;
     return true;
 }
 
@@ -218,28 +261,49 @@ bool read_now_title(NowTitle& out) {
 
 NowSettings read_now_settings() {
     NowSettings settings;
-    settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
-    settings.dim_after_minutes = g_dim_after_minutes.load();
+    settings.view = g_follow.view();
+    settings.dim_after_minutes = g_follow.dim_after_minutes();
+    settings.speakers_style = g_follow.speakers_style();
+    settings.night = g_follow.night();
+    // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
+    if (settings.night.enabled) {
+        settings.minute_of_day = iclforge::wallclock::minute_of_day(player::wall_clock_read());
+    }
     return settings;
 }
 
-iclforge::wallclock::Reading read_wall_clock() { return player::wall_clock_read(); }
-
-void set_backlight(int percent) { display_set_backlight(percent); }
-
-void choose_now_view(iclforge::nowview::View view) {
-    // A tap is followed even where the store is refused (the console says so): the screen does what it
-    // was told until the next boot.
-    (void)settings_set_now_view(view);
-    g_now_view.store(static_cast<int>(view));
+iclforge::wallclock::Reading read_wall_clock() {
+    iclforge::wallclock::Reading reading = player::wall_clock_read();
+    // How the person who owns the board wants it written is the panel's to know, not the clock's.
+    reading.format = g_follow.clock_format();
+    return reading;
 }
 
-void choose_dim_after(int minutes) {
-    (void)settings_set_dim_after(minutes);
-    g_dim_after_minutes.store(minutes);
+void set_backlight(int percent) {
+    g_follow.ask_backlight(percent);
+    display_set_backlight(effective_backlight(percent));
 }
+
+int backlight_lit_percent() { return effective_backlight(kBacklightNormalPercent); }
+
+iclforge::prefs::Backend& preferences_backend() { return player::preferences(); }
 
 std::int64_t time_us() { return esp_timer_get_time(); }
+
+iclforge::meters::MeterTap& meters_tap() {
+    // Made the first time the Meters view is built, in LVGL's heap (PSRAM: 32 KB of ring), and handed to the player once: it is asked for blocks
+    // only while the view shows (MeterTap::set_wanted).
+    static iclforge::meters::MeterTap* const tap = [] {
+        void* const memory = lv_malloc(sizeof(iclforge::meters::MeterTap));
+        if (memory == nullptr) {
+            std::abort();
+        }
+        auto* const made = new (memory) iclforge::meters::MeterTap(+[]() noexcept -> std::uint64_t { return static_cast<std::uint64_t>(esp_timer_get_time()); });
+        sendspin_set_block_tap(made);
+        return made;
+    }();
+    return *tap;
+}
 
 int demo_mode() { return g_demo.load(); }
 
@@ -261,6 +325,8 @@ std::mutex g_lock;
 panel::Display g_display;
 PanelStats g_stats;
 std::atomic<bool> g_started{false};
+// The display is open and the screen is built on it: g_display is read-only from here on.
+std::atomic<bool> g_display_ready{false};
 std::int64_t g_refresh_started_us = 0;
 std::uint64_t g_render_total_us = 0;
 TaskHandle_t g_task = nullptr;
@@ -278,6 +344,8 @@ void on_refresh_ready(lv_event_t* /*event*/) {
     g_stats.render_us_last = took;
     g_stats.render_us_max = std::max(g_stats.render_us_max, took);
     g_stats.render_us_mean = static_cast<std::uint32_t>(g_render_total_us / g_stats.refreshes);
+    g_stats.render_us_total = g_render_total_us;
+    panel::now_meters_refresh(took);
 }
 
 void on_flush_start(lv_event_t* event) {
@@ -311,25 +379,62 @@ void rest(std::int64_t rest_us) {
     }
 }
 
+// The audio comes first. A decoder that spends a long share of its 32 ms on a burst (a 7.1.4 object stream, AC-4) is slowed by the screen's memory
+// traffic beside it: the kit measured the Meters view at +1.6 to 2.2 ms a burst under JOC, +0.5 to 0.7 with the screen's task kept on the decode
+// core (planning/p4x-meters-view.md, "What the screen costs the audio path"). So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+// or more (in at that, out at 70 % of it, so it does not flap) the Meters view is held at ten updates a second. At YIELD 2 this task is also made
+// on the decode core (start()), where it cannot run beside the decode task: FreeRTOS here has no call to move a task between cores, so that one is
+// for always. Looked at once a second; a stream that is not bursts is never busy.
+void follow_decoder_load() {
+    if constexpr (CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD != 0) {
+        static bool busy = false;
+        std::uint64_t burst_us = 0;
+        if (const auto status = sendspin_status()) {
+            burst_us = status->stream == "bursts" ? static_cast<std::uint64_t>(status->burst_us) : 0;
+        }
+        constexpr std::uint64_t kEnterUs = CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US;
+        const bool want = burst_us >= kEnterUs || (busy && burst_us >= kEnterUs * 7 / 10);
+        if (want == busy) {
+            return;
+        }
+        busy = want;
+        {
+            const std::lock_guard lock(g_lock);
+            panel::now_meters_hold_slow(busy);
+        }
+        std::printf("panel: the decoder is %s (a burst of %llu us): the Meters view is %s\n", busy ? "busy" : "free again",
+                    static_cast<unsigned long long>(burst_us), busy ? "held at ten a second" : "let go");
+    }
+}
+
 void run(void* /*arg*/) {
     const std::int64_t fill_period_us = 1'000'000 / std::max(kFps, 1);
     constexpr std::int64_t kRestPeriodUs = 100'000;
     std::int64_t period_us = fill_period_us;
     std::uint32_t reported_ms = tick_ms();
+    std::uint32_t followed_ms = reported_ms;
     for (;;) {
         const std::int64_t started = esp_timer_get_time();
         bool filling = false;
         {
             const std::lock_guard lock(g_lock);
+            // A brightness set since the last cycle (by a PUT, or by a tap on this task): the glass is given the level
+            // for what the screen last asked for, here, where the glass is the panel's alone.
+            if (g_follow.take_backlight_stale()) {
+                panel::set_backlight(g_follow.backlight_request());
+            }
             filling = panel::screen_update();
             (void)lv_timer_handler();
             const panel::ScreenStats screen = panel::screen_stats();
             g_stats.screen = screen.name;
             g_stats.dimmed = screen.dimmed;
-            g_stats.backlight = screen.backlight;
+            g_stats.backlight = effective_backlight(screen.backlight);
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
+            g_stats.prefs_view = screen.prefs_view;
+            g_stats.prefs_builds = screen.prefs_builds;
+            g_stats.prefs_build_us_max = screen.prefs_build_us_max;
             g_stats.dev_refreshes = screen.dev_refreshes;
             g_stats.dev_refresh_us_last = screen.dev_refresh_us_last;
             g_stats.dev_refresh_us_max = screen.dev_refresh_us_max;
@@ -348,6 +453,10 @@ void run(void* /*arg*/) {
         // A line on the console every ten seconds while something is being drawn, which is also what
         // GET /log carries to a board with no cable on it.
         const std::uint32_t now = tick_ms();
+        if (now - followed_ms >= 1000) {
+            followed_ms = now;
+            follow_decoder_load();
+        }
         if (now - reported_ms >= 10000) {
             reported_ms = now;
             const std::lock_guard lock(g_lock);
@@ -389,12 +498,12 @@ void run(void* /*arg*/) {
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
     const WallClockStats clock = wall_clock_stats();
-    char buffer[1536];
+    char buffer[1792];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
-                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"dev_refreshes\":%lu,"
+                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"prefs_view\":%s,\"prefs_builds\":%lu,\"prefs_build_us_max\":%lu,\"dev_refreshes\":%lu,"
                   "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,"
                   "\"clock_enabled\":%s,\"clock_asking\":%s,\"clock_synced\":%s,\"clock_syncs\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
@@ -406,8 +515,11 @@ void run(void* /*arg*/) {
                   static_cast<unsigned long>(counters.failures.load()),
                   static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
-                  iclforge::nowview::view_name(static_cast<iclforge::nowview::View>(g_now_view.load())),
+                  iclforge::nowview::view_name(g_follow.view()),
                   stats.dimmed ? "true" : "false", stats.backlight, stats.dev_view ? "true" : "false",
+                  stats.prefs_view ? "true" : "false",
+                  static_cast<unsigned long>(stats.prefs_builds),
+                  static_cast<unsigned long>(stats.prefs_build_us_max),
                   static_cast<unsigned long>(stats.dev_refreshes),
                   static_cast<unsigned long>(stats.dev_refresh_us_last),
                   static_cast<unsigned long>(stats.dev_refresh_us_max), clock.enabled ? "true" : "false",
@@ -603,9 +715,37 @@ bool panel_built() { return true; }
 
 bool panel_has_view(iclforge::nowview::View view) { return panel::now_view_drawn(view); }
 
-void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
+iclforge::DisplayCaps panel_display_caps() {
+    iclforge::DisplayCaps caps;
+    if (!g_display_ready.load()) {
+        return caps;
+    }
+    const std::string_view kind = g_display.kind;
+    caps.kind = kind == "dsi" ? iclforge::DisplayKind::kDsi : iclforge::DisplayKind::kFrameBuffer;
+    caps.width = g_display.width;
+    caps.height = g_display.height;
+    caps.touch = g_display.touch;
+    caps.backlight = g_display.backlight;
+    return caps;
+}
 
-void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
+iclforge::devview::Facts panel_board_facts() { return panel::gather_about_facts(); }
+
+// The setters below are called by the preferences' backend: on the control surface's task (a PUT), and on THIS panel's
+// task for a tap on the Preferences sheet, which holds g_lock for the frame that reads the tap. None of them takes g_lock
+// (std::mutex is not recursive: the brightness setter did, and a tap on Brightness - or + hung the screen for good), and
+// none touches the glass: PanelFollow is atomics, and the brightness only marks the glass stale for the loop below.
+void panel_set_view(iclforge::nowview::View view) { g_follow.set_view(view); }
+
+void panel_set_dim_after(int minutes) { g_follow.set_dim_after(minutes); }
+
+void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_follow.set_speakers_style(style); }
+
+void panel_set_brightness(int percent) { g_follow.set_brightness(percent); }
+
+void panel_set_clock_format(iclforge::wallclock::ClockFormat format) { g_follow.set_clock_format(format); }
+
+void panel_set_night(const iclforge::nowview::NightSchedule& night) { g_follow.set_night(night); }
 
 bool panel_start() {
     if (g_started.exchange(true)) {
@@ -615,8 +755,12 @@ bool panel_start() {
         std::printf("panel: no PSRAM, which LVGL's heap is; no screen\n");
         return false;
     }
-    g_now_view.store(static_cast<int>(settings().now_view));
-    g_dim_after_minutes.store(settings().dim_after_minutes);
+    g_follow.set_view(settings().now_view);
+    g_follow.set_dim_after(settings().dim_after_minutes);
+    g_follow.set_speakers_style(settings().speakers_style);
+    g_follow.set_brightness(settings().brightness_percent);
+    g_follow.set_clock_format(settings().clock_format);
+    g_follow.set_night(settings().night);
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {
@@ -630,16 +774,21 @@ bool panel_start() {
         return false;
     }
 
+    g_display_ready.store(true);
     g_stats.kind = g_display.kind;
     g_stats.width = g_display.width;
     g_stats.height = g_display.height;
     g_stats.touch = g_display.touch;
     g_stats.screen = "idle";
 
-    // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point.
+    // The stack in PSRAM: the screen's own cost in internal RAM is nothing, which is the point. On any core, unless the audio is to come first
+    // by the strictest rule (PANEL_YIELD 2): then on the decode task's, where the two cannot run side by side.
+    constexpr BaseType_t kPanelCore = CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD == 2 && CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE >= 0
+                                          ? static_cast<BaseType_t>(CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE)
+                                          : tskNO_AFFINITY;
     const BaseType_t created = xTaskCreatePinnedToCoreWithCaps(
         &run, "panel", CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES, nullptr,
-        CONFIG_ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY, &g_task, tskNO_AFFINITY,
+        CONFIG_ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY, &g_task, kPanelCore,
         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (created != pdPASS) {
         std::printf("panel: its task could not be created\n");
@@ -653,13 +802,40 @@ bool panel_start() {
 }
 
 PanelStats panel_stats() {
+    // Not from the panel's own task, which holds g_lock for the frame: it reads the counters as they stand, as the
+    // developer view does (read_dev_facts()), and a caller that forgot would otherwise hang the screen.
+    if (xTaskGetCurrentTaskHandle() == g_task) {
+        return g_stats;
+    }
     const std::lock_guard lock(g_lock);
     return g_stats;
+}
+
+std::optional<std::string> panel_stats_text() {
+    PanelStats snapshot;
+    iclforge::panelstats::MetersStats meters;
+    {
+        // The panel's task holds g_lock for the frame and reads the counters as they stand; any other task takes it, which also keeps the Meters
+        // view's figures from changing under the copy.
+        std::optional<std::lock_guard<std::mutex>> guard;
+        if (xTaskGetCurrentTaskHandle() != g_task) {
+            guard.emplace(g_lock);
+        }
+        snapshot = g_stats;
+        meters = panel::now_meters_stats();
+    }
+    if (!snapshot.running) {
+        return std::nullopt;
+    }
+    return panel::panel_stats_report(snapshot, meters);
 }
 
 }  // namespace player
 
 namespace player::panel {
+
+// The time between the loop's frames while it draws: the panel's frame rate (kFps, above).
+int panel_frame_us() { return 1'000'000 / std::max(kFps, 1); }
 
 // What the developer view shows (dev_info.hpp). It is called from the panel's task, which holds
 // g_lock for the frame, so the counters are read as they stand and not through panel_stats().

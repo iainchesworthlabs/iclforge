@@ -290,10 +290,24 @@ ctest --preset test-linux-gcc-coverage -LE Performance
 ./tools/checks/coverage_report.sh -g gcov-16
 ```
 
-`apps/forge/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
-coverage job, which installs none (CI puts Qt only on the plain `gui` build legs, which are not
-instrumented). Its interactive surfaces are covered by `apps/forge/gui/tests`' own Qt Quick suite, and
-its one Qt-free class (`RecordingSink`) is already in `iclforge-app-media-tests`. `bindings/python/` has its own floor
+`apps/forge/gui`, `apps/crucible/ui` and `apps/hearth/ui` are absent from that report: instrumenting
+their C++ needs a Qt kit, which the coverage job installs none of. They have a report of their own, from
+the preset that adds the three windows and the tests labelled for them, run offscreen:
+
+```bash
+cmake --preset config-linux-gcc-coverage-qt        # with a Qt kit found as in the Qt section below
+cmake --build --preset build-linux-gcc-coverage-qt -- -k 0
+ctest --preset test-linux-gcc-coverage-qt
+./tools/checks/coverage_report.sh -q -g gcov-16
+```
+
+CI runs it as the `coverage-qt` job of `_ci-core.yml`, nightly, with the Qt version and aqtinstall commit
+of `.github/toolchain-versions.json`. gcov counts the C++ only; QML has no line coverage from gcov and
+the Qt Quick suites stay the check on it. The floors in `coverage_report.sh`'s `qt_components` table are
+provisional until that job's first hosted run. On a Linux machine with no Qt and no vcpkg (a cloud
+sandbox whose proxy refuses GitHub's source archives), `tools/dev/qt-sandbox-setup.sh PREFIX` installs
+the same Qt kit, builds Hearth's dependencies into a private prefix and prints the configure line.
+`bindings/python/` has its own floor
 instead, in `.github/workflows/wheels.yml`'s `python-coverage` job — `pytest --cov` against the
 built wheel; see that job's own comment for what a Python percentage does and does not measure
 when nearly all of the binding surface is C++.
@@ -420,6 +434,7 @@ run to see a failing case's output.
 | `ICLFORGE_BUILD_IAB` | `ON` | Build `iclforge::iab` (`libs/iab`), the standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader. Like the three container writers above it needs no opt-in third-party library, so it defaults on the same way; unlike them nothing in `apps/` or `examples/` links it yet, so there is no all-off guard — `tests/CMakeLists.txt` simply adds its test file when this is on. |
 | `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`libs/containers/src/iamf`), the standalone IAMF v2.0 OBU and ISO-BMFF reader and writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp`, `examples/iamf_objects.cpp` and `examples/iamf_coded.cpp` build when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
 | `ICLFORGE_BUILD_AC4` | `ON` | Build the AC-4 codec `iclforge::ac4` (`libs/ac4`): the inspector, the decoder and the encoder, one library, with the tables and transforms the decoder and the encoder share inside it (`libs/ac4/src/core`) — see [AC-4](library/ac4.md). It is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`. `OFF` needs the CLI, the GUI and the tests off too, and Hearth unless it is the ESP-IDF player half (the root `CMakeLists.txt` guards), since they link them. The Python wheel binds them (`iclforge.ac4`), the WebAssembly preset builds them for the `iclforge_wasm_ac4` module, and the Android app builds them without linking them yet; the ESP-IDF component and the minimum-footprint presets turn the option off and take the decoder alone through `ICLFORGE_MINIMAL_AC4`. The vcpkg port's `ac4` feature and the Conan recipe's `ac4` option install them, off by default. |
+| `ICLFORGE_BUILD_TRUEHD` | `ON` | Build the TrueHD and MLP codec `iclforge::truehd` (`libs/truehd`): the bitstream layer, the lossless decoder and the TrueHD encoder; it links `iclforge::base` only — see [TrueHD and MLP](library/truehd.md). `OFF` needs the CLI off too (the root `CMakeLists.txt` guard), since `forge` decodes, probes and encodes TrueHD through it; the C API still declares `iclforge_truehd_*`, and answers `ICLFORGE_ERROR_UNSUPPORTED`. The Python wheel, the WebAssembly modules and the Android app do not use it; the ESP-IDF component and the minimum-footprint presets turn the option off. The vcpkg port's `truehd` feature and the Conan recipe's `truehd` option install it, off by default. |
 | `ICLFORGE_BUILD_CAPI` | `ON` | Build `iclforge::c` (`libs/capi`), the C API over the encode/decode core — see [C API](library/c-api.md). Depends on nothing but `iclforge::ac3_static`, so unlike `ICLFORGE_BUILD_ADM` there is no extra dependency footprint to opt out of. |
 | `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`bindings/python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `bindings/python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
 | `ICLFORGE_BUILD_ADM` | `OFF` | Build `iclforge::adm` (`libs/adm`), the standalone BW64/RF64 + ADM parser — see [ADM / BW64 reading](library/adm.md). Off by default, unlike every other library component: it vendors libbw64/libadm via `FetchContent`, and libadm needs several Boost header libraries, resolved separately via `-DVCPKG_MANIFEST_FEATURES=adm` (`vcpkg.json`'s `adm` feature) — turning this `ON` without also selecting that feature fails with a clear configure-time message rather than a bare "Boost not found". |

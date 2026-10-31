@@ -4,8 +4,8 @@ Every program in [`examples/`](https://github.com/iainchesworthlabs/iclforge/tre
 builds by default (`ICLFORGE_BUILD_EXAMPLES=ON`) and registers as a `ctest` entry named
 `example.<name>`, so "the examples still work" is checked by the same command as everything else
 (`read_adm`, `encode_adm`, and `encode_iab` additionally need
-`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` needs `ICLFORGE_BUILD_AC4` and the two C programs
-`ICLFORGE_BUILD_CAPI`, both on by default). These programs are
+`-DICLFORGE_BUILD_ADM=ON`; `decode_ac4` and `ac4_content_signature` need `ICLFORGE_BUILD_AC4`, the C programs
+`ICLFORGE_BUILD_CAPI`, and the two TrueHD ones `ICLFORGE_BUILD_TRUEHD` as well, all on by default). These programs are
 also the source the library pages excerpt from — each page's "Full program" link lands on one of
 them.
 
@@ -40,6 +40,7 @@ them.
 | [`osc_object_control`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/osc_object_control.cpp) | A hand-built OSC 1.0 datagram, parsed and merged onto a `SceneCursor` object — no socket. | [Spatial & Atmos objects](spatial-and-atmos.md) |
 | [`atmos_fallback`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/atmos_fallback.cpp) | The same programme with and without the EMDF container — the either/or 5.1-fallback tradeoff. | [Spatial & Atmos objects](spatial-and-atmos.md) |
 | [`object_signing`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/object_signing.cpp) | Sign an Atmos stream's EMDF container with an operator key. | [Object signing](signing.md) |
+| [`ac4_content_signature`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/ac4_content_signature.cpp) | Read an AC-4 stream's content signature, and with the operator's own key and chain sign it and check the result against a trust anchor. `ctest` hands it a committed stream, which carries none. | [AC-4 content signing](signing.md#ac-4-content-signing) |
 | [`station_broadcast`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/station_broadcast.cpp) | A fully worked 115-second diegetic Atmos scene with authored flight paths. | [A worked scene — station broadcast](station-broadcast.md) |
 
 ## Containers
@@ -69,6 +70,8 @@ them.
 |---|---|---|
 | [`capi_encode_decode`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_decode.c) | Encode/decode AC-3 through `iclforge_c/iclforge.h` — plain C, not C++, so the build itself proves the header is C-usable. | [C API](c-api.md) |
 | [`capi_encode_eac3`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_eac3.c) | Encode a 5.1.2 E-AC-3 access unit (a bed plus one dependent substream) through the C API and decode it back. | [C API](c-api.md) |
+| [`capi_decode_truehd`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_decode_truehd.c) | Decode a TrueHD or MLP stream to raw 24-bit PCM through the C API. | [C API](c-api.md#truehd-and-mlp) |
+| [`capi_encode_truehd`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_truehd.c) | Encode a stereo tone as TrueHD through the C API and decode it back; the codec is lossless, so every sample must return. | [C API](c-api.md#truehd-and-mlp) |
 
 ## Python
 

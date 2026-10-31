@@ -275,6 +275,187 @@ TEST_CASE("wall_clock: the face is the time to the minute, the date, and a note 
     CHECK_FALSE(wc::face(reading) == start);
 }
 
+TEST_CASE("wall_clock: the rules of a zone are read as the days they fall on", "[wall_clock]") {
+    const auto melbourne = wc::parse_zone_rules("AEST-10AEDT,M10.1.0,M4.1.0/3");
+    REQUIRE(melbourne.has_value());
+    CHECK(melbourne->offsets == *wc::parse_time_zone("AEST-10AEDT,M10.1.0,M4.1.0/3"));
+    CHECK(melbourne->start.kind == wc::RuleKind::kMonthWeekDay);
+    CHECK(melbourne->start.month == 10);
+    CHECK(melbourne->start.week == 1);
+    CHECK(melbourne->start.day == 0);
+    CHECK(melbourne->start.time_s == 7200);  // the default: 02:00
+    CHECK(melbourne->end.month == 4);
+    CHECK(melbourne->end.time_s == 3 * 3600);
+
+    // A time past a day and a negative one, as Cairo's and Nuuk's rules have.
+    const auto cairo = wc::parse_zone_rules("EET-2EEST,M4.5.5/0,M10.5.4/24");
+    REQUIRE(cairo.has_value());
+    CHECK(cairo->start.time_s == 0);
+    CHECK(cairo->end.time_s == 24 * 3600);
+    const auto nuuk = wc::parse_zone_rules("<-02>2<-01>,M3.5.0/-1,M10.5.0/0");
+    REQUIRE(nuuk.has_value());
+    CHECK(nuuk->start.time_s == -3600);
+
+    // The three kinds of day.
+    const auto julian = wc::parse_zone_rules("XXX1YYY,J60/1:30,300");
+    REQUIRE(julian.has_value());
+    CHECK(julian->start.kind == wc::RuleKind::kJulian1);
+    CHECK(julian->start.day == 60);
+    CHECK(julian->start.time_s == 5400);
+    CHECK(julian->end.kind == wc::RuleKind::kJulian0);
+    CHECK(julian->end.day == 300);
+
+    // What parse_time_zone refuses, parse_zone_rules refuses, and it answers the same for what it takes.
+    for (const char* text : {"", "AEST", "AEST-10AEDT", "AEST-10AEDT,M13.1.0,M4.1.0", "AEST-10AEDT,M10.1.0,M4.1.0,M1.1.1"}) {
+        CHECK(wc::parse_zone_rules(text).has_value() == wc::parse_time_zone(text).has_value());
+    }
+}
+
+TEST_CASE("wall_clock: the day a rule falls on, in a leap year and not", "[wall_clock]") {
+    const auto day_of = [](const char* rule_text, int year) {
+        const auto rules = wc::parse_zone_rules(rule_text);
+        REQUIRE(rules.has_value());
+        return wc::rule_day(rules->start, year);
+    };
+    // The first Sunday of October 2026 is the 4th; the last Sunday of March 2026 is the 29th, and in 2027 the 28th.
+    CHECK(day_of("AEST-10AEDT,M10.1.0,M4.1.0", 2026) == wc::days_from_civil(2026, 10, 4));
+    CHECK(day_of("AEST-10AEDT,M10.1.0,M4.1.0", 2027) == wc::days_from_civil(2027, 10, 3));
+    CHECK(day_of("CET-1CEST,M3.5.0,M10.5.0", 2026) == wc::days_from_civil(2026, 3, 29));
+    CHECK(day_of("CET-1CEST,M3.5.0,M10.5.0", 2027) == wc::days_from_civil(2027, 3, 28));
+    // Week 5 is the last such day even when the month has only four: the last Sunday of February 2026 is the 22nd.
+    CHECK(day_of("CET-1CEST,M2.5.0,M10.5.0", 2026) == wc::days_from_civil(2026, 2, 22));
+    // ... and in a leap year the fifth Sunday of February 2032 exists (the 29th).
+    CHECK(day_of("CET-1CEST,M2.5.0,M10.5.0", 2032) == wc::days_from_civil(2032, 2, 29));
+    // Jn skips February 29 and n counts it: day 60 is March 1 in a common year, and in a leap year J60 is March 1
+    // while 59 is February 29.
+    CHECK(day_of("XXX1YYY,J60,300", 2026) == wc::days_from_civil(2026, 3, 1));
+    CHECK(day_of("XXX1YYY,J60,300", 2028) == wc::days_from_civil(2028, 3, 1));
+    CHECK(day_of("XXX1YYY,59,300", 2028) == wc::days_from_civil(2028, 2, 29));
+    CHECK(day_of("XXX1YYY,59,300", 2026) == wc::days_from_civil(2026, 3, 1));
+    CHECK(wc::is_leap_year(2028));
+    CHECK_FALSE(wc::is_leap_year(2100));
+    CHECK(wc::is_leap_year(2000));
+    CHECK(wc::days_in_month(2028, 2) == 29);
+    CHECK(wc::days_in_month(2026, 2) == 28);
+    // 1970-01-01 was a Thursday and 2026-10-25 a Sunday.
+    CHECK(wc::weekday_of_days(0) == 4);
+    CHECK(wc::weekday_of_days(wc::days_from_civil(2026, 10, 25)) == 0);
+    CHECK(wc::weekday_of_days(-1) == 3);
+}
+
+TEST_CASE("wall_clock: a zone's offset follows its rules across the year, in either hemisphere", "[wall_clock]") {
+    const auto at = [](int year, int month, int day, int hour, int minute = 0, int second = 0) {
+        return wc::days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second;
+    };
+    const auto sydney = *wc::parse_zone_rules("AEST-10AEDT,M10.1.0,M4.1.0/3");
+    // Southern: daylight time runs across New Year.
+    CHECK(wc::zone_offset_at(sydney, at(2026, 1, 15, 12)) == 11 * 3600);
+    CHECK(wc::zone_offset_at(sydney, at(2026, 7, 15, 12)) == 10 * 3600);
+    CHECK(wc::zone_offset_at(sydney, at(2026, 12, 31, 23, 59, 59)) == 11 * 3600);
+    CHECK(wc::zone_offset_at(sydney, at(2026, 1, 1, 0)) == 11 * 3600);
+    const auto new_york = *wc::parse_zone_rules("EST5EDT,M3.2.0,M11.1.0");
+    // Northern: the other way about.
+    CHECK(wc::zone_offset_at(new_york, at(2026, 1, 15, 12)) == -5 * 3600);
+    CHECK(wc::zone_offset_at(new_york, at(2026, 7, 15, 12)) == -4 * 3600);
+    // A zone with no daylight saving has one offset.
+    const auto tokyo = *wc::parse_zone_rules("JST-9");
+    CHECK(wc::zone_offset_at(tokyo, at(2026, 1, 15, 12)) == 9 * 3600);
+    CHECK(wc::zone_offset_at(tokyo, at(2026, 7, 15, 12)) == 9 * 3600);
+    // The probe instants the board checks its C library with are in different halves for any zone with daylight time.
+    CHECK(wc::zone_offset_at(sydney, wc::kProbeJanuary) != wc::zone_offset_at(sydney, wc::kProbeJuly));
+    CHECK(wc::zone_offset_at(new_york, wc::kProbeJanuary) != wc::zone_offset_at(new_york, wc::kProbeJuly));
+    // And the wall time is the offset applied: 12:00 UTC in Sydney in January is 23:00.
+    const wc::LocalTime local = wc::zone_local_time(sydney, at(2026, 1, 15, 12));
+    CHECK(local.hour == 23);
+    CHECK(local.day == 15);
+}
+
+TEST_CASE("wall_clock: the clock format is 24 or 12 hours, with or without seconds, and stored as one number", "[wall_clock]") {
+    CHECK(wc::parse_clock_format("24") == wc::ClockFormat{});
+    CHECK(wc::parse_clock_format("12") == wc::ClockFormat{.twelve_hour = true});
+    CHECK(wc::parse_clock_format("24 seconds") == wc::ClockFormat{.seconds = true});
+    CHECK(wc::parse_clock_format("12 seconds\n") == wc::ClockFormat{.twelve_hour = true, .seconds = true});
+    CHECK(wc::parse_clock_format(" 12\r\n") == wc::ClockFormat{.twelve_hour = true});
+    for (const char* bad : {"", "13", "2", "24h", "12 second", "12  seconds", "seconds", "24 seconds now", "twelve", "12seconds",
+                            "12 Seconds", "240"}) {
+        CHECK_FALSE(wc::parse_clock_format(bad).has_value());
+    }
+    // It reads back as the words it was set with.
+    for (const bool twelve : {false, true}) {
+        for (const bool seconds : {false, true}) {
+            const wc::ClockFormat format{.twelve_hour = twelve, .seconds = seconds};
+            CHECK(wc::parse_clock_format(wc::clock_format_text(format)) == format);
+            CHECK(wc::clock_format_from_stored(wc::clock_format_stored(format)) == format);
+        }
+    }
+    CHECK(wc::clock_format_text({}) == "24");
+    CHECK(wc::clock_format_text({.twelve_hour = true, .seconds = true}) == "12 seconds");
+    // The stored numbers are these, never renumbered; the default is 0, and a number nobody knows is refused.
+    CHECK(wc::clock_format_stored({}) == 0);
+    CHECK(wc::clock_format_stored({.twelve_hour = true}) == 1);
+    CHECK(wc::clock_format_stored({.seconds = true}) == 2);
+    CHECK(wc::clock_format_stored({.twelve_hour = true, .seconds = true}) == 3);
+    CHECK_FALSE(wc::clock_format_from_stored(-1).has_value());
+    CHECK_FALSE(wc::clock_format_from_stored(4).has_value());
+}
+
+TEST_CASE("wall_clock: the face writes the time as the format says, in 24 hours or 12", "[wall_clock]") {
+    wc::Reading reading;
+    reading.known = true;
+    reading.zone_set = true;
+    const auto face_at = [&reading](int hour, int minute, int second, wc::ClockFormat format) {
+        reading.local = wc::LocalTime{2026, 10, 20, hour, minute, second, 2};
+        reading.format = format;
+        return wc::face(reading);
+    };
+    const wc::ClockFormat twelve{.twelve_hour = true};
+    const wc::ClockFormat with_seconds{.seconds = true};
+    const wc::ClockFormat twelve_seconds{.twelve_hour = true, .seconds = true};
+
+    // The default is what it always was: 24 hours, no seconds, nothing beside it.
+    wc::Face face = face_at(21, 47, 12, {});
+    CHECK(face.time == "21:47");
+    CHECK(face.suffix.empty());
+    // 12 hours has no leading zero and no hour 0.
+    face = face_at(21, 47, 12, twelve);
+    CHECK(face.time == "9:47");
+    CHECK(face.suffix == "PM");
+    CHECK(face_at(9, 5, 0, twelve).time == "9:05");
+    CHECK(face_at(9, 5, 0, twelve).suffix == "AM");
+    CHECK(face_at(0, 5, 0, twelve).time == "12:05");  // midnight is 12 AM
+    CHECK(face_at(0, 5, 0, twelve).suffix == "AM");
+    CHECK(face_at(12, 0, 0, twelve).time == "12:00");  // noon is 12 PM
+    CHECK(face_at(12, 0, 0, twelve).suffix == "PM");
+    CHECK(face_at(11, 59, 59, twelve).time == "11:59");
+    CHECK(face_at(11, 59, 59, twelve).suffix == "AM");
+    CHECK(face_at(13, 0, 0, twelve).time == "1:00");
+    CHECK(face_at(23, 59, 0, twelve).time == "11:59");
+    CHECK(face_at(23, 59, 0, twelve).suffix == "PM");
+    // Seconds go small beside the time: the minute's rectangle does not change with them.
+    face = face_at(21, 47, 5, with_seconds);
+    CHECK(face.time == "21:47");
+    CHECK(face.suffix == ":05");
+    face = face_at(21, 47, 59, twelve_seconds);
+    CHECK(face.time == "9:47");
+    CHECK(face.suffix == ":59 PM");
+    CHECK(face_at(0, 0, 0, twelve_seconds).time == "12:00");
+    CHECK(face_at(0, 0, 0, twelve_seconds).suffix == ":00 AM");
+    // The date and the note do not depend on the format; and with no time known nothing is said, in either.
+    CHECK(face_at(21, 47, 12, twelve).date == face_at(21, 47, 12, {}).date);
+    reading.known = false;
+    reading.format = twelve_seconds;
+    CHECK(wc::face(reading) == wc::Face{});
+    // Every hour of the day reads back to the hour it was: 12-hour text and the AM or PM say the same time as 24.
+    reading.known = true;
+    for (int hour = 0; hour < 24; ++hour) {
+        const wc::Face twelve_face = face_at(hour, 30, 0, twelve);
+        const int shown = std::stoi(twelve_face.time);
+        CHECK(shown >= 1);
+        CHECK(shown <= 12);
+        CHECK((shown % 12) + (twelve_face.suffix == "PM" ? 12 : 0) == hour);
+    }
+}
+
 TEST_CASE("wall_clock: every weekday and month has its name", "[wall_clock]") {
     wc::Reading reading;
     reading.known = true;
@@ -380,4 +561,16 @@ TEST_CASE("wall_clock: the time as GET /status writes it is to the second, with 
     CHECK(wc::local_text(wc::LocalTime{2026, 1, 5, 0, 0, 0, 1}) == "2026-01-05 00:00:00");
     CHECK(wc::local_text(wc::LocalTime{2027, 12, 31, 23, 59, 59, 5}) == "2027-12-31 23:59:59");
     CHECK(wc::local_text(wc::local_from_unix(wc::kProbeJanuary, 11 * 3600)) == "2026-01-15 23:00:00");
+}
+
+TEST_CASE("wall_clock: the minute of the day is nothing until the time is known", "[wall_clock]") {
+    wc::Reading reading;
+    CHECK_FALSE(wc::minute_of_day(reading).has_value());
+    reading.known = true;
+    reading.local = wc::LocalTime{2026, 10, 25, 0, 0, 0, 0};
+    CHECK(wc::minute_of_day(reading) == 0);
+    reading.local = wc::LocalTime{2026, 10, 25, 7, 5, 59, 0};
+    CHECK(wc::minute_of_day(reading) == 7 * 60 + 5);
+    reading.local = wc::LocalTime{2026, 10, 25, 23, 59, 59, 0};
+    CHECK(wc::minute_of_day(reading) == 23 * 60 + 59);
 }

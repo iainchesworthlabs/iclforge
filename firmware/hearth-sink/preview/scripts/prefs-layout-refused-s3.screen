@@ -1,0 +1,35 @@
+# An ESP32-S3 (four 32-bit slots on one line) greys the layouts it cannot carry and says why: a tap on a greyed one
+# changes nothing and the card gives its reason, a layout it carries with a limit is taken at Apply. Preview
+# only: no board on the bench has these capabilities, so a run with --board refuses it at the profile.
+board s3-spi-320x240
+display 1024 600
+scene lyrics
+
+tap "Preferences"
+expect shown "Speaker layout"
+expect pref speaker-layout = 2.0
+
+tap "Change" in "Speaker layout"
+expect text "This board carries up to 4 speakers"
+tap "5.1"
+expect text "5.1 needs 6 slots"
+expect text "16-bit slots would carry 8"
+tap "Apply"
+expect pref speaker-layout = 2.0
+
+tap "2.1"
+expect text "Works, with a limit"
+tap "Apply"
+expect pref speaker-layout = 2.1
+
+tap "Change" in "Speaker layout"
+tap "Build yours"
+tap "9"
+expect text "Nine around you needs 9 slots"
+tap "Cancel"
+expect pref speaker-layout = 2.1
+
+tap "Change" in "Speaker layout"
+tap "2.0"
+tap "Apply"
+expect pref speaker-layout = 2.0

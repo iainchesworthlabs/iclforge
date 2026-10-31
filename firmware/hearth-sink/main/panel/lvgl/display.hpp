@@ -23,6 +23,8 @@ struct Display {
     const std::uint16_t* frame = nullptr;
     // A touch controller is reading.
     bool touch = false;
+    // The backlight can be set to a level (display_set_backlight does something).
+    bool backlight = false;
     // "null" or "dsi".
     const char* kind = "";
 };
@@ -34,13 +36,19 @@ bool display_open(Display& out);
 // The backlight's brightness, percent. Does nothing where the display has none.
 void display_set_backlight(int percent);
 
-// What the backlight is at, and what it goes down to when the no-lyrics screen dims
-// (planning/p4x-now-playing.md): the lowest at which the one line of the dark screen can still be read
-// at arm's length in a dark room.
+// The three levels the screen asks for (set_backlight in board_info.hpp): lit, and what it goes down to when
+// the no-lyrics screen dims (planning/p4x-now-playing.md), the lowest at which the one line of the dark screen can
+// still be read at arm's length in a dark room, and off. They are names for a level, not the percent the glass is
+// given: the lit one is whatever the person set as the brightness (iclforge::nowview::kDefaultBrightness unless
+// they did), and the dimmed one is the floor, never above it (iclforge::nowview::backlight_percent).
 inline constexpr int kBacklightNormalPercent = 80;
 inline constexpr int kBacklightDimPercent = 4;
 // The dark view (planning/p4x-now-playing.md): the backlight off, for a listener who wants no light.
 inline constexpr int kBacklightOffPercent = 0;
+
+// The percent the backlight is given for a level the screen asked for, with the person's brightness applied: what
+// display_dsi.cpp lights the glass at when it opens.
+[[nodiscard]] int backlight_lit_percent();
 
 // A pointer that something other than the glass moved (a tap that POST /panel/tap made): read in
 // preference to the touch controller while it is down. A board with no touch controller has only

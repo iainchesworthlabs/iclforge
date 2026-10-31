@@ -99,16 +99,18 @@ namespace detail {
 }
 
 // CEA-861 Table 34's coding-type nibble, collapsed to what this project acts
-// on. 1 = LPCM, 2 = AC-3, 10 (0xA) = Dolby Digital Plus (E-AC-3); everything
-// else (DTS, AAC, MAT/TrueHD, ...) is not a format this codebase produces or
-// consumes, so it is tracked only as "not one of the three" below.
-enum class CodingType : std::uint8_t { kLpcm, kAc3, kEac3, kOther };
+// on. 1 = LPCM, 2 = AC-3, 10 (0xA) = Dolby Digital Plus (E-AC-3), 12 (0xC) = MAT,
+// which is what Dolby TrueHD travels as over HDMI; everything else (DTS, AAC, ...)
+// is not a format this codebase produces or consumes, so it is tracked only as
+// "not one of the four" below.
+enum class CodingType : std::uint8_t { kLpcm, kAc3, kEac3, kMat, kOther };
 
 [[nodiscard]] inline CodingType coding_type_from_code(unsigned code) {
     switch (code) {
         case 1: return CodingType::kLpcm;
         case 2: return CodingType::kAc3;
         case 10: return CodingType::kEac3;
+        case 12: return CodingType::kMat;
         default: return CodingType::kOther;
     }
 }
@@ -216,6 +218,7 @@ parse_eld_proc_text(std::string_view contents) {
                 case detail::CodingType::kLpcm: caps.pcm = true; break;
                 case detail::CodingType::kAc3: caps.ac3 = true; break;
                 case detail::CodingType::kEac3: caps.eac3 = true; break;
+                case detail::CodingType::kMat: caps.mat = true; break;
                 case detail::CodingType::kOther: break;
             }
             continue;

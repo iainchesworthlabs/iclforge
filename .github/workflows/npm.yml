@@ -47,11 +47,14 @@ jobs:
         with:
           persist-credentials: false
 
+      # No dependency cache anywhere in this workflow: it publishes (the job below, on a v* tag),
+      # and a cache that a pull request's run could have written is what zizmor's cache-poisoning
+      # audit flags there. `npm ci` from the lockfile is a few seconds; the other workflows keep
+      # their caches. package-manager-cache: false turns off setup-node's automatic npm cache too.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: bindings/js/package-lock.json
+          package-manager-cache: false
 
       - name: Install, build, test
         working-directory: bindings/js
@@ -101,6 +104,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       # npm trusted publishing needs npm CLI >= 11.5.1. The npm that setup-node's Node 24
       # bundles is far past that, so this step does not install one (an `npm install -g`

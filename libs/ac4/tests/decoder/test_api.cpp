@@ -764,6 +764,28 @@ TEST_CASE("presentations() lists each presentation of the table of contents",
         CHECK(p.members.front().speakers == p.speakers);
         CHECK(p.substream_groups == std::vector<int>{0});
     }
+    SECTION("a 5.1.4 stream, sent as 7.1.4 without Lb and Rb, lists the channels decode() writes") {
+        // b_4_back_channels_present 0: the presentation has the ten channels of the stream's source,
+        // not the twelve of Table 56's 7.1.4.
+        const auto frames = frames_of(baseline("ac4-514-tones-256"));
+        iclforge::ac4::Decoder decoder;
+        REQUIRE(decoder.parse(frames.front()).has_value());
+        REQUIRE(decoder.presentations().size() == 1);
+        const iclforge::ac4::PresentationInfo& p = decoder.presentations().front();
+        using S = iclforge::ac4::Speaker;
+        const std::vector<S> ten = {S::kLeft,          S::kRight,        S::kCentre,
+                                    S::kLfe,           S::kLeftSurround, S::kRightSurround,
+                                    S::kTopFrontLeft,  S::kTopFrontRight, S::kTopBackLeft,
+                                    S::kTopBackRight};
+        CHECK(p.speakers == ten);
+        REQUIRE(p.members.size() == 1);
+        CHECK(p.members.front().speakers == ten);
+        // ...and they are the channels the decode of the stream writes.
+        const auto decoded = decoder.decode(frames.front());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        CHECK((*decoded)->speakers == ten);
+    }
     SECTION("the multiplexer's presentations of several substreams") {
         const auto frames =
             frames_of(fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4");

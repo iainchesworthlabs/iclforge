@@ -90,11 +90,9 @@ it, and the other stacks this page spells are held to it too. The list, generate
 |---|---|---|---|
 | `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` | `hearth-sink-esp32c6-16mb` | C6 |
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none |
-| `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
-| `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
-| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
-| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
-| `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
+| `p4-rev1` | `hw`, `p4`, `sendspin`, `ac4` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `ac4`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
+| `s3-n16r8` | `hw`, `psram`, `psram-4k`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | `hearth-sink-esp32s3` | S3a, S3b |
 
 <!-- sink-profiles:end -->
 
@@ -190,7 +188,8 @@ the flash size setting and the bootloader change only over USB.
 
 An ESP32-C6 with 16 MB of flash takes `partitions.csv` and its 4 MiB slots:
 add `sdkconfig.flash16mb` after the C6's own overlays. `partitions_c6.csv`'s
-slots are 1.75 MiB, for any C6 module. The ESP32-P4 uses `partitions.csv`, as
+slots are 1.875 MiB, for any C6 module, and it has no `audio` and no `storage`
+partition: the player takes its audio from the network. The ESP32-P4 uses `partitions.csv`, as
 the S3 does.
 
 ### Updating over the network
@@ -245,6 +244,31 @@ through a browser on this network. Images are not signed while the boards are
 in development: anyone on the network can update a board, as anyone with a USB
 cable can. [planning/esp32-ota.md](../../planning/esp32-ota.md) has the
 reasons, and what later phases add.
+
+### Updates from GitHub releases
+
+A board built with `sdkconfig.pull` (`CONFIG_ICLFORGE_FIRMWARE_PULL`) can look at GitHub for a newer
+release and install it, in addition to being pushed to
+([planning/esp32-ota.md](../../planning/esp32-ota.md), "Updates from GitHub releases (O10)"):
+
+- `GET /firmware/available` is the state of that flow: whether this board can pull and, if not, why;
+  what stops a check right now; the channel (`stable` or `beta`); the version a check found; the
+  trust anchors the board holds; who signed the list. `POST /firmware/check` starts a check, and
+  `PUT /firmware/from-release` with the offered version as its body installs it: the board enters
+  flash mode, downloads the image, checks it as an upload is checked, and restarts into it on trial.
+  `PUT /firmware/channel` chooses the channel.
+- What the board trusts is a small index of the channel (`hearth-update-<channel>.json`, with the SHA-256
+  of each image) and the signature over it (`hearth-update-<channel>.sig.json`: a certificate chain and
+  the signature). The signature has to chain to a **trust anchor built into the image**
+  (`CONFIG_ICLFORGE_EXAMPLE_TRUST_ANCHORS`, a PEM file of public certificates), the leaf has to be for
+  code signing with the channel's pinned name (`CONFIG_ICLFORGE_FIRMWARE_LEAF_STABLE`, `_BETA`), and
+  the index must not be older than one the board has accepted. A build with no anchor says so and pulls
+  nothing. The images carry no signature, and neither does one that is pushed: `PUT /firmware` takes
+  what it always took.
+- The connection is TLS against a certificate bundle of the three roots GitHub's hosts chain to
+  (`tls_roots.pem`), and needs the board to know the date.
+- Under QEMU, `tools/checks/run_pull_qemu.py` runs all of it against a loopback release signed by a
+  throwaway CA (`sdkconfig.ci-pull`).
 
 ### Without a cable
 
@@ -514,24 +538,30 @@ configurations set 80; the default is 0, none), the component's
 | --- | --- |
 | `GET /` | a web page that shows what the player is doing and drives it through the routes below and nothing else (below); its script is `GET /ui.js` |
 | `GET /api` | these routes, as text - what `GET /` answered before the page |
-| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: the interface in use, the access point's SSID and signal, and the board's address; on a board with a cable as well, the `preference` and how each interface stands under `interfaces`) |
+| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: the interface in use, the access point's SSID and signal, and the board's address; on a board with a wired network as well, the `preference` and how each interface stands under `interfaces`) |
 | `GET /hardware` | what the board is, as JSON: `target`, `chip` and `revision`, `cores`, `fpu`, `cpu_freq_mhz`, `psram_bytes`, the sink's `sink_max_slots` and the firmware's `project`, `version` and `idf_version`. Read once at start-up, since none of it changes while the board runs |
 | `POST /play` | body: a URL for the `http` source, a path for `fatfs` or `sd`. `202 Accepted` — the location is handed to the task that owns the player, and `/status` says how the open went. `409` from `partition`, which has one thing in it. |
 | `POST /stop` | |
 | `POST /volume` | body: `0.0` to `1.0`, a linear gain the decode task applies before the sink |
 | `GET /layout` | the output layout, as text |
+| `GET /layout-options` | the layouts to choose from (`1.0` to `9.1.6`), each `supported`, `limits` or `unavailable` on this board with the sentence that says why, as JSON. Read-only; `404` on a build with no sink. [Choosing the speaker layout](../../docs/hearth/sink-layouts.md) |
 | `PUT /layout` | body: a name (`5.1.4`) or a speaker list (`L,R,C,LFE,Ls,Rs`), the same grammar as `CONFIG_ICLFORGE_EXAMPLE_LAYOUT`. Takes effect at the next play - the `i2s` sink reconfigures its mode and slot count to match, so this never needs a rebuild. `400` for text that is not a layout, `409` for one with more slots than the sink's ceiling. |
 | `GET /name` | what the board calls itself, as text |
 | `PUT /name` | body: a name, up to 32 bytes. Stored on the board, so it survives a reflash; it is the mDNS instance name and what a server lists the sink under. `409` if it does not fit or NVS refused it. |
 | `GET /wiring` | `1` if a second I2S line is wired, `0` if not; `404` where there can be no second line - the ESP32-C6, the P4's `i2s_wide`, `capture` and `null` - and `/status` then has no `second_line` |
 | `PUT /wiring` | body: `1` or `0`. Moves the sink's ceiling with it - two lines carry twice one line's slots - and takes effect at the next play. `409` while a play is running, and where there can be no second line. |
 | `PUT /network` | body: an SSID, a newline, then the passphrase. Stored for the next boot; the station stays on the network it is already associated with. Improv over the serial port is the other way in, and the one a board with no network at all needs. |
-| `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a cable and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
+| `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a wired network and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
 | `PUT /network-preference` | body: `auto`, `ethernet` or `wifi`. Stored, and acted on at once with no restart. `400` for any other word, `409` where there is nothing to choose between, or where `wifi` has no network stored to join. A change to one interface is undone if that interface does not come up |
-| `GET /now-playing` | `speakers`, `title`, `clock`, `off` or `dark`, as text, on a board with a panel: what the screen shows while a song has no lyrics ([planning](../../planning/p4x-now-playing.md)); `dark` is the backlight off until a touch lights the speakers for 30 s; `404` on a board with none |
+| `GET /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark`, as text, on a board with a panel: what the screen shows while a song has no lyrics ([planning](../../planning/p4x-now-playing.md)); `meters` is a spectrum of the main mix with the room's channels under it ([planning](../../planning/p4x-meters-view.md)), on a screen of at least 240 by 240 with the Sendspin player; `dark` is the backlight off until a touch lights the speakers for 30 s; `404` on a board with none |
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
 | `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
 | `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
+| `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it; [planning](../../planning/p4x-speakers-options.md)); `404` on a board with none |
+| `PUT /speakers-style` | body: `glow` or `pulse`. Stored (`np_style`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
+| `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants ([planning](../../planning/hearth-late-night.md)); `404` on a board with none |
+| `PUT /dynamic-range` | body: `standard` or `late-night`. Stored (NVS key `dyn_range`, kept over a restart; `CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE` is a board's first answer), and followed from the next stream's start. `late-night` is line mode's level with the stream's `compr` words (AC-3, E-AC-3) or speaker DRC mode (AC-4) on top, and wins over a server's decoder mode; it changes nothing in a stream that carries neither. `400` for any other word, `409` where there is no player. `POST /play` plays as the build says |
+| `GET /preferences` | every preference this board has, as JSON, on every board: its id, group, label, kind, how a change applies, the route that sets it, its value, whether the board can use it and why not, and each choice the same way. Read-only: a change goes through the entry's own route. The board's capability description decides what is available ([the Preferences sheet](../../docs/hearth/sink-esp32-p4.md#adjust-and-preferences)) |
 | `GET /timezone` | the time zone the board's time is shown in, as text: a POSIX string, or `none` (the time is UTC); `404` on a board that keeps no time (no network, or QEMU's) |
 | `PUT /timezone` | body: a POSIX time zone with its daylight saving rules, such as `AEST-10AEDT,M10.1.0,M4.1.0/3` (the offset is the hours *west* of UTC, so Australia's is `-10`), or `none`. Read by the board's C library as the route read it (on a day in January and a day in July), then stored and followed at once. `400` for a string that is not a zone, or is one with daylight saving and no rules; `409` where the board keeps no time, the C library reads it differently, or it could not be stored |
 | `GET /ntp-server` | the time server a person named, as text, or `none`: the board then asks the one the router gave over DHCP (option 42) and, behind it, `pool.ntp.org` |
@@ -623,13 +653,14 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
 ```
 
 `sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,
 D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
-network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) goes with the AC-4 decoder
-and not here: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with it, and the cache bought AC-3 and E-AC-3 nothing.
+network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) and `sdkconfig.ac4` are
+in the S3 release image since 2026-10-29: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with the cache at the 16 KB allocation
+limit and leaves 60 KB free at the end of its lap at the 4 KB limit the image keeps (`sdkconfig.psram-4k`), and the cache is what holds the AC-4 plays in real time.
 
 [An ESP32-S3 sink](../../docs/hearth/sink-esp32-s3.md) takes a board
 through this step by step: flashing, joining a network, pairing, groups,
@@ -745,33 +776,33 @@ second of audio; the next play was clean (630 of 630 bursts, nothing late).
 
 ### Ethernet
 
-A board with an EMAC and a PHY has a cable as well as the station
+A board with an EMAC and a PHY has a wired network as well as the station
 (`CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET`, the ESP32-P4 only; the pins are
 `CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the ESP32-P4X-Function-EV-Board's
 IP101GR). The code is three files under `main/net/`: `wired/ethernet.cpp` is
-the cable (MAC, PHY, DHCP, the board's name as its host name), `wifi/station.cpp`
+wired (MAC, PHY, DHCP, the board's name as its host name), `wifi/station.cpp`
 is the station that every board with Wi-Fi shares, and `dual/network.cpp`
 chooses between them, so `network.hpp`'s functions answer for the pair. A board
 without a PHY builds `wifi/network.cpp`, a thin adapter over the same station,
 and is unchanged.
 
-- **auto** (the default): both are up when the cable is in and a network is
-  stored. The cable has route priority 200 and the station 100, so the board
-  uses the cable while it holds an address, falls back to the station at once
+- **auto** (the default): both are up when the Ethernet cable is in and a network is
+  stored. Wired has route priority 200 and the station 100, so the board
+  uses wired while it holds an address, falls back to the station at once
   when the cable is pulled (the station has been joined all along) and returns
-  to the cable when it is put back, with no restart. A board with the cable in
-  and no Wi-Fi network stored comes up on the cable alone.
+  to wired when it is put back, with no restart. A board with the cable in
+  and no Wi-Fi network stored comes up on wired alone.
 - **ethernet** and **wifi** pin the board to one interface and switch the other
   off (the radio idle, or the EMAC stopped). Stored in NVS (`net_pref`), set by
   `PUT /network-preference`, and kept only once the interface they name holds an
   address: a pin that cannot be met is not kept and the other interface stays on.
 - `network_ready()`, the address, the panel's idle line and mDNS follow the
   interface in use; Improv asks about the station alone
-  (`network_wifi_ready()`, `network_wifi_up()`), so a board on the cable still
+  (`network_wifi_ready()`, `network_wifi_up()`), so a board on wired still
   offers its Wi-Fi form.
 - `GET /status` says the interface in use and, under `network.interfaces`, how
   each stands (link, address, MAC; the Wi-Fi's SSID, signal and whether a network
-  is stored; the cable's speed and duplex). Never the passphrase.
+  is stored; the wired speed and duplex). Never the passphrase.
 
 ### Pairing
 
@@ -1149,6 +1180,12 @@ curl -X POST "http://<board>:8081/panel/demo?mode=2"   # a song loops on the scr
 curl -o screen.bmp http://<board>:8081/panel.bmp
 ```
 
+That port-8081 server has no authentication, so the release profile `p4-rev3` (the image with the glass)
+does not start it. A kit that is run on a bench gets it from the `panel-capture` overlay
+(`SDKCONFIG_DEFAULTS="$(python tools/hearth/sink_profile.py defaults p4-rev3 --overlay panel-capture)"`), which
+`sink_profile.py verify p4-rev3 --overlay panel-capture` holds to the profile and
+`package_firmware.py` refuses to publish.
+
 `preview/` draws the same `lyric_screen.cpp` on a computer, in seconds. The screens, the pins, the
 fonts and what drawing costs are in [An ESP32-P4 sink](../../docs/hearth/sink-esp32-p4.md) and
 [planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md).
@@ -1297,7 +1334,9 @@ as a name — `2.0` (the default), `5.1`, `7.1`, `5.1.4`, `7.1.4`, `9.2.4`,
 `5.0.4` — or as a speaker list, one token per slot in slot order:
 `L,R,C,LFE,Ls,Rs` for a 5.1 DAC wired in WAV order, `30/0,-30/0,lfe` by angles,
 `-` for a slot nothing is on. A name is Table E2.5's order with the LFE last, so
-`5.1` is L C R Ls Rs LFE; a list is whatever order the board is wired in. The
+`5.1` is L C R Ls Rs LFE; a list is whatever order the board is wired in. A
+name or list is at most sixteen slots: `9.1.6` is exactly sixteen, and `9.2.6`
+(seventeen) is refused rather than trimmed. The
 grammar is [`iclforge/render/layout.hpp`](../../libs/render/include/iclforge/render/layout.hpp)'s and
 `PUT /layout` on the control surface takes the same text for the next play.
 

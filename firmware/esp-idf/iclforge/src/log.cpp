@@ -42,13 +42,18 @@ int g_console = -1;  // /dev/console, which every write goes on to
 thread_local bool t_console_only = false;
 
 ssize_t log_write(void* /*ctx*/, int /*fd*/, const void* data, std::size_t size) {
-    const ssize_t written = ::write(g_console, data, size);
+    // The console is best effort. The USB-Serial-JTAG console fails every write with EIO while no
+    // host is on the port (usb_serial_jtag_vfs.c), and a failed write makes stdio drop what it had
+    // buffered: a line over the 128-byte buffer lost its tail from the ring as well, with no
+    // cable on the board. The write is reported whole, so that the ring keeps every byte
+    // whatever the console does.
+    (void)::write(g_console, data, size);
     if (!t_console_only && g_ring != nullptr) {
         portENTER_CRITICAL(&g_lock);
         g_ring->put({static_cast<const char*>(data), size});
         portEXIT_CRITICAL(&g_lock);
     }
-    return written;
+    return static_cast<ssize_t>(size);
 }
 
 int log_open(void* /*ctx*/, const char* /*path*/, int /*flags*/, int /*mode*/) { return 0; }

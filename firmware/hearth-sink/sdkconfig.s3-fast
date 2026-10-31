@@ -2,9 +2,10 @@
 # sdkconfig.psram; costs about 1 KB of internal RAM. The S3 board's release image is built
 # with it (decision 43, 2026-10-11).
 #
-#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
 #
-# With the AC-4 decoder: sdkconfig.ac4 before sdkconfig.s3-fast and sdkconfig.s3-dcache after it.
+# The release image has the AC-4 decoder too: sdkconfig.ac4 before sdkconfig.s3-fast and
+# sdkconfig.s3-dcache after it (planning/ac4-in-release-images.md).
 #
 # What each line bought, an AC-4 frame's time against its duration on a board with Wi-Fi up
 # (2026-10-10, hearth-eb2c64, a null sink; the same PCM in every column). One core, the decoder

@@ -6,7 +6,7 @@
 // the page does". The error paths are the device's own refusals (400, 409), a
 // connection closed unanswered and a device that does not answer at all.
 
-const { test, expect } = require('./fixtures');
+const { test, expect, holdClockAt } = require('./fixtures');
 const { REPLIES } = require('./stub');
 
 const DEMO = 'http://10.0.2.2:8000/demo.ec3';
@@ -47,7 +47,7 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Name').fill('Kitchen');
         await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
         await expect(page.getByRole('status')).toHaveText(
-            'Name Kitchen refused (409): not a name this player can hold: it is too long, or it could not be stored',
+            'Name Kitchen refused (409): not a name this player can hold: 1 to 32 bytes of text, with no control character in it and no space at either end, or it could not be stored',
         );
         await expect(page.getByRole('status')).toHaveClass(/error/);
     });
@@ -132,6 +132,18 @@ test.describe('with the clock running', () => {
         await expect(page.getByRole('status')).toHaveText('Name Kitchen: no connection.');
     });
 
+    test('a connection closed unanswered says so on a connection that was reused too', async ({ page, stub }) => {
+        // Chromium sends a request again that a reused connection closes unanswered, once for each such connection
+        // it has, and a run that is slow between next() and the click can meet one (stub.js, resends): here every
+        // connection is left open, so that it does. The page sent the request once, and the stand-in saw it once.
+        stub.reuseConnections(true);
+        stub.next('PUT /name', 'drop');
+        await page.getByLabel('Name').fill('Kitchen');
+        await page.locator('#name-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByRole('status')).toHaveText('Name Kitchen: no connection.');
+        expect(stub.sent('PUT /name')).toHaveLength(1);
+    });
+
     test('a play someone else started shows through to its end', async ({ page, stub }) => {
         // The page still reports a play; it just does not start one.
         stub.device.framesPerPoll = 125;
@@ -186,7 +198,7 @@ test.describe('with the clock running', () => {
         await page.getByLabel('Output layout').fill('5.1');
         await page.getByRole('button', { name: 'Apply' }).click();
         await expect.poll(() => stub.sent('PUT /layout').map((r) => r.body)).toEqual(['5.1']);
-        await expect(page.getByRole('status')).toHaveText('Output layout 5.1 refused (409): it needs 6 slots and this sink has 2.');
+        await expect(page.getByRole('status')).toHaveText("Output layout 5.1 refused (409): 5.1 needs 6 slots; this board's output carries 2.");
         await expect(page.locator('#next')).toHaveText('2.0');
     });
 
@@ -230,6 +242,91 @@ test.describe('with the clock running', () => {
         await expect(page.getByLabel('Output layout')).toHaveAccessibleDescription(/This sink has 16 slots\.$/);
     });
 
+    // GET /layout-options (iclforge/layout_options.hpp): the board's own verdict on each preset.
+    const option = (layout, slots, verdict, reason) => ({ layout, slots, verdict, fix: 'none', verified: verdict === 'supported', ...(reason ? { reason } : {}) });
+
+    test('a preset the board calls unavailable is greyed with its reason, one with a limit keeps its place', async ({ page, stub }) => {
+        stub.device.sinkSlots = 8;
+        stub.device.layoutOptions = {
+            layout: '2.0', slots: 8, slot_bits: 16, profile: 'c6-16mb',
+            options: [
+                option('1.0', 1, 'supported'),
+                option('2.0', 2, 'supported'),
+                option('5.1', 6, 'limits', 'This build decodes streams of at most 2 channels, so a wider stream is decoded elsewhere and sent narrower, and 5.1 plays through no more than 2 of its speakers.'),
+                option('7.1', 8, 'supported'),
+                option('7.1.4', 12, 'unavailable', "7.1.4 needs 12 slots; this board's output carries 8 (16-bit slots, one line). The most this board can carry is 8."),
+            ],
+        };
+        await page.reload();
+        const preset = (name) => page.getByRole('radio', { name, exact: true });
+        await expect(preset('7.1.4')).toBeDisabled();
+        await expect(preset('5.1')).toBeEnabled();
+        await expect(preset('7.1')).toBeEnabled();
+        // A preset the answer does not list falls back to the page's own count of slots.
+        await expect(preset('9.1.6')).toBeDisabled();
+        await expect(preset('5.1.2')).toBeEnabled();
+        await expect(page.locator('#layouts label').filter({ has: preset('7.1.4') })).toHaveAttribute('title', /^7\.1\.4 needs 12 slots; this board's output carries 8/);
+        await expect(page.locator('#layouts label').filter({ has: preset('5.1') })).toHaveAttribute('title', /decodes streams of at most 2 channels/);
+        await expect(page.locator('#layouts label').filter({ has: preset('7.1') })).toHaveAttribute('title', '');
+        // The reasons, once each, with the layout named where the sentence does not.
+        await expect(page.locator('#layout-why-sum')).toHaveText('Why 2 layouts are unavailable or limited');
+        const why = page.locator('#layout-why li');
+        await expect(why).toHaveCount(2);
+        await expect(why.nth(0)).toHaveText(/^5\.1: This build decodes streams of at most 2 channels/);
+        await expect(why.nth(1)).toHaveText(/^7\.1\.4 needs 12 slots; this board's output carries 8/);
+    });
+
+    test('one layout unavailable reads in the singular, and none hides the list', async ({ page, stub }) => {
+        stub.device.layoutOptions = {
+            layout: '2.0', slots: 2,
+            options: [option('2.0', 2, 'supported'), option('5.1', 6, 'unavailable', '5.1 needs 6 slots; this board\'s output carries 2.')],
+        };
+        await page.reload();
+        await expect(page.locator('#layout-why-sum')).toHaveText('Why 1 layout is unavailable or limited');
+        stub.device.layoutOptions = { layout: '2.0', slots: 2, options: [option('2.0', 2, 'supported')] };
+        stub.device.sinkSlots = 6; // the ceiling moved, so the options are read again
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+    });
+
+    test('a board without GET /layout-options leaves the presets to their own count', async ({ page, stub }) => {
+        stub.device.layoutOptions = null;
+        await page.reload();
+        await expect.poll(() => stub.sent('GET /layout-options').length).toBeGreaterThan(0);
+        await expect(page.getByRole('radio', { name: '5.1', exact: true })).toBeDisabled();
+        await expect(page.getByRole('radio', { name: '2.0', exact: true })).toBeEnabled();
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+        // Asked once for this ceiling, not at every poll.
+        const asked = stub.sent('GET /layout-options').length;
+        await page.waitForTimeout(2200);
+        expect(stub.sent('GET /layout-options')).toHaveLength(asked);
+    });
+
+    test('an answer that is not the list is read again at the next poll', async ({ page, stub }) => {
+        stub.next('GET /layout-options', { status: 200, body: 'not json' });
+        stub.device.sinkSlots = 12;
+        await page.reload();
+        await expect.poll(() => stub.sent('GET /layout-options').length).toBeGreaterThan(1);
+        await expect(page.getByRole('radio', { name: '7.1.4', exact: true })).toBeEnabled();
+        await expect(page.getByRole('radio', { name: '9.1.6', exact: true })).toBeDisabled();
+        await expect(page.locator('#layout-why li').first()).toContainText('needs');
+    });
+
+    test('a list that is not a list leaves the presets to their count', async ({ page, stub }) => {
+        stub.device.layoutOptions = { layout: '2.0', options: 'none' };
+        await page.reload();
+        await expect(page.getByRole('radio', { name: '5.1', exact: true })).toBeDisabled();
+    });
+
+    test('the options are read again when the sink grows', async ({ page, stub }) => {
+        const enabled = () =>
+            page.locator('#layouts input').evaluateAll((presets) => presets.filter((p) => !p.disabled).map((p) => p.value));
+        await expect.poll(enabled).toEqual(['1.0', '2.0']);
+        stub.device.sinkSlots = 16;
+        await expect.poll(enabled).toEqual(['1.0', '2.0', '5.1', '7.1', '5.1.2', '5.1.4', '7.1.4', '9.1.6']);
+        expect(stub.sent('GET /layout-options').length).toBeGreaterThan(1);
+        await expect(page.locator('#layout-why-box')).toBeHidden();
+    });
+
     test("a play's own output, the speakers it leaves silent, and the next play's layout", async ({ page, stub }) => {
         Object.assign(stub.device, { sinkSlots: 12, layout: '7.1.4', framesPerPoll: 1 });
         await page.reload();
@@ -258,6 +355,76 @@ test.describe('with the clock running', () => {
         await expect(page.getByRole('status')).toHaveText('Enter an output layout.');
         expect(stub.sent('PUT /layout')).toHaveLength(0);
     });
+
+    test('a time zone is chosen by region and then city, and sent by its name', async ({ page, stub }) => {
+        const region = page.locator('#zone-select');
+        const city = page.locator('#zone-city');
+        await expect(page.locator('#zone-pick')).toBeVisible();
+        // No zone chosen: both lists are at their prompts, and a region alone sends nothing.
+        await expect(region).toHaveValue('');
+        await expect(city).toHaveValue('');
+        await region.selectOption('Australia');
+        await expect(city.locator('option')).toHaveCount(13); // the prompt, and Australia's twelve
+        await expect(city.locator('option', { hasText: 'Broken Hill' })).toHaveCount(1);
+        expect(stub.sent('PUT /timezone')).toHaveLength(0);
+        // A city is sent by its name, and the page then shows it as the board holds it.
+        await city.selectOption({ label: 'Melbourne' });
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne']);
+        await expect(page.getByRole('status')).toHaveText('Time zone Australia/Melbourne.');
+        // The page says where the board is as a place, and never fills the field with the string the board keeps it by.
+        await expect(page.locator('#zone-now')).toHaveText('Now: Melbourne (Australia).');
+        await expect(page.locator('#time-now')).toContainText('Melbourne (Australia)');
+        await expect(page.locator('#zone-input')).toHaveValue('');
+        await expect(region).toHaveValue('Australia');
+        await expect(city).toHaveValue('Australia/Melbourne');
+        // Save with nothing typed sends nothing: it is not a request for UTC.
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByRole('status')).toHaveText('Choose a region and a city, or type a zone.');
+        expect(stub.sent('PUT /timezone')).toHaveLength(1);
+        // A city with a place between its region and itself is named with it.
+        await region.selectOption('America');
+        await expect(city.locator('option', { hasText: 'Buenos Aires (Argentina)' })).toHaveCount(1);
+        await expect(city.locator('option', { hasText: 'New Salem (North Dakota)' })).toHaveCount(1);
+        await expect(city.locator('option', { hasText: 'New York' })).toHaveCount(1);
+        // A name that has no region is in Other.
+        await region.selectOption('Other');
+        await city.selectOption({ label: 'UTC' });
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC']);
+        // A string typed instead has no name; the table has a place for it (Tokyo's), which the lists show.
+        await page.locator('#zone-input').fill('JST-9');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['Australia/Melbourne', 'UTC', 'JST-9']);
+        await expect(page.locator('#zone-now')).toHaveText('Now: Tokyo (Asia).');
+        await expect(region).toHaveValue('Asia');
+        await expect(city).toHaveValue('Asia/Tokyo');
+        // One in no table is read as its offset and the person's own, and both lists go back to their prompts.
+        await page.locator('#zone-input').fill('ZZZ-9:45');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('#zone-now')).toHaveText('Now: UTC+09:45 (custom).');
+        await expect(region).toHaveValue('');
+        await expect(city).toHaveValue('');
+        await expect(page.locator('#zone-input')).not.toHaveValue('AEST-10AEDT,M10.1.0,M4.1.0/3');
+    });
+
+    test("a board that has no list of zones, or whose list cannot be read at first, still takes a typed zone", async ({
+        page,
+        stub,
+    }) => {
+        // No list: the choice of region and city is not offered, and the field under it is.
+        stub.next('GET /time-zones', { status: 404, body: REPLIES.noClock });
+        await page.reload();
+        await expect(page.locator('#state')).toHaveText('Stopped');
+        await expect(page.locator('#zone-input')).toBeVisible();
+        await expect(page.locator('#zone-pick')).toBeHidden();
+        await page.locator('#zone-input').fill('EST5EDT,M3.2.0,M11.1.0');
+        await page.locator('#zone-form').getByRole('button', { name: 'Save' }).click();
+        await expect.poll(() => stub.sent('PUT /timezone').map((r) => r.body)).toEqual(['EST5EDT,M3.2.0,M11.1.0']);
+        // A read that fails is made again at the next poll, and the list then appears.
+        stub.next('GET /time-zones', 'drop');
+        await page.reload();
+        await expect(page.locator('#zone-pick')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('#zone-select option')).toHaveCount(12); // the prompt, and the eleven regions
+    });
 });
 
 // A poll a second up to `last`, each let finish before the clock moves on:
@@ -272,8 +439,7 @@ async function everySecondUntil(page, last) {
 
 test.describe('with the clock held', () => {
     test.beforeEach(async ({ page, stub }) => {
-        await page.clock.install({ time: new Date('2026-09-11T12:00:00Z') });
-        await page.clock.pauseAt(new Date('2026-09-11T12:00:00Z'));
+        await holdClockAt(page, new Date('2026-09-11T12:00:00Z'));
         await page.goto(stub.url);
         await expect(page.locator('#state')).toHaveText('Stopped');
     });

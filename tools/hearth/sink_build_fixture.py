@@ -41,11 +41,9 @@ TABLE_4MB = [
     ("nvs", 1, 0x02, 0x9000, 0x6000),
     ("phy_init", 1, 0x01, 0xF000, 0x1000),
     ("otadata", 1, 0x00, 0x10000, 0x2000),
-    ("ota_0", 0, 0x10, 0x20000, 0x1C0000),
-    ("ota_1", 0, 0x11, 0x1E0000, 0x1C0000),
-    ("coredump", 1, 0x03, 0x3A0000, 0x10000),
-    ("audio", 1, 0x40, 0x3B0000, 0x10000),
-    ("storage", 1, 0x81, 0x3C0000, 0x40000),
+    ("ota_0", 0, 0x10, 0x20000, 0x1E0000),
+    ("ota_1", 0, 0x11, 0x200000, 0x1E0000),
+    ("coredump", 1, 0x03, 0x3E0000, 0x10000),
 ]
 
 
@@ -59,6 +57,7 @@ def app_image(
     flash_code: int = 4,
     segment_bytes: int = 1024,
     seed: int = 1,
+    secure_version: int = 0,
 ) -> bytes:
     header = bytearray(24)
     header[0] = 0xE9
@@ -71,7 +70,7 @@ def app_image(
     header[23] = 1  # hash_appended
     segment = bytearray((i * 7 + seed) & 0xFF for i in range(segment_bytes))
     segment[:256] = bytes(256)
-    struct.pack_into("<I", segment, 0, 0xABCD5432)
+    struct.pack_into("<II", segment, 0, 0xABCD5432, secure_version)
     segment[16 : 16 + len(version)] = version.encode()
     segment[48 : 48 + len(project)] = project.encode()
     segment[112:116] = b"v6.1"
@@ -104,9 +103,11 @@ def make_build(
     flash_size: str = "16MB",
     psram: bool = True,
     wifi_ssid: str = "",
+    capture_port: str | None = None,
     min_rev: int = 0,
     max_rev: int = 99,
     app: bytes | None = None,
+    secure_version: int = 0,
 ) -> Path:
     """A build directory under `root`, with the audio source beside it; returns the directory."""
     build = root / "build"
@@ -122,6 +123,7 @@ def make_build(
             flash_code=FLASH_CODES[flash_size],
             min_rev=min_rev,
             max_rev=max_rev,
+            secure_version=secure_version,
         )
     (build / "bootloader" / "bootloader.bin").write_bytes(bytes(range(256)) * 20)
     (build / "partition_table" / "partition-table.bin").write_bytes(partition_table(table))
@@ -130,16 +132,20 @@ def make_build(
     (build / "iclforge_hearth_sink.elf").write_bytes(b"\x7fELF" + bytes(2000))
     (build / "storage.bin").write_bytes(b"\xeb\x3c\x90" + bytes(4093))
     (root / "stream" / "sample.ac3").write_bytes(b"\x0b\x77" + bytes(1022))
-    audio_at = next(offset for label, _, _, offset, _ in table if label == "audio")
-    storage_at = next(offset for label, _, _, offset, _ in table if label == "storage")
+    # The 4 MB table has neither partition (firmware/hearth-sink/CMakeLists.txt flashes
+    # each only where the table has it), so its flash_args has neither region.
+    offsets = {label: offset for label, _, _, offset, _ in table}
+    regions = ""
+    if "audio" in offsets:
+        regions += f"{offsets['audio']:#x} ../stream/sample.ac3\n"
+    if "storage" in offsets:
+        regions += f"{offsets['storage']:#x} storage.bin\n"
     (build / "flash_args").write_text(
         f"--flash-mode dio --flash-freq 80m --flash-size {flash_size}\n"
         f"{bootloader_at:#x} bootloader/bootloader.bin\n"
         "0x8000 partition_table/partition-table.bin\n"
         "0x10000 ota_data_initial.bin\n"
-        "0x20000 iclforge_hearth_sink.bin\n"
-        f"{audio_at:#x} ../stream/sample.ac3\n"
-        f"{storage_at:#x} storage.bin\n",
+        "0x20000 iclforge_hearth_sink.bin\n" + regions,
         "utf-8",
     )
     (build / "sdkconfig").write_text(
@@ -147,7 +153,12 @@ def make_build(
         f'CONFIG_ESPTOOLPY_FLASHSIZE="{flash_size}"\n'
         + ("CONFIG_SPIRAM=y\n" if psram else "# CONFIG_SPIRAM is not set\n")
         + f'CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID="{wifi_ssid}"\n'
-        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD=""\n',
+        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD=""\n'
+        + (
+            ""
+            if capture_port is None
+            else f"CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT={capture_port}\n"
+        ),
         "utf-8",
     )
     (build / "project_description.json").write_text(

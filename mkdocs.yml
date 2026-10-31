@@ -1,5 +1,5 @@
 site_name: ICL Forge
-site_description: A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library in C++23, the Forge CLI and GUI over it, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks
+site_description: A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library and a TrueHD / MLP codec in C++23, the Forge CLI and GUI over them, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks
 site_url: https://iainchesworthlabs.github.io/iclforge/
 repo_url: https://github.com/iainchesworthlabs/iclforge
 repo_name: iainchesworthlabs/iclforge
@@ -81,6 +81,7 @@ nav:
           - Atmos & JOC: concepts/atmos-joc.md
           - Object signing: concepts/object-signing.md
           - AC-4: concepts/ac4.md
+          - TrueHD & MLP: concepts/truehd.md
       - Building from source: building.md
   - Library:
       - Overview: library/index.md
@@ -104,6 +105,7 @@ nav:
           - ADM → Atmos bridging: library/adm-bridge.md
           - IAMF reading and writing: library/iamf.md
           - AC-4 decoding and encoding: library/ac4.md
+          - TrueHD and MLP decoding and encoding: library/truehd.md
           - Measuring quality: library/quality.md
           - Object signing: library/signing.md
           - Header map: library/header-map.md
@@ -122,6 +124,7 @@ nav:
   - Performance & quality:
       - Overview: performance-quality.md
       - Performance trend: performance-trend.md
+      - TrueHD against FFmpeg and DEE: truehd-comparison.md
       - Quality trend: quality-trend.md
       - Tool comparison trend: tool-comparison-trend.md
       - Object quality trend: object-quality-trend.md
@@ -163,12 +166,15 @@ nav:
   - Hearth:
       - Overview: hearth/index.md
       - Using the desktop player: hearth/desktop-player.md
+      - Hearth Player for Windows: hearth/player.md
       - Hearth for Android: hearth/android.md
       - An ESP32-S3 sink: hearth/sink-esp32-s3.md
       - An ESP32-C6 sink: hearth/sink-esp32-c6.md
       - An ESP32-P4 sink: hearth/sink-esp32-p4.md
+      - Speaker levels and the test tone: hearth/sink-speakers.md
       - Sink firmware: hearth/sink-firmware.md
       - Install from the browser: hearth/sink-installer.md
+      - Choosing the speaker layout: hearth/sink-layouts.md
       - Design record: hearth/design/player-appliance.md
   - Platforms:
       - Which platform: platforms/index.md

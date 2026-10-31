@@ -238,18 +238,60 @@ the app streams the unsigned `bed51`-equivalent, always safe on any receiver.
 
 ## Sibling: TrueHD Evolution
 
-This page is **E-AC-3 / EMDF** object signing only. TrueHD uses a different keyed check —
-**Evolution frame protection** (truncated HMAC-SHA-256 over the access unit and the Evolution
-frame). That seam belongs on the TrueHD/MLP branch (`feature/truehd-atmos-support`, roadmap IM5),
-not in `iclforge::ac3::signing`. Open tools such as truehdd expose it as an optional `--evo-key`; decode
-without a key stays unchecked. Any future multi-key verify / licensed soft-gate for MLP should
-target Evolution HMAC, parallel to but separate from the EMDF policy on this page.
+This page is **E-AC-3 / EMDF** object signing. TrueHD has a check of its own on the **evolution frame**, the payload that carries
+Atmos object metadata, and nothing for it is built here: the TrueHD decoder carries the frame's bytes and reads none of them.
+
+Two accounts of that check exist, and neither has been tested against a stream. An earlier note in this project described a
+truncated HMAC-SHA-256 over the access unit and the evolution frame, verified optionally with an operator-supplied key. The owner's
+TrueHD specification (TH spec §16.3, §16.6 and §22, version 3.4 and later) describes the payload as the same `ContentSignature`
+container, serialised with Thrift and signed under the same `pace-ccjf1` scheme, as [AC-4's](#sibling-ac-4), and lists the container's
+field IDs, the digest scope and whether each frame carries its own signature as unconfirmed. The code follows the specification, the
+later of the two; which one real streams use is open question 1 of
+[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
+
+If it is the container, the seam is already cut: everything in `iclforge::base::crypto` (SHA-1 and SHA-256, ECDSA P-256 with RFC 6979
+nonces, DER, X.509, PEM, chain validation, the Thrift reader and writer, `sign_content_digest` and `verify_content_signature`) knows no
+codec, and a TrueHD front end supplies only what `iclforge/ac4/io/content_signature.hpp` supplies for AC-4: where the blob sits in the
+stream and which bytes the digest covers. The same BYOK, opt-in and anchoring rules would apply. Either way it belongs to the TrueHD
+library and `iclforge::base::crypto`, not to `iclforge::ac3::signing`'s EMDF path, and decode without a key would stay unchecked.
 
 ## Sibling: AC-4
 
-AC-4 objects carry no such tag in this project. The AC-4 encoder writes its EMDF containers with no
+AC-4 objects carry no EMDF tag in this project. The AC-4 encoder writes its EMDF containers with no
 protection bytes (`libs/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
 [AC-4](ac4.md).
+
+AC-4 has its own, different signature, and it is not per frame or per object: **one** ECDSA P-256
+signature over the whole stream (SHA-256 of every byte before it), made with the operator's own
+private key and X.509 certificate chain, serialised with Thrift and written after the last sync
+frame of a raw `.ac4` file. The frames are not touched, so a signed file decodes as the unsigned one.
+The rest follows this page's stance:
+
+- It is opt-in everywhere: nothing signs or checks unless `ac4-sign`, `sign-content`, `ac4-verify`,
+  `verify-content` or `check-content` is given, and a key, chain or trust option without the
+  command that uses it is refused rather than dropped.
+- The key and the chain are the operator's (`content-key=`, `content-chain=`, or
+  `ICLFORGE_CONTENT_KEY_FILE` / `ICLFORGE_CONTENT_KEY` and `ICLFORGE_CONTENT_CHAIN_FILE`), read at
+  run time, zeroized, never stored; no key, certificate or fingerprint of any issuer ships.
+- It has a strict mode and a report mode, as the EMDF tag has: `verify-content` refuses a stream
+  unless the signature, the chain and an anchor all check, `check-content` says what it finds and
+  carries on.
+- It cannot call a signature valid on its own say-so. The chain has to lead to a `trust-anchor=`
+  certificate or a `pin=` fingerprint the operator names. A signature that checks out against a chain
+  nothing the operator trusts vouches for is reported as `chain unanchored` (`ac4-verify` exits 6 and
+  `decode` exits 2, unless `unanchored-ok`), which says the file agrees with its own signature and nothing about who made it.
+- Certificates are judged at the time `verify-time=` names: now (the specification's, and the
+  default of `ac4-verify` and `verify-content`), the date the signer wrote (only as good as the
+  signer, and the default of `check-content`, which reports and carries on), a given instant or never.
+- The signature names who made it (publisher UUID and name, product, platform), as CS spec v2.6
+  section 5.3 describes. `ac4-sign` takes these as options and `ac4-verify` reports them. The
+  publisher UUID is the PACE account's and is not in the signing certificate, so it is compared with
+  nothing unless `expect-publisher-uuid=` names the accounts you accept; `verify-content` refuses a
+  UUID that is missing or that is none of them. Only a raw `.ac4` stream is signed: signing an MP4 is
+  out of scope (section 8.3.2) and is refused by name.
+
+See [Signing](../library/signing.md#ac-4-content-signing) for the API, and `libs/ac4/ERRATA.md` for
+what was measured on a real signature and the questions still open.
 
 ## Decode modes
 
@@ -272,6 +314,11 @@ path, never a shipped one; it is a known and accepted gap, not an open task.
 
 ## What this is not
 
+- **Not content protection.** "Protection" in the EMDF `protection` field, and on this page, names an
+  authenticity tag that gates object decoding. It encrypts nothing. It has no relation to Common
+  Encryption (ISO/IEC 23001-7), to DRM, or to a Common Encryption key ID: the EMDF `key_id` selects
+  an authentication key and nothing more. An MP4 protected with Common Encryption is a separate
+  matter; the MP4 reader refuses such a track and says so.
 - **Not a key you get from us.** The library ships the machinery, never a key — see above. Whoever
   uses it, in this project or outside it, brings their own and is responsible for being entitled to
   use it.

@@ -280,8 +280,13 @@ void note(std::vector<std::string>& notes, std::string text) {
 
 // TS 103 420 §8.3.2.2's own 16-channel cap, the same constant and reasoning bridge.cpp's own
 // kMaxChannels documents for build() - reused by citation, not by symbol, since that one has
-// internal linkage in its own translation unit.
+// internal linkage in its own translation unit. As there, it counts the channels that become an
+// object, which leaves out the LFE bed channels: they are the encoder's implicit LFE.
 constexpr std::size_t kMaxChannels = 15;
+
+bool is_lfe_identity(const ChannelIdentity& identity) {
+    return identity.key.is_bed && identity.bed_placement->lfe;
+}
 
 }  // namespace
 
@@ -294,7 +299,11 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
     if (!identities) {
         return std::unexpected(identities.error());
     }
-    if (identities->size() > kMaxChannels) {
+    const auto object_slots = static_cast<std::size_t>(
+        std::ranges::count_if(*identities, [](const ChannelIdentity& identity) {
+            return !is_lfe_identity(identity);
+        }));
+    if (object_slots > kMaxChannels) {
         return std::unexpected(BridgeError::kTooManyChannels);
     }
 
@@ -439,7 +448,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
             return std::unexpected(BridgeError::kUnsupportedIabChannel);
         }
 
-        const bool is_lfe = identity.key.is_bed && identity.bed_placement->lfe;
+        const bool is_lfe = is_lfe_identity(identity);
         out.channel_ids.push_back(identity.key.is_bed
                                        ? "bed:" + std::to_string(identity.key.meta_id) + ":" +
                                              std::to_string(identity.key.sub_channel_id)

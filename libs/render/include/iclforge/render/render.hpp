@@ -496,6 +496,62 @@ class LayoutRenderer {
         }
     }
 
+    // The slot channel `channel` of a folded block of `channels` channels is written to by render_folded(),
+    // or -1 for a channel it has no slot for. The same rule, asked without rendering: a stereo pair goes to
+    // the slots named L and R (so "R,L" still plays the right way round), anything else to the full-bandwidth
+    // slots in order. A folded channel is copied to its slot as it is.
+    [[nodiscard]] int folded_slot(std::size_t channel, std::size_t channels) const {
+        std::size_t next_speaker = 0;
+        for (std::size_t ch = 0; ch <= channel && ch < channels; ++ch) {
+            int slot = -1;
+            if (channels == 2) {
+                slot = layout_.index_of(ch == 0 ? Location::kLeft : Location::kRight);
+            }
+            if (slot < 0) {
+                while (next_speaker < layout_.slots() && layout_.slot(next_speaker).kind != Speaker::Kind::kSpeaker) {
+                    ++next_speaker;
+                }
+                if (next_speaker >= layout_.slots()) {
+                    return -1;
+                }
+                slot = static_cast<int>(next_speaker++);
+            }
+            if (ch == channel) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    // The one slot coded channel `coded` of the bed (set_bed) is rendered to when nothing else is done to it:
+    // a speaker of the room named for the channel (gain 1, no other slot), in a room with no small speaker
+    // (whose bass management would split it) and not an LFE channel (which goes through a delay line when
+    // objects are placed). The slot then carries the channel's samples, bit for bit, so a meter may read the
+    // channel in the slot's place. -1 for every other channel: one the room has no speaker for, which is
+    // panned across several, or one in a room with a small speaker.
+    [[nodiscard]] int unity_slot(std::size_t coded) const {
+        if (coded >= bed_channels_ || has_small_) {
+            return -1;
+        }
+        for (std::size_t i = 0; i < lfe_channels_; ++i) {
+            if (lfe_coded_[i] == coded) {
+                return -1;
+            }
+        }
+        int found = -1;
+        for (std::size_t slot = 0; slot < layout_.slots(); ++slot) {
+            const float gain = bed_gains_[coded][slot];
+            if (gain == 0.0F) {
+                continue;
+            }
+            if (found >= 0 || gain != 1.0F) {
+                return -1;
+            }
+            found = static_cast<int>(slot);
+        }
+        return found;
+    }
+
    private:
     // The unit-power gains of one object over the layout's speakers
     // (`gains` is sized to targets_ and overwritten, sum of squares 1).

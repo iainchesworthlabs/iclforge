@@ -15,6 +15,10 @@
 # (bindings/rust/, roadmap AP9) expects in CI.
 *.rs text eol=lf
 
+# The firmware update trust anchor (firmware/keys/) is a public certificate that is embedded in the
+# image and checked against what CI signs: LF in every checkout, whatever core.autocrlf says.
+firmware/keys/*.pem text eol=lf
+
 # The three products' notice fragments, licence texts and platform files (notices/) are read at
 # configure time and concatenated into each package's NOTICES.txt (cmake/Notices.cmake); the
 # generator normalises line endings, and pinning the blobs to LF keeps the checked-in bytes the same
@@ -57,3 +61,12 @@ testdata/audio/*.paths text eol=lf
 # The parts are WAV and the stream is .ac3 (above), which git already leaves alone.
 examples/karaoke/**/*.lrc text eol=lf
 examples/karaoke/**/*.forgeproj text eol=lf
+
+# The update index fixtures (tools/hearth/testdata/update_index) are signed bytes: a signature covers
+# a file's exact bytes, so a Windows checkout's autocrlf must not touch them.
+tools/hearth/testdata/update_index/** -text
+
+# DEE's TrueHD fixtures (testdata/truehd-dee): streams and WAVs, and the logs and manifest whose
+# SHA-256s the manifest holds. A Windows checkout's autocrlf must change none of them.
+*.mlp -text
+testdata/truehd-dee/** -text

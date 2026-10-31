@@ -1651,13 +1651,16 @@ column has; the second table has every configuration with them. What each is, an
   ([The decode stack goes in PSRAM](#the-decode-stack-goes-in-psram)). The owner decided on 2026-10-11 to spend it
 ([decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)) in the
 images that carry the AC-4 decoder, and it stays its own file so that a build that needs the 32 KB back drops one line.
-An image without the decoder is no place for it: the release shape (E-AC-3 and AC-3, no AC-4) with the cache and the decode
+An image without the decoder was no place for it: the release shape (E-AC-3 and AC-3, no AC-4) with the cache and the decode
 stack in PSRAM had 1,479 bytes of internal RAM free at the least in an E-AC-3 7.1.4 play, and the cache bought it nothing
-(0.32 and 0.33 of a frame for AC-3 and E-AC-3 5.1 and 0.75 for 7.1.4 without it, 0.29, 0.33 and 0.75 with it).
+(0.32 and 0.33 of a frame for AC-3 and E-AC-3 5.1 and 0.75 for 7.1.4 without it, 0.29, 0.33 and 0.75 with it). That was at the
+16 KB allocation limit; with the 4 KB limit the release image has had since 2026-10-25, the one image that now has the decoder and
+the cache plays E-AC-3 JOC 7.1.4, 9.1.6 and 5.1.4 (`testdata/object-fixture/dee_joc_*.ec3`) with no failed allocation and 60 KB of
+internal RAM free at the end of the lap (S3b, 2026-10-29), and an E-AC-3 2.0 stream over Sendspin leaves 44 KB at the least.
 
 `sdkconfig.s3-fast` has the first three (QIO, the lines, the code and constants in PSRAM) and `sdkconfig.s3-dcache` the fourth, each
-over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. The S3 board's release
-image, which has no AC-4 decoder, is built with the first; the second goes with `sdkconfig.ac4`.
+over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. Since 2026-10-29 the S3 board's release
+image has the decoder and takes both ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md)).
 
 **The second core.** The decoder's stages that are per channel or per slot run on both cores (the player's worker task is on the core
 the decode task is not on): each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and its three
@@ -1779,7 +1782,7 @@ of `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`). The stack in PSRAM is the default for 
 An AC-4 stream a Sendspin group sends the board as it is, one sync frame a chunk under the data type
 `ac4`, is decoded by the player with the decoder above and written by the playout AC-3 and E-AC-3
 use. An image with `CONFIG_ICLFORGE_AC4` and the 64 KB data cache (`sdkconfig.ac4`,
-`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`: the `s3-n16r8-ac4` profile) lists `ac4`
+`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`: the `s3-n16r8` profile) lists `ac4`
 (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4`) and states two limits, 2 channels and 25 frames a second
 (`..._AC4_MAX_CODED_CHANNELS`, `..._AC4_MAX_FRAME_RATE`), and no objects: a server decodes what is
 past either and sends PCM. The release image has no decoder and lists none. A frame past either

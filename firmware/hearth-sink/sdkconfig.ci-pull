@@ -1,0 +1,12 @@
+# An update pulled from a release under QEMU (planning/esp32-ota.md, "Tests"), after sdkconfig.ci-ota and
+# sdkconfig.pull:
+#
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-ota;sdkconfig.pull;sdkconfig.ci-pull"
+#   idf.py -DICLFORGE_TRUST_ANCHORS_FILE=<the throwaway sub-CA's certificate> build
+#
+# tools/checks/run_pull_qemu.py serves the index, its signature and an image from a loopback server on the host
+# (QEMU's user network gives it to the board as 10.0.2.2), signed by a throwaway CA made before the build. The
+# address may be http:// and no date is judged (QEMU's board has no clock); the signature is checked exactly
+# as on a board. Never for a board.
+CONFIG_ICLFORGE_FIRMWARE_PULL_TEST_HTTP=1
+CONFIG_ICLFORGE_FIRMWARE_UPDATE_BASE_URL="http://10.0.2.2:18081/dl"

@@ -41,6 +41,7 @@
 #include "../exit_codes.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -264,6 +265,13 @@ int run_mkv(std::string_view in_path, std::string_view out_path, const Options& 
     if (raw.empty()) {
         return kExitInput;
     }
+    // TrueHD and MLP: A_TRUEHD, one access unit a block (truehd_containers.cpp).
+    if (is_truehd_stream(raw)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
+        return run_mkv_truehd(raw, in_path, out_path);
+    }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
@@ -352,6 +360,13 @@ int run_mp4(std::string_view in_path, std::string_view out_path, const Options& 
     auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
         return kExitInput;
+    }
+    // TrueHD and MLP: the 'mlpa' sample entry and its 'dmlp' box (truehd_containers.cpp).
+    if (is_truehd_stream(raw)) {
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
+        return run_mp4_truehd(raw, in_path, out_path);
     }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
@@ -731,9 +746,17 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
     // read_elementary_stream also takes a Matroska, MP4 or MPEG-TS input, as
     // mkv/mp4/ts do: 'ac4-encode' and 'mp4' write MP4, which this fragments
     // as readily as the raw stream.
-    auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path, /*reads_truehd=*/false);
     if (raw.empty()) {
         return kExitInput;
+    }
+    if (is_truehd_stream(raw)) {
+        fmt::println(stderr,
+                     "error: {} is TrueHD or MLP, for which no CMAF, HLS or DASH signalling is "
+                     "defined here ('forge mp4' writes the 'mlpa' track the container library "
+                     "can fragment; libs/containers/ERRATA.md says what is known of it)",
+                     in_path);
+        return kExitUsage;
     }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
@@ -935,20 +958,36 @@ iclforge::containers::mpegts::ServiceInfo service_info_from(
 
 int run_ts(std::string_view in_path, std::string_view out_path, std::string_view profile_name,
            const Options& meta) {
-    iclforge::containers::mpegts::BroadcastProfile profile =
-        iclforge::containers::mpegts::BroadcastProfile::kDvb;
-    if (profile_name == "atsc") {
-        profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc;
-    } else if (!profile_name.empty() && profile_name != "dvb") {
-        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb or atsc)", profile_name);
-        return kExitUsage;
-    }
     // read_elementary_stream (container readers (mkv/mp4/ts)) also accepts a Matroska or MP4
     // input here - container-to-container remux, same as run_mkv/run_mp4
     // above.
     auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
         return kExitInput;
+    }
+    // TrueHD and MLP: Blu-ray's stream_type 0x83, the only transport profile that carries them
+    // (TH spec §21.2); the dvb and atsc profiles of the other codecs do not apply.
+    if (is_truehd_stream(raw)) {
+        // mainid=, asvc= and programme= describe a service of the AC-3 family; none is written here.
+        if (const int refused = check_options_applied(meta, {}); refused != kExitOk) {
+            return refused;
+        }
+        return run_ts_truehd(raw, in_path, out_path, profile_name);
+    }
+    iclforge::containers::mpegts::BroadcastProfile profile =
+        iclforge::containers::mpegts::BroadcastProfile::kDvb;
+    if (profile_name == "atsc") {
+        profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc;
+    } else if (profile_name == "bluray") {
+        fmt::println(stderr,
+                     "error: the bluray profile carries TrueHD (stream_type 0x83), and {} is not "
+                     "TrueHD or MLP",
+                     in_path);
+        return kExitUsage;
+    } else if (!profile_name.empty() && profile_name != "dvb") {
+        fmt::println(stderr, "error: unknown TS profile '{}' (expected dvb or atsc)",
+                     profile_name);
+        return kExitUsage;
     }
     if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
@@ -1246,7 +1285,16 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
                 },
                 [&](std::span<const std::byte> sample) { emit_mp4_sample(track_codec, sample); });
             if (!track.has_value()) {
-                status = fail(iclforge::containers::mp4::describe(track.error()), kExitInput);
+                // A protected track is not damaged input; say which one and how it is protected.
+                // The source can be read again, so the detail is one more walk of the boxes.
+                std::string why{iclforge::containers::mp4::describe(track.error())};
+                if (track.error() == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                    if (const auto refused =
+                            iclforge::containers::mp4::list_refused_tracks(read_at, file_size)) {
+                        why = iclforge::containers::mp4::describe_refusal(*refused);
+                    }
+                }
+                status = fail(why, kExitInput);
             } else {
                 codec_id = track->codec_id;
                 sample_rate = track->sample_rate;
@@ -1256,12 +1304,15 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
             iclforge::containers::mp4::Reader reader{};
             drive(
                 reader,
-                [](iclforge::containers::mp4::DemuxError e) -> std::string_view {
+                [&reader](iclforge::containers::mp4::DemuxError e) -> std::string {
                     if (e == iclforge::containers::mp4::DemuxError::kMoovAfterMdat) {
                         return "this MP4's sample table (moov) follows its media data, which "
                                "cannot be read from a pipe: give demux the file's path instead";
                     }
-                    return iclforge::containers::mp4::describe(e);
+                    if (e == iclforge::containers::mp4::DemuxError::kProtectedTrack) {
+                        return iclforge::containers::mp4::describe_refusal(reader.refused_tracks());
+                    }
+                    return std::string{iclforge::containers::mp4::describe(e)};
                 },
                 [&reader, &emit_mp4_sample](std::span<const std::byte> sample) {
                     emit_mp4_sample(reader.track().codec_id, sample);
@@ -1282,7 +1333,10 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
         // rate or channel count - those live in the bitstream, which this
         // command deliberately never looks inside. Reported as absent
         // rather than guessed.
-        codec_id = reader.stream().ac4 ? "AC-4" : reader.stream().eac3 ? "E-AC-3" : "AC-3";
+        codec_id = reader.stream().truehd ? "TrueHD"
+                   : reader.stream().ac4  ? "AC-4"
+                   : reader.stream().eac3 ? "E-AC-3"
+                                          : "AC-3";
     }
     if (status != kExitOk) {
         return status;

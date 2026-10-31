@@ -254,7 +254,8 @@
         "ICLFORGE_BUILD_IAB": "OFF",
         "ICLFORGE_BUILD_IAMF": "OFF",
         "ICLFORGE_BUILD_CAPI": "OFF",
-        "ICLFORGE_BUILD_AC4": "OFF"
+        "ICLFORGE_BUILD_AC4": "OFF",
+        "ICLFORGE_BUILD_TRUEHD": "OFF"
       }
     },
 
@@ -313,6 +314,19 @@
       "name": "config-linux-gcc",
       "inherits": [ "release", "linux-gcc", "core" ],
       "displayName": "Linux GCC Release"
+    },
+    {
+      "name": "config-linux-gcc-no-truehd",
+      "inherits": [ "release", "linux-gcc", "core" ],
+      "displayName": "Linux GCC Release, without the TrueHD codec",
+      "description": "ICLFORGE_BUILD_TRUEHD=OFF with the tests and examples on, which the root CMakeLists.txt allows only for a build with neither forge nor Hearth: forge decodes and probes TrueHD through iclforge::truehd unconditionally, and Hearth's engine links it. What this builds is the library without the codec: the C API answers every iclforge_truehd_* call with ICLFORGE_ERROR_UNSUPPORTED from libs/capi/src/truehd_absent.cpp, and libs/capi/tests/test_capi_truehd_absent.cpp holds it to that. No other leg builds that file (the minimal profiles that set the option have no tests). The _ci-core.yml job truehd-off runs it nightly.",
+      "cacheVariables": {
+        "ICLFORGE_BUILD_TRUEHD": "OFF",
+        "ICLFORGE_BUILD_CLI": "OFF",
+        "ICLFORGE_BUILD_GUI": "OFF",
+        "ICLFORGE_BUILD_HEARTH": "OFF",
+        "VCPKG_MANIFEST_FEATURES": ""
+      }
     },
     {
       "name": "config-linux-gcc-debug",
@@ -400,6 +414,16 @@
       }
     },
     {
+      "name": "config-linux-gcc-coverage-qt",
+      "inherits": "config-linux-gcc-coverage",
+      "displayName": "Linux GCC Coverage, with the Qt applications",
+      "description": "config-linux-gcc-coverage plus forge-gui, Crucible and Hearth's window, built against the Qt kit CI pins (.github/toolchain-versions.json, installed by aqtinstall; tools/dev/qt-sandbox-setup.sh does the same by hand). The kit is found the way cmake/FindQt6.cmake finds any other: QT_ROOT_DIR, ICLFORGE_QT_ROOT or -DICLFORGE_QT_ROOT. tools/checks/coverage_report.sh -q gates the C++ of apps/forge/gui, apps/crucible/ui and apps/hearth/ui from the tests labelled gui, forge-gui, crucible, crucible-ui, hearth and hearth-ui (the _ci-core.yml job coverage-qt). The Qt Quick suites are the only thing that drives those trees' controllers; QML itself has no gcov line coverage, so the suites stay the check on it.",
+      "cacheVariables": {
+        "ICLFORGE_BUILD_GUI": "ON",
+        "ICLFORGE_BUILD_CRUCIBLE": "ON"
+      }
+    },
+    {
       "name": "minimal-encoder",
       "hidden": true,
       "description": "The minimum-footprint profile pointed at ENCODE instead of decode: one encode-only static library (iclforge::ac3_minimal) carrying both codecs, plus firmware/baremetal's encode probe, built without exceptions or RTTI. Mutually exclusive with minimal-decoder, and measured to be: on an ESP32-S3 with 277,400 bytes of internal SRAM free, decode peaks at 233,546, AC-3 encode at 201,770 and E-AC-3 encode at 243,770 - each fits alone, no two fit at once. See libs/ac3/minimal.cmake and docs/building.md.",
@@ -417,7 +441,8 @@
         "ICLFORGE_BUILD_IAB": "OFF",
         "ICLFORGE_BUILD_IAMF": "OFF",
         "ICLFORGE_BUILD_CAPI": "OFF",
-        "ICLFORGE_BUILD_AC4": "OFF"
+        "ICLFORGE_BUILD_AC4": "OFF",
+        "ICLFORGE_BUILD_TRUEHD": "OFF"
       }
     },
     {
@@ -550,6 +575,11 @@
       "displayName": "Windows LLVM Debug + coverage"
     },
     {
+      "name": "build-linux-gcc-no-truehd",
+      "configurePreset": "config-linux-gcc-no-truehd",
+      "displayName": "Linux GCC Release, without the TrueHD codec"
+    },
+    {
       "name": "build-linux-gcc",
       "configurePreset": "config-linux-gcc",
       "displayName": "Linux GCC Release"
@@ -634,6 +664,11 @@
       "name": "build-linux-gcc-coverage",
       "configurePreset": "config-linux-gcc-coverage",
       "displayName": "Linux GCC Coverage"
+    },
+    {
+      "name": "build-linux-gcc-coverage-qt",
+      "configurePreset": "config-linux-gcc-coverage-qt",
+      "displayName": "Linux GCC Coverage, with the Qt applications"
     },
     {
       "name": "build-linux-gcc-minimal",
@@ -844,10 +879,31 @@
       }
     },
     {
+      "name": "test-linux-gcc-no-truehd",
+      "configurePreset": "config-linux-gcc-no-truehd",
+      "displayName": "Linux GCC Release Tests, without the TrueHD codec",
+      "inherits": "test-base"
+    },
+    {
       "name": "test-linux-gcc-coverage",
       "configurePreset": "config-linux-gcc-coverage",
       "displayName": "Linux GCC Coverage Tests",
       "inherits": "test-base"
+    },
+    {
+      "name": "test-linux-gcc-coverage-qt",
+      "configurePreset": "config-linux-gcc-coverage-qt",
+      "displayName": "Linux GCC Coverage Tests, the Qt applications",
+      "inherits": "test-base",
+      "filter": {
+        "include": {
+          "label": "^(gui|forge-gui|crucible|crucible-ui|hearth|hearth-ui)$"
+        }
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "PIPEWIRE_DEBUG": "0"
+      }
     },
     {
       "name": "test-linux-llvm-shared",

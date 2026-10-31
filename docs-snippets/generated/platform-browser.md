@@ -9,4 +9,5 @@
 | JavaScript decoder package | **Source**<br>built and tested in CI<br>build from bindings/js/; unpublished on npm |
 | C++ WebAssembly modules | **Source**<br>built and tested in CI<br>decode and encode |
 | AC-4 WebAssembly module | **Source**<br>built and tested in CI<br>decode and encode, objects included; no demo page |
+| TrueHD WebAssembly module | **Source**<br>built and tested in CI<br>decode, probe and scan; no demo page |
 | Forge, Crucible and Hearth apps | **Unavailable**<br>not browser applications |

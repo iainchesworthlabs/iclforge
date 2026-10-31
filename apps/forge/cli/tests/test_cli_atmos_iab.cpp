@@ -140,15 +140,23 @@ constexpr unsigned kTotalIabFrames = 20;
 constexpr std::uint16_t kPosMin = 0x8000;  // §5.4's own valid domain floor - see
 constexpr std::uint16_t kPosMax = 0xFFFF;  // examples/encode_iab.cpp's identical comment
 
-std::vector<std::byte> build_bed_payload() {
+// The bed: its Center channel and, with `with_lfe`, an LFE (Table 19's ChannelID 0xD) after it - each
+// channel a ChannelID, the AudioDataID of its audio, a unity gain prefix and no decorrelation.
+std::vector<std::byte> build_bed_payload(bool with_lfe = false) {
     BitWriter bw;
     bw.push_plex(1, 8);
     bw.push_bits(0, 1);
-    bw.push_plex(1, 4);
+    bw.push_plex(with_lfe ? 2 : 1, 4);
     bw.push_plex(0x2, 4);  // Center
     bw.push_plex(1, 8);
     bw.push_bits(0, 2);
     bw.push_bits(0, 1);
+    if (with_lfe) {
+        bw.push_plex(0xD, 4);  // LFE
+        bw.push_plex(3, 8);
+        bw.push_bits(0, 2);
+        bw.push_bits(0, 1);
+    }
     bw.push_bits(0x180, 10);
     bw.align_to_byte();
     bw.push_bits(0x01, 8);
@@ -194,19 +202,24 @@ std::vector<std::byte> build_pcm_payload(std::uint32_t audio_data_id,
     return bw.bytes();
 }
 
-std::vector<std::byte> build_iaframe(unsigned index) {
+constexpr double kLfeHz = 55.0;
+
+std::vector<std::byte> build_iaframe(unsigned index, bool with_lfe = false) {
     const bool right_half = index < kTotalIabFrames / 2;
     const std::uint16_t pos_x = right_half ? kPosMax : kPosMin;
     constexpr std::uint16_t kPosYMid = 0xC000;
 
     std::vector<std::int16_t> bed_samples(kSamplesPerIabFrame);
     std::vector<std::int16_t> object_samples(kSamplesPerIabFrame);
+    std::vector<std::int16_t> lfe_samples(kSamplesPerIabFrame);
     for (std::uint32_t i = 0; i < kSamplesPerIabFrame; ++i) {
         const double t = static_cast<double>(index * kSamplesPerIabFrame + i) / 48000.0;
         bed_samples[i] =
             static_cast<std::int16_t>(0.3 * 32767.0 * std::sin(2.0 * std::numbers::pi * 300.0 * t));
         object_samples[i] =
             static_cast<std::int16_t>(0.3 * 32767.0 * std::sin(2.0 * std::numbers::pi * 800.0 * t));
+        lfe_samples[i] = static_cast<std::int16_t>(
+            0.3 * 32767.0 * std::sin(2.0 * std::numbers::pi * kLfeHz * t));
     }
 
     BitWriter header;
@@ -216,13 +229,16 @@ std::vector<std::byte> build_iaframe(unsigned index) {
     header.push_bits(kFrameRateCode, 4);
     header.push_plex(0, 8);
     header.align_to_byte();
-    header.push_plex(4, 8);
+    header.push_plex(with_lfe ? 5 : 4, 8);
 
     std::vector<std::byte> iaframe_payload = header.bytes();
-    append(iaframe_payload, wrap_element(0x10, build_bed_payload()));
+    append(iaframe_payload, wrap_element(0x10, build_bed_payload(with_lfe)));
     append(iaframe_payload, wrap_element(0x40, build_object_payload(pos_x, kPosYMid)));
     append(iaframe_payload, wrap_element(0x400, build_pcm_payload(1, bed_samples)));
     append(iaframe_payload, wrap_element(0x400, build_pcm_payload(2, object_samples)));
+    if (with_lfe) {
+        append(iaframe_payload, wrap_element(0x400, build_pcm_payload(3, lfe_samples)));
+    }
 
     std::vector<std::byte> segment;
     segment.push_back(std::byte{0x01});
@@ -239,10 +255,10 @@ std::vector<std::byte> build_iaframe(unsigned index) {
     return segment;
 }
 
-bool write_fixture(const fs::path& path) {
+bool write_fixture(const fs::path& path, bool with_lfe = false) {
     std::vector<std::byte> file;
     for (unsigned i = 0; i < kTotalIabFrames; ++i) {
-        append(file, build_iaframe(i));
+        append(file, build_iaframe(i, with_lfe));
     }
     std::ofstream out(path, std::ios::binary);
     if (!out) {
@@ -260,6 +276,18 @@ double channel_energy(std::span<const float> samples) {
         energy += sd * sd;
     }
     return energy;
+}
+
+// How much of `frequency` a signal holds: 0 for silence, 0.15 for a tone of amplitude 0.3.
+double tone_magnitude(std::span<const float> signal, double frequency) {
+    double real = 0.0;
+    double imag = 0.0;
+    for (std::size_t n = 0; n < signal.size(); ++n) {
+        const double phase = 2.0 * std::numbers::pi * frequency * static_cast<double>(n) / 48000.0;
+        real += static_cast<double>(signal[n]) * std::cos(phase);
+        imag += static_cast<double>(signal[n]) * std::sin(phase);
+    }
+    return std::hypot(real, imag) / static_cast<double>(signal.size());
 }
 
 }  // namespace
@@ -309,6 +337,50 @@ TEST_CASE("forge atmos-iab parses, bridges and encodes a real IAB fixture end to
     }
     // The bed (Center) is static throughout every frame.
     CHECK(saw_center_energy);
+}
+
+// Issue 1627 for IAB. An LFE bed channel (ChannelID 0xD) used to be bridged as an object at gain 0,
+// which an object reaches the LFE with as lfe_send * gain: silent, and one more object counted beside
+// the bed's own LFE. It is the encoder's LFE now.
+TEST_CASE("forge atmos-iab carries a bed's LFE through, and counts it once",
+          "[cli][atmos-iab][lfe]") {
+    const auto dir = scratch_dir();
+    const auto fixture_path = dir / "atmos_iab_lfe_fixture.iab";
+    REQUIRE(write_fixture(fixture_path, /*with_lfe=*/true));
+
+    const auto out_path = dir / "atmos_iab_lfe_out.ec3";
+    const auto log_path = dir / "atmos_iab_lfe.log";
+    const auto rc = run_cli(
+        "atmos-iab \"" + fixture_path.string() + "\" \"" + out_path.string() + "\" 448", log_path);
+    const auto text = read_log(log_path);
+    INFO(text);
+    REQUIRE(rc == 0);
+    // The Center and the object take a slot each, and the LFE is the bed's own: three objects, not four.
+    CHECK(text.find("1 bed channel(s) + 1 dynamic object(s) + the bed's LFE = 3 objects") !=
+          std::string::npos);
+
+    std::ifstream stream_in{out_path, std::ios::binary};
+    const std::vector<char> raw{std::istreambuf_iterator<char>{stream_in},
+                                std::istreambuf_iterator<char>{}};
+    std::vector<std::byte> stream_bytes(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        stream_bytes[i] = static_cast<std::byte>(raw[i]);
+    }
+    const auto units = iclforge::ac3::split_access_units(stream_bytes);
+    REQUIRE(units.has_value());
+
+    iclforge::ac3::Eac3Decoder decoder;
+    constexpr std::size_t kLfeCh = 5;  // AC-3 3/2 coded order (Table 5.8): L, C, R, Ls, Rs, LFE.
+    std::vector<float> lfe;
+    for (const auto& unit : *units) {
+        const auto decoded = decoder.decode_access_unit(unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        const auto& channel = (*decoded)->channels[kLfeCh];
+        lfe.insert(lfe.end(), channel.begin(), channel.end());
+    }
+    // The 55 Hz of the fixture's LFE is in what was decoded; it was silence before.
+    CHECK(tone_magnitude(lfe, kLfeHz) > 0.05);
 }
 
 TEST_CASE("forge atmos-iab reports a clear diagnosis for a file with no IAB essence",

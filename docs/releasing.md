@@ -154,15 +154,26 @@ dispatched build fetches full history (or gets the version stamped directly via
 3. Releases must be **cut from main** - `resolve-version` checks this with
    `git merge-base --is-ancestor` and fails otherwise (dry runs are exempt).
 4. Decide the tag.
-5. **Update [CHANGELOG.md](https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md)**
-   - move `## [Unreleased]`'s content down to a `## [x.y.z] - YYYY-MM-DD` section matching the
-     tag from step 4 without its `v` (`## [0.10.0-beta.1] - 2026-09-01` for `v0.10.0-beta.1`),
-     [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, grouped by
-     user-facing area with bold lead-in bullets. This has to happen *before* tagging, not after:
-     `github-release`'s "Render release notes from CHANGELOG.md" step
-     (`tools/release/render_release_notes.py`, see [Post-release](#post-release)) extracts this
-     exact section for the release body the moment the tag is pushed, and hard-fails the release
-     if it cannot find one.
+5. **Assemble the changelog.** Every change since the last release added a fragment to
+   [`changelog.d/`](https://github.com/iainchesworthlabs/iclforge/tree/main/changelog.d) (pull
+   requests never edit `CHANGELOG.md`; two of them landing together would collide on it). In a
+   release pull request, `chore/release-x.y.z`, run
+
+   ```bash
+   python3 tools/release/changelog_tool.py pending        # read what will be written
+   python3 tools/release/changelog_tool.py assemble --version 0.10.0-beta.1 --date 2026-09-01
+   ```
+
+   `assemble` writes a `## [x.y.z] - YYYY-MM-DD` section matching the tag from step 4 without its
+   `v` (`## [0.10.0-beta.1] - 2026-09-01` for `v0.10.0-beta.1`) under `## [Unreleased]`: the
+   fragments grouped as Added, Changed, Deprecated, Removed, Fixed and Security, then whatever was
+   written by hand under `## [Unreleased]` before fragments existed, which it keeps as it was. It
+   deletes the fragments. This pull request is the one that may edit `CHANGELOG.md` (the static
+   check allows it because the pull request deletes fragments). Read the section, tidy the wording
+   if it needs it, and merge. This has to happen *before* tagging, not after: `github-release`'s
+   "Render release notes from CHANGELOG.md" step (`tools/release/render_release_notes.py`, see
+   [Post-release](#post-release)) extracts this exact section for the release body the moment the
+   tag is pushed, and hard-fails the release if it cannot find one.
 
 ## Option A: tag-based release (the normal path)
 
@@ -203,13 +214,13 @@ Most of what used to be a manual post-release checklist here is now automated:
    (`tools/release/render_release_notes.py`) extracts the `## [x.y.z] - YYYY-MM-DD` section
    matching the tag being released and uses it as the release body, followed by a
    `**Full Changelog**: …/compare/v<prev>...v<this>` line (omitted for the first release). This
-   is why [updating CHANGELOG.md](#pre-release-checklist) moved into the pre-release checklist,
+   is why [assembling the changelog](#pre-release-checklist) is in the pre-release checklist,
    as its own step: it used to be listed here, as a post-release step done any time before
    finishing the curated release notes by hand - now it is a hard prerequisite of tagging itself,
    since a missing section fails the release outright with a clear error rather than falling back
    to a commit-list draft. [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-   format, grouped by user-facing area with **bold lead-in** bullets, same as always; that
-   curation now happens exactly once, in CHANGELOG.md, as part of normal development.
+   format with **bold lead-in** bullets; that curation happens once per change, in its
+   `changelog.d/` fragment, as part of normal development.
 
    Two things this deliberately does not reconstruct, left as optional manual polish via
    `gh release edit vX.Y.Z[-beta.N] --notes-file notes.md` afterward if wanted: an `## Artifacts`
@@ -297,7 +308,7 @@ updated 2026-08-19) - see
 [docs/library/index.md](library/index.md) for how a consumer uses it either way. It installs the
 library only (`iclforge::ac3`, plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/
 `iclforge::containers::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
-`capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
+`capi` (see the note below), the AC-4 library behind `ac4`, the TrueHD library behind `truehd`, `iclforge::iab` behind `iab` and
 `iclforge::containers::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
 `iclforge::adm` (the ADM/BW64 reader and its bridge) has no vcpkg feature
@@ -308,7 +319,7 @@ now - see the recipe note further down and [docs/library/index.md](library/index
 None of the features is on by default: a curated-registry port's `default-features` may only
 cover behaviors, not additional public APIs/targets/binaries (see
 [vcpkg's maintainer guide](https://learn.microsoft.com/vcpkg/contributing/maintainer-guide#default-features-should-enable-behaviors-not-apis))
-, and each of `matroska`/`mp4`/`mpegts`/`capi`/`ac4`/`iab`/`iamf` is exactly that. Upstream's
+, and each of `matroska`/`mp4`/`mpegts`/`capi`/`ac4`/`truehd`/`iab`/`iamf` is exactly that. Upstream's
 own `ICLFORGE_BUILD_<NAME>` options default ON; `vcpkg_check_features()` turns each OFF unless
 its feature is asked for. A plain `vcpkg install iclforge` installs the codec only; opt in
 explicitly with `vcpkg install iclforge[matroska,mp4,mpegts]`, `iclforge[ac4]` or any subset.
@@ -378,16 +389,16 @@ it drives change (whether or not a release is involved):
 ```bash
 vcpkg install iclforge --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
 vcpkg install iclforge --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows-static
-vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf] --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
+vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,truehd,iab,iamf] --classic --overlay-ports=packaging/vcpkg-port --triplet x64-windows
 ```
 
 `--classic` is required from inside this repo - the root `vcpkg.json` (manifest mode, for this
 project's *own* build-time dependencies) would otherwise shadow the package-name argument.
 Check for a clean post-build lint (no "not used"/"missing usage" warnings) and that the bare
 `iclforge` install excludes every feature's library (`iclforge::containers::matroska`/`iclforge::containers::mp4`/
-`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
+`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, the TrueHD library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
 unlinked, no matching files anywhere in the install tree - while
-`iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf]` installs all seven.
+`iclforge[matroska,mp4,mpegts,capi,ac4,truehd,iab,iamf]` installs all eight.
 `tools/checks/check_install_consumer.sh` makes the same check of any build tree it installs: a
 library whose `ICLFORGE_BUILD_<NAME>` option is OFF must leave no file in the prefix.
 
@@ -642,8 +653,8 @@ A Conan (2.x) recipe for `iclforge` is staged in-tree at
 (`conanfile.py`, `conandata.yml`, `test_package/`) and has not been submitted to ConanCenter
 (`conan-center-index`), where no pull request names it. Scoped the same as the vcpkg port - the library only (`iclforge::ac3`,
 plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/`iclforge::containers::mpegts` behind their own default-on `matroska`/
-`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, `iclforge::iab` and
-`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
+`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, the TrueHD library, `iclforge::iab` and
+`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`truehd`/`iab`/`iamf` options), never the
 CLI/GUI/Hearth/tests/examples/fuzzers - with one Conan option per `ICLFORGE_BUILD_<NAME>` CMake option,
 the same pattern the vcpkg port's `vcpkg_check_features()` call already establishes, and the same
 options as the port's features, which `tools/checks/check_packaging_versions.sh` checks. The
@@ -675,7 +686,7 @@ conan create packaging/conan --version <version> -s compiler.cppstd=23
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:shared=True"
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:matroska=False" -o "&:mp4=False" -o "&:mpegts=False"
 conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:capi=True"
-conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:ac4=True" -o "&:iab=True" -o "&:iamf=True"
+conan create packaging/conan --version <version> -s compiler.cppstd=23 -o "&:ac4=True" -o "&:truehd=True" -o "&:iab=True" -o "&:iamf=True"
 ```
 
 `-s compiler.cppstd=23` is required - a bare default profile's `compiler.cppstd` predates

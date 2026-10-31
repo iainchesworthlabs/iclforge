@@ -140,13 +140,18 @@ const char* network_source() { return "wired"; }
 
 void network_adopt_built_in() {}
 
+void network_forget_driver_state() {}
+
 // One network, and no station beside it.
 bool network_has_choice() { return false; }
 
 bool network_set_preference(NetworkPreference) { return false; }
 
-bool network_wifi_ready() { return false; }
+// QEMU has no radio, so this link is the station's stand-in: what Improv asks of the station
+// (network.hpp, "a build with the station alone") it asks of the one network there is, and
+// tools/checks/improv_qemu.py's late-network scenario provisions the board over it.
+bool network_wifi_ready() { return network_ready(); }
 
-bool network_wifi_up() { return false; }
+bool network_wifi_up() { return network_up(); }
 
 }  // namespace player

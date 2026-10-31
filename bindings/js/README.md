@@ -2,7 +2,8 @@
 
 A streaming AC-3/E-AC-3 (Dolby Digital/Digital Plus) decoder for the browser, compiled from
 [`iclforge::ac3`](https://github.com/iainchesworthlabs/iclforge) to WebAssembly. The
-`iclforge-wasm-decoder/ac4` export decodes and encodes AC-4 ([AC-4](#ac-4)).
+`iclforge-wasm-decoder/ac4` export decodes and encodes AC-4 ([AC-4](#ac-4)), and
+`iclforge-wasm-decoder/truehd` decodes TrueHD and MLP ([TrueHD and MLP](#truehd-and-mlp)).
 Built because a browser cannot be relied on to decode EC-3:
 [Chrome reports a decoder error](https://github.com/videojs/http-streaming/issues/1297) when an EC-3
 track turns up in an MPD, in a report that has been open since 2023. This package is an embeddable
@@ -194,6 +195,53 @@ when done: Embind objects are not garbage collected.
 
 The module builds in CI only where an Emscripten SDK is installed, and no demo page serves it.
 
+## TrueHD and MLP
+
+The `iclforge-wasm-decoder/truehd` subpath exports the decode side of `iclforge::truehd`, as typed
+wrappers over the Embind module `apps/demos/wasm/` builds as `iclforge_truehd.js`
+(`loadTruehdModule(glueUrl)` loads it): `truehdProbe` reads the first major sync, `truehdScanUnits`
+splits a bare stream into its access units, `TruehdScannedStream` says how long a stream is and where
+a decoder can join it, and `TruehdDecoder` decodes one access unit at a time. The encoder, the Atmos
+layer and the metadata edit are not in the module; Python and Rust have the same decode surface.
+
+```ts
+import {
+  loadTruehdModule,
+  truehdScanUnits,
+  TruehdDecoder,
+  TruehdScannedStream,
+} from "iclforge-wasm-decoder/truehd";
+
+const module = await loadTruehdModule("/wasm/iclforge_truehd.js");
+const bytes = new Uint8Array(await (await fetch("clip.thd")).arrayBuffer());
+
+// Every unit, front to back.
+const decoder = new TruehdDecoder(module);
+for (const unit of truehdScanUnits(module, bytes).units) {
+  const decoded = decoder.decode(unit); // null until a unit with a restart header has come
+  if (decoded) play(decoded.pcm, decoded.channels, decoded.sampleRate);
+}
+decoder.close();
+
+// Seek: decode from the last restart before the sample, and drop the samples ahead of it.
+const stream = new TruehdScannedStream(module, bytes);
+const sample = stream.sampleAtSeconds(90);
+const restart = stream.restartForSample(sample); // null past the end
+const from = stream.streamFrom(restart); // a view into `bytes`
+// ... decode truehdScanUnits(module, from).units; the first unit starts at restart.unit * stream.info.samplesPerUnit
+```
+
+A failure is thrown as a `TruehdError` whose `kind` is the library's `TruehdErrorKind`; a unit that
+gives no samples because no restart header has come yet is not a failure and gives `null`. Unlike
+the AC-3 and AC-4 wrappers, what `decode` returns is owned: `pcm` (interleaved, 24-bit values
+sign-extended into an `Int32Array`) and `extraData` are copies, so a result stays valid across the
+next call. `TruehdDecoder` has `lostData()`, `reset()` and `counters()`, and options for the
+presentation (`TruehdPresentation`) and a lenient mode that counts a failed check instead of
+dropping the unit. A decoder can only join a stream at an access unit with a major sync, so the
+restart interval is the seek granule; `TruehdScannedStream`'s second argument is the spacing it keeps
+restarts at (256 units, 0.21 s at 48 kHz, by default). Call `close()` on a decoder or a scanned
+stream when done: Embind objects are not garbage collected.
+
 ## hls.js/MSE bridge
 
 hls.js's own `BufferController` drops the audio track entirely the moment
@@ -245,6 +293,12 @@ hls.attachMedia(videoElement); // video still decodes natively; only audio is di
   same kind of stand-in for the AC-4 Embind module (`ac4.test.js`), and `package-exports.test.js`
   checks the `exports` map, `./ac4` included. No browser test loads the compiled
   `iclforge_ac4.wasm` yet.
+- The TrueHD wrappers: `truehd.test.js` checks the options, the errors and the views in Node against a
+  stand-in for the Embind module, and `truehd-wasm.test.js` runs the compiled module (when
+  `ICLFORGE_TRUEHD_WASM` names `iclforge_truehd.js`; `build-wasm` sets it) over every fixture of
+  `testdata/truehd`: the samples to the SHA-256 of what FFmpeg's strict decode gives, the probe and
+  the scan to the manifest, and a decode from the restart for a sample to the samples of a whole
+  decode.
 - The karaoke reproduction (`FoldOptions.karaoke`, `karaokeVocals`): the options reach the Embind
   constructor in the library's own numbering and the `karaoke` flag reaches the outcome, in Node
   against the stand-in. The decoding itself was held against `forge decode` of the karaoke example

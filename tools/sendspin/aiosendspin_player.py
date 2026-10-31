@@ -35,7 +35,12 @@ from aiosendspin.models.core import DeviceInfo
 from aiosendspin.models.player import ClientHelloPlayerSupport, SupportedAudioFormat
 from aiosendspin.models.types import AudioCodec, PlayerCommand, Roles
 from aiosendspin.noise.keys import Identity, generate_psk, psk_id_for
-from aiosendspin.noise.pairing_token import PSKPairingToken, encode_token
+from aiosendspin.noise.pairing_token import PSKPairingToken
+
+try:
+    from aiosendspin.noise.pairing_token import encode_psk_token
+except ImportError:  # 9.1.1 names it encode_token; 10.x renamed it with the version-1 token
+    from aiosendspin.noise.pairing_token import encode_token as encode_psk_token
 from aiosendspin.noise.trust_store import InMemoryClientPairingStore, PairingPsk
 
 SAMPLE_RATE = 48000
@@ -93,7 +98,7 @@ class ScriptedPlayer:
 
     @property
     def token(self) -> str:
-        return encode_token(
+        return encode_psk_token(
             PSKPairingToken(client_id=self.identity.peer_id, pairing_psk=self.pairing_psk)
         )
 
@@ -153,6 +158,9 @@ class ScriptedPlayer:
         assert self._client is not None
         try:
             await self._client.attach_websocket(ws)  # type: ignore[arg-type]
+        except Exception:
+            logging.getLogger(__name__).exception("the connection ended")
+            raise
         finally:
             self.closed.set()
 

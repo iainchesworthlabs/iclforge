@@ -167,13 +167,13 @@ class Gate(unittest.TestCase):
 
     def test_an_app_too_big_for_its_smallest_slot_is_refused(self) -> None:
         app = fixture.app_image(
-            fixture.CHIP_IDS["esp32c6"], "v0.11.0", flash_code=2, segment_bytes=0x1C0000
+            fixture.CHIP_IDS["esp32c6"], "v0.11.0", flash_code=2, segment_bytes=0x1E0000
         )
         self.release(**{"hearth-sink-esp32c6": {"app": app}})
         code, output = self.run_gate()
         self.assertEqual(code, 1)
         self.assertIn(
-            "hearth-sink-esp32c6: its app is 1,835,088 bytes, and the smallest slot", output
+            "hearth-sink-esp32c6: its app is 1,966,160 bytes, and the smallest slot", output
         )
 
     def test_a_network_built_in_is_refused(self) -> None:
@@ -214,6 +214,82 @@ class Gate(unittest.TestCase):
         self.assertIn(
             f"hearth-sink-esp32p4-rev1: its elf file '{entry['name']}' is not there", output
         )
+
+
+class IndexGate(Gate):
+    """--index: an update index is held to the manifest and the files it was written from."""
+
+    def index(self, channel: str = "beta") -> Path:
+        path = self.out / f"hearth-update-{channel}.json"
+        packager.write_index(
+            self.out / gate.MANIFEST_NAME, channel, path, sequence=1793000000, released="2026-11-05"
+        )
+        return path
+
+    def rewrite_index(self, path: Path, change) -> None:
+        document = json.loads(path.read_text("utf-8"))
+        change(document)
+        path.write_text(json.dumps(document), "utf-8")
+
+    def test_an_index_made_from_the_manifest_passes(self) -> None:
+        self.release()
+        code, output = self.run_gate("--index", str(self.index()))
+        self.assertEqual(code, 0, output)
+        self.assertIn("OK  hearth-update-beta.json: agrees with the manifest and the files", output)
+
+    def test_both_channels_can_be_checked_at_once(self) -> None:
+        self.release()
+        code, output = self.run_gate(
+            "--index", str(self.index("beta")), "--index", str(self.index("stable"))
+        )
+        self.assertEqual(code, 0, output)
+
+    def test_an_image_missing_from_the_index_fails(self) -> None:
+        self.release()
+        path = self.index()
+        self.rewrite_index(path, lambda d: d["images"].pop())
+        code, output = self.run_gate("--index", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn("is in the manifest and not in the index", output)
+
+    def test_a_hash_that_is_not_the_files_fails(self) -> None:
+        self.release()
+        path = self.index()
+        self.rewrite_index(path, lambda d: d["images"][0].update(sha256="0" * 64))
+        code, output = self.run_gate("--index", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn("sha256", output)
+
+    def test_another_release_than_the_manifests_fails(self) -> None:
+        self.release()
+        path = self.index()
+        self.rewrite_index(path, lambda d: d.update(version="v0.12.0"))
+        code, output = self.run_gate("--index", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn("the manifest's", output)
+
+    def test_a_file_name_a_board_would_not_fetch_fails(self) -> None:
+        self.release()
+        path = self.index()
+        self.rewrite_index(path, lambda d: d["images"][0].update(file="../x.bin"))
+        code, output = self.run_gate("--index", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn("not one a board will fetch", output)
+
+    def test_an_image_file_gone_from_the_directory_fails(self) -> None:
+        self.release()
+        path = self.index()
+        victim = json.loads(path.read_text("utf-8"))["images"][0]["file"]
+        (self.out / victim).unlink()
+        code, output = self.run_gate("--index", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn("is not there", output)
+
+    def test_an_index_that_is_not_there_fails(self) -> None:
+        self.release()
+        code, output = self.run_gate("--index", str(self.out / "nothing.json"))
+        self.assertEqual(code, 1)
+        self.assertIn("cannot be read", output)
 
 
 if __name__ == "__main__":

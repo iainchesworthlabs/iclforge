@@ -12,6 +12,10 @@
 
 namespace iclforge::audio {
 
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kNone;
+}
+
 std::string_view describe(PassthroughError error) {
     switch (error) {
         case PassthroughError::kNoBackend: return "no passthrough backend on this platform";

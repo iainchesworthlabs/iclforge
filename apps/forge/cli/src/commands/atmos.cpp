@@ -43,6 +43,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "../adm/atmos_adm.hpp"
 #include "../adm/atmos_iab.hpp"
+#include "content_signature.hpp"
 
 namespace forge_cli::commands {
 
@@ -198,6 +199,74 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
     return std::nullopt;
 }
 
+// A bridged ADM or IAB source lists its LFE bed channel(s) among its channels, but an encoder has no
+// object to give one: AtmosEncoder's objects reach the LFE as lfe_send * gain, and the same gain
+// pans them into the speakers, so a channel sent to the LFE alone can only be silent (which is what
+// the bridges' gain 0 makes of it, to keep it out of them). The LFE is the encoder's own - the `lfe`
+// span of AtmosEncoder::encode_frame, AC-4's one LFE object - and takes none of the object slots.
+//
+// This moves the channels the bridge marked is_lfe out of the lists the objects are built from,
+// leaving the ones that take a slot (is_lfe is cleared to match), and returns the LFE channels'
+// audio. Order among the rest is kept.
+std::vector<std::span<const float>> take_lfe_channels(
+    std::vector<bool>& is_lfe, std::vector<bool>& is_bed,
+    std::vector<iclforge::objects::oba::ObjectPath>& paths,
+    std::vector<std::span<const float>>& pcm) {
+    std::vector<std::span<const float>> lfe;
+    std::size_t kept = 0;
+    for (std::size_t i = 0; i < paths.size(); ++i) {
+        if (i < is_lfe.size() && is_lfe[i]) {
+            lfe.push_back(pcm[i]);
+            continue;
+        }
+        if (kept != i) {
+            paths[kept] = std::move(paths[i]);
+            pcm[kept] = pcm[i];
+            is_bed[kept] = is_bed[i];
+        }
+        ++kept;
+    }
+    paths.erase(paths.begin() + static_cast<std::ptrdiff_t>(kept), paths.end());
+    pcm.erase(pcm.begin() + static_cast<std::ptrdiff_t>(kept), pcm.end());
+    is_bed.resize(kept);
+    is_lfe.assign(kept, false);
+    return lfe;
+}
+
+// `out` is the LFE feed from sample `start` on: every LFE channel added together, since a stream has
+// one LFE and a dual-LFE bed (LFE1 and LFE2) has two. Past the end of a channel it is 0, as a tail
+// frame of the objects is.
+void mix_lfe(std::span<const std::span<const float>> lfe, std::size_t start, std::span<float> out) {
+    std::ranges::fill(out, 0.0F);
+    for (const auto channel : lfe) {
+        for (std::size_t i = 0; i < out.size() && start + i < channel.size(); ++i) {
+            out[i] += channel[start + i];
+        }
+    }
+}
+
+// Said once a run, when the source has several LFE channels: they go into the one LFE together.
+void warn_summed_lfe(std::string_view in_path, std::size_t lfe_channels) {
+    if (lfe_channels > 1) {
+        fmt::println(stderr, "warning: {}: {} LFE channels are summed into the stream's one LFE",
+                     in_path, lfe_channels);
+    }
+}
+
+// A source of nothing but its LFE has no bed to build the stream on: JOC reconstructs objects from a
+// 5.1 downmix of them, and the LFE is not one. Prints why and returns true when that is the case.
+bool refuses_lfe_only(std::string_view in_path, std::size_t object_channels,
+                      std::size_t lfe_channels) {
+    if (object_channels > 0 || lfe_channels == 0) {
+        return false;
+    }
+    fmt::println(stderr,
+                 "error: {}: names only LFE channel(s); an Atmos stream needs at least one bed "
+                 "speaker feed or object besides the LFE",
+                 in_path);
+    return true;
+}
+
 // atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement
 // (this project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2
 // Annex F) share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1
@@ -211,7 +280,11 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // names becomes a dynamic AC-4 object driven by its own ObjectPath, the same treatment the E-AC-3
 // branches beside this function give a bed channel (panned by position, no speaker-anchored
 // iclforge::ac4::BedChannel assigned) - is_bed is reported in the summary line and nothing else,
-// exactly as it already is for E-AC-3 above. AC-4's object substream is frame_rate_index 13 only
+// exactly as it already is for E-AC-3 above. The source's LFE (`lfe_pcm`, from take_lfe_channels;
+// none for a source without one) is the exception: it is AC-4's one LFE object, last, the source's
+// LFE channels added together, flagged to the writer and held at ac4_lfe_placement. As a dynamic
+// object at the bridge's gain 0 it would be written at -infinity dB.
+// AC-4's object substream is frame_rate_index 13 only
 // (iclforge/ac4/encoder/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that
 // fixed 2048-sample grid: one update per object per frame, ramped over the whole frame from the
 // previous one, evaluated at the frame's END time - the convention every Atmos-encode command in
@@ -221,6 +294,7 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
                              const std::vector<bool>& is_bed,
                              const std::vector<iclforge::objects::oba::ObjectPath>& paths,
                              const std::vector<std::span<const float>>& pcm,
+                             const std::vector<std::span<const float>>& lfe_pcm,
                              std::string_view in_path, std::string_view out_path,
                              std::uint32_t bitrate, const Options& meta) {
     if (sample_rate != 48000 && sample_rate != 44100) {
@@ -236,14 +310,31 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
         return kExitInput;
     }
 
+    // The objects, then the LFE object if the source has an LFE: one stream per object, and `lfe`
+    // marking the last. encode_ac4_objects reads `lfe` per object and `streams` is what it encodes.
+    const bool has_lfe = !lfe_pcm.empty();
+    std::vector<std::span<const float>> streams(pcm.begin(), pcm.end());
+    std::vector<float> lfe_mix;
+    std::vector<bool> lfe_flags(count + (has_lfe ? 1U : 0U));
+    if (has_lfe) {
+        lfe_mix.resize(pcm.front().size());
+        mix_lfe(lfe_pcm, 0, lfe_mix);
+        streams.emplace_back(lfe_mix);
+        lfe_flags[count] = true;
+    }
+
     const iclforge::apps::Ac4ObjectsParams params{
         .sample_rate_hz = sample_rate,
         .bitrate_kbps = static_cast<int>(bitrate),
         .dialnorm_db = static_cast<double>(meta.p.dialnorm),
         .coding = meta.ac4_atmos_coding.value_or(iclforge::ac4::ObjectCoding::kAjoc)};
     const auto encoded = iclforge::apps::encode_ac4_objects(
-        params, std::vector<bool>{}, pcm, [&paths](double time_s) {
-            return iclforge::objects::oba::evaluate_placements(paths, time_s);
+        params, lfe_flags, streams, [&paths, has_lfe](double time_s) {
+            auto placed = iclforge::objects::oba::evaluate_placements(paths, time_s);
+            if (has_lfe) {
+                placed.push_back(iclforge::apps::ac4_lfe_placement());
+            }
+            return placed;
         });
     if (!encoded.has_value()) {
         switch (encoded.error().kind) {
@@ -275,12 +366,14 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
     const auto status = status_stream(out_path);
     status_println(status, "encoded {} AC-4 frames ({} kbps, {} Hz) from {} to {}",
                    encoded->frames.size(), bitrate, sample_rate, in_path, out_path);
-    status_println(status, "  {} bed speaker feed(s) + {} dynamic object(s) = {} objects, {}-coded",
-                   bed_count, count - bed_count, count,
+    status_println(status,
+                   "  {} bed speaker feed(s) + {} dynamic object(s){} = {} objects, {}-coded",
+                   bed_count, count - bed_count, has_lfe ? " + the LFE object" : "",
+                   count + (has_lfe ? 1U : 0U),
                    params.coding == iclforge::ac4::ObjectCoding::kAjoc ? "A-JOC" : "direct");
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace
@@ -960,7 +1053,7 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
                           : std::string{crc ? "raw with CRC" : "raw without CRC"});
     status_println(status, "  the decoder's output lags the input by {} samples",
                    encoded->lag_samples);
-    return kExitOk;
+    return sign_encoded_file(out_path, meta);
 }
 
 }  // namespace
@@ -968,6 +1061,11 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
 int run_atmos_encode(std::string_view in_path, std::string_view out_path,
                      std::uint32_t bitrate, std::uint32_t objects,
                      const Options& meta, std::string_view paths_path) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // codec=ac4 takes the AC-4 objects path above, src=/map= and all.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_encode_ac4(in_path, out_path, bitrate, objects, meta, paths_path);
@@ -1199,6 +1297,11 @@ int run_atmos_encode(std::string_view in_path, std::string_view out_path,
 
 int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   const Options& meta, std::string_view programme_id) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // No fixed source layout to measure a pre-encode loudness figure against the way
     // atmos-encode's WAV input has (iclforge::ac3::io::ac3_layout_for) - an ADM document's channels
     // are an arbitrary mix of bed speaker feeds and dynamic objects, not one of the handful of
@@ -1222,12 +1325,21 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
         fmt::println(stderr, "warning: {}: {}", in_path, warning);
     }
 
+    // The LFE is the encoder's own, not an object: it comes out of the channel lists here, before
+    // either codec counts or builds them (take_lfe_channels says why). A 9.1.6 master is then
+    // fifteen channels and an LFE, which is exactly what fits.
+    const auto lfe = take_lfe_channels(source->is_lfe, source->is_bed, source->paths, source->pcm);
+    if (refuses_lfe_only(in_path, source->channel_count(), lfe.size())) {
+        return kExitInput;
+    }
+    warn_summed_lfe(in_path, lfe.size());
+
     // codec=ac4 (planning/ac4.md, I5): AC-4 as this command's output codec, the ADM master's
     // bed/object channels going into E9's object encoder rather than AtmosEncoder below.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_objects_to_ac4("ADM BWF", source->sample_rate, source->is_bed,
-                                        source->paths, source->pcm, in_path, out_path, bitrate,
-                                        meta);
+                                        source->paths, source->pcm, lfe, in_path, out_path,
+                                        bitrate, meta);
     }
 
     const auto sr = wav_sample_rate(source->sample_rate, "E-AC-3", true);
@@ -1266,6 +1378,9 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
     std::vector<std::vector<float>> block(count, std::vector<float>(frame_samples));
     std::vector<std::span<const float>> views(count);
     std::vector<std::span<const float>> metered(6);
+    // One frame of the source's LFE, when it has one: empty otherwise, which encode_frame reads as
+    // no LFE feed.
+    std::vector<float> lfe_block(lfe.empty() ? 0 : frame_samples);
     // Streamed out as encoded - no sign-objects on this command, so no
     // defer case either.
     EncodedStreamSink out_sink;
@@ -1285,12 +1400,15 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
             }
             views[ch] = block[ch];
         }
+        if (!lfe.empty()) {
+            mix_lfe(lfe, start, lfe_block);
+        }
         // Evaluated at the frame's END time, the same convention run_atmos_path/run_atmos_encode
         // use.
         const auto placement = iclforge::objects::oba::evaluate_placements(
             source->paths, static_cast<double>(start + frame_samples) /
                                 static_cast<double>(source->sample_rate));
-        auto unit = encoder.encode_frame(views, placement);
+        auto unit = encoder.encode_frame(views, placement, lfe_block);
         if (!unit.has_value()) {
             fmt::println(stderr,
                          "error: cannot encode {} channels at {} kbps — the metadata and the "
@@ -1336,6 +1454,11 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
 
 int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   const Options& meta) {
+    if (const int refused = check_sign_content_request(
+            out_path, meta, meta.take_codec == iclforge::ac3::plan::Codec::kAc4);
+        refused != kExitOk) {
+        return refused;
+    }
     // Same refusal, same reason as run_atmos_adm's own: an IAB file's Bed/Object channels are an
     // arbitrary mix, not one of iclforge::ac3::io::ac3_layout_for's fixed layouts - see that
     // function's own comment above.
@@ -1356,11 +1479,19 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
         fmt::println(stderr, "warning: {}: {}", in_path, warning);
     }
 
+    // The LFE bed channel(s) are the encoder's own LFE rather than objects - see run_atmos_adm's
+    // identical step, and take_lfe_channels for why.
+    const auto lfe = take_lfe_channels(source->is_lfe, source->is_bed, source->paths, source->pcm);
+    if (refuses_lfe_only(in_path, source->channel_count(), lfe.size())) {
+        return kExitInput;
+    }
+    warn_summed_lfe(in_path, lfe.size());
+
     // codec=ac4 (planning/ac4.md, I5): AC-4 as this command's output codec, the IAB file's
     // Bed/Object channels going into E9's object encoder rather than AtmosEncoder below.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_objects_to_ac4("IAB", source->sample_rate, source->is_bed, source->paths,
-                                        source->pcm, in_path, out_path, bitrate, meta);
+                                        source->pcm, lfe, in_path, out_path, bitrate, meta);
     }
 
     const auto sr = wav_sample_rate(source->sample_rate, "E-AC-3", true);
@@ -1398,6 +1529,8 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
     std::vector<std::vector<float>> block(count, std::vector<float>(frame_samples));
     std::vector<std::span<const float>> views(count);
     std::vector<std::span<const float>> metered(6);
+    // One frame of the source's LFE, when it has one - see run_atmos_adm's.
+    std::vector<float> lfe_block(lfe.empty() ? 0 : frame_samples);
     EncodedStreamSink out_sink;
     if (!out_sink.open(out_path, meta.keep_partial)) {
         return kExitOutput;
@@ -1415,12 +1548,15 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
             }
             views[ch] = block[ch];
         }
+        if (!lfe.empty()) {
+            mix_lfe(lfe, start, lfe_block);
+        }
         // Evaluated at the frame's END time, the same convention every other Atmos-encode command
         // uses.
         const auto placement = iclforge::objects::oba::evaluate_placements(
             source->paths, static_cast<double>(start + frame_samples) /
                                 static_cast<double>(source->sample_rate));
-        auto unit = encoder.encode_frame(views, placement);
+        auto unit = encoder.encode_frame(views, placement, lfe_block);
         if (!unit.has_value()) {
             fmt::println(stderr,
                          "error: cannot encode {} channels at {} kbps — the metadata and the "

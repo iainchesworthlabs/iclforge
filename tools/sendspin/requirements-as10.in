@@ -1,0 +1,14 @@
+# Input for requirements-as10.txt: the same set as requirements.in with aiosendspin 10.2.1, the
+# release a forked Music Assistant runs, for the ma_role tests, ma_role_harness.py and the 10.2.1
+# pass of aiosendspin_server.py (_ci-core.yml, hearth-validate). Regenerate the lock with:
+#   python -m piptools compile --generate-hashes --strip-extras \
+#     --output-file=requirements-as10.txt requirements-as10.in
+# Compiled under Python 3.14, the container's python3. Move requirements.in to 10.2.1 and delete
+# this pair once aiosendspin_exit.py and aiosendspin_group_exit.py pass on it.
+aiosendspin==10.2.1
+av==19.0.1
+numpy==2.5.4
+pillow==13.0.0
+pytest==9.1.1
+aiohttp==3.14.5
+idna==3.20

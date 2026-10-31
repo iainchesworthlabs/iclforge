@@ -4,10 +4,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <sstream>
 #include <span>
 #include <string>
 #include <vector>
@@ -336,4 +339,86 @@ TEST_CASE("null_burst: a null-data burst of the period asked for, which a reader
         CHECK(reader.skipped_bursts() == 2);
         CHECK(out == elementary);
     }
+}
+
+// The E-AC-3 burst vectors tools/sendspin/ma_role checks its Python burst builder against
+// (planning/hearth-sendspin-extension.md, Burst chunks): for each fixture, the payloads Hearth's
+// server would put in `_iclforge_player@v1` chunks, taken from Eac3BurstPacker over the stream's
+// access units, as one line per burst: Pc, Pd and an FNV-1a digest of the payload. The committed
+// file is held to the packer here; ICLFORGE_BURST_VECTORS_OUT names where the hidden case
+// [.burst-vectors] writes a new one.
+namespace {
+
+constexpr const char* kVectorsRelative = "/../../tools/sendspin/ma_role/tests/golden/eac3_bursts.txt";
+constexpr std::array<const char*, 2> kVectorFixtures{"apps/demos/wasm/assets/demo.ec3",
+                                                     "firmware/hearth-sink/www/514-joc-dee.ec3"};
+
+std::uint64_t fnv1a(std::uint64_t hash, std::span<const std::byte> bytes) {
+    for (const std::byte b : bytes) {
+        hash = (hash ^ std::to_integer<std::uint8_t>(b)) * 1099511628211ULL;
+    }
+    return hash;
+}
+
+std::string vectors_text() {
+    std::ostringstream out;
+    out << "# E-AC-3 burst payloads (Pc, Pd, FNV-1a 64 of the payload), from Eac3BurstPacker.\n"
+        << "# Regenerate: ICLFORGE_BURST_VECTORS_OUT=<file> iclforge-containers-tests \"[.burst-vectors]\"\n";
+    for (const char* fixture : kVectorFixtures) {
+        const std::vector<std::byte> stream =
+            read_file(std::filesystem::path{ICLFORGE_GOLDEN_OBJECT_DIR "/../.."} / fixture);
+        const auto units = iclforge::ac3::split_access_units(stream);
+        REQUIRE(units.has_value());
+        iec::Eac3BurstPacker packer;
+        std::uint64_t whole = 14695981039346656037ULL;
+        std::size_t bursts = 0;
+        std::size_t bytes = 0;
+        std::ostringstream lines;
+        for (const auto& unit : *units) {
+            const auto burst = packer.push(unit);
+            REQUIRE(burst.has_value());
+            if (!burst->has_value()) {
+                continue;
+            }
+            const Parts parts = parts_of(**burst);
+            REQUIRE(parts.pc == 0x0015);
+            // The payload put back is the burst the packer wrote.
+            const auto again = iec::burst_from_parts(parts.pc, parts.pd, parts.payload);
+            REQUIRE(again.has_value());
+            REQUIRE(*again == **burst);
+            char line[64];
+            std::snprintf(line, sizeof line, "burst %04x %u %016llx\n", static_cast<unsigned>(parts.pc),
+                          static_cast<unsigned>(parts.pd),
+                          static_cast<unsigned long long>(fnv1a(14695981039346656037ULL, parts.payload)));
+            lines << line;
+            whole = fnv1a(whole, parts.payload);
+            ++bursts;
+            bytes += parts.payload.size();
+        }
+        char head[160];
+        std::snprintf(head, sizeof head, "stream %s %zu %zu %016llx\n", fixture, bursts, bytes,
+                      static_cast<unsigned long long>(whole));
+        out << head << lines.str();
+    }
+    return out.str();
+}
+
+}  // namespace
+
+TEST_CASE("iec61937: the E-AC-3 burst vectors tools/sendspin holds its builder to are the packer's",
+          "[iec61937][sendspin]") {
+    std::ifstream in(std::filesystem::path{ICLFORGE_GOLDEN_OBJECT_DIR + std::string{kVectorsRelative}},
+                     std::ios::binary);
+    REQUIRE(in.good());
+    std::string committed{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    committed.erase(std::remove(committed.begin(), committed.end(), '\r'), committed.end());
+    CHECK(committed == vectors_text());
+}
+
+TEST_CASE("iec61937: write the E-AC-3 burst vectors", "[.burst-vectors]") {
+    const char* const path = std::getenv("ICLFORGE_BURST_VECTORS_OUT");
+    REQUIRE(path != nullptr);
+    std::ofstream out(path, std::ios::binary);
+    REQUIRE(out.good());
+    out << vectors_text();
 }

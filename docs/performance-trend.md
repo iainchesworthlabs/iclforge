@@ -60,7 +60,7 @@ The AC-3, E-AC-3 and Atmos encoders are `plain_51` and `plain_51_fast_mdct`,
 are timed against streams encoded in the same run: a decode number only means something against
 a stream whose rate and tool set are known. By name, `plain_*` and `ac3_*` are AC-3 (`plain_51`
 is `iclforge::ac3::FrameEncoder` at 5.1, 448 kbit/s), `eac3_*`, `ecpl_*` and `atmos_*` are E-AC-3 (Atmos is
-joint object coding carried in E-AC-3) and `ac4_*` is AC-4. The memory series name their
+joint object coding carried in E-AC-3), `ac4_*` is AC-4 and `truehd_*` is TrueHD. The memory series name their
 workloads `<codec>_<layout>_encode` and `_decode` (`ac3_51_encode`, `ecpl_51_encode`,
 `atmos_4obj_decode`), with one for enhanced coupling that the timing series lack.
 
@@ -71,6 +71,22 @@ budget and the AC-4 rows are held to theirs. The AC-4 workloads encode the same 
 shared transforms: `ac4_mdct512_forward`, `ac4_imdct512_inverse`, `ac4_fft512_forward`,
 `ac4_qmf_analysis64` and `ac4_qmf_synthesis64`. AC-4 decode quality has its own series on
 [Quality trend](quality-trend.md#ac-4-decode-quality).
+
+TrueHD adds `truehd_stereo_*`, `truehd_51_*`, `truehd_71_*`, `truehd_51_96k_*` and `truehd_stereo_192k_*` (each
+`_encode` and `_decode`):
+24 bits, stereo, 5.1 and 7.1 at 48 kHz, 5.1 at 96 kHz and stereo at 192 kHz, from the same `reference_51.wav`. The 7.1 rows repeat its first two channels as the rear
+surrounds, and the 96 and 192 kHz rows declare the same samples at the higher rate: they measure what the codec does for a second of audio at that rate
+(more samples, another substream layout, a lower filter limit), not the music's spectrum there. `iclforge-perf` holds all ten to twice their real-time budget.
+[TrueHD against FFmpeg and DEE](truehd-comparison.md) has the comparison. The file is 16 bit; the low byte of
+each 24-bit sample is a fixed pseudo-random sequence that stands for a master's noise floor. A frame is
+an access unit, 40 samples or 0.83 ms, so a decode is a few microseconds and the table shows three
+significant digits below 1 ms. The decode series run the stream the encoder wrote from the same source,
+twenty times over. The encoder is given one access unit a call, as a live caller would, and the call that
+completes a 128-unit restart interval does the interval's whole analysis: the mean is the cost of the
+codec, and the maximum column is that burst. The memory series carry the same names and count
+three intervals. `iclforge-bench --truehd-fixtures` adds a row for each committed TrueHD and MLP stream
+(`testdata/truehd`); CI does not pass it, the rows are a table to read. [The TrueHD parity page](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-performance.md)
+has the numbers and the kernel split.
 
 Every workload is fed real programme material (`testdata/audio/reference_51.wav`,
 through `tests/performance/real_audio.hpp`), not the 440 Hz tone `iclforge-bench` and
@@ -333,6 +349,12 @@ follow the same convention, table-only (no chart to style).
     return text.split("\n").filter((l) => l.trim().length > 0).map((l) => JSON.parse(l));
   }
 
+  // Milliseconds a frame: three decimals from 1 ms up, three significant digits below it. A TrueHD
+  // access unit is 0.83 ms and a decode of one takes microseconds, which three decimals show as 0.002.
+  function perfTrendMs(ms) {
+    return ms >= 1 ? ms.toFixed(3) : ms.toPrecision(3);
+  }
+
   function perfTrendShortSha(sha) {
     return (sha || "").slice(0, 7);
   }
@@ -574,7 +596,7 @@ follow the same convention, table-only (no chart to style).
       const cy = y(r.ms_per_frame).toFixed(1);
       const color = colorOf(perfTrendCpu(r));
       const release = releasesBySha[r.commit];
-      const title = `${perfTrendShortSha(r.commit)} - ${r.ms_per_frame.toFixed(3)} ms/frame on ${r.commit_date.slice(0, 10)}, ${perfTrendEsc(perfTrendCpuLabel(perfTrendCpu(r)))}${release ? ` - release ${release.name}` : ""}`;
+      const title = `${perfTrendShortSha(r.commit)} - ${perfTrendMs(r.ms_per_frame)} ms/frame on ${r.commit_date.slice(0, 10)}, ${perfTrendEsc(perfTrendCpuLabel(perfTrendCpu(r)))}${release ? ` - release ${release.name}` : ""}`;
       svg += `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}"><title>${title}</title></circle>`;
       if (release) {
         svg += `<circle cx="${cx}" cy="${cy}" r="6.5" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="2,1.5"><title>${title}</title></circle>`;
@@ -627,7 +649,7 @@ follow the same convention, table-only (no chart to style).
       return `<tr${classes ? ` class="${classes}"` : ""}>
         <td>${r.commit_date ? r.commit_date.slice(0, 10) : ""}</td>
         <td><a href="https://github.com/${REPO}/commit/${r.commit}">${perfTrendShortSha(r.commit)}</a></td>
-        <td>${r.ms_per_frame.toFixed(3)}</td>
+        <td>${perfTrendMs(r.ms_per_frame)}</td>
         <td>${cpuCell(perfTrendCpu(r), colorOf)}</td>
         <td>${budget !== null ? budget.toFixed(3) : ""}</td>
         <td>${r.frames}</td>

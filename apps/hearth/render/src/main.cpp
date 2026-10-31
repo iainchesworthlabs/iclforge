@@ -50,7 +50,7 @@ using iclforge::hearth::PcmSink;
 
 constexpr std::string_view kUsage = R"(usage: hearth-render INPUT OUTPUT.wav [setting=value]...
 
-Plays INPUT, an .ac3, .ec3 or .ac4 elementary stream, through Hearth's engine:
+Plays INPUT, an .ac3, .ec3, .ac4, .thd or .mlp elementary stream, through Hearth's engine:
 the player, session and stream decoder the window plays an item with. What
 the engine puts out goes to OUTPUT.wav, 32-bit float, a channel for each slot
 of the layout in the layout's order.
@@ -295,6 +295,8 @@ std::optional<std::string> own_layout(std::uint16_t channels) {
             return "L,R,C,Ls,Rs";
         case 6:
             return "L,R,C,LFE,Ls,Rs";
+        case 8:
+            return "L,R,C,LFE,Ls,Rs,Lrs,Rrs";
         default:
             return std::nullopt;
     }

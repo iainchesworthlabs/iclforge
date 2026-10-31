@@ -1,0 +1,34 @@
+# The fixed patterns the content-signature readers look for, for libFuzzer's -dict=: the PEM
+# markers (libs/base/src/crypto/pem.cpp, credentials.cpp), the DER encodings of the object
+# identifiers x509.cpp and credentials.cpp compare against (kOid... in those files), the leaf
+# title the verifier requires by default (content_signature.hpp) and a signed date's shape. The
+# input's first byte picks the entry point, so a pattern reaches the reader it is for.
+
+# PEM: the markers, and the labels of a certificate, a private key and a public key.
+pem_begin_certificate="-----BEGIN CERTIFICATE-----"
+pem_end_certificate="-----END CERTIFICATE-----"
+pem_begin_ec_private_key="-----BEGIN EC PRIVATE KEY-----"
+pem_end_ec_private_key="-----END EC PRIVATE KEY-----"
+pem_begin_private_key="-----BEGIN PRIVATE KEY-----"
+pem_end_private_key="-----END PRIVATE KEY-----"
+pem_begin_public_key="-----BEGIN PUBLIC KEY-----"
+pem_dashes="-----"
+pem_crlf="\x0D\x0A"
+
+# DER: a SEQUENCE with a two-byte length, and each object identifier as an OBJECT IDENTIFIER
+# element: id-ecPublicKey, prime256v1, ecdsa-with-SHA256, -SHA384 and -SHA512, keyUsage and
+# basicConstraints.
+der_sequence="\x30\x82"
+der_oid_ec_public_key="\x06\x07\x2A\x86\x48\xCE\x3D\x02\x01"
+der_oid_prime256v1="\x06\x08\x2A\x86\x48\xCE\x3D\x03\x01\x07"
+der_oid_ecdsa_sha256="\x06\x08\x2A\x86\x48\xCE\x3D\x04\x03\x02"
+der_oid_ecdsa_sha384="\x06\x08\x2A\x86\x48\xCE\x3D\x04\x03\x03"
+der_oid_ecdsa_sha512="\x06\x08\x2A\x86\x48\xCE\x3D\x04\x03\x04"
+der_oid_key_usage="\x06\x03\x55\x1D\x0F"
+der_oid_basic_constraints="\x06\x03\x55\x1D\x13"
+der_oid_common_name="\x06\x03\x55\x04\x03"
+
+# The title the verifier requires of the leaf, and the shape of a date (ISO 8601, UTC).
+leaf_title="Code/Content Signer"
+date_utc="2026-10-29T12:34:56Z"
+date_utc_bare="2026-10-29T12:34:56"
