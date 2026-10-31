@@ -390,6 +390,16 @@ using TrackFn = std::function<void(const ReadTrack&)>;
     const ReadAtFn& read_at, std::uint64_t size, const TrackFn& on_track,
     const Reader::SampleFn& on_sample, const ReadOptions& options = {});
 
+// Delivers a sample and the offset in the source at which its bytes lie.
+using SampleAtFn = std::function<void(std::span<const std::byte>, std::uint64_t)>;
+
+// demux_seekable(), with each sample's offset in the source: a caller that keeps the offsets and
+// sizes can read the samples again later without walking the boxes.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<ReadTrack, DemuxError> demux_seekable_at(
+    const ReadAtFn& read_at, std::uint64_t size, const TrackFn& on_track,
+    const SampleAtFn& on_sample, const ReadOptions& options = {},
+    std::vector<SkippedTrack>* skipped = nullptr);
+
 // The audio tracks of an MP4 that the reader refuses for being protected, in file order, each
 // with its `protection` set: the detail behind a kProtectedTrack that demux() or
 // demux_seekable() returned, for a caller that has no Reader to ask. Walks the boxes the way those
