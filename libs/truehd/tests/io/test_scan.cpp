@@ -232,7 +232,8 @@ TEST_CASE("scan: damage is passed over as the reader passes it, and counted", "[
     CHECK(damaged->restarts.front() == clean->restarts.front());
     // Every restart it lists is a place a decoder can start: a unit with a major sync that reads.
     for (const RestartPoint& restart : damaged->restarts) {
-        ElementaryReader reader(std::span(stream).subspan(restart.offset));
+        const auto from = std::span(stream).subspan(restart.offset);
+        ElementaryReader reader(from);
         const auto unit = reader.next();
         REQUIRE(unit.has_value());
         CHECK(reader.skipped_bytes() == 0);
