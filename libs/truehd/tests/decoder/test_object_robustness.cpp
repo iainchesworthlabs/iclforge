@@ -525,10 +525,11 @@ void decode_all(const std::vector<std::byte>& stream, const DecoderConfig& confi
 
 TEST_CASE("the hand-built object streams, flipped and cut in a fixed sequence, decode or fail cleanly",
           "[truehd][decoder][robustness][mutation]") {
-    const std::array<const char*, 5> files{"hb_atmos_objects.thd", "hb_substream3_limits.thd",
+    const std::array<const char*, 6> files{"hb_atmos_objects.thd", "hb_substream3_limits.thd",
                                            "hb_substream3_fine_matrices.thd",
                                            "hb_substream3_object_bypass.thd",
-                                           "hb_substream3_object_noise.thd"};
+                                           "hb_substream3_object_noise.thd",
+                                           "hb_substream3_object_extension.thd"};
     constexpr std::size_t kUnits = 6;
     // A longer run for a trial: ICLFORGE_TRUEHD_MUTATIONS=20000 iclforge-truehd-tests "[mutation]"
     int mutations_per_file = 120;

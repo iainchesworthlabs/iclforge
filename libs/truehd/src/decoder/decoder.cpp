@@ -495,7 +495,10 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
                 const auto index = static_cast<std::size_t>(c);
-                if (spec.present[index] && spec.coeff[index] != 0) {
+                // A present coefficient of base 0 stays when its delta is not 0: the finer part
+                // refines it from nothing (ERRATA.md entry 69).
+                if (spec.present[index] &&
+                    (spec.coeff[index] != 0 || (use_fine && spec.ext_value[index] != 0))) {
                     const auto slot = static_cast<std::size_t>(plan.count++);
                     const int column = c < restart.matrix_channels()
                                            ? c

@@ -862,6 +862,78 @@
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
     },
     {
+      "name": "hb_substream3_object_extension_all",
+      "file": "hb_substream3_object_extension.thd",
+      "description": "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "object_extension",
+        "object_noise",
+        "matrices_4"
+      ],
+      "oracle": "ffmpeg-bed",
+      "ffmpeg": {
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "ef22253b25ff76b00fab9b568fc2d7ff6e0c42fb50aada41258e92c41cfbe8c8"
+      },
+      "codec": "truehd",
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 12,
+      "access_units": 16,
+      "pcm_samples": 640,
+      "stream_sha256": "90709e90c8dd5c6b4677fdad269c32a0f30bea50b8666006e023e74278b6ea39",
+      "pcm_sha256": "22b1142fc428a85de6e58ee0906345dc414c53fdbaa8f7b6954143a6302365c5"
+    },
+    {
+      "name": "hb_substream3_object_extension_best",
+      "file": "hb_substream3_object_extension.thd",
+      "description": "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "object_extension",
+        "object_noise",
+        "matrices_4"
+      ],
+      "oracle": "ffmpeg-bed",
+      "ffmpeg": {
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "ef22253b25ff76b00fab9b568fc2d7ff6e0c42fb50aada41258e92c41cfbe8c8"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 16,
+      "pcm_samples": 640,
+      "stream_sha256": "90709e90c8dd5c6b4677fdad269c32a0f30bea50b8666006e023e74278b6ea39",
+      "pcm_sha256": "ef22253b25ff76b00fab9b568fc2d7ff6e0c42fb50aada41258e92c41cfbe8c8"
+    },
+    {
       "name": "hb_atmos_objects_all",
       "file": "hb_atmos_objects.thd",
       "description": "a twelve channel substream 3 with object audio metadata in two evolution frames",

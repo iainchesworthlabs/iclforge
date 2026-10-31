@@ -16,6 +16,7 @@ the lab tool (section 7).
 | Tag | Meaning |
 |---|---|
 | VERIFIED | A stream of the owner's decodes losslessly because of it, or a hand-built test holds it and real streams agree. |
+| VERIFIED (hand-built only) | A hand-built stream of this repository holds the decoder's reading and the Python reference decodes it the same way, sample for sample. No owner's stream shows the rule and no outside decoder reads it, so it is provisional. |
 | PARSE-ONLY | The field is read to the right length (the fields after it then read as expected), but no stream shows what it does. |
 | OPEN | The meaning is unknown or the decoder's reading has no stream behind it. |
 
@@ -117,8 +118,8 @@ N is `max_matrix_chan` + 1. The matrices of substream 3 are numbered in the orde
 
 | Field | Bits | What the decoder does | Evidence |
 |---|---|---|---|
-| A: the matrices change | 1 | 0: keep the last set (and its deltas) and go to A2 | OPEN (not seen with A = 0 in an owner file; the writer writes A = 0 only for an empty set) |
-| B: headers follow | 1 (only if A) | 0: reuse the last set's headers and read coefficients only | PARSE-ONLY (the units after the first update, 4,072 in `soll_e12`, parse because of it) |
+| A: the matrices change | 1 | 0: keep the last set (and its deltas) and go to A2 | Not seen with A = 0 in an owner file. VERIFIED (hand-built only): `hb_substream3_object_extension` (the matrices and the deltas stand) |
+| B: headers follow | 1 (only if A) | 0: reuse the last set's headers and read coefficients only (the coefficients replace the deltas) | PARSE-ONLY on real streams (the units after the first update, 4,072 in `soll_e12`, parse because of it); VERIFIED (hand-built only): `hb_substream3_object_extension` |
 | count less one | 4 (only if B) | 1 to 16 on the wire; the decoder refuses more than 15 | VERIFIED |
 | per matrix, output channel | 4 | row the matrix writes (0 to 15, may exceed `max_matrix_chan`) | VERIFIED |
 | `frac_bits` | 4 | 0 to 15 | VERIFIED |
@@ -127,17 +128,31 @@ N is `max_matrix_chan` + 1. The matrices of substream 3 are numbered in the orde
 | `field_m4` | 4 | the matrix's noise shift (generator 1) | VERIFIED |
 | presence mask | N | bit c set: the matrix has a coefficient on matrix channel c; channel 0 is sent first | VERIFIED |
 | (after all headers) coefficients, per matrix, per set mask bit in ascending channel | `frac_bits` + 2, signed | the raw value | VERIFIED |
-| A2: an extension follows | 1 | | PARSE-ONLY |
-| B2: this block has deltas (only if A2) | 1 | | PARSE-ONLY |
-| C2: widths follow (only if B2) | 1 | 0: the widths of the last set stand | PARSE-ONLY |
-| per matrix, delta width w (only if C2) | 4 | | PARSE-ONLY |
-| per matrix, reserved (only if C2) | 2 | carried as read, not used | OPEN |
-| deltas: per matrix with w not 0, per set mask bit | w + 1, signed | refine the coefficient (section 3) | layout PARSE-ONLY; the scale OPEN |
+| A2: an extension follows | 1 | | PARSE-ONLY on real streams; VERIFIED (hand-built only) |
+| B2: this block has deltas (only if A2) | 1 | | PARSE-ONLY on real streams; VERIFIED (hand-built only) |
+| C2: widths follow (only if B2) | 1 | 0: the widths of the last set stand | PARSE-ONLY on real streams; VERIFIED (hand-built only) |
+| per matrix, delta width w (only if C2) | 4 | | PARSE-ONLY on real streams; VERIFIED (hand-built only) |
+| per matrix, reserved (only if C2) | 2 | carried as read, not used | OPEN (the hand-built stream sends 0 to 3 and the decode ignores it) |
+| deltas: per matrix with w not 0, per set mask bit | w + 1, signed | refine the coefficient (section 3) | layout PARSE-ONLY on real streams; the layout and the scale 2^-(w + 1) VERIFIED (hand-built only), the scale also supported by the owner's runs (section 5) |
 
 A set of headers whose `frac_bits` less `f_shift` exceeds 15 is refused (the finest coefficient is 2^-15). When new headers are sent, each
-matrix keeps the extension width and reserved field of the matrix at the same place in the last set. The deltas of a set stand until
-the set is replaced. The writer sends A = 1, B = 1, no extension, and A = 0 with no extension for an empty set. A present coefficient
-of value 0 is dropped when the matrix is set up, so a delta on it is lost.
+matrix keeps the extension width and reserved field of the matrix at the same place in the last set (VERIFIED, hand-built only). The deltas
+of a set stand until the set is replaced; sending coefficients again (A = 1) clears them, so a block that sends coefficients and no
+deltas has none. A restart clears the set with its widths. A present coefficient of base 0 stays in the matrix when its delta is not 0
+(a refinement from nothing); a coefficient with base and delta 0 is dropped as before. Held by the hand-built stream
+`hb_substream3_object_extension` (below), which fails when the zero base is dropped. The library's encoder writes A = 1, B = 1, no
+extension, and A = 0 with no extension for an empty set.
+
+**The hand-built stream.** `hb_substream3_object_extension` (`tools/references/truehd_writer.py`, `case_substream3_object_extension`) has
+four matrices (outputs 8 to 11; `frac_bits` 12, 13 with `f_shift` 1, 0 and 15; noise shifts 2, 0, 5 and 3) and seven matrix sections in
+16 access units: new headers with C2 (widths 3, 5, 2, 0; the reserved bits 1, 2, 3, 0) and deltas, with present coefficients of base 0
+carrying a delta; new headers with different masks and C2 clear (the widths stand, the deltas follow the new masks); A = 0 with
+A2 = 0 (the matrices and deltas stand); A = 1 and B = 0 with new coefficients, widths standing and new deltas; a restart with A2 set and B2 clear (no
+deltas, widths gone); A = 0 with C2 (widths 0, 4, 6, 2) and deltas on the set that stands; and A = 0 again (those deltas stand). The coded
+channels are derived by running the matrices backwards in integers. The Python reference decodes it with its own implementation of the
+rule (`truehd_syntax.py`, `read_object_matrices` and `decode_block`), and C++ and Python both give the signal sample for sample. Each
+of these changes fails the stream's decode (ERRATA 69): the deltas left out, the scale 2^-w, the widths not inherited, the deltas
+cleared under A = 0, and the zero base dropped.
 
 **Where the layout evidence comes from.** The section reads to the bit, with the extension bit 0, in nine restarts of DEE's silent
 encodes and in the steady restart of the disc (ERRATA 69). In `ctl_c` unit 256 (a restart with A2 set) the 1,184 bits that follow the
@@ -151,7 +166,7 @@ Rows are 32-bit integers. The decoder scales every coefficient to 2^-15, so a su
 1. **Coefficient.** With `scale = 15 - frac_bits + f_shift`, the coefficient at 2^-15 is `raw << scale`. The real value is
    `raw / 2^(frac_bits - f_shift)`. The finer extension part, if the matrix has width w not 0, is `delta << scale`, read in units of
    2^-(w + 1) of the coefficient's last place (the base's last place is 2^-(frac_bits - f_shift)).
-2. **Sum.** `sum = Σ row[c] × coeff[c]` over the matrix's coefficients, in 64 bits.
+2. **Sum.** `sum = Σ row[c] × coeff[c]` over the matrix's coefficients, in 64 bits. A coefficient whose base is 0 is kept when its delta is not 0.
 3. **Noise.** If `field_m4` (the shift s) is not 0, add `buffer[index] × 2^(s + 8)`. The buffer, its index and its stride are in section 4.
 4. **Fine terms.** If w is not 0, `sum = (sum << (w + 1)) + Σ row[c] × (delta[c] << scale)` and the final shift becomes 15 + w + 1.
 5. **Shift and mask.** `value = (sum >> shift) & keep`, an arithmetic shift (a negative sum rounds toward minus infinity). `keep` clears
@@ -179,8 +194,9 @@ coefficient of 4096); the sample values, the noise shift of 2, the buffer value 
 
 The sample row 0 and row 11 values in `z_short.mlp` are small (within about -2 to 2): the rows carry the encoder's dither, and the
 three matrices cancel it by adding it back, which is why the noise shift has to be right for the check to pass (a shift of
-`field_m4` plus or minus 1 passes no interval). The extension scale (step 4) is OPEN: only `test_kernels.cpp` holds the arithmetic and
-no hand-built stream does.
+`field_m4` plus or minus 1 passes no interval). The extension scale (step 4) is held by the hand-built stream
+`hb_substream3_object_extension` and by `test_kernels.cpp` (VERIFIED, hand-built only: no outside decoder confirms it, and the owner's
+streams give only the counts in section 5).
 
 After the matrices, each output channel p takes row m (from `ch_assign`), applies `output_shift[m]`, is folded into the check and
 written as a 24-bit sample (sign-extended).
@@ -249,7 +265,7 @@ tests each is in `DecoderLab` (`libs/truehd/include/iclforge/truehd/decoder/deco
 | Filter histories cleared at an object restart (`object_restart_clears`) | No difference at all |
 | Noise shift = `field_m4` plus or minus 1 | Passes no interval (`field_m4` itself is right) |
 | `field_2b` in the coefficient divisor | `ctl_c` passes 1 of 93 intervals, against 43 without |
-| Extension delta scale 2^-w instead of 2^-(w + 1) | Fewer pass: `soll_e12` 10 against 11, `soll_sil6` 15 against 18 |
+| Extension delta scale 2^-w instead of 2^-(w + 1) | Fewer pass: `soll_e12` 10 against 11, `soll_sil6` 15 against 18. The hand-built `hb_substream3_object_extension` fails under it |
 | The check folds the coded channels alone, the channels below them, or the coded samples before the matrices, each by the matrix-channel shift and by the place shift (`fold_scope` 1 to 6) | At chance, 0 to 3 of 244 |
 | The check folds the matrix channels from N upward, N = 1 to 8 (`fold_scope` 11 to 18) | At chance |
 | The check folds some subset of the 24 per-channel folds (after and before the matrices) | None above 3 of 12 intervals on `EX_00002b.thd`, 2 of 12 on `soll_sil6.mlp` |
@@ -277,8 +293,9 @@ starting "block header at bit").
 
 **The extension.** What the deltas do, and their scale: the decoder applies `delta / 2^(w + 1)` of the base's last place, which lifts
 `soll_e12` from 9 to 11 passing checks and `soll_sil6` from 15 to 18. The deltas of `ctl_c` and `EX_00002a` are near 0 and the scale is
-not exercised there. The 2 reserved bits that follow each width are not understood. A present coefficient of 0 with a delta is dropped by
-the decoder, which may be wrong.
+not exercised there. The hand-built stream `hb_substream3_object_extension` holds the decoder's rule (section 2), but it holds the
+decoder's reading and no outside decoder's. The 2 reserved bits that follow each width are not understood. A present coefficient of 0
+with a delta is kept (a refinement from nothing); nothing in the owner's streams shows whether a real encoder sends one.
 
 **`field_2b` bit 1.** Carried as read; no effect is known. `field_2b` bit 0 is taken as the LSB bypass because a doubled coefficient
 (2.0 on the output's own row in `ctl_c`, where every other matrix has 1.0) loses the low bit that the bypass restores, and the block
@@ -288,13 +305,11 @@ data length is right with one bit per bypass matrix and sample. That reading has
 **The missing first matrix in `ctl_c` at unit 256.** The first matrix of that restart (output 8, 9 coefficients) is missing from the
 matrix list the decoder reads. Why is not known. Unit 256 is also the unit that shows the extension layout.
 
-**Without evidence.** ERRATA records no stream that shows a section with A = 0, a different output shift on each row of substream 3, the
+**Without evidence.** ERRATA records no owner's stream that shows a section with A = 0 (the hand-built extension stream holds the decoder's reading), a different output shift on each row of substream 3, the
 quantiser mask on matrix outputs, or several blocks in one unit of substream 3.
 
 **Not changed in this repository.** The encoder writes substream 3 with `min_chan` 0 and no matrix (the discs code rows 8 and up and
-rebuild the rest with matrices, ERRATA 63, question 63). The Python reference (`truehd_syntax.py`) reads the extension and does not apply
-the deltas; for A = 0 it returns an empty matrix list without reading the A2 bit, and for B = 0 it raises an error, where the decoder
-keeps the last set, reads A2 and reuses the last headers. Its docstring still says DEE never sets the extension.
+rebuild the rest with matrices, ERRATA 63, question 63).
 
 ## 7. The lab tool
 
@@ -354,5 +369,5 @@ earlier search for the layout: it tries readings of the standard matrix section,
 | restart, noise draw, bypass, fine terms, output stage, fold | `libs/truehd/src/decoder/decoder.cpp`, `kernels.hpp` |
 | lab switches | `DecoderLab` in `decoder.hpp`; the tool in `libs/truehd/tests/tools/ss3_lab.cpp` |
 | Python reference and writer | `tools/references/truehd_syntax.py`, `truehd_writer.py` |
-| hand-built streams | `testdata/truehd/handbuilt/hb_substream3_fine_matrices.thd`, `hb_substream3_object_noise.thd`, `hb_substream3_object_bypass.thd`, `hb_substream3_limits.thd`, `hb_atmos_objects.thd` |
-| tests | `libs/truehd/tests/core/test_syntax.cpp`, `tests/decoder/test_kernels.cpp`, `test_substream3.cpp`, `test_handbuilt.cpp` |
+| hand-built streams | `testdata/truehd/handbuilt/hb_substream3_fine_matrices.thd`, `hb_substream3_object_noise.thd`, `hb_substream3_object_bypass.thd`, `hb_substream3_object_extension.thd`, `hb_substream3_limits.thd`, `hb_atmos_objects.thd` |
+| tests | `libs/truehd/tests/core/test_syntax.cpp`, `tests/decoder/test_kernels.cpp`, `test_substream3.cpp`, `test_handbuilt.cpp` (the extension stream) |

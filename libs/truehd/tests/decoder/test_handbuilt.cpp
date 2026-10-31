@@ -479,3 +479,59 @@ TEST_CASE("the 16-channel stream has an object substream and four directory entr
     CHECK(info->channels[2] == 8);
     CHECK(info->channels[3] == 16);
 }
+
+TEST_CASE("the object matrices' extension refines the coefficients, sample for sample",
+          "[truehd][handbuilt][no-external-oracle]") {
+    // ERRATA entry 69, "The extension". hb_substream3_object_extension is four object matrices over
+    // sixteen access units in two restart intervals, with seven matrix sections:
+    //   sample   0  new headers, C2 with widths 3, 5, 2, 0 and deltas; the matrix of width 0 sends
+    //               none, and a present coefficient of base 0 has a delta (refined from nothing)
+    //   sample  80  new headers, C2 clear: the widths of the matrices at the same place stand
+    //   sample 160  A clear: the matrices and their deltas stand
+    //   sample 240  A set and B clear: new coefficients on the headers that stand, the widths stand
+    //   sample 320  a restart: A2 set, B2 clear, no deltas, and the widths are gone
+    //   sample 400  A clear, C2 with new widths and deltas on the set that stands
+    //   sample 480  A clear: the deltas of sample 400 stand
+    // The expected signal is the one the Python writer built the stream from, and the Python decode
+    // (tools/references/truehd_syntax.py) agrees with this one. Each part of the rule changes the
+    // samples when it is left out: the finer part, its scale 2^-(width + 1), the inherited widths,
+    // the deltas standing under A = 0, and the zero base. No decoder outside this repository reads
+    // the section.
+    std::ifstream manifest_file(dir() + "/manifest.json");
+    REQUIRE(manifest_file.good());
+    const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
+    std::string expected;
+    for (const nlohmann::json& fixture : manifest["fixtures"]) {
+        if (fixture["name"] == "hb_substream3_object_extension_all") {
+            expected = fixture["pcm_sha256"].get<std::string>();
+            CHECK(fixture["channels"].get<int>() == 12);
+        }
+    }
+    REQUIRE_FALSE(expected.empty());
+
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_substream3_object_extension.thd");
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    std::vector<std::byte> pcm;
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        for (const std::int32_t sample : (*decoded)->pcm) {
+            const auto word = static_cast<std::uint32_t>(sample) << 8U;
+            for (unsigned shift = 0; shift < 32; shift += 8) {
+                pcm.push_back(static_cast<std::byte>((word >> shift) & 0xFFU));
+            }
+        }
+    }
+    CHECK(pcm.size() == 640U * 12U * 4U);
+    CHECK(hex(iclforge::base::crypto::sha256(pcm)) == expected);
+    // Seven blocks send a matrix section, and the lossless checks of the first interval, which
+    // fold the output after the matrices, hold in all four substreams.
+    CHECK(decoder.counters().matrix_headers == 7);
+    CHECK(decoder.counters().lossless_checks_ok == 4);
+    CHECK(decoder.counters().lossless_check_failures == 0);
+    CHECK(decoder.counters().check_failures == 0);
+}
