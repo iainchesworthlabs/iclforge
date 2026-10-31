@@ -133,6 +133,8 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
         stream_suffix = ".ec3";
     } else if (codec == "ac4") {
         stream_suffix = ".ac4";
+    } else if (codec == "truehd") {
+        stream_suffix = ".thd";
     } else {
         return std::unexpected(Message{"unknown-codec", {codec}});
     }
@@ -164,6 +166,57 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     if (container != "elementary" && !direct_mp4) {
         stream = request.scratch / path_of(stem + stream_suffix);
         out.scratch_files.push_back(stream);
+    }
+
+    // ---- TrueHD: one source, one command ---------------------------------------------------------
+    // `forge truehd-encode <source> <stream>` [truehd-downmix=standard] [verify], and then the
+    // container command like any other stream's. A lossless encode has no bit rate, tools, layout
+    // or metadata of the AC-3 family, so a project that names them for it is refused, not run with
+    // them dropped; the bit rate the window always writes is the one thing left out.
+    if (codec == "truehd") {
+        if (atmos) {
+            return std::unexpected(Message{"truehd-no-atmos", {}});
+        }
+        if (container == "fmp4") {
+            return std::unexpected(Message{"truehd-no-fmp4", {}});
+        }
+        if (sources.size() != 1) {
+            return std::unexpected(Message{"truehd-one-source", {std::to_string(sources.size())}});
+        }
+        if (const Json* given = member(project, "assignments");
+            given != nullptr && given->is_array() && !given->empty()) {
+            return std::unexpected(Message{"truehd-no-assignments", {}});
+        }
+        if (const Json* given = member(encode, "options");
+            given != nullptr && given->is_object() && !given->empty()) {
+            return std::unexpected(Message{"truehd-no-options", {}});
+        }
+        Step first;
+        first.argv = {"truehd-encode", sources.front(), utf8(stream)};
+        if (const Json* thd = member(encode, "truehd"); thd != nullptr && thd->is_object()) {
+            if (string_of(*thd, "downmix", "none") == "standard") {
+                first.argv.emplace_back("truehd-downmix=standard");
+            }
+            if (bool_of(*thd, "verify")) {
+                first.argv.emplace_back("verify");
+            }
+        }
+        out.steps.push_back(std::move(first));
+        if (container != "elementary") {
+            static constexpr std::array<std::pair<std::string_view, std::string_view>, 4> kThd{{
+                {"matroska", "mkv"},
+                {"spdif", "spdif"},
+                {"mp4", "mp4"},
+                {"mpegts", "ts"},
+            }};
+            for (const auto& [id, command] : kThd) {
+                if (id == container) {
+                    out.steps.push_back(
+                        Step{{std::string{command}, utf8(stream), utf8(out.output)}});
+                }
+            }
+        }
+        return out;
     }
 
     // ---- the rate, the layout and the routing -------------------------------------------------

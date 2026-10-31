@@ -1730,7 +1730,7 @@ practice; `dsurmod` additionally exists only for coding mode 2/0 (§5.4.2.7).
 
 | Command | What it does |
 |---|---|
-| `project` | Encodes what a Forge project file (`.forgeproj`, [the format](../gui/projects.md)) says: the sources, the channel plan, the assignments and the encode settings, by running the commands they stand for. `forge project song.forgeproj` writes the stream (or the container's file) beside the project, named for it; `forge project song.forgeproj out.ac3` says where, and `print` shows the commands it would run and runs none of them |
+| `project` | Encodes what a Forge project file (`.forgeproj`, [the format](../gui/projects.md)) says: the sources, the channel plan, the assignments and the encode settings, by running the commands they stand for. `forge project song.forgeproj` writes the stream (or the container's file) beside the project, named for it; `forge project song.forgeproj out.ac3` says where, and `print` shows the commands it would run and runs none of them. A project of codec `truehd` runs `forge truehd-encode` (and `mkv`, `mp4`, `ts` or `spdif` for a container) |
 
 ```bash
 forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj out.ac3
