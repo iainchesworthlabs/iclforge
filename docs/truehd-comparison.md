@@ -84,14 +84,14 @@ and in FFmpeg's strict decode, sample for sample.
 | film 7.1 (TrueHD) F b | 8 | 45 | 17,525,586 * | 11,332,580 | - | 21.9% |
 | film 7.1 (TrueHD) G a | 8 | 45 | 16,358,580 * | 13,383,746 | - | 25.8% |
 | film 7.1 (TrueHD) G b | 8 | 45 | 17,919,668 * | 14,573,614 | - | 28.1% |
-| film 96 kHz stereo H a | 2 | 40 | 7,302,522 | 6,516,698 | 0.892 | 47.2% |
-| film 96 kHz stereo H c | 2 | 40 | 4,882,172 | 4,120,022 | 0.844 | 29.8% |
-| film 96 kHz 5.1 H a | 6 | 40 | 16,900,140 | 15,899,768 | 0.941 | 38.3% |
-| film 96 kHz 5.1 H c | 6 | 40 | 12,129,056 | 10,969,150 | 0.904 | 26.4% |
-| film 96 kHz 7.1 H a | 8 | 40 | 32,347,542 * | 20,764,856 | - | 37.6% |
-| film 96 kHz 7.1 H b | 8 | 40 | 33,913,138 * | 23,047,752 | - | 41.7% |
-| film 96 kHz 7.1 H c | 8 | 40 | 25,857,542 * | 13,769,546 | - | 24.9% |
-| film 96 kHz 7.1 H d | 8 | 40 | 28,795,906 * | 16,848,970 | - | 30.5% |
+| film 96 kHz stereo H a | 2 | 40 | 7,302,522 | 6,516,698 | 0.892 | 28.3% |
+| film 96 kHz stereo H c | 2 | 40 | 4,882,172 | 4,120,022 | 0.844 | 17.9% |
+| film 96 kHz 5.1 H a | 6 | 40 | 16,900,140 | 15,899,768 | 0.941 | 23.0% |
+| film 96 kHz 5.1 H c | 6 | 40 | 12,129,056 | 10,969,150 | 0.904 | 15.9% |
+| film 96 kHz 7.1 H a | 8 | 40 | 32,347,542 * | 20,764,856 | - | 22.5% |
+| film 96 kHz 7.1 H b | 8 | 40 | 33,913,138 * | 23,047,752 | - | 25.0% |
+| film 96 kHz 7.1 H c | 8 | 40 | 25,857,542 * | 13,769,546 | - | 14.9% |
+| film 96 kHz 7.1 H d | 8 | 40 | 28,795,906 * | 16,848,970 | - | 18.3% |
 
 On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. FFmpeg's 7.1 streams do not decode to the source, so they
 have no ratio. A 7.1 file with the standard channel mask lists BL BR before SL SR, TrueHD has Ls Rs before Lrs Rrs, and
