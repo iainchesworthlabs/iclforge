@@ -147,7 +147,7 @@ struct MatrixSpec {
 // The matrices a block header sends: `count` of `items` are used. A fixed array, so that reading a
 // header does not allocate.
 struct MatrixSet {
-    std::array<MatrixSpec, kMaxMatrices> items{};
+    std::array<MatrixSpec, kMaxObjectMatrices> items{};
     std::uint8_t count = 0;
     bool extension = false;  // object-audio matrices: a second precision term followed
     friend bool operator==(const MatrixSet&, const MatrixSet&) = default;

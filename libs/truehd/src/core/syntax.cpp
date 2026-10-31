@@ -107,9 +107,9 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
         const bool headers = reader.read(1) != 0;
         if (headers) {
             const unsigned count = reader.read(4) + 1;
-            if (count > kMaxMatrices) {
+            if (count > static_cast<unsigned>(kMaxObjectMatrices)) {
                 return std::unexpected(
-                    Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
+                    Error{ErrorKind::kBadParameter, "more than 16 primitive matrices"});
             }
             set.count = static_cast<std::uint8_t>(count);
             for (unsigned m = 0; m < count; ++m) {

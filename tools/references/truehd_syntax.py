@@ -348,8 +348,8 @@ class Substream:
         if not bits.read(1):
             raise StreamError("object matrices without their header loop")
         count = bits.read(4) + 1
-        if count > 15:
-            raise StreamError("more than 15 primitive matrices")
+        if count > 16:
+            raise StreamError("more than 16 primitive matrices")
         channels = self.max_matrix_chan + 1
         headers = []
         for _ in range(count):

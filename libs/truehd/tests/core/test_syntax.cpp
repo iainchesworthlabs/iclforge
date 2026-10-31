@@ -417,6 +417,37 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     CHECK(refused.error().kind == ErrorKind::kBadParameter);
 }
 
+TEST_CASE("the object matrix section holds 16 matrices, the largest count its four bits give",
+          "[truehd][syntax]") {
+    BlockContext context;
+    context.max_chan = 15;
+    context.max_matrix_chan = 15;
+    context.object_matrices = true;
+    context.presence_flags = presence::kMatrix;
+
+    MatrixSet set;
+    set.count = 16;
+    for (unsigned m = 0; m < 16; ++m) {
+        set.items[m].out_ch = static_cast<std::uint8_t>(m);
+        set.items[m].frac_bits = 5;
+        set.items[m].present[m] = true;
+        set.items[m].coeff[m] = 32;  // 1.0 at frac_bits 5
+    }
+    BlockHeaderSpec header;
+    header.matrices = set;
+    iclforge::BitWriter writer;
+    write_block_header(writer, context, header);
+    writer.align();
+    const std::vector<std::byte> bytes = writer.take();
+    iclforge::BitReader reader(bytes);
+    const auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    REQUIRE(read->matrices.has_value());
+    CHECK(read->matrices->count == 16);
+    CHECK(read->matrices->items[15].out_ch == 15);
+    CHECK(read->matrices->items[15].coeff[15] == 32);
+}
+
 TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 0;

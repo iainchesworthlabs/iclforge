@@ -40,6 +40,7 @@ inline constexpr int kMaxSubstreams = 4;  // TH spec §4.1, App. A
 inline constexpr int kMaxChannels = 16;   // matrix channels 0..15, TH spec §7.1
 inline constexpr int kNoiseChannels = 2;  // the two channels a matrix can draw noise from
 inline constexpr int kMaxMatrices = 15;   // TH spec §10.3, substream 3
+inline constexpr int kMaxObjectMatrices = 16;  // the object section counts 1 to 16 (4 bits and one)
 inline constexpr int kMaxFirOrder = 8;    // TH spec §9.3
 inline constexpr int kMaxIirOrder = 4;
 inline constexpr int kMaxFilterOrder = 8;     // FIR order + IIR order

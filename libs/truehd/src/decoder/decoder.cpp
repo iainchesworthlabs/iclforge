@@ -86,7 +86,7 @@ struct SubstreamState {
     bool object_have = false;
     int block_size = kDefaultBlockSize;
     int matrix_count = 0;
-    std::array<MatrixPlan, kMaxMatrices> matrices{};
+    std::array<MatrixPlan, kMaxObjectMatrices> matrices{};
     std::array<std::int8_t, kMaxChannels> output_shift{};
     // The matrix channel each output channel takes: ch_assign read the way TH spec §7.4 words it,
     // `ch_assign[matrix channel]` being the output channel (ERRATA.md entry 42).
@@ -606,7 +606,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             plan.bias -= std::int64_t{1} << (lsb_bits - 1);
         }
     }
-    std::array<std::uint8_t, kMaxMatrices> bypass_matrix{};
+    std::array<std::uint8_t, kMaxObjectMatrices> bypass_matrix{};
     int bypass_count = 0;
     for (int m = 0; m < state.matrix_count; ++m) {
         if (state.matrices[static_cast<std::size_t>(m)].lsb_bypass) {
