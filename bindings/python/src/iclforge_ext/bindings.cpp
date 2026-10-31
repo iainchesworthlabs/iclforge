@@ -1938,4 +1938,6 @@ PYBIND11_MODULE(_iclforge, m) {
     iclforge::python::register_ac4(m);
 
     iclforge::python::register_lyrics(m);
+
+    iclforge::python::register_truehd(m);
 }
