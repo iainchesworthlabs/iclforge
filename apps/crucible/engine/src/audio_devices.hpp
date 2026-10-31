@@ -30,6 +30,15 @@
 
 namespace iclforge::crucible {
 
+// What a burst sink carries. The third argument of BurstSink::start was a
+// bool (E-AC-3 or not) while there were two; TrueHD's MAT bursts made it
+// three, and a flag cannot name a third.
+enum class BurstFormat : std::uint8_t {
+    kAc3,    // IEC 61937 data type 1
+    kEac3,   // data type 21
+    kTrueHd  // data type 22, the MAT carrier
+};
+
 // What a render endpoint probe finds, before the policy turns it into
 // EndpointFacts (output_policy.hpp adds the null-sink judgement).
 struct DeviceFacts {
@@ -38,18 +47,21 @@ struct DeviceFacts {
     bool is_default = false;
     bool accepts_eac3 = false;
     bool accepts_ac3 = false;
+    // Always false from the real probe for now: no audio backend carries MAT
+    // yet (libs/audio has no TrueHD BitstreamFormat). The fakes script it.
+    bool accepts_truehd = false;
     std::uint16_t shared_channels = 0;
     bool spatial = false;
     std::uint32_t spatial_max_objects = 0;
 };
 
-// IEC 61937 bursts to an exclusive-mode endpoint (Atmos, DD+ 5.1, DD 5.1).
+// IEC 61937 bursts to an exclusive-mode endpoint (Atmos, DD+ 5.1, DD 5.1, TrueHD).
 class BurstSink {
 public:
     virtual ~BurstSink() = default;
     [[nodiscard]] virtual std::expected<void, std::string> start(const std::string& device_id,
                                                                  std::uint32_t sample_rate,
-                                                                 bool eac3) = 0;
+                                                                 BurstFormat format) = 0;
     virtual bool submit(std::span<const std::byte> burst) = 0;
     // True from a successful start() until stop() - or until the endpoint
     // goes away under the stream, exactly as iclforge::audio::PassthroughSink::

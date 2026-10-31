@@ -45,6 +45,7 @@ struct EndpointFacts {
     bool is_null_sink = false;    // the demo's own (or a stand-in) silent endpoint
     bool accepts_eac3 = false;    // IsFormatSupported, exclusive, E-AC-3 IEC 61937
     bool accepts_ac3 = false;     // likewise AC-3
+    bool accepts_truehd = false;  // likewise TrueHD in MAT
     std::uint16_t shared_channels = 0;  // the shared-mode mix format's channel count
     bool spatial = false;         // a spatial sound format is enabled on it
     std::uint32_t spatial_max_objects = 0;

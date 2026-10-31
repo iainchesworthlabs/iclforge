@@ -33,10 +33,17 @@ namespace {
 class WasapiBurstSink final : public BurstSink {
 public:
     std::expected<void, std::string> start(const std::string& device_id, std::uint32_t sample_rate,
-                                           bool eac3) override {
+                                           BurstFormat format) override {
+        // libs/audio has no TrueHD BitstreamFormat yet (no backend carries
+        // MAT), so the probe never offers it and a stage that asks anyway
+        // is told why.
+        if (format == BurstFormat::kTrueHd) {
+            return std::unexpected(std::string("TrueHD passthrough is not available in this build"));
+        }
         const auto started = sink_.start(device_id, sample_rate,
-                                         eac3 ? iclforge::audio::BitstreamFormat::kEac3
-                                              : iclforge::audio::BitstreamFormat::kAc3);
+                                         format == BurstFormat::kEac3
+                                             ? iclforge::audio::BitstreamFormat::kEac3
+                                             : iclforge::audio::BitstreamFormat::kAc3);
         if (!started) {
             return std::unexpected(std::string(iclforge::audio::describe(started.error())));
         }

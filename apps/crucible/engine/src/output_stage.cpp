@@ -218,6 +218,7 @@ std::vector<EndpointFacts> OutputStage::enumerate() const {
                                          lower(device.name).find(needle) != std::string::npos,
                          .accepts_eac3 = device.accepts_eac3,
                          .accepts_ac3 = device.accepts_ac3,
+                         .accepts_truehd = device.accepts_truehd,
                          .shared_channels = device.shared_channels,
                          .spatial = device.spatial,
                          .spatial_max_objects = device.spatial_max_objects});
@@ -269,7 +270,7 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
         case OutputMode::kAtmos:
         case OutputMode::kDdPlus51: {
             impl_->passthrough = impl_->devices->burst_sink();
-            const auto started = impl_->passthrough->start(choice.endpoint_id, config_.sample_rate, true);
+            const auto started = impl_->passthrough->start(choice.endpoint_id, config_.sample_rate, BurstFormat::kEac3);
             if (!started.has_value()) {
                 return refuse(started.error());
             }
@@ -278,7 +279,7 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
         }
         case OutputMode::kDd51: {
             impl_->passthrough = impl_->devices->burst_sink();
-            const auto started = impl_->passthrough->start(choice.endpoint_id, config_.sample_rate, false);
+            const auto started = impl_->passthrough->start(choice.endpoint_id, config_.sample_rate, BurstFormat::kAc3);
             if (!started.has_value()) {
                 return refuse(started.error());
             }

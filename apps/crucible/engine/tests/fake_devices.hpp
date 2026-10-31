@@ -25,7 +25,7 @@ struct SinkRecord {
     std::mutex mutex;
     std::string device_id;
     std::uint32_t sample_rate = 0;
-    bool eac3 = false;
+    BurstFormat format = BurstFormat::kAc3;
     std::uint16_t channels = 0;
     std::uint32_t channel_mask = 0;
     bool low_latency = false;
@@ -58,14 +58,14 @@ class FakeBurstSink final : public BurstSink {
 public:
     explicit FakeBurstSink(std::shared_ptr<SinkRecord> record) : record_(std::move(record)) {}
     std::expected<void, std::string> start(const std::string& device_id, std::uint32_t sample_rate,
-                                           bool eac3) override {
+                                           BurstFormat format) override {
         const std::lock_guard lock(record_->mutex);
         if (record_->refuse_start) {
             return std::unexpected("refused by the test");
         }
         record_->device_id = device_id;
         record_->sample_rate = sample_rate;
-        record_->eac3 = eac3;
+        record_->format = format;
         record_->started = true;
         record_->running = true;
         return {};

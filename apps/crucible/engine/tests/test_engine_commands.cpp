@@ -348,7 +348,7 @@ TEST_CASE("crucible engine commands: pin, preferred endpoint and bypass reach th
         const std::lock_guard devices_lock(rig.devices->mutex);
         for (const auto& sink : rig.devices->burst_sinks) {
             const std::lock_guard lock(sink->mutex);
-            if (sink->started && !sink->eac3 && sink->submits > 0) {
+            if (sink->started && sink->format == BurstFormat::kAc3 && sink->submits > 0) {
                 return true;
             }
         }
