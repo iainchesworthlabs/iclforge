@@ -63,7 +63,7 @@ legs](ci-agentic.md#the-legs)).
 
 Within a lane, the tier picks the legs and the extra passes (the leg table in [The
 tiers](ci-agentic.md#the-tiers)), and some jobs are nightly only: `linux-appimage` and the
-`core` jobs `coverage`, `abi-gate` and `ffmpeg-validate` do not run in the run after a merge
+`core` jobs `coverage`, `coverage-qt`, `abi-gate` and `ffmpeg-validate` do not run in the run after a merge
 (`inputs.tier != 't2'`).
 
 A change confined to `apps/demos/android/` runs `build-android` after a merge and skips `build-wasm`,
@@ -82,16 +82,17 @@ comment in `_build.yml`.
 
 ## The core lane
 
-`_ci-core.yml` contains coverage, ADM and Hearth validation, the ABI gate, FFmpeg-oracle
-validation, and the external-comparison and object-quality persisters - seven jobs, called as one
-`core` job and gated on `needs.changes.outputs.core == 'true'`. Only a change that touches the
-library or trips a conservative fallback runs those seven jobs; a platform-only change does not. None tests anything
+`_ci-core.yml` contains coverage (and, for the three Qt applications, `coverage-qt`), ADM and Hearth
+validation, the ABI gate, FFmpeg-oracle validation, and the external-comparison and object-quality
+persisters - eight jobs, called as one `core` job and gated on `needs.changes.outputs.core == 'true'`.
+Only a change that touches the library or trips a conservative fallback runs those eight jobs; a platform-only change does not. None tests anything
 platform-specific, so this is the intended behaviour, not an accident of the lane boundaries - see
 each job's own header comment in `_ci-core.yml` for why.
 
-Three of them run only above tier `t2` (`inputs.tier != 't2'`), that is in the nightly run and in
-a run at tier `all`, which the `ci:deep` label dispatches: `coverage`, `abi-gate` and
-`ffmpeg-validate`. The two persisters read `ffmpeg-validate`'s artifacts. The performance and
+Four of them run only above tier `t2` (`inputs.tier != 't2'`), that is in the nightly run and in
+a run at tier `all`, which the `ci:deep` label dispatches: `coverage`, `coverage-qt`, `abi-gate` and
+`ffmpeg-validate`. `coverage-qt` installs the Qt kit the Windows legs pin, builds forge-gui, Crucible
+and Hearth's window instrumented and gates their C++ (`tools/checks/coverage_report.sh -q`). The two persisters read `ffmpeg-validate`'s artifacts. The performance and
 memory comparisons and their two gates have left `_ci-core.yml`: they ran on pull requests until the
 gate replaced `ci.yml` there, and now `_compare.yml`, called by `pr-gate.yml`, runs them for a
 merge-queue entry that changes `src/` ([The merge queue](ci-agentic.md#the-merge-queue)). `ci.yml`'s
@@ -118,7 +119,7 @@ performance publisher among its own `needs`.
 required check: branch protection points at `pr-gate.yml`'s `CI Status`, and this job has a
 different name so the two cannot be mistaken for each other on a commit both ran on.
 
-`_ci-core.yml` threads each of the six jobs `ci-status` needs (`coverage`, `adm-validate`,
+`_ci-core.yml` threads each of the seven jobs `ci-status` needs (`coverage`, `coverage-qt`, `adm-validate`,
 `hearth-validate`, `ffmpeg-validate`, `persist-external-comparison-trend`,
 `persist-object-quality-trend`) out through its own
 `workflow_call.outputs`, rather than folding them into one aggregate result the way
