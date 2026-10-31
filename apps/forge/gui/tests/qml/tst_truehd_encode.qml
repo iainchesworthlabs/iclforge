@@ -87,6 +87,37 @@ TestCase {
         compare(QcController.integrityOk, true);
     }
 
+    // A TrueHD session is saved as a project of codec truehd: the WAV, and the dialog's two options.
+    // `forge project` runs the same file as truehd-encode (apps/forge/cli/tests/test_cli_project.cpp).
+    function test_aTrueHdSessionIsSavedAsAProjectAndComesBack() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        TruehdEncodeController.clear();
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.verify = true;
+        TruehdEncodeController.standardDownmix = true;
+        const file = Qt.resolvedUrl("_test_output/tst_truehd_project.forgeproj");
+        verify(win.saveProjectFile(file), "the project could not be saved");
+
+        const project = win.captureProject();
+        compare(project.encode.codec, "truehd");
+        compare(project.sources.length, 1);
+        compare(project.encode.truehd.verify, true);
+        compare(project.encode.truehd.downmix, "standard");
+        compare(Object.keys(project.encode.options).length, 0);
+
+        TruehdEncodeController.clear();
+        TruehdEncodeController.verify = false;
+        TruehdEncodeController.standardDownmix = false;
+        compare(TruehdEncodeController.sourcePath, "");
+        verify(win.openProjectFile(file));
+        verify(TruehdEncodeController.sourcePath.indexOf("speakers-3-0-lfe.wav") >= 0,
+               TruehdEncodeController.sourcePath);
+        compare(TruehdEncodeController.verify, true);
+        compare(TruehdEncodeController.standardDownmix, true);
+        compare(EncoderController.sourceModel.length, 0);
+    }
+
     // What is not a WAV is refused with the reader's sentence, and nothing is written.
     function test_aFileThatIsNotAWavIsRefusedAndNothingIsWritten() {
         const win = createTemporaryObject(mainWindowComponent, testCase);

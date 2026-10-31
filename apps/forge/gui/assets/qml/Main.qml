@@ -1205,6 +1205,8 @@ ApplicationWindow {
             return qsTr("Source %1 has no path and was left out.").arg(a[0]);
         case "source-missing":
             return qsTr("%1 was not found, so it was not loaded.").arg(a[0]);
+        case "truehd-one-source":
+            return qsTr("A TrueHD project codes one WAV, and this one has %1, so none was loaded.").arg(a[0]);
         case "source-not-loaded":
             return qsTr("%1 could not be loaded: %2").arg(a[0]).arg(a[1]);
         case "setting-unknown-choice":
@@ -1239,6 +1241,23 @@ ApplicationWindow {
     function captureProject() {
         const project = JSON.parse(JSON.stringify(window.projectBase));
         project.flow = window.tier;
+
+        // A TrueHD encode is a project of its own kind (codec "truehd"): the WAV of the Encode TrueHD
+        // dialog and its two options, when the workbench holds no source of its own.
+        if (EncoderController.sourceModel.length === 0 && TruehdEncodeController.sourcePath.length > 0) {
+            project.sources = [{ path: TruehdEncodeController.sourcePath }];
+            const encode = Object.assign({}, project.encode || {});
+            encode.codec = "truehd";
+            encode.container = "elementary";
+            encode.options = {};
+            encode.truehd = { verify: TruehdEncodeController.verify,
+                              downmix: TruehdEncodeController.standardDownmix ? "standard" : "none" };
+            project.encode = encode;
+            delete project.assignments;
+            delete project.atmos;
+            delete project.objects;
+            return project;
+        }
 
         // A source that was in the file keeps the keys it had there, whatever they are.
         const before = {};
@@ -1343,6 +1362,23 @@ ApplicationWindow {
     function applyProject(project) {
         const notes = [];
         const encode = project.encode || {};
+        // A TrueHD project is the Encode TrueHD dialog's, and leaves the workbench as it is.
+        if (encode.codec === "truehd") {
+            const given = project.sources || [];
+            TruehdEncodeController.clear();
+            if (given.length !== 1) {
+                notes.push({ code: "truehd-one-source", args: [given.length] });
+            } else if (given[0].exists === false) {
+                notes.push({ code: "source-missing", args: [given[0].path] });
+            } else {
+                TruehdEncodeController.chooseSource(given[0].url);
+            }
+            const thd = encode.truehd || {};
+            TruehdEncodeController.verify = thd.verify === true;
+            TruehdEncodeController.standardDownmix = thd.downmix === "standard";
+            truehdEncodeDialog.open();
+            return notes;
+        }
         // The codec and container first: the rest of the draft is shaped by them.
         notes.push.apply(notes, ProjectFile.applyEncode(EncoderController, encode, 0));
 

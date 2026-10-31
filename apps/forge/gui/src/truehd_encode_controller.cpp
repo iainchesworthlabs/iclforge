@@ -236,3 +236,20 @@ void TruehdEncodeController::encode() {
 void TruehdEncodeController::cancel() {
     stop_.store(true, std::memory_order_relaxed);
 }
+
+void TruehdEncodeController::clear() {
+    if (busy_) {
+        return;
+    }
+    source_.clear();
+    output_.clear();
+    summary_.clear();
+    error_.clear();
+    progress_ = 0.0;
+    emit sourceChanged();
+    emit outputChanged();
+    emit resultChanged();
+    emit progressChanged();
+    emit stateChanged();
+    emit cliLineChanged();
+}

@@ -66,6 +66,8 @@ class TruehdEncodeController : public QObject {
     Q_INVOKABLE void encode();
     // Asks the run to stop at its next chunk; nothing is written.
     Q_INVOKABLE void cancel();
+    // Forgets the source, the output and the last result, for a project that brings its own.
+    Q_INVOKABLE void clear();
 
    signals:
     void sourceChanged();

@@ -46,7 +46,7 @@ The `encode` object holds these, each by the command line's own word for it:
 
 | Key | Values |
 |---|---|
-| `codec` | `"ac3"`, `"eac3"`, `"ac4"` (`"truehd"` is not a value: `forge project` does not encode TrueHD, and the window's [Encode TrueHD](truehd-encode.md) dialog is not saved in a project) |
+| `codec` | `"ac3"`, `"eac3"`, `"ac4"`, or `"truehd"`: a project of codec `truehd` is the [Encode TrueHD](truehd-encode.md) dialog's, one WAV in `sources`, run by `forge truehd-encode`. Its `encode.truehd` object holds `verify` (a bool) and `downmix` (`"none"` or `"standard"`), `options` must be empty, `bitrateKbps` is ignored (a lossless encode has none), and it takes no `assignments`, no `atmos` and no `fmp4` container; a project that names them is refused with a sentence, not run with them dropped. The window saves a TrueHD project when the dialog has a WAV and the workbench has no source, and opens one into the dialog, leaving the workbench as it is. |
 | `container` | `"elementary"`, `"matroska"`, `"spdif"`, `"mp4"`, `"fmp4"`, `"mpegts"` |
 | `bitrateKbps` | A rate the codec offers, such as `384` |
 | `tools` | The coding tools, as the token `eac3-encode` takes: `"cpl+spx"`, `"auto"`, `"aht:0"`. Absent for none. |
