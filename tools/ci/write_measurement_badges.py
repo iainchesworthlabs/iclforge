@@ -112,6 +112,12 @@ WORKLOADS = {
     "truehd_stereo_decode": ("TrueHD", "stereo decode"),
     "truehd_51_encode": ("TrueHD", "5.1 encode"),
     "truehd_51_decode": ("TrueHD", "5.1 decode"),
+    "truehd_71_encode": ("TrueHD", "7.1 encode"),
+    "truehd_71_decode": ("TrueHD", "7.1 decode"),
+    "truehd_51_96k_encode": ("TrueHD", "5.1 96 kHz encode"),
+    "truehd_51_96k_decode": ("TrueHD", "5.1 96 kHz decode"),
+    "truehd_stereo_192k_encode": ("TrueHD", "stereo 192 kHz encode"),
+    "truehd_stereo_192k_decode": ("TrueHD", "stereo 192 kHz decode"),
 }
 
 # What the number of channels in a quality record says about its layout.

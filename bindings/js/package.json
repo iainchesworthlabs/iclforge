@@ -1,13 +1,15 @@
 {
   "name": "iclforge-wasm-decoder",
   "version": "0.0.0-dev",
-  "description": "Streaming AC-3/E-AC-3 (Dolby Digital/Digital Plus) decoder for the browser, compiled from iclforge::ac3 to WebAssembly - a push-frame API, an AudioWorklet pipeline, and an hls.js/MSE bridge for playing EC-3 where Chrome cannot decode it natively. The ./ac4 export decodes and encodes AC-4.",
+  "description": "Streaming AC-3/E-AC-3 (Dolby Digital/Digital Plus) decoder for the browser, compiled from iclforge::ac3 to WebAssembly - a push-frame API, an AudioWorklet pipeline, and an hls.js/MSE bridge for playing EC-3 where Chrome cannot decode it natively. The ./ac4 export decodes and encodes AC-4; the ./truehd export decodes TrueHD and MLP.",
   "type": "module",
   "license": "GPL-3.0-only",
   "keywords": [
     "ac3",
     "eac3",
     "ac4",
+    "truehd",
+    "mlp",
     "dolby-digital",
     "atmos",
     "audio",
@@ -44,6 +46,10 @@
     "./ac4": {
       "types": "./dist/ac4.d.ts",
       "default": "./dist/ac4.js"
+    },
+    "./truehd": {
+      "types": "./dist/truehd.d.ts",
+      "default": "./dist/truehd.js"
     }
   },
   "scripts": {

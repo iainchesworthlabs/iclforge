@@ -10,7 +10,49 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-- **Added: `forge decode truehd-reading=` (`seed-shr7-32`, `zero-histories`, `shift-by-position`, `fold-by-position`) decodes a TrueHD or MLP stream with the other reading of a point the specification leaves open, for scoring a provisional reading (`DecoderConfig::readings`; ERRATA question 101).** Used on DEE's set (142 legs: 87 PASS, 9 ALTER, 46 UNEXPLAINED, 0 FAIL; 34,600 lossless-check intervals ok), it scores the output shift and the lossless fold by matrix channel (32 PASS legs fail with the shift by position) and noise generator 1's details, and shows that no DEE stream depends on the 16-bit `seed_shr7` or on the filter histories surviving a restart. `gen_dee_gold.py` makes the last legs (group `truehd-last`: 96 kHz impulses and band-limited tones, a stepped tone with and without `--optimize-data-rate`, dialnorm and DRC on streams of three presentations) and Atmos legs from a master named with `--atmos-master` (also `-e12`, `-e14`, `-e16`); `planning/truehd-validation.md` is the owner's runbook and `planning/truehd-spec-issues.md` the list for the specification's author. Six Atmos disc streams are probed (`planning/truehd-disc-findings.md`); ERRATA 5, 6, 19, 43 and 44 carry the evidence, 51 to 55 the channel meaning read back from known inputs.
+- **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
+  `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
+  units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
+  `truehdProbe`, `truehdScanUnits`, `TruehdScannedStream` and `TruehdDecoder`, with a `TruehdError` that carries the library's `ErrorKind`.
+  What a decode returns is a copy, so it stays valid across the next call. The module is built for Node as well as the web, and
+  `build-wasm` runs `truehd-wasm.test.js` over it: every fixture of `testdata/truehd` decodes to the SHA-256 of FFmpeg's strict decode,
+  and a decode from the restart for a sample gives that sample. The check that a decoded unit owns its samples fails when the module
+  returns a view into its heap. The encoder is not wrapped. The support catalogue's "TrueHD WebAssembly module" row moves from
+  unavailable to source and CI.
+- **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
+  borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
+  `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every
+  committed fixture to the SHA-256 of FFmpeg's strict decode, and to `forge decode` when `ICLFORGE_FORGE` names one; `cargo clippy
+  -D warnings` and `cargo fmt --check` pass. The encoder is not wrapped.
+- **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
+  `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
+  Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
+  `apps/crucible/ui` and `apps/hearth/ui` with `tools/checks/coverage_report.sh -q`. Only Crucible had a floor before, and only on Windows.
+  The three floors are provisional until the job's first hosted run. `tools/dev/qt-sandbox-setup.sh PREFIX` does the same installation by hand
+  (aqtinstall at the pinned commit, the apt packages, and for Hearth a private prefix with mbedTLS, cpp-httplib with the repository's patch and
+  mdns.h, each download checked against a pinned SHA-256) and prints the configure line. `hearth_qmltests` now links the coverage target, so
+  the controllers it recompiles are instrumented like the other two windows' are.
+- **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
+  A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
+  end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
+  where a decoder can start, thinned to one every `restart_spacing` units. `restart_for_sample()` and the C call of the same name give the unit
+  and the byte offset to decode from to reach a sample; decoding from there gives the samples an unbroken decode gives, checked on every
+  fixture. Hearth's player has had an index of this shape over a file it reads in windows; this is the in-memory form for the library, `forge`
+  and the bindings. Nothing else is changed.
+
+- **Fixed: a shared build of the library did not link `forge` or the TrueHD tests.** `EvolutionFrame::find` and `oamd` were defined in the library
+  and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
+  an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
+  tests and `forge` links, and the evolution tests pass against it.
+- **Added: TrueHD as MAT in the audio library's passthrough sink, and the Hearth output decision that knows it; not run on any platform.**
+  `BitstreamFormat::kMat` opens the eight-channel link (16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz family, 3,840 frames
+  to a 61,440-byte burst, the owner's decision of 2026-10-29): ALSA on an HDMI device, PipeWire as SPA's `TRUEHD`, WASAPI as
+  `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, and Android through two new optional bridge methods (not built); Core Audio refuses it. The sink
+  descriptor reads a MAT entry from ALSA's ELD and PipeWire's codec list. Hearth's output decision lists each platform as "not run" until a run on a
+  receiver passes, picks MAT automatically only for a platform that has, sends it when Bitstream is pinned (with the warning), and gives the
+  fallback for a TrueHD item that is decoded: the stream's presentation for the output's width, else stereo, else a refusal; there is no transcode.
+  The player does not pack MAT bursts yet, so a TrueHD item is still decoded. The Output picker shows "TrueHD (MAT) opens, not run".
+
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
@@ -33,8 +75,7 @@ See [README.md](README.md) for the project overview and
   decodes each presentation the stream has (2, 6 and 8 channels for one, two and three substreams), measures its integrated loudness with the
   BS.1770-5 Annex 3 weights `forge loudness` uses, maps it to a dialogue norm the way E-AC-3's `normalize` does (ATSC A/85 §8: the loudness
   negated and rounded, clamped to 1 to 31, which is the range the 5 bit fields hold) and writes it into that presentation's field of every
-  major sync, the 2 channel field being the norm plus 6 with its control-enabled bit set, as DEE writes them. **No gain is applied: the
-  stream is lossless, so only the fields change**; the mix level, source format, the 6 and 8 channel control-enabled bits
+  major sync. **No gain is applied: the stream is lossless, so only the field changes**; the mix level, source format, control-enabled bits
   and DRC start-up gains are left as they were, and a presentation whose control-enabled bit is off is said to be one a decoder may not apply.
   Nothing above the gate is exit 5, a damaged stream exit 2. The audit's T4. **Provisional, with no oracle until the DEE set**
   (`libs/truehd/ERRATA.md`, questions 51 and 54).
@@ -7024,6 +7065,27 @@ The sections below contain the complete change list and fixes.
   coupling spectrum buffer (2,048 bytes, a member of every decoder) is made when a stream first
   uses enhanced coupling, as its second side was. Nothing a decode writes changes: the ac3 test binary's results are the same on the fixed tier (182 failing
   assertions of 3,721,493, the same ones as before) and all 1,011 cases pass on the double tier.
+- **Fixed: the TrueHD encoder sends each channel's own output shift and quantiser step.** One step for every channel was the smallest the whole
+  interval allowed, so a 5.1 programme whose L, R, Ls and Rs are 16-bit material and whose C and LFE use 24 bits sent the low 8 bits of four
+  channels for nothing: the 5.1 music of the DEE fixtures was 101,314 bytes, against FFmpeg's encoder's 63,254 and DEE's 58,688, and is 56,672
+  (0.896 and 0.966). A pair matrix is tried between rows with the same step only, and the downmix presentations keep one step. FFmpeg's strict
+  decode and the library's decoder return every sample (`libs/truehd/ERRATA.md` entry 90).
+- **Added: `tools/checks/compare_truehd_encoders.py` and `compare_truehd_decoders.py`, and the page [TrueHD against FFmpeg and DEE](docs/truehd-comparison.md).**
+  The first sizes forge's streams against FFmpeg's encoder's and DEE's (the 13 committed legs, programme material, a directory of WAV files), checks
+  that every stream counted decodes to the source, and fails the pull-request flow's FFmpeg job if forge is larger than either on a committed source.
+  The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
+  forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
+  says where forge is larger: 1.06 and 1.15 times FFmpeg's size at 192 kHz.
+- **Changed: the TrueHD encoder writes restart sync 0x31EB in substream 1 of every stream of two or more substreams.** It wrote 0x31EA there
+  for 3 to 6 channels, following the reference specification's exemption for the last substream of a presentation of at most 6 channels; every
+  retail stream seen carries 0x31EB there (the owner's 7.1 discs, and the 48 and 192 kHz 5.1 tracks of a UHD disc, which are the two-substream
+  layout of 2 and 6 channels the encoder now writes at 176.4 and 192 kHz). FFmpeg's strict decode takes either (`libs/truehd/ERRATA.md`
+  entry 97).
+- **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
+  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. The encoder
+  now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks
+  for and FFmpeg 8.0.1's strict decode refuses; FFmpeg's own encoder writes two, and its decode of forge's 192 kHz 5.1 programme is exact
+  (`libs/truehd/ERRATA.md` entry 90, provisional). The encoder fuzzer's 192 kHz cases, 10 of 110 failing before, pass (2,815 cases).
 
 ## [0.10.0-beta.1] - 2026-09-01
 

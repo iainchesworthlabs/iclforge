@@ -2534,6 +2534,7 @@ ICLFORGE_C_EXPORT iclforge_lyrics_word_state_t iclforge_lyrics_word_state(
 
 typedef struct iclforge_truehd_decoder iclforge_truehd_decoder_t;
 typedef struct iclforge_truehd_units iclforge_truehd_units_t;
+typedef struct iclforge_truehd_scanned_stream iclforge_truehd_scanned_stream_t;
 typedef struct iclforge_truehd_decoded iclforge_truehd_decoded_t;
 
 /* Which substreams a decode reads: iclforge::truehd::Presentation, same ordinals. Reading
@@ -2593,6 +2594,57 @@ ICLFORGE_C_EXPORT size_t iclforge_truehd_units_offset(const iclforge_truehd_unit
 ICLFORGE_C_EXPORT size_t iclforge_truehd_units_size(const iclforge_truehd_units_t* units,
                                                     size_t index);
 ICLFORGE_C_EXPORT size_t iclforge_truehd_units_skipped_bytes(const iclforge_truehd_units_t* units);
+
+/* A scan of a whole stream: how long it is, and where a decoder can join it. A unit holds 40, 80 or
+ * 160 samples, so a unit's first sample is its number times that length; a decoder can only start at
+ * a unit that carries a major sync, so those units are listed ("restarts"), thinned to one every
+ * `restart_spacing` units at most (0 or 1 lists every one). To reach a sample, decode from the
+ * last restart at or before its unit: the restart interval is the seek granule. Unit numbers count
+ * the units that read, from the first one; offsets are into the data given to create, which has to
+ * outlive any use of one. A handle is read by any number of threads at once and changed by none. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_scanned_stream_create(
+    const uint8_t* data, size_t size, uint64_t restart_spacing,
+    iclforge_truehd_scanned_stream_t** out_stream);
+ICLFORGE_C_EXPORT void iclforge_truehd_scanned_stream_destroy(
+    iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint32_t
+iclforge_truehd_scanned_stream_sample_rate(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT int iclforge_truehd_scanned_stream_samples_per_unit(
+    const iclforge_truehd_scanned_stream_t* stream);
+/* The units that read. */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_units(const iclforge_truehd_scanned_stream_t* stream);
+/* Every sample the stream holds per channel: whole units less the padding the last one counts. */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_samples(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT int iclforge_truehd_scanned_stream_padding_samples(
+    const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT double
+iclforge_truehd_scanned_stream_duration_seconds(const iclforge_truehd_scanned_stream_t* stream);
+/* Bytes that were not part of a unit that read, those ahead of the first unit included, and the
+ * part of them that came before the first unit (not a loss of the stream). */
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_skipped_bytes(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint64_t
+iclforge_truehd_scanned_stream_leading_bytes(const iclforge_truehd_scanned_stream_t* stream);
+/* Restart i's unit number and its first byte (the unit's 4-byte header) in the data. 0 for an
+ * index out of range. */
+ICLFORGE_C_EXPORT size_t
+iclforge_truehd_scanned_stream_restart_count(const iclforge_truehd_scanned_stream_t* stream);
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_restart_unit(
+    const iclforge_truehd_scanned_stream_t* stream, size_t index);
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_restart_offset(
+    const iclforge_truehd_scanned_stream_t* stream, size_t index);
+/* The sample at `seconds`, rounded down; a negative time is sample 0. */
+ICLFORGE_C_EXPORT uint64_t iclforge_truehd_scanned_stream_sample_at_seconds(
+    const iclforge_truehd_scanned_stream_t* stream, double seconds);
+/* Where to start decoding to reach `sample`: the unit number and the offset of the last restart
+ * at or before the unit that holds it. ICLFORGE_ERROR_INVALID_ARGUMENT for a sample past the end
+ * (the outputs are left untouched). Decode on from there; the first sample the decoder gives is
+ * the unit's number times iclforge_truehd_scanned_stream_samples_per_unit. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_scanned_stream_restart_for_sample(
+    const iclforge_truehd_scanned_stream_t* stream, uint64_t sample, uint64_t* out_unit,
+    uint64_t* out_offset);
 
 ICLFORGE_C_EXPORT iclforge_status_t iclforge_truehd_decoder_create(
     const iclforge_truehd_decoder_config_t* config, iclforge_truehd_decoder_t** out_decoder);

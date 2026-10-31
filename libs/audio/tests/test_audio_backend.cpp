@@ -309,6 +309,78 @@ TEST_CASE("passthrough formats: the rate and burst lengths and name of each link
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kAc4, 0));
 }
 
+TEST_CASE("passthrough formats: MAT rides an eight-channel link that follows the content family",
+          "[audio-backend][concurrency]") {
+    using iclforge::audio::BitstreamFormat;
+    using iclforge::audio::carrier_channels;
+    using iclforge::audio::carrier_frame_bytes;
+    using iclforge::audio::link_rate;
+    using iclforge::audio::carrier_ratio;
+    constexpr auto kMat = BitstreamFormat::kMat;
+
+    // 24 access units of 40, 80 or 160 samples at 48, 96 or 192 kHz are all 20 ms, so the burst
+    // fills the same 3,840 link frames at 192 kHz whichever of the three the content is in; the
+    // 44.1 kHz family does the same at 176.4 kHz (libs/containers/ERRATA.md, question 7).
+    for (const std::uint32_t content : {48000U, 96000U, 192000U}) {
+        CHECK(link_rate(kMat, content) == 192000U);
+    }
+    for (const std::uint32_t content : {44100U, 88200U, 176400U}) {
+        CHECK(link_rate(kMat, content) == 176400U);
+    }
+    CHECK(carrier_ratio(kMat, 48000U) == 4U);
+    CHECK(carrier_ratio(kMat, 96000U) == 2U);
+    CHECK(carrier_ratio(kMat, 192000U) == 1U);
+    CHECK(carrier_ratio(kMat, 44100U) == 4U);
+    CHECK(carrier_ratio(kMat, 88200U) == 2U);
+    CHECK(carrier_ratio(kMat, 176400U) == 1U);
+
+    // No other content rate has a link, and the answer is "none", not a guess.
+    for (const std::uint32_t content : {0U, 8000U, 32000U, 22050U, 384000U}) {
+        CHECK(link_rate(kMat, content) == 0U);
+        CHECK(carrier_ratio(kMat, content) == 0U);
+    }
+
+    CHECK(carrier_channels(kMat) == 8U);
+    CHECK(carrier_frame_bytes(kMat) == 16U);
+    CHECK(iclforge::audio::max_burst_bytes(kMat) == 61440U);
+    CHECK(iclforge::audio::max_burst_bytes(kMat) / carrier_frame_bytes(kMat) == 3840U);
+    CHECK(iclforge::audio::burst_size_fits(kMat, 61440U));
+    CHECK_FALSE(iclforge::audio::burst_size_fits(kMat, 61424U));
+    CHECK(iclforge::audio::is_mat(kMat));
+    CHECK_FALSE(iclforge::audio::is_mat(BitstreamFormat::kEac3));
+    CHECK_FALSE(iclforge::audio::is_ac4(kMat));
+    CHECK(iclforge::audio::format_name(kMat) == "TrueHD (MAT)");
+
+    // The content frames in a burst, as position() counts them: 24 access units whatever the rate.
+    CHECK(3840U / carrier_ratio(kMat, 48000U) == 24U * 40U);
+    CHECK(3840U / carrier_ratio(kMat, 96000U) == 24U * 80U);
+    CHECK(3840U / carrier_ratio(kMat, 192000U) == 24U * 160U);
+
+    // Every other format keeps its figures: two channels, four bytes a frame, the old ratios.
+    for (const auto other : {BitstreamFormat::kAc3, BitstreamFormat::kEac3, BitstreamFormat::kAc4,
+                             BitstreamFormat::kAc4Hbr4}) {
+        CHECK(carrier_channels(other) == 2U);
+        CHECK(carrier_frame_bytes(other) == 4U);
+        CHECK(link_rate(other, 48000U) == 48000U * carrier_ratio(other));
+        CHECK(carrier_ratio(other, 48000U) == carrier_ratio(other));
+    }
+    CHECK(carrier_channels(BitstreamFormat::kAc4Hbr16) == 8U);
+}
+
+TEST_CASE("passthrough: MAT at a content rate it has no link for is refused before a device is touched",
+          "[audio-backend][concurrency]") {
+    // 32 kHz is no TrueHD rate, so there is no link to open on any platform; the answer comes
+    // before a device is looked up. A build with no backend, or one that does not carry MAT, says
+    // so with its own error.
+    iclforge::audio::PassthroughSink sink;
+    const auto started = sink.start("", 32000, iclforge::audio::BitstreamFormat::kMat);
+    REQUIRE_FALSE(started.has_value());
+    CHECK((started.error() == iclforge::audio::PassthroughError::kFormatRejected ||
+           started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat ||
+           started.error() == iclforge::audio::PassthroughError::kNoBackend));
+    CHECK_FALSE(sink.running());
+}
+
 TEST_CASE("passthrough: AC-4 HBR16 is refused everywhere before a device is touched",
           "[audio-backend][concurrency]") {
     // No backend opens the eight-channel link HBR16 needs, and the three whose

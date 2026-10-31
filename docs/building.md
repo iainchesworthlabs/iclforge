@@ -290,10 +290,24 @@ ctest --preset test-linux-gcc-coverage -LE Performance
 ./tools/checks/coverage_report.sh -g gcov-16
 ```
 
-`apps/forge/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
-coverage job, which installs none (CI puts Qt only on the plain `gui` build legs, which are not
-instrumented). Its interactive surfaces are covered by `apps/forge/gui/tests`' own Qt Quick suite, and
-its one Qt-free class (`RecordingSink`) is already in `iclforge-app-media-tests`. `bindings/python/` has its own floor
+`apps/forge/gui`, `apps/crucible/ui` and `apps/hearth/ui` are absent from that report: instrumenting
+their C++ needs a Qt kit, which the coverage job installs none of. They have a report of their own, from
+the preset that adds the three windows and the tests labelled for them, run offscreen:
+
+```bash
+cmake --preset config-linux-gcc-coverage-qt        # with a Qt kit found as in the Qt section below
+cmake --build --preset build-linux-gcc-coverage-qt -- -k 0
+ctest --preset test-linux-gcc-coverage-qt
+./tools/checks/coverage_report.sh -q -g gcov-16
+```
+
+CI runs it as the `coverage-qt` job of `_ci-core.yml`, nightly, with the Qt version and aqtinstall commit
+of `.github/toolchain-versions.json`. gcov counts the C++ only; QML has no line coverage from gcov and
+the Qt Quick suites stay the check on it. The floors in `coverage_report.sh`'s `qt_components` table are
+provisional until that job's first hosted run. On a Linux machine with no Qt and no vcpkg (a cloud
+sandbox whose proxy refuses GitHub's source archives), `tools/dev/qt-sandbox-setup.sh PREFIX` installs
+the same Qt kit, builds Hearth's dependencies into a private prefix and prints the configure line.
+`bindings/python/` has its own floor
 instead, in `.github/workflows/wheels.yml`'s `python-coverage` job — `pytest --cov` against the
 built wheel; see that job's own comment for what a Python percentage does and does not measure
 when nearly all of the binding surface is C++.

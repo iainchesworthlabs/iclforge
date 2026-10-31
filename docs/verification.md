@@ -2383,8 +2383,8 @@ among them the scale of `peak_data_rate`, how channels are spread over
 substreams, that a substream reads its predecessor's rows before that predecessor's matrices, and that FFmpeg's decoder takes a
 substream of more than 6 channels only under restart sync `0x31EB`. `tools/ci/fuzz_truehd_encoder_space.py` draws random legal
 configurations against adversarial PCM (about 800 cases in 100 s) and the same check; its first run found an encoder that never
-finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.95 times the size of FFmpeg's encoder's
-over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
+finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.85 to 0.96 times the size of FFmpeg's encoder's
+at 44.1 to 96 kHz and larger at 192 kHz, with DEE's and the programme material in [the measured table](truehd-comparison.md), and its decode is held to FFmpeg's strict decode, which a bit flipped in a payload does not fail. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
 outside the library reads the 2 and 6 channel presentations.
 
 Not covered: the details of noise generator 1 that the specification leaves out (the buffer size, start index and stride are measured

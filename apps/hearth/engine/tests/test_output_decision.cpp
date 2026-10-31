@@ -425,6 +425,196 @@ TEST_CASE("output decision: a TrueHD item pinned to a bitstream output is decode
     CHECK(mentions(automatic.reason, "Passthrough of TrueHD is not available"));
 }
 
+// ---------------------------------------------------------------------------------------------
+// TrueHD as MAT to a local output (planning/truehd-parity-hearth-player.md, H6) and the fallback
+// chain when it cannot be (H8). Every platform is "not run" (mat_status.hpp), and the decision says
+// so; a test stands in for a platform that has been run.
+// ---------------------------------------------------------------------------------------------
+
+namespace {
+
+using iclforge::audio::PassthroughBackend;
+using iclforge::hearth::ItemCodec;
+using iclforge::hearth::MatPlatformStatus;
+using iclforge::hearth::MatRun;
+using iclforge::truehd::Presentation;
+
+EndpointFacts mat_receiver(std::string name, PassthroughBackend backend = PassthroughBackend::kAlsa,
+                           std::uint16_t channels = 8, bool is_default = false) {
+    EndpointFacts facts = receiver(std::move(name), /*eac3=*/true, /*ac3=*/true, is_default);
+    facts.channels = channels;
+    facts.accepts_mat = true;
+    facts.backend = backend;
+    return facts;
+}
+
+OutputRequest truehd_request(std::span<const EndpointFacts> endpoints) {
+    OutputRequest request = asking(endpoints, std::nullopt);
+    request.codec = ItemCodec::kTruehd;
+    request.mat_passthrough = true;
+    return request;
+}
+
+// A platform whose run has passed, for the cases that need one.
+MatPlatformStatus every_platform_run(PassthroughBackend backend) {
+    return {backend, MatRun::kRun, "a stand-in for a run that passed"};
+}
+
+}  // namespace
+
+TEST_CASE("output decision: every platform's MAT output is not run, and says what it does instead",
+          "[hearth][output-decision][truehd]") {
+    for (const auto backend :
+         {PassthroughBackend::kAlsa, PassthroughBackend::kPipeWire, PassthroughBackend::kWasapi,
+          PassthroughBackend::kCoreAudio, PassthroughBackend::kAndroid, PassthroughBackend::kNone}) {
+        const MatPlatformStatus status = iclforge::hearth::mat_status(backend);
+        // This is the table the owner's rule is kept in: a platform becomes "run" in the same
+        // commit as the page that records a run that passed on a receiver, and this test changes
+        // with it. Until then no platform may claim it.
+        CHECK(status.run == MatRun::kNotRun);
+        CHECK(status.backend == backend);
+        CHECK_FALSE(status.basis.empty());
+    }
+}
+
+TEST_CASE("output decision: a platform not run is decoded here and the reason says so and how to try it",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {mat_receiver("Receiver")};
+    const auto choice = choose_output(truehd_request(endpoints));
+    CHECK(choice.mode == OutputMode::kLocalPcm);
+    CHECK_FALSE(choice.stream.has_value());
+    CHECK(mentions(choice.reason, "takes TrueHD (MAT)"));
+    CHECK(mentions(choice.reason, "has not been run against a receiver"));
+    CHECK(mentions(choice.reason, "ALSA"));
+    CHECK(mentions(choice.reason, "Pin Bitstream"));
+    // The decode still states the presentation it plays.
+    CHECK(choice.presentation == Presentation::k8ch);
+}
+
+TEST_CASE("output decision: a platform that has been run gets the stream as MAT unprompted",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {mat_receiver("Receiver", PassthroughBackend::kAlsa)};
+    OutputRequest request = truehd_request(endpoints);
+    request.mat_status_of = &every_platform_run;
+    const auto choice = choose_output(request);
+    CHECK(choice.mode == OutputMode::kBitstream);
+    CHECK(choice.stream == BitstreamFormat::kMat);
+    CHECK(choice.endpoint_id == "Receiver-id");
+    CHECK(mentions(choice.reason, "TrueHD (MAT)"));
+    // A run that passed leaves nothing to warn about.
+    CHECK_FALSE(mentions(choice.reason, "not been run"));
+    CHECK_FALSE(choice.presentation.has_value());
+
+    // The output that does not take MAT is passed over for the one that does.
+    const std::vector<EndpointFacts> two = {receiver("Soundbar", true, true), mat_receiver("Receiver")};
+    OutputRequest both = truehd_request(two);
+    both.mat_status_of = &every_platform_run;
+    CHECK(choose_output(both).endpoint_name == "Receiver");
+}
+
+TEST_CASE("output decision: pinning Bitstream sends TrueHD as MAT to a platform not run, and says so",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {mat_receiver("Receiver", PassthroughBackend::kWasapi)};
+    OutputRequest request = truehd_request(endpoints);
+    request.pinned = OutputMode::kBitstream;
+    const auto choice = choose_output(request);
+    CHECK(choice.mode == OutputMode::kBitstream);
+    CHECK(choice.stream == BitstreamFormat::kMat);
+    CHECK(mentions(choice.reason, "WASAPI"));
+    CHECK(mentions(choice.reason, "has not been run against a receiver"));
+}
+
+TEST_CASE("output decision: a pinned bitstream with no output that takes MAT falls back, or refuses under follow=off",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {receiver("Soundbar", true, true), analogue("Speakers", 2)};
+    OutputRequest request = truehd_request(endpoints);
+    request.pinned = OutputMode::kBitstream;
+    const auto fallback = choose_output(request);
+    CHECK(fallback.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(fallback.reason, "No available output takes TrueHD (MAT)"));
+
+    request.follow_sink = false;
+    const auto refused = choose_output(request);
+    CHECK(refused.mode == OutputMode::kNone);
+    CHECK(mentions(refused.reason, "No available output takes TrueHD (MAT)"));
+    CHECK(mentions(refused.reason, "follow=off"));
+
+    // The chosen output is the one asked about, not the first that happens to take it.
+    const std::vector<EndpointFacts> pair = {mat_receiver("Receiver"), analogue("Speakers", 2)};
+    OutputRequest chosen = truehd_request(pair);
+    chosen.pinned = OutputMode::kBitstream;
+    chosen.preferred_endpoint_id = "Speakers-id";
+    const auto result = choose_output(chosen);
+    CHECK(result.mode == OutputMode::kLocalPcm);
+    CHECK(result.endpoint_name == "Speakers");
+    CHECK(mentions(result.reason, "No chosen output takes TrueHD (MAT)"));
+}
+
+TEST_CASE("output decision: MLP has no carriage and a build that cannot send MAT decodes as before",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {mat_receiver("Receiver")};
+    OutputRequest mlp = truehd_request(endpoints);
+    mlp.codec = ItemCodec::kMlp;
+    mlp.mat_status_of = &every_platform_run;
+    mlp.pinned = OutputMode::kBitstream;
+    const auto mlp_choice = choose_output(mlp);
+    CHECK(mlp_choice.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(mlp_choice.reason, "Passthrough of MLP is not available"));
+
+    OutputRequest cannot = truehd_request(endpoints);
+    cannot.mat_passthrough = false;
+    cannot.mat_status_of = &every_platform_run;
+    cannot.pinned = OutputMode::kBitstream;
+    const auto cannot_choice = choose_output(cannot);
+    CHECK(cannot_choice.mode == OutputMode::kLocalPcm);
+    CHECK(mentions(cannot_choice.reason, "Passthrough of TrueHD is not available"));
+}
+
+TEST_CASE("output decision: follow=off refuses a decode, and still says why MAT was not sent",
+          "[hearth][output-decision][truehd]") {
+    const std::vector<EndpointFacts> endpoints = {mat_receiver("Receiver")};
+    OutputRequest request = truehd_request(endpoints);
+    request.follow_sink = false;
+    const auto choice = choose_output(request);
+    CHECK(choice.mode == OutputMode::kNone);
+    CHECK(mentions(choice.reason, "follow=off"));
+    CHECK(mentions(choice.reason, "has not been run against a receiver"));
+}
+
+TEST_CASE("output decision: the fallback presentation is the output's stated width, else stereo",
+          "[hearth][output-decision][truehd]") {
+    using iclforge::hearth::truehd_fallback_presentation;
+    EndpointFacts sink = analogue("Sink", 8);
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k8ch);
+    sink.channels = 16;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k8ch);
+    sink.channels = 7;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k6ch);
+    sink.channels = 6;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k6ch);
+    sink.channels = 5;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k2ch);
+    sink.channels = 2;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k2ch);
+    // An output that does not say gets the stream's stereo mix, not a guess at its width.
+    sink.channels = 0;
+    CHECK(truehd_fallback_presentation(sink) == Presentation::k2ch);
+
+    // And the decode says which it is.
+    const std::vector<EndpointFacts> speakers = {analogue("Speakers", 6, true)};
+    OutputRequest request = asking(speakers, std::nullopt);
+    request.codec = ItemCodec::kTruehd;
+    const auto choice = choose_output(request);
+    CHECK(choice.mode == OutputMode::kLocalPcm);
+    CHECK(choice.presentation == Presentation::k6ch);
+    // The reason does not claim a presentation is decoded: nothing applies the choice yet.
+    CHECK_FALSE(mentions(choice.reason, "mix is the one decoded"));
+
+    // An item that is not lossless has no presentation to choose.
+    OutputRequest ac3 = asking(speakers, BitstreamFormat::kAc3);
+    CHECK_FALSE(choose_output(ac3).presentation.has_value());
+}
+
 TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and each sink is sent PCM",
           "[hearth][output-decision][truehd]") {
     using iclforge::hearth::ItemCodec;

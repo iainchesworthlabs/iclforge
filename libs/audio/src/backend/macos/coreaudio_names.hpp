@@ -60,7 +60,7 @@ namespace iclforge::coreaudio {
 // device-name rate both do.
 [[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
                                                     std::uint32_t content_rate) {
-    return content_rate * audio::carrier_ratio(format);
+    return audio::link_rate(format, content_rate);
 }
 
 // The physical-format fourCC a digital output stream is asked for.
@@ -85,6 +85,13 @@ namespace iclforge::coreaudio {
 // Nothing for AC-4: CoreAudioBaseTypes.h defines no AC-4 format ID at all, so
 // there is nothing to look for among a stream's physical formats or to retune
 // one to, and start() refuses AC-4 with kUnsupportedFormat.
+//
+// Nothing for TrueHD (MAT) either, and for a different reason: it is not that the header was
+// read and has none, but that no format ID for it is known to this backend and the session that
+// wrote this had no Mac and no SDK to look in. A Mac may offer eight channels of 192 kHz linear PCM
+// on an HDMI output, in which a MAT burst could be sent as data; whether it does, and whether a
+// receiver then names the stream TrueHD, is the owner's to try, and until it is tried the backend
+// refuses MAT (apps/hearth/engine/src/mat_status.hpp). Core Audio is the last of the platforms.
 [[nodiscard]] constexpr std::optional<AudioFormatID> physical_format_id(
     audio::BitstreamFormat format) {
     switch (format) {
@@ -95,6 +102,7 @@ namespace iclforge::coreaudio {
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
+        case audio::BitstreamFormat::kMat:
             break;
     }
     return std::nullopt;

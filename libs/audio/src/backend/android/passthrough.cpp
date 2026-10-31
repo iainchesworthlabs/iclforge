@@ -85,6 +85,12 @@
 //       // AudioTrack.getUnderrunCount(): the times the track ran dry, which stats() adds to the
 //       // writes that failed (a write the track took does not show a starvation after it).
 //       fun underrunCount(): Int
+//       // Optional, and required only for TrueHD (BitstreamFormat::kMat), which rides an
+//       // ENCODING_IEC61937 track on an eight-channel mask, not the two-channel one open()
+//       // makes: whether the route takes that link, and opening it. `channels` is 8. A bridge
+//       // without them refuses MAT with kUnsupportedFormat and answers no to its probe.
+//       fun isLinkSupported(carrierRateHz: Int, channels: Int): Boolean
+//       fun openLink(carrierRateHz: Int, channels: Int): Boolean
 //   }
 //
 // The app registers one bridge instance for the process's lifetime, and tells the backend the
@@ -135,9 +141,8 @@ jmethodID g_mid_pause = nullptr;          // boolean pause()
 jmethodID g_mid_resume = nullptr;         // boolean resume()
 jmethodID g_mid_flush = nullptr;          // boolean flush()
 jmethodID g_mid_underrun_count = nullptr;  // int underrunCount()
-
-// The IEC 61937 carrier's frame: two channels of 16 bits.
-constexpr std::size_t kLinkFrameBytes = 4;
+jmethodID g_mid_is_link_supported = nullptr;  // boolean isLinkSupported(int, int)
+jmethodID g_mid_open_link = nullptr;          // boolean openLink(int, int)
 
 // Calls one of the optional boolean methods; false when the bridge lacks it.
 bool call_optional(JNIEnv* env, jmethodID method) {
@@ -209,6 +214,10 @@ bool bridge_ready() {
 
 }  // namespace
 
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kAndroid;
+}
+
 std::string_view describe(PassthroughError error) {
     switch (error) {
         case PassthroughError::kNoBackend: return "no passthrough backend on this platform";
@@ -229,8 +238,9 @@ std::string_view describe(PassthroughError error) {
         case PassthroughError::kAlreadyRunning: return "passthrough is already running";
         case PassthroughError::kNotRunning: return "passthrough is not running";
         case PassthroughError::kUnsupportedFormat:
-            return "AC-4 HBR16 travels on an eight-channel high-bit-rate link, and the "
-                   "AudioTrack bridge opens a two-channel one";
+            return "AC-4 HBR16 travels on an eight-channel high-bit-rate link, which this "
+                   "backend does not open, and TrueHD (MAT) needs an app bridge that offers "
+                   "isLinkSupported and openLink";
     }
     return "unknown passthrough error";
 }
@@ -285,9 +295,23 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
         // that route, rather than a real per-device list - see
         // android_support.hpp's make_render_device_info() for the pure
         // (and tested) half of this mapping.
+        // TrueHD rides the eight-channel link, which only a bridge with the link methods can
+        // ask about. A content rate MAT has no link for is not asked.
+        bool mat_ok = false;
+        const auto mat_carrier = android_audio::carrier_rate(BitstreamFormat::kMat, sample_rate);
+        if (g_mid_is_link_supported != nullptr && mat_carrier != 0) {
+            const jboolean mat_supported = env->CallBooleanMethod(
+                g_bridge, g_mid_is_link_supported, static_cast<jint>(mat_carrier),
+                static_cast<jint>(carrier_channels(BitstreamFormat::kMat)));
+            mat_ok = env->ExceptionCheck() == 0 && mat_supported != JNI_FALSE;
+            if (env->ExceptionCheck() != 0) {
+                env->ExceptionClear();
+            }
+        }
         // AC-4's link is AC-3's, an ENCODING_IEC61937 track at the content
         // rate, so the AC-3 probe answers for both.
-        devices.push_back(android_audio::make_render_device_info(ac3_ok, eac3_ok, pcm_ok, ac3_ok));
+        devices.push_back(
+            android_audio::make_render_device_info(ac3_ok, eac3_ok, pcm_ok, ac3_ok, mat_ok));
     }
 
     return devices;
@@ -330,6 +354,8 @@ struct PassthroughSink::Impl {
     PlayHead head;
     // Link frames to a content frame (carrier_ratio()).
     std::uint32_t ratio = 1;
+    // Bytes of one link frame (carrier_frame_bytes()): 4, or 16 for MAT's eight channels.
+    std::size_t frame_bytes = 4;
     std::atomic_bool paused{false};
 
     // Closes the Kotlin track and lets go of the buffer pool's references,
@@ -404,7 +430,7 @@ std::optional<MonitorPosition> PassthroughSink::position() const {
     }
     const std::uint64_t played = impl_->head.read(
         static_cast<std::uint32_t>(static_cast<std::uint64_t>(head) & 0xFFFFFFFFULL));
-    const std::uint64_t accepted = impl_->accepted_bytes / kLinkFrameBytes;
+    const std::uint64_t accepted = impl_->accepted_bytes / impl_->frame_bytes;
     // AudioTrack gives no latency past its buffer through a public call, so
     // none is reported: 0 is "cannot say".
     return per_content_frame(
@@ -620,6 +646,14 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (format == BitstreamFormat::kAc4Hbr16) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
+    if (android_audio::needs_link_bridge(format) &&
+        (g_mid_open_link == nullptr || g_mid_is_link_supported == nullptr)) {
+        return std::unexpected(PassthroughError::kUnsupportedFormat);
+    }
+    if (android_audio::carrier_rate(format, sample_rate) == 0) {
+        // MAT at a content rate it has no link for.
+        return std::unexpected(PassthroughError::kFormatRejected);
+    }
     if (!bridge_ready()) {
         return std::unexpected(PassthroughError::kNoBackend);
     }
@@ -661,11 +695,18 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // why that fact lives in exactly one place, here, and not in
         // Kotlin).
         const auto carrier = android_audio::carrier_rate(format, sample_rate);
-        // "The four-times link": E-AC-3's, and AC-4 HBR4's (see this file's
-        // header comment).
-        const jboolean eac3 = carrier_ratio(format) == 4 ? JNI_TRUE : JNI_FALSE;
-        opened = env->CallBooleanMethod(g_bridge, g_mid_open, static_cast<jint>(carrier),
-                                        eac3) != JNI_FALSE;
+        if (android_audio::needs_link_bridge(format)) {
+            // MAT: an ENCODING_IEC61937 track on the eight-channel mask.
+            opened = env->CallBooleanMethod(g_bridge, g_mid_open_link, static_cast<jint>(carrier),
+                                            static_cast<jint>(carrier_channels(format))) !=
+                     JNI_FALSE;
+        } else {
+            // "The four-times link": E-AC-3's, and AC-4 HBR4's (see this file's
+            // header comment).
+            const jboolean eac3 = carrier_ratio(format) == 4 ? JNI_TRUE : JNI_FALSE;
+            opened = env->CallBooleanMethod(g_bridge, g_mid_open, static_cast<jint>(carrier),
+                                            eac3) != JNI_FALSE;
+        }
         if (env->ExceptionCheck() != 0) {
             env->ExceptionClear();
             opened = false;
@@ -699,7 +740,8 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // A new track's head starts at zero, so nothing is stale.
         impl_->head = PlayHead{};
     }
-    impl_->ratio = carrier_ratio(format);
+    impl_->ratio = carrier_ratio(format, sample_rate);
+    impl_->frame_bytes = carrier_frame_bytes(format);
     impl_->paused.store(false, std::memory_order_relaxed);
     impl_->running.store(true, std::memory_order_release);
     return {};
@@ -769,6 +811,8 @@ void register_passthrough_bridge(JNIEnv* env, jobject bridge) {
     g_mid_resume = optional_method("resume", "()Z");
     g_mid_flush = optional_method("flush", "()Z");
     g_mid_underrun_count = optional_method("underrunCount", "()I");
+    g_mid_is_link_supported = optional_method("isLinkSupported", "(II)Z");
+    g_mid_open_link = optional_method("openLink", "(II)Z");
 
     g_bridge = env->NewGlobalRef(bridge);
     env->DeleteLocalRef(local_class);

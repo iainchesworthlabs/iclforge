@@ -82,3 +82,21 @@ TEST_CASE("without ICLFORGE_BUILD_TRUEHD the TrueHD encoder is unsupported too",
     iclforge_truehd_encoder_destroy(encoder);
     iclforge_truehd_encoded_destroy(encoded);
 }
+
+TEST_CASE("without ICLFORGE_BUILD_TRUEHD the scanned-stream calls are unsupported too",
+          "[capi][truehd]") {
+    const std::array<std::uint8_t, 16> bytes{};
+    iclforge_truehd_scanned_stream_t* stream = nullptr;
+    CHECK(iclforge_truehd_scanned_stream_create(bytes.data(), bytes.size(), 1, &stream) ==
+          ICLFORGE_ERROR_UNSUPPORTED);
+    CHECK(stream == nullptr);
+    CHECK(iclforge_truehd_scanned_stream_sample_rate(stream) == 0);
+    CHECK(iclforge_truehd_scanned_stream_units(stream) == 0);
+    CHECK(iclforge_truehd_scanned_stream_samples(stream) == 0);
+    CHECK(iclforge_truehd_scanned_stream_restart_count(stream) == 0);
+    std::uint64_t unit = 0;
+    std::uint64_t offset = 0;
+    CHECK(iclforge_truehd_scanned_stream_restart_for_sample(stream, 0, &unit, &offset) ==
+          ICLFORGE_ERROR_UNSUPPORTED);
+    iclforge_truehd_scanned_stream_destroy(stream);
+}

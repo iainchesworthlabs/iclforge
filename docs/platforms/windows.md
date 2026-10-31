@@ -225,6 +225,24 @@ is explicit about the difference.
     as a display Windows extends onto at all, so there is no WMI monitor entry to read its SADs
     from even if this project wired one up.
 
+### TrueHD (MAT)
+
+!!! warning "Not run on any platform"
+    TrueHD over HDMI (MAT) has been **built, and tested against software devices, and has not been run against a receiver on
+    Windows**. Nothing here says a receiver names the stream TrueHD. The code does what the carrier decision of 2026-10-29
+    says, which is itself provisional ([libs/containers/ERRATA.md](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md),
+    question 7): eight channels of 16 bits at 192 kHz for content in the 48 kHz family and 176.4 kHz for the 44.1 kHz family,
+    3,840 frames to a 61,440-byte burst. The list of what has been run is `apps/hearth/engine/src/mat_status.hpp`, and
+    the output decision quotes it.
+
+Exclusive mode asks for TrueHD by `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP` (`{0000000c-0cea-0010-8000-00aa00389b71}`, taken from
+`ksmedia.h` in the 10.0.26100 SDK, and compared with the SDK's own initialiser in a test), on **eight channels** of 16 bits at the link
+rate, with the 7.1 speaker mask and the encoded fields as the other two families have them (the content rate and eight channels). Those
+last fields, and the mask, are what Microsoft's description of the MLP format would settle and this project has not seen a driver accept or
+refuse: it is why the format builders are in their own header (`libs/audio/src/backend/windows/iec61937_format.hpp`) with a test
+of every field (`test_windows_formats.cpp`). `enumerate_render_devices` asks `IsFormatSupported` for it and sets
+`supports_mat_passthrough` on a yes; nothing has opened it.
+
 ### When a packet was captured, and a requested period
 
 A microphone is only useful to an application that knows *when* each sample was captured, so that

@@ -20,6 +20,13 @@ page. This page is the reference.
     what the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is
     [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
+    The audio library can now open the eight-channel MAT link for TrueHD (ALSA, PipeWire and WASAPI; Android has a bridge that has not
+    been built; Core Audio refuses it), and the output decision knows it. **Every platform is marked "not run"**: no receiver has
+    been played a MAT stream from any of them, and the player does not yet pack MAT bursts, so a TrueHD item is still decoded
+    whatever is chosen. The Output picker lists an output that opens the link as "TrueHD (MAT) opens, not run", and the reason line says so.
+    The decision also works out, for a TrueHD item that is decoded, which of the stream's own presentations the output's width calls for (8 or 6
+    channels, else stereo) as the owner's fallback chain says; the player does not apply it yet, and there is no transcode.
+
 ## The desktop player
 
 `hearth` runs on Windows, Linux, and macOS with a Qt 6.8 or later kit, and builds as the

@@ -105,16 +105,14 @@ Result bench_truehd_decode(std::string name, const perf::truehd_bench::Stream& s
 }  // namespace
 
 void add_truehd_results(std::vector<Result>& results, const iclforge::ac3::io::WavData& audio) {
-    // TrueHD at 24 bits and 48 kHz, stereo and 5.1, from the same programme material as the others.
+    // TrueHD at 24 bits: stereo, 5.1 and 7.1 at 48 kHz, 5.1 at 96 and stereo at 192, from the same
+    // programme material as the others.
     {
         namespace tb = perf::truehd_bench;
-        const struct {
-            const char* layout;
-            std::span<const std::size_t> channels;
-        } layouts[] = {{"stereo", tb::kStereoChannels}, {"51", tb::kFiveOneChannels}};
-        for (const auto& layout : layouts) {
-            const std::string base = std::string("truehd_") + layout.layout;
-            const tb::Source source = tb::make_source(audio, layout.channels, 24);
+        for (const auto& layout : tb::kLayouts) {
+            const std::string base = std::string("truehd_") + layout.name;
+            const tb::Source source =
+                tb::make_source(audio, layout.channels, 24, layout.sample_rate);
             const auto config = tb::config_for(source);
             results.push_back(bench_truehd_encode(base + "_encode", source, config));
             results.push_back(bench_truehd_decode(base + "_decode", tb::encode_stream(source, config)));

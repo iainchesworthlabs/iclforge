@@ -79,9 +79,9 @@ REQUIRED.update(
         "a matrix coefficient on a noise channel": lambda r: r["noise_coefficients"],
         "an output shift": lambda r: r["output_shifts"],
         "a negative output shift": lambda r: r["output_shift_negative"],
-        "an output shift on a matrix channel that ch_assign moves": lambda r: (
-            r["output_shift_on_moved_channel"]
-        ),
+        "an output shift on a matrix channel that ch_assign moves": lambda r: r[
+            "output_shift_on_moved_channel"
+        ],
         "IIR filter state (new_states) with a state shift": lambda r: r["iir_state_shift"],
         "a 16 bit MLP stream with bits set below bit 8": lambda r: r["mlp_word16_low_bits"],
         "a quantiser step": lambda r: bool(r["quant_steps"]),

@@ -4403,95 +4403,105 @@
         <translation>AC-3 %1 · E-AC-3 %2</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="191"/>
-        <location filename="../qml/OutputPicker.qml" line="203"/>
+        <location filename="../qml/OutputPicker.qml" line="154"/>
+        <source> · TrueHD (MAT) ✓</source>
+        <translation> · TrueHD (MAT) ✓</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPicker.qml" line="155"/>
+        <source> · TrueHD (MAT) opens, not run</source>
+        <translation> · TrueHD (MAT) s’ouvre, pas encore essayé</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPicker.qml" line="198"/>
+        <location filename="../qml/OutputPicker.qml" line="210"/>
         <source>Where Hearth plays</source>
         <translation>Où Hearth joue</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="197"/>
+        <location filename="../qml/OutputPicker.qml" line="204"/>
         <source>OUTPUT</source>
         <translation>SORTIE</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="223"/>
+        <location filename="../qml/OutputPicker.qml" line="230"/>
         <source>This computer · PCM</source>
         <translation>Cet ordinateur · PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="279"/>
+        <location filename="../qml/OutputPicker.qml" line="286"/>
         <source>%1 · default</source>
         <translation>%1 · par défaut</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="294"/>
-        <location filename="../qml/OutputPicker.qml" line="383"/>
-        <location filename="../qml/OutputPicker.qml" line="488"/>
+        <location filename="../qml/OutputPicker.qml" line="301"/>
+        <location filename="../qml/OutputPicker.qml" line="390"/>
+        <location filename="../qml/OutputPicker.qml" line="495"/>
         <source>playing here</source>
         <translation>joue ici</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="308"/>
+        <location filename="../qml/OutputPicker.qml" line="315"/>
         <source>No output devices were found on this computer.</source>
         <translation>Aucun périphérique de sortie n&apos;a été trouvé sur cet ordinateur.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="315"/>
+        <location filename="../qml/OutputPicker.qml" line="322"/>
         <source>Passthrough · the receiver decodes</source>
         <translation>Transmission directe · le récepteur décode</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="340"/>
+        <location filename="../qml/OutputPicker.qml" line="347"/>
         <source>%1, passthrough</source>
         <translation>%1, transmission directe</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="397"/>
+        <location filename="../qml/OutputPicker.qml" line="404"/>
         <source>No passthrough-capable outputs were found.</source>
         <translation>Aucune sortie capable de transmission directe n&apos;a été trouvée.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="406"/>
+        <location filename="../qml/OutputPicker.qml" line="413"/>
         <source>Read by asking each endpoint whether it accepts AC-3 and E-AC-3 over IEC 61937 in exclusive mode. An item the receiver takes is sent to it untouched, and the receiver decodes and renders it: the decoder settings, the speaker setup and the volume here do not apply, and the meters show a decode made here. Anything else is decoded and played to the same output as PCM.</source>
         <translation>Déterminé en demandant à chaque point de sortie s&apos;il accepte l&apos;AC-3 et l&apos;E-AC-3 via IEC 61937 en mode exclusif. Un élément que le récepteur accepte lui est envoyé intact, et le récepteur le décode et le rend&#xa0;: les réglages du décodeur, la configuration des haut-parleurs et le volume d&apos;ici ne s&apos;appliquent pas, et les indicateurs montrent un décodage fait ici. Tout le reste est décodé et joué sur la même sortie en PCM.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="418"/>
+        <location filename="../qml/OutputPicker.qml" line="425"/>
         <source>Network · Sendspin</source>
         <translation>Réseau · Sendspin</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="441"/>
+        <location filename="../qml/OutputPicker.qml" line="448"/>
         <source>%1, group</source>
         <translation>%1, groupe</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="480"/>
+        <location filename="../qml/OutputPicker.qml" line="487"/>
         <source>%1 · %2</source>
         <translation>%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="502"/>
+        <location filename="../qml/OutputPicker.qml" line="509"/>
         <source>No groups yet. On the Network page, pair a sink and add it to a group - a group of one plays to a single sink.</source>
         <translation>Aucun groupe pour l&apos;instant. Dans la page Réseau, appairez un lecteur et ajoutez-le à un groupe - un groupe d&apos;un seul lecteur joue vers ce seul lecteur.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="513"/>
+        <location filename="../qml/OutputPicker.qml" line="520"/>
         <source>Each sink in a group decodes the stream for itself, to its own speakers. A group plays to the members connected when it starts, and to others as they connect.</source>
         <translation>Chaque lecteur d&apos;un groupe décode le flux pour lui-même, vers ses propres haut-parleurs. Un groupe joue vers les membres connectés à son démarrage, et vers les autres au fur et à mesure de leur connexion.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="529"/>
+        <location filename="../qml/OutputPicker.qml" line="536"/>
         <source>Network page…</source>
         <translation>Page Réseau…</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="535"/>
+        <location filename="../qml/OutputPicker.qml" line="542"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="540"/>
+        <location filename="../qml/OutputPicker.qml" line="547"/>
         <source>Play here</source>
         <translation>Jouer ici</translation>
     </message>
@@ -6108,17 +6118,17 @@ Déposez ici des fichiers AC-3, E-AC-3, AC-4, TrueHD ou MLP (bruts, MP4, Matrosk
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1631"/>
+        <location filename="../../src/hearth_controller.cpp" line="1643"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>Cette version ne porte pas de fichier de notices intégré (:/notices/NOTICES.txt n&apos;a pas été compilé dedans)&#xa0;; le NOTICES.txt à côté de l&apos;application et le LICENSE du dépôt disent ce qu&apos;elle livre.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2830"/>
+        <location filename="../../src/hearth_controller.cpp" line="2842"/>
         <source>saved to %1</source>
         <translation>enregistré dans&#xa0;%1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2833"/>
+        <location filename="../../src/hearth_controller.cpp" line="2845"/>
         <source>could not write %1: %2</source>
         <translation>impossible d&apos;écrire&#xa0;%1&#xa0;:&#xa0;%2</translation>
     </message>

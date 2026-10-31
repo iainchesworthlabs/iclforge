@@ -122,6 +122,27 @@ TEST_CASE("output selector: a row carries a format only when the probe and the d
     }
 }
 
+TEST_CASE("output selector: a row carries MAT only when the probe and the descriptor both do",
+          "[hearth][output-decision][truehd]") {
+    RenderDeviceInfo device = hdmi(false, false);
+    device.supports_mat_passthrough = true;
+    SinkAudioCapabilities with_mat = descriptor(false, false);
+    with_mat.mat = true;
+
+    const auto both = endpoint_facts(device, with_mat);
+    CHECK(both.accepts_mat);
+    CHECK(both.backend == iclforge::audio::passthrough_backend());
+
+    // The receiver has no MAT descriptor: it does not decode TrueHD, whatever opened.
+    CHECK_FALSE(endpoint_facts(device, descriptor(false, false)).accepts_mat);
+    // The output would not open the link: the descriptor alone does not make it so.
+    CHECK_FALSE(endpoint_facts(hdmi(false, false), with_mat).accepts_mat);
+    // No descriptor at all (a receiver that is off): nothing is known of it.
+    CHECK_FALSE(endpoint_facts(device, std::unexpected(EdidError::kNoEdid)).accepts_mat);
+    // No reader on this platform: the open is all there is.
+    CHECK(endpoint_facts(device, std::unexpected(EdidError::kNoBackend)).accepts_mat);
+}
+
 TEST_CASE("output selector: rows are read once a rate, and again after a refresh",
           "[hearth][output-decision]") {
     std::vector<std::uint32_t> asked;

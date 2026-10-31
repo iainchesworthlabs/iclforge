@@ -46,6 +46,55 @@ size_t iclforge_truehd_units_skipped_bytes(const iclforge_truehd_units_t*) {
     return 0;
 }
 
+iclforge_status_t iclforge_truehd_scanned_stream_create(const uint8_t*, size_t, uint64_t,
+                                                        iclforge_truehd_scanned_stream_t**) {
+    return ICLFORGE_ERROR_UNSUPPORTED;
+}
+void iclforge_truehd_scanned_stream_destroy(iclforge_truehd_scanned_stream_t*) {}
+uint32_t iclforge_truehd_scanned_stream_sample_rate(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+int iclforge_truehd_scanned_stream_samples_per_unit(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_units(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_samples(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+int iclforge_truehd_scanned_stream_padding_samples(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+double iclforge_truehd_scanned_stream_duration_seconds(const iclforge_truehd_scanned_stream_t*) {
+    return 0.0;
+}
+uint64_t iclforge_truehd_scanned_stream_skipped_bytes(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_leading_bytes(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+size_t iclforge_truehd_scanned_stream_restart_count(const iclforge_truehd_scanned_stream_t*) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_restart_unit(const iclforge_truehd_scanned_stream_t*,
+                                                     size_t) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_restart_offset(const iclforge_truehd_scanned_stream_t*,
+                                                       size_t) {
+    return 0;
+}
+uint64_t iclforge_truehd_scanned_stream_sample_at_seconds(const iclforge_truehd_scanned_stream_t*,
+                                                          double) {
+    return 0;
+}
+iclforge_status_t iclforge_truehd_scanned_stream_restart_for_sample(
+    const iclforge_truehd_scanned_stream_t*, uint64_t, uint64_t*, uint64_t*) {
+    return ICLFORGE_ERROR_UNSUPPORTED;
+}
+
 iclforge_status_t iclforge_truehd_decoder_create(const iclforge_truehd_decoder_config_t*,
                                                  iclforge_truehd_decoder_t** out_decoder) {
     if (out_decoder != nullptr) {

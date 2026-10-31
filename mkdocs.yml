@@ -124,6 +124,7 @@ nav:
   - Performance & quality:
       - Overview: performance-quality.md
       - Performance trend: performance-trend.md
+      - TrueHD against FFmpeg and DEE: truehd-comparison.md
       - Quality trend: quality-trend.md
       - Tool comparison trend: tool-comparison-trend.md
       - Object quality trend: object-quality-trend.md

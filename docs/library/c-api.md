@@ -695,7 +695,13 @@ The codec is lossless, so a decode returns the integers the stream was made from
 (a 16-bit stream's values are multiples of 256). A decoder takes one whole access unit at a time,
 from its 4-byte header, and keeps what the next one continues. A bare `.thd` or `.mlp` is cut into
 units by `iclforge_truehd_scan()`, which returns offsets into the bytes it was given; the units of
-an MP4 or Matroska track are already whole.
+an MP4 or Matroska track are already whole. How long a bare stream is, and where a decoder can join it, is
+`iclforge_truehd_scanned_stream_create()`: the sample rate, the samples (padding left out), the duration, the
+bytes skipped, and the restarts, the units with a major sync that a decode can start at, thinned to one every
+`restart_spacing` units. `iclforge_truehd_scanned_stream_restart_for_sample()` gives the unit number and the
+byte offset to start decoding at for a sample; the first sample the decoder gives is that unit number times
+`iclforge_truehd_scanned_stream_samples_per_unit()`. The handle holds numbers only, so it can be read by any
+number of threads.
 
 ```c
 iclforge_truehd_stream_info_t info;

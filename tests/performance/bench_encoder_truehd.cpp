@@ -95,25 +95,25 @@ std::vector<std::span<const std::byte>> as_spans(const perf::truehd_bench::Strea
 void add_truehd_results(std::vector<Result>& results, const iclforge::ac3::io::WavData& audio,
                         const std::vector<std::string>& only, bool fixtures) {
     const auto wanted = [&only](std::string_view name) { return perf::bench::wanted(only, name); };
-    // TrueHD: stereo and 5.1 at 48 kHz and 24 bits, each direction. The decode rows read what the
+    // TrueHD at 24 bits, each direction: stereo, 5.1 and 7.1 at 48 kHz, 5.1 at 96, stereo at 192. The decode rows read what the
     // encode rows' encoder writes from the same source, as the other codecs' do.
-    const bool want_truehd_encode = wanted("truehd_stereo_encode") || wanted("truehd_51_encode");
-    const bool want_truehd_decode = wanted("truehd_stereo_decode") || wanted("truehd_51_decode");
-    if (want_truehd_encode || want_truehd_decode) {
+    {
         namespace tb = perf::truehd_bench;
         constexpr int kTrueHdDecodePasses = 20;
-        const struct {
-            const char* layout;
-            std::span<const std::size_t> channels;
-        } layouts[] = {{"stereo", tb::kStereoChannels}, {"51", tb::kFiveOneChannels}};
-        for (const auto& layout : layouts) {
-            const std::string base = std::string("truehd_") + layout.layout;
-            const tb::Source source = tb::make_source(audio, layout.channels, 24);
+        for (const auto& layout : tb::kLayouts) {
+            const std::string base = std::string("truehd_") + layout.name;
+            const bool encode = wanted(base + "_encode");
+            const bool decode = wanted(base + "_decode");
+            if (!encode && !decode) {
+                continue;
+            }
+            const tb::Source source =
+                tb::make_source(audio, layout.channels, 24, layout.sample_rate);
             const auto config = tb::config_for(source);
-            if (wanted(base + "_encode")) {
+            if (encode) {
                 results.push_back(bench_truehd_encode(base + "_encode", source, config));
             }
-            if (wanted(base + "_decode")) {
+            if (decode) {
                 const tb::Stream stream = tb::encode_stream(source, config);
                 const auto units = as_spans(stream);
                 results.push_back(bench_truehd_decode(base + "_decode", units, stream.sample_rate,

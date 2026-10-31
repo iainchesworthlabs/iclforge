@@ -7,6 +7,8 @@
 #include <string_view>
 
 #include "iclforge/audio/passthrough.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
+#include "mat_status.hpp"
 #include "queue.hpp"
 
 // Which output Hearth plays through, on which endpoint, and why
@@ -105,6 +107,12 @@ struct EndpointFacts {
     // 0 means the backend cannot say, not none.
     std::uint16_t channels = 0;
     std::uint32_t speakers = 0;
+    // The endpoint opens the eight-channel MAT link (iclforge::audio::RenderDeviceInfo::
+    // supports_mat_passthrough). That is the open and no more: whether a receiver names what then
+    // arrives TrueHD is what mat_status.hpp says nobody has run.
+    bool accepts_mat = false;
+    // The platform audio API these facts came from, which is what mat_status() is asked about.
+    audio::PassthroughBackend backend = audio::PassthroughBackend::kNone;
 };
 
 struct OutputRequest {
@@ -140,6 +148,15 @@ struct OutputRequest {
     // only AC-3. False turns the kBitstreamAsAc3 leg off, and the reason
     // then says the sink's limit rather than offering it.
     bool transcode_available = true;
+    // Whether this build's player can send a TrueHD item to a local output as MAT. False until the
+    // player packs MAT bursts (mat_feed.hpp) and hands them to the passthrough output: with it
+    // false the decision is what it was before H6, and a TrueHD item is decoded here whatever is
+    // pinned. Only an item of codec kTruehd is ever sent so; MLP has no carriage.
+    bool mat_passthrough = false;
+    // What has been run, per platform API: mat_status() in the build, a stand-in in a test. The
+    // decision reads it for every MAT answer, so that "not run" is a fact the table states and
+    // not a sentence the decision invents.
+    MatPlatformStatus (*mat_status_of)(audio::PassthroughBackend) = &mat_status;
 };
 
 struct OutputChoice {
@@ -154,6 +171,14 @@ struct OutputChoice {
     // One line for the Output screen and the log: why this, or why not
     // something better. Never empty.
     std::string reason{};
+    // The link format a kBitstream choice sends: the stream as the item carries it, or MAT for a
+    // TrueHD item. Unset for every other mode.
+    std::optional<audio::BitstreamFormat> stream = std::nullopt;
+    // For a TrueHD or MLP item decoded here, the stream's own presentation the fallback chain
+    // asks for: the one the output states (its channel count), else stereo
+    // (truehd_fallback_presentation()). It is the decision's answer and nothing applies it yet: the
+    // player decodes the presentation in DecoderSettings (best by default). Unset for any other item.
+    std::optional<truehd::Presentation> presentation = std::nullopt;
 };
 
 // The output a player has open while it asks about an item. A probe of that
@@ -169,6 +194,14 @@ struct HeldOutput {
 
     [[nodiscard]] bool held() const { return mode != OutputMode::kNone; }
 };
+
+// The presentation of a TrueHD stream to decode for a local output that cannot be sent it as MAT
+// (the owner's decision of 2026-10-29: the sink's stated presentation, then stereo PCM, then
+// refuse; no transcode). The output states its width as its channel count: 8 or more gets the
+// 8 channel presentation, 6 or 7 the 6 channel one, and anything narrower, or an output that does
+// not say, gets the stereo one - which is the stream's own stereo mix, not a fold. The refusal is
+// the decision's: an output that cannot take PCM at all, or follow=off, in choose_output().
+[[nodiscard]] truehd::Presentation truehd_fallback_presentation(const EndpointFacts& endpoint);
 
 [[nodiscard]] OutputChoice choose_output(const OutputRequest& request);
 

@@ -72,14 +72,18 @@ shared transforms: `ac4_mdct512_forward`, `ac4_imdct512_inverse`, `ac4_fft512_fo
 `ac4_qmf_analysis64` and `ac4_qmf_synthesis64`. AC-4 decode quality has its own series on
 [Quality trend](quality-trend.md#ac-4-decode-quality).
 
-TrueHD adds `truehd_stereo_encode`, `truehd_51_encode`, `truehd_stereo_decode` and `truehd_51_decode`:
-24 bits at 48 kHz, stereo and 5.1, from the same `reference_51.wav`. The file is 16 bit; the low byte of
+TrueHD adds `truehd_stereo_*`, `truehd_51_*`, `truehd_71_*`, `truehd_51_96k_*` and `truehd_stereo_192k_*` (each
+`_encode` and `_decode`):
+24 bits, stereo, 5.1 and 7.1 at 48 kHz, 5.1 at 96 kHz and stereo at 192 kHz, from the same `reference_51.wav`. The 7.1 rows repeat its first two channels as the rear
+surrounds, and the 96 and 192 kHz rows declare the same samples at the higher rate: they measure what the codec does for a second of audio at that rate
+(more samples, another substream layout, a lower filter limit), not the music's spectrum there. `iclforge-perf` holds all ten to twice their real-time budget.
+[TrueHD against FFmpeg and DEE](truehd-comparison.md) has the comparison. The file is 16 bit; the low byte of
 each 24-bit sample is a fixed pseudo-random sequence that stands for a master's noise floor. A frame is
 an access unit, 40 samples or 0.83 ms, so a decode is a few microseconds and the table shows three
 significant digits below 1 ms. The decode series run the stream the encoder wrote from the same source,
 twenty times over. The encoder is given one access unit a call, as a live caller would, and the call that
 completes a 128-unit restart interval does the interval's whole analysis: the mean is the cost of the
-codec, and the maximum column is that burst. The memory series carry the same four names and count
+codec, and the maximum column is that burst. The memory series carry the same names and count
 three intervals. `iclforge-bench --truehd-fixtures` adds a row for each committed TrueHD and MLP stream
 (`testdata/truehd`); CI does not pass it, the rows are a table to read. [The TrueHD parity page](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-performance.md)
 has the numbers and the kernel split.

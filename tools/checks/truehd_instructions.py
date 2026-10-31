@@ -81,8 +81,13 @@ def run_workload(bench: Path, workload: str, valgrind: str) -> dict:
     with tempfile.TemporaryDirectory(prefix="truehd-icount-") as scratch:
         out = Path(scratch) / "callgrind.out"
         result_json = Path(scratch) / "bench.json"
-        command = [valgrind, "--tool=callgrind", "--compress-strings=no", "--compress-pos=no",
-                   f"--callgrind-out-file={out}"]
+        command = [
+            valgrind,
+            "--tool=callgrind",
+            "--compress-strings=no",
+            "--compress-pos=no",
+            f"--callgrind-out-file={out}",
+        ]
         command += [f"--toggle-collect={pattern}" for pattern in WORKLOADS[workload]]
         command += [str(bench), "--only", workload, "--json-out", str(result_json)]
         subprocess.run(command, check=True, capture_output=True, text=True)
@@ -107,12 +112,17 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--bench", type=Path, required=True, help="the iclforge-bench binary")
-    parser.add_argument("--workload", action="append", choices=sorted(WORKLOADS),
-                        help="a workload to count; repeatable, default all four")
+    parser.add_argument(
+        "--workload",
+        action="append",
+        choices=sorted(WORKLOADS),
+        help="a workload to count; repeatable, default all four",
+    )
     parser.add_argument("--valgrind", default="valgrind")
     parser.add_argument("--json-out", type=Path)
-    parser.add_argument("--ceilings", type=Path,
-                        help="a JSON file of {workload: most instructions per access unit}")
+    parser.add_argument(
+        "--ceilings", type=Path, help="a JSON file of {workload: most instructions per access unit}"
+    )
     args = parser.parse_args()
 
     names = args.workload or sorted(WORKLOADS)
@@ -128,9 +138,11 @@ def main() -> int:
         ceiling = ceilings.get(row["workload"])
         over = ceiling is not None and row["instructions_per_unit"] > ceiling
         failed = failed or over
-        print(f"{row['workload']:<24} {row['calls']:>8} {row['instructions_per_unit']:>12,} "
-              f"{row['unit_ms']:>8.3f} {row['instructions_per_second_of_audio'] / 1e6:>15.1f}  "
-              f"{'-' if ceiling is None else format(ceiling, ',')}{' OVER' if over else ''}")
+        print(
+            f"{row['workload']:<24} {row['calls']:>8} {row['instructions_per_unit']:>12,} "
+            f"{row['unit_ms']:>8.3f} {row['instructions_per_second_of_audio'] / 1e6:>15.1f}  "
+            f"{'-' if ceiling is None else format(ceiling, ',')}{' OVER' if over else ''}"
+        )
     if args.json_out:
         args.json_out.write_text(json.dumps({"rows": rows}, indent=2) + "\n")
     return 1 if failed else 0

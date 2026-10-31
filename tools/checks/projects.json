@@ -33,7 +33,7 @@
     "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "lyrics", "objects", "app-cdg-picture", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS."},
     "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"], "lanes": ["android"], "purpose": "The Android (Shield) demo application."},
     "hearth-android": {"kind": "app", "path": "apps/hearth/android", "may_use": ["audio", "lyrics", "sendspin", "sink"], "lanes": ["android"], "purpose": "Hearth for Android: a Sendspin sink for Android TV, advertised on the network, paired with from Hearth and playing what it sends. A foreground service owns one iclforge::sink; the screens are platform Views over JNI (planning/hearth-android.md)."},
-    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "lyrics", "objects", "pitch"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
+    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "lyrics", "objects", "pitch", "truehd"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
 
     "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "lyrics", "objects"], "lanes": ["python"], "purpose": "The Python binding: the iclforge wheel, built with scikit-build-core."},
     "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"], "lanes": ["rust"], "purpose": "The Rust crates: iclforge and iclforge-sys over the C API."},

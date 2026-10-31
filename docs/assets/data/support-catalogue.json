@@ -1812,9 +1812,9 @@
         [
           "TrueHD WebAssembly module",
           [
-            "unavailable",
-            "not-applicable",
-            "no WebAssembly module links it"
+            "source",
+            "ci",
+            "decode, probe and scan; no demo page"
           ]
         ],
         [

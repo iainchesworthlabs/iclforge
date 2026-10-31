@@ -119,6 +119,11 @@ target_link_libraries(hearth_qmltests PRIVATE
     iclforge::ac4
     iclforge::containers
     iclforge::warnings iclforge::fmt
+    # Inert unless ICLFORGE_ENABLE_COVERAGE is on (cmake/Coverage.cmake). This target recompiles
+    # the controllers in ../src, so without it the instrumented libraries it links would give it
+    # the gcov runtime and leave apps/hearth/ui/src with no data for coverage_report.sh -q
+    # (Crucible's and forge-gui's qmltests link it the same way).
+    iclforge::coverage
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest
     # QTest::keyClick() on a QWindow, for TestServices.keyClick() (see
     # qml_test_main.cpp).

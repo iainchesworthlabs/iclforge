@@ -84,12 +84,12 @@ inline void ensure_initialized() {
 // code at all.
 [[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
                                                     std::uint32_t content_rate) {
-    return content_rate * audio::carrier_ratio(format);
+    return audio::link_rate(format, content_rate);
 }
 
 // The SPA codec a format is negotiated as; nothing for AC-4, which PipeWire's
 // list does not name (UNKNOWN, PCM, DTS, AC3, MPEG, MPEG2_AAC, EAC3, TRUEHD
-// and DTSHD in 1.6), so there is no format to ask a sink for.
+// and DTSHD in 1.6), so there is no format to ask a sink for. MAT is TRUEHD.
 [[nodiscard]] constexpr std::optional<spa_audio_iec958_codec> iec958_codec_for(
     audio::BitstreamFormat format) {
     switch (format) {
@@ -101,14 +101,15 @@ inline void ensure_initialized() {
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
             break;
+        case audio::BitstreamFormat::kMat:
+            return SPA_AUDIO_IEC958_CODEC_TRUEHD;
     }
     return std::nullopt;
 }
 
-// The carrier is a 2-channel 16-bit stream whatever rides inside it (see
-// iclforge::alsa's identical constant and the comment on it), so a burst's length
-// in bytes and in sample-frames differ by a constant 4 here too.
-inline constexpr std::size_t kCarrierFrameBytes = 4;
+// The carrier is a 16-bit stream, two channels wide for every format but MAT, so a burst's
+// length in bytes and in sample-frames differ by a constant (audio::carrier_frame_bytes(): 4,
+// and 16 for MAT).
 
 // Every Audio/Source or Audio/Sink node currently in the graph, visited once
 // each with its global id and property dictionary.
@@ -731,6 +732,26 @@ struct SinkInfo {
             return true;
         }
         at = stop;
+    }
+    return false;
+}
+
+// Whether an `iec958.codecs` list names the codec `format` is negotiated as. SPA's list spells
+// TrueHD "TrueHD" (a Raspberry Pi and an Atmos receiver listed it so, in
+// libs/audio/tests/backend/pipewire/test_pipewire_support.cpp) and its enum member TRUEHD, so a
+// list is read for either; the other codecs have one spelling. AC-4 has no codec to list.
+[[nodiscard]] inline bool codec_enabled(std::string_view list, audio::BitstreamFormat format) {
+    switch (format) {
+        case audio::BitstreamFormat::kAc3:
+            return codec_listed(list, "AC3");
+        case audio::BitstreamFormat::kEac3:
+            return codec_listed(list, "EAC3");
+        case audio::BitstreamFormat::kMat:
+            return codec_listed(list, "TrueHD") || codec_listed(list, "TRUEHD");
+        case audio::BitstreamFormat::kAc4:
+        case audio::BitstreamFormat::kAc4Hbr4:
+        case audio::BitstreamFormat::kAc4Hbr16:
+            break;
     }
     return false;
 }

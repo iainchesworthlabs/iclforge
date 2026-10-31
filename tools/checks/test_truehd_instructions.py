@@ -54,12 +54,26 @@ class Gate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as scratch:
             table = Path(scratch) / "ceilings.json"
             table.write_text(json.dumps({"ceilings": {"truehd_51_decode": ceiling}}))
-            row = {"workload": "truehd_51_decode", "calls": 10, "instructions_per_unit": 60000,
-                   "unit_ms": 0.8333, "instructions_per_second_of_audio": 72000000}
-            argv = ["truehd_instructions.py", "--bench", "x", "--workload", "truehd_51_decode",
-                    "--ceilings", str(table)]
-            with mock.patch.object(sys, "argv", argv), \
-                    mock.patch.object(ti, "run_workload", return_value=row):
+            row = {
+                "workload": "truehd_51_decode",
+                "calls": 10,
+                "instructions_per_unit": 60000,
+                "unit_ms": 0.8333,
+                "instructions_per_second_of_audio": 72000000,
+            }
+            argv = [
+                "truehd_instructions.py",
+                "--bench",
+                "x",
+                "--workload",
+                "truehd_51_decode",
+                "--ceilings",
+                str(table),
+            ]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(ti, "run_workload", return_value=row),
+            ):
                 return ti.main()
 
     def test_a_workload_over_its_ceiling_fails(self):

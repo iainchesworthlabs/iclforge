@@ -15,6 +15,8 @@ private const val TAG = "PassthroughBridge"
 // to the first sound, and the most the sink can be ahead of the link.
 private const val AC3_BURST_BYTES = 6144
 private const val EAC3_BURST_BYTES = 24576
+private const val MAT_BURST_BYTES = 61440
+private const val MAT_CHANNELS = 8
 private const val BUFFER_BURSTS = 8
 
 /**
@@ -55,6 +57,50 @@ class PassthroughBridge {
             .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
             .build()
         return AudioTrack.isDirectPlaybackSupported(format, ATTRIBUTES)
+    }
+
+    /**
+     * Whether the route takes an `ENCODING_IEC61937` track of [channels] channels at [carrierRateHz]: TrueHD in its MAT
+     * frame is eight channels at 192 kHz, or 176.4 kHz for the 44.1 kHz family. Asked once per route by the native side
+     * (`isLinkSupported` in passthrough.cpp's contract); the eight-channel mask is `CHANNEL_OUT_7POINT1_SURROUND`.
+     * Not run on a Shield or a receiver: the answer is the platform's, and nothing here has seen it.
+     */
+    fun isLinkSupported(carrierRateHz: Int, channels: Int): Boolean {
+        if (Build.VERSION.SDK_INT < 29) return false
+        val supported =
+            AudioTrack.isDirectPlaybackSupported(iec61937Format(carrierRateHz, channels), ATTRIBUTES)
+        Log.d(TAG, "isLinkSupported(carrier=$carrierRateHz channels=$channels) = $supported")
+        return supported
+    }
+
+    /** Opens the eight-channel track MAT needs, playing, with nothing in it yet: [open]'s twin for a wider link. */
+    fun openLink(carrierRateHz: Int, channels: Int): Boolean = synchronized(trackLock) {
+        close()
+        if (Build.VERSION.SDK_INT < 29) return@synchronized false
+        val format = iec61937Format(carrierRateHz, channels)
+        if (!AudioTrack.isDirectPlaybackSupported(format, ATTRIBUTES)) {
+            Log.w(TAG, "openLink: isDirectPlaybackSupported=false for carrier=$carrierRateHz channels=$channels")
+            LinkHealth.refused(SystemClock.uptimeMillis())
+            return@synchronized false
+        }
+        val bufferBytes = MAT_BURST_BYTES * BUFFER_BURSTS
+        try {
+            val track = AudioTrack.Builder()
+                .setAudioFormat(format)
+                .setAudioAttributes(ATTRIBUTES)
+                .setBufferSizeInBytes(bufferBytes)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+            track.play()
+            audioTrack = track
+            Log.i(TAG, "openLink: AudioTrack opened, carrier=$carrierRateHz channels=$channels buffer=$bufferBytes")
+            LinkHealth.opened(SystemClock.uptimeMillis())
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "openLink: AudioTrack.Builder().build()/play() threw", e)
+            LinkHealth.refused(SystemClock.uptimeMillis())
+            false
+        }
     }
 
     /** Opens the track at the given (already-carrier) rate, playing, with nothing in it yet. */
@@ -187,12 +233,16 @@ class PassthroughBridge {
         track.release()
     }
 
-    // Stereo, not 5.1/7.1: a burst rides a two-channel 16-bit carrier whatever it decodes to.
-    private fun iec61937Format(carrierRateHz: Int): AudioFormat =
+    // Stereo for AC-3 and E-AC-3, which ride a two-channel 16-bit carrier whatever they decode to; the
+    // eight-channel mask for MAT, whose burst fills an eight-channel carrier.
+    private fun iec61937Format(carrierRateHz: Int, channels: Int = 2): AudioFormat =
         AudioFormat.Builder()
             .setEncoding(AudioFormat.ENCODING_IEC61937)
             .setSampleRate(carrierRateHz)
-            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+            .setChannelMask(
+                if (channels == MAT_CHANNELS) AudioFormat.CHANNEL_OUT_7POINT1_SURROUND
+                else AudioFormat.CHANNEL_OUT_STEREO
+            )
             .build()
 
     private companion object {

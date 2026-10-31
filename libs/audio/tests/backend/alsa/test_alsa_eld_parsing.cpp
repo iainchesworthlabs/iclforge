@@ -48,6 +48,23 @@ constexpr std::string_view kLpcmAc3Eac3 =
     "sad2_rates\t\t[0x0e0] 32000 44100 48000\n"
     "sad2_max_bitrate\t0\n";
 
+constexpr std::string_view kLpcmEac3Mat =
+    "monitor_present\t\t1\n"
+    "eld_valid\t\t1\n"
+    "sad_count\t\t3\n"
+    "sad0_coding_type\t[0x1] LPCM\n"
+    "sad0_channels\t\t8\n"
+    "sad0_rates\t\t[0x1ee0] 32000 44100 48000 88200 96000 176400 192000\n"
+    "sad0_bits\t\t[0xe0000] 16 20 24\n"
+    "sad1_coding_type\t[0xa] Dolby Digital+ (Dolby Digital Plus)\n"
+    "sad1_channels\t\t8\n"
+    "sad1_rates\t\t[0x0e0] 32000 44100 48000\n"
+    "sad1_max_bitrate\t0\n"
+    "sad2_coding_type\t[0xc] MAT (MLP)\n"
+    "sad2_channels\t\t8\n"
+    "sad2_rates\t\t[0x0e0] 32000 44100 48000\n"
+    "sad2_max_bitrate\t0\n";
+
 constexpr std::string_view kAc3OnlyNoLpcm =
     "monitor_present\t\t1\n"
     "eld_valid\t\t1\n"
@@ -90,6 +107,21 @@ TEST_CASE("a descriptor with LPCM, AC-3 and E-AC-3 SADs reports all three") {
     // reads this field.
     CHECK(caps->max_pcm_channels == 2);
     CHECK(caps->pcm_sample_rates_hz == std::vector<std::uint32_t>{32000, 44100, 48000});
+}
+
+TEST_CASE("a MAT descriptor (coding type 12) reports mat, and the others do not") {
+    const auto caps = parse_eld_proc_text(kLpcmEac3Mat);
+    REQUIRE(caps.has_value());
+    CHECK(caps->mat);
+    CHECK(caps->eac3);
+    CHECK_FALSE(caps->ac3);
+    // The MAT descriptor's own 8 channels and its rates must not reach the LPCM fields.
+    CHECK(caps->max_pcm_channels == 8);
+    CHECK(caps->pcm_sample_rates_hz ==
+          std::vector<std::uint32_t>{32000, 44100, 48000, 88200, 96000, 176400, 192000});
+    // A descriptor with no MAT entry does not claim it.
+    CHECK_FALSE(parse_eld_proc_text(kLpcmAc3Eac3)->mat);
+    CHECK_FALSE(parse_eld_proc_text(kLpcmOnly)->mat);
 }
 
 TEST_CASE("a compressed-only descriptor leaves the PCM fields at unknown") {

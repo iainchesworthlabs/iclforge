@@ -179,6 +179,12 @@ TestCase {
         // a bitstream.
         verify(H.textContaining(picker.contentItem, "AC-3 ✓ · E-AC-3 ✓") !== null,
                "the passthrough section does not list the receiver");
+        // It opens TrueHD's eight-channel link too, and says it has not been run rather than
+        // showing a tick: no platform has played MAT to a receiver that named it TrueHD.
+        verify(H.textContaining(picker.contentItem, "TrueHD (MAT) opens, not run") !== null,
+               "the receiver's TrueHD mark does not say it is not run");
+        verify(H.textContaining(picker.contentItem, "TrueHD (MAT) ✓") === null,
+               "a TrueHD tick appeared for a platform that has not been run");
         // The current endpoint starts selected.
         compare(picker.selectedDeviceId, "fake-speakers");
         mouseClick(findChild(win, "outputPickerCancel"));
