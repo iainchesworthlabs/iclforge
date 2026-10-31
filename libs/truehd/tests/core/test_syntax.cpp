@@ -283,33 +283,61 @@ TEST_CASE("the matrices of restart sync 0x31EC send every header, then every coe
     CHECK(again.bit_count() == 1 + 1 + 1 + 1 + 4 + 2 * 21 + 18 + 28 + 1);
 }
 
-TEST_CASE("the matrices of restart sync 0x31EC refuse what the owner's discs never send",
+TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry a second term",
           "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 3;
     context.max_matrix_chan = 3;
     context.object_matrices = true;
     context.presence_flags = presence::kMatrix;
-    // A set extension bit after one matrix with no coefficients.
+
+    // The headers of one matrix: out 2, frac_bits 5, f_shift 0, channels 0 and 3.
+    MatrixSet last;
+    last.count = 1;
+    last.items[0].out_ch = 2;
+    last.items[0].frac_bits = 5;
+    last.items[0].present[0] = true;
+    last.items[0].present[3] = true;
+    context.object_previous = &last;
+
+    // A section with B = 0 sends coefficients only (7 bits each), then a second term: A2 = 1,
+    // B2 = 1, C2 = 1, a width of 3 and a reserved field, and one value for each present channel.
     iclforge::BitWriter bits;
-    bits.put(0, 1);
-    bits.put(1, 1);
-    bits.put(1, 1);
-    bits.put(1, 1);
-    bits.put(0, 4);
-    bits.put(2, 4);
-    bits.put(5, 4);
-    bits.put(1, 3);
+    bits.put(0, 1);  // new_guards
+    bits.put(1, 1);  // matrix group present
+    bits.put(1, 1);  // A: the matrices change
+    bits.put(0, 1);  // B: no headers
+    bits.put(20, 7);
+    bits.put(static_cast<std::uint32_t>(-9) & 0x7FU, 7);
+    bits.put(1, 1);  // A2
+    bits.put(1, 1);  // B2
+    bits.put(1, 1);  // C2
+    bits.put(3, 4);  // width
     bits.put(0, 2);
-    bits.put(0, 4);
-    bits.put(0, 4);
-    bits.put(1, 1);  // matrix_extension_present
+    bits.put(2, 3);
+    bits.put(static_cast<std::uint32_t>(-3) & 0x7U, 3);
     bits.align();
     const std::vector<std::byte> bytes = bits.take();
     iclforge::BitReader reader(bytes);
     const auto read = read_block_header(reader, context);
-    REQUIRE_FALSE(read.has_value());
-    CHECK(read.error().kind == ErrorKind::kBadParameter);
+    REQUIRE(read.has_value());
+    REQUIRE(read->matrices.has_value());
+    const MatrixSet& set = *read->matrices;
+    REQUIRE(set.count == 1);
+    CHECK(set.items[0].out_ch == 2);
+    CHECK(set.items[0].coeff[0] == 20);
+    CHECK(set.items[0].coeff[3] == -9);
+    CHECK(set.extension);
+    CHECK(set.items[0].ext_width == 3);
+    CHECK(set.items[0].ext_value[0] == 2);
+    CHECK(set.items[0].ext_value[3] == -3);
+
+    // Without earlier headers a section that reuses them is refused.
+    context.object_previous = nullptr;
+    iclforge::BitReader again(bytes);
+    const auto refused = read_block_header(again, context);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().kind == ErrorKind::kBadParameter);
 }
 
 TEST_CASE("a block header that sends nothing is two bits per group", "[truehd][syntax]") {

@@ -78,6 +78,9 @@ struct SubstreamState {
     bool running = false;
     RestartHeader restart;
     BlockContext context;
+    // The object-audio matrices last sent: a section that sends no headers reuses them.
+    MatrixSet object_last;
+    bool object_have = false;
     int block_size = kDefaultBlockSize;
     int matrix_count = 0;
     std::array<MatrixPlan, kMaxMatrices> matrices{};
@@ -311,8 +314,10 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     if (state.running && state.interval_open) {
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
+            ++counters.lossless_ok_by_substream[static_cast<std::size_t>(index)];
         } else {
             ++counters.lossless_check_failures;
+            ++counters.lossless_failed_by_substream[static_cast<std::size_t>(index)];
             if (strict()) {
                 state.running = false;
                 return std::unexpected(make_error(ErrorKind::kBadLosslessCheck,
@@ -348,6 +353,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.noise_type = header->noise_type();
     // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
     state.context.object_matrices = header->sync == kRestartSyncAtmos;
+    state.context.object_extension_variant = config.lab.extension_variant;
+    state.object_have = false;  // a restart resets the coding parameters, the matrices included
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
@@ -424,8 +431,10 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                            ? c
                                            : kMaxChannels + (c - restart.matrix_channels());
                     plan.channel[slot] = static_cast<std::uint8_t>(column);
-                    plan.coeff[slot] =
-                        spec.coeff[index] * (1 << (kMatrixShift - spec.frac_bits + spec.f_shift));
+                    const int scale = config.lab.inverse_f_shift
+                                          ? kMatrixShift - spec.frac_bits - spec.f_shift
+                                          : kMatrixShift - spec.frac_bits + spec.f_shift;
+                    plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
                 }
             }
         }
@@ -616,10 +625,12 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_matrices");
-        for (int m = 0; m < state.matrix_count; ++m) {
+        const bool object = state.context.object_matrices;
+        for (int step = 0; step < state.matrix_count; ++step) {
+            const int m = object && config.lab.reverse_matrices ? state.matrix_count - 1 - step : step;
             const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
             const std::uint32_t keep =
-                plan.out <= max_chan
+                plan.out <= max_chan && !(object && config.lab.no_quantiser_mask)
                     ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
                         1U)
                     : 0xFFFFFFFFU;
@@ -638,6 +649,10 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                                   plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
                                   kRowStride, noise);
         }
+    }
+
+    if (config.lab.lower_rows_after_matrices && index < kObjectSubstream) {
+        std::copy_n(matrix_base, static_cast<std::size_t>(block) * kRowStride, rows_base);
     }
 
     // The output: each channel from the matrix channel ch_assign assigns to it, shifted, and folded
@@ -702,10 +717,15 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     ErrorKind::kBadBlockData,
                     "the directory promises a restart header the segment lacks (TH spec §6.2)"));
             }
+            state.context.object_previous = state.object_have ? &state.object_last : nullptr;
             auto header = read_block_header(reader, state.context);
             if (!header) {
                 state.running = false;
                 return std::unexpected(header.error());
+            }
+            if (header->matrices && state.context.object_matrices) {
+                state.object_last = *header->matrices;
+                state.object_have = header->matrices->count > 0;
             }
             if (auto applied = apply_block_header(state, *header); !applied) {
                 state.running = false;

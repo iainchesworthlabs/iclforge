@@ -135,6 +135,12 @@ struct MatrixSpec {
     std::int8_t f_shift = 0;
     std::uint8_t field_2b = 0;  // 2 bits
     std::uint8_t field_m4 = 0;  // 4 bits
+    // The second precision term of the object-audio matrices (TH spec §10.2.1a; ERRATA.md entry
+    // 69): a width, two more bits and one value for each present coefficient. Parsed and carried; the
+    // owner's DEE streams set it where the objects move, and what it does to the samples is open.
+    std::uint8_t ext_width = 0;   // 4 bits
+    std::uint8_t ext_field2 = 0;  // 2 bits
+    std::array<std::int32_t, kMaxChannels> ext_value{};
     friend bool operator==(const MatrixSpec&, const MatrixSpec&) = default;
 };
 
@@ -143,6 +149,7 @@ struct MatrixSpec {
 struct MatrixSet {
     std::array<MatrixSpec, kMaxMatrices> items{};
     std::uint8_t count = 0;
+    bool extension = false;  // object-audio matrices: a second precision term followed
     friend bool operator==(const MatrixSet&, const MatrixSet&) = default;
 };
 
@@ -165,6 +172,13 @@ struct BlockContext {
     bool noise_type = false;
     // Restart sync 0x31EC: the matrix section is the object-audio variant of TH spec §10.2.1a.
     bool object_matrices = false;
+    // The object-audio matrices in force before this header: its headers are the ones a section
+    // that sends none reuses (TH spec §10.2.1a). Not owned; null when there are none.
+    const MatrixSet* object_previous = nullptr;
+    // The open grammar of the second precision term, for the owner's trials (ERRATA.md entry 69):
+    // bit 0 reads a value for every matrix channel and not for the present ones, bit 1 shares one
+    // width and one reserved field among the matrices.
+    int object_extension_variant = 0;
     std::uint8_t presence_flags = presence::kAll;  // in effect before this header
     friend bool operator==(const BlockContext&, const BlockContext&) = default;
 };

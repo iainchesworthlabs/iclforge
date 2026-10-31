@@ -64,9 +64,23 @@ enum class Strictness : std::uint8_t {
                // restart interval of a stream, which no restart header follows
 };
 
+// Switches for trials on the points of the object substream (restart sync 0x31EC) that no stream
+// has settled (ERRATA.md entry 69). All off is the decoder. A stream whose lossless checks pass
+// only with one on says what the point is; nothing else should set them.
+struct DecoderLab {
+    int extension_variant = 0;  // BlockContext::object_extension_variant
+    // The object substream reads the lower substreams' rows after their matrices, not before.
+    bool lower_rows_after_matrices = false;
+    bool no_quantiser_mask = false;  // the object matrices do not mask their output's low bits
+    bool reverse_matrices = false;   // the object matrices run last to first
+    bool inverse_f_shift = false;    // the coefficient is raw / 2^(frac_bits + f_shift)
+    friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
+};
+
 struct DecoderConfig {
     Presentation presentation = Presentation::kBest;
     Strictness strictness = Strictness::kStrict;
+    DecoderLab lab = {};
 };
 
 // One decoded access unit. The views point into the decoder and stay valid until its next decode()
@@ -112,6 +126,9 @@ struct DecoderCounters {
     std::uint64_t restarts = 0;
     std::uint64_t lossless_checks_ok = 0;
     std::uint64_t lossless_check_failures = 0;
+    // The same, by substream.
+    std::array<std::uint64_t, kMaxSubstreams> lossless_ok_by_substream{};
+    std::array<std::uint64_t, kMaxSubstreams> lossless_failed_by_substream{};
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
     // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec

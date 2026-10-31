@@ -92,65 +92,112 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 }
 
 // TH spec §10.2.1a, restart sync 0x31EC: the matrix section of the object substream. Two present
-// bits, the count less one, then every matrix's header (output channel, frac_bits, f_shift + 1,
-// two reserved bits, four bits per matrix, and a presence mask over the matrix channels), then every
-// matrix's coefficients, then one bit that says whether a second precision term follows (DEE never
-// sets it; it is refused here). Provisional for what the owner's discs do not show (ERRATA.md
-// entry 69).
+// bits (A: this block changes the matrices; B: it sends their headers, and a section without
+// them reuses the last ones and sends only coefficients), the count less one, the header of every
+// matrix (output channel 4 bits, frac_bits 4, f_shift + 1 in 3, two reserved bits, four bits per
+// matrix, and a presence mask over the matrix channels), the coefficients of every matrix, then
+// the second precision term (A2, B2, C2; ERRATA.md entry 69). Provisional for what the owner's
+// streams do not show.
 [[nodiscard]] std::expected<MatrixSet, Error> read_object_matrices(BitReader& reader,
                                                                   const BlockContext& context) {
     MatrixSet set;
-    if (reader.read(1) == 0) {
-        return set;  // no matrices follow
-    }
-    if (reader.read(1) == 0) {
-        return std::unexpected(
-            Error{ErrorKind::kBadParameter, "object matrices without their header loop"});
-    }
-    const unsigned count = reader.read(4) + 1;
-    if (count > kMaxMatrices) {
-        return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
-    }
-    set.count = static_cast<std::uint8_t>(count);
     const int channels = context.max_matrix_chan + 1;
-    std::array<std::uint32_t, kMaxMatrices> masks{};
-    for (unsigned m = 0; m < count; ++m) {
-        MatrixSpec& matrix = set.items[m];
-        matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
-        matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
-        matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
-        matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
-        matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
-        masks[m] = reader.read(channels);
-        if (matrix.frac_bits - matrix.f_shift > 15) {
-            return std::unexpected(
-                Error{ErrorKind::kBadParameter, "matrix coefficients finer than 2^-15"});
+    const bool changed = reader.read(1) != 0;
+    if (changed) {
+        const bool headers = reader.read(1) != 0;
+        if (headers) {
+            const unsigned count = reader.read(4) + 1;
+            if (count > kMaxMatrices) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
+            }
+            set.count = static_cast<std::uint8_t>(count);
+            for (unsigned m = 0; m < count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
+                matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
+                matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
+                matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
+                matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
+                const std::uint32_t mask = reader.read(channels);
+                for (int c = 0; c < channels; ++c) {
+                    matrix.present[static_cast<std::size_t>(c)] = ((mask >> c) & 1U) != 0;
+                }
+            }
+        } else {
+            if (context.object_previous == nullptr || context.object_previous->count == 0) {
+                return std::unexpected(Error{ErrorKind::kBadParameter,
+                                             "object matrices reuse headers none were sent for"});
+            }
+            set = *context.object_previous;
+            for (MatrixSpec& matrix : set.items) {
+                matrix.coeff = {};
+                matrix.ext_value = {};
+            }
+            set.extension = false;
         }
-    }
-    for (unsigned m = 0; m < count; ++m) {
-        MatrixSpec& matrix = set.items[m];
-        for (int c = 0; c < channels; ++c) {
-            const auto index = static_cast<std::size_t>(c);
-            matrix.present[index] = ((masks[m] >> c) & 1U) != 0;
-            if (matrix.present[index]) {
-                matrix.coeff[index] = read_signed(reader, matrix.frac_bits + 2);
+        for (unsigned m = 0; m < set.count; ++m) {
+            MatrixSpec& matrix = set.items[m];
+            if (matrix.frac_bits - matrix.f_shift > 15) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "matrix coefficients finer than 2^-15"});
+            }
+            for (int c = 0; c < channels; ++c) {
+                const auto index = static_cast<std::size_t>(c);
+                if (matrix.present[index]) {
+                    matrix.coeff[index] = read_signed(reader, matrix.frac_bits + 2);
+                }
             }
         }
+    } else if (context.object_previous != nullptr) {
+        set = *context.object_previous;
+        set.extension = false;
+        for (MatrixSpec& matrix : set.items) {
+            matrix.ext_value = {};
+        }
     }
+    // The second precision term.
     if (reader.read(1) != 0) {
-        return std::unexpected(
-            Error{ErrorKind::kBadParameter, "matrix extension (never written by DEE)"});
+        set.extension = true;
+        if (reader.read(1) != 0) {
+            const bool all_channels = (context.object_extension_variant & 1) != 0;
+            const bool shared_width = (context.object_extension_variant & 2) != 0;
+            if (reader.read(1) != 0) {
+                std::uint8_t shared = 0;
+                std::uint8_t shared_field = 0;
+                if (shared_width) {
+                    shared = static_cast<std::uint8_t>(reader.read(4));
+                    shared_field = static_cast<std::uint8_t>(reader.read(2));
+                }
+                for (unsigned m = 0; m < set.count; ++m) {
+                    MatrixSpec& matrix = set.items[m];
+                    matrix.ext_width = shared_width ? shared : static_cast<std::uint8_t>(reader.read(4));
+                    matrix.ext_field2 =
+                        shared_width ? shared_field : static_cast<std::uint8_t>(reader.read(2));
+                }
+            }
+            for (unsigned m = 0; m < set.count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                for (int c = 0; c < channels; ++c) {
+                    const auto index = static_cast<std::size_t>(c);
+                    if ((all_channels || matrix.present[index]) && matrix.ext_width != 0) {
+                        matrix.ext_value[index] = read_signed(reader, matrix.ext_width);
+                    }
+                }
+            }
+        }
     }
     return set;
 }
 
 void write_object_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
     if (set.count == 0) {
-        put_field(writer, 0, 1);
+        put_field(writer, 0, 1);  // A: no change
+        put_field(writer, 0, 1);  // no second precision term
         return;
     }
-    put_field(writer, 1, 1);
-    put_field(writer, 1, 1);
+    put_field(writer, 1, 1);  // A
+    put_field(writer, 1, 1);  // B: the headers follow
     put_field(writer, set.count - 1U, 4);
     const int channels = context.max_matrix_chan + 1;
     for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
@@ -177,7 +224,7 @@ void write_object_matrices(BitWriter& writer, const BlockContext& context, const
             }
         }
     }
-    put_field(writer, 0, 1);
+    put_field(writer, 0, 1);  // no second precision term
 }
 
 [[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,

@@ -881,7 +881,13 @@ in each mask), then one bit for a second precision term. The coefficient is `raw
 matrices ending at bit 1,658 of the 1,714 shared, each with a coefficient of exactly 1.0 on its own output channel (a primitive matrix). This corrects
 entries 65 (b) and (c), 67 and 68: the "13 matrices", the 29 bit stretch and the 14 bit period were this layout read as the standard one. Held by
 `test_syntax.cpp` (a section written bit by bit; a set extension bit refused) and `hb_substream3_fine_matrices` (a matrix with `f_shift` 1; the decode is
-sample for sample, and fails when the shift is left out). **Provisional until the owner's streams decode with every lossless check passing**
+sample for sample, and fails when the shift is left out). **First run on the owner's streams (2026-10-31):** every unit of the second excerpt and of `z_short.mlp` parsed to closure, so the section, the filter, channel-parameter and block-data
+sections after it read as the standard ones, and the lossless check passed in substreams 0 to 2 and failed in every interval of substream 3 (243 of 243; 18 of 18). In the DEE encodes
+the section failed at the first non-restart matrix update (unit 4,072 in `soll_e12` to `soll_e16`, 11,291 in `soll_sil6`): the second precision term, set there, and a section
+with no headers of its own. The reader now reuses the last headers when the second present bit is 0 (and sends only coefficients), keeps the last matrices when the first is 0, and
+reads the second term as A2, B2, C2 with a width and a reserved field a matrix (C2 clear reuses the last widths) and one value for each present channel; what it does to the samples
+is not applied. The grammar of the term and the cause of the substream 3 check are open, so `iclforge-truehd-ss3-lab STREAM` decodes a stream under each setting of `DecoderLab`
+(four grammars of the term; the lower substreams' rows read after their matrices; no quantiser mask; matrices last to first; the other sign of `f_shift`) and prints one line each. **Provisional until the owner's streams decode with every lossless check passing**
 (`forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient`): the filter, channel-parameter and block-data sections after the matrices are
 the standard ones by TH spec v3.20, which this repository has not yet run on a real stream. Not changed: the encoder still writes an independent substream 3
 with `min_chan` 0 (question 63); the discs and DEE code channels 8 to 11 and let the matrices rebuild 0 to 7.

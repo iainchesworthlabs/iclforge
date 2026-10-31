@@ -9,7 +9,7 @@ The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of 
                                      [--directory] [--agreement] [--common-prefix]
                                      [--dump-header]
                                      [--first-unit N] [--last-unit N]
-                                     [--dump-bits N]
+                                     [--dump-bits N] [--lossless]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -589,6 +589,12 @@ def main():
         help="print N bits after the restart header of the first restarts in the unit range",
     )
     parser.add_argument(
+        "--lossless",
+        action="store_true",
+        help="decode all four substreams under the standard reading and say where the lossless "
+        "check or the parse first fails",
+    )
+    parser.add_argument(
         "--dump-header",
         action="store_true",
         help="print the bits after the restart header that the steady-state restarts all share",
@@ -605,6 +611,11 @@ def main():
     data = args.stream.read_bytes()
     if args.directory:
         print_directory(data, min(args.units, 80))
+        return 0
+    if args.lossless:
+        default = {key: values[0] for key, values in READINGS.items()}
+        default["gap_bits"] = 0
+        print(dict(full_decode(data, default, args.units)))
         return 0
     if args.dump_bits:
         print_restart_bits(data, args.units, args.dump_bits, args.first_unit, args.last_unit)

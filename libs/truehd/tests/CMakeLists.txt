@@ -63,3 +63,9 @@ endif()
 add_executable(iclforge-truehd-encode-tool tools/encode_tool.cpp)
 target_link_libraries(iclforge-truehd-encode-tool PRIVATE iclforge::truehd iclforge::warnings)
 add_dependencies(iclforge-tests iclforge-truehd-encode-tool)
+
+# iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
+# TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).
+add_executable(iclforge-truehd-ss3-lab tools/ss3_lab.cpp)
+target_link_libraries(iclforge-truehd-ss3-lab PRIVATE iclforge::truehd iclforge::warnings)
+add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
