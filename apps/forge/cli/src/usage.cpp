@@ -578,10 +578,11 @@ void print_truehd_topic() {
     fmt::println("       stream declares) and meters each presentation, shows the dialogue norm");
     fmt::println("       it carries beside the measurement, and judges preset= on the presentation");
     fmt::println("       truehd-presentation= names (the largest by default); exit 6 when a gate");
-    fmt::println("       fails. cut starts at the first access unit with a major sync at or after");
+    fmt::println("       fails. monitor plays the decode of the presentation truehd-presentation=");
+    fmt::println("       names. cut starts at the first access unit with a major sync at or after");
     fmt::println("       the time asked and says the time it used; cat joins streams of one shape,");
-    fmt::println("       each opening with a major sync, and no byte is changed. transcode, fmp4,");
-    fmt::println("       play and monitor do not read TrueHD or MLP and say so.");
+    fmt::println("       each opening with a major sync, and no byte is changed. fmp4 and play do");
+    fmt::println("       not read TrueHD or MLP and say so.");
 }
 
 void print_ac4_decode_topic() {

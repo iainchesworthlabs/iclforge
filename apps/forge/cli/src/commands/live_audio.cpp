@@ -229,6 +229,107 @@ int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
     return kExitOk;
 }
 
+// TrueHD and MLP: the decode of the presentation truehd-presentation= names, played as the units
+// decode (the channels in the order `decode` writes them, which is the WAV order the output
+// takes). The output is asked for the stream's own channel count and rate: the shared-mode device
+// says no if it does not take eight channels or 192 kHz, and the sentence says which it was
+// (planning/truehd-parity-forge.md, row L2).
+int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
+                   const MonitorTarget& target, const Options& meta) {
+    namespace th = iclforge::truehd;
+    th::DecoderConfig config;
+    if (meta.truehd_presentation == "2ch") {
+        config.presentation = th::Presentation::k2ch;
+    } else if (meta.truehd_presentation == "6ch") {
+        config.presentation = th::Presentation::k6ch;
+    } else if (meta.truehd_presentation == "8ch") {
+        config.presentation = th::Presentation::k8ch;
+    } else if (meta.truehd_presentation == "all") {
+        config.presentation = th::Presentation::kAll;
+    }
+    config.strictness = meta.truehd_lenient ? th::Strictness::kLenient : th::Strictness::kStrict;
+    th::Decoder decoder(config);
+    th::ElementaryReader reader(stream);
+    iclforge::audio::MonitorSink sink;
+    int channels = 0;
+    std::uint32_t rate = 0;
+    std::size_t played = 0;
+    std::size_t index = 0;
+    std::size_t errors = 0;
+    std::vector<float> chunk;
+    while (const auto unit = reader.next()) {
+        const auto result = decoder.decode(*unit);
+        ++index;
+        if (!result) {
+            ++errors;
+            fmt::println(stderr, "error: {}: access unit {}: {}", in_path, index,
+                         th::to_string(result.error().kind));
+            if (!meta.truehd_lenient) {
+                sink.stop();
+                return kExitInput;
+            }
+            continue;
+        }
+        if (!*result) {
+            continue;  // waiting for a restart header
+        }
+        const th::DecodedAccessUnit& decoded = **result;
+        if (channels == 0) {
+            channels = decoded.channels;
+            rate = decoded.sample_rate;
+            const auto started = sink.start(target.id, rate, static_cast<std::uint16_t>(channels));
+            if (!started.has_value()) {
+                fmt::println(stderr, "error: {} ({} channel(s) at {} Hz)",
+                             iclforge::audio::describe(started.error()), channels, rate);
+                return kExitUnavailable;
+            }
+            std::string names;
+            for (const th::Channel channel : decoded.layout) {
+                names += names.empty() ? "" : " ";
+                names += th::channel_name(channel);
+            }
+            status_println(status_stream(), "monitoring {} (TrueHD, {} channels{}, {} Hz) on \"{}\"…",
+                           in_path, channels, names.empty() ? "" : " (" + names + ")", rate,
+                           target.name);
+        } else if (decoded.channels != channels || decoded.sample_rate != rate) {
+            fmt::println(stderr, "error: {}: access unit {}: the channel count or the rate changes",
+                         in_path, index);
+            sink.stop();
+            return kExitInput;
+        }
+        chunk.resize(decoded.pcm.size());
+        for (std::size_t i = 0; i < decoded.pcm.size(); ++i) {
+            chunk[i] = static_cast<float>(decoded.pcm[i]) / 8388608.0F;
+        }
+        if (!iclforge::apps::submit_while_running(sink, std::chrono::milliseconds(4), chunk)) {
+            fmt::println(stderr, "error: \"{}\" went away ({}); playback stopped", target.name,
+                         kOutputGoneReasons);
+            return kExitRuntime;
+        }
+        ++played;
+    }
+    if (channels == 0) {
+        fmt::println(stderr, "error: {}: no access unit decoded", in_path);
+        return kExitInput;
+    }
+    const bool played_out =
+        iclforge::apps::wait_while_running(sink, std::chrono::milliseconds(10), [&sink] {
+            const auto counts = sink.stats();
+            return counts.frames_rendered >= counts.frames_submitted;
+        });
+    const auto stats = sink.stats();
+    sink.stop();
+    if (!played_out) {
+        fmt::println(stderr, "error: \"{}\" went away ({}) before the last access units played",
+                     target.name, kOutputGoneReasons);
+        return kExitRuntime;
+    }
+    status_println(status_stream(), "played {} TrueHD access units, {} underruns{}", played,
+                   stats.underruns,
+                   errors > 0 ? fmt::format("; {} unit(s) did not decode", errors) : std::string{});
+    return kExitOk;
+}
+
 }  // namespace
 
 int run_monitor(std::string_view in_path, int device_index, const Options& meta) {
@@ -237,7 +338,16 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         return kExitInput;
     }
     if (is_truehd_stream(raw)) {
-        return refuse_truehd("monitor", in_path);
+        if (const int refused =
+                check_options_applied(meta, {"truehd-presentation=", "truehd-check="});
+            refused != kExitOk) {
+            return refused;
+        }
+        const auto target = monitor_target(device_index);
+        if (!target.has_value()) {
+            return target.error();
+        }
+        return monitor_truehd(raw, in_path, *target, meta);
     }
     // AC-4's sync word, 0xAC40 or 0xAC41, where A/52's is 0x0B77: its own
     // decoder, and none of the A/52 checks below.

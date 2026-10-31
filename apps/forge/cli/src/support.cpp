@@ -2422,7 +2422,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         // something else.
         const bool reads_truehd = command == "decode" || command == "levels" ||
                                   command == "loudness" || command == "qc" ||
-                                  command == "transcode";
+                                  command == "transcode" || command == "monitor";
         if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);

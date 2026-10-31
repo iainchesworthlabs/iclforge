@@ -2508,3 +2508,30 @@ TEST_CASE("silence and sine with a .thd output make TrueHD streams", "[forge-cli
         CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
     }
 }
+
+TEST_CASE("monitor reads a TrueHD stream: it plays it, or says why the output cannot",
+          "[forge-cli][truehd][monitor]") {
+    // On a machine with speakers this plays the second of tone; with none (a CI leg, this one) the
+    // device is what is missing, and the run says so with the exit status of a missing output.
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "monitor.log";
+    const std::string in = cli_arg(tone.thd);
+    SECTION("the stream is read, not refused") {
+        const int code = run_cli("monitor " + in, log);
+        const std::string text = read_text(log);
+        CHECK(code != kExitUsage);
+        CHECK(text.find("does not read") == std::string::npos);
+        if (code == 0) {
+            CHECK(text.find("monitoring ") != std::string::npos);
+            CHECK(text.find("(TrueHD, 6 channels (L R C LFE Ls Rs), 48000 Hz)") !=
+                  std::string::npos);
+            CHECK(text.find("played ") != std::string::npos);
+        }
+    }
+    SECTION("the presentation is chosen as decode chooses it, and what monitor does not apply is refused") {
+        CHECK(run_cli("monitor " + in + "truehd-presentation=2ch", log) != kExitUsage);
+        CHECK(run_cli("monitor " + in + "dialnorm=27", log) == kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+        CHECK(run_cli("monitor " + in + "truehd-presentation=7ch", log) == kExitUsage);
+    }
+}
