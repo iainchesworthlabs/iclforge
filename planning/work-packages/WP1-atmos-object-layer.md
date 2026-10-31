@@ -88,3 +88,8 @@ Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; st
 - Step 4 (the owner said yes to the write side on 2026-10-30): `EncoderConfig::object_channels`, `forge truehd-atmos` (ERRATA 63, 64). ADM master input is
   there (decision 5). Left: IAB input, signing (decision 4), the project file and the GUI.
 
+**Status of substream 3 (2026-10-31).** [libs/truehd/SUBSTREAM3.md](../../libs/truehd/SUBSTREAM3.md) records the object substream as it is now
+implemented and evidenced: the block header and the object matrix section as bit tables with an evidence tag for each field, one matrix
+worked in integer form, the restart procedure, the hypotheses the lab has rejected, the open items and how to run `iclforge-truehd-ss3-lab`.
+Silence, a single tone and `z_short.mlp` pass every lossless-check interval; files with several active objects still fail some intervals
+(rare differences of 1), and two DEE encodes break the parse at one later unit each. Step 1 is not done until the owner's streams pass.

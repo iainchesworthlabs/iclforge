@@ -10,6 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `libs/truehd/SUBSTREAM3.md`, a developer's reference for the TrueHD Atmos object substream (restart sync 0x31EC).** The block header and the object matrix section as bit tables with an evidence tag for each field, one matrix worked in integer form, the restart procedure, the hypotheses the lab has rejected, the open items and the use of `iclforge-truehd-ss3-lab`. Documentation only.
 - **Changed: the matrices of a TrueHD Atmos object substream (restart sync 0x31EC) are read and written in the object-audio layout of TH spec v3.20 §10.2.1a.** Every header first, then the coefficients, a presence mask and an `f_shift` for coefficients past 2. It reads the owner's disc and DEE's encodes to the bit; whether those streams then decode with every lossless check passing is the owner's next run (ERRATA 69). The hand-built substream 3 streams are regenerated.
 - **Fixed: a bare TrueHD stream from a Blu-ray transport stream reads all its units.** The AC-3 core frames between the units are passed over by `ElementaryReader`, `probe_stream` and the Python reference; before, every unit up to the next major sync after the first frame was lost (ERRATA 66).
 - **Changed: a TrueHD matrix may write any of the 16 rows.** The decoder refused an output channel above `max_matrix_chan`; the owner's disc has a 12 channel substream (`max_matrix_chan` 11) whose matrices write channel 15 (ERRATA 65). `truehd_substream3_search.py` skips empty segments and tries two more readings.
