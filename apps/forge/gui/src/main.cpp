@@ -23,6 +23,7 @@
 #include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "encoder_controller.hpp"
+#include "stream_player_controller.hpp"
 #include "language_manager.hpp"
 #include "settings_migration.hpp"
 #include "window_memory.hpp"
@@ -36,6 +37,7 @@
 //   forge-gui --smoke-record <deviceIndex> <seconds> <out.ac3> [shot.png] [prop=value ...]
 //   forge-gui --smoke-live   <deviceIndex> <seconds> <out.ac3> [shot.png] [prop=value ...]
 //   forge-gui --smoke-shot   <shot.png>              [in.wav]  [prop=value ...]
+//   forge-gui --smoke-open   <stream>  [shot.png]    (an .ac3, .ec3, .ac4, .thd or .mlp in the player)
 //
 // The trailing prop=value tokens are set through Qt's property system, which
 // is the same path a QML binding writes through - so a smoke run exercises the
@@ -601,6 +603,55 @@ int run_smoke_shot(QQmlApplicationEngine& engine, const QString& shot_path,
     return QGuiApplication::exec();
 }
 
+// Open a coded stream in the player and watch it come up: `--smoke-open <stream> [shot.png]`. The
+// stream goes through the same gesture a drop or a command-line file does (Main.qml's
+// openDroppedFile), so a TrueHD or MLP file reaches the player; the run fails unless the player
+// finishes without an error and says what the stream is. With a picture path, the window is grabbed.
+int run_smoke_open(QQmlApplicationEngine& engine, const QString& stream_path, const QString& shot) {
+    if (engine.rootObjects().isEmpty()) {
+        fmt::println(stderr, "smoke: no root object; the QML failed to load");
+        return 1;
+    }
+    auto* player =
+        engine.singletonInstance<StreamPlayerController*>("ForgeGui", "StreamPlayerController");
+    if (player == nullptr) {
+        fmt::println(stderr, "smoke: StreamPlayerController singleton is not registered");
+        return 1;
+    }
+    QMetaObject::invokeMethod(engine.rootObjects().first(), "openDroppedFile",
+                              Q_ARG(QVariant, QVariant::fromValue(QUrl::fromLocalFile(stream_path))));
+    auto* poll = new QTimer(player);
+    poll->setInterval(kSmokeShotLapMs);
+    QObject::connect(poll, &QTimer::timeout, player,
+                     [&engine, player, poll, shot, waited = 0]() mutable {
+                         waited += kSmokeShotLapMs;
+                         if (player->busy() && waited < kSmokeShotSettleMs) {
+                             return;
+                         }
+                         poll->stop();
+                         if (player->busy() || !player->error().isEmpty() || !player->hasResult()) {
+                             fmt::println(stderr, "smoke: the player did not open the stream: {}",
+                                          player->error().isEmpty() ? std::string{"still decoding"}
+                                                                    : player->error().toStdString());
+                             QCoreApplication::exit(1);
+                             return;
+                         }
+                         fmt::println("smoke: opened -> {}", player->summaryLine().toStdString());
+                         if (shot.isEmpty()) {
+                             QCoreApplication::exit(0);
+                             return;
+                         }
+                         QTimer::singleShot(kSmokeShotLapMs, poll, [&engine, shot] {
+                             const bool ok = save_window(engine, shot);
+                             fmt::println("smoke: window grab -> {}",
+                                          ok ? shot.toStdString() : std::string{"FAILED"});
+                             QCoreApplication::exit(ok ? 0 : 1);
+                         });
+                     });
+    poll->start();
+    return QGuiApplication::exec();
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -739,6 +790,9 @@ int main(int argc, char* argv[]) {
         const auto properties = trailing(5, shot);
         return run_smoke_live(engine, args[2].toInt(), args[3].toDouble(), args[4], shot,
                               properties);
+    }
+    if (args.size() >= 3 && args[1] == QLatin1String("--smoke-open")) {
+        return run_smoke_open(engine, args[2], args.size() >= 4 ? args[3] : QString());
     }
     if (args.size() >= 3 && args[1] == QLatin1String("--smoke-shot")) {
         // shot.png is the one fixed positional here (unlike the other three

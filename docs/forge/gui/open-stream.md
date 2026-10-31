@@ -15,9 +15,9 @@ it: the GUI twin of `forge monitor`, plus `forge decode`'s WAV and object export
 **Open stream…**, in the header beside **QC a stream…**, **Inspect objects…** and
 **Settings**. It opens regardless of what (if anything) is loaded in the main workbench.
 
-**Choose file…** opens a standard file picker with three filters: `*.ac3`/`*.ec3`, `*.ac4` and
-**All files**. The player does not open TrueHD or MLP (`.thd`, `.mlp`): `forge decode` reads them. Picking one starts the decode immediately, off the window's own event loop so the dialog stays
-responsive while a long file decodes — the whole file is held in memory once decoded, the same
+**Choose file…** opens a standard file picker with four filters: `*.ac3`/`*.ec3`, `*.ac4`, `*.thd`/`*.mlp` and
+**All files**. A TrueHD or MLP file (`.thd`, `.mlp`) is opened without being decoded into memory: the file is indexed once (the access units that carry a major sync, where a decode can begin), and the player decodes a window at a time as it plays, so a film that would decode to about 11 GB plays in a few megabytes; a seek decodes from the restart before the time asked, and **Export decoded WAV** writes the 24-bit WAV `forge decode` writes, a window at a time. The meters name the speakers of the best presentation. Picking any other file starts the decode immediately, off the window's own event loop so the dialog stays
+responsive while a long file decodes — the whole file is held in memory once decoded (AC-3, E-AC-3 and AC-4; not TrueHD), the same
 trade QC and Inspect objects already make, because a real seek needs the samples already
 resident rather than re-decoded on demand.
 

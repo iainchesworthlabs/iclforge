@@ -21,9 +21,10 @@ shell, works from the first-run screen or the workbench alike — a WAV becomes 
 already-encoded `.ac3`/`.ec3` opens in the [stream player](open-stream.md) instead, and a
 `.forgeproj` opens as a [project](projects.md). An `.ac4` file
 is not recognised there: dropped or named on the command line it is read as a source and refused,
-so open one with **Open stream…**, whose file picker has an AC-4 filter. A `.thd` or `.mlp` file is not
-recognised either: the window does not open, play, check or encode TrueHD or MLP, and `forge` does
-([TrueHD and MLP](../cli/commands.md#truehd-and-mlp)). `forge-gui` claims no file
+so open one with **Open stream…**, whose file picker has an AC-4 filter. A `.thd` or `.mlp` file opens the
+stream player, dropped or named on the command line: the window opens, plays and checks TrueHD and MLP
+(a window at a time, [Open stream](open-stream.md); [QC](qc.md)), and does not encode them yet; `forge`
+encodes them ([TrueHD and MLP](../cli/commands.md#truehd-and-mlp)). `forge-gui` claims no file
 type with the desktop, so a double-click in the file manager does not reach it:
 
 - On Linux `com.iainchesworthlabs.forge-gui.desktop` has no `MimeType=` line, and the `forge-gui-mime.xml` fragment the package

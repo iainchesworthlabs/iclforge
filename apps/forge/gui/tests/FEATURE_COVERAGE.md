@@ -3,8 +3,8 @@
 What every user-facing feature of the Forge GUI (`apps/forge/gui/assets/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
-hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 222
-test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (four files, 45
+hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (37 suites, 232
+test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (six files, 51
 cases, tagged `[gui]` and built into `iclforge-forge-gui-tests`). All the QML suites run the
 real controllers, not mocks.
 
@@ -210,6 +210,30 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | QC report data / preset constants | logic | logic | QcPanel::test_measuringRealFileIsAsyncAndReportsRealData, test_presetSelectionNarrowsToTheChosenPresetsRealNumbers |
 | The dialog shows the measurement: the summary line and one programme card | logic | logic | QcPanel::test_dialogRendersTheRealMeasurement |
 | Gate meter pass/fail visuals and accessibility | logic | logic | QcPanel::test_gateMeter*, Accessibility::test_qcGateMeter* |
+
+## TrueHD and MLP (player and QC)
+
+The player reads these files a window at a time (`src/truehd_pcm_source.hpp`), never a whole decode:
+a two-hour film at 48 kHz and eight channels is about 11 GB. The Qt-free cases hold the samples to
+FFmpeg's decode (the SHA-256 of `testdata/truehd/manifest.json`); the Qt Quick suite holds the
+controllers and the dialogs. Nothing is pressed in these rows: the tests call the controllers and
+`openDroppedFile`, and the pickers' name filters are not exercised (as for AC-4 above).
+
+| Feature | Before | Now | Test case(s) |
+|---|---|---|---|
+| The windows of a TrueHD or MLP file add up to FFmpeg's decode (4 fixtures, 3 window sizes) | new | logic | iclforge-forge-gui-tests [gui][truehd]: the TrueHD player's windows add up to FFmpeg's decode |
+| A seek lands on the sample asked for (forward over restarts, back, mid-unit, at and past the end) | new | logic | [gui][truehd]: a seek in a TrueHD stream lands on the sample asked for; a seek past the last restart of a stream with few of them |
+| A file that is not a stream, or is missing, is refused with a sentence | new | logic | [gui][truehd]: a file that is not a TrueHD stream is refused with a sentence |
+| The exported WAV is the 24-bit WAV `forge decode` writes (header, mask 0x60F, samples) | new | logic | [gui][truehd]: the exported WAV is the 24-bit WAV forge decode writes |
+| Open stream: the summary line, the speakers, the length; MLP says so | new | logic | TrueHd::test_openingATrueHdStreamReportsItsFormatAndSpeakers, test_anMlpStreamSaysSo |
+| Seek while paused; Play (starts, or names the output it could not open) | new | logic (hardware) | TrueHd::test_seekWhilePausedMovesPositionOnATrueHdStream, test_playingATrueHdStreamStartsOrNamesTheOutputItCouldNotOpen |
+| Export decoded WAV from the player | new | logic | TrueHd::test_exportingAnTrueHdStreamWritesAWavWithoutError |
+| A dropped or launched `.thd` or `.mlp` opens the player, not the WAV source loader | new | logic | TrueHd::test_aDroppedTrueHdFileOpensThePlayer |
+| The Open stream and QC pickers offer `*.thd *.mlp` | new | none | No case: the tests set the picker's `selectedFile`, so a name filter is not exercised. |
+| QC: one programme for each presentation, with the stored dialogue norm beside the measurement | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate |
+| QC: the integrity gate passes a good stream and fails two streams joined end to end | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate, test_qcOfAStreamJoinedEndToEndFailsTheIntegrityGate |
+| QC of an AC-3 stream has no integrity row | new | logic | TrueHd::test_qcOfAnAc3StreamHasNoIntegrityGate |
+| `forge-gui --smoke-open <stream>` opens a TrueHD file in the player | new | CI step | `forge-gui --smoke-open apps/forge/gui/tests/fixtures/truehd_m51_s24.thd shot.png` (run by hand for this change: exit 0) |
 
 ## Objects (authoring) and object inspector
 
