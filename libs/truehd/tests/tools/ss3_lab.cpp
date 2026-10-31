@@ -319,6 +319,9 @@ int main(int argc, char** argv) {
         scaled.object_noise_scale = mode;
         settings.push_back({kScaleNames[mode], scaled});
     }
+    DecoderLab noisy_only = base;
+    noisy_only.object_noise_left = 1;
+    settings.push_back({"noise start index: noisy matrices only", noisy_only});
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});

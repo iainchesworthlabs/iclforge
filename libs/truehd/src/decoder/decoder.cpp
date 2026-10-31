@@ -724,9 +724,16 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
             if (plan.noise_shift != 0 && state.context.noise_type) {
                 const bool lab_index = object && config.lab.object_noise_index != 0;
-                const auto first = static_cast<unsigned>(
+                auto first = static_cast<unsigned>(
                     lab_index && (config.lab.object_noise_index & 2) != 0 ? m + 1
                                                                           : state.matrix_count - m);
+                if (object && config.lab.object_noise_left == 1) {
+                    // Lab: the matrices that draw no noise do not count.
+                    first = 0;
+                    for (int j = m; j < state.matrix_count; ++j) {
+                        first += state.matrices[static_cast<std::size_t>(j)].noise_shift != 0 ? 1U : 0U;
+                    }
+                }
                 noise.buffer = state.noise_buffer.data();
                 noise.shift = plan.noise_shift;
                 noise.stride = 2U * first + 1U;
