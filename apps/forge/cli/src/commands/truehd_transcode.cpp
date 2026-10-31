@@ -50,6 +50,8 @@ fs::path scratch_wav_path() {
 // two DEE encodes of one programme at two settings, whose fields followed the dialnorm in both
 // (libs/truehd/ERRATA.md, questions 51 to 55; one programme, not yet a second title). Nothing for a
 // stream that stores none (a field of 0, as FFmpeg's streams have) or for MLP.
+}  // namespace
+
 std::optional<int> stored_dialnorm(std::span<const std::byte> stream, std::string_view presentation) {
     namespace th = iclforge::truehd;
     const auto info = th::probe_stream(stream);
@@ -75,8 +77,6 @@ std::optional<int> stored_dialnorm(std::span<const std::byte> stream, std::strin
     }
     return value;
 }
-
-}  // namespace
 
 int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_path,
                          std::string_view out_path, std::uint32_t bitrate,

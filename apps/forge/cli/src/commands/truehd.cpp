@@ -299,7 +299,7 @@ bool contains(const Range& range, std::string_view key) {
 
 }  // namespace
 
-int check_options_applied(const Options& meta, std::initializer_list<std::string_view> applied) {
+int check_options_applied(const Options& meta, std::span<const std::string_view> applied) {
     std::vector<std::string_view> ignorable;
     std::vector<std::string_view> refused;
     bool verification = false;

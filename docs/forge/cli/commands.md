@@ -1017,7 +1017,7 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 profile writes that Blu-ray one for TrueHD and MLP, as it writes DVB's for AC-3, E-AC-3 and AC-4. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut` and `cat`
+reads either back. `decode ... channels=2` writes the stream's own 2 channel presentation (the substream a stereo player reads, not a fold the decoder makes), as `truehd-presentation=2ch` does, and `channels=as-coded` is what a decode does; no other count or fold is taken. `loudness` of a TrueHD stream says the dialnorm the loudness implies (ATSC A/85 section 8) beside the one the stream stores for the presentation decoded. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut` and `cat`
 move whole access units and never change a byte: `cut in.thd out.thd [start] [duration]` starts at the first access unit that carries a
 major sync (the start of a restart interval, one in 128 by default) at or after the time asked, says which time it used, and ends on the
 unit boundary that covers the duration; `cat` joins streams of one shape (stream type, rate, substreams, channels, channel assignment) and

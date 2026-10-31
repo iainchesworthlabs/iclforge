@@ -1324,7 +1324,7 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
     SECTION("decode") {
         // Each of these was accepted, exit 0, and left the output as it would have been.
         for (const std::string option :
-             {"channels=2", "downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
+             {"downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
               "mix-lfe", "programme=3", "bed-only", "verify-objects", "gate-objects",
               "dialnorm=27", "syntax-trace=trace.txt", "verify-content", "check-content",
               "heavy"}) {
@@ -1343,10 +1343,10 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
             CHECK(read_text(log).find("Nothing was verified") != std::string::npos);
         }
         SECTION("every option the line carries is named") {
-            CHECK(run_cli("decode " + in + out + "drc=0.5 truehd-check=lenient channels=2", log) ==
+            CHECK(run_cli("decode " + in + out + "drc=0.5 truehd-check=lenient mix-lfe", log) ==
                   kExitUsage);
             const std::string text = read_text(log);
-            CHECK(text.find("drc=0.5, channels=2") != std::string::npos);
+            CHECK(text.find("drc=0.5, mix-lfe") != std::string::npos);
             CHECK(text.find("truehd-check=lenient, ") == std::string::npos);
         }
         SECTION("the objects directory and the ADM path are not dropped either") {
@@ -2417,5 +2417,40 @@ TEST_CASE("truehd-encode reports an output that could not be written", "[forge-c
         CHECK(run_cli(command + " \"" + good.string() + "\" \"" + link.string() + "\"", log) != 0);
         CHECK(read_text(log).find("write failed") != std::string::npos);
         fs::remove(link, ec);
+    }
+}
+
+TEST_CASE("decode channels=2 is the stream's own 2 channel presentation", "[forge-cli][truehd][options]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "channels.log";
+    const std::string in = cli_arg(tone.thd);
+    const fs::path two = tone.dir / "channels_two.wav";
+    const fs::path named = tone.dir / "channels_named.wav";
+    const fs::path coded = tone.dir / "channels_coded.wav";
+    const fs::path best = tone.dir / "channels_best.wav";
+    REQUIRE(run_cli("decode " + in + cli_arg(two) + "channels=2", log) == 0);
+    REQUIRE(run_cli("decode " + in + cli_arg(named) + "truehd-presentation=2ch", log) == 0);
+    CHECK(read_wav(two).channels == 2);
+    CHECK(read_wav(two).s32le == read_wav(named).s32le);  // the same substream, not a fold
+    SECTION("as-coded is what a decode does, and an option that disagrees is refused") {
+        REQUIRE(run_cli("decode " + in + cli_arg(coded) + "channels=as-coded", log) == 0);
+        REQUIRE(run_cli("decode " + in + cli_arg(best), log) == 0);
+        CHECK(read_wav(coded).s32le == read_wav(best).s32le);
+        CHECK(run_cli("decode " + in + cli_arg(tone.dir / "channels_bad.wav") +
+                          "channels=2 truehd-presentation=6ch",
+                      log) == kExitUsage);
+        CHECK(read_text(log).find("asks for another") != std::string::npos);
+    }
+    SECTION("loudness says the dialnorm it implies beside the stream's own") {
+        const fs::path stored = tone.dir / "loudness_dialnorm.thd";
+        REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(stored) +
+                            "truehd-dialnorm-6ch=11",
+                        log) == 0);
+        REQUIRE(run_cli("loudness " + cli_arg(stored), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("dialnorm ") != std::string::npos);
+        CHECK(text.find("the stream's own dialnorm 11") != std::string::npos);
+        REQUIRE(run_cli("loudness " + in, log) == 0);
+        CHECK(read_text(log).find("the stream stores no dialogue norm") != std::string::npos);
     }
 }

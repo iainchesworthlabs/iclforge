@@ -1521,8 +1521,27 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
         // stage, the DRC options, the programme choice, the object outputs and every verification
         // flag, none of which a TrueHD decode reads. verify-content passing here would pass
         // without verifying anything.
+        // channels=2 is the stream's own 2 channel presentation, which the stream carries as a
+        // substream and not as a fold the decoder makes (planning/truehd-parity-forge.md,
+        // question 5); channels=as-coded is what a TrueHD decode does. No other count is taken.
+        forge_cli::Options truehd_options = requested;
+        std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "strict",
+                                              "channels=as-coded"};
+        if (std::ranges::find(requested.given, std::string{"channels=2"}) !=
+            requested.given.end()) {
+            if (requested.truehd_presentation != "best" && requested.truehd_presentation != "2ch" &&
+                !requested.truehd_presentation.empty()) {
+                fmt::println(stderr,
+                             "error: channels=2 is the 2 channel presentation, and "
+                             "truehd-presentation={} asks for another",
+                             requested.truehd_presentation);
+                return kExitUsage;
+            }
+            truehd_options.truehd_presentation = "2ch";
+            applied.emplace_back("channels=2");
+        }
         if (const int refused = check_options_applied(
-                requested, {"truehd-presentation=", "truehd-check=", "strict"});
+                requested, std::span<const std::string_view>(applied));
             refused != kExitOk) {
             return refused;
         }
@@ -1533,7 +1552,7 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
                          in_path, !objects_dir.empty() ? objects_dir : adm_out);
             return kExitUsage;
         }
-        return run_decode_truehd(stream, in_path, out_path, requested, loss);
+        return run_decode_truehd(stream, in_path, out_path, truehd_options, loss);
     }
     warn_truehd_options_unused(requested, in_path);
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where

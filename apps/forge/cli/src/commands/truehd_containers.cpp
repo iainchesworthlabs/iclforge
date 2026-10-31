@@ -28,6 +28,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "iclforge/ac3/meta/loudness.hpp"
 #include "truehd.hpp"
 
 // TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
@@ -576,6 +577,15 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
         return kExitRuntime;
     }
     fmt::println("  integrated loudness {:.1f} LKFS (BS.1770-5 Annex 3 weights)", *lkfs);
+    // As for E-AC-3: the loudness as the dialnorm it implies (ATSC A/85 section 8), beside the one
+    // the stream stores for the presentation decoded.
+    const int implied = iclforge::ac3::meta::dialnorm_from_lkfs(*lkfs);
+    if (const auto stored = stored_dialnorm(stream, meta.truehd_presentation)) {
+        fmt::println("  dialnorm {} implied; the stream's own dialnorm {}{}", implied, *stored,
+                     implied == *stored ? "" : " (they differ)");
+    } else {
+        fmt::println("  dialnorm {} implied; the stream stores no dialogue norm", implied);
+    }
     if (const auto peak = meter->true_peak_dbtp()) {
         fmt::println("  true peak {:.1f} dBTP", *peak);
     }

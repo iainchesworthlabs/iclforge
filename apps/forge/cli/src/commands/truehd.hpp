@@ -192,6 +192,13 @@ int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_
                          std::string_view layout, const Options& meta,
                          iclforge::ac3::plan::Codec target);
 
+// The dialogue norm a TrueHD stream stores for the presentation `presentation` names ("" or "best"
+// is the largest the stream has), as an AC-3 or E-AC-3 dialnorm (1 to 31): the 6 and 8 channel
+// fields as they are, the 2 channel field less 6 (libs/truehd/ERRATA.md, questions 51 to 55).
+// Nothing for a stream that stores none (a field of 0, as FFmpeg's streams have) or for MLP.
+[[nodiscard]] std::optional<int> stored_dialnorm(std::span<const std::byte> stream,
+                                                 std::string_view presentation);
+
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path,
@@ -210,7 +217,11 @@ int refuse_truehd(std::string_view command, std::string_view in_path,
 // ("truehd-presentation=", "verify"); quiet and verbose are always applied. Returns kExitOk, or
 // names every other option the line carries (Options::given) on stderr and returns kExitUsage.
 [[nodiscard]] int check_options_applied(const Options& meta,
-                                        std::initializer_list<std::string_view> applied);
+                                        std::span<const std::string_view> applied);
+[[nodiscard]] inline int check_options_applied(const Options& meta,
+                                               std::initializer_list<std::string_view> applied) {
+    return check_options_applied(meta, std::span<const std::string_view>(applied.begin(), applied.size()));
+}
 
 // The warning a command that also reads other streams gives when truehd-presentation= or
 // truehd-check= is given and `stream_path` is not TrueHD or MLP: neither can change anything there.
