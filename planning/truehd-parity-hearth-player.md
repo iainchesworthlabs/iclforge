@@ -6,11 +6,13 @@
     in Hearth, what TrueHD would do, and what is missing. The ESP32 firmware is another audit's.
     Round 2 is the owner's to decide after reading this page.
 
-!!! note "Status as of 2026-10-31: H4 and the streaming demuxer are built; H5 is not"
+!!! note "Status as of 2026-10-31: H4 and H5 and the streaming demuxer are built; the ESP32 phases are not"
     H0 to H3 are built (2026-10-30). The streaming demuxer for Matroska and MP4, the per-output choice of a remux's track
-    (engine only), and H4 (a group sent PCM and Opus at one rate, with the audio converted for a sink that does not list the
-    item's) are built on `feature/truehd-hearth-network` and checked by engine and loopback tests on Windows with Qt 6.12:
-    no board, receiver or Shield was used. Questions 13 to 17 below are new. H5 and the ESP32 phases have not been started.
+    (engine only), H4 (a group sent PCM and Opus at one rate, with the audio converted for a sink that does not list the
+    item's) and H5 (TrueHD access units to the sinks that list `truehd`, with the sink library's decode, `hearth-testsink` and
+    `hearth-testserver`) are built on `feature/truehd-hearth-network` and checked by engine and loopback tests on Windows with
+    Qt 6.12: no board, receiver or Shield was used. The wire is in [the extension page](hearth-sendspin-extension.md#truehd).
+    Questions 13 to 17 below are new, and 18 to 20 came with H5. The ESP32 phases have not been started.
 
 "DD+" here is E-AC-3, with AC-3 and the JOC object layer riding with it. "TH spec" is the owner's
 *Dolby TrueHD (MLP) Reference Specification*, which is not in the repository
@@ -547,6 +549,20 @@ Each has a recommendation, and none is settled here.
     `data_type_of()` and the output decision, which H5's data type touches. *Recommend:* merge it first and start H5 on top.
     H5 and the ESP32 phases 0 to 4 also need board time (P4, S3, C6), which was not asked for because no phase that
     needed one was reached.
+
+18. **A sink joins a seek late.** After a seek the units before the next major sync decode to nothing, so a sink that decodes
+    chunks is silent for up to a restart interval (107 ms at the encoder's default, 3.4 s at most) while the members sent PCM
+    play exactly from the place. Sending from the restart before it needs frames before the place on the group's timeline.
+    *Recommend:* accept it for round 1 (a seek is rare in a group), and give `Group` a start offset (a burst whose frame is
+    earlier than the programme's first) if a person notices.
+19. **The presentation a sink takes.** A sink that states 2 or 6 channels is sent PCM, though the stream's 2 and 6 channel
+    presentations are substreams 0 and 1 and a sender could drop the rest (19 to 29% of the bytes for a 2 channel presentation).
+    *Recommend:* build it with ESP32 phase 5, since only a sink that decodes fewer channels than the stream's best gains by it,
+    and it needs a test of the substream drop against the host's decode of that substream.
+20. **A declared peak is not a measured one.** `max_data_rate` is compared with the peak the major sync declares (18 Mbit/s for
+    this library's encoder by default), so a sink that states 12 Mbit/s refuses every stream the encoder writes with its default,
+    though most never pass 5. *Recommend:* leave it; a stream's declared peak is what a sink must be able to take, and the
+    encoder's peak is a setting (`truehd-peak-rate=`).
 
 The questions that block the most work are 1 and 2 (H5, H7), 5 (all of H6 and so H7), 7 (part of
 H4) and 8 (the last part of H0).

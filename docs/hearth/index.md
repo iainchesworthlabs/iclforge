@@ -13,8 +13,9 @@ page. This page is the reference.
 !!! note "TrueHD and MLP are decoded here, and not passed through"
     The desktop player decodes TrueHD and MLP (`.thd`, `.mlp`, and the TrueHD track of an MP4, Matroska or MPEG-TS file) and plays
     the result as PCM, to this computer's outputs and to a network group. It does not send TrueHD to a receiver as it is (the
-    output decision says "Passthrough of TrueHD is not available"), no network sink is sent the coded stream, and Hearth for
-    Android and the ESP32 sinks do not take it. The decode is lossless and 24 bits wide, and what reaches the output is float32
+    output decision says "Passthrough of TrueHD is not available"). A network sink that lists `truehd` is sent the stream's access
+    units, 24 to a chunk, and decodes them itself (tested against the Hearth test sink only); every other sink is sent PCM or Opus,
+    converted to a rate it lists. Hearth for Android and the ESP32 sinks do not take TrueHD. The decode is lossless and 24 bits wide, and what reaches the output is float32
     through the operating system's mixer, so it is not a bit-exact path. How the work is staged is in the
     [parity audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-hearth-player.md);
     what the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is

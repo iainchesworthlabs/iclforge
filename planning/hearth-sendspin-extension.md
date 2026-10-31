@@ -335,7 +335,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 
 | Field | Type | Meaning |
 |---|---|---|
-| `data_types` | string[] | Bitstreams the sink decodes: a non-empty subset of `"ac3"`, `"eac3"`, `"ac4"`. `"eac3"` includes E-AC-3 JOC |
+| `data_types` | string[] | Bitstreams the sink decodes: a non-empty subset of `"ac3"`, `"eac3"`, `"ac4"`, `"truehd"`. `"eac3"` includes E-AC-3 JOC; `"truehd"` is TrueHD only (not MLP), as access units ([TrueHD](#truehd)) |
 | `sample_rates` | integer[] | Coded sample rates the sink plays, in Hz; `[48000]` on the boards |
 | `outputs` | object | `count`: output slots at the current setting; `bit_depth`: bits per slot at the current setting; `bit_depths`: the widths the sink can be set to on its own page. For display: the server does not change them |
 | `layout_grammar` | integer | Version of the speaker-layout text grammar (`ac3::render::OutputLayout`) the sink parses: `1` |
@@ -345,6 +345,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 | `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `max_frame_rate?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 1,000: the most frames a second, an access unit and so a burst chunk each, the sink decodes of a stream of that type in real time. A stream whose frame rate is higher is refused by the sink, so a server sends it another way, as it does one past `max_coded_channels`. A frame rate is compared as it is, to within half a percent, so `25` takes 23.976, 24 and 25 and `30` takes 29.97 and 30. A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
+| `max_data_rate?` | object | Per data type name, 1 to 100,000: the most coded data, in kbit/s, the sink takes of a stream of that type, compared with the peak the stream declares (for TrueHD, the peak data rate in its major sync). A stream that declares more is refused by the sink, so a server sends it another way. A type the object does not name states none; absent when the sink states none for any type. Stated by a sink whose link or ring cannot hold what a stream's declared peak allows |
 | `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A sink counts what a stream declares from its first unit, before it decodes: the OBA complexity index of the addbsi less the LFE, which is also the figure a server falls back to; a listener who chose objects `always` is not overruled A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `lyrics?` | object | `max_bytes`: 1 to 60,000, the most bytes of lyric document (an LRC text in UTF-8) the sink holds for the item playing. Absent when the sink holds none. A sink that states it lists `lyrics` and `lyrics_position` in `supported_commands` ([Lyrics](#lyrics)) |
 | `karaoke_codecs?` | string[] | Data type names (`"ac3"`, `"eac3"`, `"ac4"`): the codecs the sink reproduces karaoke for when it is told to, which is the `karaoke` decoder setting. Absent, or empty, for a sink that states none, and a server then reads it as `["ac3"]`: the codec every sink's karaoke path was written for. A sink that reproduces an E-AC-3 stream's lists `"eac3"`. A karaoke stream of a type the sink does not list is played as coded by its own decoder, so a server that wants the reproduction sends it PCM it has decoded itself. A name a reader does not know is skipped |
@@ -423,6 +424,11 @@ What a burst is, exactly as the library packs it for a receiver:
   a whole 8-byte unit. The frame's duration: 2,048 samples at `frame_rate_index` 13, at 48 or
   44.1 kHz, and from 400 to 2,002 samples at the other rates.
 
+- **TrueHD**: whole access units, one to 24, in stream order ([TrueHD](#truehd)). `Pc` data type 22,
+  `Pd` the payload length in bytes. 40, 80 or 160 samples a unit (at 48, 96 or 192 kHz; the 44.1 kHz
+  family the same), so 960 to 3,840 samples a chunk, 20 ms at every rate (21.77 ms at 44.1, 88.2 and
+  176.4 kHz).
+
 What is left out, compared with a burst for a receiver: the sync words `Pa` and `Pb`, the
 byte-swapping of the payload into 16-bit words, the pad byte of an odd-length payload, and the
 zero stuffing to the repetition period (6,144 bytes for AC-3, 24,576 for E-AC-3, and for AC-4 its
@@ -442,6 +448,46 @@ data type 24 with any subdata type), whose `Pd` disagrees with the payload lengt
 whose payload does not start with a syncframe (for AC-4, a sync frame whose own size fills the
 payload, less HBR16's padding), and counts it in `invalid_chunks`. Rejecting a chunk drops it; it
 does not close the connection.
+
+### TrueHD
+
+Added to the role on 2026-10-31 (phase H5 of [the Hearth parity audit](truehd-parity-hearth-player.md)),
+as a value of `data_types`: a sink that lists `"truehd"` decodes TrueHD, and a server sends it the
+stream as chunks. It is the stream's access units and not the MAT burst of IEC 61937: a MAT frame is
+61,440 bytes whatever the stream holds, 24.6 Mbit/s over a link for a 1.3 Mbit/s stream, which is
+for an HDMI carrier and not for a network.
+
+- **A chunk** is one to 24 whole access units, in stream order, concatenated as the stream has them:
+  each opens with a check nibble, a 12-bit length in 16-bit words that counts the unit, and a 16-bit
+  timing word (TH spec section 3.1), and the next begins where the length ends. The payload is at most
+  61,424 bytes (a MAT frame's payload), which with the 17-byte header fits one encrypted message
+  ([E12](#encryption)): no fragments. A server fills a chunk to 24 units and sends a shorter one at the
+  end of an item, at a join between two items of different rates, and where it flushes.
+- **`Pc`** is 22 (bits 5 and 6 zero), **`Pd`** the payload's length in bytes, and the `timestamp` the
+  time the chunk's first sample leaves the audio port.
+- **Where a sink joins.** A decoder can only join a stream at a unit with a major sync (TH spec section
+  4.2), which this library's encoder writes every 128 units by default (107 ms) and may write every
+  4,096 (3.4 s). A server starts an item at its first unit, which has one. After a seek, or for a sink
+  that joins late, the units before the next major sync decode to nothing, and the sink plays them as
+  silence for their samples, so its output is as long as the chunks say. The same holds after a unit
+  that does not read: it and the units after it play as silence until the next major sync. A server
+  that sends from the restart before the place asked for is future work (the group's timeline has no
+  frames before an item's start to put them at).
+- **What a sink states.** `sample_rates` (44.1 to 192 kHz, the rates it plays), `max_coded_channels`
+  (full-bandwidth and LFE channels of the presentation it decodes: 2, 6 or 8), `max_frame_rate` in
+  chunks a second (a chunk of 24 units is 50 a second at 48 kHz and 45.94 at 44.1), `max_data_rate`
+  in kbit/s and `max_chunk_bytes`. A server compares each with the stream (its rate, its channels, its
+  chunk rate, its declared peak, and the longest chunk the peak allows, 24 units at that rate plus the
+  17-byte header) and sends a stream outside any of them as PCM it decodes, naming the limit on the
+  Network page.
+- **Presentations.** The sink decodes the highest presentation the stream has (best). A server does
+  not yet send only the substreams of a lower one for a sink that states 2 or 6 channels: such a
+  sink is sent PCM.
+- **Objects.** None: this library does not decode TrueHD's object substream, and a sink decodes the
+  bed.
+- **MLP** (DVD-Audio) has no data type here and is decoded by the server.
+- **The sink rejects** a chunk whose `Pc` data type is not 22, whose `Pd` is not the payload's length,
+  or whose payload is not one to 24 whole access units, and counts it in `invalid_chunks`.
 
 ### Timing
 
@@ -605,9 +651,9 @@ reserve are free, otherwise holding none, which it reports as it does an item wi
 ### Versions
 
 The role is `v1` as defined here. Adding a value to `data_types` (AC-4 was added this way, by D11
-of [the AC-4 plan](ac4.md#d11-ac-4-over-iec-61937)) or a key to `decoder` settings does not change
+of [the AC-4 plan](ac4.md#d11-ac-4-over-iec-61937), and TrueHD by H5 of [the Hearth parity audit](truehd-parity-hearth-player.md)) or a key to `decoder` settings does not change
 the version, because a server only sends what a sink listed. The same holds for an optional key in
-the support object or the state object: `max_chunk_bytes`, `max_coded_channels`, `max_objects`,
+the support object or the state object: `max_chunk_bytes`, `max_coded_channels`, `max_data_rate`, `max_objects`,
 `karaoke_codecs` and `layout` were added so, each absent from a sink that does not say, and a reader that does not know a key ignores it.
 Anything that changes a field's meaning or the chunk layout is `_ac3forge_player@v2`, and a sink may
 list both.

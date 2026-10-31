@@ -10,6 +10,18 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: Hearth sends TrueHD to the network sinks that decode it, as access units.** `_iclforge_player@v1` gains the data type
+  `"truehd"` (a value of `data_types`, not a new version): a burst chunk of 1 to 24 whole access units, `Pc` 22, `Pd` in bytes, at
+  most 61,424 bytes, so that a 48 kHz stream is 50 chunks a second and not the 1,200 messages of a unit each and not the 24.6 Mbit/s of
+  a MAT burst. The support object gains `max_data_rate` (kbit/s) beside `max_coded_channels`, `max_frame_rate` and `max_chunk_bytes`,
+  and Hearth compares each with the stream (its rate, channels, chunk rate, declared peak and the longest chunk the peak allows)
+  and sends a stream outside one as PCM it decodes, naming the limit on the Network page. The sink library's decoding output decodes the
+  chunks (`DecodingBurstOutput`, silence for a unit before the stream's first restart header or one that does not read), `hearth-testsink`
+  lists `truehd`, and `hearth-testserver --play x.thd` sends a file. A loopback test plays two seconds of stereo TrueHD to a sink that
+  decodes the chunks and one that does not, and both write the item's own samples. **Not done:** a board (the ESP32 decoder is not built),
+  Hearth for Android, sending only the substreams of a lower presentation, and starting at the restart before a seek.
+- **Changed: the index of a TrueHD stream and its cursor moved to `apps/shared/media/src/truehd_stream.hpp`** (over `iclforge::apps::ByteSource`),
+  so that Forge's window can read a stream in windows as Hearth does. Hearth's names are unchanged.
 - **Added: Hearth reads a Matroska or MP4 file's TrueHD track where it lies, a window at a time.** A film remux's lossless track (about
   4.5 GB for two hours) was copied into memory beside the file; now `iclforge::apps::index_container_track` finds where its frames lie
   (`libs/containers`' Matroska `Reader::push_at` and MP4 `demux_seekable_at` say at what offset) and `ExtentSource` reads the track back by
