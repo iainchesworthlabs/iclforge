@@ -93,6 +93,7 @@ struct SubstreamState {
     // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds
     // anything.
     std::uint32_t interval_fold = 0;
+    unsigned object_updates = 0;  // matrix sections the interval's blocks carried (lab log)
     // Lab: the fold of each matrix channel alone, after the matrices (0-11) and before (12-23).
     std::array<std::uint32_t, 24> column_fold{};
     bool interval_open = false;
@@ -325,6 +326,12 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             }
             ++counters.object_checks_kept;
         }
+        if (index == kObjectSubstream &&
+            counters.object_interval_log.size() < DecoderCounters::kObjectIntervalsKept) {
+            const bool passed = lossless_check_of(state.interval_fold) == header->lossless_check;
+            counters.object_interval_log.push_back(static_cast<std::uint8_t>(
+                (passed ? 1U : 0U) | (std::min(state.object_updates, 127U) << 1U)));
+        }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
             ++counters.lossless_ok_by_substream[static_cast<std::size_t>(index)];
@@ -366,7 +373,8 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.noise_type = header->noise_type();
     // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
     state.context.object_matrices = header->sync == kRestartSyncAtmos;
-    if (config.lab.object_noise != 0 && header->sync == kRestartSyncAtmos) {
+    // ERRATA.md entry 69: the object matrices draw generator 1's noise, `field_m4` their shift.
+    if (header->sync == kRestartSyncAtmos) {
         state.context.noise_type = true;
     }
     state.context.object_extension_variant = config.lab.extension_variant;
@@ -437,11 +445,8 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
             plan.noise_shift = spec.noise_shift;
-            if (config.lab.object_noise != 0 && restart.sync == kRestartSyncAtmos) {
-                const int shift = spec.field_m4 + (config.lab.object_noise == 2   ? 1
-                                                   : config.lab.object_noise == 3 ? -1
-                                                                                  : 0);
-                plan.noise_shift = spec.field_m4 == 0 ? 0 : std::max(shift, 0);
+            if (restart.sync == kRestartSyncAtmos) {
+                plan.noise_shift = spec.field_m4;
             }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
@@ -820,6 +825,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             if (header->matrices && state.context.object_matrices) {
                 state.object_last = *header->matrices;
                 state.object_have = header->matrices->count > 0;
+                if (header->matrices->count > 0) {
+                    ++state.object_updates;
+                }
                 if (header->matrices->count > 0 && counters.object_first_matrices.empty()) {
                     for (unsigned m = 0; m < header->matrices->count; ++m) {
                         const MatrixSpec& spec = header->matrices->items[m];

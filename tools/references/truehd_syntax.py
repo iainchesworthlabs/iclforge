@@ -287,7 +287,9 @@ class Substream:
             raise StreamError("restart header CRC")
         # Restart sync 0x31EB is noise_type 1: generator 1 (TH spec 17.3) and matrices with no noise
         # coefficients but a noise shift each (ERRATA 32).
-        self.noise_type = sync == 0x31EB
+        # Restart sync 0x31EC draws generator 1's noise too, its matrices' `field_m4` the noise
+        # shift (ERRATA 69).
+        self.noise_type = sync in (0x31EB, 0x31EC)
         # Restart sync 0x31EC has the object-audio matrix section (TH spec 10.2.1a).
         self.object_matrices = sync == 0x31EC
         if self.running and self.interval is not None:
@@ -355,20 +357,20 @@ class Substream:
             frac_bits = bits.read(4)
             f_shift = bits.read(3) - 1
             bits.read(2)
-            bits.read(4)
+            noise_shift = bits.read(4)
             mask = bits.read(channels)
             if frac_bits - f_shift > MATRIX_SHIFT:
                 raise StreamError("matrix coefficients finer than 2^-15")
-            headers.append((out, frac_bits, f_shift, mask))
+            headers.append((out, frac_bits, f_shift, mask, noise_shift))
         matrices = []
-        for out, frac_bits, f_shift, mask in headers:
+        for out, frac_bits, f_shift, mask, noise_shift in headers:
             coeffs = [0] * (channels + NOISE_CHANNELS)
             for channel in range(channels):
                 if mask >> channel & 1:
                     coeffs[channel] = bits.signed(frac_bits + 2) << (
                         MATRIX_SHIFT - frac_bits + f_shift
                     )
-            matrices.append((out, coeffs, 0, 0))
+            matrices.append((out, coeffs, 0, noise_shift))
         if bits.read(1):
             raise StreamError("matrix extension (never written by DEE)")
         return matrices

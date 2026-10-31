@@ -168,6 +168,17 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             }
             std::printf("\n");
         }
+        std::printf("    object substream, each interval's check (o passed, F failed) and the "
+                    "matrix sections it carried (0-9, + for more):\n      ");
+        for (const std::uint8_t entry : c.object_interval_log) {
+            std::printf("%c", (entry & 1U) != 0 ? 'o' : 'F');
+        }
+        std::printf("\n      ");
+        for (const std::uint8_t entry : c.object_interval_log) {
+            const unsigned updates = entry >> 1U;
+            std::printf("%c", updates > 9 ? '+' : static_cast<char>('0' + updates));
+        }
+        std::printf("\n");
         print_subsets(c);
     }
 }
@@ -205,13 +216,6 @@ int main(int argc, char** argv) {
     DecoderLab shift = base;
     shift.inverse_f_shift = true;
     settings.push_back({"inverse f_shift", shift});
-    static const char* const kNoiseNames[] = {"", "object noise: shift = m4", "object noise: shift = m4 + 1",
-                                              "object noise: shift = m4 - 1"};
-    for (int mode = 1; mode <= 3; ++mode) {
-        DecoderLab noisy = base;
-        noisy.object_noise = mode;
-        settings.push_back({kNoiseNames[mode], noisy});
-    }
     static const char* const kScopeNames[] = {
         "",
         "fold: coded channels, shift by matrix channel",

@@ -308,7 +308,8 @@ def write_full_block_header(w, sub, params, size):
         w.put(1, 1)
         w.put(len(sub.matrices) - 1, 4)
         channels = sub.mm + 1
-        # (out, frac_bits, lsb_bypass, {channel: coefficient}, f_shift): f_shift widens the range
+        # (out, frac_bits, lsb_bypass, {channel: coefficient}, f_shift, noise shift): f_shift
+        # widens the range; the 4 bit field next to it is the matrix's noise shift (ERRATA 69)
         for out, frac_bits, lsb_bypass, coeffs, *_noise in sub.matrices:
             assert not lsb_bypass, "the object-audio matrices carry no bypass bit"
             mask = sum(1 << c for c in range(channels) if coeffs.get(c))
@@ -316,7 +317,7 @@ def write_full_block_header(w, sub, params, size):
             w.put(frac_bits, 4)
             w.put((_noise[0] if _noise else 0) + 1, 3)  # f_shift + 1
             w.put(0, 2)
-            w.put(0, 4)
+            w.put(_noise[1] if len(_noise) > 1 else 0, 4)
             w.put(mask, channels)
         for _out, frac_bits, _bypass, coeffs, *_noise in sub.matrices:
             for c in range(channels):
@@ -845,7 +846,7 @@ def case_substream3_limits():
     )
 
 
-def case_substream3_fine_matrices(extra_data=None):
+def case_substream3_fine_matrices(extra_data=None, noise_shifts=None, seed=0x2A5F31):
     """A twelve channel substream 3 (restart sync 0x31EC) whose matrices carry `frac_bits` 15, 14,
     13 and 0, as the object substream of the owner's discs does (ERRATA 60): four channels of
     objects predicted from the 7.1 bed and from each other, with coefficients that need the last
@@ -864,16 +865,21 @@ def case_substream3_fine_matrices(extra_data=None):
         # frac_bits 13 is 2.3167 and the unity coefficient of the output is 4096
         (11, 13, {0: 9489, 6: -4001}, 1),
     ]
+    steps = [(*item, 0) if len(item) == 3 else item for item in plan]
+    shifts = list(noise_shifts) if noise_shifts else [0] * len(steps)
     matrices = [
-        (out, frac, False, {out: 1 << (frac - fs), **others}, fs)
-        for out, frac, others, fs in ((*item, 0) if len(item) == 3 else item for item in plan)
+        (out, frac, False, {out: 1 << (frac - fs), **others}, fs, shift)
+        for (out, frac, others, fs), shift in zip(steps, shifts, strict=True)
     ]
+    # Generator 1's noise (TH spec 17.3) as each matrix adds it, in the matrices' 2^-15 domain
+    terms = noise1_terms(n, 40, 0, 16, seed, shifts)
     coded = [list(column) for column in src]
-    for out, frac, others, fs in reversed(
-        [(*item, 0) if len(item) == 3 else item for item in plan]
-    ):
+    for k in reversed(range(len(steps))):
+        out, frac, others, fs = steps[k]
+        scale = 15 - frac + fs
         coded[out] = [
-            o - ((sum(coded[c][i] * w for c, w in others.items())) >> (frac - fs))
+            o
+            - (((sum(coded[c][i] * w for c, w in others.items()) << scale) + 2 * terms[k][i]) >> 15)
             for i, o in enumerate(coded[out])
         ]
 
@@ -892,7 +898,15 @@ def case_substream3_fine_matrices(extra_data=None):
     }
     rows = [tuple(src[c][i] for c in range(12)) for i in range(n)]
     last = Substream(
-        8, 11, 11, wide, rows, {c: coded[c] for c in range(8, 12)}, matrices=matrices, sync=0x31EC
+        8,
+        11,
+        11,
+        wide,
+        rows,
+        {c: coded[c] for c in range(8, 12)},
+        matrices=matrices,
+        sync=0x31EC,
+        noise_seed=seed,
     )
     subs = [sub_for(0, 1), sub_for(2, 5), sub_for(6, 7, 0x31EB), last]
     stream = Stream(subs, n, terminator_b=True, extra_data=extra_data)
@@ -925,6 +939,19 @@ def atmos_extra_data(unit):
     if payload is None:
         return None
     return evolution.build_evo_frame("emdf", payloads=[(11, evolution.default_config(), payload)])
+
+
+def case_substream3_object_noise():
+    """The stream of `case_substream3_fine_matrices` with a noise shift on four of its seven
+    matrices (2, 0, 7, 11, 0, 4, 1): the object matrices draw generator 1's noise (ERRATA 69)."""
+    stream, _description, _features = case_substream3_fine_matrices(
+        noise_shifts=(2, 0, 7, 11, 0, 4, 1)
+    )
+    return (
+        stream,
+        "a twelve channel substream 3 whose matrices carry noise shifts",
+        ["substream_3", "twelve_channels", "object_noise", "matrices_7"],
+    )
 
 
 def case_atmos_objects():
@@ -1307,6 +1334,7 @@ CASES = {
     "hb_eight_channels": case_eight_channels,
     "hb_substream3_limits": case_substream3_limits,
     "hb_substream3_fine_matrices": case_substream3_fine_matrices,
+    "hb_substream3_object_noise": case_substream3_object_noise,
     "hb_atmos_objects": case_atmos_objects,
 }
 
@@ -1371,6 +1399,13 @@ FFMPEG = {
         "note": "restart sync 0x31EC in substreams 2 and 3 (FFmpeg reads 0x31EA and 0x31EB only)",
     },
     "hb_substream3_fine_matrices": {
+        "outcome": "bed",
+        "columns": [0, 1, 2, 3, 6, 7, 4, 5],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "
+        "alone: it returns the 7.1 bed, the best presentation, in its own channel order "
+        "(ERRATA 33)",
+    },
+    "hb_substream3_object_noise": {
         "outcome": "bed",
         "columns": [0, 1, 2, 3, 6, 7, 4, 5],
         "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "

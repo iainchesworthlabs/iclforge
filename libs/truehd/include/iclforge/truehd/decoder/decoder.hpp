@@ -80,9 +80,6 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
-    // The object matrices draw generator 1's noise (TH spec §17.3), their `field_m4` the noise
-    // shift: 0 draws none, 1 uses `field_m4`, 2 one more, 3 one less.
-    int object_noise = 0;
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 
@@ -144,6 +141,10 @@ struct DecoderCounters {
     std::array<std::uint8_t, kObjectChecksKept> object_check_stored{};
     std::array<std::uint8_t, kObjectChecksKept> object_check_folded{};
     std::size_t object_checks_kept = 0;
+    // The first 256 checks of the object substream, in order: bit 0 set when the check passed,
+    // the upper bits the number of matrix sections the interval's blocks carried (at most 127).
+    static constexpr std::size_t kObjectIntervalsKept = 256;
+    std::vector<std::uint8_t> object_interval_log;
     // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
     // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
     static constexpr std::size_t kObjectColumns = 24;

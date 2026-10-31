@@ -681,7 +681,7 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "f7b64911da59eb2bdd8be62b6cd9a8eb8056cf3995583c2afcf661b26b690a97",
+      "stream_sha256": "a2ff07fadc7754ccf2e4fb070093ce8de9f8b4593bb28f8f4e4e80742325e6e2",
       "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34"
     },
     {
@@ -716,7 +716,77 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "f7b64911da59eb2bdd8be62b6cd9a8eb8056cf3995583c2afcf661b26b690a97",
+      "stream_sha256": "a2ff07fadc7754ccf2e4fb070093ce8de9f8b4593bb28f8f4e4e80742325e6e2",
+      "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
+    },
+    {
+      "name": "hb_substream3_object_noise_all",
+      "file": "hb_substream3_object_noise.thd",
+      "description": "a twelve channel substream 3 whose matrices carry noise shifts",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "object_noise",
+        "matrices_7"
+      ],
+      "oracle": "ffmpeg-bed",
+      "ffmpeg": {
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
+      },
+      "codec": "truehd",
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 12,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "c718f52d5c15fe81ef088b961a0703a726de2a098574db45cd35e65adf636e02",
+      "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34"
+    },
+    {
+      "name": "hb_substream3_object_noise_best",
+      "file": "hb_substream3_object_noise.thd",
+      "description": "a twelve channel substream 3 whose matrices carry noise shifts",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "object_noise",
+        "matrices_7"
+      ],
+      "oracle": "ffmpeg-bed",
+      "ffmpeg": {
+        "outcome": "bed",
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          7,
+          4,
+          5
+        ],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) alone: it returns the 7.1 bed, the best presentation, in its own channel order (ERRATA 33)",
+        "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 8,
+      "access_units": 32,
+      "pcm_samples": 1280,
+      "stream_sha256": "c718f52d5c15fe81ef088b961a0703a726de2a098574db45cd35e65adf636e02",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
     },
     {
@@ -751,7 +821,7 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "e8142d94d6caceacc242bcb0f31e9dc98c7f6637495c864245817431158aa3ef",
+      "stream_sha256": "e45927bfac6670cfcfbff97ea96415f4bbe7af49cf940fdc434e360200d4b167",
       "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34",
       "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     },
@@ -787,7 +857,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "e8142d94d6caceacc242bcb0f31e9dc98c7f6637495c864245817431158aa3ef",
+      "stream_sha256": "e45927bfac6670cfcfbff97ea96415f4bbe7af49cf940fdc434e360200d4b167",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0",
       "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     }

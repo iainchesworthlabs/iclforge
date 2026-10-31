@@ -900,6 +900,12 @@ chance: on `z_short.mlp` (channels 2 to 10 silent) the stored byte of all 12 int
 carry small values (-1..1, -2..1). Read provisionally: what substream 3's check folds is not the output this decoder builds from the matrices, and in a stream with moving objects
 the difference is the whole check. Open: whether the objects' matrices add dither (`field_m4` as a noise shift is untried), and what the check covers. The controlled DEE encodes that
 would settle it are digital silence and a constant on one object with all others silent (DEE's licence ends 2026-11-06).
+**The noise (2026-10-31, confirmed).** `field_m4` of an object matrix is its noise shift, and restart sync 0x31EC draws generator 1's noise exactly as 0x31EB does (the buffer from the
+restart header's seed, the matrix's start index and stride from its place in the list, the draw scaled by `2^(shift + 8)` in the matrices' 2^-15 domain, a shift of 0 drawing none). With it
+`z_short.mlp` passes every substream 3 check (18 of 18, from 0), `EX_00002b.thd` rises from 1 to 28 of 244 and `soll_sil6.mlp` from 0 to 15 of 118; a shift of `field_m4` plus or minus one passes none.
+The sums say what the matrices are for: in `z_short.mlp` the original rows 0 and 11 are silent, and the small values coded there are the encoder's dither, which the three matrices
+(0.293 x row 0 less row 11; row 0 less 1/√11 of rows 2 to 11; 2.3167 x row 0 plus row 11) cancel by adding it back. The decoder, the Python reference and a hand-built stream with noise shifts
+(`hb_substream3_object_noise`; it fails without the rule) hold it. Open: the intervals of `EX_00002b.thd` and `soll_sil6.mlp` that still fail.
 
 ## Atmos, spec v3.6
 
