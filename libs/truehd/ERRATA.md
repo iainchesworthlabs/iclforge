@@ -906,6 +906,15 @@ restart header's seed, the matrix's start index and stride from its place in the
 The sums say what the matrices are for: in `z_short.mlp` the original rows 0 and 11 are silent, and the small values coded there are the encoder's dither, which the three matrices
 (0.293 x row 0 less row 11; row 0 less 1/√11 of rows 2 to 11; 2.3167 x row 0 plus row 11) cancel by adding it back. The decoder, the Python reference and a hand-built stream with noise shifts
 (`hb_substream3_object_noise`; it fails without the rule) hold it. Open: the intervals of `EX_00002b.thd` and `soll_sil6.mlp` that still fail.
+**What does not explain the rest (2026-10-31, lab builds a54d216 to 128592c).** With the noise on, `EX_00002b.thd` passes 28 of 244 intervals, `EX_00002a.thd` 17 of 206 and `soll_e12.mlp` 8 of 60,
+the passes scattered (soll_e12's early intervals, with only the out 0 / out 11 pair that `z_short.mlp` passes on every interval, pass 8 of 32). None of these changes lifts a count, each by the
+owner's runs: any of the 15 combinations of reading the lower substreams' rows after their matrices, no quantiser mask, matrices last to first and the other sign of `f_shift`; the object
+matrices reading the bed as substream 2 outputs it (substreams 0 to 2 keep their counts, substream 3 falls); a quantiser mask on the coded rows only or the bed rows only (the block header sends one
+step for all twelve rows, 4 to 6 in the three files, and an output shift of 1 on every row of `EX_00002b.thd`); a noise index counted from the block, or matrices numbered from the first; clearing
+the filter histories at an object restart (no difference at all); every fold of other samples into the check, and every subset of the 24 per-channel folds. Sections do not explain it either:
+`EX_00002a.thd` and `EX_00002b.thd` carry one matrix section in every interval. One block per access unit in all the owner's files, so a block-position effect is out too. In soll_e12 and EX_00002a the
+passes stop where the matrix count and the sample sizes jump (intervals 32 and 34), at the parse breaks of units 4072 and 4175, where the structure after the coefficients is not read. Open, and
+probably needing a controlled encode (DEE's licence ends 2026-11-06): one object with a tone and every other silent; two objects; silence; a constant on one object.
 
 ## Atmos, spec v3.6
 
