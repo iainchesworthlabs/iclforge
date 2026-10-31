@@ -132,7 +132,10 @@ std::expected<StreamEditSummary, Error> edit_channel_meaning(std::span<std::byte
 
     std::vector<ChannelMeaning> distinct;
     for (const Patch& patch : patches) {
-        if (std::ranges::find(distinct, patch.before) == distinct.end()) {
+        // any_of and not find: clang-cl on MSVC's standard library takes find over a type with a
+        // defaulted operator== for a vectorised search and static_asserts on its size.
+        const auto seen = [&patch](const ChannelMeaning& meaning) { return meaning == patch.before; };
+        if (!std::ranges::any_of(distinct, seen)) {
             distinct.push_back(patch.before);
         }
     }

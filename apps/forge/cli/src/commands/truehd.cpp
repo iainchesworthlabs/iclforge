@@ -617,8 +617,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             substreams = parsed->major_sync->num_substreams;
             if (parsed->major_sync->kind == th::StreamKind::kTrueHd &&
                 meanings.size() < kMaxMeanings &&
-                std::ranges::find(meanings, parsed->major_sync->channel_meaning) ==
-                    meanings.end()) {
+                !std::ranges::any_of(meanings, [&parsed](const th::ChannelMeaning& meaning) {
+                    return meaning == parsed->major_sync->channel_meaning;
+                })) {
                 meanings.push_back(parsed->major_sync->channel_meaning);
             }
         }
