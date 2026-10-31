@@ -104,10 +104,10 @@ struct EvolutionFrame {
     bool trailing_zero = true;  // every bit after that, to the end of the payload, is 0
 
     // The first payload with this id, or null.
-    [[nodiscard]] const EvolutionPayload* find(std::uint64_t id) const noexcept;
+    [[nodiscard]] ICLFORGE_TRUEHD_EXPORT const EvolutionPayload* find(std::uint64_t id) const noexcept;
     // The bytes of the first payload with id 11 (the object audio metadata), empty when there is
     // none.
-    [[nodiscard]] std::span<const std::byte> oamd() const noexcept;
+    [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::span<const std::byte> oamd() const noexcept;
 };
 
 // Every way the container can fail to read, each its own kind.
