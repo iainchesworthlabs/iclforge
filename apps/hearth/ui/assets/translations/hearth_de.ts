@@ -4405,12 +4405,12 @@
     <message>
         <location filename="../qml/OutputPicker.qml" line="154"/>
         <source> · TrueHD (MAT) ✓</source>
-        <translation type="unfinished"></translation>
+        <translation> · TrueHD (MAT) ✓</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="155"/>
         <source> · TrueHD (MAT) opens, not run</source>
-        <translation type="unfinished"></translation>
+        <translation> · TrueHD (MAT) öffnet, nicht ausprobiert</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="198"/>
