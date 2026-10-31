@@ -1022,7 +1022,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     std::to_string(reader.bit_position()) + ", size " +
                     std::to_string(state.block_size) + ", matrices " +
                     std::to_string(state.matrix_count) + " of which " + std::to_string(bypassing) +
-                    " with bypass, error \"" + std::string(decoded.error().detail) +
+                    " with bypass, channels " + std::to_string(state.context.min_chan) + " to " +
+                    std::to_string(state.context.max_chan) + " of " +
+                    std::to_string(state.context.max_matrix_chan + 1) + ", error \"" +
+                    std::string(decoded.error().detail) +
                     "\"; blocks of the segment: " + segment_trace;
             }
             state.running = false;
