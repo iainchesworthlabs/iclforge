@@ -64,7 +64,10 @@ def check(tests: str, tool: str, ffmpeg: str, work: Path) -> bool:
     env = dict(os.environ, ICLFORGE_CRUCIBLE_TRUEHD_DUMP_DIR=str(work))
     done = run([tests, "[truehd_dump]"], env=env)
     if done.returncode != 0:
-        print(f"FAIL  dump: {tests} [truehd_dump] exited {done.returncode}: {tail(done.stdout + done.stderr)}")
+        print(
+            f"FAIL  dump: {tests} [truehd_dump] exited {done.returncode}: "
+            f"{tail(done.stdout + done.stderr)}"
+        )
         return False
     mat, expected_file = work / "leg.mat", work / "leg.s32"
     if not mat.exists() or not expected_file.exists():
@@ -88,10 +91,15 @@ def check(tests: str, tool: str, ffmpeg: str, work: Path) -> bool:
     want = samples(expected_file.read_bytes())
     frames = len(got) // CHANNELS
     if len(got) % CHANNELS or frames < MIN_FRAMES:
-        print(f"FAIL  ffmpeg decode: {len(got)} samples is not a whole number of 6-channel frames, or too few")
+        print(
+            f"FAIL  ffmpeg decode: {len(got)} samples is not a whole number of "
+            "6-channel frames, or too few"
+        )
         return False
     if len(got) > len(want):
-        print(f"FAIL  ffmpeg decode: {len(got)} samples, more than the {len(want)} the leg was given")
+        print(
+            f"FAIL  ffmpeg decode: {len(got)} samples, more than the {len(want)} the leg was given"
+        )
         return False
     for i, value in enumerate(got):
         if value != want[i] << 8:
@@ -102,13 +110,16 @@ def check(tests: str, tool: str, ffmpeg: str, work: Path) -> bool:
             return False
     print(
         f"PASS  ffmpeg strict decode equals the integers the leg was given "
-        f"({frames} of {len(want) // CHANNELS} frames; the rest is the encoder's last restart interval)"
+        f"({frames} of {len(want) // CHANNELS} frames; "
+        "the rest is the encoder's last restart interval)"
     )
     return True
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--tests", required=True, help="iclforge-crucible-tests")
     parser.add_argument("--tool", required=True, help="iclforge-truehd-container-tool")
     parser.add_argument("--ffmpeg", default="ffmpeg")
