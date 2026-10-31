@@ -24,6 +24,14 @@ See [README.md](README.md) for the project overview and
   packets; each as a raw OBU stream and as an ISO-BMFF file, 17 files of 0.3 to 10 KB. `tools/fuzz/generate-seeds.sh` runs the tool when
   it is beside forge. `test_iamf_seeds.cpp` holds each seed to being read by its own framing's reader, decoded where it is `ipcm`, and
   refused by the other's. `tools/checks/check_fuzz_harnesses.py` has no known gap left.
+- **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
+  `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
+  Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
+  `apps/crucible/ui` and `apps/hearth/ui` with `tools/checks/coverage_report.sh -q`. Only Crucible had a floor before, and only on Windows.
+  The three floors are provisional until the job's first hosted run. `tools/dev/qt-sandbox-setup.sh PREFIX` does the same installation by hand
+  (aqtinstall at the pinned commit, the apt packages, and for Hearth a private prefix with mbedTLS, cpp-httplib with the repository's patch and
+  mdns.h, each download checked against a pinned SHA-256) and prints the configure line. `hearth_qmltests` now links the coverage target, so
+  the controllers it recompiles are instrumented like the other two windows' are.
 - **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
   A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
   end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
