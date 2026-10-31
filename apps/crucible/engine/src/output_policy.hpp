@@ -32,6 +32,11 @@ enum class OutputMode : std::uint8_t {
     kPcmSurround,  // decoded 5.1/7.1 PCM, shared mode
     kHeadphones,   // decoded objects through Windows Spatial Sound
     kStereo,       // decoded Lo/Ro, shared mode
+    // A lossless TrueHD 5.1 bed in MAT, exclusive bitstream. Pin-only: the automatic
+    // choice never picks it until a receiver has read it (planning/truehd-parity-crucible.md,
+    // question 3), and it carries no objects. Placed after kStereo so the values of the
+    // others do not move.
+    kTrueHd51,
     kNone,         // nothing usable
 };
 

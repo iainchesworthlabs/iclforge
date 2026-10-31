@@ -330,6 +330,34 @@ TEST_CASE("crucible engine commands: an application that leaves is dropped from 
     engine.stop();
 }
 
+TEST_CASE("crucible engine commands: pinning TrueHD 5.1 sends MAT bursts to a receiver that takes them",
+          "[crucible][engine][concurrency][truehd]") {
+    Rig rig;
+    rig.devices->devices = {realtek_default(), hdmi_avr_truehd()};
+    Engine engine(rig.config());
+    REQUIRE(engine.start().has_value());
+    REQUIRE(wait_for([&] { return engine.status().mode == OutputMode::kDdPlus51; }));  // not unpinned
+
+    engine.pin(OutputMode::kTrueHd51);
+    REQUIRE(wait_for([&] { return engine.status().mode == OutputMode::kTrueHd51; }));
+    // The default restart interval is 128 access units (5120 samples): the first burst
+    // leaves after that and 24 more access units are packed.
+    REQUIRE(wait_for([&] {
+        const std::lock_guard devices_lock(rig.devices->mutex);
+        for (const auto& sink : rig.devices->burst_sinks) {
+            const std::lock_guard lock(sink->mutex);
+            if (sink->started && sink->format == BurstFormat::kTrueHd && sink->submits > 0) {
+                return sink->bytes == sink->submits * 61440;
+            }
+        }
+        return false;
+    }));
+    CHECK(engine.status().underruns == 0);
+    engine.pin(std::nullopt);
+    REQUIRE(wait_for([&] { return engine.status().mode == OutputMode::kDdPlus51; }));
+    engine.stop();
+}
+
 TEST_CASE("crucible engine commands: pin, preferred endpoint and bypass reach the output stage",
           "[crucible][engine][concurrency]") {
     Rig rig;

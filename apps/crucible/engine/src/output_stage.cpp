@@ -16,8 +16,10 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
 
 namespace iclforge::crucible {
 
@@ -28,6 +30,25 @@ namespace {
 constexpr std::uint32_t kMaskStereo = 0x3;
 constexpr std::uint32_t kMask51 = 0x3f;
 constexpr std::uint32_t kSpeakerLowFrequency = 0x8;
+
+// The bed arrives in AC-3 coded order (L C R Ls Rs LFE); the PCM sinks and the
+// TrueHD encoder's 5.1 layout (L R C LFE Ls Rs, TH spec section 13.1) both want
+// WAVE order. Entry w is the bed channel that goes in position w.
+constexpr std::size_t kCodedForWave[6] = {0, 2, 1, 5, 3, 4};
+
+// Float to the 24-bit integers the TrueHD encoder takes: to the nearest,
+// ties to even, clamped to the range, and silence for a value that is not a
+// number. This is where "lossless" starts: the stream decodes to exactly
+// these integers, and the float mix they came from is not recoverable from
+// them (planning/truehd-parity-crucible.md, question 4).
+std::int32_t to_24_bit(float sample) {
+    constexpr float kFullScale = 8388608.0F;  // 2^23
+    if (std::isnan(sample)) {
+        return 0;
+    }
+    const float scaled = std::nearbyint(sample * kFullScale);
+    return static_cast<std::int32_t>(std::clamp(scaled, -kFullScale, kFullScale - 1.0F));
+}
 
 // How long submit() is prepared to wait for a full sink before giving the
 // frame up: a sink that has died must not hold the encode loop forever.
@@ -127,6 +148,12 @@ struct OutputStage::Impl {
     // nothing waits here.
     std::vector<std::vector<float>> ac3_pending;
     std::vector<std::span<const float>> ac3_views;
+    // TrueHD 5.1 only. A fresh encoder per start, so the first access unit
+    // that leaves after a hot switch carries a major sync and a restart
+    // header and a receiver can join there.
+    std::optional<iclforge::truehd::Encoder> truehd_encoder;
+    std::unique_ptr<iclforge::containers::iec61937::MatPacker> mat_packer;
+    std::vector<std::int32_t> truehd_pcm;  // the frame being encoded, interleaved
     std::unique_ptr<iclforge::ac3::Eac3Decoder> decoder;                // the decoded modes
 
     std::vector<float> interleaved;
@@ -149,7 +176,8 @@ struct OutputStage::Impl {
         switch (mode) {
             case OutputMode::kAtmos:
             case OutputMode::kDdPlus51:
-            case OutputMode::kDd51: return !passthrough || passthrough->running();
+            case OutputMode::kDd51:
+            case OutputMode::kTrueHd51: return !passthrough || passthrough->running();
             case OutputMode::kPcmSurround:
             case OutputMode::kStereo: return !monitor || monitor->running();
             case OutputMode::kHeadphones: return !spatial_started || spatial->running();
@@ -175,6 +203,9 @@ struct OutputStage::Impl {
         packer.reset();
         ac3_encoder.reset();
         ac3_pending.clear();
+        truehd_encoder.reset();
+        mat_packer.reset();
+        truehd_pcm.clear();
         decoder.reset();
         lfe_delay.reset();
     }
@@ -293,6 +324,27 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
                     .lfe = true});
             break;
         }
+        case OutputMode::kTrueHd51: {
+            impl_->passthrough = impl_->devices->burst_sink();
+            const auto started =
+                impl_->passthrough->start(choice.endpoint_id, config_.sample_rate, BurstFormat::kTrueHd);
+            if (!started.has_value()) {
+                return refuse(started.error());
+            }
+            auto encoder = iclforge::truehd::Encoder::create(
+                {.sample_rate = config_.sample_rate,
+                 .channels = 6,
+                 .bits = 24,
+                 .restart_interval_units = config_.truehd_restart_interval_units,
+                 .peak_data_rate_bps = config_.truehd_peak_data_rate_bps});
+            if (!encoder.has_value()) {
+                return refuse("the TrueHD encoder refused its configuration: " +
+                              std::string(encoder.error().detail));
+            }
+            impl_->truehd_encoder.emplace(std::move(*encoder));
+            impl_->mat_packer = std::make_unique<iclforge::containers::iec61937::MatPacker>();
+            break;
+        }
         case OutputMode::kPcmSurround: {
             impl_->monitor = impl_->devices->pcm_sink();
             const auto started =
@@ -395,7 +447,6 @@ void OutputStage::submit_raw(const RawFrame& raw) {
     }
     const std::size_t frames = raw.bed[0].size();
     if (status_.mode == OutputMode::kPcmSurround) {
-        constexpr std::size_t kCodedForWave[6] = {0, 2, 1, 5, 3, 4};
         impl.interleaved.resize(frames * 6);
         for (std::size_t i = 0; i < frames; ++i) {
             for (std::size_t w = 0; w < 6; ++w) {
@@ -415,6 +466,57 @@ void OutputStage::submit_raw(const RawFrame& raw) {
     submit_with_patience(*impl.monitor, status_.underruns,
                          std::span<const float>(impl.interleaved));
     status_.sink_queue_frames = impl.monitor->queued_frames();
+}
+
+// The TrueHD 5.1 leg: the bed rounded to 24 bits in WAVE order, encoded, and
+// the access units packed 24 to a MAT burst. The encoder takes any whole
+// number of frames and holds a restart interval before it emits anything, so
+// a call may return no units, and the first calls after a switch return none
+// until the interval is full; then a few bursts leave together.
+void OutputStage::submit_truehd(const RawFrame& raw) {
+    auto& impl = *impl_;
+    if (raw.bed.size() < 6) {
+        return;
+    }
+    const std::size_t frames = raw.bed[0].size();
+    for (std::size_t ch = 1; ch < 6; ++ch) {
+        if (raw.bed[ch].size() != frames) {
+            return;  // a bed that is not whole is not encoded, whatever is in it
+        }
+    }
+    impl.truehd_pcm.resize(frames * 6);
+    for (std::size_t i = 0; i < frames; ++i) {
+        for (std::size_t w = 0; w < 6; ++w) {
+            impl.truehd_pcm[i * 6 + w] = to_24_bit(raw.bed[kCodedForWave[w]][i]);
+        }
+    }
+
+    // As ensure_spatial does for its sink: the output stops, the reason says
+    // why, and the next probe starts it again.
+    const auto fail = [&](const std::string& why) {
+        status_.reason += "; " + why;
+        impl.teardown();
+        status_.running = false;
+        status_.mode = OutputMode::kNone;
+    };
+
+    auto units = impl.truehd_encoder->encode(impl.truehd_pcm);
+    if (!units.has_value()) {
+        fail("the TrueHD encoder stopped: " + std::string(units.error().detail));
+        return;
+    }
+    for (const auto& unit : *units) {
+        auto burst = impl.mat_packer->push(unit.bytes);
+        if (!burst.has_value()) {
+            fail("the MAT packer refused an access unit: " +
+                 std::string(iclforge::containers::iec61937::describe(burst.error())));
+            return;
+        }
+        if (*burst) {
+            submit_with_patience(*impl.passthrough, status_.underruns,
+                                 std::span<const std::byte>(**burst));
+        }
+    }
 }
 
 void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
@@ -461,6 +563,7 @@ void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
             }
             return;
         }
+        case OutputMode::kTrueHd51: submit_truehd(raw); return;
         case OutputMode::kPcmSurround:
         case OutputMode::kStereo:
         case OutputMode::kHeadphones: break;
@@ -522,7 +625,6 @@ void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
         if (out.channels.size() < 6) {
             return;
         }
-        constexpr std::size_t kCodedForWave[6] = {0, 2, 1, 5, 3, 4};
         impl.interleaved.resize(frames * 6);
         for (std::size_t i = 0; i < frames; ++i) {
             for (std::size_t w = 0; w < 6; ++w) {
