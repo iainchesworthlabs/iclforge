@@ -44,6 +44,10 @@ struct SinkAudioCapabilities {
     bool pcm = false;
     bool ac3 = false;
     bool eac3 = false;
+    // A descriptor for MAT (CEA-861's audio format code 12, which is what Dolby TrueHD travels as
+    // over HDMI). The descriptor says the sink has the decoder; it does not say the output will
+    // carry the eight-channel link, which is what RenderDeviceInfo::supports_mat_passthrough asks.
+    bool mat = false;
     // 0 when no LPCM descriptor was present to say - not "no channels".
     std::uint16_t max_pcm_channels = 0;
     // Every LPCM sample rate at least one LPCM descriptor advertised, in Hz.

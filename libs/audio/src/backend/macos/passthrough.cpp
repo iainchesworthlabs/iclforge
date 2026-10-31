@@ -151,6 +151,10 @@ bool offers(AudioObjectID device, BitstreamFormat format, std::uint32_t sample_r
 
 }  // namespace
 
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kCoreAudio;
+}
+
 std::string_view describe(PassthroughError error) {
     switch (error) {
         case PassthroughError::kNoBackend: return "no passthrough backend on this platform";
@@ -170,7 +174,8 @@ std::string_view describe(PassthroughError error) {
         case PassthroughError::kNotRunning: return "passthrough is not running";
         case PassthroughError::kUnsupportedFormat:
             return "Core Audio defines no AC-4 format ID (CoreAudioBaseTypes.h), so no stream "
-                   "can offer AC-4 or be retuned to it";
+                   "can offer AC-4 or be retuned to it, and this backend knows no format ID for "
+                   "TrueHD (MAT) either: it is not offered, and nothing is opened for it";
     }
     return "unknown passthrough error";
 }
