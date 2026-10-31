@@ -80,6 +80,9 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
+    // The object matrices draw generator 1's noise (TH spec §17.3), their `field_m4` the noise
+    // shift: 0 draws none, 1 uses `field_m4`, 2 one more, 3 one less.
+    int object_noise = 0;
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 

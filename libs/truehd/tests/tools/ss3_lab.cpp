@@ -205,6 +205,13 @@ int main(int argc, char** argv) {
     DecoderLab shift = base;
     shift.inverse_f_shift = true;
     settings.push_back({"inverse f_shift", shift});
+    static const char* const kNoiseNames[] = {"", "object noise: shift = m4", "object noise: shift = m4 + 1",
+                                              "object noise: shift = m4 - 1"};
+    for (int mode = 1; mode <= 3; ++mode) {
+        DecoderLab noisy = base;
+        noisy.object_noise = mode;
+        settings.push_back({kNoiseNames[mode], noisy});
+    }
     static const char* const kScopeNames[] = {
         "",
         "fold: coded channels, shift by matrix channel",

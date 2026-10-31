@@ -366,6 +366,9 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.noise_type = header->noise_type();
     // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
     state.context.object_matrices = header->sync == kRestartSyncAtmos;
+    if (config.lab.object_noise != 0 && header->sync == kRestartSyncAtmos) {
+        state.context.noise_type = true;
+    }
     state.context.object_extension_variant = config.lab.extension_variant;
     state.object_have = false;  // a restart resets the coding parameters, the matrices included
     state.context.presence_flags = presence::kAll;
@@ -434,6 +437,12 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
             plan.noise_shift = spec.noise_shift;
+            if (config.lab.object_noise != 0 && restart.sync == kRestartSyncAtmos) {
+                const int shift = spec.field_m4 + (config.lab.object_noise == 2   ? 1
+                                                   : config.lab.object_noise == 3 ? -1
+                                                                                  : 0);
+                plan.noise_shift = spec.field_m4 == 0 ? 0 : std::max(shift, 0);
+            }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
