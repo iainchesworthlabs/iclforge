@@ -74,6 +74,11 @@ struct DecoderLab {
     bool no_quantiser_mask = false;  // the object matrices do not mask their output's low bits
     bool reverse_matrices = false;   // the object matrices run last to first
     bool inverse_f_shift = false;    // the coefficient is raw / 2^(frac_bits + f_shift)
+    // What the object substream's lossless check folds: 0 the output of every matrix channel;
+    // 1 and 2 the output of the coded channels (shifted left by the matrix channel, or by its
+    // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
+    // coded samples before the matrices.
+    int fold_scope = 0;
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 

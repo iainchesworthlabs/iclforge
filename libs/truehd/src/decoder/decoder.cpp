@@ -690,9 +690,35 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         ICLFORGE_ZONE_SCOPED_N("truehd_output");
         std::int32_t* const pcm_base =
             pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
+        const std::uint32_t fold_before = state.interval_fold;
         state.interval_fold = kernels::assign_output(
             block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
             kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
+        if (index == kObjectSubstream && config.lab.fold_scope != 0) {
+            // Lab: fold other samples than the output of every matrix channel (ERRATA.md entry 69).
+            const int scope = config.lab.fold_scope;
+            const int first = scope >= 3 && scope <= 4 ? 0 : state.context.min_chan;
+            const int last = scope >= 3 && scope <= 4 ? state.context.min_chan - 1
+                                                       : state.context.max_chan;
+            const bool coded = scope >= 5;
+            const bool relative = scope == 2 || scope == 4 || scope == 6;
+            std::uint32_t fold = fold_before;
+            for (int i = 0; i < block; ++i) {
+                const std::int32_t* const row =
+                    (coded ? rows_base : matrix_base) + static_cast<std::ptrdiff_t>(i) * kRowStride;
+                for (int c = first; c <= last; ++c) {
+                    const std::int32_t source = row[c];
+                    const int shift = coded ? 0 : state.output_shift[static_cast<std::size_t>(c)];
+                    const std::int32_t output =
+                        shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source)
+                                                               << shift)
+                                   : source >> -shift;
+                    fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output),
+                                              static_cast<unsigned>(relative ? c - first : c));
+                }
+            }
+            state.interval_fold = fold;
+        }
     }
     state.interval_open = true;
     return {};

@@ -128,6 +128,19 @@ int main(int argc, char** argv) {
     DecoderLab shift = base;
     shift.inverse_f_shift = true;
     settings.push_back({"inverse f_shift", shift});
+    static const char* const kScopeNames[] = {
+        "",
+        "fold: coded channels, shift by matrix channel",
+        "fold: coded channels, shift by place",
+        "fold: channels below, shift by matrix channel",
+        "fold: channels below, shift by place",
+        "fold: coded samples before matrices, shift by matrix channel",
+        "fold: coded samples before matrices, shift by place"};
+    for (int scope = 1; scope <= 6; ++scope) {
+        DecoderLab folded = base;
+        folded.fold_scope = scope;
+        settings.push_back({kScopeNames[scope], folded});
+    }
     bool first = true;
     for (const Setting& setting : settings) {
         run(stream, setting.name, setting.lab, first);
