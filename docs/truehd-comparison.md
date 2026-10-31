@@ -57,13 +57,13 @@ and music at 24 bit are still [ERRATA question 92](https://github.com/iaincheswo
 | speech-10-48-24 | 48000 | 1 | 24 | 10 | - | 550,498 | 500,996 | 0.91 | - | yes |
 | speech-20-48-24 | 48000 | 2 | 24 | 10 | - | 565,948 | 501,772 | 0.887 | - | yes |
 | ref-51-48-24 | 48000 | 6 | 24 | 1.5 | - | 352,378 | 298,558 | 0.847 | - | yes |
-| ref-51-48-16 | 48000 | 6 | 16 | 1.5 | - | 352,378 | 298,558 | 0.847 | - | yes |
+| ref-51-48-16 | 48000 | 6 | 16 | 1.5 | - | 352,378 | 298,562 | 0.847 | - | yes |
 | ref-51-96-24 | 96000 | 6 | 24 | 1.5 | - | 1,210,068 | 1,159,498 | 0.958 | - | yes |
-| ref-51-192-24 | 192000 | 6 | 24 | 1.5 | - | 1,699,984 | 1,953,458 | 1.149 | - | yes |
+| ref-51-192-24 | 192000 | 6 | 24 | 1.5 | - | 1,699,984 | 1,953,462 | 1.149 | - | yes |
 | ref-71-48-24 | 48000 | 8 | 24 | 1.5 | - | 731,874 * | 469,266 | - | - | yes |
 | ref-71-96-24 | 96000 | 8 | 24 | 1.5 | - | 1,111,560 * | 1,449,674 | - | - | yes |
 
-Over the 22 rows with FFmpeg's stream: forge 12,386,386 bytes, FFmpeg 12,978,598, ratio 0.954.
+Over the 22 rows with FFmpeg's stream: forge 12,386,406 bytes, FFmpeg 12,978,598, ratio 0.954.
 Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.734.
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
