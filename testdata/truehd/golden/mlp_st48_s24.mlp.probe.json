@@ -1,0 +1,60 @@
+{
+  "container": null,
+  "schema": "iclforge.probe/1",
+  "truehd": {
+    "ac3_core_frames": 0,
+    "access_units": 300,
+    "average_bit_rate_bps": 1412992,
+    "bytes": 44156,
+    "channel_meaning": null,
+    "channels": [
+      2
+    ],
+    "codec": "mlp",
+    "duration_seconds": 0.25,
+    "evolution": {
+      "provisional": true,
+      "question": "libs/truehd/ERRATA.md, Atmos spec v3.6, question 22",
+      "regions": 0
+    },
+    "extra_data_units": 0,
+    "leading_bytes": 0,
+    "lossless": null,
+    "major_syncs": 19,
+    "object_substream": false,
+    "peak_data_rate": 3199,
+    "peak_data_rate_bps": 9597000,
+    "presentations": [
+      {
+        "channels": 2,
+        "layout": [],
+        "name": "2ch",
+        "substream": 0
+      }
+    ],
+    "rate_model": {
+      "declared_bps": 9597000,
+      "latency_limit_ms": 75.0,
+      "max_unit_rate_bps": 2438400,
+      "violations": 0,
+      "worst_latency_ms": 0.229
+    },
+    "restart_spacing": {
+      "major_syncs": 19,
+      "max_units": 16,
+      "min_units": 16
+    },
+    "sample_rate": 48000,
+    "samples_per_access_unit": 40,
+    "segment_failures": 0,
+    "segments_checked": 300,
+    "skipped_bytes": 0,
+    "substreams": 1,
+    "unreadable_units": 0,
+    "variable_rate": true,
+    "word_length": {
+      "group1_bits": 24,
+      "group2_bits": 0
+    }
+  }
+}

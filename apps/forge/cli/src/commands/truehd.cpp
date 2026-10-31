@@ -25,13 +25,13 @@
 #include "../support.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
-#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "probe_truehd.hpp"
 #include "truehd_evolution.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_structure.hpp"
@@ -41,6 +41,7 @@ namespace forge_cli::commands {
 namespace {
 
 namespace th = iclforge::truehd;
+namespace tp = iclforge::apps::truehd_probe;
 
 constexpr int kBitsPerSample = 24;
 constexpr std::size_t kWavHeaderBytes = 68;
@@ -566,91 +567,42 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
     // detail=frames and detail=blocks ask for per-unit lines this report does not have, and are
-    // refused; detail=evolution, structure and format are its own.
+    // refused; detail=evolution, structure, format and checks are its own.
     if (const int refused = check_options_applied(
-            meta, {"json=", "detail=evolution", "detail=structure", "detail=format"});
+            meta,
+            {"json=", "detail=evolution", "detail=structure", "detail=format", "detail=checks"});
         refused != kExitOk) {
         return refused;
     }
-    const auto info = th::probe_stream(stream);
-    if (!info) {
-        fmt::println(stderr, "error: {}: {}", in_path, error_text(info.error()));
-        return 1;
-    }
-
-    // Every unit's header, directory and, where the directory says so, the parity and CRC bytes of
-    // its segments.
-    th::ElementaryReader reader(stream);
-    std::uint64_t units = 0;
-    std::uint64_t major_syncs = 0;
-    std::uint64_t segments = 0;
-    std::uint64_t segment_failures = 0;
-    int substreams = 0;
-    std::uint64_t extra_data_units = 0;
-    // The different channel meanings (TH spec §14.1) the major syncs carry; the first is reported.
-    constexpr std::size_t kMaxMeanings = 256;
-    std::vector<th::ChannelMeaning> meanings;
     // detail=evolution, structure or format: the structure of the evolution frames, the
     // stream-level syntax facts the specification leaves open, or both (the owner's check on a
-    // disc's stream).
+    // disc's stream). detail=checks decodes the stream for the lossless check of every restart
+    // interval; structure and format decode it too.
     const bool want_evolution =
         meta.detail.has_value() && (*meta.detail == "evolution" || *meta.detail == "format");
     const bool want_structure =
         meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
+    const bool want_lossless = meta.detail.has_value() && *meta.detail == "checks";
     EvolutionSurvey evolution(want_evolution);
     StructureSurvey structure;
-    while (const auto unit = reader.next()) {
-        const auto parsed = th::parse_access_unit(*unit, substreams, true);
-        if (!parsed) {
-            continue;
-        }
-        evolution.add(units, *parsed);
+    tp::ReportOptions options;
+    options.lossless = want_lossless;
+    options.on_unit = [&](std::uint64_t index, const th::AccessUnit& unit) {
+        evolution.add(index, unit);
         if (want_structure) {
-            structure.add(units, *parsed);
+            structure.add(index, unit);
         }
-        ++units;
-        if (parsed->extra_data) {
-            ++extra_data_units;
-        }
-        if (parsed->major_sync) {
-            ++major_syncs;
-            substreams = parsed->major_sync->num_substreams;
-            if (parsed->major_sync->kind == th::StreamKind::kTrueHd &&
-                meanings.size() < kMaxMeanings &&
-                std::ranges::find(meanings, parsed->major_sync->channel_meaning) ==
-                    meanings.end()) {
-                meanings.push_back(parsed->major_sync->channel_meaning);
-            }
-        }
-        for (int i = 0; i < parsed->num_substreams; ++i) {
-            const auto& entry = parsed->entries[static_cast<std::size_t>(i)];
-            const auto segment = parsed->segments[static_cast<std::size_t>(i)];
-            if (!entry.crc_present || segment.size() < 3) {
-                continue;
-            }
-            ++segments;
-            const auto payload = segment.first(segment.size() - 2);
-            if (th::substream_parity(payload) !=
-                    std::to_integer<std::uint8_t>(segment[segment.size() - 2]) ||
-                th::substream_crc(payload) !=
-                    std::to_integer<std::uint8_t>(segment[segment.size() - 1])) {
-                ++segment_failures;
-            }
-        }
+    };
+    const auto report = tp::build_report(stream, options);
+    if (!report) {
+        fmt::println(stderr, "error: {}: {}", in_path, error_text(report.error()));
+        return 1;
     }
     if (want_structure) {
         structure.decode(stream);
     }
-    const std::uint64_t unreadable = info->access_units > units ? info->access_units - units : 0;
-    const std::size_t lost_bytes = reader.skipped_bytes() - reader.leading_bytes();
-    const bool damaged = segment_failures != 0 || unreadable != 0 || lost_bytes != 0;
+    const th::MajorSync& major_sync = report->info.major_sync;
 
-    const th::MajorSync& major_sync = info->major_sync;
-    std::string channels_text;
-    for (int i = 0; i < info->num_substreams; ++i) {
-        channels_text +=
-            fmt::format("{}{}", i == 0 ? "" : ", ", info->channels[static_cast<std::size_t>(i)]);
-    }
     if (meta.json) {
         iclforge::cli::platform::set_stdio_binary();
         JsonWriter json{stdout};
@@ -666,46 +618,20 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             json.value_null();
         }
         json.key("truehd");
-        json.begin_object();
-        json.member("codec", major_sync.kind == th::StreamKind::kTrueHd ? "truehd" : "mlp");
-        json.member("sample_rate", static_cast<std::uint64_t>(info->sample_rate));
-        json.member("substreams", static_cast<std::uint64_t>(info->num_substreams));
-        json.key("channels");
-        json.begin_array();
-        for (int i = 0; i < info->num_substreams; ++i) {
-            json.value(static_cast<std::uint64_t>(info->channels[static_cast<std::size_t>(i)]));
-        }
-        json.end_array();
-        json.member("access_units", static_cast<std::uint64_t>(info->access_units));
-        json.member("samples_per_access_unit",
-                    static_cast<std::uint64_t>(info->samples_per_access_unit));
-        json.member("variable_rate", major_sync.is_vbr);
-        json.member("peak_data_rate", static_cast<std::uint64_t>(major_sync.peak_data_rate));
-        json.member("peak_data_rate_bps", major_sync.peak_data_rate_bps());
-        json.member("object_substream", info->has_object_substream);
-        // TH spec §14.1; an MLP stream's bytes after substream_info are not described.
-        json.key("channel_meaning");
-        if (major_sync.kind == th::StreamKind::kTrueHd) {
-            write_channel_meaning_json(json, major_sync.channel_meaning, info->num_substreams,
-                                       meanings.size());
-        } else {
-            json.value_null();
-        }
-        json.member("extra_data_units", extra_data_units);
-        json.member("ac3_core_frames", static_cast<std::uint64_t>(ac3_core_frames));
-        json.member("major_syncs", major_syncs);
-        json.member("segments_checked", segments);
-        json.member("segment_failures", segment_failures);
-        json.member("unreadable_units", unreadable);
-        json.member("skipped_bytes", static_cast<std::uint64_t>(lost_bytes));
-        json.member("leading_bytes", static_cast<std::uint64_t>(reader.leading_bytes()));
-        json.key("evolution");
-        evolution.write_json(json);
-        if (want_structure) {
-            json.key("structure");
-            structure.write_json(json);
-        }
-        json.end_object();
+        tp::JsonExtras extras;
+        extras.channel_meaning = [&](iclforge::apps::JsonSink& sink) {
+            write_channel_meaning_json(sink, major_sync.channel_meaning, report->info.num_substreams,
+                                       report->meanings.size());
+        };
+        extras.tail = [&](iclforge::apps::JsonSink& sink) {
+            sink.key("evolution");
+            evolution.write_json(sink);
+            if (want_structure) {
+                sink.key("structure");
+                structure.write_json(sink);
+            }
+        };
+        tp::write_json(json, *report, ac3_core_frames, extras);
         json.end_object();
         json.finish();
     } else {
@@ -713,47 +639,29 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         if (container_text) {
             container_text();
         }
-        fmt::println("{:<16}{}", "codec", codec_name(major_sync));
-        fmt::println("{:<16}{} ({} sample(s) each), {} major sync(s)", "access units",
-                     info->access_units, info->samples_per_access_unit, major_syncs);
-        fmt::println("{:<16}{} Hz", "sample rate", info->sample_rate);
-        fmt::println("{:<16}{} ({} channel(s) in substream order)", "substreams",
-                     info->num_substreams, channels_text);
-        fmt::println("{:<16}{}, peak data rate {} bit/s (field {})", "rate",
-                     major_sync.is_vbr ? "variable" : "constant", major_sync.peak_data_rate_bps(),
-                     major_sync.peak_data_rate);
+        const auto print = [](const std::vector<tp::TextLine>& lines) {
+            for (const tp::TextLine& line : lines) {
+                fmt::println("{:<16}{}", line.label, line.text);
+            }
+        };
+        print(tp::text_head(*report));
         if (major_sync.kind == th::StreamKind::kTrueHd) {
-            print_channel_meaning_text(major_sync.channel_meaning, info->num_substreams,
-                                       meanings.size());
+            print_channel_meaning_text(major_sync.channel_meaning, report->info.num_substreams,
+                                       report->meanings.size());
         }
-        if (info->has_object_substream) {
-            fmt::println("{:<16}present (read as a 16-channel substream, not rendered)",
-                         "object substream");
-        }
-        if (extra_data_units != 0) {
-            fmt::println("{:<16}{} access unit(s) carry extra data (carried, not read)",
-                         "extra data", extra_data_units);
-        }
-        if (ac3_core_frames != 0) {
-            fmt::println("{:<16}{} AC-3 frame(s) between the access units, set aside", "ac3 core",
-                         ac3_core_frames);
-        }
-        fmt::println(
-            "{:<16}{} of {} segment(s) pass their parity and CRC; {} unreadable unit(s); {} "
-            "skipped byte(s)",
-            "checks", segments - segment_failures, segments, unreadable, lost_bytes);
-        if (reader.leading_bytes() != 0) {
+        print(tp::text_tail(*report, ac3_core_frames));
+        if (report->leading_bytes != 0) {
             fmt::println(stderr,
                          "warning: {}: {} byte(s) ahead of the first access unit are not part of "
                          "the stream and are skipped",
-                         in_path, reader.leading_bytes());
+                         in_path, report->leading_bytes);
         }
         evolution.print_text();
         if (want_structure) {
             structure.print_text();
         }
     }
-    return damaged ? 1 : 0;
+    return report->damaged() ? 1 : 0;
 }
 
 }  // namespace forge_cli::commands

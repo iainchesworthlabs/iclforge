@@ -2421,7 +2421,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
         // something else.
         const bool reads_truehd = command == "decode" || command == "levels" ||
-                                  command == "loudness" || command == "qc";
+                                  command == "loudness" || command == "qc" ||
+                                  command == "transcode";
         if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
@@ -3443,10 +3444,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "detail") {
-            if (value != "frames" && value != "blocks" && value != "evolution" &&
+            if (value != "frames" && value != "blocks" && value != "evolution" && value != "checks" &&
                 value != "structure" && value != "format") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure or format "
+                             "error: detail must be frames, blocks, evolution, structure, format or checks "
                              "(got '{}')",
                              token);
                 return false;

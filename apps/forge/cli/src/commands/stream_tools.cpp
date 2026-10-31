@@ -1262,8 +1262,9 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
         bitrate = to_ac4 ? 192 : 448;
     }
     if (is_truehd_stream(bytes)) {
-        return refuse_truehd("transcode", in_path);
+        return run_transcode_truehd(bytes, in_path, out_path, bitrate, layout, meta, *target_codec);
     }
+    warn_truehd_options_unused(meta, in_path);
     if (is_ac4_stream(bytes)) {
         return transcode_from_ac4(in_path, out_path, bitrate, layout, meta, *target_codec, bytes);
     }

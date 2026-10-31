@@ -778,10 +778,11 @@ void print_probe_topic() {
     fmt::println("       each presentation (id, name, language, level, channels, substreams)");
     fmt::println("       and the selected one's dialnorm, loudness, DRC modes, dialogue");
     fmt::println("       enhancement and stereo downmix values.");
-    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
+    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the duration,");
+    fmt::println("       the rate and the bit rate it measures (TH spec section 18), the restart spacing,");
     fmt::println("       the substreams and their channels, and how many segments pass their");
     fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
-    fmt::println("       it has no such dump, and detail=evolution, structure and format are its own.");
+    fmt::println("       it has no such dump, and detail=evolution, structure, format and checks are its own.");
 }
 
 void print_mkv_topic() {
@@ -1141,6 +1142,8 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
         fmt::println("                    headers, a decode check, what follows each last block");
         fmt::println("  detail=format     both; metadata only, no content");
+        fmt::println("  detail=checks     TrueHD and MLP: decode the stream for the lossless check of every");
+        fmt::println("                    restart interval (the cost of a decode); exit 1 when one fails");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");

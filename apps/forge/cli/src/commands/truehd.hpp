@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "../support.hpp"
+#include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "probe_truehd.hpp"
 #include "truehd_meaning.hpp"
 
 namespace iclforge::apps {
@@ -119,18 +121,8 @@ struct PresentationLoudness {
     std::optional<double> true_peak_dbtp = std::nullopt;
 };
 
-// TH spec §18: the stream must be sendable within the declared peak data rate and 75 ms. The
-// declared rate is MajorSync::peak_data_rate_bps(), bits per second as TH spec v3.9 section 4.4
-// gives it (ERRATA.md question 12), and the model is the encoder's: a unit starts to arrive when its
-// slot opens, when the previous unit has arrived and one unit duration after the previous started,
-// and takes bytes x 8 / rate to arrive.
-struct RateReport {
-    std::uint64_t declared_bps = 0;
-    std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
-    double worst_latency_ms = 0.0;        // from a unit's slot opening to its last byte
-    double latency_limit_ms = 75.0;
-    std::uint64_t violations = 0;  // units whose latency is over the limit
-};
+// TH spec §18's data rate model and its report: apps/shared/media/src/probe_truehd.hpp.
+using RateReport = iclforge::apps::truehd_probe::RateReport;
 
 struct TruehdMeasurement {
     std::vector<PresentationLoudness> presentations;        // as asked, in the order asked
@@ -190,6 +182,15 @@ int run_cut_truehd(std::span<const std::byte> stream, std::string_view in_path,
                    std::string_view duration_seconds, const Options& meta);
 int run_cat_truehd(std::string_view out_path, std::span<const std::string_view> in_paths,
                    const Options& meta);
+
+// `transcode` of a TrueHD or MLP stream to AC-3 or E-AC-3 (truehd_transcode.cpp): the decode of
+// the presentation truehd-presentation= names, encoded as the target codec's WAV encode does, so
+// that layout, bitrate and metadata options mean what they mean there. Refused for AC-4. The stream's
+// dialogue norm is not carried (provisional, libs/truehd/ERRATA.md questions 51 to 55).
+int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_path,
+                         std::string_view out_path, std::uint32_t bitrate,
+                         std::string_view layout, const Options& meta,
+                         iclforge::ac3::plan::Codec target);
 
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.

@@ -460,7 +460,7 @@ constexpr std::array<Command, 49> kCommands{{
      "track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
-    {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
+    {"transcode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
      "decode and re-encode, carrying dialnorm, compr and the mix metadata across - the "
      "DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or "
      "E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the "
