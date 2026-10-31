@@ -93,6 +93,8 @@ struct SubstreamState {
     // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds
     // anything.
     std::uint32_t interval_fold = 0;
+    // Lab: the fold of each matrix channel alone, after the matrices (0-11) and before (12-23).
+    std::array<std::uint32_t, 24> column_fold{};
     bool interval_open = false;
     // TH spec §17.2, §17.3: the running state of the noise generator, loaded from the restart
     // header and carried across the blocks of the restart interval. Generator 0 steps it a sample;
@@ -317,6 +319,10 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             counters.object_check_stored[counters.object_checks_kept] = header->lossless_check;
             counters.object_check_folded[counters.object_checks_kept] =
                 lossless_check_of(state.interval_fold);
+            for (std::size_t col = 0; col < state.column_fold.size(); ++col) {
+                counters.object_column_bytes[counters.object_checks_kept][col] =
+                    lossless_check_of(state.column_fold[col]);
+            }
             ++counters.object_checks_kept;
         }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
@@ -694,6 +700,26 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         state.interval_fold = kernels::assign_output(
             block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
             kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
+        if (index == kObjectSubstream && counters.object_checks_kept < DecoderCounters::kObjectChecksKept) {
+            for (int i = 0; i < block; ++i) {
+                const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
+                for (int c = 0; c < 12 && c < out_channels; ++c) {
+                    const auto shift = state.output_shift[static_cast<std::size_t>(c)];
+                    const auto apply = [&](std::int32_t sample) {
+                        return static_cast<std::uint32_t>(
+                            shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(sample)
+                                                                   << shift)
+                                       : sample >> -shift);
+                    };
+                    state.column_fold[static_cast<std::size_t>(c)] = lossless_fold_step(
+                        state.column_fold[static_cast<std::size_t>(c)], apply(matrix_base[at + c]),
+                        static_cast<unsigned>(c));
+                    state.column_fold[static_cast<std::size_t>(12 + c)] = lossless_fold_step(
+                        state.column_fold[static_cast<std::size_t>(12 + c)], apply(rows_base[at + c]),
+                        static_cast<unsigned>(c));
+                }
+            }
+        }
         if (index == kObjectSubstream && config.lab.fold_scope != 0) {
             // Lab: fold other samples than the output of every matrix channel (ERRATA.md entry 69).
             const int scope = config.lab.fold_scope;

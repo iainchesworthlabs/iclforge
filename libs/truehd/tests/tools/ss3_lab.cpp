@@ -8,6 +8,8 @@
 //
 // Prints counts and error texts only: no sample leaves the decoder.
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -38,6 +40,65 @@ void print_stats(const DecoderCounters& c, int channels) {
                     c.object_stats.coded_min[i], c.object_stats.coded_max[i],
                     c.object_stats.coded_changes[i], c.object_stats.out_min[i],
                     c.object_stats.out_max[i], c.object_stats.out_changes[i]);
+    }
+}
+
+// Which sets of per-channel folds XOR to the stored check byte: every subset of the 24 columns
+// (the matrix channels after the matrices, then before them) is tried, and the five that match most
+// of the kept intervals are printed. The fold is linear, so a check that covers some channels is
+// the XOR of those channels' columns.
+void print_subsets(const DecoderCounters& c) {
+    constexpr std::size_t kColumns = DecoderCounters::kObjectColumns;
+    const std::size_t n = c.object_checks_kept;
+    if (n == 0) {
+        return;
+    }
+    struct Best {
+        std::size_t matches = 0;
+        std::uint32_t subset = 0;
+    };
+    std::array<Best, 5> best{};
+    std::array<std::array<std::uint8_t, DecoderCounters::kObjectChecksKept>, kColumns + 1> sums{};
+    for (std::size_t i = 0; i < n; ++i) {
+        sums[0][i] = 0;
+    }
+    const auto visit = [&](auto&& self, std::size_t column, std::uint32_t subset) -> void {
+        if (column == kColumns) {
+            std::size_t matches = 0;
+            for (std::size_t i = 0; i < n; ++i) {
+                matches += sums[column][i] == c.object_check_stored[i] ? 1U : 0U;
+            }
+            if (matches > best.back().matches) {
+                best.back() = {matches, subset};
+                std::sort(best.begin(), best.end(),
+                          [](const Best& a, const Best& b) { return a.matches > b.matches; });
+            }
+            return;
+        }
+        sums[column + 1] = sums[column];
+        self(self, column + 1, subset);
+        for (std::size_t i = 0; i < n; ++i) {
+            sums[column + 1][i] = static_cast<std::uint8_t>(sums[column][i] ^
+                                                           c.object_column_bytes[i][column]);
+        }
+        self(self, column + 1, subset | (1U << column));
+    };
+    visit(visit, 0, 0);
+    std::printf("    subsets of per-channel folds that XOR to the stored byte (of %zu intervals):\n", n);
+    for (const Best& b : best) {
+        std::printf("      %zu matched: out", b.matches);
+        for (std::size_t col = 0; col < 12; ++col) {
+            if ((b.subset >> col) & 1U) {
+                std::printf(" %zu", col);
+            }
+        }
+        std::printf("  before");
+        for (std::size_t col = 12; col < kColumns; ++col) {
+            if ((b.subset >> col) & 1U) {
+                std::printf(" %zu", col - 12);
+            }
+        }
+        std::printf("\n");
     }
 }
 
@@ -92,6 +153,7 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
     std::printf("\n");
     if (stats) {
         print_stats(c, 12);
+        print_subsets(c);
     }
 }
 

@@ -140,6 +140,10 @@ struct DecoderCounters {
     std::array<std::uint8_t, kObjectChecksKept> object_check_stored{};
     std::array<std::uint8_t, kObjectChecksKept> object_check_folded{};
     std::size_t object_checks_kept = 0;
+    // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
+    // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
+    static constexpr std::size_t kObjectColumns = 24;
+    std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
     // The first three intervals of the object substream, by matrix channel: the smallest and the
     // largest value and the number of samples that differ from the one before, in the rows as
     // decoded (before the matrices) and in the rows as output (after them). Counts and ranges only.
