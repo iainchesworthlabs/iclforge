@@ -307,8 +307,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     substream has a 2 channel presentation whatever its channel count). **Built, provisional, no oracle until the DEE set:** the library
     writes and reads the raw numbers, widths and ranges as §12.5 and §14.1 give them, rejecting a value outside its range by field name;
     `probe` shows each as n and as -n dBFS; `normalize` writes round(-LKFS) clamped to 1..31 for every presentation the stream has (the
-    mapping of ATSC A/85 §8 that E-AC-3's `normalize` uses, and the range the 5 bit fields hold, so no value relies on 32 to 63 and none is
-    0). **Recommendation:** as built; the DEE set is two encodes of one programme, one with dialnorm 0 and one with another value for each
+    mapping of ATSC A/85 §8 that E-AC-3's `normalize` uses, and the range the 5 bit fields hold, none is 0), and 6 more in the 2 channel
+    field, as DEE writes it (confirmed 2026-10-31, below); `qc` takes the 6 off before it compares. **Recommendation:** as built; the DEE set is two encodes of one programme, one with dialnorm 0 and one with another value for each
     presentation, and a read of the field, which settles (a) and (b); (c) and (d) need a statement from the owner or a decode of a stream
     with a known dialogue norm by a decoder that applies it.
     **Measured (2026-10-31; the owner allowed it for known inputs, question 100)** on the DEE legs given a dialogue norm N (`skip:dialnorm=-N`: N = 1, 5, 10, 17, 20,
@@ -345,8 +345,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     should set it too.
     **Measured (2026-10-31):** DEE sets `twoch_control_enabled` in every stream and `sixch_` and `eightch_control_enabled` only in a stream of the 2 channel presentation alone; it writes the
     6 and 8 channel dialogue norms of a multichannel stream with their bit clear, so the bit does not say that a dialogue norm is present. The discs: the 2 channel bit is set in *Dune: Part
-    Two* (three streams) and the Zimmer disc and clear in *Blade Runner 2049* and *The Two Towers*; the 6 and 8 channel bits are clear. **Recommendation:** `normalize` sets the 2 channel bit
-    (DEE always does) and leaves the other two; not changed until the owner confirms.
+    Two* (three streams) and the Zimmer disc and clear in *Blade Runner 2049* and *The Two Towers*; the 6 and 8 channel bits are clear. **Done on the owner's word of 2026-10-31:** `normalize` sets the 2 channel bit
+    (DEE always does), writes that field as the norm plus 6, and leaves the other two bits; tests pin both and fail when either is removed.
 55. **The DRC start-up gains (§12.3, §14.1).** `heavy_drc_start_up_gain` is signed, 6 bits, and `drc_start_up_gain` signed, 7 bits; no unit, and
     "start-up" is not explained: the gain a decoder applies before the first DRC word of the directory (§12.1) or the restart header (§12.2)
     arrives, or the gain at the start of each restart interval, or the reference level. Whether the most negative value means "off" is not

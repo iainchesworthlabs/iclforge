@@ -33,7 +33,8 @@ See [README.md](README.md) for the project overview and
   decodes each presentation the stream has (2, 6 and 8 channels for one, two and three substreams), measures its integrated loudness with the
   BS.1770-5 Annex 3 weights `forge loudness` uses, maps it to a dialogue norm the way E-AC-3's `normalize` does (ATSC A/85 §8: the loudness
   negated and rounded, clamped to 1 to 31, which is the range the 5 bit fields hold) and writes it into that presentation's field of every
-  major sync. **No gain is applied: the stream is lossless, so only the field changes**; the mix level, source format, control-enabled bits
+  major sync, the 2 channel field being the norm plus 6 with its control-enabled bit set, as DEE writes them. **No gain is applied: the
+  stream is lossless, so only the fields change**; the mix level, source format, the 6 and 8 channel control-enabled bits
   and DRC start-up gains are left as they were, and a presentation whose control-enabled bit is off is said to be one a decoder may not apply.
   Nothing above the gate is exit 5, a damaged stream exit 2. The audit's T4. **Provisional, with no oracle until the DEE set**
   (`libs/truehd/ERRATA.md`, questions 51 and 54).

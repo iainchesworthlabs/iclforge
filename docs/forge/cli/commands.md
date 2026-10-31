@@ -1066,8 +1066,9 @@ and, for an AC-3 or E-AC-3 stream, any `truehd-` option. The same provisional ma
 for two, 8 for three), measures its integrated loudness with the BS.1770-5 Annex 3 weights `loudness` uses (from the speakers the major sync
 names), maps it to a dialogue norm as E-AC-3's `normalize` maps it (ATSC A/85 section 8: the loudness negated and rounded, from 1 to 31, the
 range the 5 bit fields hold, so a quiet programme is 31 and no field is written as 0), and writes it into that presentation's field of every
-major sync, as `metadata` does. **No gain is applied to the audio: the stream is lossless, so only the field changes**, and the mix level,
-source format, control-enabled bits and DRC start-up gains are left as they were (E-AC-3's `normalize` leaves its mixing metadata alone
+major sync, as `metadata` does, except that the 2 channel field gets the norm plus 6 and its control-enabled bit is set, as DEE writes
+them (ERRATA question 51 and 54). **No gain is applied to the audio: the stream is lossless, so only the fields change**, and the mix level,
+source format, the 6 and 8 channel control-enabled bits and DRC start-up gains are left as they were (E-AC-3's `normalize` leaves its mixing metadata alone
 too). The status lines give each presentation's loudness and its dialogue norm before and after, and say for each whose control-enabled bit
 is off that a decoder may not apply the field (`metadata ... truehd-control-6ch=on` sets it; whether any decoder reads the bit that way is
 open). A stream with nothing above the -70 LKFS gate in some presentation is exit status 5 and writes nothing, a damaged stream is exit

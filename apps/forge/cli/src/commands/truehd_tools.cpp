@@ -213,6 +213,15 @@ bool control_of(const th::ChannelMeaning& meaning, MeaningPresentation presentat
     return meaning.eightch_control_enabled;
 }
 
+// What the 2 channel field holds above the programme's dialogue norm: DEE writes N + 6 there and
+// N in the 6 and 8 channel fields, in every leg of a known N (ERRATA.md question 51), and the six
+// disc streams agree.
+constexpr int kTwochDialogueNormOffset = 6;
+
+int dialogue_norm_offset(MeaningPresentation presentation) {
+    return presentation == MeaningPresentation::k2ch ? kTwochDialogueNormOffset : 0;
+}
+
 int dialogue_norm_field(const th::ChannelMeaning& meaning, MeaningPresentation presentation) {
     switch (presentation) {
         case MeaningPresentation::k2ch:
@@ -274,9 +283,14 @@ int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_pat
         // ATSC A/85 section 8, as E-AC-3's normalize takes it: dialnorm states where dialogue
         // sits relative to full scale, and the anchor for a programme with no separate dialogue
         // measurement is its own integrated loudness. The same mapping, clamped to 1..31, which
-        // the 5 bit fields hold and the 6 bit one never needs (ERRATA.md question 51).
+        // the 5 bit fields hold. The 2 channel field is 6 above it (6 bits, so at most 37), and its
+        // control bit is set, as DEE writes both (ERRATA.md questions 51 and 54).
         dialogue_norm_of(edit, loudness.presentation) =
-            iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs);
+            iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs) +
+            dialogue_norm_offset(loudness.presentation);
+        if (loudness.presentation == MeaningPresentation::k2ch) {
+            edit.twoch_control_enabled = true;
+        }
     }
     const auto summary = th::edit_channel_meaning(bytes, edit);
     if (!summary) {
@@ -292,16 +306,21 @@ int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_pat
         const char* name = presentation_name(loudness.presentation);
         status_println(status, "  {}  measured {:+.2f} LKFS (BS.1770-5 Annex 3 weights, {})", name,
                        *loudness.integrated_lkfs, loudness.layout);
-        status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8)", name,
+        status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8{})", name,
                        dialogue_norm_field(summary->before, loudness.presentation),
-                       dialogue_norm_field(summary->after, loudness.presentation));
+                       dialogue_norm_field(summary->after, loudness.presentation),
+                       loudness.presentation == MeaningPresentation::k2ch
+                           ? fmt::format(", plus {} in the 2 channel field, control bit on, as DEE "
+                                         "writes it",
+                                         kTwochDialogueNormOffset)
+                           : std::string{});
     }
     // What the changes in the major sync are, field by field, is above; what is left alone is said
     // once.
     status_println(status,
                    "  no gain is applied (the stream is lossless): only the dialogue norm fields "
-                   "change; the mix level, source format, control bits and DRC start-up gains are "
-                   "as they were");
+                   "and the 2 channel control bit change; the mix level, source format, the 6 and "
+                   "8 channel control bits and DRC start-up gains are as they were");
     for (const PresentationLoudness& loudness : measured->presentations) {
         if (!control_of(summary->after, loudness.presentation)) {
             status_println(
@@ -461,7 +480,9 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
         // The stream's own claim, as the major sync has it. Provisional: the unit is the
         // specification's for the 6 and 8 channel fields and assumed for the 2 channel one, and
         // whether a decoder applies the field at all depends on the control bit (ERRATA.md 51, 54).
-        const int claimed = dialogue_norm_field(meaning, loudness.presentation);
+        const int claimed =
+            dialogue_norm_field(meaning, loudness.presentation) -
+            dialogue_norm_offset(loudness.presentation);
         const bool has_meaning = sync.kind == th::StreamKind::kTrueHd;
         if (has_meaning) {
             fmt::println(
@@ -475,8 +496,13 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
             const double claimed_lkfs = 0.0 - static_cast<double>(claimed);
             const int implied = iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs);
             fmt::println("  dialnorm check:");
-            fmt::println("    claimed              {:>+8.2f} LKFS  (from dialogue norm {}{})",
+            fmt::println("    claimed              {:>+8.2f} LKFS  (from dialogue norm {}{}{})",
                          claimed_lkfs, claimed,
+                         dialogue_norm_offset(loudness.presentation) != 0
+                             ? fmt::format(", the field's {} less {}",
+                                           dialogue_norm_field(meaning, loudness.presentation),
+                                           dialogue_norm_offset(loudness.presentation))
+                             : std::string{},
                          control_of(meaning, loudness.presentation)
                              ? ""
                              : "; the control-enabled bit is off, so a decoder may not apply it");

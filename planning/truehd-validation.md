@@ -166,8 +166,8 @@ Open:
 1. **The 96 kHz and stepped-tone legs (46 UNEXPLAINED).** The 96 kHz impulse decodes to a dense pattern at the source's amplitudes, in forge and FFmpeg alike; the fold of the lossless check cannot tell a
    misplaced sample from a right one. **Recommendation:** decode `D:/ac3bld/dee-gold/streams/thd-last-2ch-impulse-96k24/dee.mlp` with Dolby's own decoder or player if there is one, and tell me
    what it gives; until then the legs stay UNEXPLAINED and forge does not change.
-2. **`normalize` for TrueHD.** DEE writes the 2 channel dialogue norm 6 above the multichannel one and sets only the 2 channel control bit. **Recommendation:** make `normalize` do the same (2 channel
-   field N + 6, at most 63, control bit on; 6 and 8 channel fields N). It is a change to a command the owner asked to leave as built; not done.
+2. **`normalize` for TrueHD (done 2026-10-31, on the owner's yes).** DEE writes the 2 channel dialogue norm 6 above the multichannel one and sets only the 2 channel control bit; `normalize` now
+   does the same (2 channel field N + 6, control bit on; 6 and 8 channel fields N) and `qc` takes the 6 off before it compares. Both are held by tests that fail when either is taken out.
 3. **TH-5 and TH-18 have no DEE evidence and cannot get any** (DEE has no option for either). **Recommendation:** accept the hand-built streams in FFmpeg's decode and v3.7 and v3.9 as the evidence and
    take both marks off, or leave them; I have left them.
 4. **Entries 14, 32 to 34, 48, 50 (evidence exists).** **Recommendation:** take the marks off with the numbers above; left for you because the rule you gave named only TH-5, 6, 18 and 19.
