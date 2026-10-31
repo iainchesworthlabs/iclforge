@@ -81,6 +81,9 @@ Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; st
   one restart, or the matrix file DEE builds and deletes (`matrix_info_mx.mx`). Park it as WP1b.
   Found on the way and fixed (ERRATA 66): the AC-3 core frames between the units of a Blu-ray track, which lost 80% of an excerpt for the bare
   stream `forge demux` writes, and a matrix output channel above `max_matrix_chan` (ERRATA 65).
+- Step 4, object substream structure (2026-10-31): `EncoderConfig::object_layout = ObjectLayout::kBedMatrices` writes substream 3 with `min_chan` 8, the channels from 8 up
+  coded and primitive matrices (noise, one LSB bypass, a fixed bed render) that rebuild 9 to 16 objects, decoded sample for sample by the library and the Python reference (ERRATA 70).
+  Left: moving objects (the extension A2 is not written), a rendering that follows the objects' metadata, the downmix presentations with it, `forge truehd-atmos` on the new layout.
 - Step 2: `forge decode truehd-presentation=all` writes the full channel set; `adm_out` with another presentation is the bed as DirectSpeakers.
 - Step 3: `objects_dir`, `adm_out` and `truehd-render=` (ERRATA 61, questions 61, 62). The render of a stream's objects equals its bed
   when the stream was written by `truehd-atmos`; on a disc the same comparison (`truehd-presentation=8ch` against `truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs`)

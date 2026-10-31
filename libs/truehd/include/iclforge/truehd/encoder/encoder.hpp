@@ -104,6 +104,21 @@ struct ExperimentalTools {
 // writes the framing of TH spec §16.1 and §16.4 around the bytes and never looks inside them.
 using ExtraDataSource = std::function<std::vector<std::byte>(std::uint64_t access_unit_index)>;
 
+// What substream 3 codes (TH spec §15.3; ERRATA.md entries 63 and 70).
+enum class ObjectLayout : std::uint8_t {
+    // The channels of substream 3 are coded as they are, with no matrix and no prediction from the
+    // bed, and `min_chan` 0. The bed is whatever the caller gives. This is not the structure of the
+    // owner's streams.
+    kIndependent,
+    // The structure of the owner's streams: substream 3 codes only the channels from 8 up
+    // (`min_chan` 8), and its primitive matrices rebuild all the output channels from the 7.1 bed
+    // of substreams 0 to 2 and those coded channels. The 7.1 bed is therefore not an input: it is
+    // the first eight objects with the rest mixed in by a fixed render, and the PCM given to
+    // encode() is the `object_channels` objects alone. `object_channels` is 9 to 16 and the
+    // downmix is DownmixMode::kNone.
+    kBedMatrices,
+};
+
 struct EncoderConfig {
     StreamKind kind = StreamKind::kTrueHd;  // only kTrueHd is written
     std::uint32_t sample_rate = 48000;
@@ -143,13 +158,25 @@ struct EncoderConfig {
     // sync 0x31EC and the 16-channel extension of the major sync (§14.2). 0 writes none. The PCM
     // given to encode() then has `channels` + `object_channels` values a frame: the 7.1 bed first
     // (`channels` must be 8, substreams 0 to 2, 48 kHz only, §15.2, §20.2), then the object
-    // channels, which are coded as substream 3 on their own, with no matrix or prediction from the
-    // bed. A decode of the best presentation gives the bed; Presentation::kAll gives the object
-    // channels. The programme they carry (which are beds, which objects) is the object audio
-    // metadata's, written by the caller in the extra data (`extra_data`); this only says in the
-    // major sync what `object_meaning` says. PROVISIONAL, no oracle but this library's decoder and
-    // the Python reference (ERRATA.md entry 63; questions 61 to 63).
+    // channels, which (ObjectLayout::kIndependent) are coded as substream 3 on their own, with no
+    // matrix or prediction from the bed; `object_layout` says what kBedMatrices changes. A decode
+    // of the best presentation gives the bed; Presentation::kAll gives the object channels. The
+    // programme they carry (which are beds, which objects) is the object audio metadata's, written
+    // by the caller in the extra data (`extra_data`); this only says in the major sync what
+    // `object_meaning` says. PROVISIONAL, no oracle but this library's decoder and the Python
+    // reference (ERRATA.md entry 63; questions 61 to 63).
     int object_channels = 0;
+    // How substream 3 relates to the bed (ERRATA.md entries 63 and 70).
+    ObjectLayout object_layout = ObjectLayout::kIndependent;
+    // kBedMatrices only: the noise shift (0 to 15; 0 draws none, 1 is what the owner's silent
+    // streams have) of the matrices that mix the objects into the bed. The matrices draw generator
+    // 1's noise, which the encoder reproduces to the bit.
+    int object_noise_shift = 0;
+    // kBedMatrices only: one matrix with the LSB bypass (object_channels - 1, 2.0 on itself), which
+    // sends one bit a sample for the low bit the doubling loses. Needs a quantiser step of 0, so
+    // the encoder leaves the bits below the output shift's reach in the samples (a 16 bit source
+    // loses the one bit of saving it would otherwise have).
+    bool object_lsb_bypass = false;
     // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
     // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
     // how the owner's discs count them. Used only with object_channels.
@@ -187,6 +214,9 @@ struct EncoderStats {
     // Restart intervals whose downmix had its gains lowered, or dropped, to stay within 24 bits.
     std::uint64_t downmix_reduced_intervals = 0;
     std::uint64_t verified_units = 0;
+    // ObjectLayout::kBedMatrices: restart intervals whose mix of the objects into the bed had its
+    // gain lowered, or dropped, to keep the bed within 24 bits.
+    std::uint64_t object_mix_reduced_intervals = 0;
 };
 
 class ICLFORGE_TRUEHD_EXPORT Encoder {

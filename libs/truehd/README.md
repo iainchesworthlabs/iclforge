@@ -65,6 +65,11 @@ does not parse or write the object audio metadata (it links `iclforge::base` onl
 (`forge truehd-atmos`, `forge decode`). Provisional: ERRATA.md entries 60 to 64, and nothing outside this repository reads
 substream 3.
 
+`EncoderConfig::object_layout = ObjectLayout::kBedMatrices` writes substream 3 the way the owner's discs have it (ERRATA.md entry 70):
+`min_chan` 8, only the channels from 8 up coded, and primitive matrices (with matrix noise and one LSB bypass matrix, as options) that
+rebuild all `object_channels` (9 to 16) from the bed rows and those channels. The 7.1 bed is then made from the objects by a fixed render,
+so `encode()` takes the objects alone. Static within a restart interval; no moving objects, no downmix presentations.
+
 ## Checks
 
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in

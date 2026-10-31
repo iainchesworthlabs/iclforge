@@ -155,9 +155,11 @@ them), no MLP, and no block data CRC; the evolution payload it only frames, from
 `EncoderConfig::object_channels` it also writes an Atmos stream: the 7.1 bed in substreams 0 to 2 and 1 to 16 object channels in
 substream 3 (restart sync `0x31EC`, no matrix, FIR prediction), with the 16-channel extension in the major sync. The bed's
 substreams are those of the 7.1 stream of the bed alone, byte for byte, so FFmpeg's strict decode (which leaves substream 3 alone)
-returns the bed. `forge truehd-atmos` is the command that supplies the metadata. Provisional (entry 63): the stream codes the bed
-and the objects separately, where the owner's discs most likely predict one from the other, and no decoder outside this repository
-reads substream 3.
+returns the bed. `forge truehd-atmos` is the command that supplies the metadata. Provisional (entry 63): this stream codes the bed
+and the objects separately, where the owner's discs predict one from the other; `EncoderConfig::object_layout = ObjectLayout::kBedMatrices`
+writes that structure (entry 70: `min_chan` 8, the channels from 8 up coded, primitive matrices with optional noise and one LSB bypass
+rebuilding all 9 to 16 objects from the bed rows, the bed a fixed render of the objects so that `encode()` takes the objects alone;
+static within a restart interval). No decoder outside this repository reads substream 3.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;
 `iclforge-truehd-encode-tool` (WAV in, `.thd` out) is the test tool the interoperability checks use.

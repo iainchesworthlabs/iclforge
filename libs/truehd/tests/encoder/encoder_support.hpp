@@ -56,7 +56,11 @@ inline Encoded encode_all(const EncoderConfig& config, std::span<const std::int3
     auto encoder = Encoder::create(config);
     REQUIRE(encoder.has_value());
     Encoded out;
-    const auto channels = static_cast<std::size_t>(config.channels);
+    // The PCM's frame: the objects alone when the encoder makes the bed from them.
+    const bool bed_from_objects =
+        config.object_channels > 0 && config.object_layout == ObjectLayout::kBedMatrices;
+    const auto channels = static_cast<std::size_t>(
+        bed_from_objects ? config.object_channels : config.channels + config.object_channels);
     const std::size_t step = chunk_frames == 0 ? pcm.size() : chunk_frames * channels;
     for (std::size_t at = 0; at < pcm.size(); at += step) {
         auto units = encoder->encode(pcm.subspan(at, std::min(step, pcm.size() - at)));

@@ -5,6 +5,10 @@
 //
 //   iclforge-truehd-encode-tool in.wav out.thd [bits=N] [restart=N] [order=N] [matrix=0|1]
 //       [verify=0|1] [chunk=N] [peak=BPS] [assignment=0xNNNN] [stereo-mode=N] [rate-violations=0|1]
+//       [object-bed=0|1] [object-noise=N] [object-bypass=0|1]
+//
+// object-bed=1 reads the file's 9 to 16 channels as the objects of an Atmos stream whose 7.1 bed is
+// made from them (EncoderConfig::object_layout kBedMatrices, ERRATA.md entry 70, 48 kHz).
 //
 // Reads 16, 24 or 32 bit integer PCM (WAVE_FORMAT_PCM or EXTENSIBLE). `bits` is the width of the
 // samples to code (default: the file's, at most 24); a 24 bit file given bits=16 must carry 16 bit
@@ -130,6 +134,7 @@ int main(int argc, char** argv) {
     config.channels = wav.channels;
     config.bits = std::min(wav.bits, 24);
     std::size_t chunk = 4096;
+    bool object_bed = false;
     for (int i = 3; i < argc; ++i) {
         std::string value;
         const std::string_view arg = argv[i];
@@ -157,10 +162,23 @@ int main(int argc, char** argv) {
             config.allow_rate_violations = value != "0";
         } else if (option(arg, "downmix", value)) {
             config.downmix = value == "standard" ? DownmixMode::kStandard : DownmixMode::kNone;
+        } else if (option(arg, "object-bed", value)) {
+            object_bed = value != "0";
+        } else if (option(arg, "object-noise", value)) {
+            config.object_noise_shift = std::atoi(value.c_str());
+        } else if (option(arg, "object-bypass", value)) {
+            config.object_lsb_bypass = value != "0";
         } else {
             std::fprintf(stderr, "error: unknown option %s\n", argv[i]);
             return 2;
         }
+    }
+    if (object_bed) {
+        config.object_channels = wav.channels;
+        config.channels = 8;
+        config.object_layout = ObjectLayout::kBedMatrices;
+        config.object_meaning.dyn_object_only = true;
+        config.object_meaning.lfe_present = true;
     }
     // A file wider than the coded width carries the samples in its high bits.
     const int file_bits = std::min(wav.bits, 24);

@@ -19,6 +19,7 @@ iclforge_add_library(truehd
         src/decoder/decoder.cpp
         src/encoder/coding.cpp
         src/encoder/encoder.cpp
+        src/encoder/object_bed.cpp
         src/io/access_unit.cpp
         src/io/elementary.cpp
         src/io/evolution.cpp

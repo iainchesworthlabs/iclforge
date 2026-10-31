@@ -889,8 +889,8 @@ reads the second term as A2, B2, C2 with a width and a reserved field a matrix (
 is not applied. The grammar of the term and the cause of the substream 3 check are open, so `iclforge-truehd-ss3-lab STREAM` decodes a stream under each setting of `DecoderLab`
 (the lower substreams' rows read after their matrices; no quantiser mask; matrices last to first; the other sign of `f_shift`; and 96 grammars of the term) and prints one line each, with the first run's per-channel ranges of the object substream before and after its matrices. The four grammars first tried (every present channel or every channel, one width or one a matrix) all failed at the first update (unit 4,072 in `soll_e12`, 4,175 in `EX_00002a`), and the lossless check of substream 3 failed in every variant of the arithmetic. **Provisional until the owner's streams decode with every lossless check passing**
 (`forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient`): the filter, channel-parameter and block-data sections after the matrices are
-the standard ones by TH spec v3.20, which this repository has not yet run on a real stream. Not changed: the encoder still writes an independent substream 3
-with `min_chan` 0 (question 63); the discs and DEE code channels 8 to 11 and let the matrices rebuild 0 to 7.
+the standard ones by TH spec v3.20, which this repository has not yet run on a real stream. Not changed by this entry: the encoder wrote an independent substream 3
+with `min_chan` 0 (question 63); the discs and DEE code channels 8 to 11 and let the matrices rebuild 0 to 7. Entry 70 writes that structure.
 **Second run (2026-10-31; lab builds d3bbef5, 34f2b6c, df9305c, 81544d7).** The second term read as one bit per matrix channel (variant 12) changes nothing. Two of the
 owner's files parse to the end (`EX_00002b.thd`, `z_short.mlp`; the DEE encodes stop at the first update) and substream 3's check still fails in both (243 of 244 and 18 of 18),
 while substreams 0 to 2 pass (732, 54, 927, 1,077 intervals over the files), so the fold formula is right for them. The fold scope is not the cause: the output of the coded channels alone, of the
@@ -932,6 +932,31 @@ the decoder does it. (2) `field_2b` does not enter the coefficient divisor: with
 (a delta is therefore half a place at most); the decoder applies them, and the finer part stands with the matrices until they are replaced. With the finer parts soll_e12 passes 11 of 296 checks (from 9) and soll_sil6 18 of 357 (from 15); a scale of
 2^-width gives 10 and 15. Provisional: no hand-built stream holds the scale, only `test_kernels.cpp` holds the arithmetic. The failing intervals of ctl_c and EX_00002a are not helped (their objects hardly move; the deltas are near 0).
 Still open: the next parse break of soll_e12 (unit 11319, "block header") and of soll_sil6 (unit 19277), and the bulk of the failing checks in files without any extension (ctl_d, EX_00002b).
+
+**70. The object substream the encoder writes with matrices (`EncoderConfig::object_layout` `kBedMatrices`; entries 60, 63, 65, 68 and 69).** The structure the owner's discs and DEE's
+encodes have, as far as entries 65 to 69 establish it: substream 3 has `min_chan` 8 and `max_chan` = `max_matrix_chan` = objects - 1, codes only the channels 8 and up, and its matrices
+rebuild the output channels 0 to objects - 1 from the rows 0 to 7 of substreams 0 to 2 (as those substreams decode them, before their own matrices) and the coded channels. Because the 7.1
+bed carries 8 channels of information and substream 3 only objects - 8, the bed cannot be an independent input: it is a function of the objects. So with `kBedMatrices` the PCM given to `encode()`
+is the objects alone (9 to 16 channels, 48 kHz, `channels` 8, `DownmixMode::kNone`), and the encoder derives the bed and the coded channels. **The chain** (in the order the decoder applies
+it; every matrix primitive, the coefficient on its own output exactly +1.0, -1.0 or 2.0 with the LSB bypass): (1) out 8, `frac_bits` 0, `f_shift` -1, -1.0 on itself, the sparse matrix of the
+owner's streams; (2) with `object_lsb_bypass`, out objects - 1, `frac_bits` 12, `f_shift` 1, 2.0 on itself, `field_2b` 1 (bit 0 the bypass); (3) for each object k above the bed (8 and up) a matrix
+on one bed row, 1.0 on itself and -g on the object (`frac_bits` 12, g = 1/√2 = 2896/4096; the rows are 0 1 2 4 5 6 7 3, so object 8 goes to L, 9 to R, 10 to C and so on, the LFE last). Every matrix of (2)
+and (3) has the noise shift `object_noise_shift` in `field_m4` (0 draws none; the restart header's seed is 0x2A5F31 and is reloaded at every restart). The bed row j is then the object j plus the
+objects mixed into it, rounded as the decoder rounds (a floor), and the coded channels are the objects from 8 up (the first one negated; the last one halved with its low bit in the bypass bit). This
+render is a placeholder, not Dolby's (their bed is a dynamic downmix whose matrices differ from restart to restart, entry 68). **The arithmetic.** The encoder runs the chain backwards over the objects in
+integers: for a matrix with own coefficient +1, `before = after - ((F >> 15) & keep)`; with -1, `before = ((F >> 15) & keep) - after`; with 2.0 and the bypass, `after - (F >> 15)` is `2 * before` plus the bit,
+which is sent. F is the sum of the other rows times their coefficients (at 2^-15) plus the matrix's noise, `buffer[(left + (2 * left + 1) * position) & 63] * 2^(shift + 8)` with `left` the matrices
+from this one to the end and `position` the sample in the access unit, the buffer of each access unit filled from the seed the unit before left. Then it applies the chain forwards the way the decoder does and
+requires the objects back (kInternal otherwise). The output shift and the quantiser step are those of the objects (the common trailing zeros, the shift at most 7), the same for every row and
+for the bed; the bypass needs a quantiser step of 0. The mix is tried at full gain, half, a quarter and none, and the first whose bed stays within 24 bits is written for the interval
+(`EncoderStats::object_mix_reduced_intervals` counts the intervals that needed less). The bed's substreams carry the rows as they are: no pair matrices and no downmix, which would change what the object
+matrices read. **Held by** `test_encoder_object_bed.cpp` (12, 14, 16 and 9 objects; noise shifts 0 to 7; the bypass; 16 bit sources; loud objects; the chain read back from the stream; chunking), which decodes
+with the strict decoder, so the lossless check of every restart interval passes, and by `tools/checks/verify_truehd_object_bed.py`, which has `tools/references/truehd_syntax.py` decode the streams
+of the encoder tool (5 configurations) to the objects, and the bed to the render computed from this entry. Each part fails when it is removed (the noise term, the bypass bits, the seed, the
+24 bit fit, the layout, the sign of the first matrix). **Not done:** the objects are static within a restart interval (the matrices are sent with the restart header and the extension A2 is 0, so no
+moving object and no per-block update; the matrices change only between intervals, by the gain step); no rendering matrices of Dolby's, no 12 matrix chain with the coarse matrix (`frac_bits` 5, `f_shift` 2) or
+the 2.3167 coefficient; no downmix presentations with it; no rate control for the larger stream; `forge truehd-atmos` still writes `kIndependent`, with the bed its renderer makes, because the new
+layout replaces that bed with the fixed render. **Provisional:** the bypass reading (entry 69) and everything else about 0x31EC that no decoder outside this repository reads.
 
 ## Atmos, spec v3.6
 

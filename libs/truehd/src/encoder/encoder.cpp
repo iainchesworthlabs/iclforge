@@ -6,7 +6,9 @@
 #include <cmath>
 #include <optional>
 
+#include "core/noise.hpp"
 #include "encoder/coding.hpp"
+#include "encoder/object_bed.hpp"
 #include "encoder/verify.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
@@ -515,11 +517,15 @@ struct StageWork {
     int quant = 0;
     std::uint16_t sync = kRestartSyncStandard;
     bool noise = false;
+    std::uint32_t noise_seed = 0;      // the restart header's, which generator 1 starts from
     std::vector<MatrixSpec> matrices;  // in the order the decoder applies them
-    std::vector<Plane> coded;          // the rows this stage codes, before its matrices
-    std::vector<Plane> outputs;        // the stage's output rows, in the 24 bit domain
-    std::vector<FilterSpec> fir;       // per coded row
-    std::vector<Plane> residual;       // per coded row, in units of 2^quant
+    // For each matrix with the LSB bypass, in order, the bit it sends for every sample of the
+    // interval (sent ahead of the sample's residuals).
+    std::vector<std::vector<std::uint8_t>> bypass;
+    std::vector<Plane> coded;     // the rows this stage codes, before its matrices
+    std::vector<Plane> outputs;   // the stage's output rows, in the 24 bit domain
+    std::vector<FilterSpec> fir;  // per coded row
+    std::vector<Plane> residual;  // per coded row, in units of 2^quant
     std::vector<BlockPlan> blocks;
     int max_lsbs = 0;
     std::uint8_t check = 0;  // the fold of this interval's output
@@ -646,9 +652,13 @@ struct Encoder::Impl {
     std::unique_ptr<Decoder> verifier;
     std::unique_ptr<Decoder> object_verifier;  // Presentation::kAll, for substream 3
 
-    // The values in a frame of the PCM the caller gives: the bed, then the object channels.
+    // The values in a frame of the PCM the caller gives: the bed, then the object channels (the
+    // object channels alone when the bed is made from them, ObjectLayout::kBedMatrices).
+    [[nodiscard]] bool bed_matrices() const noexcept {
+        return config.object_channels > 0 && config.object_layout == ObjectLayout::kBedMatrices;
+    }
     [[nodiscard]] int frame_width() const noexcept {
-        return config.channels + config.object_channels;
+        return bed_matrices() ? config.object_channels : config.channels + config.object_channels;
     }
     [[nodiscard]] std::size_t pending_frames() const noexcept {
         return (pending.size() - pending_start) / static_cast<std::size_t>(frame_width());
@@ -687,6 +697,19 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
         if (const std::string_view field = extra_channel_meaning_problem(config.object_meaning);
             !field.empty()) {
             return field;
+        }
+        if (config.object_layout == ObjectLayout::kBedMatrices) {
+            if (config.object_channels <= detail::kBedChannels) {
+                return "ObjectLayout::kBedMatrices needs 9 to 16 object channels: substream 3 "
+                       "codes the channels above the 7.1 bed";
+            }
+            if (config.downmix != DownmixMode::kNone) {
+                return "ObjectLayout::kBedMatrices is written without the downmix presentations: "
+                       "the object matrices read the bed's coded rows";
+            }
+            if (config.object_noise_shift < 0 || config.object_noise_shift > 15) {
+                return "object_noise_shift must be 0..15 (a 4 bit field)";
+            }
         }
     }
     if (config.bits != 16 && config.bits != 20 && config.bits != 24) {
@@ -943,6 +966,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     const int channels = config.channels;
     const int objects = config.object_channels;
     const auto width = static_cast<std::size_t>(frame_width());
+    const bool bed_chain = bed_matrices();
     IntervalShape shape;
     shape.units = units;
     shape.nominal = nominal;
@@ -951,10 +975,13 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     const bool final_unit_padded = padding > 0;
 
     // The planes of the input, one per channel: the bed's first, then the objects' (TH spec §15).
-    std::vector<Plane> input(width, Plane(n, 0));
+    // When the bed is made from the objects the caller gives the objects alone and the bed's planes
+    // are filled in below.
+    std::vector<Plane> input(static_cast<std::size_t>(channels + objects), Plane(n, 0));
+    const std::size_t first_given = bed_chain ? static_cast<std::size_t>(channels) : 0;
     for (std::size_t t = 0; t < valid_frames; ++t) {
         for (std::size_t c = 0; c < width; ++c) {
-            input[c][t] = pending[pending_start + t * width + c];
+            input[first_given + c][t] = pending[pending_start + t * width + c];
         }
     }
     const std::size_t stage_count = stages.size() + (objects > 0 ? 1U : 0U);
@@ -973,6 +1000,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         const DownmixPlan* downmix = nullptr;
         bool pairs = false;
         bool atmos = false;
+        // The low bits every sample leaves clear, when the caller knows them (-1: found here).
+        int zero_bits = -1;
     };
     const std::vector<StageSpec> object_stages{StageSpec{0, objects - 1}};
     const std::vector<Channel> no_layout;
@@ -993,7 +1022,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
         }
         const int zero_bits =
-            seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
+            program.zero_bits >= 0
+                ? program.zero_bits
+                : (seen == 0 ? 0
+                             : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep));
         const int output_shift = std::min(zero_bits, kMaxOutputShift);
         const int quant = zero_bits - output_shift;
         std::vector<Plane> rows = original;
@@ -1097,10 +1129,95 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         }
         return {};
     };
-    if (auto bed = prepare({0, channels, &stages, &layout, &downmix_plan, true, false}); !bed) {
+
+    // --- the object substream with matrices (ObjectLayout::kBedMatrices; ERRATA.md entry 70). The
+    // object signals are what substream 3 has to output. The matrices run backwards over them give
+    // the rows the decoder starts from: the 7.1 bed's rows, which substreams 0 to 2 code as they
+    // are, and the channels from 8 up that substream 3 codes. The matrices are primitive, so the
+    // run is exact; it includes the matrices' noise and LSB bypass, and the self-check below
+    // applies the matrices the way the decoder does and requires the objects back.
+    int bed_zero_bits = -1;
+    int chain_shift = 0;
+    detail::ObjectChainShape chain_shape;
+    std::vector<MatrixSpec> chain;
+    std::vector<Plane> chain_rows;      // the rows before the matrices
+    std::vector<Plane> object_outputs;  // the rows after them: the objects, in units of 2^quant
+    std::vector<std::vector<std::uint8_t>> chain_bypass;
+    if (bed_chain) {
+        std::uint32_t seen = 0;
+        for (std::size_t k = 0; k < static_cast<std::size_t>(objects); ++k) {
+            for (const std::int32_t v : input[static_cast<std::size_t>(channels) + k]) {
+                seen |= static_cast<std::uint32_t>(v);
+            }
+        }
+        const int zero_bits =
+            seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
+        chain_shift = std::min(zero_bits, kMaxOutputShift);
+        // The doubled bypass matrix cannot keep a quantiser step's cleared bits (see
+        // invert_object_chain).
+        chain_shape.quant = config.object_lsb_bypass ? 0 : zero_bits - chain_shift;
+        chain_shape.units = units;
+        chain_shape.nominal = nominal;
+        chain_shape.noise_size = static_cast<int>(detail::noise_buffer_size(rate_factor(ratebits)));
+        bed_zero_bits = chain_shift + chain_shape.quant;
+        for (std::size_t k = 0; k < static_cast<std::size_t>(objects); ++k) {
+            object_outputs.push_back(input[static_cast<std::size_t>(channels) + k]);
+            for (std::int32_t& v : object_outputs.back()) {
+                v >>= chain_shift;
+            }
+        }
+        // The largest mix of the objects into the bed whose bed stays within 24 bits (the last
+        // step mixes nothing, which always does).
+        bool fitted = false;
+        for (int step = 0; step < detail::kObjectMixSteps && !fitted; ++step) {
+            chain = detail::make_object_bed_chain(objects, step, config.object_noise_shift,
+                                                  config.object_lsb_bypass);
+            chain_rows = object_outputs;
+            if (!detail::invert_object_chain(chain, chain_shape, chain_rows, chain_bypass)) {
+                return std::unexpected(make_error(EncodeErrorKind::kInternal,
+                                                  "the object matrices cannot be run backwards"));
+            }
+            fitted = true;
+            for (std::size_t row = 0; row < static_cast<std::size_t>(detail::kBedChannels); ++row) {
+                fitted = fitted && within_24_bits(chain_rows[row], chain_shift);
+            }
+            if (fitted && step > 0) {
+                ++stats.object_mix_reduced_intervals;
+            }
+        }
+        std::vector<Plane> forward = chain_rows;
+        detail::apply_object_chain(chain, chain_shape, chain_bypass, forward);
+        if (!fitted || forward != object_outputs) {
+            return std::unexpected(make_error(EncodeErrorKind::kInternal,
+                                              "the object matrices do not give back the objects"));
+        }
+        for (std::size_t row = 0; row < static_cast<std::size_t>(detail::kBedChannels); ++row) {
+            for (std::size_t t = 0; t < n; ++t) {
+                input[row][t] = static_cast<std::int32_t>(
+                    static_cast<std::uint32_t>(chain_rows[row][t]) << chain_shift);
+            }
+        }
+    }
+    // The pair and downmix matrices of the bed would change the rows the object matrices read.
+    if (auto bed = prepare({0, channels, &stages, &layout, bed_chain ? &no_downmix : &downmix_plan,
+                            !bed_chain, false, bed_zero_bits});
+        !bed) {
         return std::unexpected(bed.error());
     }
-    if (objects > 0) {
+    if (bed_chain) {
+        work.emplace_back();
+        StageWork& stage = work.back();
+        stage.spec = StageSpec{detail::kBedChannels, objects - 1};
+        stage.output_shift = chain_shift;
+        stage.quant = chain_shape.quant;
+        stage.sync = kRestartSyncAtmos;
+        stage.noise_seed = chain_shape.noise_seed;
+        stage.matrices = chain;
+        stage.bypass = chain_bypass;
+        stage.outputs = object_outputs;
+        stage.coded.assign(chain_rows.begin() + detail::kBedChannels, chain_rows.end());
+        stats.matrices_used += chain.size();
+    } else if (objects > 0) {
         if (auto atmos = prepare({static_cast<std::size_t>(channels), objects, &object_stages,
                                   &no_layout, &no_downmix, false, true});
             !atmos) {
@@ -1308,6 +1425,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                         restart.min_chan = static_cast<std::uint8_t>(stage.spec.first_row);
                         restart.max_chan = static_cast<std::uint8_t>(stage.spec.last_row);
                         restart.max_matrix_chan = static_cast<std::uint8_t>(stage.spec.last_row);
+                        restart.noisegen_seed = stage.noise_seed;
                         restart.max_shift = static_cast<std::uint8_t>(stage.output_shift);
                         restart.max_lsbs = static_cast<std::uint8_t>(std::min(stage.max_lsbs, 31));
                         restart.max_bits = 24;
@@ -1336,6 +1454,11 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 }
                 for (int i = 0; i < plan.size; ++i) {
                     const std::size_t t = plan.start + static_cast<std::size_t>(i);
+                    // The bits that put back what the LSB bypass matrices drop come first
+                    // (TH spec §10.2.1, kernels::read_residuals).
+                    for (const std::vector<std::uint8_t>& bits : stage.bypass) {
+                        w.put(bits[t], 1);
+                    }
                     for (std::size_t k = 0; k < in_force.size(); ++k) {
                         detail::put_residual(w, stage.residual[k][t], stage.quant, in_force[k]);
                     }
