@@ -86,7 +86,7 @@ class TierIsPassedDown(unittest.TestCase):
 
 
 class WhatRunsAfterAMerge(unittest.TestCase):
-    NIGHTLY_ONLY_CORE = ("coverage", "coverage-qt", "abi-gate", "ffmpeg-validate")
+    NIGHTLY_ONLY_CORE = ("coverage", "coverage-qt", "truehd-off", "abi-gate", "ffmpeg-validate")
     STAYS_CORE = ("adm-validate", "hearth-validate")
 
     def test_the_slow_core_jobs_wait_for_the_nightly_run(self):

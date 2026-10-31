@@ -24,6 +24,15 @@ See [README.md](README.md) for the project overview and
   packets; each as a raw OBU stream and as an ISO-BMFF file, 17 files of 0.3 to 10 KB. `tools/fuzz/generate-seeds.sh` runs the tool when
   it is beside forge. `test_iamf_seeds.cpp` holds each seed to being read by its own framing's reader, decoded where it is `ipcm`, and
   refused by the other's. `tools/checks/check_fuzz_harnesses.py` has no known gap left.
+- **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
+  `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
+  units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
+  `truehdProbe`, `truehdScanUnits`, `TruehdScannedStream` and `TruehdDecoder`, with a `TruehdError` that carries the library's `ErrorKind`.
+  What a decode returns is a copy, so it stays valid across the next call. The module is built for Node as well as the web, and
+  `build-wasm` runs `truehd-wasm.test.js` over it: every fixture of `testdata/truehd` decodes to the SHA-256 of FFmpeg's strict decode,
+  and a decode from the restart for a sample gives that sample. The check that a decoded unit owns its samples fails when the module
+  returns a view into its heap. The encoder is not wrapped. The support catalogue's "TrueHD WebAssembly module" row moves from
+  unavailable to source and CI.
 - **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
   borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
   `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every
@@ -7070,6 +7079,27 @@ The sections below contain the complete change list and fixes.
   coupling spectrum buffer (2,048 bytes, a member of every decoder) is made when a stream first
   uses enhanced coupling, as its second side was. Nothing a decode writes changes: the ac3 test binary's results are the same on the fixed tier (182 failing
   assertions of 3,721,493, the same ones as before) and all 1,011 cases pass on the double tier.
+- **Fixed: the TrueHD encoder sends each channel's own output shift and quantiser step.** One step for every channel was the smallest the whole
+  interval allowed, so a 5.1 programme whose L, R, Ls and Rs are 16-bit material and whose C and LFE use 24 bits sent the low 8 bits of four
+  channels for nothing: the 5.1 music of the DEE fixtures was 101,314 bytes, against FFmpeg's encoder's 63,254 and DEE's 58,688, and is 56,672
+  (0.896 and 0.966). A pair matrix is tried between rows with the same step only, and the downmix presentations keep one step. FFmpeg's strict
+  decode and the library's decoder return every sample (`libs/truehd/ERRATA.md` entry 90).
+- **Added: `tools/checks/compare_truehd_encoders.py` and `compare_truehd_decoders.py`, and the page [TrueHD against FFmpeg and DEE](docs/truehd-comparison.md).**
+  The first sizes forge's streams against FFmpeg's encoder's and DEE's (the 13 committed legs, programme material, a directory of WAV files), checks
+  that every stream counted decodes to the source, and fails the pull-request flow's FFmpeg job if forge is larger than either on a committed source.
+  The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
+  forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
+  says where forge is larger: 1.06 and 1.15 times FFmpeg's size at 192 kHz.
+- **Changed: the TrueHD encoder writes restart sync 0x31EB in substream 1 of every stream of two or more substreams.** It wrote 0x31EA there
+  for 3 to 6 channels, following the reference specification's exemption for the last substream of a presentation of at most 6 channels; every
+  retail stream seen carries 0x31EB there (the owner's 7.1 discs, and the 48 and 192 kHz 5.1 tracks of a UHD disc, which are the two-substream
+  layout of 2 and 6 channels the encoder now writes at 176.4 and 192 kHz). FFmpeg's strict decode takes either (`libs/truehd/ERRATA.md`
+  entry 97).
+- **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
+  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. The encoder
+  now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks
+  for and FFmpeg 8.0.1's strict decode refuses; FFmpeg's own encoder writes two, and its decode of forge's 192 kHz 5.1 programme is exact
+  (`libs/truehd/ERRATA.md` entry 90, provisional). The encoder fuzzer's 192 kHz cases, 10 of 110 failing before, pass (2,815 cases).
 
 ## [0.10.0-beta.1] - 2026-09-01
 
