@@ -2325,6 +2325,33 @@ TEST_CASE("transcode of a TrueHD stream to AC-3 and E-AC-3 keeps the programme",
         CHECK(channels == 2);
         CHECK(std::abs(20.0 * std::log10(left / (kToneShare[0] / std::sqrt(2.0)))) < 1.5);
     }
+    SECTION("the dialogue norm the stream stores is carried as the dialnorm") {
+        // The 6 channel field is the dialnorm; the 2 channel field is the dialnorm plus 6.
+        const fs::path coded = tone.dir / "stored_dialnorm.thd";
+        REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(coded) +
+                            "truehd-dialnorm-6ch=27 truehd-dialnorm-2ch=33",
+                        log) == 0);
+        const auto dialnorm_of = [&](const std::string& options) {
+            const fs::path ac3 = tone.dir / "stored_dialnorm.ac3";
+            const fs::path wav = tone.dir / "stored_dialnorm.wav";
+            fs::remove(ac3);
+            REQUIRE(run_cli("transcode " + cli_arg(coded) + cli_arg(ac3) + "448 " + options, log) ==
+                    0);
+            REQUIRE(run_cli("decode " + cli_arg(ac3) + cli_arg(wav), log) == 0);
+            return read_text(log);
+        };
+        CHECK(dialnorm_of("").find("metadata: dialnorm 27 ") != std::string::npos);
+        CHECK(dialnorm_of("truehd-presentation=6ch").find("metadata: dialnorm 27 ") !=
+              std::string::npos);
+        CHECK(dialnorm_of("truehd-presentation=2ch").find("metadata: dialnorm 27 ") !=
+              std::string::npos);
+        // The operator's word beats the stream's.
+        CHECK(dialnorm_of("dialnorm=20").find("metadata: dialnorm 20 ") != std::string::npos);
+    }
+    SECTION("a stream that stores no dialogue norm keeps the encoder's default, and says so") {
+        REQUIRE(run_cli("transcode " + in + cli_arg(tone.dir / "no_dialnorm.ac3") + "448", log) == 0);
+        CHECK(read_text(log).find("stores no dialogue norm") != std::string::npos);
+    }
     SECTION("to stdout, nothing but the stream is written there") {
         const fs::path piped = tone.dir / "transcoded_stdout.ac3";
         const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" transcode " + in + "- 448 codec=ac3 > " +
