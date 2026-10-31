@@ -80,11 +80,9 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
-    bool inherit_ext_widths = false;  // new object matrix headers keep the extension widths
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;
-    bool object_2b_divisor = false;  // field_2b adds to the exponent of an object matrix's divisor
     // The rows whose matrix output the quantiser step masks: 0 all, 1 the coded rows only (8 and
     // up), 2 the bed rows only.
     int mask_rows = 0;

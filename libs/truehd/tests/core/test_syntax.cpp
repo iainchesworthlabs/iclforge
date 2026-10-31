@@ -356,6 +356,37 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     CHECK(reused->matrices->items[0].ext_value[0] == 5);
     CHECK(reused->matrices->items[0].ext_value[3] == -8);
 
+    // New headers (B = 1) keep the width of the matrix at the same place in the last set, so C2
+    // clear still has widths to read the deltas with.
+    last.items[0].ext_width = 3;
+    iclforge::BitWriter fresh;
+    fresh.put(0, 1);
+    fresh.put(1, 1);
+    fresh.put(1, 1);  // A
+    fresh.put(1, 1);  // B
+    fresh.put(0, 4);  // one matrix
+    fresh.put(2, 4);  // out 2
+    fresh.put(5, 4);  // frac_bits
+    fresh.put(1, 3);  // f_shift 0
+    fresh.put(0, 2);
+    fresh.put(0, 4);
+    fresh.put(0x9, 4);  // channels 0 and 3
+    fresh.put(20, 7);
+    fresh.put(static_cast<std::uint32_t>(-9) & 0x7FU, 7);
+    fresh.put(1, 1);  // A2
+    fresh.put(1, 1);  // B2
+    fresh.put(0, 1);  // C2
+    fresh.put(7, 4);
+    fresh.put(static_cast<std::uint32_t>(-6) & 0xFU, 4);
+    fresh.align();
+    const std::vector<std::byte> fresh_bytes = fresh.take();
+    iclforge::BitReader fresh_reader(fresh_bytes);
+    const auto renewed = read_block_header(fresh_reader, context);
+    REQUIRE(renewed.has_value());
+    CHECK(renewed->matrices->items[0].ext_width == 3);
+    CHECK(renewed->matrices->items[0].ext_value[0] == 7);
+    CHECK(renewed->matrices->items[0].ext_value[3] == -6);
+
     // A matrix of width 0 sends no deltas at all.
     last.items[0].ext_width = 0;
     iclforge::BitWriter none;

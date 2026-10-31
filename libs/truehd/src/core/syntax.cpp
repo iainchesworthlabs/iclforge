@@ -125,8 +125,9 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
                 for (int c = 0; c < channels; ++c) {
                     matrix.present[static_cast<std::size_t>(c)] = ((mask >> c) & 1U) != 0;
                 }
-                if (context.object_inherit_widths && context.object_previous != nullptr &&
-                    m < context.object_previous->count) {
+                // New headers keep the extension widths of the matrix at the same place in the
+                // last set (ERRATA.md entry 69).
+                if (context.object_previous != nullptr && m < context.object_previous->count) {
                     matrix.ext_width = context.object_previous->items[m].ext_width;
                     matrix.ext_field2 = context.object_previous->items[m].ext_field2;
                 }

@@ -261,16 +261,6 @@ int main(int argc, char** argv) {
         tied.object_tie_mode = mode;
         settings.push_back({kTieNames[mode], tied});
     }
-    DecoderLab inherit = base;
-    inherit.inherit_ext_widths = true;
-    settings.push_back({"extension widths inherited", inherit});
-    DecoderLab divisor = base;
-    divisor.object_2b_divisor = true;
-    settings.push_back({"field_2b in the divisor", divisor});
-    DecoderLab both = base;
-    both.inherit_ext_widths = true;
-    both.object_2b_divisor = true;
-    settings.push_back({"widths inherited, 2b in divisor", both});
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});
