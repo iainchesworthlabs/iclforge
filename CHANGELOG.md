@@ -10,6 +10,11 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
+  borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
+  `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every
+  committed fixture to the SHA-256 of FFmpeg's strict decode, and to `forge decode` when `ICLFORGE_FORGE` names one; `cargo clippy
+  -D warnings` and `cargo fmt --check` pass. The encoder is not wrapped.
 - **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
   `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
   Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
