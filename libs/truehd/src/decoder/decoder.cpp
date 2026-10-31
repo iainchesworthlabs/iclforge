@@ -711,6 +711,17 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             // (the number of matrices left, this one included) it starts the access unit at.
             kernels::NoiseDraw noise;
             noise.tie_mode = object ? config.lab.object_tie_mode : 0;
+            if (object) {
+                const int shift_out = state.output_shift[static_cast<std::size_t>(plan.out)];
+                const int step_out = state.quant_step[static_cast<std::size_t>(plan.out)];
+                switch (config.lab.object_noise_scale) {
+                case 1: noise.extra_shift = -shift_out; break;
+                case 2: noise.extra_shift = -step_out; break;
+                case 3: noise.extra_shift = -(shift_out + step_out); break;
+                case 4: noise.extra_shift = shift_out; break;
+                default: break;
+                }
+            }
             if (plan.noise_shift != 0 && state.context.noise_type) {
                 const bool lab_index = object && config.lab.object_noise_index != 0;
                 const auto first = static_cast<unsigned>(
@@ -863,6 +874,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     BitReader reader(payload);
     SegmentResult result;
     bool first_block = true;
+    std::string segment_trace;  // lab: where each block of the segment starts and ends
     state.noise_filled = false;
     while (true) {
         if (reader.read(1) != 0) {
@@ -882,6 +894,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             }
             state.context.object_previous = state.object_have ? &state.object_last : nullptr;
             const std::size_t header_start = reader.bit_position();
+            segment_trace += "[block starts at " + std::to_string(header_start) + "]";
             auto header = read_block_header(reader, state.context);
             if (!header) {
                 if (index == kObjectSubstream && counters.object_error_context.empty()) {
@@ -900,7 +913,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                             text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
                         }
                     }
-                    counters.object_error_context = text;
+                    counters.object_error_context = text + "; blocks of the segment: " + segment_trace;
                 }
                 state.running = false;
                 return std::unexpected(header.error());
@@ -974,7 +987,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             return std::unexpected(decoded.error());
         }
         result.samples += state.block_size;
+        const std::size_t data_end = reader.bit_position();
         const bool last = reader.read(1) != 0;
+        segment_trace += " size " + std::to_string(state.block_size) + " data ends " +
+                         std::to_string(data_end) + (last ? " last" : " not last") + ";";
         if (reader.overflowed()) {
             state.running = false;
             return std::unexpected(

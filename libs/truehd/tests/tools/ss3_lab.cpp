@@ -312,6 +312,13 @@ int main(int argc, char** argv) {
         tied.object_tie_mode = mode;
         settings.push_back({kTieNames[mode], tied});
     }
+    static const char* const kScaleNames[] = {"", "noise scaled: minus the output shift", "noise scaled: minus the quantiser step",
+                                              "noise scaled: minus both", "noise scaled: plus the output shift"};
+    for (int mode = 1; mode <= 4; ++mode) {
+        DecoderLab scaled = base;
+        scaled.object_noise_scale = mode;
+        settings.push_back({kScaleNames[mode], scaled});
+    }
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});

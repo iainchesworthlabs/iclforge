@@ -84,6 +84,9 @@ struct DecoderLab {
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;
+    // The object matrices' noise draw is shifted by: 1 minus the output shift; 2 minus the
+    // quantiser step; 3 minus both; 4 plus the output shift (of the matrix's output row).
+    int object_noise_scale = 0;
     // The rows whose matrix output the quantiser step masks: 0 all, 1 the coded rows only (8 and
     // up), 2 the bed rows only.
     int mask_rows = 0;
