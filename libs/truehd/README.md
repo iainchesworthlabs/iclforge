@@ -12,7 +12,7 @@ It links `iclforge::base` and nothing else. The option is `ICLFORGE_BUILD_TRUEHD
 | Directory | What |
 |---|---|
 | `include/iclforge/truehd/core/` | `format.hpp` (constants, sample rates, channel vocabulary), `error.hpp` (`ErrorKind`, `Error`), `crc.hpp` (the four check values), `syntax.hpp` (restart header, block header, filters, matrices, Huffman codes: a reader and a writer for each) |
-| `include/iclforge/truehd/io/` | `major_sync.hpp`, `access_unit.hpp` (parse a unit, write its header and directory), `elementary.hpp` (`probe_stream`, `ElementaryReader`), `evolution.hpp` (the extra data's evolution frame and its payloads, a provisional reading) |
+| `include/iclforge/truehd/io/` | `major_sync.hpp`, `access_unit.hpp` (parse a unit, write its header and directory), `elementary.hpp` (`probe_stream`, `ElementaryReader`), `scan.hpp` (`scan_stream`: length, timing, restarts to seek by), `evolution.hpp` (the extra data's evolution frame and its payloads, a provisional reading) |
 | `include/iclforge/truehd/decoder/` | `decoder.hpp`: `Decoder`, `DecoderConfig`, `DecodedAccessUnit`, `DecoderCounters` |
 | `include/iclforge/truehd/encoder/` | `encoder.hpp`: `Encoder`, `EncoderConfig`, `EncodedAccessUnit`, `EncoderStats`, `DownmixMode` |
 | `src/` | the same split; `core/huffman.hpp` holds the codebooks |
