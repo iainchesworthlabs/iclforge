@@ -701,6 +701,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             // TH spec §17.3: the matrix draws noise at a stride of 2 * index + 1 from the index
             // (the number of matrices left, this one included) it starts the access unit at.
             kernels::NoiseDraw noise;
+            noise.tie_mode = object ? config.lab.object_tie_mode : 0;
             if (plan.noise_shift != 0 && state.context.noise_type) {
                 const bool lab_index = object && config.lab.object_noise_index != 0;
                 const auto first = static_cast<unsigned>(

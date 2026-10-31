@@ -143,6 +143,7 @@ struct NoiseDraw {
     unsigned first = 0;
     unsigned stride = 1;
     unsigned mask = 0;
+    int tie_mode = 0;  // lab: how a sum exactly between two outputs rounds (0 down)
 };
 
 // TH spec §10: one primitive matrix over one block. Row[out] becomes the sum over the `count`
@@ -165,6 +166,14 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             sum += std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
                                              noise.mask]} *
                    noise_scale;
+        }
+        if (noise.tie_mode != 0) {
+            const std::int64_t low = sum & ((std::int64_t{1} << kMatrixShift) - 1);
+            const std::int64_t half = std::int64_t{1} << (kMatrixShift - 1);
+            if (noise.tie_mode == 3 || (low == half && (noise.tie_mode == 1 ||
+                                                         (noise.tie_mode == 2 && ((sum >> kMatrixShift) & 1) != 0)))) {
+                sum += half;
+            }
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
         if (lsb_bypass) {

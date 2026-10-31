@@ -254,6 +254,13 @@ int main(int argc, char** argv) {
     DecoderLab mask_bed = base;
     mask_bed.mask_rows = 2;
     settings.push_back({"quantiser mask: bed rows only", mask_bed});
+    static const char* const kTieNames[] = {"", "matrix sums: a tie rounds up", "matrix sums: a tie rounds to even",
+                                            "matrix sums: round to nearest (control)"};
+    for (int mode = 1; mode <= 3; ++mode) {
+        DecoderLab tied = base;
+        tied.object_tie_mode = mode;
+        settings.push_back({kTieNames[mode], tied});
+    }
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});
