@@ -960,7 +960,8 @@ def case_ch_assign_cycle():
     )
     return (
         Stream([stereo, six], n),
-        "ch_assign [1, 2, 3, 4, 5, 0], a six-cycle, in a substream of six channels after one of two",
+        "ch_assign [1, 2, 3, 4, 5, 0], a six-cycle, "
+        "in a substream of six channels after one of two",
         ["ch_assign", "ch_assign_cycle", "substreams_2"],
     )
 
