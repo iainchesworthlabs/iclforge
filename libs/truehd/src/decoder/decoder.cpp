@@ -404,7 +404,6 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     if (header->sync == kRestartSyncAtmos) {
         state.context.noise_type = true;
     }
-    state.context.object_extension_variant = config.lab.extension_variant;
     state.object_have = false;  // a restart resets the coding parameters, the matrices included
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;

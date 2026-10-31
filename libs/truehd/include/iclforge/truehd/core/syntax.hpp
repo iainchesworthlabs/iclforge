@@ -178,7 +178,6 @@ struct BlockContext {
     // The open grammar of the second precision term, for the owner's trials (ERRATA.md entry 69):
     // bit 0 reads a value for every matrix channel and not for the present ones, bit 1 shares one
     // width and one reserved field among the matrices.
-    int object_extension_variant = 0;
     std::uint8_t presence_flags = presence::kAll;  // in effect before this header
     friend bool operator==(const BlockContext&, const BlockContext&) = default;
 };

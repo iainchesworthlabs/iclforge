@@ -300,8 +300,9 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     last.items[0].present[3] = true;
     context.object_previous = &last;
 
-    // A section with B = 0 sends coefficients only (7 bits each), then a second term: A2 = 1,
-    // B2 = 1, C2 = 1, a width of 3 and a reserved field, and one value for each present channel.
+    // A section with B = 0 sends coefficients only (7 bits each), then the extension: A2 = 1,
+    // B2 = 1, C2 = 1, a width of 3 and a field of 2 bits, and a delta of 3 + 1 bits for each
+    // present channel.
     iclforge::BitWriter bits;
     bits.put(0, 1);  // new_guards
     bits.put(1, 1);  // matrix group present
@@ -314,8 +315,8 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     bits.put(1, 1);  // C2
     bits.put(3, 4);  // width
     bits.put(0, 2);
-    bits.put(2, 3);
-    bits.put(static_cast<std::uint32_t>(-3) & 0x7U, 3);
+    bits.put(2, 4);
+    bits.put(static_cast<std::uint32_t>(-3) & 0xFU, 4);
     bits.align();
     const std::vector<std::byte> bytes = bits.take();
     iclforge::BitReader reader(bytes);
@@ -331,6 +332,51 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     CHECK(set.items[0].ext_width == 3);
     CHECK(set.items[0].ext_value[0] == 2);
     CHECK(set.items[0].ext_value[3] == -3);
+
+    // C2 = 0 keeps the last widths: the same deltas without the width and the field.
+    last.items[0].ext_width = 3;
+    iclforge::BitWriter kept;
+    kept.put(0, 1);
+    kept.put(1, 1);
+    kept.put(1, 1);
+    kept.put(0, 1);
+    kept.put(20, 7);
+    kept.put(static_cast<std::uint32_t>(-9) & 0x7FU, 7);
+    kept.put(1, 1);  // A2
+    kept.put(1, 1);  // B2
+    kept.put(0, 1);  // C2
+    kept.put(5, 4);
+    kept.put(static_cast<std::uint32_t>(-8) & 0xFU, 4);
+    kept.align();
+    const std::vector<std::byte> kept_bytes = kept.take();
+    iclforge::BitReader kept_reader(kept_bytes);
+    const auto reused = read_block_header(kept_reader, context);
+    REQUIRE(reused.has_value());
+    CHECK(reused->matrices->items[0].ext_width == 3);
+    CHECK(reused->matrices->items[0].ext_value[0] == 5);
+    CHECK(reused->matrices->items[0].ext_value[3] == -8);
+
+    // A matrix of width 0 sends no deltas at all.
+    last.items[0].ext_width = 0;
+    iclforge::BitWriter none;
+    none.put(0, 1);
+    none.put(1, 1);
+    none.put(1, 1);
+    none.put(0, 1);
+    none.put(20, 7);
+    none.put(static_cast<std::uint32_t>(-9) & 0x7FU, 7);
+    none.put(1, 1);  // A2
+    none.put(1, 1);  // B2
+    none.put(1, 1);  // C2
+    none.put(0, 4);  // width 0
+    none.put(0, 2);
+    none.align();
+    const std::vector<std::byte> none_bytes = none.take();
+    iclforge::BitReader none_reader(none_bytes);
+    const auto zero = read_block_header(none_reader, context);
+    REQUIRE(zero.has_value());
+    CHECK(zero->matrices->items[0].ext_value[0] == 0);
+    CHECK(none_reader.bit_position() == 27);  // nothing after the width and its field
 
     // Without earlier headers a section that reuses them is refused.
     context.object_previous = nullptr;

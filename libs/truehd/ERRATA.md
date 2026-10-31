@@ -921,6 +921,12 @@ object (`ctl_b`, 93 of 93) pass. A constant on one object (`ctl_d`) passes 27 of
 one matrix (output 2) has `field_2b` 1 and a coefficient of 2.0 on its own output, where every other matrix has 1.0. **Reading, provisional:** bit 0 of `field_2b` is the matrix's LSB bypass,
 one bit a sample in the block data, as in the standard matrix section (the doubled coefficient loses the low bit the bypass restores). The decoder, the Python reference and the writer apply it;
 `hb_substream3_object_bypass` holds it (it fails without it). To confirm: `ctl_c` decodes and its checks pass.
+**The extension (2026-10-31, from `ctl_c` unit 256, a restart with A2 set).** After the coefficients: A2, B2, C2 (each one bit, B2 inside A2, C2 inside B2); with C2 set, for each matrix a width (4 bits) and
+2 bits that nothing reads yet (the last widths stand when C2 is clear); then for each matrix whose width is not 0, a delta of width + 1 bits, signed, for each coefficient in its mask. Checked on the 1,184 bits
+that follow the coefficients of that block: read this way the extension ends where `1` and twelve nibbles of `0100` (the output shift of 4 that every other restart of the stream has) begin. This is
+the layout an earlier message from the other session proposed; it failed on unit 4072 of `soll_e12` only because that block's start was misplaced, and its lab sweep (variant 16) predated the bypass. The deltas are read and not applied:
+what they do to the coefficients (a ramp over the block is the obvious candidate) is open, and so is why the first matrix of that restart (output 8, 9 coefficients) is missing from the matrix list.
+The 2b = 1 matrix has a coefficient of 2.0 on its own output if the divisor is left as it is, or 1.0 if the divisor takes `field_2b` as well; the second reading is untested.
 
 ## Atmos, spec v3.6
 

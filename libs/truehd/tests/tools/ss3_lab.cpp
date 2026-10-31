@@ -124,9 +124,9 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
         }
     }
     const DecoderCounters& c = decoder.counters();
-    std::printf("%-34s ext=%d  units %llu decoded %llu errors %llu  ss3 ok %llu failed %llu  "
+    std::printf("%-34s units %llu decoded %llu errors %llu  ss3 ok %llu failed %llu  "
                 "ss0-2 ok %llu failed %llu",
-                name, lab.extension_variant, static_cast<unsigned long long>(units),
+                name, static_cast<unsigned long long>(units),
                 static_cast<unsigned long long>(c.units_decoded),
                 static_cast<unsigned long long>(errors),
                 static_cast<unsigned long long>(c.lossless_ok_by_substream[3]),
@@ -297,20 +297,6 @@ int main(int argc, char** argv) {
     for (const Setting& setting : settings) {
         run(stream, setting.name, setting.lab, first);
         first = false;
-    }
-    // The grammars of the second precision term, under the standard arithmetic: a grammar that
-    // reads the owner's stream pushes the first error far past the first extension.
-    std::printf("grammars of the second precision term (variant: bit 0 all channels, bit 1 shared "
-                "width, bits 2-3 structure, bit 4 width + 1, bits 5-6 field bits):\n");
-    for (int variant = 0; variant < 128; ++variant) {
-        if (((variant >> 2) & 3) == 3 && variant != 12) {
-            continue;  // structure 3 is one bit per matrix channel; only its plain form varies
-        }
-        DecoderLab lab;
-        lab.extension_variant = variant;
-        char name[32];
-        std::snprintf(name, sizeof name, "extension variant %3d", variant);
-        run(stream, name, lab, false, true);
     }
     return 0;
 }

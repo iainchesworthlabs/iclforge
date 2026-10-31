@@ -69,7 +69,6 @@ enum class Strictness : std::uint8_t {
 // has settled (ERRATA.md entry 69). All off is the decoder. A stream whose lossless checks pass
 // only with one on says what the point is; nothing else should set them.
 struct DecoderLab {
-    int extension_variant = 0;  // BlockContext::object_extension_variant
     // The object substream reads the bed rows as the substream before it output them, after that
     // substream's matrices, not before.
     bool lower_rows_after_matrices = false;

@@ -371,8 +371,24 @@ class Substream:
                         MATRIX_SHIFT - frac_bits + f_shift
                     )
             matrices.append((out, coeffs, bypass, noise_shift))
-        if bits.read(1):
-            raise StreamError("matrix extension (never written by DEE)")
+        # The extension (ERRATA 69): A2, B2, C2, a width and 2 bits for each matrix when C2 is set
+        # (the last widths stand otherwise), then a delta of width + 1 bits for each coefficient of
+        # each matrix whose width is not 0. The deltas are read and not applied.
+        widths = getattr(self, "object_widths", [0] * len(headers))
+        if len(widths) != len(headers):
+            widths = [0] * len(headers)
+        if bits.read(1) and bits.read(1):
+            if bits.read(1):
+                widths = []
+                for _ in headers:
+                    widths.append(bits.read(4))
+                    bits.read(2)
+            for width, (_o, _f, _s, mask, *_rest) in zip(widths, headers, strict=True):
+                if width:
+                    for channel in range(channels):
+                        if mask >> channel & 1:
+                            bits.signed(width + 1)
+        self.object_widths = widths
         return matrices
 
     def read_matrices(self, bits):
