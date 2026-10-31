@@ -4,9 +4,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
+#include <iterator>
 #include <numbers>
 #include <optional>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -69,6 +72,51 @@ TEST_CASE("every rate, channel count and width comes back sample for sample",
         REQUIRE(padding >= 0);
         REQUIRE(decoded.size() == pcm.size());
         REQUIRE(decoded == pcm);
+    }
+}
+
+TEST_CASE("at 176.4 and 192 kHz three or more channels are two substreams",
+          "[truehd][encoder][roundtrip]") {
+    // TH spec section 9.6's text forbids a second substream there; FFmpeg 8.0.1's strict decode
+    // refuses one substream of 3 or more channels and reads 2 + the rest (ERRATA.md entry 90).
+    for (const std::uint32_t rate : {176400U, 192000U}) {
+        for (const int channels : {2, 3, 6}) {
+            CAPTURE(rate, channels);
+            EncoderConfig config;
+            config.sample_rate = rate;
+            config.channels = channels;
+            config.restart_interval_units = 8;
+            config.verify = true;
+            auto encoder = Encoder::create(config);
+            REQUIRE(encoder.has_value());
+            CHECK(encoder->substreams() == (channels > 2 ? 2 : 1));
+            const auto pcm = make_pcm(channels, static_cast<int>(rate / 16), 24,
+                                      static_cast<std::uint32_t>(channels + 5));
+            const Encoded encoded = encode_all(config, pcm);
+            REQUIRE(encoded.stats.verified_units == encoded.units.size());
+            const auto decoded = decode_all(encoded.units, 24, channels, Presentation::kBest);
+            REQUIRE(decoded == pcm);
+            // Substream 0 is held to FIR order 4 (section 9.6); here both substreams are, so a
+            // request for order 8 writes the bytes order 4 does, and order 2 does not.
+            EncoderConfig four = config;
+            four.max_fir_order = 4;
+            EncoderConfig eight = config;
+            eight.max_fir_order = 8;
+            EncoderConfig two = config;
+            two.max_fir_order = 2;
+            const Encoded at_four = encode_all(four, pcm);
+            const Encoded at_eight = encode_all(eight, pcm);
+            REQUIRE(at_four.units.size() == at_eight.units.size());
+            for (std::size_t i = 0; i < at_four.units.size(); ++i) {
+                REQUIRE(at_four.units[i].bytes == at_eight.units[i].bytes);
+            }
+            std::size_t differing = 0;
+            const Encoded at_two = encode_all(two, pcm);
+            for (std::size_t i = 0; i < std::min(at_two.units.size(), at_four.units.size()); ++i) {
+                differing += at_two.units[i].bytes != at_four.units[i].bytes ? 1U : 0U;
+            }
+            CHECK(differing > 0);
+        }
     }
 }
 
@@ -135,22 +183,22 @@ TEST_CASE("a major sync and a restart header open every restart interval and no 
     }
 }
 
-TEST_CASE(
-    "the restart sync of a substream follows TH spec 7.2: 0x31EB unless it is the last of a "
-    "presentation",
-    "[truehd][encoder][stream]") {
+TEST_CASE("substream 1 of a stream of several substreams carries restart sync 0x31EB",
+          "[truehd][encoder][stream]") {
     // TH spec §7.2 (v3.9): a non-Atmos substream carries 0x31EA or 0x31EB whatever its index, and
-    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation,
-    // which is to say unless the stream has a third; the third (8 channel) substream carries 0x31EB
-    // (the owner's Blu-ray has 0x31EA in substream 0 and 0x31EB in 1 and 2). 0x31EC is the Atmos
-    // substream's and the encoder writes none.
+    // substream 1 SHALL carry 0x31EB unless it is the last substream of a 6 channel presentation.
+    // Every retail stream seen has 0x31EB in substream 1 whatever follows (the owner's Blu-rays:
+    // 0x31EA in substream 0 and 0x31EB in 1 and 2 of 7.1; the 48 and 192 kHz 5.1 tracks of a UHD
+    // Blu-ray: 0x31EB in 1 of 2), so the encoder writes it there (ERRATA.md entry 97); the third (8
+    // channel) substream carries it too. 0x31EC is the Atmos substream's and the encoder writes
+    // none.
     struct Case {
         int channels;
         std::vector<std::uint16_t> syncs;
     };
     const std::vector<Case> cases{
         {2, {kRestartSyncStandard}},
-        {6, {kRestartSyncStandard, kRestartSyncStandard}},
+        {6, {kRestartSyncStandard, kRestartSyncNoise}},
         {7, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
         {8, {kRestartSyncStandard, kRestartSyncNoise, kRestartSyncNoise}},
     };
@@ -542,4 +590,101 @@ TEST_CASE("silence costs almost nothing and a pair of equal channels costs one",
     config.channels = 1;
     const Encoded single = encode_all(config, mono);
     REQUIRE(paired.stats.bytes < single.stats.bytes + single.stats.bytes / 8);
+}
+
+namespace {
+
+// The 24 bit 5.1 music of testdata/truehd-dee/sources/fx_music_51.wav (0.25 s, a 44 byte header
+// and L R C LFE Ls Rs): the front and surround channels are 16 bit material with 7 or 8 clear low
+// bits and the centre and the LFE use all 24 bits.
+std::vector<std::int32_t> read_music_51() {
+    const std::string path =
+        std::string(ICLFORGE_GOLDEN_AUDIO_DIR) + "/../truehd-dee/sources/fx_music_51.wav";
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in.good());
+    const std::vector<char> file((std::istreambuf_iterator<char>(in)),
+                                 std::istreambuf_iterator<char>());
+    REQUIRE(file.size() > 44);
+    std::vector<std::int32_t> pcm;
+    for (std::size_t at = 44; at + 3 <= file.size(); at += 3) {
+        const auto b = [&](std::size_t k) {
+            return static_cast<std::uint32_t>(file[at + k]) & 0xFFU;
+        };
+        const std::uint32_t raw = b(0) | (b(1) << 8U) | (b(2) << 16U);
+        pcm.push_back(static_cast<std::int32_t>(raw << 8U) >> 8);
+    }
+    REQUIRE(pcm.size() % 6 == 0);
+    return pcm;
+}
+
+}  // namespace
+
+TEST_CASE("each channel sends its own clear low bits as its output shift and quantiser step",
+          "[truehd][encoder][stream]") {
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    config.verify = true;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(decode_all(encoded.units, 24, 6) == pcm);
+
+    // Substream 1 codes channels 2 to 5 and its block header sets the shift and step of all six.
+    auto parsed = parse_access_unit(encoded.units.front().bytes, 2, true);
+    REQUIRE(parsed.has_value());
+    const auto payload = parsed->segments[1];
+    iclforge::BitReader reader(payload);
+    REQUIRE(reader.read(1) == 1);  // block_header_exists
+    REQUIRE(reader.read(1) == 1);  // restart_header_exists
+    auto restart = read_restart_header(reader, payload, true);
+    REQUIRE(restart.has_value());
+    BlockContext context;
+    context.min_chan = restart->min_chan;
+    context.max_chan = restart->max_chan;
+    context.max_matrix_chan = restart->max_matrix_chan;
+    context.noise_type = restart->noise_type();
+    auto block = read_block_header(reader, context);
+    REQUIRE(block.has_value());
+    REQUIRE(block->output_shift);
+    REQUIRE(block->quant_step);
+    // L R Ls Rs: 8 clear bits (7 of them the shift) or 7 (the shift alone); C and LFE: none.
+    const std::array<int, 6> shift{7, 7, 0, 0, 7, 7};
+    const std::array<int, 6> step{1, 1, 0, 0, 0, 0};
+    for (std::size_t ch = 0; ch < 6; ++ch) {
+        CAPTURE(ch);
+        CHECK((*block->output_shift)[ch] == shift[ch]);
+        CHECK((*block->quant_step)[ch] == step[ch]);
+    }
+    // One step for all six sent the low 8 bits of four channels, 101,314 bytes in all; FFmpeg's
+    // encoder writes 63,254 and DEE's 58,688 for these samples.
+    CHECK(encoded.stats.bytes < 60'000);
+}
+
+TEST_CASE(
+    "one bit flipped in the payload of any unit of a real stream is refused by a strict decode",
+    "[truehd][decoder][checks]") {
+    // FFmpeg's strict decode of the same streams warns of the failed parity, checksum and lossless
+    // check and writes the wrong audio with exit status 0 (tools/checks/compare_truehd_decoders.py,
+    // `flip-payload`); this decoder stops at the unit.
+    const std::vector<std::int32_t> pcm = read_music_51();
+    EncoderConfig config;
+    config.channels = 6;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE(encoded.units.size() > 60);
+    std::size_t flips = 0;
+    for (const std::size_t victim : {std::size_t{5}, std::size_t{40}}) {
+        const std::size_t length = encoded.units[victim].bytes.size();
+        for (std::size_t step = 0; step < 24; ++step) {
+            std::vector<std::byte> damaged = encoded.units[victim].bytes;
+            const std::size_t at = length * 4 / 10 + step * (length * 5 / 10) / 24;
+            damaged[at] ^= std::byte{static_cast<unsigned char>(1U << (step % 8))};
+            Decoder decoder(DecoderConfig{});
+            for (std::size_t unit = 0; unit < victim; ++unit) {
+                auto clean = decoder.decode(encoded.units[unit].bytes);
+                REQUIRE(clean.has_value());
+            }
+            CHECK_FALSE(decoder.decode(damaged).has_value());
+            ++flips;
+        }
+    }
+    CHECK(flips == 48);
 }

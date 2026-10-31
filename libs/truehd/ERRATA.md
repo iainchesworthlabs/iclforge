@@ -339,6 +339,92 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
     presentation whose control bit is set.
 
+90. **Substreams at 176.4 and 192 kHz with more than 2 channels (TH spec §9.6; entry 91).** *Answered in the encoder, owner to confirm
+    (entry 91).* The encoder wrote one substream at these
+    rates, as §9.6 says, and FFmpeg 8.0.1's strict decode (the version `.github/workflows/_ci-core.yml` pins) refuses every such stream of
+    3 to 6 channels: `Assignment of matrix channel 0 to invalid output channel -22 is not implemented`, then `No restart header present in
+    substream 0`. The same decode takes the stereo streams, and takes the encoder's streams at 44.1, 48, 88.2 and 96 kHz. FFmpeg's own
+    encoder writes 192 kHz 3 and 6 channel streams as two substreams (2 and the rest, as it does at 48 kHz), which its decoder reads, and
+    forge written that way (a temporary one-line change to the layout, not kept) decodes in FFmpeg too: 3 channels 266,956 bytes against
+    FFmpeg's 270,482, 6 channels 648,754 against 565,828. The `fuzz_truehd_encoder_space.py` cases at 176.4 and 192 kHz with 3 or more
+    channels fail on this (10 of 110 in a 4 s run), as do `synth-6ch-192` of `verify_truehd_encode_interop.py --full` and the 192 kHz
+    5.1 row of `compare_truehd_encoders.py --programme`. DEE has no option for these rates, so no oracle but FFmpeg answers it. Does §9.6
+    forbid a second substream at 176.4 and 192 kHz, or does it only limit the filter order there? **Recommendation:** if §9.6 limits the
+    order only, write 2 + the rest as FFmpeg's encoder does, since the one reader that exists refuses the other; if it forbids a second
+    substream, keep one and have `truehd-encode` refuse 3 or more channels at these rates with a sentence, since the stream it writes
+    today plays nowhere the owner can test. The reference text read from the specification answers the first half and the evidence the
+    second (entry 91), and the encoder now writes 2 + the rest; the owner is asked to confirm that a Blu-ray or Dolby player accepts it.
+
+91. **IIR, and a filter order above 8, for material that was resampled up (TH spec §9.5; `libs/truehd/ERRATA.md` question 8, entry 13).**
+    The encoder writes no IIR filter. Measured with `tools/checks/compare_truehd_encoders.py`: on the 96 kHz music source
+    (`thd-fx-2ch-music-96k24`, a 48 kHz recording resampled up, so a band-limited signal) a least-squares FIR of order 32 needs about 11 per cent
+    fewer bits than order 8 by an estimate with exact coefficients (38,408 against 43,251 bytes of residual), while at 48 kHz the same
+    estimate gains under 3 per cent beyond order 8 (36,412 against 37,051 for the stereo music, 92,831 against 94,962 for the 5.1). forge is
+    0.932 of FFmpeg's size on that 96 kHz source and DEE's stream of it is not the source (entry 50), so no stream says how much of the 11 per
+    cent the format's FIR 8 plus IIR 4 reaches. A prototype fit of the two (FIR 8 and IIR 4 by regression on the residuals of a long fit) was
+    unstable once the coefficients were quantised and run in the decoder's recursion, which is the work an IIR writer has to do. Windowed and
+    least-squares FIR coefficients make the same stream within 0.04 per cent. **Recommendation:** do not write the IIR filter now: the gain is
+    on one kind of source, no external decoder but FFmpeg's exercises the tool, and the encoder is already smaller than FFmpeg's wherever
+    the comparison is valid except at 192 kHz, where the limit is the specification's (entry 35). Revisit if the owner's material is mostly
+    resampled up. *Read from the reference specification (§9.2, §9.3, §9.5, §9.6):* an IIR needs order 0 to 4 with order A + order B <= 8,
+    `coeff_q` 8 to 15 and the same for both filters of a channel, `coeff_bits` 1 to 16 with `coeff_bits + coeff_shift <= 16`, coefficients
+    within +-32767, `state_bits` 1 to 15 with the loaded state within +-2^23, and an output within +-2^23 (substreams 0 and 1) or +-2^31
+    (2 and 3); a restart never clears the IIR state (only the order and shift go to 0), so decoding from a restart on its own needs
+    `new_states` or a zero history. **The specification gives no stability criterion** for the quantised recursion, only these ranges and
+    "a conformant encoder SHALL detect filter overload", so the instability of my prototype is the case it leaves to the encoder. It says
+    nothing that ties IIR to resampled or band-limited material, and no decoder but FFmpeg's is known to exercise it (whether DEE writes
+    one is not looked at). The recommendation stands. **Measured on real material (2026-10-31, `tools/checks/estimate_truehd_iir_gain.py`):**
+    over 13 files of two channels, 24 segments of 5,120 samples each, with the coefficients quantised as the format asks, the recursion run in
+    integers, filter B's roots checked and the bits of each 80-sample block estimated from its mean absolute value, FIR order 8 plus IIR
+    order 4 is 99.9 to 100.4 per cent of order 8's bits on every real recording (a concert at 48, 96 and 192 kHz, film at 48 and 96 kHz
+    including the 96 kHz track that is band-limited, a 192 kHz film 5.1) and 99.7 to 100.0 per cent choosing the better of the two for each
+    segment: nothing. It reaches 96.3 per cent (best of the two) on the repository's music resampled up to 96 kHz by FFmpeg and 88.9 per
+    cent at 192 kHz, where substream 0 may not carry an IIR (§9.7) and so a stereo stream could not use it. In 1 to 3 of 24 segments of the
+    film material the fit was unstable or out of range and had to be dropped. FIR order 4 against 8 costs 0.3 to 8 per cent of the residual
+    bits (4.9 on the concert at 192 kHz), which is what the order-4 limit costs (question 96). The earlier estimate of about 11 per cent
+    belonged to the resampled test signal. **Recommendation: do not write the IIR filter**, now with a measurement behind it.
+92. **The corpus for the encoder comparison.** The repository has no 24-bit programme material: `testdata/audio` is 16 bit (a Mendelssohn
+    recording, a spoken-word recording, a 2.5 s 5.1 reference), so the 24-bit rows of `compare_truehd_encoders.py --programme` are 16-bit samples
+    in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. The reference session holds no source material of
+    this kind (only the DEE-encoded set, which is not source) and knows of no licensed 24-bit, film or 7.1 recording; forge can synthesise
+    signals but that is not programme material. *The owner's answer (2026-10-31): drive F: is 7.1 film and G: is 5.1 film.* Both are Blu-ray discs with clear streams: F: has a 24-bit DTS-HD MA 5.1
+    track and a TrueHD plus Atmos 7.1 track, G: a TrueHD plus Atmos 7.1 track. Six 45 s excerpts (two 5.1 from the DTS-HD MA track, four 7.1)
+    are in `D:/ac3bld/thd-corpus` (local, not committed) and measured on [the comparison page](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/truehd-comparison.md): 0.948
+    and 0.953 of FFmpeg's size on the 5.1, every forge stream exact in both decoders. Drive H: (a third disc, 2026-10-31) has a 96 kHz 24-bit 7.1 TrueHD track in its main feature and in a 98 s clip, and 16-bit stereo
+    LPCM clips (no use for 24 bit); eight 40 s excerpts of it (7.1, and the same audio as 5.1 and stereo by picking channels) are
+    in `D:/ac3bld/thd-corpus` too: forge is 0.84 to 0.94 of FFmpeg's size on the stereo and 5.1, and every stream is exact in both
+    decoders. That audio is band-limited (74 to 82 dB below the total above 24 kHz), the kind of source question 91's IIR estimate
+    was about, so the estimate could be run on it. A concert release the owner pointed to (a Blu-ray rip on the server: TrueHD plus Atmos 7.1 at 48 kHz, FLAC stereo at 96 and 192
+    kHz, all 24 bit, real full-band music) gave ten more 40 s excerpts, the 24-bit music asked for: forge is 0.93 to 0.95 of FFmpeg's size at
+    48 kHz, 0.97 at 96 and 1.02 to 1.04 at 192 kHz, every stream exact in both decoders. A film of a 1980s concert-driven drama (the owner's UHD Blu-ray remux) added four 40 s music excerpts at 48 kHz, 24 bit (its DTS-HD MA
+    5.1 and its FLAC stereo, from two loud passages: 0.94 to 0.95 of FFmpeg's size) and two of speech from its commentary track, which is a lossy
+    AC-3 decode (0.84 to 0.86); all exact in both decoders. **Question 92 is answered** for 24-bit music at 48, 96 and 192 kHz, film at 5.1 and
+    7.1, and speech as a signal; a 24-bit speech recording is the one thing the corpus lacks. **Recommendation:** 5 to 10
+    excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
+    music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
+93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,
+    9,954 from forge and 19,598 from FFmpeg's encoder, while the 16-bit stream of the same tones is 9,140 (DEE) and 9,116 (forge). Is there a DEE
+    option or behaviour that explains DEE's larger 20-bit stream? *From the specification only:* the one documented reason is the count of significant bits. `output_shift` and the
+    block's `huff_lsbs` capture trailing zeros, so 16 bit material in a 24 bit container has 8 and a 20 bit one 4, about 4 more significant
+    bits to code per sample; forge's 20 bit stream is 0.8 KB larger than its 16 bit one, DEE's 7 KB, FFmpeg's 5.7 KB. The specification has no
+    20-bit rule that forces extra size (dither and noise belong to `noise_type`, LSB bypass is optional, `mlp_quants` is only 0 = 16, 1 = 20,
+    2 = 24 bits), so forge's smaller stream is missing nothing it requires. Why DEE's is larger is an encoder strategy and not in the
+    specification. *Answered from the gold set's manifest (options and sizes only, 2026-10-31):* the DEE commands of the 16, 20 and 24 bit tones legs are the
+    same (`--presentation 2ch --input-format wav ... --overwrite 1`) and only the input differs; the 20 bit source is the 24 bit tones with
+    the low four bits clear and the 16 bit one is rounded to 16, and this DEE build lists no dither, noise, word-size or filter option, so
+    none was passed. The 7 KB is DEE's coding of a 20 bit signal, not an option and not a rule. **Closed; nothing for the owner.**
+94. **What "better than DEE" means for the encoder (WP5 question 1).** The comparison reports size at equal losslessness, the only measure two
+    lossless streams of one source have, and not speed: DEE is a licensed binary on another machine, so its speed is not comparable.
+    **Recommendation:** size first (bytes for the same bit-exact decode), then forge's own speed against the real-time budget (`iclforge-perf`).
+    On the 11 committed legs where DEE's stream is the source forge is 0.734 of its size in all and not larger on any (0.553 to 0.997); on the
+    5.1 music, the row that decided it, 0.966. *The specification adds two budgets an authoring flow keeps, beyond size:* a peak data rate of
+    at most 18 Mbit/s (§4.4, raw 6000 at 48 kHz, Blu-ray's default and ceiling) and the 75 ms decoder latency (§18, `input_timing` steps of
+    at most `samples_per_75ms`, with `block_data_bits` at most 16,000 and at most 2 blocks per segment for 2 substreams). The encoder
+    declares and keeps the peak rate and the 75 ms already (entry 12; `encoder.cpp` refuses a stream it cannot send within both);
+    "real-time headroom" is that and the speed. **Not checked:** it has no test of its own for `block_data_bits` at most 16,000 or the
+    blocks per segment (a 192 kHz 6 channel stream of white noise has more than 16,000 bits in a block of 160 samples if sent raw), which
+    is a gap to measure with the stream probe and close in a later change. No tighter ceiling is known; the work-package README names none.
+
 ## Entries
 
 Each is numbered; code and documentation cite them as "ERRATA n".
@@ -511,7 +597,7 @@ confirm** (Q10).
 rows 0 and 1 (L, R), substream 1 rows 2 to 5, `ch_assign` is the identity and there are no matrices
 (`dump_struct.py truehd_m51_s24.thd`); a 2 channel decode therefore gives L and R unchanged. The encoder spreads
 channels the same way, and puts rows 6 and 7 of an 8 channel stream in a third substream. At 176.4 and 192 kHz a stream
-has one substream (§9.6). FFmpeg writes no 7.1 stream, so the three substream form has FFmpeg's decoder as its only
+has one substream if it has 1 or 2 channels and two (2 and the rest, at most 6 channels) otherwise (entry 91). FFmpeg writes no 7.1 stream, so the three substream form has FFmpeg's decoder as its only
 check: it decodes it (entries 32 to 34).
 
 **32. A substream above 6 channels (§7.2, §10.2).** A stream whose third substream (rows 6 and 7) has restart sync 0x31EA
@@ -693,7 +779,7 @@ the byte. **Confirmed by the Blu-ray; the meaning of 3 is open (question 46).**
 presentation (the third, 8 channel substream of a non-Atmos 7.1 stream carries 0x31EB too). The owner's Blu-ray agrees: 0x31EA in
 substream 0, 0x31EB in 1 and 2, 0x31EC in 3. The encoder wrote 0x31EB only for a substream with a channel above 5 (entry 32); it now
 writes it for substream 1 of every stream that has a third substream (7 and 8 channels, with or without the downmix presentations) and
-0x31EA for the last substream of a 5.1 or stereo stream. The matrices of such a substream carry the 4-bit noise shift, zero, and no noise
+0x31EA for the last substream of a 5.1 stream (**changed by entry 97: now 0x31EB in substream 1 of every stream of several substreams**). The matrices of such a substream carry the 4-bit noise shift, zero, and no noise
 channel coefficients (entry 32); FFmpeg's strict decode of those streams is exact (`verify_truehd_encode_interop.py`, the 7 and 8 channel
 cases), and `test_encoder.cpp` reads the syncs. The decoder takes 0x31EA, 0x31EB and 0x31EC in any substream and ties nothing but the
 `huff_lsbs` limit (31) to 0x31EC; v3.9 says only that 0x31EC marks the Atmos substream, so it does not refuse it elsewhere. §2.3, §20.1
@@ -1103,3 +1189,71 @@ too. FFmpeg's strict decode of a join is the two decodes in order, and of a cut 
 (`planning/truehd-parity-forge.md`, question 14, which asks whether the words should be renumbered). `forge`'s own strict decode stops
 at the join, for the reason of question 20, and `truehd-check=lenient` decodes it. **Provisional, owner to confirm**; no player has been
 asked about the timing words.
+
+## Encoder quality (WP5)
+
+**90. A channel's own output shift and quantiser step (TH spec §8.2).** The encoder sent one output shift and one quantiser step for
+all channels, the smallest the whole interval allowed. A 5.1 programme whose L, R, Ls and Rs are 16 bit material (7 or 8 clear low bits)
+and whose C and LFE use all 24 bits then sent the low 8 bits of four channels for nothing: `thd-fx-6ch-music-48k24` was 101,314 bytes
+against FFmpeg's 63,254 and DEE's 58,688. The block header carries a shift for each matrix channel and a step for each channel, the
+decoder keeps both per channel (`state.quant_step[ch]`, the matrix keeps the low bits its output channel's step clears), and FFmpeg's
+strict decode reads them: the encoder now finds each channel's clear low bits in the interval and sends them as that channel's shift
+(at most 7) and step (the rest, at most 15). A pair matrix is tried only between rows with the same shift and step (the fold is then the
+same arithmetic in both). The standard downmix folds channels into each other with one step, so a stream with it keeps the common one.
+The same 5.1 stream is 56,672 bytes. The size is the evidence and the strict decode the check; how another encoder chooses a channel's step
+is not looked at (README rule 4 of the work packages).
+
+**91. Two substreams at 176.4 and 192 kHz for 3 or more channels (TH spec §9.6, "192/176.4 kHz Restrictions"; question 90). Provisional, owner to confirm.**
+The restrictions read, for these two rates: filter A (FIR) order at most 4 in substream 0; no filter B (IIR) in substream 0; no LSB bypass in
+substream 0; **a second substream shall not be present**. The encoder followed the last line and wrote one substream of 3 to 6 channels,
+which FFmpeg 8.0.1's strict decode refuses ("Assignment of matrix channel 0 to invalid output channel -22", "No restart header present in
+substream 0"), while FFmpeg's own encoder writes such streams as two substreams (2 and the rest, the layout it uses at 48 kHz) and its
+decoder reads them. The stream and the text disagree, and the stream of the one reader there is wins (this file's preamble): the encoder
+lays out 3 to 6 channels at 176.4 and 192 kHz as at 48 kHz, 2 channels in substream 0 and the rest in substream 1; 1 and 2 channels stay in
+one substream; more than 6 channels stay refused (FFmpeg caps the stream at 6 as well). Substream 0 keeps the written limits (order 4, no
+IIR, no LSB bypass), as every substream of such a stream does here (the order cap applies to all of them, so substream 1 could code a little
+smaller with order 8, which the specification does not say it may). Measured: the 192 kHz 5.1 programme row of `compare_truehd_encoders.py`
+decodes exactly in FFmpeg's strict decode (1,953,458 bytes, 1.149 of FFmpeg's 1,699,984); `verify_truehd_encode_interop.py --full` is
+43 cases, 0 failing, with `synth-6ch-192` at 1.012; `fuzz_truehd_encoder_space.py` ran 2,815 cases and the regression seeds with 0
+failing, where 10 of 110 failed with one substream; a library test decodes 2, 3 and 6 channels at both rates with the encoder's own check
+on. Not known: whether a Dolby decoder (a Blu-ray player) accepts the stream: there is no reference 192 kHz multichannel stream, and DEE has
+no option for these rates, so no oracle but FFmpeg answers it. Checked against FFmpeg's own 192 kHz 5.1 stream with `forge probe detail=structure`: forge's has the same structure
+(substream 0 and substream 1 both restart sync 0x31EA at the time, since substream 1 is the last substream of a presentation of at most
+6 channels (§7.2); entry 97 then moved substream 1 to 0x31EB; `substream_info` 0x3C; `extended_substream_info` 0; channels 2 and 6); the peak data rate differs on purpose (18 Mbit/s declared
+by default against FFmpeg's 9.588). The reference specification's own text now agrees (the "second substream" clause was read as wrong
+for 3 or more channels and rewritten in the reference copy, v3.24, §9.7 and §5.3); FIR order in substream 1 may go to 8 there, and
+stays capped at 4 here. **Question for the owner (95), the owner's lean is to keep two substreams:** is a stream written against the
+text of the v3.9 specification's "shall not" acceptable where the reference decoder and FFmpeg's encoder both do the other thing, or
+should `truehd-encode` refuse 3 or more channels at these rates until a player has been tried? **The owner answered yes (2026-10-31): keep two substreams.** The reference session then checked four forge
+streams (192 kHz 6 and 3 channels, 176.4 kHz 3 channels, 176.4 kHz stereo as the one-substream control, from the repository's own 5.1
+reference programme, in an independent decode and in FFmpeg's): all decode to their source sample for sample in both decoders, every
+restart header and segment passes its CRC and parity, substream 1 has sync 0x31EA, `substream_info` is 0x3C (0x14 for the lone stereo
+substream) and `extended_substream_info` 0, no LSB bypass is written, the per-unit timing is far inside 75 ms and a unit is about 1 KB
+against the 16,000 bit block limit. Not checked by it: the FIR order of each substream and the exact number of blocks per segment (a
+unit of 160 samples holds at most 2). The order is held here: a test encodes 192 and 176.4 kHz streams of 2, 3 and 6 channels at
+orders 8 and 4 (same bytes) and at 2 (different bytes). The declared peak rate is the configured ceiling (18 Mbit/s, 17,992,800 at 176.4
+kHz), not the stream's measured peak, on purpose (entry 12): it is the rate the stream is declared and checked not to exceed. The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
+`test_encoder.cpp` holds the two substreams.
+
+**96. FIR order at 192 kHz costs 2 to 4 per cent on real music (TH spec §9.6; entry 35; question 14).** On two 40 s excerpts of the concert's
+192 kHz FLAC stereo track forge's stream is 1.018 and 1.037 of FFmpeg's (27,711,254 and 27,527,458 bytes against 27,209,944 and
+26,556,322), where at 96 kHz it is 0.973 and at 48 kHz 0.93 to 0.95. The one substream of a stereo stream at 176.4 and 192 kHz is held to
+FIR order 4 as the specification says (the "in substream 0" limits of §9.7 of the reference copy), and FFmpeg's encoder writes order 7 and its
+decoder reads it. **Recommendation:** keep the specification's limit: the loss is small, the specification does not say why the limit is there (a hardware
+decoder's filter cycles is a guess), and the one reader that shows order 7 is accepted is not a Blu-ray player. If the owner wants to
+trade the limit for size, an option `fir-order-over-spec` could lift it for authoring to software players, off by default. Left as is.
+
+**97. The restart sync of substream 1 in a stream of two substreams (TH spec §7.2; entry 48; question 90). Done, owner agreed 2026-10-31.** The retail 192 kHz and 48 kHz
+5.1 TrueHD tracks of one of the owner's UHD Blu-rays, an animated feature (read with `forge probe detail=structure`, structure only) are two substreams of 2 and
+6 channels with `substream_info` 0x3C and `extended_substream_info` 0, which is the layout forge now writes at 192 kHz, and their substream 1
+carries restart sync **0x31EB** (substream 0 0x31EA), where forge and FFmpeg's encoder write 0x31EA there because the reference
+specification exempts the last substream of a presentation of at most 6 channels. The owner's 7.1 Blu-rays carry 0x31EB in substreams 1 and 2
+(entry 48), so every retail stream seen has 0x31EB in substream 1. FFmpeg's strict decode takes either: forge's 192 kHz and 48 kHz 5.1
+streams written with 0x31EB in substream 1 (a temporary change, not kept) decode to their source sample for sample. **Recommendation:** write
+0x31EB in substream 1 of every stream of two or more substreams, as retail discs do, since a Blu-ray player has been shown to accept it
+and the exemption is only a reading of the specification; the change is one condition in `noise_flag` (`encoder.cpp`) and moves the
+golden bytes of the 3 to 6 channel tests. **Done:** `noise_flag` now returns true for substream 1 of any stream of two or more substreams;
+`test_encoder.cpp` reads 0x31EA, 0x31EB for 6 channels; the 43-case interop matrix is 43 cases with none failing, the fuzzer ran 1,674 cases and
+the regression seeds with none failing, and the 158 TrueHD and forge tests pass (one skipped here). Both retail layouts (two substreams of 2
+and 6 channels at 48 and 192 kHz) are now what forge writes, which answers question 90's last doubt about a Dolby decoder: the retail
+discs are what such decoders play.
