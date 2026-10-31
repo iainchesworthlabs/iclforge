@@ -151,10 +151,18 @@ struct NoiseDraw {
 // matrix's noise (TH spec §17.3) if it draws any, shifted down by 14, with the quantiser step's low
 // bits cleared (`keep`); with LSB bypass the bit the stream sent for this matrix (`bypass`, bit
 // `matrix_index`) is added back.
+// The extension of an object matrix (ERRATA.md entry 69): `delta[k]` is the finer part of coefficient
+// k, in units of 2^-`bits` of the coefficient's own last place and already scaled to 2^-15.
+struct FineTerms {
+    const std::int32_t* delta = nullptr;
+    int bits = 0;
+};
+
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
                          int matrix_index, const std::uint16_t* bypass, std::int32_t* rows,
-                         std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
+                         std::ptrdiff_t stride, const NoiseDraw& noise = {},
+                         const FineTerms& fine = {}) {
     const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + kNoiseScaleShift);
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
@@ -175,7 +183,16 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                 sum += half;
             }
         }
-        std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
+        int shift = kMatrixShift;
+        if (fine.bits != 0) {
+            std::int64_t finer = 0;
+            for (int k = 0; k < count; ++k) {
+                finer += std::int64_t{row[channel[k]]} * fine.delta[k];
+            }
+            sum = (sum << fine.bits) + finer;
+            shift += fine.bits;
+        }
+        std::uint32_t value = static_cast<std::uint32_t>(sum >> shift) & keep;
         if (lsb_bypass) {
             const std::uint32_t sent = bypass[static_cast<std::size_t>(i)];
             value += (sent >> matrix_index) & 1U;

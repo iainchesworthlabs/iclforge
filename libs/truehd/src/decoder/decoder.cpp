@@ -72,6 +72,9 @@ struct MatrixPlan {
     // channels, then the two noise channels (columns kMaxChannels and kMaxChannels + 1).
     std::array<std::uint8_t, kRowStride> channel{};
     std::array<std::int32_t, kRowStride> coeff{};
+    // The extension's finer part of each coefficient, scaled to 2^-15 and read as 2^-fine_bits.
+    std::array<std::int32_t, kRowStride> fine{};
+    int fine_bits = 0;
 };
 
 struct SubstreamState {
@@ -471,6 +474,11 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
             plan.noise_shift = spec.noise_shift;
+            const int mode = restart.sync == kRestartSyncAtmos ? config.lab.object_extension : 0;
+            const bool use_fine = mode != 0 && spec.ext_width != 0 && (mode != 3 || header.matrices->extension);
+            if (use_fine) {
+                plan.fine_bits = spec.ext_width + (mode == 2 ? 0 : 1);
+            }
             if (restart.sync == kRestartSyncAtmos) {
                 plan.noise_shift = spec.field_m4;
             }
@@ -488,6 +496,7 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                           ? kMatrixShift - spec.frac_bits - spec.f_shift
                                           : kMatrixShift - spec.frac_bits + spec.f_shift;
                     plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
+                    plan.fine[slot] = use_fine ? spec.ext_value[index] * (1 << std::max(scale, 0)) : 0;
                 }
             }
         }
@@ -715,7 +724,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
             kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
                                   plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride, noise);
+                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits});
         }
     }
 

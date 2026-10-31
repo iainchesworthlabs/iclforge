@@ -158,11 +158,8 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
             }
         }
     } else if (context.object_previous != nullptr) {
-        set = *context.object_previous;
+        set = *context.object_previous;  // the deltas stand with the matrices
         set.extension = false;
-        for (MatrixSpec& matrix : set.items) {
-            matrix.ext_value = {};
-        }
     }
     // The extension (A2, B2, C2; ERRATA.md entry 69): per-block deltas to the coefficients, for a
     // moving object. A2 says there is one; B2 that this block has deltas; C2 that the width of the

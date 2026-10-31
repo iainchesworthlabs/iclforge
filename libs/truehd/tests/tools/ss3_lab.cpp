@@ -261,6 +261,12 @@ int main(int argc, char** argv) {
         tied.object_tie_mode = mode;
         settings.push_back({kTieNames[mode], tied});
     }
+    static const char* const kExtensionNames[] = {"", "extension refines by 2^-(width+1)", "extension refines by 2^-width", "extension refines (width+1), its block only"};
+    for (int mode = 1; mode <= 3; ++mode) {
+        DecoderLab refined = base;
+        refined.object_extension = mode;
+        settings.push_back({kExtensionNames[mode], refined});
+    }
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});
