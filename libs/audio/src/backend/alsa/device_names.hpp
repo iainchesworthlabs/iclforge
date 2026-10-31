@@ -57,9 +57,11 @@ struct ChannelStatus {
 // WAVEFORMATEXTENSIBLE, and this backend by opening the device at 4x. AC-4
 // runs its link at the content rate, and its HBR4 bursts at 4x like E-AC-3's
 // (IEC 61937-14 5.3.1 and 5.3.3): audio::carrier_ratio() has every format's.
+// MAT's link is 192 kHz (176.4 kHz) at any content rate of its family, and 0 for
+// a content rate it has none for: audio::link_rate() has the table.
 [[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
                                                    std::uint32_t content_rate) {
-    return content_rate * audio::carrier_ratio(format);
+    return audio::link_rate(format, content_rate);
 }
 
 // Channel status for an IEC 61937 burst stream on a link running at

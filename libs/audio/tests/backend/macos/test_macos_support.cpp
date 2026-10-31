@@ -55,6 +55,10 @@ TEST_CASE("the physical format id matches the bitstream kind") {
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4).has_value());
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4Hbr4).has_value());
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4Hbr16).has_value());
+    // Nor is one known for TrueHD (MAT): the backend refuses it rather than open a guess.
+    CHECK_FALSE(physical_format_id(BitstreamFormat::kMat).has_value());
+    CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
 }
 
 TEST_CASE("a stream's available formats are searched for a matching id and rate") {
