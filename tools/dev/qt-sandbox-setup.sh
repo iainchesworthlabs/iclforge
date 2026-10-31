@@ -180,10 +180,8 @@ write_port_files() {
 # The Debian copyright file of a package apt installed, or the first licence file the library's
 # headers sit beside, as the texts for libflac and opus.
 system_licence() {
-    local package="$1" out="$2" f
-    for f in "/usr/share/doc/$package/copyright"; do
-        if [[ -f "$f" ]]; then cp "$f" "$out"; return 0; fi
-    done
+    local package="$1" out="$2" f="/usr/share/doc/$1/copyright"
+    if [[ -f "$f" ]]; then cp "$f" "$out"; return 0; fi
     # No Debian file (--no-apt on a minimal image): say where the text is rather than leave nothing.
     printf 'See the licence of the %s package installed on this machine.\n' "$package" >"$out"
 }
