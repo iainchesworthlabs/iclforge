@@ -312,6 +312,13 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
 
     // TH spec §7.3: this header carries the check of the interval that ends here.
     if (state.running && state.interval_open) {
+        if (index == kObjectSubstream &&
+            counters.object_checks_kept < DecoderCounters::kObjectChecksKept) {
+            counters.object_check_stored[counters.object_checks_kept] = header->lossless_check;
+            counters.object_check_folded[counters.object_checks_kept] =
+                lossless_check_of(state.interval_fold);
+            ++counters.object_checks_kept;
+        }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
             ++counters.lossless_ok_by_substream[static_cast<std::size_t>(index)];

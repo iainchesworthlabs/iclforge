@@ -66,6 +66,13 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
         std::printf("  first: %s", first_error.c_str());
     }
     std::printf("\n");
+    // The first checks of the object substream: the stored byte, the folded byte, and their XOR.
+    std::printf("    stored/folded/xor:");
+    for (std::size_t i = 0; i < c.object_checks_kept; ++i) {
+        std::printf(" %02x/%02x/%02x", c.object_check_stored[i], c.object_check_folded[i],
+                    static_cast<unsigned>(c.object_check_stored[i] ^ c.object_check_folded[i]));
+    }
+    std::printf("\n");
 }
 
 }  // namespace

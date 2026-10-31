@@ -129,6 +129,12 @@ struct DecoderCounters {
     // The same, by substream.
     std::array<std::uint64_t, kMaxSubstreams> lossless_ok_by_substream{};
     std::array<std::uint64_t, kMaxSubstreams> lossless_failed_by_substream{};
+    // The first checks of the object substream: the byte the restart header stored and the one the
+    // decoder folded (ERRATA.md entry 69; for the trials of DecoderLab).
+    static constexpr std::size_t kObjectChecksKept = 12;
+    std::array<std::uint8_t, kObjectChecksKept> object_check_stored{};
+    std::array<std::uint8_t, kObjectChecksKept> object_check_folded{};
+    std::size_t object_checks_kept = 0;
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
     // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec
