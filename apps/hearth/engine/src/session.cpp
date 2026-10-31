@@ -191,7 +191,7 @@ struct Ac4ObjectReading {
 
 std::expected<Session, std::string> Session::open(
     const std::string& path, const ItemLoader& loader, std::optional<int> programme,
-    const iclforge::ac4::PresentationChoice& presentation) {
+    const iclforge::ac4::PresentationChoice& presentation, TrackPreference track) {
     if (!loader) {
         return std::unexpected(std::string{"Nothing is set up to read items."});
     }
@@ -199,8 +199,16 @@ std::expected<Session, std::string> Session::open(
     if (!loaded) {
         return std::unexpected(std::move(loaded.error()));
     }
+    const bool offers_compressed = static_cast<bool>(loaded->compressed_track);
+    if (track == TrackPreference::kCompressed && offers_compressed) {
+        // The file's other track, if it reads; the one already loaded plays if it does not.
+        if (auto other = loaded->compressed_track(); other) {
+            loaded = std::move(other);
+        }
+    }
 
     Session session;
+    session.has_compressed_track_ = offers_compressed && loaded->truehd;
     std::string note = std::move(loaded->note);
     std::vector<std::uint32_t> lengths;
     std::uint32_t rate = 0;

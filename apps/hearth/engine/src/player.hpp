@@ -520,6 +520,10 @@ private:
     // The output a session's item would be played through, as the decision
     // has it, asked while the open output is held.
     [[nodiscard]] OutputChoice decide(const Session& session) const;
+    // Opens `path` as the settings say, which for a file with a TrueHD track first and a
+    // compressed one after it (settings_.track) includes which of the two plays: the compressed one
+    // where the output decision for it is a bitstream, else the TrueHD, decoded here.
+    [[nodiscard]] std::expected<Session, std::string> open_session(const std::string& path) const;
     [[nodiscard]] HeldOutput held_output() const;
     // Why the prepared item cannot join the open output although the
     // transport would join it, or empty: another endpoint, or units the

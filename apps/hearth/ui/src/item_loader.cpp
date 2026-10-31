@@ -4,14 +4,19 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "item_source.hpp"
 #include "container_input.hpp"
+#include "container_stream.hpp"
 
 namespace iclforge::hearth::ui {
 
@@ -76,6 +81,86 @@ private:
 
 }  // namespace
 
+namespace {
+
+// The codecs of a file's tracks that Hearth can send to an output as they are.
+constexpr iclforge::apps::CodecSet kCompressedCodecs{
+    .ac3 = true, .eac3 = true, .ac4 = true, .truehd = false};
+
+// A transport stream is read whole: its reader rebuilds a PES packet from the payloads of many
+// transport packets, so a frame is not one run of the file (container_stream.hpp). This is the
+// most of one the loader holds; a longer one is refused, by name, instead of exhausting memory.
+constexpr std::uint64_t kTransportStreamLimit = std::uint64_t{1} << 30;
+
+// Whether a container says it holds an AC-3, E-AC-3 or AC-4 audio track besides the one read.
+[[nodiscard]] bool lists_compressed_track(const iclforge::apps::ContainerFacts& container) {
+    return std::ranges::any_of(container.other_tracks, [](const iclforge::apps::OtherTrack& other) {
+        return other.kind == "audio" &&
+               (other.codec_id == "A_AC3" || other.codec_id == "A_EAC3" || other.codec_id == "ac-3" ||
+                other.codec_id == "ec-3" || other.codec_id == "ac-4");
+    });
+}
+
+// The item for a track found in a container file. A TrueHD track is read where it lies, a window
+// at a time (iclforge::apps::ExtentSource); any other is small, and is read whole.
+[[nodiscard]] std::expected<LoadedItem, std::string> track_item(
+    const std::shared_ptr<FileByteSource>& file, iclforge::apps::StreamedTrack track,
+    bool offer_compressed) {
+    if (!track.error.empty()) {
+        return std::unexpected(std::move(track.error));
+    }
+    LoadedItem item{.skip_samples = track.trim.start,
+                    .play_samples = track.trim.length,
+                    .note = std::move(track.trim_note),
+                    .container = std::move(track.container)};
+    if (track.codec == iclforge::apps::TrackCodec::kTruehd) {
+        item.truehd = true;
+        if (offer_compressed && lists_compressed_track(item.container)) {
+            item.compressed_track = [file]() {
+                return track_item(
+                    file, iclforge::apps::index_container_track(*file, kCompressedCodecs), false);
+            };
+        }
+        item.source = std::make_shared<iclforge::apps::ExtentSource>(file, std::move(track.extents));
+    } else {
+        item.bytes = iclforge::apps::read_track_bytes(*file, track);
+    }
+    return item;
+}
+
+// A transport stream's item, from the whole file as the batch demuxer reads it.
+[[nodiscard]] std::expected<LoadedItem, std::string> transport_stream_item(
+    std::vector<std::byte> bytes) {
+    auto stream = iclforge::apps::elementary_stream_from_bytes(bytes, kPlayedCodecs);
+    if (!stream.error.empty()) {
+        return std::unexpected(std::move(stream.error));
+    }
+    LoadedItem item{.bytes = std::move(stream.bytes),
+                    .truehd = stream.codec == iclforge::apps::TrackCodec::kTruehd,
+                    .skip_samples = stream.trim.start,
+                    .play_samples = stream.trim.length,
+                    .note = std::move(stream.trim_note),
+                    .container = std::move(stream.container)};
+    if (item.truehd) {
+        // The file is in memory already; the compressed track comes out of the same bytes.
+        auto whole = std::make_shared<const std::vector<std::byte>>(std::move(bytes));
+        item.compressed_track = [whole]() -> std::expected<LoadedItem, std::string> {
+            auto other = iclforge::apps::elementary_stream_from_bytes(*whole, kCompressedCodecs);
+            if (!other.error.empty()) {
+                return std::unexpected(std::move(other.error));
+            }
+            return LoadedItem{.bytes = std::move(other.bytes),
+                              .skip_samples = other.trim.start,
+                              .play_samples = other.trim.length,
+                              .note = std::move(other.trim_note),
+                              .container = std::move(other.container)};
+        };
+    }
+    return item;
+}
+
+}  // namespace
+
 iclforge::hearth::ItemLoader make_file_item_loader() {
     return [](const std::string& path) -> std::expected<LoadedItem, std::string> {
         if (!is_media_extension(lowercase_extension(path))) {
@@ -87,56 +172,46 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         if (sized) {
             return std::unexpected(sized.message());
         }
-        std::ifstream file(path, std::ios::binary);
-        if (!file) {
+        auto file = std::make_shared<FileByteSource>(path, size);
+        if (!file->ok()) {
             return std::unexpected("could not open the file");
         }
-        // A bare TrueHD or MLP stream is told by its first bytes and is not read into memory:
-        // the session indexes it and reads it as it plays.
-        std::vector<std::byte> head(static_cast<std::size_t>(std::min<std::uintmax_t>(size, kSniffBytes)));
-        if (!head.empty()) {
-            file.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
-            if (!file) {
+        // The file is told by its first bytes, not its name (a rip is as likely to be called
+        // "title00.mkv" when it is not one, and an MP4 may be named ".ac3").
+        std::vector<std::byte> head(
+            static_cast<std::size_t>(std::min<std::uintmax_t>(size, kSniffBytes)));
+        if (file->read(0, head) != head.size()) {
+            return std::unexpected("could not read the file");
+        }
+        const iclforge::apps::ContainerKind kind = iclforge::apps::sniff_container(head);
+        if (kind == iclforge::apps::ContainerKind::kUnknown) {
+            // A bare TrueHD or MLP stream is not read into memory: the session indexes it and
+            // reads it as it plays.
+            if (iclforge::apps::looks_like_truehd(head)) {
+                return LoadedItem{.source = std::move(file), .truehd = true};
+            }
+            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            if (file->read(0, bytes) != bytes.size()) {
                 return std::unexpected("could not read the file");
             }
-        }
-        if (iclforge::apps::sniff_container(head) == iclforge::apps::ContainerKind::kUnknown &&
-            iclforge::apps::looks_like_truehd(head)) {
-            auto source = std::make_shared<FileByteSource>(path, size);
-            if (!source->ok()) {
-                return std::unexpected("could not open the file");
-            }
-            return LoadedItem{.source = std::move(source), .truehd = true};
-        }
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
-        std::copy(head.begin(), head.end(), bytes.begin());
-        if (bytes.size() > head.size()) {
-            file.read(reinterpret_cast<char*>(bytes.data() + head.size()),
-                      static_cast<std::streamsize>(bytes.size() - head.size()));
-            if (!file) {
-                return std::unexpected("could not read the file");
-            }
-        }
-        // A container is told by its first bytes, not its name (a rip is as
-        // likely to be called "title00.mkv" when it is not one, and an MP4 may
-        // be named ".ac3"), so a bare stream goes through whatever its
-        // extension says, without a second copy of it.
-        if (iclforge::apps::sniff_container(bytes) == iclforge::apps::ContainerKind::kUnknown) {
             return LoadedItem{.bytes = std::move(bytes)};
         }
-        auto stream = iclforge::apps::elementary_stream_from_bytes(bytes, kPlayedCodecs);
-        if (!stream.error.empty()) {
-            return std::unexpected(std::move(stream.error));
+        if (kind == iclforge::apps::ContainerKind::kMpegTs) {
+            if (size > kTransportStreamLimit) {
+                return std::unexpected(
+                    "a Transport Stream over 1 GiB is not read yet: Hearth holds one in memory");
+            }
+            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            if (file->read(0, bytes) != bytes.size()) {
+                return std::unexpected("could not read the file");
+            }
+            return transport_stream_item(std::move(bytes));
         }
-        // The edit list's priming and padding are decoded but not played
-        // (Session applies skip_samples and play_samples); what the container
-        // said about the track reaches the media information.
-        return LoadedItem{.bytes = std::move(stream.bytes),
-                          .truehd = stream.codec == iclforge::apps::TrackCodec::kTruehd,
-                          .skip_samples = stream.trim.start,
-                          .play_samples = stream.trim.length,
-                          .note = std::move(stream.trim_note),
-                          .container = std::move(stream.container)};
+        // Matroska and MP4: the track is found where it lies and read from there, so a film's
+        // lossless track is never held beside the file. The edit list's priming and padding are
+        // decoded but not played (Session applies skip_samples and play_samples); what the
+        // container said about the track reaches the media information.
+        return track_item(file, iclforge::apps::index_container_track(*file, kPlayedCodecs), true);
     };
 }
 

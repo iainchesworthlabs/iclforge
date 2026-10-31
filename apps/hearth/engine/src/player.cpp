@@ -229,6 +229,27 @@ std::optional<audio::BitstreamFormat> Player::sent_stream(const Session& session
     return session.first_programme() ? session.facts().stream : std::nullopt;
 }
 
+std::expected<Session, std::string> Player::open_session(const std::string& path) const {
+    const TrackPreference wanted = settings_.track;
+    auto best = Session::open(path, loader_, settings_.programme, presentation_choice(settings_),
+                              wanted == TrackPreference::kCompressed ? TrackPreference::kCompressed
+                                                                     : TrackPreference::kBest);
+    if (!best || wanted != TrackPreference::kAutomatic || !best->has_compressed_track()) {
+        return best;
+    }
+    // The file's best track is TrueHD, which this player can only decode. A compressed track
+    // after it plays instead where the output it would be sent to takes the stream as it is.
+    auto compressed = Session::open(path, loader_, settings_.programme,
+                                    presentation_choice(settings_), TrackPreference::kCompressed);
+    if (compressed && !compressed->truehd()) {
+        const OutputMode mode = decide(*compressed).mode;
+        if (mode == OutputMode::kBitstream || mode == OutputMode::kBitstreamAsAc3) {
+            return compressed;
+        }
+    }
+    return best;
+}
+
 OutputChoice Player::decide(const Session& session) const {
     if (!choose_) {
         return OutputChoice{.mode = OutputMode::kLocalPcm,
@@ -1397,8 +1418,7 @@ bool Player::start_session(std::size_t item) {
         return true;
     }
     drop_prepared();
-    auto opened = Session::open(queue_.items()[item].path, loader_, settings_.programme,
-                                presentation_choice(settings_));
+    auto opened = open_session(queue_.items()[item].path);
     if (!opened) {
         last_error_ = std::move(opened.error());
         return false;
@@ -1997,8 +2017,7 @@ std::size_t Player::prepare_next(PumpReport& report) {
             return Queue::kNone;
         }
         drop_prepared();
-        auto opened =
-            Session::open(path, loader_, settings_.programme, presentation_choice(settings_));
+        auto opened = open_session(path);
         if (opened) {
             queue_.set_facts(next, opened->facts());
             prepared_ = std::move(*opened);
