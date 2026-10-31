@@ -205,7 +205,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for suite in tools/checks tools/ci tools/hearth tools/adapt tools/pictures; do
+          for suite in tools/checks tools/ci tools/hearth tools/adapt tools/pictures tools/release; do
             printf '\n=== %s ===\n' "$suite"
             python3 -m unittest discover --start-directory "$suite" --pattern 'test_*.py' --verbose
           done
@@ -415,6 +415,26 @@ jobs:
         run: |
           python3 tools/checks/check_patch_attribution.py --range "$BASE_SHA..HEAD" \
             --expect-name "Iain Chesworth" --expect-email "iain.chesworth@gmail.com"
+
+      # Where a change's changelog entry goes. CHANGELOG.md's `## [Unreleased]` took every pull
+      # request's entry at the same place, so two pull requests landing together collided, and the
+      # merge that fixed the collision started CI again. A change adds changelog.d/<slug>.<type>.md
+      # instead and a release assembles them (changelog.d/README.md, tools/release/changelog_tool.py).
+      # This fails a pull request that edits CHANGELOG.md, other than the release's own, which
+      # deletes the fragments it assembles, and one whose fragment is misnamed or has no bold lead-in.
+      # The label `changelog-edit` lets a pull request edit the file by hand (a rewrite of the
+      # whole file, say); it does not exist until someone needs it. Whether a change has an entry
+      # at all is not gated (--require-fragment is the switch, and the unit tests hold it).
+      - name: Changelog fragment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dependabot/') }}
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ALLOW_EDIT: ${{ contains(github.event.pull_request.labels.*.name, 'changelog-edit') }}
+        run: |
+          flags=()
+          if [ "$ALLOW_EDIT" = "true" ]; then flags+=(--allow-changelog); fi
+          python3 tools/checks/check_changelog_fragment.py --base "$BASE_SHA" "${flags[@]}"
 
       # The comparison tables are committed Markdown so they remain searchable
       # and usable without JavaScript. The home-page selector reads the JSON

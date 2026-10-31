@@ -129,8 +129,8 @@ channels with a primitive matrix where that makes the stream smaller, predicts e
 to order 8 found by windowed autocorrelation and the Levinson-Durbin recursion (order 4 at 176.4 and 192 kHz, the
 specification's limit), and codes each block's residual with whichever of the three codebooks or raw bits takes the
 fewest bits, with the offset and raw width to match. Channels are spread over substreams the way FFmpeg's encoder
-spreads them: two in substream 0, the next four in substream 1 and the last two in substream 2 (one substream at
-176.4 and 192 kHz).
+spreads them: two in substream 0, the next four in substream 1 and the last two in substream 2 (stereo and mono are one substream at 176.4 and 192 kHz, and
+3 to 6 channels there are two, as FFmpeg writes them although the specification's text says one: ERRATA entry 91, provisional).
 
 `DownmixMode::kStandard` writes the 2 and 6 channel presentations as downmixes instead: substream 0 holds a stereo
 mix, the matrices of the later substreams take the folded-in channels out again, and a 7.1 stream folds its rear
@@ -162,8 +162,8 @@ inside it. The restart interval is 1 or at least 8 access units; a longer interv
 one a quicker random access.
 
 FFmpeg's strict decode of what it writes is the check, sample for sample
-(`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.95 times the size of
-FFmpeg's encoder's over the layouts it writes. It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
+(`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.85 to 0.96 times the size of
+FFmpeg's encoder's at 44.1 to 96 kHz and 1.06 to 1.15 times at 192 kHz, and 0.966 of DEE's on the 5.1 music ([the measured table](../truehd-comparison.md)). It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
 them), no MLP, and no block data CRC; the Atmos substream and the evolution payload it only frames, from bytes it is given.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;

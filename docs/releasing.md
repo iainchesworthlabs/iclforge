@@ -154,15 +154,26 @@ dispatched build fetches full history (or gets the version stamped directly via
 3. Releases must be **cut from main** - `resolve-version` checks this with
    `git merge-base --is-ancestor` and fails otherwise (dry runs are exempt).
 4. Decide the tag.
-5. **Update [CHANGELOG.md](https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md)**
-   - move `## [Unreleased]`'s content down to a `## [x.y.z] - YYYY-MM-DD` section matching the
-     tag from step 4 without its `v` (`## [0.10.0-beta.1] - 2026-09-01` for `v0.10.0-beta.1`),
-     [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, grouped by
-     user-facing area with bold lead-in bullets. This has to happen *before* tagging, not after:
-     `github-release`'s "Render release notes from CHANGELOG.md" step
-     (`tools/release/render_release_notes.py`, see [Post-release](#post-release)) extracts this
-     exact section for the release body the moment the tag is pushed, and hard-fails the release
-     if it cannot find one.
+5. **Assemble the changelog.** Every change since the last release added a fragment to
+   [`changelog.d/`](https://github.com/iainchesworthlabs/iclforge/tree/main/changelog.d) (pull
+   requests never edit `CHANGELOG.md`; two of them landing together would collide on it). In a
+   release pull request, `chore/release-x.y.z`, run
+
+   ```bash
+   python3 tools/release/changelog_tool.py pending        # read what will be written
+   python3 tools/release/changelog_tool.py assemble --version 0.10.0-beta.1 --date 2026-09-01
+   ```
+
+   `assemble` writes a `## [x.y.z] - YYYY-MM-DD` section matching the tag from step 4 without its
+   `v` (`## [0.10.0-beta.1] - 2026-09-01` for `v0.10.0-beta.1`) under `## [Unreleased]`: the
+   fragments grouped as Added, Changed, Deprecated, Removed, Fixed and Security, then whatever was
+   written by hand under `## [Unreleased]` before fragments existed, which it keeps as it was. It
+   deletes the fragments. This pull request is the one that may edit `CHANGELOG.md` (the static
+   check allows it because the pull request deletes fragments). Read the section, tidy the wording
+   if it needs it, and merge. This has to happen *before* tagging, not after: `github-release`'s
+   "Render release notes from CHANGELOG.md" step (`tools/release/render_release_notes.py`, see
+   [Post-release](#post-release)) extracts this exact section for the release body the moment the
+   tag is pushed, and hard-fails the release if it cannot find one.
 
 ## Option A: tag-based release (the normal path)
 
@@ -203,13 +214,13 @@ Most of what used to be a manual post-release checklist here is now automated:
    (`tools/release/render_release_notes.py`) extracts the `## [x.y.z] - YYYY-MM-DD` section
    matching the tag being released and uses it as the release body, followed by a
    `**Full Changelog**: …/compare/v<prev>...v<this>` line (omitted for the first release). This
-   is why [updating CHANGELOG.md](#pre-release-checklist) moved into the pre-release checklist,
+   is why [assembling the changelog](#pre-release-checklist) is in the pre-release checklist,
    as its own step: it used to be listed here, as a post-release step done any time before
    finishing the curated release notes by hand - now it is a hard prerequisite of tagging itself,
    since a missing section fails the release outright with a clear error rather than falling back
    to a commit-list draft. [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-   format, grouped by user-facing area with **bold lead-in** bullets, same as always; that
-   curation now happens exactly once, in CHANGELOG.md, as part of normal development.
+   format with **bold lead-in** bullets; that curation happens once per change, in its
+   `changelog.d/` fragment, as part of normal development.
 
    Two things this deliberately does not reconstruct, left as optional manual polish via
    `gh release edit vX.Y.Z[-beta.N] --notes-file notes.md` afterward if wanted: an `## Artifacts`
