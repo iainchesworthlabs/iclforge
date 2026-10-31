@@ -1353,6 +1353,13 @@ jobs:
       - name: TrueHD encoder against FFmpeg's strict decode (bit-exact)
         run: python3 tools/checks/verify_truehd_encode_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
 
+      # The size of forge's streams against FFmpeg's encoder and DEE's, on the 13 sources committed in
+      # testdata/truehd-dee: never larger than either where the other stream decodes to the source
+      # (compare_truehd_encoders.py leaves out a stream that does not, such as DEE's at 96 kHz). The
+      # encoder is deterministic, so a change that makes any of the 13 larger fails here.
+      - name: TrueHD encoder size against FFmpeg's and DEE's streams
+        run: python3 tools/checks/compare_truehd_encoders.py --forge build/config-linux-llvm/bin/forge --max-ratio-ffmpeg 1.0 --max-ratio-dee 1.0
+
       # The seeds that ever made the encoder write a stream a decoder disagreed with, replayed exactly
       # (REGRESSION_SEEDS in the script): deterministic and quick, so it gates. The unseeded search is
       # fuzz.yml's nightly job.
