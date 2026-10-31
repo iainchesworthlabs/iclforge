@@ -1161,7 +1161,12 @@ decodes exactly in FFmpeg's strict decode (1,953,458 bytes, 1.149 of FFmpeg's 1,
 43 cases, 0 failing, with `synth-6ch-192` at 1.012; `fuzz_truehd_encoder_space.py` ran 2,815 cases and the regression seeds with 0
 failing, where 10 of 110 failed with one substream; a library test decodes 2, 3 and 6 channels at both rates with the encoder's own check
 on. Not known: whether a Dolby decoder (a Blu-ray player) accepts the stream: there is no reference 192 kHz multichannel stream, and DEE has
-no option for these rates, so no oracle but FFmpeg answers it. **Question for the owner (95):** is a stream written against the specification's
-"shall not" acceptable where the reference decoder and FFmpeg's encoder both do the other thing, or should `truehd-encode` refuse 3 or more
-channels at these rates until a player has been tried? The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
+no option for these rates, so no oracle but FFmpeg answers it. Checked against FFmpeg's own 192 kHz 5.1 stream with `forge probe detail=structure`: forge's has the same structure
+(substream 0 and substream 1 both restart sync 0x31EA, since substream 1 is the last substream of a presentation of at most 6 channels
+(§7.2); `substream_info` 0x3C; `extended_substream_info` 0; channels 2 and 6); the peak data rate differs on purpose (18 Mbit/s declared
+by default against FFmpeg's 9.588). The reference specification's own text now agrees (the "second substream" clause was read as wrong
+for 3 or more channels and rewritten in the reference copy, v3.24, §9.7 and §5.3); FIR order in substream 1 may go to 8 there, and
+stays capped at 4 here. **Question for the owner (95), the owner's lean is to keep two substreams:** is a stream written against the
+text of the v3.9 specification's "shall not" acceptable where the reference decoder and FFmpeg's encoder both do the other thing, or
+should `truehd-encode` refuse 3 or more channels at these rates until a player has been tried? The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
 `test_encoder.cpp` holds the two substreams.
