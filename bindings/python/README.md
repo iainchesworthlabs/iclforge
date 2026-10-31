@@ -3,9 +3,10 @@
 Python bindings for [ICL Forge](https://github.com/iainchesworthlabs/iclforge), a clean-room
 AC-3/E-AC-3 (Dolby Digital/Digital Plus) and AC-4 encoder and decoder written in C++23, including
 the Atmos-in-DD+ object layer (OAMD + JOC). The AC-4 (ETSI TS 103 190) decoder and encoder, objects
-included, are in the `iclforge.ac4` submodule. The library's TrueHD and MLP codec is not in these
-bindings yet; it is in the [C API](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/c-api.md#truehd-and-mlp)
-and in `forge`.
+included, are in the `iclforge.ac4` submodule. The TrueHD and MLP lossless decoder, with a stream's
+length, timing and seek points, is in `iclforge.truehd`; the TrueHD encoder is in the
+[C API](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/c-api.md#truehd-and-mlp)
+and in `forge`, not in these bindings yet.
 
 ```bash
 pip install iclforge      # or, from a checkout of the repository: pip install ./bindings/python

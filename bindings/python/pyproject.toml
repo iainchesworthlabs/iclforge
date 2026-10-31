@@ -67,6 +67,10 @@ ICLFORGE_BUILD_HEARTH = "OFF"
 # "wheel always carries the full surface" reasoning as the matroska/mp4/mpegts/signing targets
 # below.
 ICLFORGE_BUILD_AC4 = "ON"
+# ON here too (it is the default): the wheel carries iclforge.truehd, the TrueHD and MLP lossless
+# decoder with a stream's scan, bound directly onto iclforge::truehd
+# (bindings/python/src/iclforge_ext/truehd/present/truehd_module.cpp).
+ICLFORGE_BUILD_TRUEHD = "ON"
 # ON since Python bindings completeness: the wheel carries the container muxers/demuxers
 # (iclforge.containers) and object signing (iclforge.signing) - the
 # "no containers, no signing" gap its record used to name.
