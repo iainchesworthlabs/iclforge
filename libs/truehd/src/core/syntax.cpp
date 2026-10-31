@@ -200,7 +200,16 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
                 }
             }
         };
-        if (structure == 0) {
+        if (structure == 3) {
+            // One bit per matrix channel for every matrix, no gating bits.
+            for (unsigned m = 0; m < set.count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                for (int c = 0; c < channels; ++c) {
+                    matrix.ext_value[static_cast<std::size_t>(c)] =
+                        static_cast<std::int32_t>(reader.read(1));
+                }
+            }
+        } else if (structure == 0) {
             if (reader.read(1) != 0) {
                 if (reader.read(1) != 0) {
                     read_widths();

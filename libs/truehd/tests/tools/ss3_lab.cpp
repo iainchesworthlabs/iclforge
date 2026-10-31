@@ -138,8 +138,8 @@ int main(int argc, char** argv) {
     std::printf("grammars of the second precision term (variant: bit 0 all channels, bit 1 shared "
                 "width, bits 2-3 structure, bit 4 width + 1, bits 5-6 field bits):\n");
     for (int variant = 0; variant < 128; ++variant) {
-        if (((variant >> 2) & 3) == 3) {
-            continue;
+        if (((variant >> 2) & 3) == 3 && variant != 12) {
+            continue;  // structure 3 is one bit per matrix channel; only its plain form varies
         }
         DecoderLab lab;
         lab.extension_variant = variant;
