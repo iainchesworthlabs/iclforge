@@ -43,10 +43,18 @@ on:
         description: "needs.toolchain-versions.outputs.llvm_version - display-only, in two step names below (abi-gate, ffmpeg-validate)."
         type: string
         required: true
+      qt_version:
+        description: "needs.toolchain-versions.outputs.qt_version, at the ci.yml call site - the Qt kit coverage-qt installs."
+        type: string
+        required: true
+      aqt_source:
+        description: "needs.toolchain-versions.outputs.aqt_source, at the ci.yml call site - the aqtinstall commit install-qt-action installs instead of PyPI's."
+        type: string
+        required: true
       tier:
         description: >-
           `t2` is the run on main after a merge, which skips the jobs marked "nightly only" below
-          (coverage, the ABI gate, FFmpeg Validate and the two trend publishers that read it).
+          (coverage, coverage-qt, truehd-off, the ABI gate, FFmpeg Validate and the two trend publishers that read it).
           `all`, the default, runs every job. Set by ci.yml.
         type: string
         default: all
@@ -67,6 +75,10 @@ on:
       # needs to tell apart at a glance).
       coverage_result:
         value: ${{ jobs.coverage.outputs.result }}
+      coverage_qt_result:
+        value: ${{ jobs.coverage-qt.outputs.result }}
+      truehd_off_result:
+        value: ${{ jobs.truehd-off.outputs.result }}
       adm_result:
         value: ${{ jobs.adm-validate.outputs.result }}
       hearth_result:
@@ -274,6 +286,230 @@ jobs:
         if: always()
         continue-on-error: true
         uses: ./.github/actions/save-vcpkg-cache
+
+  # The coverage job above for the three Qt applications: the C++ of apps/forge/gui, apps/crucible/ui
+  # and apps/hearth/ui, which that job cannot measure because it has no Qt kit and builds no window
+  # (tools/checks/coverage_report.sh's header). Before this job the only gate on any of them was the
+  # Windows clang-cl one over Crucible (tools/checks/coverage_crucible.ps1); forge-gui and Hearth's
+  # window had none, and a change to a controller that no Qt Quick suite reached passed unnoticed.
+  #
+  # It builds everything config-linux-gcc-coverage does plus the three windows (config-linux-gcc-
+  # coverage-qt), against the Qt kit install-qt-action fetches at the version and aqtinstall commit
+  # .github/toolchain-versions.json pins - the same two inputs the Windows legs take, with
+  # qtquick3d and qtshadertools for Crucible's room, which is unusable without the second. It runs
+  # only the tests labelled for the windows (gui, forge-gui, crucible, crucible-ui, hearth,
+  # hearth-ui), offscreen, and gates only their rows (coverage_report.sh -q). The library rows stay
+  # the coverage job's, which runs the whole suite, so this job pays for the Qt build and not for
+  # a second run of everything.
+  #
+  # Nightly only, like coverage and for its reason: a long build for a number that moves slowly.
+  # Whether it also belongs in the run after a merge is the owner's call once its time is known
+  # (planning/work-packages/WP7-library-surfaces-and-ci.md, question 1).
+  #
+  # The last step runs tools/dev/qt-sandbox-setup.sh for Hearth's private prefix, so that script's
+  # pinned downloads, their checksums and the repository's httplib patch are exercised every night
+  # and cannot rot unseen. It writes outside the workspace and does not touch the build above.
+  #
+  # The floors in coverage_report.sh's qt_components table are provisional until this job's first
+  # hosted run has produced figures to set them from.
+  coverage-qt:
+    name: Coverage, Qt applications (Linux, GCC)
+    if: inputs.tier != 't2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    # Hosted, so the newest main commit's run waits and an older one gives way: see the coverage
+    # job's concurrency comment (docs/ci-lanes.md, "Only the newest main commit runs the hosted jobs").
+    concurrency:
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'coverage-qt-main' || format('coverage-qt-run-{0}', github.run_id) }}
+      cancel-in-progress: false
+    container: ubuntu:26.04
+    outputs:
+      result: ${{ steps.record-result.outputs.status }}
+    steps:
+      # The coverage job's packages, plus what Qt's prebuilt kit loads at run time (the offscreen
+      # platform plugin still wants fontconfig, EGL, GL and xkbcommon), the PipeWire headers
+      # Crucible's Linux audio arm builds against, and a font for the layout suites to measure with.
+      - name: Bootstrap container
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          attempt=1
+          until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+            build-essential ca-certificates cmake curl git gnupg libasound2-dev lsb-release \
+            ninja-build pkg-config python3-pip python3-venv software-properties-common tar unzip wget zip \
+            libegl1 libgl1 libgl-dev libegl-dev libxkbcommon0 libxkbcommon-dev libfontconfig1 \
+            libdbus-1-3 libglib2.0-0 libpipewire-0.3-dev libspa-0.2-dev fonts-dejavu-core
+          do
+            echo "::warning title=apt-get::attempt $attempt of 3 failed"
+            [ "$attempt" -lt 3 ] || exit 1
+            attempt=$((attempt + 1))
+            sleep 30
+          done
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install GCC 16
+        run: bash .github/toolchain/02-gcc-toolchain.sh
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          vcpkg-commit: ${{ inputs.vcpkg_commit }}
+
+      - name: Install gcovr
+        run: pip install --quiet --break-system-packages --require-hashes -r requirements/requirements-coverage.txt
+
+      # The same action, inputs and pin as the Windows legs and _build.yml's AppImage leg, with
+      # setup-python: false for the reason that leg's comment gives (a hosted-cache Python linked
+      # against a newer glibc than the container). PIP_BREAK_SYSTEM_PACKAGES because this image's
+      # pip refuses a system-scope install (PEP 668) and the action installs aqtinstall with
+      # pip; the container is thrown away at the end of the job. The action exports QT_ROOT_DIR,
+      # which cmake/FindQt6.cmake reads, and the library path the offscreen tests load Qt from.
+      - name: Install Qt (prebuilt)
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: "1"
+        with:
+          version: ${{ inputs.qt_version }}
+          aqtsource: ${{ inputs.aqt_source }}
+          modules: qtquick3d qtshadertools qttasktree
+          cache: true
+          setup-python: false
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Quick 3D is found but unusable without qtshadertools, and CMake then drops Crucible's
+          # room and the Qt and font sections of its notices; the kit above installs both, and this
+          # says so here rather than three steps later as a failed Crucible test.
+          test -f "$QT_ROOT_DIR/lib/cmake/Qt6ShaderTools/Qt6ShaderToolsConfig.cmake"
+          cmake --preset config-linux-gcc-coverage-qt
+          if ! grep -q '^Qt6Quick3D_DIR' build/config-linux-gcc-coverage-qt/CMakeCache.txt; then
+            echo "::error::Qt Quick 3D was not found, so Crucible's room is missing from this build"
+            exit 1
+          fi
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset build-linux-gcc-coverage-qt -- -k 0
+
+      - name: Test
+        shell: bash
+        run: ctest --preset test-linux-gcc-coverage-qt
+
+      - name: Coverage report + gate
+        shell: bash
+        run: bash tools/checks/coverage_report.sh -q -g gcov-16
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-qt-report
+          path: build/config-linux-gcc-coverage-qt/coverage*.html
+
+      # Hearth's private prefix, built by the script a developer with no vcpkg uses: it downloads
+      # mbedTLS, cpp-httplib and mdns.h, checks each against its pinned SHA-256, applies the
+      # repository's httplib patch and writes the package files. --no-apt and --no-qt because this
+      # job has both already. A failure here means a pin, a URL or the patch has gone stale.
+      - name: Qt sandbox script, Hearth prefix
+        shell: bash
+        run: bash tools/dev/qt-sandbox-setup.sh --no-apt --no-qt "${RUNNER_TEMP}/qt-sandbox"
+
+      - name: Record result
+        id: record-result
+        if: always()
+        shell: bash
+        env:
+          STATUS: ${{ job.status }}
+        run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
+  # The library with ICLFORGE_BUILD_TRUEHD=OFF and the tests on: the C API's stand-ins for the TrueHD
+  # functions (libs/capi/src/truehd_absent.cpp) and the test that holds them to answering "unsupported"
+  # (libs/capi/tests/test_capi_truehd_absent.cpp) were built by no leg - the minimal profiles that
+  # turn the option off have no tests, and every other leg has it on. The root CMakeLists.txt allows
+  # the combination only without forge and Hearth, which use the codec unconditionally, so this is a
+  # library-only build (config-linux-gcc-no-truehd).
+  #
+  # Nightly only: it builds the whole library once more, for a configuration that changes when the
+  # C API's TrueHD section or the option's wiring does, which the nightly run finds within a day.
+  truehd-off:
+    name: Library without TrueHD (Linux, GCC)
+    if: inputs.tier != 't2'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'truehd-off-main' || format('truehd-off-run-{0}', github.run_id) }}
+      cancel-in-progress: false
+    container: ubuntu:26.04
+    outputs:
+      result: ${{ steps.record-result.outputs.status }}
+    steps:
+      - name: Bootstrap container
+        run: |
+          set -eu
+          export DEBIAN_FRONTEND=noninteractive
+          attempt=1
+          until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+            build-essential ca-certificates cmake curl git gnupg libasound2-dev lsb-release \
+            ninja-build pkg-config python3-pip software-properties-common tar unzip wget zip
+          do
+            echo "::warning title=apt-get::attempt $attempt of 3 failed"
+            [ "$attempt" -lt 3 ] || exit 1
+            attempt=$((attempt + 1))
+            sleep 30
+          done
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install GCC 16
+        run: bash .github/toolchain/02-gcc-toolchain.sh
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          vcpkg-commit: ${{ inputs.vcpkg_commit }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset config-linux-gcc-no-truehd
+          grep -q '^ICLFORGE_BUILD_TRUEHD:BOOL=OFF$' build/config-linux-gcc-no-truehd/CMakeCache.txt
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset build-linux-gcc-no-truehd -- -k 0
+
+      # The stand-ins' test has to be among those that ran: a configuration that quietly dropped it
+      # would pass this job and prove nothing.
+      - name: Test
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --preset test-linux-gcc-no-truehd -N | grep -q 'without ICLFORGE_BUILD_TRUEHD every TrueHD call is unsupported'
+          ctest --preset test-linux-gcc-no-truehd -LE Performance
+
+      - name: Record result
+        id: record-result
+        if: always()
+        shell: bash
+        env:
+          STATUS: ${{ job.status }}
+        run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # iclforge::adm (libs/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
   # library component (see the root CMakeLists.txt's own option() and libs/adm/CMakeLists.txt's
   # header comment for why: libadm needs Boost header libraries, a third-party dependency that
@@ -1117,6 +1353,13 @@ jobs:
       - name: TrueHD encoder against FFmpeg's strict decode (bit-exact)
         run: python3 tools/checks/verify_truehd_encode_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
 
+      # The size of forge's streams against FFmpeg's encoder and DEE's, on the 13 sources committed in
+      # testdata/truehd-dee: never larger than either where the other stream decodes to the source
+      # (compare_truehd_encoders.py leaves out a stream that does not, such as DEE's at 96 kHz). The
+      # encoder is deterministic, so a change that makes any of the 13 larger fails here.
+      - name: TrueHD encoder size against FFmpeg's and DEE's streams
+        run: python3 tools/checks/compare_truehd_encoders.py --forge build/config-linux-llvm/bin/forge --max-ratio-ffmpeg 1.0 --max-ratio-dee 1.0
+
       # The seeds that ever made the encoder write a stream a decoder disagreed with, replayed exactly
       # (REGRESSION_SEEDS in the script): deterministic and quick, so it gates. The unseeded search is
       # fuzz.yml's nightly job.
@@ -1125,6 +1368,12 @@ jobs:
 
       - name: TrueHD in MP4, Matroska, MPEG-TS and MAT against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_containers.py --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
+
+      # Crucible's pinned TrueHD 5.1 mode: the bursts its output stage hands a sink, unwrapped and held
+      # to FFmpeg's strict decode against the 24-bit integers the stage was given (the stage's own
+      # tests hold them to this library's decoder; this is the other one).
+      - name: Crucible's TrueHD 5.1 leg against FFmpeg's strict decode (bit-exact)
+        run: python3 tools/checks/verify_crucible_truehd_leg.py --tests build/config-linux-llvm/bin/iclforge-crucible-tests --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
 
       # The fixture set must still carry every feature it was made for (the gate's static job runs
       # this too, without a build), and forge's decode of stand-ins for the Blu-ray layouts (a BDAV

@@ -5,6 +5,7 @@
 // to answer. The build here has ICLFORGE_BUILD_TRUEHD on; test_capi_truehd_absent.cpp is the other
 // build's.
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
@@ -860,4 +861,132 @@ TEST_CASE("every TrueHD encoder status has its own message", "[capi][truehd]") {
         CHECK(std::find(seen.begin(), seen.end(), message) == seen.end());
         seen.push_back(message);
     }
+}
+
+struct ScannedStream {
+    iclforge_truehd_scanned_stream_t* handle = nullptr;
+    ScannedStream() = default;
+    ScannedStream(const ScannedStream&) = delete;
+    ScannedStream& operator=(const ScannedStream&) = delete;
+    ~ScannedStream() { iclforge_truehd_scanned_stream_destroy(handle); }
+};
+
+TEST_CASE("a scanned stream states what the manifest states and lists the restarts of the units",
+          "[capi][truehd]") {
+    for (const nlohmann::json& fixture : manifest()["fixtures"]) {
+        DYNAMIC_SECTION(fixture["name"].get<std::string>()) {
+            const std::vector<std::uint8_t> stream = fixture_bytes(fixture["file"]);
+            ScannedStream scanned;
+            REQUIRE(iclforge_truehd_scanned_stream_create(stream.data(), stream.size(), 1,
+                                                          &scanned.handle) == ICLFORGE_OK);
+            REQUIRE(scanned.handle != nullptr);
+            const auto* s = scanned.handle;
+            CHECK(iclforge_truehd_scanned_stream_sample_rate(s) ==
+                  fixture["sample_rate"].get<std::uint32_t>());
+            CHECK(iclforge_truehd_scanned_stream_units(s) ==
+                  fixture["access_units"].get<std::uint64_t>());
+            CHECK(iclforge_truehd_scanned_stream_samples(s) ==
+                  fixture["pcm_samples"].get<std::uint64_t>());
+            CHECK(iclforge_truehd_scanned_stream_samples(s) +
+                      static_cast<std::uint64_t>(iclforge_truehd_scanned_stream_padding_samples(s)) ==
+                  iclforge_truehd_scanned_stream_units(s) *
+                      static_cast<std::uint64_t>(iclforge_truehd_scanned_stream_samples_per_unit(s)));
+            CHECK(iclforge_truehd_scanned_stream_skipped_bytes(s) == 0);
+            CHECK(iclforge_truehd_scanned_stream_leading_bytes(s) == 0);
+            CHECK(iclforge_truehd_scanned_stream_duration_seconds(s) ==
+                  Catch::Approx(static_cast<double>(fixture["pcm_samples"].get<std::uint64_t>()) /
+                                fixture["sample_rate"].get<double>()));
+
+            // Each restart is a unit the units list also holds, at the offset it gives.
+            Units units;
+            REQUIRE(iclforge_truehd_scan(stream.data(), stream.size(), &units.handle) == ICLFORGE_OK);
+            const std::size_t restarts = iclforge_truehd_scanned_stream_restart_count(s);
+            REQUIRE(restarts >= 1);
+            CHECK(iclforge_truehd_scanned_stream_restart_unit(s, 0) == 0);
+            CHECK(iclforge_truehd_scanned_stream_restart_offset(s, 0) == 0);
+            for (std::size_t i = 0; i < restarts; ++i) {
+                const auto unit =
+                    static_cast<std::size_t>(iclforge_truehd_scanned_stream_restart_unit(s, i));
+                CHECK(iclforge_truehd_scanned_stream_restart_offset(s, i) ==
+                      iclforge_truehd_units_offset(units.handle, unit));
+            }
+            // Past the last restart there is none to read.
+            CHECK(iclforge_truehd_scanned_stream_restart_unit(s, restarts) == 0);
+            CHECK(iclforge_truehd_scanned_stream_restart_offset(s, restarts) == 0);
+        }
+    }
+}
+
+TEST_CASE("a scanned stream answers where to start decoding for a sample", "[capi][truehd]") {
+    const std::vector<std::uint8_t> stream = fixture_bytes("truehd_st48_s24.thd");
+    ScannedStream thin;
+    REQUIRE(iclforge_truehd_scanned_stream_create(stream.data(), stream.size(), 64, &thin.handle) ==
+            ICLFORGE_OK);
+    // 300 units of 40 samples with a major sync every 16, kept at least 64 apart: 0, 64, 128, 192, 256.
+    REQUIRE(iclforge_truehd_scanned_stream_restart_count(thin.handle) == 5);
+    CHECK(iclforge_truehd_scanned_stream_samples_per_unit(thin.handle) == 40);
+
+    std::uint64_t unit = 99;
+    std::uint64_t offset = 99;
+    REQUIRE(iclforge_truehd_scanned_stream_restart_for_sample(thin.handle, 0, &unit, &offset) ==
+            ICLFORGE_OK);
+    CHECK(unit == 0);
+    CHECK(offset == 0);
+    REQUIRE(iclforge_truehd_scanned_stream_restart_for_sample(thin.handle, 64 * 40, &unit, &offset) ==
+            ICLFORGE_OK);
+    CHECK(unit == 64);
+    CHECK(offset == iclforge_truehd_scanned_stream_restart_offset(thin.handle, 1));
+    REQUIRE(iclforge_truehd_scanned_stream_restart_for_sample(
+                thin.handle, iclforge_truehd_scanned_stream_samples(thin.handle) - 1, &unit,
+                &offset) == ICLFORGE_OK);
+    CHECK(unit == 256);
+
+    // A sample past the end has no restart, and the outputs are left as they were.
+    unit = 7;
+    offset = 8;
+    CHECK(iclforge_truehd_scanned_stream_restart_for_sample(
+              thin.handle, iclforge_truehd_scanned_stream_samples(thin.handle), &unit, &offset) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(unit == 7);
+    CHECK(offset == 8);
+
+    CHECK(iclforge_truehd_scanned_stream_sample_at_seconds(thin.handle, 0.125) == 6000);
+    CHECK(iclforge_truehd_scanned_stream_sample_at_seconds(thin.handle, -1.0) == 0);
+
+    // A spacing of 0 lists every unit that carries a major sync, as 1 does.
+    ScannedStream all;
+    REQUIRE(iclforge_truehd_scanned_stream_create(stream.data(), stream.size(), 0, &all.handle) ==
+            ICLFORGE_OK);
+    CHECK(iclforge_truehd_scanned_stream_restart_count(all.handle) == 19);
+}
+
+TEST_CASE("a scanned stream refuses what is not a stream and answers a NULL handle with zeros",
+          "[capi][truehd]") {
+    const std::vector<std::uint8_t> junk(4096, 0x5A);
+    iclforge_truehd_scanned_stream_t* made = nullptr;
+    CHECK(iclforge_truehd_scanned_stream_create(junk.data(), junk.size(), 1, &made) ==
+          ICLFORGE_ERROR_TRUEHD_BAD_SYNC);
+    CHECK(made == nullptr);
+    CHECK(iclforge_truehd_scanned_stream_create(nullptr, 0, 1, &made) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_truehd_scanned_stream_create(junk.data(), junk.size(), 1, nullptr) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+
+    CHECK(iclforge_truehd_scanned_stream_sample_rate(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_samples_per_unit(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_units(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_samples(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_padding_samples(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_duration_seconds(nullptr) == 0.0);
+    CHECK(iclforge_truehd_scanned_stream_skipped_bytes(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_leading_bytes(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_restart_count(nullptr) == 0);
+    CHECK(iclforge_truehd_scanned_stream_restart_unit(nullptr, 0) == 0);
+    CHECK(iclforge_truehd_scanned_stream_restart_offset(nullptr, 0) == 0);
+    CHECK(iclforge_truehd_scanned_stream_sample_at_seconds(nullptr, 1.0) == 0);
+    std::uint64_t unit = 0;
+    std::uint64_t offset = 0;
+    CHECK(iclforge_truehd_scanned_stream_restart_for_sample(nullptr, 0, &unit, &offset) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    iclforge_truehd_scanned_stream_destroy(nullptr);  // a no-op
 }

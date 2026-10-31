@@ -113,10 +113,17 @@ not been measured end to end;
 [Troubleshooting](troubleshooting.md#sound-is-behind-the-picture) carries the estimate. Changing
 it restarts the stream.
 
+The setting does not apply to the pinned **TrueHD 5.1** mode, and the page says so while that mode
+is in use. TrueHD has no short frame: its encoder works in intervals of 128 access units (about
+107 ms) before the first burst leaves, and it sends 20 ms bursts after that.
+
 ## 04 Codec
 
 **Bitrate** is automatic or one of seven fixed rates from 256 kb/s to 2048 kb/s. Automatic is
-448 kb/s, or 1536 kb/s in low latency. Changing it restarts the stream.
+448 kb/s, or 1536 kb/s in low latency. Changing it restarts the stream. It does not apply to the
+pinned **TrueHD 5.1** mode, which is lossless and has a rate that follows the music; the page says
+so while that mode is in use. The encoder declares a peak of 18 Mb/s, and the bed's raw 24-bit
+PCM at 48 kHz is 6.9 Mb/s.
 
 **Split stereo applications into two objects** is the default for applications the engine meets
 from now on; the Split button on the Room page overrides it either way for one application. That

@@ -179,7 +179,7 @@ scheduled workflows are separate.
 | The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams, and the tests that read the owner's AC-4 content-signature sample skip when `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` is unset | AC-3, E-AC-3, AC-4, TrueHD | Gate, queue, after a merge, nightly |
 | The unit tests of the oracle scripts (`tools/checks`, `tools/ci`), which include the AC-4 syntax digests and presentation tables | all | The gate's static job |
 | The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones), and for TrueHD a bit-exact comparison with FFmpeg's strict decode of the committed fixtures and of `forge truehd-encode`'s stream | AC-3, E-AC-3, TrueHD | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
-| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
+| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, `verify_crucible_truehd_leg.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
 | Hearth's engine against the AC-4 gain formulas (`gain_ac4_decode.py --engine`) | AC-4 | After a merge, nightly |
 | The ASan + UBSan leg with the codec matrix, and the TSan leg | all | Nightly |
 | `Fuzz Regress` | all | Every push to `main`, and every pull request unless the repository variable `PAUSE_NONESSENTIAL_CI` is `true` |
@@ -2383,8 +2383,8 @@ among them the scale of `peak_data_rate`, how channels are spread over
 substreams, that a substream reads its predecessor's rows before that predecessor's matrices, and that FFmpeg's decoder takes a
 substream of more than 6 channels only under restart sync `0x31EB`. `tools/ci/fuzz_truehd_encoder_space.py` draws random legal
 configurations against adversarial PCM (about 800 cases in 100 s) and the same check; its first run found an encoder that never
-finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.95 times the size of FFmpeg's encoder's
-over the layouts it writes. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
+finished on a constant block far from zero, which is now a regression seed and a unit test. Streams are 0.85 to 0.96 times the size of FFmpeg's encoder's
+at 44.1 to 96 kHz and larger at 192 kHz, with DEE's and the programme material in [the measured table](truehd-comparison.md), and its decode is held to FFmpeg's strict decode, which a bit flipped in a payload does not fail. The downmix presentations are the exception: FFmpeg's decoder returns the last substream only, so nothing
 outside the library reads the 2 and 6 channel presentations.
 
 Not covered: the details of noise generator 1 that the specification leaves out (the buffer size, start index and stride are measured

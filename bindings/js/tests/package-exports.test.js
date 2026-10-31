@@ -1,6 +1,7 @@
-// package.json's `exports` map: every entry names files `npm run build` writes, and `./ac4` (the
-// AC-4 wrapper, bindings/js/src/ac4.ts) is reachable through the package's own name the way a consumer
-// reaches it, with declarations that name what it exports.
+// package.json's `exports` map: every entry names files `npm run build` writes, and `./ac4` and
+// `./truehd` (the AC-4 and TrueHD wrappers, bindings/js/src/ac4.ts and truehd.ts) are reachable
+// through the package's own name the way a consumer reaches them, with declarations that name what
+// they export.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -51,6 +52,47 @@ test("./ac4 is exported, loads through the package's own name, and its declarati
     "RawAc4Object",
     "RawAc4ObjectUpdate",
     "RawAc4ObjectProperties",
+  ];
+  for (const name of declared) {
+    assert.match(declarations, new RegExp(`export (declare )?(class|interface|type|enum|function) ${name}\\b`), name);
+  }
+});
+
+test("./truehd is exported, loads through the package's own name, and its declarations name its exports", async () => {
+  assert.deepEqual(pkg.exports["./truehd"], { types: "./dist/truehd.d.ts", default: "./dist/truehd.js" });
+  const truehd = await import("iclforge-wasm-decoder/truehd");
+  const values = [
+    "TruehdDecoder",
+    "TruehdScannedStream",
+    "TruehdError",
+    "TruehdErrorKind",
+    "TruehdPresentation",
+    "loadTruehdModule",
+    "truehdProbe",
+    "truehdScanUnits",
+    "TRUEHD_DEFAULT_RESTART_SPACING",
+  ];
+  for (const name of values) {
+    assert.ok(name in truehd, `${name} is not exported`);
+  }
+  const declarations = readFileSync(join(root, "dist", "truehd.d.ts"), "utf8");
+  const declared = [
+    "TruehdDecoder",
+    "TruehdScannedStream",
+    "TruehdError",
+    "TruehdErrorKind",
+    "TruehdPresentation",
+    "loadTruehdModule",
+    "truehdProbe",
+    "truehdScanUnits",
+    "TruehdDecoderOptions",
+    "TruehdStreamInfo",
+    "TruehdUnits",
+    "TruehdRestart",
+    "TruehdDecoded",
+    "TruehdCounters",
+    "TruehdScanInfo",
+    "TruehdEmbindModule",
   ];
   for (const name of declared) {
     assert.match(declarations, new RegExp(`export (declare )?(class|interface|type|enum|function) ${name}\\b`), name);

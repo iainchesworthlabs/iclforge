@@ -9,6 +9,7 @@ use iclforge::ac3;
 use iclforge::atmos::{AtmosConfig, AtmosEncoder, ObjectPlacement};
 use iclforge::eac3;
 use iclforge::stream;
+use iclforge::truehd::ErrorKind as Thd;
 use iclforge::types::{Acmod, DecoderConfig};
 use iclforge::Error;
 
@@ -32,6 +33,54 @@ const EXPECTED_MESSAGES: &[(Error, &str)] = &[
     (Error::DecodeReservedValue, "reserved value"),
     (Error::DecodeUnsupported, "legal but unsupported syntax"),
     (Error::DecodeInvalidStream, "invalid stream"),
+    (Error::Truehd(Thd::Truncated), "truncated TrueHD data"),
+    (
+        Error::Truehd(Thd::BadSync),
+        "no TrueHD major sync or access unit",
+    ),
+    (
+        Error::Truehd(Thd::BadCheckNibble),
+        "bad TrueHD check nibble",
+    ),
+    (Error::Truehd(Thd::BadLength), "bad TrueHD length"),
+    (
+        Error::Truehd(Thd::BadSignature),
+        "bad TrueHD major sync signature",
+    ),
+    (
+        Error::Truehd(Thd::BadMajorSyncCrc),
+        "bad TrueHD major sync CRC",
+    ),
+    (
+        Error::Truehd(Thd::BadRestartSync),
+        "bad TrueHD restart sync",
+    ),
+    (
+        Error::Truehd(Thd::BadRestartCrc),
+        "bad TrueHD restart header CRC",
+    ),
+    (Error::Truehd(Thd::BadParity), "bad TrueHD substream parity"),
+    (
+        Error::Truehd(Thd::BadSubstreamCrc),
+        "bad TrueHD substream CRC",
+    ),
+    (
+        Error::Truehd(Thd::BadParameter),
+        "TrueHD parameter out of range",
+    ),
+    (Error::Truehd(Thd::BadBlockData), "bad TrueHD block data"),
+    (
+        Error::Truehd(Thd::BadLosslessCheck),
+        "TrueHD lossless check failed",
+    ),
+    (
+        Error::Truehd(Thd::NeedsRestart),
+        "TrueHD substream needs a restart header not yet seen",
+    ),
+    (
+        Error::Truehd(Thd::Unsupported),
+        "legal but unsupported TrueHD syntax",
+    ),
 ];
 
 #[test]

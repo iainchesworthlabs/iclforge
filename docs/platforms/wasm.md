@@ -21,7 +21,8 @@ That package is named but **not published**: this repository has never released 
 building it from `bindings/js/` is the only way to get it — see [Publishing](#publishing)
 below. A fourth piece, the [AC-4 module](#ac-4-module), wraps the AC-4 decoder and encoder over
 the `iclforge::ac4` libraries rather than `iclforge::ac3`; it has no demo page, and the package exports its
-typed wrapper as `./ac4`.
+typed wrapper as `./ac4`. A fifth, the [TrueHD module](#truehd-module), wraps the TrueHD and MLP decoder
+over `iclforge::truehd`; it has no demo page either, and the package exports its wrapper as `./truehd`.
 The decode demo consumes the package (see "What's reused, what's new" below) rather than
 reimplementing it — see [bindings/js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md)
 for the package's own API docs. The demos exist to prove the codec runs correctly outside a
@@ -40,6 +41,7 @@ pages in this section.
 | Encode demo, and the Atmos authoring page | Built and [published live](../wasm-encode-demo.md) |
 | `iclforge-wasm-decoder` npm package | **Never released to npm.** Building it from `bindings/js/` is the only way to get it |
 | AC-4 module | Decodes and encodes AC-4, objects included. Built in the same CI job as the two modules above, and the package's Node tests drive its wrapper against a fake module; no test runs the compiled module, and there is no demo page yet |
+| TrueHD module | Decodes, probes and scans TrueHD and MLP; not the encoder. Built in the same CI job, and the compiled module is run in Node over the fixtures of `testdata/truehd` and held to the samples of FFmpeg's strict decode; there is no demo page |
 | Why the package exists | A browser cannot be relied on to decode EC-3 |
 | Correctness | CI asserts stream properties and known-signal measurements (channel count, sample rate, object count and movement, non-silent output, a 997 Hz tone's true peak, a decode round trip). It does not compare the WebAssembly decoder's samples with the native decoder's |
 | Real hardware | Not applicable — the browser is the target |
@@ -214,6 +216,37 @@ imports `./ac4` through the package's own name. `ac4_bindings.cpp` itself is bui
 in CI: the run on `main` of 2026-09-29 linked `bin/wasm_ac4_demo/iclforge_ac4.js`, and the
 package's suite passed 102 tests. No test runs the compiled module, so what the wrapper does with
 the compiled module is not verified by CI.
+
+## TrueHD module
+
+`apps/demos/wasm/truehd_bindings.cpp` is a fourth Embind module, `iclforge_wasm_truehd`
+(`iclforge_truehd.js`/`.wasm`, `-sEXPORT_NAME=createIclForgeTruehdModule`), wrapping the decode side of
+`iclforge::truehd`: `probe_stream`, the `ElementaryReader` that splits a stream into access units,
+`scan_stream` (the length of a stream and the restarts a decoder can join it at) and `Decoder`. It is a
+module of its own for the reason the encode module is: a page that plays AC-3 has no use for another
+codec's size. The encoder, the Atmos layer and the metadata edit are not in it. Python's
+`iclforge.truehd` and Rust's `iclforge::truehd` have the same decode surface.
+
+One difference from the other three: `-sENVIRONMENT=web,node`, not `web`, so the test can run the
+module in Node. A call that can fail returns `{ error, message, detail }` in place of its result (an
+Embind throw reaches the page as a bare pointer number), and `bindings/js/src/truehd.ts` turns that into a
+`TruehdError` carrying the library's `ErrorKind`. Everything that leaves the module is a copy, so a
+decoded unit stays valid across the next call.
+
+`bindings/js/src/truehd.ts` is the typed wrapper and `package.json`'s `exports` map has it as
+`./truehd`. Guarded on `ICLFORGE_BUILD_TRUEHD` (default on), built in `build-wasm` by the same
+`cmake --build` over the preset, into `bin/wasm_truehd_demo/`.
+
+Two tests. `bindings/js/tests/truehd.test.js` runs the wrapper in Node against a stand-in for the Embind
+module and holds what the wrapper does itself: the options the native constructors are given, a native
+failure becoming a `TruehdError` of the right kind (kind 0 included), a `null` staying `null`, the units
+being views into the caller's bytes. `bindings/js/tests/truehd-wasm.test.js` runs the compiled module,
+when `ICLFORGE_TRUEHD_WASM` names `iclforge_truehd.js`, which `build-wasm` sets: every fixture of
+`testdata/truehd` decodes to the SHA-256 FFmpeg's strict decode gives (as the C API's, Rust's and
+Python's tests hold it), the probe and the scan state what the manifest states, a decode from the
+restart for a sample gives that sample, a damaged unit fails a strict decode and is counted by a
+lenient one, and a decoded unit keeps its samples through the next decode. The last was checked by
+making the module return a view into its heap, which the test fails.
 
 ## Build and run
 

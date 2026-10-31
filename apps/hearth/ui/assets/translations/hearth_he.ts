@@ -968,7 +968,6 @@
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="59"/>
-        <location filename="../qml/DecoderTruehd.qml" line="129"/>
         <source>Plays</source>
         <translation>משמיע</translation>
     </message>
@@ -1019,48 +1018,27 @@
         <translation>סלחני</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="111"/>
-        <location filename="../qml/DecoderTruehd.qml" line="132"/>
-        <source>Track</source>
-        <translation type="unfinished">רצועה</translation>
-    </message>
-    <message>
-        <location filename="../qml/DecoderTruehd.qml" line="116"/>
-        <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/DecoderTruehd.qml" line="135"/>
-        <source>Automatic</source>
-        <translation type="unfinished">אוטומטי</translation>
-    </message>
-    <message>
-        <location filename="../qml/DecoderTruehd.qml" line="137"/>
-        <source>Compressed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/DecoderTruehd.qml" line="146"/>
+        <location filename="../qml/DecoderTruehd.qml" line="110"/>
         <source>Level</source>
         <translation>רמה</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="152"/>
+        <location filename="../qml/DecoderTruehd.qml" line="116"/>
         <source>The stream&apos;s dialogue normalisation and dynamic range words are read and shown, and nothing applies them: the level is the stream&apos;s own. The output is float32 through the operating system&apos;s mixer, which is not a bit-exact path.</source>
         <translation>מילות נרמול הדיאלוג וטווח הדינמיקה של הזרם נקראות ומוצגות, ושום דבר אינו מחיל אותן: הרמה היא הרמה של הזרם עצמו. הפלט הוא float32 דרך המיקסר של מערכת ההפעלה, שאינו נתיב מדויק עד רמת הסיבית.</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="164"/>
+        <location filename="../qml/DecoderTruehd.qml" line="128"/>
         <source>This stream</source>
         <translation>הזרם הזה</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="167"/>
+        <location filename="../qml/DecoderTruehd.qml" line="131"/>
         <source>Nothing TrueHD is playing.</source>
         <translation>שום דבר ב-TrueHD לא מושמע.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/DecoderTruehd.qml" line="173"/>
+        <location filename="../qml/DecoderTruehd.qml" line="137"/>
         <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
         <translation>
             <numerusform>%1 · %2 kHz · תת-זרם אחד של %3 ערוצים</numerusform>
@@ -1068,18 +1046,17 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="174"/>
+        <location filename="../qml/DecoderTruehd.qml" line="138"/>
         <source>MLP</source>
         <translation>MLP</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="136"/>
-        <location filename="../qml/DecoderTruehd.qml" line="174"/>
+        <location filename="../qml/DecoderTruehd.qml" line="138"/>
         <source>TrueHD</source>
         <translation>TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="184"/>
+        <location filename="../qml/DecoderTruehd.qml" line="148"/>
         <source>A decoder can join it about every %1 ms; a seek decodes from the join point before the place asked for.</source>
         <translation>מפענח יכול להצטרף אליו בערך כל %1 ms; חיפוש מפענח החל מנקודת ההצטרפות שלפני המקום המבוקש.</translation>
     </message>
@@ -4428,12 +4405,12 @@
     <message>
         <location filename="../qml/OutputPicker.qml" line="154"/>
         <source> · TrueHD (MAT) ✓</source>
-        <translation type="unfinished"></translation>
+        <translation> · TrueHD (MAT) ✓</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="155"/>
         <source> · TrueHD (MAT) opens, not run</source>
-        <translation type="unfinished"></translation>
+        <translation> · TrueHD (MAT) נפתח, לא נבדק</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="198"/>
@@ -6141,17 +6118,17 @@ Drop AC-3, E-AC-3, AC-4, TrueHD or MLP files (raw, MP4, Matroska or MPEG-TS) or 
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1671"/>
+        <location filename="../../src/hearth_controller.cpp" line="1643"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>בנייה זו אינה נושאת קובץ הודעות מוטמע (:/notices/NOTICES.txt לא הודר לתוכה); קובץ NOTICES.txt שליד היישום וקובץ LICENSE שבמאגר אומרים מה היא כוללת.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2870"/>
+        <location filename="../../src/hearth_controller.cpp" line="2842"/>
         <source>saved to %1</source>
         <translation>נשמר אל %1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2873"/>
+        <location filename="../../src/hearth_controller.cpp" line="2845"/>
         <source>could not write %1: %2</source>
         <translation>לא ניתן היה לכתוב את %1: %2</translation>
     </message>

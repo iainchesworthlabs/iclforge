@@ -148,7 +148,12 @@ TEST_CASE("a downmix of a stereo stream is the stream, and layouts it cannot fol
     high.sample_rate = 192000;
     high.channels = 6;
     high.downmix = DownmixMode::kStandard;
-    REQUIRE(!Encoder::create(high).has_value());  // one substream: no lower presentation
+    high.verify = true;
+    high.restart_interval_units = 8;
+    REQUIRE(Encoder::create(high).has_value());  // two substreams at 192 kHz too (ERRATA entry 90)
+    const auto high_pcm = make_pcm(6, 192000 / 16, 24, 9);
+    const Encoded high_encoded = encode_all(high, high_pcm);
+    REQUIRE(decode_all(high_encoded.units, 24, 6, Presentation::kBest) == high_pcm);
 
     EncoderConfig height;
     height.channels = 5;

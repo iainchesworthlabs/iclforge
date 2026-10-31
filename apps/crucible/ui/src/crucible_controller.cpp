@@ -58,6 +58,7 @@ QString mode_key(OutputMode mode) {
         case OutputMode::kAtmos: return QStringLiteral("atmos");
         case OutputMode::kDdPlus51: return QStringLiteral("ddplus");
         case OutputMode::kDd51: return QStringLiteral("dd");
+        case OutputMode::kTrueHd51: return QStringLiteral("truehd");
         case OutputMode::kPcmSurround: return QStringLiteral("pcm");
         case OutputMode::kHeadphones: return QStringLiteral("headphones");
         case OutputMode::kStereo: return QStringLiteral("stereo");
@@ -70,6 +71,7 @@ std::optional<OutputMode> mode_from_key(const QString& key) {
     if (key == QLatin1String("atmos")) return OutputMode::kAtmos;
     if (key == QLatin1String("ddplus")) return OutputMode::kDdPlus51;
     if (key == QLatin1String("dd")) return OutputMode::kDd51;
+    if (key == QLatin1String("truehd")) return OutputMode::kTrueHd51;
     if (key == QLatin1String("pcm")) return OutputMode::kPcmSurround;
     if (key == QLatin1String("headphones")) return OutputMode::kHeadphones;
     if (key == QLatin1String("stereo")) return OutputMode::kStereo;
@@ -115,6 +117,7 @@ QString short_mode_name(OutputMode mode) {
         case OutputMode::kAtmos: return CrucibleController::tr("Atmos");
         case OutputMode::kDdPlus51: return CrucibleController::tr("Dolby Digital Plus 5.1");
         case OutputMode::kDd51: return CrucibleController::tr("Dolby Digital 5.1");
+        case OutputMode::kTrueHd51: return CrucibleController::tr("TrueHD 5.1");
         case OutputMode::kPcmSurround: return CrucibleController::tr("PCM surround");
         case OutputMode::kHeadphones: return CrucibleController::tr("Headphones");
         case OutputMode::kStereo: return CrucibleController::tr("Stereo");
@@ -437,6 +440,7 @@ void CrucibleController::poll() {
             row.insert(QStringLiteral("isNullSink"), e.is_null_sink);
             row.insert(QStringLiteral("eac3"), e.accepts_eac3);
             row.insert(QStringLiteral("ac3"), e.accepts_ac3);
+            row.insert(QStringLiteral("truehd"), e.accepts_truehd);
             row.insert(QStringLiteral("pcmChannels"), static_cast<int>(e.shared_channels));
             row.insert(QStringLiteral("spatial"), e.spatial);
             row.insert(QStringLiteral("chosen"), from_utf8(e.name) == endpoint_name_ && s.mode != OutputMode::kNone);

@@ -10,6 +10,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     io/test_channel_meaning.cpp
     io/test_metadata_edit.cpp
     io/test_presentation_cut.cpp
+    io/test_scan.cpp
     decoder/test_decoder.cpp
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp

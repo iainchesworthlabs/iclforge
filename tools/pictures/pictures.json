@@ -155,6 +155,10 @@
     "3a06cdad6": {
       "commit": "3a06cdad62c2ab5bc353eb1066eea562a6c78e7b",
       "what": "the tree panel_preview was built from: the Speaker layout sheet with High and In the ceiling for the heights (quick picks, build yours, the room beside the buttons, a footer that stays on the glass), 2026-10-26"
+    },
+    "49104d85e": {
+      "commit": "49104d85eeb284a34fb226642502f70a2de2a6d1",
+      "what": "Release build on Windows: cl.exe, Qt from C:/Repos/common/qt/6.12.0/msvc2022_64, taken 2026-10-31 or after"
     }
   },
   "pictures": [
@@ -1003,7 +1007,7 @@
       "env": {
         "ICLFORGE_SIGNING_KEY_FILE": "{media}/demo-signing.key"
       },
-      "build": "b4083ba0f",
+      "build": "49104d85e",
       "note": "Taken over a scripted machine (--app) on a settings store of its own, so the room draws a monogram for each application and not its icon, and the machine's own applications, sound output and settings are not in it. The window and the engine are the program's own."
     },
     {

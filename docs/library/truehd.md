@@ -53,6 +53,30 @@ and the unit after it reads too (or is cut short by the end of the data with a c
 says how many were skipped, `forge truehd-decode` and `forge probe` warn with the count (a warning, not an error), and what the
 bytes hold is not looked into.
 
+**Length, timing and seeking.** `scan_stream()` (`iclforge/truehd/io/scan.hpp`) reads a stream held in memory once and gives a
+`ScannedStream`: the sample rate, the samples in a unit, the units and their bytes, the bytes it skipped (those ahead of the first unit
+counted apart), the padding the last unit's end-of-stream marker counts, and the restarts. A unit holds 40, 80 or 160 samples, the same
+number for every unit, so a unit's first sample is its number times that and needs no record. A decoder can only join at a unit with a
+major sync, so those units are the seek granule: the scan keeps their numbers and byte offsets, at least `restart_spacing` units apart
+(256 by default, about 0.2 s at 48 kHz; 1 keeps every one, which are also the only places a cut or a join may start). To reach a sample,
+`restart_for_sample()` gives the last restart at or before its unit; decode on from there and drop the samples before the one wanted.
+
+```cpp
+const auto scan = iclforge::truehd::scan_stream(stream);          // std::expected<ScannedStream, Error>
+if (scan) {
+    const double seconds = scan->duration_seconds();               // samples() / sample_rate, padding left out
+    const auto from = scan->restart_for_sample(scan->sample_at_seconds(90.0));  // nothing past the end
+    // iclforge::truehd::ElementaryReader reader(std::span(stream).subspan(from->offset)); decode from there;
+    // its first sample is scan->unit_start_sample(from->unit)
+}
+```
+
+Unit numbers count the units that read, so a stream that lost bytes in the middle numbers the units after the loss as if they followed.
+The padding is read by decoding the last restart interval once, so the scan costs one reading of the stream and one interval's decode. A
+stream whose last interval does not decode to its end reports no padding. The window the Hearth player plays a stream through keeps its
+own index of the same shape over a file it reads in windows (`apps/hearth/engine/src/truehd_index.hpp`); the scan holds the whole
+stream in memory.
+
 `decode()` gives no samples and no error for a unit that comes before the first major sync or before a
 substream's first restart header (a stream joined partway). `Presentation` picks the substreams read: `kBest`
 (0 to 2, the default), `k2ch`, `k6ch`, `k8ch` or `kAll` (substream 3 too). `Strictness::kStrict` makes a failed check
@@ -105,8 +129,8 @@ channels with a primitive matrix where that makes the stream smaller, predicts e
 to order 8 found by windowed autocorrelation and the Levinson-Durbin recursion (order 4 at 176.4 and 192 kHz, the
 specification's limit), and codes each block's residual with whichever of the three codebooks or raw bits takes the
 fewest bits, with the offset and raw width to match. Channels are spread over substreams the way FFmpeg's encoder
-spreads them: two in substream 0, the next four in substream 1 and the last two in substream 2 (one substream at
-176.4 and 192 kHz).
+spreads them: two in substream 0, the next four in substream 1 and the last two in substream 2 (stereo and mono are one substream at 176.4 and 192 kHz, and
+3 to 6 channels there are two, as FFmpeg writes them although the specification's text says one: ERRATA entry 91, provisional).
 
 `DownmixMode::kStandard` writes the 2 and 6 channel presentations as downmixes instead: substream 0 holds a stereo
 mix, the matrices of the later substreams take the folded-in channels out again, and a 7.1 stream folds its rear
@@ -138,8 +162,8 @@ inside it. The restart interval is 1 or at least 8 access units; a longer interv
 one a quicker random access.
 
 FFmpeg's strict decode of what it writes is the check, sample for sample
-(`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.95 times the size of
-FFmpeg's encoder's over the layouts it writes. It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
+(`tools/checks/verify_truehd_encode_interop.py`, with `--forge` through `forge truehd-encode`); the streams are 0.85 to 0.96 times the size of
+FFmpeg's encoder's at 44.1 to 96 kHz and 1.06 to 1.15 times at 192 kHz, and 0.966 of DEE's on the 5.1 music ([the measured table](../truehd-comparison.md)). It writes no noise, no IIR filter and no LSB bypass (nothing outside this library reads
 them), no MLP, and no block data CRC; the Atmos substream and the evolution payload it only frames, from bytes it is given.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;

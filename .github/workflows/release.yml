@@ -589,6 +589,20 @@ jobs:
       # CHANGELOG.md, as normal development practice (grouped by user-facing area, bold
       # lead-in bullets - see tools/release/render_release_notes.py's own docstring for
       # what this deliberately does not try to reconstruct on top of that).
+      # A change adds a changelog.d/ fragment and the release pull request assembles them into
+      # CHANGELOG.md (docs/releasing.md, step 5). One still here was written after that pull request
+      # branched, or never assembled, and would be left out of the notes this step renders.
+      - name: No unassembled changelog fragments
+        shell: bash
+        run: |
+          set -euo pipefail
+          left=$(find changelog.d -maxdepth 1 -name '*.md' ! -name README.md | sort)
+          if [ -n "$left" ]; then
+            echo "::error::changelog.d still holds fragments the release notes do not include:"
+            echo "$left"
+            exit 1
+          fi
+
       - name: Render release notes from CHANGELOG.md
         env:
           VERSION_TAG: ${{ needs.resolve-version.outputs.version_tag }}
