@@ -17,6 +17,7 @@ fn main() {
     for rel in [
         "libs/capi",
         "libs/ac3/include",
+        "libs/truehd",
         "libs/base",
         "libs/dsp",
         "libs/objects",

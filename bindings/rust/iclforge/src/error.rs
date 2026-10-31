@@ -49,6 +49,10 @@ pub enum Error {
     /// `iclforge_lyrics_parse()` refused bytes that are not lyrics. [`crate::lyrics::Lyrics::parse`]
     /// returns the reason with it, as [`crate::lyrics::LyricsError::Unreadable`].
     LyricsUnreadable,
+    /// `iclforge::truehd::ErrorKind` — [`crate::truehd::probe`], [`crate::truehd::scan`] and
+    /// [`crate::truehd::Decoder::decode`] refused the bytes. The encoder's `ICLFORGE_ERROR_TRUEHD_ENCODE_*`
+    /// codes are not here (nothing in this crate wraps the encoder) and surface as [`Error::Other`].
+    Truehd(crate::truehd::ErrorKind),
     /// A raw `iclforge_status_t` value this crate doesn't recognize. `iclforge_status_message`
     /// still gives a human-readable string for it (`"unknown status"` for a value the C library
     /// itself doesn't recognize either — see `libs/capi/src/common.cpp`'s own fallback), so
@@ -60,6 +64,9 @@ impl Error {
     /// `None` for `ICLFORGE_OK`, `Some(Error)` otherwise — matches how every raw entry point
     /// returns a status alongside its real result.
     pub(crate) fn from_status(status: iclforge_sys::iclforge_status_t) -> Option<Error> {
+        if let Some(kind) = crate::truehd::ErrorKind::from_status(status) {
+            return Some(Error::Truehd(kind));
+        }
         use iclforge_sys::*;
         #[allow(non_upper_case_globals)]
         Some(match status {
@@ -182,6 +189,7 @@ impl Error {
             }
             Error::Ac4EncodeInvalidInput => iclforge_status_ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT,
             Error::LyricsUnreadable => iclforge_status_ICLFORGE_ERROR_LYRICS_UNREADABLE,
+            Error::Truehd(kind) => kind.raw(),
             // The mirror of from_status's cast, same platform reasoning.
             #[allow(clippy::unnecessary_cast)]
             Error::Other(raw) => raw as _,
