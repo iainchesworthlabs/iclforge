@@ -24,6 +24,14 @@ See [README.md](README.md) for the project overview and
   packets; each as a raw OBU stream and as an ISO-BMFF file, 17 files of 0.3 to 10 KB. `tools/fuzz/generate-seeds.sh` runs the tool when
   it is beside forge. `test_iamf_seeds.cpp` holds each seed to being read by its own framing's reader, decoded where it is `ipcm`, and
   refused by the other's. `tools/checks/check_fuzz_harnesses.py` has no known gap left.
+- **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
+  A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
+  end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
+  where a decoder can start, thinned to one every `restart_spacing` units. `restart_for_sample()` and the C call of the same name give the unit
+  and the byte offset to decode from to reach a sample; decoding from there gives the samples an unbroken decode gives, checked on every
+  fixture. Hearth's player has had an index of this shape over a file it reads in windows; this is the in-memory form for the library, `forge`
+  and the bindings. Nothing else is changed.
+
 - **Fixed: a shared build of the library did not link `forge` or the TrueHD tests.** `EvolutionFrame::find` and `oamd` were defined in the library
   and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
   an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
