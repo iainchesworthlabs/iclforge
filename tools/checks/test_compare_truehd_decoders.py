@@ -1,9 +1,14 @@
 """Unit tests for compare_truehd_decoders.py: the damage it does to a stream and how it judges a
 decode. No decoder runs here; the streams are made of units with the length field of TH spec 3.1."""
 
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
+
+if importlib.util.find_spec("numpy") is None:
+    # _static.yml discovers tools/checks with the system python3; these read samples with numpy.
+    raise unittest.SkipTest("numpy is not installed")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

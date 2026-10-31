@@ -7,6 +7,7 @@ ratios, the bit-exact verdict, the exit status and the size limits.
 """
 
 import contextlib
+import importlib.util
 import io
 import json
 import sys
@@ -14,6 +15,10 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+if importlib.util.find_spec("numpy") is None:
+    # _static.yml discovers tools/checks with the system python3; these read samples with numpy.
+    raise unittest.SkipTest("numpy is not installed")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

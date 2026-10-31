@@ -941,7 +941,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         shifts[static_cast<std::size_t>(c)] = std::min(bits, kMaxOutputShift);
         quants[static_cast<std::size_t>(c)] = bits - shifts[static_cast<std::size_t>(c)];
     }
-    const int output_shift = *std::max_element(shifts.begin(), shifts.end());
+    int output_shift = 0;
+    for (const int shift : shifts) {
+        output_shift = std::max(output_shift, shift);
+    }
     std::vector<Plane> rows = original;
     for (int c = 0; c < channels; ++c) {
         if (shifts[static_cast<std::size_t>(c)] > 0) {

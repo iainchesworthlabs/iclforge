@@ -1,8 +1,13 @@
 """Unit tests for estimate_truehd_iir_gain.py: the pieces that its numbers rest on."""
 
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
+
+if importlib.util.find_spec("numpy") is None:
+    # _static.yml discovers tools/checks with the system python3; these read samples with numpy.
+    raise unittest.SkipTest("numpy is not installed")
 
 import numpy as np
 
