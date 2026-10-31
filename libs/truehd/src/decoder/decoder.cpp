@@ -697,11 +697,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         if (index == kObjectSubstream && config.lab.fold_scope != 0) {
             // Lab: fold other samples than the output of every matrix channel (ERRATA.md entry 69).
             const int scope = config.lab.fold_scope;
-            const int first = scope >= 3 && scope <= 4 ? 0 : state.context.min_chan;
-            const int last = scope >= 3 && scope <= 4 ? state.context.min_chan - 1
-                                                       : state.context.max_chan;
-            const bool coded = scope >= 5;
-            const bool relative = scope == 2 || scope == 4 || scope == 6;
+            const bool upward = scope >= 10;
+            const int first = upward                   ? scope - 10
+                              : scope >= 3 && scope <= 4 ? 0
+                                                         : state.context.min_chan;
+            const int last = upward                    ? state.context.max_matrix_chan
+                             : scope >= 3 && scope <= 4 ? state.context.min_chan - 1
+                                                        : state.context.max_chan;
+            const bool coded = scope >= 5 && !upward;
+            const bool relative = !upward && (scope == 2 || scope == 4 || scope == 6);
             std::uint32_t fold = fold_before;
             for (int i = 0; i < block; ++i) {
                 const std::int32_t* const row =

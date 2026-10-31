@@ -77,7 +77,7 @@ struct DecoderLab {
     // What the object substream's lossless check folds: 0 the output of every matrix channel;
     // 1 and 2 the output of the coded channels (shifted left by the matrix channel, or by its
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
-    // coded samples before the matrices.
+    // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };

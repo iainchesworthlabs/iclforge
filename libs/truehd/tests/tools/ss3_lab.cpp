@@ -141,6 +141,15 @@ int main(int argc, char** argv) {
         folded.fold_scope = scope;
         settings.push_back({kScopeNames[scope], folded});
     }
+    static const char* const kUpwardNames[] = {
+        "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
+        "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",
+        "fold: matrix channels 7 up", "fold: matrix channels 8 up"};
+    for (int from = 1; from <= 8; ++from) {
+        DecoderLab folded = base;
+        folded.fold_scope = 10 + from;
+        settings.push_back({kUpwardNames[from - 1], folded});
+    }
     bool first = true;
     for (const Setting& setting : settings) {
         run(stream, setting.name, setting.lab, first);
