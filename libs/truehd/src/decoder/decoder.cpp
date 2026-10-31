@@ -695,11 +695,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             // (the number of matrices left, this one included) it starts the access unit at.
             kernels::NoiseDraw noise;
             if (plan.noise_shift != 0 && state.context.noise_type) {
-                const auto first = static_cast<unsigned>(state.matrix_count - m);
+                const bool lab_index = object && config.lab.object_noise_index != 0;
+                const auto first = static_cast<unsigned>(
+                    lab_index && (config.lab.object_noise_index & 2) != 0 ? m + 1
+                                                                          : state.matrix_count - m);
                 noise.buffer = state.noise_buffer.data();
                 noise.shift = plan.noise_shift;
                 noise.stride = 2U * first + 1U;
-                noise.first = first + noise.stride * static_cast<unsigned>(position);
+                const bool from_block = lab_index && (config.lab.object_noise_index & 1) != 0;
+                noise.first = first + (from_block ? 0U : noise.stride * static_cast<unsigned>(position));
                 noise.mask = static_cast<unsigned>(noise_size - 1U);
             }
             kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),

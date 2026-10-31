@@ -239,6 +239,13 @@ int main(int argc, char** argv) {
                                     ((bits & 8) != 0 ? " inverse-fshift" : ""));
         settings.push_back({combination_names.back().c_str(), combined});
     }
+    static const char* const kIndexNames[] = {"", "noise index: from the block", "noise index: matrices from the first",
+                                              "noise index: from the block, matrices from the first"};
+    for (int mode = 1; mode <= 3; ++mode) {
+        DecoderLab indexed = base;
+        indexed.object_noise_index = mode;
+        settings.push_back({kIndexNames[mode], indexed});
+    }
     static const char* const kScopeNames[] = {
         "",
         "fold: coded channels, shift by matrix channel",
