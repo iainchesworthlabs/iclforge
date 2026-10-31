@@ -249,8 +249,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     the confirmed size.
 45. **Which way `ch_assign` reads (§7.3, §7.4, entry 42).** v3.9 §7.4 reads "The 6-bit `ch_assign` field maps output positions to matrix
     channels" and §7.3's pseudo-code takes `mat_ch = ch_assign[out_ch]`; v3.5 to v3.6 had "maps matrix channels to output channels". The
-    stream's `ch_assign[m]` as read from the bits is, in FFmpeg's decoder and in this library (entry 42, `hb_output_shift_permuted`
-    and the three-cycle stream of `test_channel_assignment.cpp`), the output position of matrix channel `m`; the array that maps an output
+    stream's `ch_assign[m]` as read from the bits is, in FFmpeg's decoder and in this library (entry 42, `hb_output_shift_permuted`,
+    `hb_ch_assign_cycle` and the three-cycle stream of `test_channel_assignment.cpp`), the output position of matrix channel `m`; the array that maps an output
     position to its matrix channel is its inverse, which FFmpeg holds in memory and the pseudo-code is written from. The two readings
     decode a permutation that is not its own inverse differently, and the new wording, taken for the bits of the stream, is the other one.
     The owner's Blu-ray decides the stream: its second and third substreams carry `ch_assign` (0, 5, 1, 4, 2, 3) and (0, 6, 1, 4, 2, 3,

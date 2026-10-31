@@ -8,6 +8,18 @@
     Atmos in TrueHD is on hold until the owner confirms the evolution payload layout; every row that needs it is
     marked blocked and is not in the plan.
 
+!!! note "Update of 2026-10-31 (work package 4): phases 0, 2 and 3 are built; phases 1 and 4 need the owner"
+    Built on `feature/truehd-crucible`: the seams (`BurstFormat`, `accepts_truehd`), the pin-only mode `kTrueHd51`
+    with the equality oracle, the window, runner, diagnostics, translations and pages. The answers taken from the
+    recommendations below, since the owner has not replied: question 1 yes, pin-only; 2 a 5.1 bed; 3 pin-only; 4
+    plain rounding; 5 48 kHz; 8 the restart interval stays at the encoder's 128 until a receiver confirms 8; 9
+    the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Question 6
+    was answered by the owner on 2026-10-31 (eight 16-bit channels at 192 kHz, 176.4 kHz for the 44.1 family; Microsoft's page gives the same link).
+    Phase 1 was built by the Hearth session in parallel and merged first (`BitstreamFormat::kMat`, `supports_mat_passthrough`, ALSA, PipeWire and WASAPI;
+    Core Audio refuses it); this branch uses that. Not built: the hardware reading and the throughput (phase 4). `crucible-probe` and the hidden case `[truehd_cost]` are
+    the tools for it. What this round asks is in
+    [Questions from the build](#questions-from-the-build), at the end.
+
 ## Basis
 
 The tree is `integ` at `523cf5dc` (worktree branch `parity-crucible`).
@@ -165,14 +177,14 @@ under `apps/crucible/` unless they start with `libs/`, `tools/`, `docs/` or `.gi
 | C22 | CI lanes | Crucible is built and tested on six legs: Linux LLVM x86_64 and arm64, Windows MSVC and clang-cl, macOS arm64 and x86_64 (`.github/ci/legs.jsonc`, parsed). The GCC, sanitizer and Windows arm64 legs do not build the application, but `iclforge-crucible-tests` is not gated on it (`engine/tests/CMakeLists.txt`), so those legs build the device-free suite. TrueHD's FFmpeg checks run in the core lane (`_ci-core.yml`) | A `truehd` edge makes `libs/truehd` changes light Crucible's three platform lanes. No FFmpeg check covers bursts that Crucible's leg makes | partial | S | C20 | Read only |
 | C23 | Documentation | `docs/crucible/index.md` ("Codecs", item 5 of "What it does"), `signal-path.md` (modes, Pin list, block 05), `settings.md` (03, 04, 05), `troubleshooting.md`, `install.md` and `design/promotion.md` under `docs/crucible/`; generated table `docs-snippets/generated/application-capabilities.md` from `docs/assets/data/support-catalogue.json` (`application_capabilities`); `ROADMAP.md`; `CHANGELOG.md` | The only TrueHD words are the receiver's codec list in `promotion.md` and `troubleshooting.md`. The catalogue has no TrueHD row for any application | missing | M | C15 names | `grep -rIil truehd apps/crucible docs/crucible` lists `promotion.md` and `troubleshooting.md` |
 | C24 | Throughput on the machines Crucible runs on | Measured. Spike S4 (`spikes/s4_throughput/s4_throughput.cpp`): encode and pack per frame against the 32 ms budget | Not measured on a target. About 9x real time for 5.1 on the audit host (see C1); the Pi 4B and the Windows desktop are unknown | missing | S | C1 | The audit-host figure above only |
-| C25 | A receiver's own reading | "5.1 DD+" and "Atmos/DD+" read off a receiver, Pi and PipeWire, 2026-09-05; Windows exclusive on an Onkyo TX-RZ740 per the ROADMAP (the promotion record still lists "Windows bitstream to a real receiver" as not yet, for Crucible itself) | None. [ERRATA](../libs/containers/ERRATA.md) says no receiver was tried for MAT. `tools/checks/passthrough_probe.cpp`, which streamed the DD+ fixture, is not a CMake target and, by its own header, has not run since the library was split | missing | M (needs the owner's receiver time) | C11, C12, C1 | Read only |
+| C25 | A receiver's own reading | "5.1 DD+" and "Atmos/DD+" read off a receiver, Pi and PipeWire, 2026-09-05; Windows exclusive on an Onkyo TX-RZ740 per the ROADMAP (the promotion record still lists "Windows bitstream to a real receiver" as not yet, for Crucible itself) | None. [ERRATA](../libs/containers/ERRATA.md) says no receiver was tried for MAT. `passthrough_probe`, which streamed the DD+ fixture, was not a CMake target and had not run since the library was split; as of 2026-11-01 it is the `crucible-probe` target (`apps/crucible/runner/src/bitstream_probe.cpp`) and streams a TrueHD file as MAT too | missing | M (needs the owner's receiver time) | C11, C12, C1 | Read only |
 
 Counts: 25 rows. By gap: 18 missing, 5 partial, 2 n/a, none 0. By size: 14 S, 7 M, 2 L, 1 XL, 1 not sized (C13, whose feasibility is unknown). C6 and C7 are blocked on the owner's evolution-payload answer and are outside the plan.
 
 ## Things TrueHD has that DD+ never needed
 
 **MAT carriage over a wider link.** A TrueHD stream reaches a receiver as MAT (IEC 61937 data type 22): a 61,440-byte burst
-holding 24 access units, 20 ms of audio at any supported rate. The library's reading of the carrier is eight 16-bit channels
+holding 24 access units, 20 ms of audio at the 48 kHz family's rates and 21.8 ms at the 44.1 family's. The library's reading of the carrier is eight 16-bit channels
 at 192 kHz (176.4 kHz for the 44.1 family), 24.6 Mbit/s against E-AC-3's 6.1 Mbit/s; it is provisional and is the owner's to
 confirm ([ERRATA](../libs/containers/ERRATA.md), item 7). Every `PassthroughSink` backend assumes a two-channel carrier. This is
 the same missing piece as AC-4 HBR16, which `passthrough.hpp` says no backend opens. The work sits in `libs/audio`
@@ -244,7 +256,7 @@ probe for now); `fake_devices.hpp` records the format and can script `accepts_tr
 six legs; no new mode exists.
 
 **Phase 1: the audio backends carry MAT (C11, C12, then C13). Size L to XL. Waits for Q6.**
-`BitstreamFormat::kTrueHd`, an eight-channel carrier in `PassthroughSink`, `supports_truehd_passthrough`, and per backend:
+`BitstreamFormat::kMat` (built by the Hearth session), an eight-channel carrier in `PassthroughSink`, `supports_mat_passthrough`, and per backend:
 PipeWire first, since it is Crucible's Linux path and the Pi's receiver already published TrueHD in its codec list; WASAPI
 second; Core Audio only if the owner wants macOS pursued. ALSA and Android serve forge and Hearth and are not Crucible's.
 This phase belongs to whichever document owns `libs/audio`; it is listed so that the dependency is visible. *Risks:* the
@@ -272,7 +284,7 @@ with the new entries; `generate_support_matrices.py --check`, `check_doc_paths.p
 **Phase 4: on hardware (C24, C25). Size M. Waits for Phases 1 to 3 and the owner's receiver time.**
 The Pi 4B over PipeWire first (the receiver there advertised TrueHD on 2026-09-05), then the Windows machine. Record the
 front-panel reading, the worst frame time and the underruns; measure the encode's share of a frame; revive or replace
-`tools/checks/passthrough_probe.cpp` with a MAT fixture path. Record the result in the promotion record, with what it does
+`passthrough_probe` with a MAT fixture path (done: `crucible-probe`, 2026-11-01). Record the result in the promotion record, with what it does
 not show (it names the format, not the correctness of the audio). *Risks:* the receiver may not lock on a stream whose
 restart interval or downmix presentations differ from FFmpeg's; the tap-precision question (C4) needs a short spike with a
 24-bit ramp through the driver.
@@ -322,3 +334,28 @@ Phase 4 needs the owner's hardware.
 11. **Deferred until the evolution payload is confirmed:** one signing setting for both codecs or two (the ROADMAP says the
     TrueHD check must not go through `iclforge::ac3::signing`), and whether Crucible's "objects need a key" rule holds for
     TrueHD. Recorded here so that it is asked then and not settled in code. *Recommendation:* decide when C6 unblocks.
+
+## Questions from the build
+
+Raised on 2026-10-31 by the session that built phases 0, 2 and 3. Each has a recommendation and each is built the way the
+recommendation says, provisionally.
+
+12. **Should the TrueHD entry be offered in the Pin list and the tray while no backend can carry it?** The real probe
+    answers false for TrueHD on macOS (and on a PipeWire sink that does not list it, or a Windows endpoint that refuses the format), so a pin on it falls back there,
+    with the reason line saying why. The headphones entry is
+    dropped where no renderer exists, on the argument that a list should offer what can be chosen. *Recommendation:*
+    keep it, because the hardware phase needs the pin and the reason line is honest; revisit when phase 1 lands and the probe can
+    answer, and hide it on a platform whose backend will never carry MAT.
+13. **What should the mode do when the TrueHD encoder or the MAT packer stops?** It stops the output, adds the reason and
+    leaves the mode at "none" until the next probe, as the spatial sink does. It could instead fall back to DD+ 5.1 at once.
+    *Recommendation:* as built; a lossless stream that silently becomes a lossy one is the thing to avoid. The only way the
+    encoder fails with a whole bed is a peak rate set too low (the setting is
+    `OutputStageConfig::truehd_peak_data_rate_bps`, 18 Mbit/s, which the bed's raw 6.9 Mbit/s cannot approach).
+14. **The LFE channel is silent in the live path.** The mode sends the encoder's bed, whose LFE is whatever the objects send
+    there, which in Crucible is nothing: a tap's LFE is dropped, as for DD+ 5.1 (`bed_mixer.cpp`), and `encode_frame` has an
+    overload that takes a source's own LFE that the engine does not call. *Recommendation:* feed it, for both modes, in one
+    change of its own; a lossless 5.1 stream with an empty LFE is the first thing a listener with a subwoofer will notice.
+15. **How is the first reading to be taken?** Phase 4 needs, on the Pi 4B over PipeWire, a build with phase 1 (question 6,
+    unanswered), the restart interval at 128 and then at 8 (question 8), and the front-panel word. *Recommendation:* the owner
+    answers question 6 first; the carrier is then one backend and one reading, and every other question here waits for that
+    reading.

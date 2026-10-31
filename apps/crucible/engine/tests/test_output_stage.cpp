@@ -111,7 +111,7 @@ TEST_CASE("output stage: an E-AC-3 capable endpoint gets a burst sink and E-AC-3
     CHECK(status.running);
     REQUIRE(devices->burst_sinks.size() == 1);
     CHECK(devices->burst_sinks[0]->started);
-    CHECK(devices->burst_sinks[0]->eac3);
+    CHECK(devices->burst_sinks[0]->format == BurstFormat::kEac3);
     CHECK(devices->burst_sinks[0]->device_id == "avr");
 
     Encoded encoded;
@@ -143,7 +143,7 @@ TEST_CASE("output stage: an AC-3-only endpoint gets the DD 5.1 leg", "[crucible]
     OutputStage stage(config_over(devices));
     CHECK(stage.reprobe(false).mode == OutputMode::kDd51);
     REQUIRE(devices->burst_sinks.size() == 1);
-    CHECK_FALSE(devices->burst_sinks[0]->eac3);
+    CHECK(devices->burst_sinks[0]->format == BurstFormat::kAc3);
     Encoded encoded;
     for (int i = 0; i < 3; ++i) {
         const auto raw = encoded.next();

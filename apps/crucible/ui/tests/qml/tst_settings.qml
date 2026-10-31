@@ -204,6 +204,22 @@ TestCase {
         }
     }
 
+    // The Latency and Codec blocks say they do not apply while the TrueHD
+    // mode is the one in use. The mode cannot be reached here (no endpoint these
+    // suites can reach lists TrueHD), so this holds the
+    // notes to being on the page and shown only in that mode.
+    function test_theTruehdNotesAreOnThePageAndHiddenOutsideThatMode() {
+        const page = createTemporaryObject(settingsPage, testCase.parent);
+        verify(page);
+        waitForRendering(page);
+        for (const name of ["truehdLatencyNote", "truehdBitrateNote"]) {
+            const note = findChild(page, name);
+            verify(note, name + " carries its objectName");
+            compare(note.visible, CrucibleController.modeKey === "truehd", name);
+            verify(note.text.indexOf("TrueHD 5.1") >= 0, note.text);
+        }
+    }
+
     function test_diagnosticsReportWithholdsTheKeyPath() {
         // A chosen key file: the path is remembered (in the store) and the
         // report says so without carrying it in any spelling, nor the file's

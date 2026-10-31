@@ -37,7 +37,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`, `sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-android`, `hearth-sink`, `sink` | core |
 | `sink` (internal) | `libs/sink/` | A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies: the pass-through output hands the coded bursts on, and the decoding output (AC-3, E-AC-3, AC-4) decodes and renders them and hands the samples to a PcmSink. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed. | `ac3`, `ac4`, `containers`, `lyrics`, `objects`, `render`, `sendspin` | `hearth`, `hearth-android` | core |
-| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values), the lossless decoder and the TrueHD encoder. | `base` | `app-media`, `capi`, `demo-wasm`, `forge`, `hearth`, `tests` | core |
+| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values), the lossless decoder and the TrueHD encoder. | `base` | `app-media`, `capi`, `crucible`, `demo-wasm`, `forge`, `hearth`, `tests` | core |
 
 ## Vendored code
 
@@ -60,7 +60,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `app-cdg-picture`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `truehd`, `app-cdg-picture`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `lyrics`, `objects`, `pitch`, `truehd` | nothing | wasm |
 | `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4, and, in the command-line tool only, for decoding, analysis, wrapping and encoding of TrueHD. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `truehd`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-text-encoding`, `app-theme` | nothing | windows, linux, macos |

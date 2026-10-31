@@ -128,8 +128,9 @@ What runs against it:
   decode the same mutated bytes with FFmpeg as well and diff the PCM (TrueHD's sample for sample, since
   the codec is lossless), so a *wrong* decode that does not crash is caught too. `fuzz_adm_parse` is
   built only when `ICLFORGE_BUILD_ADM` is on — see [ADM](#adm-xml-and-bw64) — and the last,
-  `fuzz_iamf_parse`, is built and has no seeds and no place in a run list yet
-  (`tools/checks/check_fuzz_harnesses.py` reports it on every run). `Fuzz Regress` replays the checked-in seed and regression corpora on
+  `fuzz_iamf_parse`, reads IAMF's OBU stream and its ISO-BMFF encapsulation from 17 seeds (a 7.1.4
+  PCM programme, object programmes in the three position codings, a fragmented file, and Opus,
+  AAC-LC and FLAC ones, each in both framings), made by `iclforge-iamf-seed-tool`. `Fuzz Regress` replays the checked-in seed and regression corpora on
   every push to `main` and on pull requests into it (a repository variable can pause the
   pull-request run, as [Where each check runs](verification.md#where-each-check-runs) says);
   `Fuzz Short` and `Fuzz Differential` add a bounded mutation budget on pushes, and a nightly job
