@@ -968,6 +968,7 @@
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="59"/>
+        <location filename="../qml/DecoderTruehd.qml" line="129"/>
         <source>Plays</source>
         <translation>Spielt</translation>
     </message>
@@ -1018,27 +1019,48 @@
         <translation>Tolerant</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="110"/>
+        <location filename="../qml/DecoderTruehd.qml" line="111"/>
+        <location filename="../qml/DecoderTruehd.qml" line="132"/>
+        <source>Track</source>
+        <translation type="unfinished">Spur</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="116"/>
+        <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="135"/>
+        <source>Automatic</source>
+        <translation type="unfinished">Automatisch</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <source>Compressed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="146"/>
         <source>Level</source>
         <translation>Pegel</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="116"/>
+        <location filename="../qml/DecoderTruehd.qml" line="152"/>
         <source>The stream&apos;s dialogue normalisation and dynamic range words are read and shown, and nothing applies them: the level is the stream&apos;s own. The output is float32 through the operating system&apos;s mixer, which is not a bit-exact path.</source>
         <translation>Die Wörter des Streams für Dialognormalisierung und Dynamikbereich werden gelesen und angezeigt, aber nichts wendet sie an: Der Pegel ist der des Streams selbst. Die Ausgabe erfolgt als float32 über den Mixer des Betriebssystems, der kein bitgenauer Pfad ist.</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="128"/>
+        <location filename="../qml/DecoderTruehd.qml" line="164"/>
         <source>This stream</source>
         <translation>Dieser Stream</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="131"/>
+        <location filename="../qml/DecoderTruehd.qml" line="167"/>
         <source>Nothing TrueHD is playing.</source>
         <translation>Es wird nichts im Format TrueHD abgespielt.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <location filename="../qml/DecoderTruehd.qml" line="173"/>
         <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
         <translation>
             <numerusform>%1 · %2 kHz · %n Substream mit %3 Kanälen</numerusform>
@@ -1046,17 +1068,18 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <location filename="../qml/DecoderTruehd.qml" line="174"/>
         <source>MLP</source>
         <translation>MLP</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <location filename="../qml/DecoderTruehd.qml" line="136"/>
+        <location filename="../qml/DecoderTruehd.qml" line="174"/>
         <source>TrueHD</source>
         <translation>TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="148"/>
+        <location filename="../qml/DecoderTruehd.qml" line="184"/>
         <source>A decoder can join it about every %1 ms; a seek decodes from the join point before the place asked for.</source>
         <translation>Ein Decoder kann etwa alle %1 ms einsteigen; ein Suchlauf decodiert ab dem Einstiegspunkt vor der gewünschten Stelle.</translation>
     </message>
@@ -6118,17 +6141,17 @@ Legen Sie hier AC-3-, E-AC-3-, AC-4-, TrueHD- oder MLP-Dateien (roh, MP4, Matros
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1643"/>
+        <location filename="../../src/hearth_controller.cpp" line="1671"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>Dieser Build enthält keine eingebettete Hinweisdatei (:/notices/NOTICES.txt wurde nicht einkompiliert); die NOTICES.txt neben der Anwendung und die LICENSE des Repositorys sagen, was er ausliefert.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2842"/>
+        <location filename="../../src/hearth_controller.cpp" line="2870"/>
         <source>saved to %1</source>
         <translation>gespeichert unter %1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2845"/>
+        <location filename="../../src/hearth_controller.cpp" line="2873"/>
         <source>could not write %1: %2</source>
         <translation>%1 konnte nicht geschrieben werden: %2</translation>
     </message>
