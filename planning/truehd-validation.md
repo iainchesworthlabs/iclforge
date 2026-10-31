@@ -144,7 +144,7 @@ A mark comes off only when its ERRATA entry names the evidence with its numbers.
 | Mark (ERRATA) | State |
 |---|---|
 | Q6 / TH-6 and entries 12, 43: the lossless check's shift and `output_shift` by matrix channel | **Off.** v3.9 §7.3; four discs (six streams); the DEE set: 32 of 87 PASS legs fail with the shift by position, 13,320 intervals in 77 legs fail with the fold by position, none with the library's reading |
-| Q19 / TH-19: extra-data length and check nibble | **Off.** v3.9 §16.2; 11,376 regions on six streams of four discs; DEE cannot score it (the owner's decision) |
+| Q19 / TH-19: extra-data length and check nibble | **Off.** v3.9 §16.2; 11,376 regions on six streams of four discs, and 1,893 more on a seventh (a fifth disc, `planning/truehd-disc-findings.md`); DEE cannot score it (the owner's decision) |
 | Q43 and entry 44: noise generator 1's buffer, index and stride | **Off (answered).** 76 legs stopped on it on 2026-10-29; 49 now PASS, 4 ALTER, 23 UNEXPLAINED, 26,236 of their intervals ok and none failed |
 | Q5 / TH-5: `seed_shr7` 16 bits | **Stays.** v3.7 §17.2. Not scored: no DEE leg changes with `seed-shr7-32` (142 short, 3 long). Needs a stream that draws on generator 0's noise |
 | Q18 / TH-18 and Q42: filter histories survive a restart | **Stays.** v3.9 §9.6. Not scored: no DEE leg changes with `zero-histories`. Needs a stream that filters from the first sample after a restart |

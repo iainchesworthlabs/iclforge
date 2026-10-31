@@ -124,3 +124,32 @@ What it settles, with the library's readings unchanged:
 - **ERRATA 12 (`peak_data_rate`):** raw values 1673 to 3147 at 48 kHz, 5.0 to 9.4 Mbit/s with `(raw x rate + 8) >> 4`.
 - **Decoding:** the lenient decode of every substream stops on the 12 or 14 channel substream's matrices (`parameter out of range`, ERRATA "Not done" above, `frac_bits` above 14); the lossless checks of the substreams
   it does decode (0 to 2) pass in every interval of every stream.
+
+## A seventh stream: the disc labelled CIVIL_WAR_UHD (2026-10-31)
+
+The owner's fifth disc, a UHD Blu-ray image mounted read-only at `G:` (label `CIVIL_WAR_UHD`, UDF), said to be a 5.1 Atmos disc. Main feature `BDMV/STREAM/00000.m2ts` (72.7 GB) holds one
+TrueHD stream (`ffprobe`: stream 2, `Dolby TrueHD + Dolby Atmos`, 48000 Hz, 8 channels), beside three AC-3 streams. A 60 s excerpt from 900 s was cut with `-c copy` (23.3 MB,
+`D:/ac3bld/bd-civilwar/excerpt-2.thd`) and probed with `detail=format` (`probe-2.txt`, `probe-2.json` beside it). Nothing from the disc is committed.
+
+**It does not answer ERRATA 15.** The stream has the same four substreams as the 7.1 discs (2, 6, 8 and 12 channels, `substream_info` 0xFC, `extended_substream_info` 3), so `substream_info` for one and
+three substreams is still unseen, and the disc is "5.1" only in its bed. What it adds:
+
+| | CIVIL_WAR_UHD |
+|---|---|
+| Substreams (channels) | 2, 6, 8, 12 |
+| `peak_data_rate` raw (Mbit/s) | 2411 (7.23) |
+| 2 channel control bit | on |
+| Dialogue norm 2ch / 6ch / 8ch, mix level 2ch / 6ch / 8ch, source format | 37 / 31 / 31, 29 / 35 / 35, 0 (the same as the other six streams) |
+| Start-up gains, heavy / standard | 0 / -4 |
+| Extra-data regions (nibble, framing, parity, `evo_reserved`, length all right) | 1,893, 58-byte frames, payload 11 of 50 bytes, 38 to 39 units apart |
+| Segments passing parity and CRC | 290,908 of 290,908 |
+| Lossless-check intervals ok / failed (lenient, every substream) | 1,704 / 0 |
+| `data_check_present` set | 0 |
+| Terminators after the last block | none in 72,727 units |
+| The 16 bits that end the restart header's fixed part | 0x0000 x316, 0x8000 x253 |
+| Matrices with LSB bypass | 0 |
+| Major syncs with a different channel meaning | 13 (the first is shown) |
+
+So ERRATA 3, 9, 10, 19, 44, 46 and 51 to 55 hold on a seventh stream of a fifth disc, with nothing new: the extra data are 1,893 more regions (13,269 on seven streams in all) and the
+channel meaning is the same constants again. The lenient decode stops on the 12 channel substream's matrices, as on the other discs (`parameter out of range` once per major sync, `frac_bits` above 14;
+ERRATA "Not done" above). The 60 s excerpt was the only part read.
