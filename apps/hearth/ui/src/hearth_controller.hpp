@@ -268,7 +268,9 @@ class HearthController : public QObject {
     // "not reported"), supportsAc3, supportsEac3 (bool, iclforge::audio::
     // RenderDeviceInfo's own probe of IEC 61937 passthrough in exclusive
     // mode: the picker's passthrough section lists the rows with either,
-    // and selectPassthroughDevice() plays to one).
+    // and selectPassthroughDevice() plays to one), supportsMat (bool, the same probe
+    // for TrueHD's eight-channel MAT link) and matRun (bool, whether a run on a receiver has
+    // shown this platform's MAT output to work: false everywhere until one has).
     Q_PROPERTY(QVariantList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
     // The endpoint a person chose in the picker's passthrough section
     // (selectPassthroughDevice()'s own id), or empty for a decode to a

@@ -159,8 +159,10 @@ std::expected<Report, th::Error> build_report(std::span<const std::byte> stream,
             last_sync_unit = index;
             if (parsed->major_sync->kind == th::StreamKind::kTrueHd &&
                 report.meanings.size() < kMaxMeanings &&
-                std::ranges::find(report.meanings, parsed->major_sync->channel_meaning) ==
-                    report.meanings.end()) {
+                !std::ranges::any_of(report.meanings,
+                                     [&parsed](const th::ChannelMeaning& meaning) {
+                                         return meaning == parsed->major_sync->channel_meaning;
+                                     })) {
                 report.meanings.push_back(parsed->major_sync->channel_meaning);
             }
         }

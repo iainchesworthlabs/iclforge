@@ -46,6 +46,37 @@ TEST_CASE("AC-4 declares its carrier at the content rate and HBR4 at four times 
     CHECK(burst_bytes_for(BitstreamFormat::kAc4Hbr4) == 8192 * 4);
 }
 
+TEST_CASE("TrueHD declares an eight-channel carrier at the MAT link rate") {
+    // The same arithmetic as every backend's: 192 kHz for the 48 kHz family at any of its rates,
+    // 176.4 kHz for the 44.1 kHz one, and none for a rate MAT has no link at.
+    CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 96000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 32000) == 0);
+    // A MAT burst is the 61,440 bytes the buffers are sized to, and the bridge is told eight
+    // channels: the count the Kotlin side turns into CHANNEL_OUT_7POINT1_SURROUND.
+    CHECK(burst_bytes_for(BitstreamFormat::kMat) == 61440);
+    CHECK(iclforge::audio::carrier_channels(BitstreamFormat::kMat) == 8);
+    CHECK(iclforge::audio::carrier_frame_bytes(BitstreamFormat::kMat) == 16);
+    // Only MAT needs the bridge's link methods; AC-3, E-AC-3 and AC-4 open as they always have.
+    CHECK(iclforge::android_audio::needs_link_bridge(BitstreamFormat::kMat));
+    CHECK_FALSE(iclforge::android_audio::needs_link_bridge(BitstreamFormat::kAc3));
+    CHECK_FALSE(iclforge::android_audio::needs_link_bridge(BitstreamFormat::kEac3));
+    CHECK_FALSE(iclforge::android_audio::needs_link_bridge(BitstreamFormat::kAc4));
+    CHECK_FALSE(iclforge::android_audio::needs_link_bridge(BitstreamFormat::kAc4Hbr4));
+}
+
+TEST_CASE("the synthetic render device reports the MAT link only when it was probed") {
+    const auto without = make_render_device_info(true, true, true);
+    CHECK_FALSE(without.supports_mat_passthrough);
+    const auto with = make_render_device_info(true, true, true, true, true);
+    CHECK(with.supports_mat_passthrough);
+    // The answer is the eight-channel probe's alone: AC-3 and E-AC-3 saying yes do not imply it.
+    const auto only_mat = make_render_device_info(false, false, false, false, true);
+    CHECK(only_mat.supports_mat_passthrough);
+    CHECK_FALSE(only_mat.supports_ac3_passthrough);
+}
+
 TEST_CASE("the synthetic render device reports exactly what was probed") {
     const auto none = make_render_device_info(false, false, false);
     CHECK_FALSE(none.supports_ac3_passthrough);

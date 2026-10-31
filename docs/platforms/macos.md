@@ -129,6 +129,14 @@ Short Audio Descriptor block for an HDMI *audio* endpoint specifically, and a pu
 output has no display EDID to read in the first place. `play` falls back to the live
 `enumerate_render_devices()` probe here, the same as before.
 
+### TrueHD (MAT)
+
+!!! warning "Not run, and not offered"
+    The backend refuses TrueHD (MAT) with `kUnsupportedFormat` and never reports `supports_mat_passthrough`. No Core Audio format ID is known
+    to it for TrueHD, and the session that wrote this had no Mac and no SDK to look in. A Mac may offer eight channels of 192 kHz linear PCM on an
+    HDMI output, in which a MAT burst could be sent as data; whether it does, and whether a receiver then names the stream TrueHD, is for the owner to
+    try before any code is written, and macOS is the last of the platforms. The list is `apps/hearth/engine/src/mat_status.hpp`.
+
 ## Per-application capture: the Core Audio process tap
 
 `forge devices` never lists a loopback entry here, and the capture class refuses

@@ -529,6 +529,8 @@ audio::RenderDeviceInfo device_info(const FakeEndpoint& endpoint) {
     info.is_default = endpoint.is_default;
     info.supports_ac3_passthrough = endpoint.passthrough;
     info.supports_eac3_passthrough = endpoint.passthrough;
+    // A receiver that takes a bitstream takes TrueHD's MAT link too, as the picker's row shows.
+    info.supports_mat_passthrough = endpoint.passthrough;
     info.supports_exclusive_pcm = true;
     info.channels = endpoint.channels;
     info.speakers = endpoint.speakers != 0 ? endpoint.speakers : audio::default_speakers(endpoint.channels);
