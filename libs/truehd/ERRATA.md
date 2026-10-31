@@ -378,7 +378,11 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     recording, a spoken-word recording, a 2.5 s 5.1 reference), so the 24-bit rows of `compare_truehd_encoders.py --programme` are 16-bit samples
     in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. The reference session holds no source material of
     this kind (only the DEE-encoded set, which is not source) and knows of no licensed 24-bit, film or 7.1 recording; forge can synthesise
-    signals but that is not programme material. **Open, the owner's:** **Recommendation:** 5 to 10
+    signals but that is not programme material. *The owner's answer (2026-10-31): drive F: is 7.1 film and G: is 5.1 film.* Both are Blu-ray discs with clear streams: F: has a 24-bit DTS-HD MA 5.1
+    track and a TrueHD plus Atmos 7.1 track, G: a TrueHD plus Atmos 7.1 track. Six 45 s excerpts (two 5.1 from the DTS-HD MA track, four 7.1)
+    are in `D:/ac3bld/thd-corpus` (local, not committed) and measured on [the comparison page](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/truehd-comparison.md): 0.948
+    and 0.953 of FFmpeg's size on the 5.1, every forge stream exact in both decoders. Still open, the owner's: 24-bit music at 48 and 96 kHz
+    and speech. **Recommendation:** 5 to 10
     excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
     music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
 93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,

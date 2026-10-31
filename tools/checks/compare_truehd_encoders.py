@@ -149,6 +149,31 @@ def ffmpeg_encode(wav, out):
     return out.stat().st_size if result.returncode == 0 and out.exists() else None
 
 
+SEVEN_ONE_MASK = 0x63F  # FL FR FC LFE BL BR SL SR, the order of a standard 7.1 WAV file
+
+
+def wav_channel_mask(path):
+    """The channel mask of a WAVE_FORMAT_EXTENSIBLE file, or 0 (no mask: TrueHD's order)."""
+    data = path.read_bytes()
+    at = data.find(b"fmt ")
+    if at < 0 or int.from_bytes(data[at + 8 : at + 10], "little") != 0xFFFE:
+        return 0
+    return int.from_bytes(data[at + 28 : at + 32], "little")
+
+
+def expected_channel_map(path, channels):
+    """Where `forge decode` puts each channel of this source.
+
+    A file with no mask is read and written in TrueHD's order, so no channel moves. A 7.1 file with
+    the standard mask lists the rear surrounds before the side surrounds (BL BR SL SR), where TrueHD
+    has Ls Rs before Lrs Rrs: the encoder maps by the mask and `forge decode`, which writes no mask,
+    returns TrueHD's order, so the last four channels come back swapped in pairs. FFmpeg's strict
+    decode, which writes the mask's order, returns the source as it is and is held to that."""
+    if channels == 8 and wav_channel_mask(path) == SEVEN_ONE_MASK:
+        return list(interop.FFMPEG_ORDER[8])
+    return list(range(channels))
+
+
 def forge_decode_exact(forge, stream, wav, scratch):
     """True if `forge decode` gives the source, sample for sample, else the reason."""
     decoded = scratch / (stream.stem + ".decoded.wav")
@@ -159,17 +184,17 @@ def forge_decode_exact(forge, stream, wav, scratch):
     _rate, got = read_wav(decoded)
     result = compare(got, source)
     if result.get("lossless") and result.get("delay") == 0:
-        if result.get("channel_map") == list(range(source.shape[1])):
+        if result.get("channel_map") == expected_channel_map(wav, source.shape[1]):
             return True
         return f"channels reordered: {result.get('channel_map')}"
     return f"differs from the source: {result}"
 
 
-def ffmpeg_decode_exact(stream, source_pcm24, channels, bits):
+def ffmpeg_decode_exact(stream, source_pcm24, channels, bits, in_ffmpeg_order=False):
     pcm, error = interop.ffmpeg_decode(stream)
     if pcm is None:
         return "ffmpeg strict decode failed: " + error[:200]
-    columns = interop.FFMPEG_ORDER.get(channels)
+    columns = None if in_ffmpeg_order else interop.FFMPEG_ORDER.get(channels)
     ordered = source_pcm24[:, columns] if columns else source_pcm24
     expected = (ordered.astype(np.int64) << 8).astype("<i4").tobytes()
     if pcm == expected:
@@ -221,11 +246,15 @@ def row_for(args, scratch, name, wav, dee_stream, note):
     row["forge_encode_x_realtime"] = round(len(samples) / rate / seconds, 1) if seconds else None
     row["forge_decode_exact"] = forge_decode_exact(args.forge, stream, wav, scratch)
     if shutil.which("ffmpeg"):
-        row["ffmpeg_decode_exact"] = ffmpeg_decode_exact(stream, samples, channels, bits)
+        # A standard 7.1 file is already in FFmpeg's decode order (see expected_channel_map).
+        in_order = expected_channel_map(wav, channels) != list(range(channels))
+        row["ffmpeg_decode_exact"] = ffmpeg_decode_exact(stream, samples, channels, bits, in_order)
         reference = scratch / f"{name}.ffmpeg.thd"
         row["ffmpeg_bytes"] = ffmpeg_encode(wav, reference)
         if row["ffmpeg_bytes"]:
-            row["ffmpeg_stream_exact"] = ffmpeg_decode_exact(reference, samples, channels, bits)
+            row["ffmpeg_stream_exact"] = ffmpeg_decode_exact(
+                reference, samples, channels, bits, in_order
+            )
     if dee_stream is not None:
         row["dee_bytes"] = dee_stream.stat().st_size
         row["dee_probe"] = probe_summary(args.forge, dee_stream)

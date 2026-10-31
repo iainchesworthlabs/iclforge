@@ -31,8 +31,8 @@ reference programme (16 bit, 2.5 s long, of which the rows use 1.5 s). **There i
 rows marked 24 bits put 16-bit samples in a 24-bit container, which the encoder sends as an output shift,
 so they come out the same size as the 16-bit rows. The 7.1 rows are the 5.1 programme with its first two
 channels repeated as the rear surrounds, not 7.1 content, and the 96 and 192 kHz rows are the 48 kHz
-recordings resampled by FFmpeg. Real 24-bit, 7.1, film and speech material is a question for the owner
-([ERRATA question 92](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)).
+recordings resampled by FFmpeg. Real 24-bit, 7.1 and film material is below, from the owner's discs and local only; speech
+and music at 24 bit are still [ERRATA question 92](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
 
 | Source | Rate | Ch | Bits | s | DEE | FFmpeg | forge | forge/FFmpeg | forge/DEE | bit-exact |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
@@ -67,6 +67,26 @@ Over the 22 rows with FFmpeg's stream: forge 12,386,386 bytes, FFmpeg 12,978,598
 Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.734.
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
+
+**Film excerpts, run locally.** The owner's two Blu-ray discs gave six 45 s excerpts of film audio, 24 bit, 48 kHz: 5.1 from the
+lossless DTS-HD MA track of one disc (decoded by FFmpeg), and 7.1 from the TrueHD tracks of both (the 7.1 presentation of a TrueHD plus
+Atmos track, decoded by FFmpeg). The audio is copyrighted and is not in the repository: the table is what
+`compare_truehd_encoders.py --set none --corpus DIR` printed for the folder. Every forge stream decodes to its source in forge's decoder
+and in FFmpeg's strict decode, sample for sample.
+
+| Source | Ch | s | FFmpeg | forge | forge/FFmpeg | forge, of the 24-bit PCM |
+|---|---:|---:|---:|---:|---:|---:|
+| film 5.1 (DTS-HD MA) a | 6 | 45 | 18,641,394 | 17,670,578 | 0.948 | 45.4% |
+| film 5.1 (DTS-HD MA) b | 6 | 45 | 18,179,952 | 17,334,296 | 0.953 | 44.6% |
+| film 7.1 (TrueHD) F a | 8 | 45 | 17,681,218 * | 11,647,988 | - | 22.5% |
+| film 7.1 (TrueHD) F b | 8 | 45 | 17,525,586 * | 11,332,580 | - | 21.9% |
+| film 7.1 (TrueHD) G a | 8 | 45 | 16,358,580 * | 13,383,746 | - | 25.8% |
+| film 7.1 (TrueHD) G b | 8 | 45 | 17,919,668 * | 14,573,614 | - | 28.1% |
+
+On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows. FFmpeg's 7.1 streams do not decode to the source, so they
+have no ratio. A 7.1 file with the standard channel mask lists BL BR before SL SR, TrueHD has Ls Rs before Lrs Rrs, and
+`forge decode` writes no mask: its output has the last four channels swapped in pairs, which the harness expects and FFmpeg's decode,
+which writes the mask's order, does not show.
 
 **What it shows.**
 

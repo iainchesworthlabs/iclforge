@@ -155,6 +155,30 @@ class CompareTests(unittest.TestCase):
         self.assertFalse(C.refused_by_ffmpeg({**row, "forge_decode_exact": "differs"}))
         self.assertFalse(C.ffmpeg_agrees({**row, "ffmpeg_decode_exact": "differs from the source"}))
 
+    def test_a_standard_7_1_file_comes_back_from_forge_decode_in_truehds_order(self):
+        # An extensible WAV with mask 0x63F lists BL BR before SL SR; forge decode writes no mask
+        # and TrueHD's order, so the last four channels swap in pairs: that is the expected map.
+        def extensible(path, channels, mask):
+            body = bytearray(40)
+            body[0:2] = (0xFFFE).to_bytes(2, "little")
+            body[2:4] = channels.to_bytes(2, "little")
+            body[20:24] = mask.to_bytes(4, "little")
+            path.write_bytes(
+                b"RIFF" + bytes(4) + b"WAVEfmt " + (40).to_bytes(4, "little") + bytes(body)
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "plain.wav"
+            masked = Path(tmp) / "masked.wav"
+            C.interop.write_wav(plain, 48000, np.zeros((4, 8), dtype=np.int64), 24)
+            extensible(masked, 8, 0x63F)
+            self.assertEqual(C.wav_channel_mask(plain), 0)
+            self.assertEqual(C.expected_channel_map(plain, 8), list(range(8)))
+            self.assertEqual(C.wav_channel_mask(masked), 0x63F)
+            self.assertEqual(C.expected_channel_map(masked, 8), [0, 1, 2, 3, 6, 7, 4, 5])
+            extensible(masked, 6, 0x3F)
+            self.assertEqual(C.expected_channel_map(masked, 6), list(range(6)))
+
     def test_no_set_reads_no_dee_stream(self):
         status, report, _ = run_main(900, 1000, ["--set", "none"])
         self.assertEqual((status, report["rows"]), (0, []))
