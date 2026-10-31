@@ -68,9 +68,11 @@ Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.73
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
 
-**Film excerpts, run locally.** The owner's two Blu-ray discs gave six 45 s excerpts of film audio, 24 bit, 48 kHz: 5.1 from the
-lossless DTS-HD MA track of one disc (decoded by FFmpeg), and 7.1 from the TrueHD tracks of both (the 7.1 presentation of a TrueHD plus
-Atmos track, decoded by FFmpeg). The audio is copyrighted and is not in the repository: the table is what
+**Film excerpts, run locally.** The owner's three Blu-ray discs gave fourteen excerpts of film audio, all 24 bit: six of 45 s at 48 kHz
+(5.1 from the lossless DTS-HD MA track of one disc, and 7.1 from the TrueHD tracks of two, the 7.1 presentation of a TrueHD plus Atmos
+track) and eight of 40 s at 96 kHz (7.1 from the 96 kHz TrueHD track of the third disc, from its main feature and from a short clip, with
+the same audio as stereo and as 5.1 by picking channels, not mixing). All were decoded by FFmpeg. The 96 kHz audio is band-limited: its
+energy above 24 kHz is 74 to 82 dB below the total. The audio is copyrighted and is not in the repository: the table is what
 `compare_truehd_encoders.py --set none --corpus DIR` printed for the folder. Every forge stream decodes to its source in forge's decoder
 and in FFmpeg's strict decode, sample for sample.
 
@@ -82,8 +84,16 @@ and in FFmpeg's strict decode, sample for sample.
 | film 7.1 (TrueHD) F b | 8 | 45 | 17,525,586 * | 11,332,580 | - | 21.9% |
 | film 7.1 (TrueHD) G a | 8 | 45 | 16,358,580 * | 13,383,746 | - | 25.8% |
 | film 7.1 (TrueHD) G b | 8 | 45 | 17,919,668 * | 14,573,614 | - | 28.1% |
+| film 96 kHz stereo H a | 2 | 40 | 7,302,522 | 6,516,698 | 0.892 | 47.2% |
+| film 96 kHz stereo H c | 2 | 40 | 4,882,172 | 4,120,022 | 0.844 | 29.8% |
+| film 96 kHz 5.1 H a | 6 | 40 | 16,900,140 | 15,899,768 | 0.941 | 38.3% |
+| film 96 kHz 5.1 H c | 6 | 40 | 12,129,056 | 10,969,150 | 0.904 | 26.4% |
+| film 96 kHz 7.1 H a | 8 | 40 | 32,347,542 * | 20,764,856 | - | 37.6% |
+| film 96 kHz 7.1 H b | 8 | 40 | 33,913,138 * | 23,047,752 | - | 41.7% |
+| film 96 kHz 7.1 H c | 8 | 40 | 25,857,542 * | 13,769,546 | - | 24.9% |
+| film 96 kHz 7.1 H d | 8 | 40 | 28,795,906 * | 16,848,970 | - | 30.5% |
 
-On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows. FFmpeg's 7.1 streams do not decode to the source, so they
+On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. FFmpeg's 7.1 streams do not decode to the source, so they
 have no ratio. A 7.1 file with the standard channel mask lists BL BR before SL SR, TrueHD has Ls Rs before Lrs Rrs, and
 `forge decode` writes no mask: its output has the last four channels swapped in pairs, which the harness expects and FFmpeg's decode,
 which writes the mask's order, does not show.

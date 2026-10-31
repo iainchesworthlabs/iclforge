@@ -381,8 +381,11 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     signals but that is not programme material. *The owner's answer (2026-10-31): drive F: is 7.1 film and G: is 5.1 film.* Both are Blu-ray discs with clear streams: F: has a 24-bit DTS-HD MA 5.1
     track and a TrueHD plus Atmos 7.1 track, G: a TrueHD plus Atmos 7.1 track. Six 45 s excerpts (two 5.1 from the DTS-HD MA track, four 7.1)
     are in `D:/ac3bld/thd-corpus` (local, not committed) and measured on [the comparison page](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/truehd-comparison.md): 0.948
-    and 0.953 of FFmpeg's size on the 5.1, every forge stream exact in both decoders. Still open, the owner's: 24-bit music at 48 and 96 kHz
-    and speech. **Recommendation:** 5 to 10
+    and 0.953 of FFmpeg's size on the 5.1, every forge stream exact in both decoders. Drive H: (a third disc, 2026-10-31) has a 96 kHz 24-bit 7.1 TrueHD track in its main feature and in a 98 s clip, and 16-bit stereo
+    LPCM clips (no use for 24 bit); eight 40 s excerpts of it (7.1, and the same audio as 5.1 and stereo by picking channels) are
+    in `D:/ac3bld/thd-corpus` too: forge is 0.84 to 0.94 of FFmpeg's size on the stereo and 5.1, and every stream is exact in both
+    decoders. That audio is band-limited (74 to 82 dB below the total above 24 kHz), the kind of source question 91's IIR estimate
+    was about, so the estimate could be run on it. Still open, the owner's: 24-bit music and speech. **Recommendation:** 5 to 10
     excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
     music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
 93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,
