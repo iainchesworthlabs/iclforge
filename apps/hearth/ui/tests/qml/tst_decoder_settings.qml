@@ -66,6 +66,15 @@ TestCase {
         return segment;
     }
 
+    // The page's format selector has a "truehd" segment of its own: a segment of one card is found
+    // from the card.
+    function clickSegmentIn(card, segmentValue) {
+        const segment = findChild(card, "seg-" + segmentValue);
+        verify(segment !== null, "no seg-" + segmentValue + " child in the card");
+        mouseClick(segment);
+        return segment;
+    }
+
     function test_dualMonoObjectsJocDomainConcealmentRoundTripThroughThePage() {
         const page = createTemporaryObject(decoderPageComponent, testCase.parent);
         verify(page !== null);
@@ -202,15 +211,16 @@ TestCase {
         verify(page !== null);
         page.format = "truehd";
         waitForRendering(page);
-        verify(findChild(page, "truehdTrack") !== null, "the TrueHD tab's track card is not on the page");
+        const card = findChild(page, "truehdTrack");
+        verify(card !== null, "the TrueHD tab's track card is not on the page");
         compare(HearthController.decoderSettings.track, "automatic");
 
-        const compressed = clickSegment(page, "compressed");
+        const compressed = clickSegmentIn(card, "compressed");
         tryVerify(function() { return HearthController.decoderSettings.track === "compressed"; }, 15000);
         compare(compressed.Accessible.checked, true);
-        clickSegment(page, "truehd");
+        clickSegmentIn(card, "truehd");
         tryVerify(function() { return HearthController.decoderSettings.track === "truehd"; }, 15000);
-        clickSegment(page, "automatic");
+        clickSegmentIn(card, "automatic");
         tryVerify(function() { return HearthController.decoderSettings.track === "automatic"; }, 15000);
     }
 }
