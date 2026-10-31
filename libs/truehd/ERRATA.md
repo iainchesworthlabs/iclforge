@@ -392,7 +392,10 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     bits to code per sample; forge's 20 bit stream is 0.8 KB larger than its 16 bit one, DEE's 7 KB, FFmpeg's 5.7 KB. The specification has no
     20-bit rule that forces extra size (dither and noise belong to `noise_type`, LSB bypass is optional, `mlp_quants` is only 0 = 16, 1 = 20,
     2 = 24 bits), so forge's smaller stream is missing nothing it requires. Why DEE's is larger is an encoder strategy and not in the
-    specification. **Open, the owner's:** **Recommendation:** ask the owner, who has DEE's options; do not look in the stream.
+    specification. *Answered from the gold set's manifest (options and sizes only, 2026-10-31):* the DEE commands of the 16, 20 and 24 bit tones legs are the
+    same (`--presentation 2ch --input-format wav ... --overwrite 1`) and only the input differs; the 20 bit source is the 24 bit tones with
+    the low four bits clear and the 16 bit one is rounded to 16, and this DEE build lists no dither, noise, word-size or filter option, so
+    none was passed. The 7 KB is DEE's coding of a 20 bit signal, not an option and not a rule. **Closed; nothing for the owner.**
 94. **What "better than DEE" means for the encoder (WP5 question 1).** The comparison reports size at equal losslessness, the only measure two
     lossless streams of one source have, and not speed: DEE is a licensed binary on another machine, so its speed is not comparable.
     **Recommendation:** size first (bytes for the same bit-exact decode), then forge's own speed against the real-time budget (`iclforge-perf`).
@@ -1192,5 +1195,13 @@ by default against FFmpeg's 9.588). The reference specification's own text now a
 for 3 or more channels and rewritten in the reference copy, v3.24, §9.7 and §5.3); FIR order in substream 1 may go to 8 there, and
 stays capped at 4 here. **Question for the owner (95), the owner's lean is to keep two substreams:** is a stream written against the
 text of the v3.9 specification's "shall not" acceptable where the reference decoder and FFmpeg's encoder both do the other thing, or
-should `truehd-encode` refuse 3 or more channels at these rates until a player has been tried? The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
+should `truehd-encode` refuse 3 or more channels at these rates until a player has been tried? **The owner answered yes (2026-10-31): keep two substreams.** The reference session then checked four forge
+streams (192 kHz 6 and 3 channels, 176.4 kHz 3 channels, 176.4 kHz stereo as the one-substream control, from the repository's own 5.1
+reference programme, in an independent decode and in FFmpeg's): all decode to their source sample for sample in both decoders, every
+restart header and segment passes its CRC and parity, substream 1 has sync 0x31EA, `substream_info` is 0x3C (0x14 for the lone stereo
+substream) and `extended_substream_info` 0, no LSB bypass is written, the per-unit timing is far inside 75 ms and a unit is about 1 KB
+against the 16,000 bit block limit. Not checked by it: the FIR order of each substream and the exact number of blocks per segment (a
+unit of 160 samples holds at most 2). The order is held here: a test encodes 192 and 176.4 kHz streams of 2, 3 and 6 channels at
+orders 8 and 4 (same bytes) and at 2 (different bytes). The declared peak rate is the configured ceiling (18 Mbit/s, 17,992,800 at 176.4
+kHz), not the stream's measured peak, on purpose (entry 12): it is the rate the stream is declared and checked not to exceed. The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
 `test_encoder.cpp` holds the two substreams.

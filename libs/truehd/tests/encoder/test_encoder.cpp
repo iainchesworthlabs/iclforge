@@ -96,6 +96,26 @@ TEST_CASE("at 176.4 and 192 kHz three or more channels are two substreams",
             REQUIRE(encoded.stats.verified_units == encoded.units.size());
             const auto decoded = decode_all(encoded.units, 24, channels, Presentation::kBest);
             REQUIRE(decoded == pcm);
+            // Substream 0 is held to FIR order 4 (section 9.6); here both substreams are, so a
+            // request for order 8 writes the bytes order 4 does, and order 2 does not.
+            EncoderConfig four = config;
+            four.max_fir_order = 4;
+            EncoderConfig eight = config;
+            eight.max_fir_order = 8;
+            EncoderConfig two = config;
+            two.max_fir_order = 2;
+            const Encoded at_four = encode_all(four, pcm);
+            const Encoded at_eight = encode_all(eight, pcm);
+            REQUIRE(at_four.units.size() == at_eight.units.size());
+            for (std::size_t i = 0; i < at_four.units.size(); ++i) {
+                REQUIRE(at_four.units[i].bytes == at_eight.units[i].bytes);
+            }
+            std::size_t differing = 0;
+            const Encoded at_two = encode_all(two, pcm);
+            for (std::size_t i = 0; i < std::min(at_two.units.size(), at_four.units.size()); ++i) {
+                differing += at_two.units[i].bytes != at_four.units[i].bytes ? 1U : 0U;
+            }
+            CHECK(differing > 0);
         }
     }
 }
