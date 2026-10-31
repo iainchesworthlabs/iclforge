@@ -165,6 +165,8 @@ A headless session never shows the menu, so each entry is fired through its
 | 93 | Room markers and level bars glide only when motion is full; reduced they take the engine's value at once | None | UI | motion::test_theMarkerGlidesWhenMotionIsFull, motion::test_theMarkerJumpsWhenMotionIsReduced, motion::test_theLevelBarEasesWhenMotionIsFull, motion::test_theLevelBarTakesTheReadingAtOnceWhenMotionIsReduced |
 | 94 | The waiting mark is three still squares while motion is reduced | None | UI | motion::test_theWaitingMarkStopsTurningWhenMotionIsReduced |
 
+| 95 | Latency and Codec say they do not apply while the TrueHD 5.1 mode is in use | None | UI (the hidden half only) | settings::test_theTruehdNotesAreOnThePageAndHiddenOutsideThatMode. The mode itself is not reachable here: see "Still not covered", item 6. |
+
 ## Cases without a feature row of their own
 
 36 of the 141 cases are not named in a row above. They check a property that
@@ -199,7 +201,7 @@ belongs to one platform skips on the others.
 | keyboard::test_segmentedControlMovesWithArrowHomeAndEnd | Left, Right, Home and End move the chosen segment, and both arrows wrap at the ends. |
 | keyboard::test_focusRingShowsOnlyWithActiveFocus | Of two buttons, only the one holding the focus shows its ring. |
 | keyboard::test_focusRingIsOnEveryKindOfControl | A check, a bed chip and the room's key scope each carry a ring that shows only while they hold the focus. |
-| output::test_pinnedModeRoundTrips | The controller reads back each of the seven pin values (`atmos`, `ddplus`, `dd`, `pcm`, `headphones`, `stereo`, `auto`) as written. |
+| output::test_pinnedModeRoundTrips | The controller reads back each of the eight pin values (`atmos`, `ddplus`, `dd`, `truehd`, `pcm`, `headphones`, `stereo`, `auto`) as written. |
 | output::test_endpointTableIsAListEvenWithNoEngine | Before the engine starts, the endpoint table is an empty list, the mode key is empty and the engine is not running. |
 | output::test_pageRendersWithTheEngineStopped | The Signal path page renders at a non-zero size with the engine stopped. |
 | platform::test_windowsFollowsTheNotificationArea | Windows only. The controller's tray answer matches Qt's, and where there is no tray the reason names the notification area. |
@@ -239,6 +241,13 @@ belongs to one platform skips on the others.
 5. **`ui/main.cpp`** (0 %). This is the application entry point
    (`--shot`/`--page`, demo-store migration, tray wiring). It is not linked
    into the Qt Quick test binary.
+
+6. **The TrueHD 5.1 mode and the endpoint table's TRUEHD column** (row 95).
+   The real probe answers false for TrueHD until an audio backend carries MAT, so
+   no endpoint the suites can reach takes it and the mode is never chosen. The
+   pin entry, the tray entry and the pin's round trip are covered; the page in
+   the mode, the notes shown in it and the column's ticks are not, and wait for
+   the backends (planning/truehd-parity-crucible.md, Phase 1).
 
 ## UI defects found (both fixed)
 
