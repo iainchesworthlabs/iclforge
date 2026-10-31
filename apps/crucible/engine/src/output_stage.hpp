@@ -20,6 +20,9 @@
 //   Atmos / DD+ 5.1  ->  Eac3BurstPacker -> PassthroughSink (E-AC-3)
 //   DD 5.1           ->  FrameEncoder over the encoder's own bed -> wrap_frame
 //                        -> PassthroughSink (AC-3)
+//   TrueHD 5.1       ->  the encoder's own bed rounded to 24 bits -> truehd::Encoder
+//                        -> MatPacker -> PassthroughSink (TrueHD). No objects, and
+//                        pin-only (output_policy.hpp, kTrueHd51)
 //   PCM surround     ->  Eac3Decoder -> MonitorSink, 5.1
 //   headphones       ->  Eac3Decoder -> SpatialObjectSink (decoded objects)
 //   stereo           ->  Eac3Decoder (Lo/Ro fold) -> MonitorSink, 2 channels
@@ -53,6 +56,18 @@ struct OutputStageConfig {
     std::string preferred_endpoint_id{};  // the user's choice of endpoint; empty: automatic
     std::uint32_t sample_rate = 48000;
     std::uint32_t ac3_bitrate_kbps = 448;  // the DD 5.1 leg only
+    // The TrueHD 5.1 leg only. Access units between restart headers (the
+    // encoder takes 1 or at least 8): it sets how long the first burst of a
+    // hot switch takes and how long a receiver that lost lock waits to regain
+    // it. 128 is the encoder's own default and the one its tests and FFmpeg's
+    // decode cover; 8 would cost about 3% more bytes for a 6.7 ms interval
+    // and waits for a receiver to confirm it locks on it (planning/
+    // truehd-parity-crucible.md, question 8).
+    int truehd_restart_interval_units = 128;
+    // The rate the TrueHD stream is declared not to exceed. 18 Mbit/s is
+    // Blu-ray's; the bed's raw PCM is 6.9 Mbit/s, so only a limit set far
+    // lower than this makes the encoder refuse.
+    std::uint32_t truehd_peak_data_rate_bps = 18'000'000;
 };
 
 struct OutputStatus {
@@ -72,7 +87,8 @@ struct OutputStatus {
 
 // The engine's own signal for one frame: every object slot's PCM with its
 // placement, and the encoder's 5.1 bed in AC-3 coded order (L C R Ls Rs
-// LFE). The DD 5.1 leg reads the bed; the bypass path reads all of it.
+// LFE). The DD 5.1 and TrueHD 5.1 legs read the bed; the bypass path reads
+// all of it.
 struct RawFrame {
     std::span<const std::span<const float>> objects;
     std::span<const iclforge::objects::oba::ObjectPlacement> placements;
@@ -120,6 +136,7 @@ private:
     struct Impl;
     [[nodiscard]] bool ensure_spatial(bool has_lfe, std::size_t objects);
     void submit_raw(const RawFrame& raw);
+    void submit_truehd(const RawFrame& raw);
     std::unique_ptr<Impl> impl_;
     OutputStageConfig config_;
     OutputStatus status_;

@@ -1369,6 +1369,12 @@ jobs:
       - name: TrueHD in MP4, Matroska, MPEG-TS and MAT against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_containers.py --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
 
+      # Crucible's pinned TrueHD 5.1 mode: the bursts its output stage hands a sink, unwrapped and held
+      # to FFmpeg's strict decode against the 24-bit integers the stage was given (the stage's own
+      # tests hold them to this library's decoder; this is the other one).
+      - name: Crucible's TrueHD 5.1 leg against FFmpeg's strict decode (bit-exact)
+        run: python3 tools/checks/verify_crucible_truehd_leg.py --tests build/config-linux-llvm/bin/iclforge-crucible-tests --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
+
       # The fixture set must still carry every feature it was made for (the gate's static job runs
       # this too, without a build), and forge's decode of stand-ins for the Blu-ray layouts (a BDAV
       # .m2ts with the AC-3 core between the TrueHD access units, and Matroska), built from the
