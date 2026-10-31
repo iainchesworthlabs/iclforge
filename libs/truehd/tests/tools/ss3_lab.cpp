@@ -179,6 +179,14 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             std::printf("%c", updates > 9 ? '+' : static_cast<char>('0' + updates));
         }
         std::printf("\n");
+        std::printf("    per interval of the object substream: check, matrices, largest noise shift, "
+                    "bits of the largest coded / bed / output sample:\n");
+        for (std::size_t i = 0; i < c.object_interval_facts.size() && i < 80; ++i) {
+            const auto& f = c.object_interval_facts[i];
+            std::printf("      %2zu %c  mats %2u  noise %2u  coded %2u  bed %2u  out %2u\n", i,
+                        (c.object_interval_log[i] & 1U) != 0 ? 'o' : 'F', f.matrices,
+                        f.max_noise_shift, f.coded_bits, f.bed_bits, f.out_bits);
+        }
         print_subsets(c);
     }
 }

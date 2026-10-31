@@ -146,6 +146,17 @@ struct DecoderCounters {
     // the upper bits the number of matrix sections the interval's blocks carried (at most 127).
     static constexpr std::size_t kObjectIntervalsKept = 256;
     std::vector<std::uint8_t> object_interval_log;
+    // For the same intervals: the matrices of the last section, the largest noise shift among
+    // them, and the bits the largest coded sample of channels 8 and up, of channels below 8
+    // (before the matrices) and of every output row took (no sample value).
+    struct ObjectIntervalFacts {
+        std::uint8_t matrices = 0;
+        std::uint8_t max_noise_shift = 0;
+        std::uint8_t coded_bits = 0;
+        std::uint8_t bed_bits = 0;
+        std::uint8_t out_bits = 0;
+    };
+    std::vector<ObjectIntervalFacts> object_interval_facts;
     // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
     // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
     static constexpr std::size_t kObjectColumns = 24;

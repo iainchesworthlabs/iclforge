@@ -94,6 +94,9 @@ struct SubstreamState {
     // anything.
     std::uint32_t interval_fold = 0;
     unsigned object_updates = 0;  // matrix sections the interval's blocks carried (lab log)
+    std::uint32_t peak_coded = 0;  // largest |sample| of the coded channels (lab log)
+    std::uint32_t peak_bed = 0;
+    std::uint32_t peak_out = 0;
     // Lab: the fold of each matrix channel alone, after the matrices (0-11) and before (12-23).
     std::array<std::uint32_t, 24> column_fold{};
     bool interval_open = false;
@@ -331,6 +334,25 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             const bool passed = lossless_check_of(state.interval_fold) == header->lossless_check;
             counters.object_interval_log.push_back(static_cast<std::uint8_t>(
                 (passed ? 1U : 0U) | (std::min(state.object_updates, 127U) << 1U)));
+            DecoderCounters::ObjectIntervalFacts facts;
+            facts.matrices = static_cast<std::uint8_t>(state.matrix_count);
+            for (int m = 0; m < state.matrix_count; ++m) {
+                facts.max_noise_shift = std::max<std::uint8_t>(
+                    facts.max_noise_shift,
+                    static_cast<std::uint8_t>(state.matrices[static_cast<std::size_t>(m)].noise_shift));
+            }
+            const auto bits_of = [](std::uint32_t v) {
+                std::uint8_t bits = 0;
+                while (v != 0) {
+                    ++bits;
+                    v >>= 1U;
+                }
+                return bits;
+            };
+            facts.coded_bits = bits_of(state.peak_coded);
+            facts.bed_bits = bits_of(state.peak_bed);
+            facts.out_bits = bits_of(state.peak_out);
+            counters.object_interval_facts.push_back(facts);
         }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
@@ -686,6 +708,19 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
 
+    if (index == kObjectSubstream) {
+        for (int i = 0; i < block; ++i) {
+            const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
+            for (int c = 0; c < out_channels; ++c) {
+                const auto magnitude = [](std::int32_t v) {
+                    return static_cast<std::uint32_t>(v < 0 ? -static_cast<std::int64_t>(v) : v);
+                };
+                auto& coded = c >= state.context.min_chan ? state.peak_coded : state.peak_bed;
+                coded = std::max(coded, magnitude(rows_base[at + c]));
+                state.peak_out = std::max(state.peak_out, magnitude(matrix_base[at + c]));
+            }
+        }
+    }
     if (index == kObjectSubstream && counters.object_checks_kept < 3) {
         auto& stats = counters.object_stats;
         for (int i = 0; i < block; ++i) {
