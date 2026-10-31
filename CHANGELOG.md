@@ -10,6 +10,15 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
+  `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
+  units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
+  `truehdProbe`, `truehdScanUnits`, `TruehdScannedStream` and `TruehdDecoder`, with a `TruehdError` that carries the library's `ErrorKind`.
+  What a decode returns is a copy, so it stays valid across the next call. The module is built for Node as well as the web, and
+  `build-wasm` runs `truehd-wasm.test.js` over it: every fixture of `testdata/truehd` decodes to the SHA-256 of FFmpeg's strict decode,
+  and a decode from the restart for a sample gives that sample. The check that a decoded unit owns its samples fails when the module
+  returns a view into its heap. The encoder is not wrapped. The support catalogue's "TrueHD WebAssembly module" row moves from
+  unavailable to source and CI.
 - **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
   borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
   `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every

@@ -201,3 +201,40 @@ if(ICLFORGE_BUILD_AC4)
         OUTPUT_NAME "iclforge_ac4"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/wasm_ac4_demo")
 endif()
+
+# ---------------------------------------------------------------------------
+# TrueHD and MLP (libs/truehd): the decode side - probe, the scan into access units, the scan of a
+# whole stream for its length and its joining points, and the decoder - as a module of its own
+# (truehd_bindings.cpp), because a page that plays AC-3 or AC-4 has no use for the codec's size and
+# nothing in the other modules shares code with it. Guarded on ICLFORGE_BUILD_TRUEHD (default ON).
+#
+# The flags are the other modules' (-fexceptions, MODULARIZE with a name of its own so the four can
+# load on one page, a memory ceiling that turns exhaustion into an ordinary error path) with one
+# difference: ENVIRONMENT is web AND node. This is the module bindings/js's tests run, in Node, over
+# the committed fixtures of testdata/truehd, which is the only place the arithmetic of the wrapper
+# and of the library meet; the web runtime is the same code with the Node file access added.
+#
+# No servable demo page is assembled: the compiled iclforge_truehd.js/.wasm land in their own
+# output directory, for bindings/js/src/truehd.ts to load.
+# ---------------------------------------------------------------------------
+
+if(ICLFORGE_BUILD_TRUEHD)
+    add_executable(iclforge_wasm_truehd truehd_bindings.cpp)
+    target_link_libraries(iclforge_wasm_truehd PRIVATE iclforge::truehd iclforge::warnings)
+
+    target_compile_options(iclforge_wasm_truehd PRIVATE "-fexceptions")
+    target_link_options(iclforge_wasm_truehd PRIVATE
+        "-fexceptions"
+        "--bind"
+        "-sMODULARIZE=1"
+        "-sEXPORT_NAME=createIclForgeTruehdModule"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sINITIAL_MEMORY=67108864"
+        "-sMAXIMUM_MEMORY=1073741824"
+        "-sENVIRONMENT=web,node"
+        "-sNO_EXIT_RUNTIME=1")
+
+    set_target_properties(iclforge_wasm_truehd PROPERTIES
+        OUTPUT_NAME "iclforge_truehd"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/wasm_truehd_demo")
+endif()

@@ -1844,6 +1844,16 @@ jobs:
       - name: Build
         run: cmake --build build/config-wasm-emscripten
 
+      # The TrueHD module is the one Embind module a test here runs: it is built for Node as well as the
+      # web, and truehd-wasm.test.js holds every fixture of testdata/truehd to the samples of FFmpeg's
+      # strict decode. Without ICLFORGE_TRUEHD_WASM the test skips, which is what the `npm test` above
+      # did before the module existed.
+      - name: Test the TrueHD module in Node
+        working-directory: bindings/js
+        env:
+          ICLFORGE_TRUEHD_WASM: ${{ github.workspace }}/build/config-wasm-emscripten/bin/wasm_truehd_demo/iclforge_truehd.js
+        run: node --test tests/truehd-wasm.test.js
+
       # apps/demos/wasm/CMakeLists.txt only knows how to assemble ITS OWN static
       # files (index.html/demo.js/favicons/the demo bitstream) plus whatever
       # RUNTIME_OUTPUT_DIRECTORY put there (iclforge_decode.js/.wasm) - it
