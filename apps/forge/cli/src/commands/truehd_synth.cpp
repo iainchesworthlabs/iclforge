@@ -72,7 +72,10 @@ int run_truehd_synth(std::string_view out_path, std::uint32_t seconds, bool sine
     iclforge::ac3::io::WavData wav;
     wav.sample_rate = kRate;
     wav.channel_mask = shape->mask;
-    wav.channels.assign(shape->channels, std::vector<float>(frames, 0.0F));
+    wav.channels.resize(shape->channels);
+    for (auto& plane : wav.channels) {
+        plane.assign(frames, 0.0F);
+    }
     if (sine) {
         // A tone in each channel, so that a mix-up of channels shows: freq_hz in the first, and each
         // later channel a quarter of freq_hz higher than the one before.
