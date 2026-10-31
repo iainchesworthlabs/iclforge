@@ -21,6 +21,11 @@
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/base/loudness.hpp"
+#include "iclforge/base/speaker.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
+#include "truehd_pcm_source.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"
@@ -370,6 +375,194 @@ std::optional<RawResult> measure_ac4(std::span<const std::byte> stream,
     return result;
 }
 
+// libs/truehd's channel names, as the speakers the BS.1770-5 Annex 3 weights are keyed on: the
+// mapping `forge qc` makes (apps/forge/cli/src/commands/truehd_containers.cpp), so that the window
+// and the command line give the same number. The less common pairs map to the nearest speaker.
+std::optional<iclforge::base::Speaker> speaker_of(iclforge::truehd::Channel channel) {
+    using C = iclforge::truehd::Channel;
+    using S = iclforge::base::Speaker;
+    switch (channel) {
+        case C::kL:
+            return S::kLeft;
+        case C::kR:
+            return S::kRight;
+        case C::kC:
+            return S::kCentre;
+        case C::kLfe:
+            return S::kLfe;
+        case C::kLs:
+        case C::kLsd:
+            return S::kLeftSurround;
+        case C::kRs:
+        case C::kRsd:
+            return S::kRightSurround;
+        case C::kLvh:
+            return S::kTopFrontLeft;
+        case C::kRvh:
+            return S::kTopFrontRight;
+        case C::kLc:
+            return S::kLeftScreen;
+        case C::kRc:
+            return S::kRightScreen;
+        case C::kLrs:
+            return S::kLeftBack;
+        case C::kRrs:
+            return S::kRightBack;
+        case C::kCs:
+            return S::kCentreBack;
+        case C::kTs:
+            return S::kTopCentre;
+        case C::kLw:
+            return S::kLeftWide;
+        case C::kRw:
+            return S::kRightWide;
+        case C::kCvh:
+            return S::kTopFrontCentre;
+        case C::kLfe2:
+            return S::kLfe2;
+    }
+    return std::nullopt;
+}
+
+// Whether the file opens as a TrueHD or MLP stream (an access unit with a major sync in its head).
+bool is_truehd_file(std::ifstream& in) {
+    std::vector<std::byte> head(iclforge::truehd::kMaxLeadingBytes + 4096);
+    in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+    head.resize(static_cast<std::size_t>(std::max<std::streamsize>(in.gcount(), 0)));
+    in.clear();
+    in.seekg(0);
+    return head.size() >= 8 && iclforge::truehd::find_stream_start(head).has_value();
+}
+
+// TrueHD and MLP, as `forge qc` measures them (apps/forge/cli/src/commands/truehd_tools.cpp): the
+// integrated loudness, range and true peak of each presentation the stream has, the dialogue norm
+// the major sync stores beside the measurement, and an integrity gate - the lossless check of
+// every restart interval, the other checks of the decode, and TH spec section 18's data rate
+// against the peak the stream declares. The file is read a window at a time, once for each
+// presentation and once through every substream, never held whole.
+std::optional<RawResult> measure_truehd(const QString& path, QString& error) {
+    namespace th = iclforge::truehd;
+    constexpr std::size_t kWindow = 4096;
+
+    // The first major sync: how many substreams there are, and the dialogue norms.
+    std::ifstream head_in{path.toStdString(), std::ios::binary};
+    std::vector<std::byte> head(th::kMaxLeadingBytes + 4096);
+    head_in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+    head.resize(static_cast<std::size_t>(std::max<std::streamsize>(head_in.gcount(), 0)));
+    const auto probed = th::probe_stream(head);
+    if (!probed) {
+        error = QStringLiteral("%1: %2").arg(path, to_qstring(th::to_string(probed.error().kind)));
+        return std::nullopt;
+    }
+    const th::MajorSync& sync = probed->major_sync;
+    const int presentations = std::min(probed->num_substreams, 3);
+    constexpr std::array<th::Presentation, 3> kDecoder{th::Presentation::k2ch,
+                                                       th::Presentation::k6ch,
+                                                       th::Presentation::k8ch};
+    constexpr std::array<const char*, 3> kNames{"2ch", "6ch", "8ch"};
+
+    RawResult result;
+    result.codec_label = sync.kind == th::StreamKind::kTrueHd ? QStringLiteral("TrueHD")
+                                                              : QStringLiteral("MLP");
+    result.unit_label = QStringLiteral("access unit(s)");
+    result.sample_rate_hz = probed->sample_rate;
+
+    for (int i = 0; i < presentations; ++i) {
+        auto source = forge_gui::TruehdPcmSource::open(path.toStdString(),
+                                                        kDecoder[static_cast<std::size_t>(i)]);
+        if (!source) {
+            error = QString::fromStdString(source.error());
+            return std::nullopt;
+        }
+        const auto& info = (*source)->info();
+        QString names;
+        std::vector<iclforge::base::Speaker> speakers;
+        for (const th::Channel channel : info.layout) {
+            if (const auto speaker = speaker_of(channel)) {
+                speakers.push_back(*speaker);
+            }
+            names += (names.isEmpty() ? QString() : QStringLiteral(" ")) +
+                     to_qstring(th::channel_name(channel));
+        }
+        const bool named = !info.layout.empty() && speakers.size() == info.layout.size();
+        std::optional<iclforge::base::LoudnessMeter> meter;
+        if (named) {
+            meter.emplace(info.sample_rate, std::span<const iclforge::base::Speaker>{speakers});
+        }
+        std::vector<std::vector<float>> planar;
+        std::vector<std::span<const float>> views;
+        std::uint64_t at = 0;
+        while (const std::size_t got = (*source)->read(at, kWindow, planar)) {
+            if (meter) {
+                views.clear();
+                for (const auto& plane : planar) {
+                    views.emplace_back(plane);
+                }
+                meter->push(views);
+            }
+            at += got;
+        }
+        RawProgramme programme;
+        programme.label = QStringLiteral("%1 (%2)")
+                              .arg(QLatin1String(kNames[static_cast<std::size_t>(i)]),
+                                   named ? names : QStringLiteral("%1 channels").arg(info.channels));
+        if (meter) {
+            programme.integrated_lkfs = meter->integrated_lkfs();
+            programme.lra_lu = meter->loudness_range();
+            programme.true_peak_dbtp = meter->true_peak_dbtp();
+        }
+        // The dialogue norm the major sync stores for this presentation (TH spec section 14; its
+        // meaning is provisional, libs/truehd/ERRATA.md questions 51 to 55), read as -n dBFS.
+        const auto& meaning = sync.channel_meaning;
+        programme.dialnorm = sync.kind != th::StreamKind::kTrueHd ? 0
+                             : i == 0                              ? meaning.twoch_dialogue_norm
+                             : i == 1                              ? meaning.sixch_dialogue_norm
+                                                                   : meaning.eightch_dialogue_norm;
+        result.programmes.push_back(std::move(programme));
+        result.unit_count = info.units;
+        result.seconds = static_cast<double>(info.frames) / static_cast<double>(info.sample_rate);
+        result.layout_label = named ? names : QStringLiteral("%1 channels").arg(info.channels);
+    }
+
+    // The integrity gate: every substream decoded, the checks counted.
+    auto all = forge_gui::TruehdPcmSource::open(path.toStdString(), th::Presentation::kAll);
+    if (!all) {
+        error = QString::fromStdString(all.error());
+        return std::nullopt;
+    }
+    {
+        std::vector<std::vector<float>> planar;
+        std::uint64_t at = 0;
+        while (const std::size_t got = (*all)->read(at, kWindow * 4, planar)) {
+            at += got;
+        }
+    }
+    const auto counters = (*all)->counters();
+    const auto& rate = (*all)->info().rate;
+    const std::uint64_t errors = (*all)->decode_errors();
+    result.integrity_checked = true;
+    result.integrity_ok = counters.lossless_check_failures == 0 && counters.check_failures == 0 &&
+                          errors == 0 && rate.violations == 0;
+    result.integrity_text =
+        QStringLiteral("lossless check: %1 restart interval(s) ok, %2 failed · other checks (access "
+                       "unit, CRC, parity) failed: %3 · %4 unit(s) could not be decoded · data "
+                       "rate: declared peak %5 Mbit/s, largest unit %6 Mbit/s, %7 unit(s) later "
+                       "than %8 ms (TH spec section 18)")
+            .arg(counters.lossless_checks_ok)
+            .arg(counters.lossless_check_failures)
+            .arg(counters.check_failures)
+            .arg(errors)
+            .arg(static_cast<double>(rate.declared_bps) / 1e6, 0, 'f', 2)
+            .arg(static_cast<double>(rate.max_unit_rate_bps) / 1e6, 0, 'f', 2)
+            .arg(rate.violations)
+            .arg(rate.latency_limit_ms, 0, 'f', 0);
+    if (result.programmes.empty()) {
+        error = QStringLiteral("%1 has no presentation to measure.").arg(path);
+        return std::nullopt;
+    }
+    return result;
+}
+
 // Reads the whole file, dispatches on the AC-4 sync word and then on bsid
 // (same convention run_qc uses: bsid > 8 is E-AC-3) and measures it. Runs
 // entirely on the calling thread - measureFile() below is what moves this off
@@ -379,6 +572,18 @@ MeasureOutcome measure_file(const QString& path, std::optional<std::size_t> pres
     std::ifstream in{path.toStdString(), std::ios::binary};
     if (!in) {
         outcome.error = QStringLiteral("Could not open %1.").arg(path);
+        return outcome;
+    }
+    // TrueHD and MLP are streamed, a presentation at a time, and never held whole.
+    if (is_truehd_file(in)) {
+        in.close();
+        QString truehd_error;
+        auto measured = measure_truehd(path, truehd_error);
+        if (!measured) {
+            outcome.error = truehd_error;
+            return outcome;
+        }
+        outcome.result = std::move(*measured);
         return outcome;
     }
     const std::vector<char> raw{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
