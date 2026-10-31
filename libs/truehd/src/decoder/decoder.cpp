@@ -369,8 +369,16 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             ++counters.lossless_failed_by_substream[static_cast<std::size_t>(index)];
             if (strict()) {
                 state.running = false;
+                // The substream is named: the object substream's check fails on real streams while
+                // its reconstruction is incomplete (ERRATA.md entry 69), the others' do not. The
+                // detail of an Error is a literal, so there is one for each substream.
+                static constexpr std::array<std::string_view, kMaxSubstreams> kDetail{
+                    "lossless check of the restart interval of substream 0",
+                    "lossless check of the restart interval of substream 1",
+                    "lossless check of the restart interval of substream 2",
+                    "lossless check of the restart interval of substream 3"};
                 return std::unexpected(make_error(ErrorKind::kBadLosslessCheck,
-                                                  "lossless check of the restart interval"));
+                                                  kDetail[static_cast<std::size_t>(index)]));
             }
         }
     }

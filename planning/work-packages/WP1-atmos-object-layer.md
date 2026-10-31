@@ -96,3 +96,32 @@ implemented and evidenced: the block header and the object matrix section as bit
 worked in integer form, the restart procedure, the hypotheses the lab has rejected, the open items and how to run `iclforge-truehd-ss3-lab`.
 Silence, a single tone and `z_short.mlp` pass every lossless-check interval; files with several active objects still fail some intervals
 (rare differences of 1), and two DEE encodes break the parse at one later unit each. Step 1 is not done until the owner's streams pass.
+
+## Status (2026-10-31, the object layer of `forge decode` reviewed against the owner's facts)
+
+What the owner's streams are known to be: substream 3 has 12, 14 or 16 channels (one the LFE, the rest dynamic), `min_chan` 8, the output order is the
+restart header's `ch_assign`, and the channels are the encoder's clustered elements, not the master's objects. The path from `forge decode` to the
+per-object output was traced against that and holds it, with the following changed.
+
+- **Held, now by tests:** 14 and 16 channel substreams (encoder-made streams: object WAVs bit for bit, the LFE first, the rendered feeds against an
+  expectation made in the test from the decoded channels and the metadata frames); the output order of a permuted `ch_assign` in substream 3
+  (new hand-built `hb_atmos_objects_permuted`: output channel p is object p, the same signals in the order the header gives; the Python reference and
+  FFmpeg's bed outcome agree); a lenient decode that goes on past a unit of substream 3 that does not read.
+- **Changed:** a decode with `truehd-presentation=all` prints substream 3's own lossless-check count (`substream 3 (objects): lossless check: N interval(s)
+  ok, M failed`) and, when M is not 0, a warning that the object audio of those intervals can be wrong; a lenient decode counts the units it could not
+  decode; a strict decode names the substream whose check failed and says that `truehd-check=lenient` goes on past it. The lenient decode never
+  stopped object output on a failed check (counted and decoded as far as it reads); it only did not say which substream. `forge probe` says the object
+  substream's channel count (it said "16-channel", and ran the label into the text), and `detail=evolution` counts the timing fields of the update
+  blocks (payload sample offset, first block's offset, offset factor, ramp, and each block's start in its access unit).
+- **Not changed, provisional (owner checks, counts and parameters only):**
+  1. Channel i is object i, the LFE object 0 of a dynamic-object-only programme. Check: `forge probe DISC detail=evolution` (object count, `dynamic-only
+     program with LFE`) against the `substreams` line (channel count of substream 3), and `detail=structure` (its `extra channel meaning` line: `dynamic objects
+     only`, and a channel count of the substream's less the LFE) agree; `forge decode DISC out.wav objs truehd-presentation=all truehd-check=lenient` prints no `warning:` about the object count.
+  2. A metadata frame takes effect at its unit's first sample + payload `smploffst` + the first block's sample offset + 32 x the block's offset factor.
+     Check: the `update timing` lines of `probe detail=evolution` (`block starts in its access unit` should be 0 to 39, and the frames about 38.4 units apart).
+  3. A ramp starts at the block's sample and reaches the new value after `ramp_duration` samples (1536 for every frame of the first disc); an unnamed ramp code
+     is read as a jump. Check: the `ramp` histogram of the same line; the rest is the owner's ear.
+  4. After a lenient decode loses units, the object WAVs and the ADM master close the gap (the sample clock counts decoded units only, as the 12-channel WAV does),
+     so metadata times and audio are consistent with each other and not with the stream's clock. Decision for the owner: pad lost units with silence in the object
+     outputs (the unit length is known), or keep the main WAV's behaviour. The `N unit(s) waited` and `could not be decoded` lines say how many.
+  5. `adm_out` holds every object's samples in memory as 32 bit floats (about 3 MB a second for 16 channels), so it suits an excerpt, not a film; `objects_dir` streams.

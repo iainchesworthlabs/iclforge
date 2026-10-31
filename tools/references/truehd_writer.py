@@ -846,12 +846,15 @@ def case_substream3_limits():
 
 
 def case_substream3_fine_matrices(
-    extra_data=None, noise_shifts=None, seed=0x2A5F31, bypass_index=None
+    extra_data=None, noise_shifts=None, seed=0x2A5F31, bypass_index=None, assign=None
 ):
     """A twelve channel substream 3 (restart sync 0x31EC) whose matrices carry `frac_bits` 15, 14,
     13 and 0, as the object substream of the owner's discs does (ERRATA 60): four channels of
     objects predicted from the 7.1 bed and from each other, with coefficients that need the last
-    bit of the 17 bit field (an odd value at `frac_bits` 15) and one that reads two channels."""
+    bit of the 17 bit field (an odd value at `frac_bits` 15) and one that reads two channels.
+    With `assign` the substream's ch_assign is that permutation of 0 to 11: the matrices and the
+    coded channels are the same, and output position p carries the matrix channel m with
+    assign[m] == p (TH spec 7.4, ERRATA 42), which is how the owner's discs order their objects."""
     n = 40 * 32
     src = [tone(n, 90 + c, 2**21) for c in range(12)]
     # (out, frac_bits, {channel: coefficient}); the unity coefficient of `out` is 2^frac_bits
@@ -914,7 +917,8 @@ def case_substream3_fine_matrices(
         )
         for c in range(8, 12)
     }
-    rows = [tuple(src[c][i] for c in range(12)) for i in range(n)]
+    sources = output_sources(assign) if assign else list(range(12))
+    rows = [tuple(src[sources[p]][i] for p in range(12)) for i in range(n)]
     last = Substream(
         8,
         11,
@@ -922,6 +926,7 @@ def case_substream3_fine_matrices(
         wide,
         rows,
         {c: coded[c] for c in range(8, 12)},
+        ch_assign=assign,
         matrices=matrices,
         bypass=bypass_bits,
         sync=0x31EC,
@@ -993,6 +998,26 @@ def case_atmos_objects():
         stream,
         "a twelve channel substream 3 with object audio metadata in two evolution frames",
         ["substream_3", "twelve_channels", "extra_data", "oamd"],
+    )
+
+
+# The ch_assign of the permuted twelve channel stream below: assign[m] is the output position of
+# matrix channel m, so output position p carries the signal of the m with assign[m] == p.
+PERMUTED_ASSIGN = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10, 11]
+
+
+def case_atmos_objects_permuted():
+    """`hb_atmos_objects` with a ch_assign on substream 3 that is not its own inverse: a cycle of
+    the first six matrix channels (the LFE of the programme, output position 0, is the signal of
+    matrix channel 5). The signals, the matrices and the metadata are the same, so the twelve
+    channels of the decode are those of `hb_atmos_objects` in another order."""
+    stream, _description, _features = case_substream3_fine_matrices(
+        atmos_extra_data, assign=PERMUTED_ASSIGN
+    )
+    return (
+        stream,
+        "a twelve channel substream 3 with a permuted ch_assign and object audio metadata",
+        ["substream_3", "twelve_channels", "extra_data", "oamd", "ch_assign"],
     )
 
 
@@ -1370,6 +1395,7 @@ CASES = {
     "hb_substream3_object_noise": case_substream3_object_noise,
     "hb_substream3_object_bypass": case_substream3_object_bypass,
     "hb_atmos_objects": case_atmos_objects,
+    "hb_atmos_objects_permuted": case_atmos_objects_permuted,
 }
 
 
@@ -1454,6 +1480,13 @@ FFMPEG = {
         "(ERRATA 33)",
     },
     "hb_atmos_objects": {
+        "outcome": "bed",
+        "columns": [0, 1, 2, 3, 6, 7, 4, 5],
+        "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "
+        "alone: it returns the 7.1 bed, the best presentation, in its own channel order "
+        "(ERRATA 33)",
+    },
+    "hb_atmos_objects_permuted": {
         "outcome": "bed",
         "columns": [0, 1, 2, 3, 6, 7, 4, 5],
         "note": "FFmpeg reads substreams 0 to 2 and leaves substream 3 (restart sync 0x31EC) "

@@ -521,6 +521,13 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             fmt::println(stderr, "error: {}: access unit {}: {}", in_path, index,
                          error_text(result.error()));
             if (!meta.truehd_lenient) {
+                if (result.error().kind == th::ErrorKind::kBadLosslessCheck && objects) {
+                    // The object substream's lossless check fails on real streams while its
+                    // reconstruction is incomplete (ERRATA.md entry 69): say what goes on past it.
+                    fmt::println(stderr,
+                                 "note: truehd-check=lenient decodes on past a failed lossless "
+                                 "check and counts the failed intervals");
+                }
                 failed = true;
                 break;
             }
@@ -604,8 +611,27 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     status_println(status, "  {} restart header(s); lossless check: {} interval(s) ok, {} failed",
                    counters.restarts, counters.lossless_checks_ok,
                    counters.lossless_check_failures);
+    if (substream == kObjectSubstream) {
+        // The object substream's own count. A lenient decode goes on past a failed interval, so
+        // the object audio of that interval can be wrong. The intervals counted are the ones a
+        // restart header follows: the last interval of a stream is not checked.
+        const auto ok = counters.lossless_ok_by_substream[kObjectSubstream];
+        const auto bad = counters.lossless_failed_by_substream[kObjectSubstream];
+        status_println(status,
+                       "  substream {} (objects): lossless check: {} interval(s) ok, {} failed",
+                       kObjectSubstream, ok, bad);
+        if (bad != 0) {
+            status_println(status,
+                           "  warning: the lossless check of substream {} failed in {} of {} "
+                           "interval(s); the object audio of those intervals can be wrong",
+                           kObjectSubstream, bad, ok + bad);
+        }
+    }
     status_println(status, "  other checks (access unit, CRC, parity) failed: {}",
                    counters.check_failures);
+    if (meta.truehd_lenient && errors != 0) {
+        status_println(status, "  {} unit(s) could not be decoded and were left out", errors);
+    }
     if (counters.units_waiting != 0) {
         status_println(status, "  {} unit(s) waited for a restart header", counters.units_waiting);
     }
@@ -801,8 +827,14 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                                        meanings.size());
         }
         if (info->has_object_substream) {
-            fmt::println("{:<16}present (read as a 16-channel substream, not rendered)",
-                         "object substream");
+            // The fourth substream's channels are its objects: 12, 14 or 16 on the owner's discs.
+            // decode truehd-presentation=all gives them, objects_dir= and adm_out= write them.
+            fmt::println(
+                "{:<16} present{} (decode truehd-presentation=all gives its channels as objects)",
+                "object substream",
+                info->num_substreams == th::kMaxSubstreams
+                    ? fmt::format(", {} channel(s)", info->channels[th::kMaxSubstreams - 1])
+                    : std::string{});
         }
         if (extra_data_units != 0) {
             fmt::println("{:<16}{} access unit(s) carry extra data (carried, not read)",
