@@ -181,6 +181,16 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path, c
 // (L R C LFE Ls Rs Lrs Rrs). "-" as the output is a bare stream on stdout.
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta);
 
+// `cut` and `cat` of TrueHD or MLP elementary streams (truehd_cut.cpp). A cut starts at the first access
+// unit that carries a major sync at or after the requested time, says which time it used, and keeps
+// whole units; a join refuses an input that does not open with a major sync or whose shape differs.
+// Bytes are never changed (libs/truehd/ERRATA.md, entry 80; provisional until owner question 14).
+int run_cut_truehd(std::span<const std::byte> stream, std::string_view in_path,
+                   std::string_view out_path, std::string_view start_seconds,
+                   std::string_view duration_seconds, const Options& meta);
+int run_cat_truehd(std::string_view out_path, std::span<const std::string_view> in_paths,
+                   const Options& meta);
+
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path,

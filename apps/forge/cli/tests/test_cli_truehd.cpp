@@ -1463,35 +1463,14 @@ TEST_CASE("levels and loudness take truehd-presentation= and truehd-check=",
     }
 }
 
-TEST_CASE("cut and cat refuse a TrueHD stream by name, and say why",
+TEST_CASE("cat names a TrueHD stream behind an AC-3 family one, and does not call it a sync error",
           "[forge-cli][truehd][refusals]") {
-    // They read it as AC-3 and stopped with an AC-3 frame-sync error, exit 2, that said nothing of
-    // the codec.
+    // cut and cat of TrueHD are in test_cli_truehd_cut.cpp. A join whose first input is E-AC-3 read
+    // the later TrueHD one as E-AC-3 and stopped with a frame-sync error, exit 2.
     const ToneFiles& tone = tone_files();
     const fs::path log = tone.dir / "tools.log";
     const fs::path out = tone.dir / "tools_out.thd";
     const std::string in = cli_arg(tone.thd);
-    struct Refusal {
-        std::string command;
-        std::string args;
-        std::string why;
-    };
-    const std::vector<Refusal> refusals{
-        {"cut", in + cli_arg(out) + "0.05 0.1", "major sync"},
-        {"cat", cli_arg(out) + in + in, "major sync"},
-    };
-    for (const Refusal& item : refusals) {
-        DYNAMIC_SECTION(item.command) {
-            fs::remove(out);
-            CHECK(run_cli(item.command + " " + item.args, log) == kExitUsage);
-            const std::string text = read_text(log);
-            CHECK(text.find("is TrueHD or MLP") != std::string::npos);
-            CHECK(text.find("'" + item.command + "' does not read") != std::string::npos);
-            CHECK(text.find(item.why) != std::string::npos);
-            CHECK(text.find("lost sync") == std::string::npos);
-            CHECK_FALSE(fs::exists(out));
-        }
-    }
     SECTION("a TrueHD stream anywhere in cat's inputs") {
         const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
         REQUIRE(fs::exists(ec3));

@@ -1008,9 +1008,15 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 profile writes that Blu-ray one for TrueHD and MLP, as it writes DVB's for AC-3, E-AC-3 and AC-4. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut`, `cat`,
-`transcode`, `fmp4`, `monitor` and `play` do not read TrueHD and say so by name (exit status 1); `cut` and `cat` would start and join only
-at an access unit that carries a major sync. In a file with
+reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut` and `cat`
+move whole access units and never change a byte: `cut in.thd out.thd [start] [duration]` starts at the first access unit that carries a
+major sync (the start of a restart interval, one in 128 by default) at or after the time asked, says which time it used, and ends on the
+unit boundary that covers the duration; `cat` joins streams of one shape (stream type, rate, substreams, channels, channel assignment) and
+refuses an input that does not open with a major sync at byte 0, one that differs in shape (the difference is named), or a damaged one
+(`cut` refuses a damaged stream too: `forge probe` it first). They take bare `.thd` and `.mlp` streams (`demux` a container first) and
+no options. FFmpeg's strict decode of a cut is the same slice of the whole decode, and of a join the two decodes in order; `forge`'s own
+strict decode stops at a join (`truehd-check=lenient` goes on; [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)
+question 20 and entry 80). `transcode`, `fmp4`, `monitor` and `play` do not read TrueHD and say so by name (exit status 1). In a file with
 several audio tracks the commands that read TrueHD take the first, and `transcode`, `qc`, `fmp4`, `monitor` and `play` take the
 first of another codec, so a Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD
 alone is refused by `transcode`, `fmp4`, `monitor` and `play`, and read by `qc`. The layouts
@@ -1593,8 +1599,8 @@ Everything above takes PCM. These five take an already-encoded AC-3/E-AC-3 eleme
 | `transcode` | Decode and re-encode. The only one here that re-encodes, because DD+ and DD are different codecs and nothing else bridges them — the route to an optical link or an AC-3-only HDMI sink, which had no route at all before. It also goes between AC-4 and AC-3 or E-AC-3, either way — see [below](#transcode-and-ac-4) |
 | `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs (a TrueHD stream takes the `truehd-` options of its [channel meaning](#truehd-and-mlp) instead). The audio bytes are copied through untouched. A field the stream does not transmit is refused, naming `insert`; with `insert` an E-AC-3 stream gets the field added to every independent substream, and each syncframe that gains one grows by a word or two (the rate rises by about 16 bits a frame at most). An AC-3 stream cannot take it, nor can a frame with block start information or auxiliary data |
 | `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else (for a TrueHD stream, [see below](#truehd-and-mlp)) |
-| `cut` | Extract on access-unit boundaries |
-| `cat` | Join streams end to end |
+| `cut` | Extract on access-unit boundaries (a TrueHD or MLP stream: from the first major sync at or after the start) |
+| `cat` | Join streams end to end (TrueHD or MLP: each input must open with a major sync and match in shape) |
 
 ```bash
 forge transcode programme.ec3 programme.ac3 448
